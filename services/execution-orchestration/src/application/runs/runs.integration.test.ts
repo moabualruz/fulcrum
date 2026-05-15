@@ -77,8 +77,7 @@ describe("application runs commands and queries", () => {
   test("cross-org run access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
-    em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    /* flushed */
+    await em.save(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
     const other = await dispatchRun(em, ctx(OTHER_ORG_ID), { agentName: "codex" });
     await expect(getRun(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);
   });

@@ -172,9 +172,8 @@ function isMissingNotificationRuleColumns(error: unknown): boolean {
   const candidate = error as { cause?: unknown; code?: unknown; message?: unknown };
   const message = String(candidate.message ?? "");
   if (
-    (candidate.code === "42703" || message.includes("does not exist")) &&
-    (message.includes("notification_rules") || message.includes("n0")) &&
-    message.includes("user_id")
+    (candidate.code === "42703" || candidate.code === "42P01" || message.includes("does not exist")) &&
+    (message.includes("notification_rules") || message.includes("n0"))
   ) {
     return true;
   }

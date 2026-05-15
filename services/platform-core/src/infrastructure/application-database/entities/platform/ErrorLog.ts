@@ -31,6 +31,9 @@ export class ErrorLog {
   occurredAt!: Date;
 
   @Column({ type: "varchar", nullable: true })
+  environment?: string;
+
+  @Column({ type: "varchar", nullable: true })
   os?: string;
 
   @Column({ type: "varchar", nullable: true })
@@ -42,8 +45,14 @@ export class ErrorLog {
   @Column({ type: "varchar", name: "fulcrum_version", nullable: true })
   fulcrumVersion?: string;
 
-  @Column({ type: "text", name: "recent_cli_command", nullable: true })
+  @Column({ type: "varchar", name: "app_version", nullable: true })
+  appVersion?: string;
+
+  @Column({ type: "varchar", name: "recent_cli_command", nullable: true })
   recentCliCommand?: string;
+
+  @Column({ type: "varchar", name: "recent_route", nullable: true })
+  recentRoute?: string;
 
   @Column({ type: "varchar", name: "recent_trpc_procedure", nullable: true })
   recentTrpcProcedure?: string;

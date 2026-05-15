@@ -236,6 +236,21 @@ export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<Te
     (em as any)._mikroCreatePatched = true;
   }
 
+  // Wrap em.save() to remove saved entities from __pendingPersist so drainPersist
+  // doesn't re-insert them (overwriting raw SQL updates that happened after create).
+  if (!(em as any)._savePatched) {
+    const origSave = em.save.bind(em);
+    (em as any).save = async (...args: unknown[]) => {
+      const result = await origSave(...(args as [any, any]));
+      const pending: unknown[] = (em as any).__pendingPersist || [];
+      const savedEntity = args.length >= 2 ? args[1] : args[0];
+      const idx = pending.indexOf(savedEntity);
+      if (idx !== -1) pending.splice(idx, 1);
+      return result;
+    };
+    (em as any)._savePatched = true;
+  }
+
   return {
     ds,
     em: em as EntityManager,

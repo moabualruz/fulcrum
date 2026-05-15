@@ -71,6 +71,7 @@ export async function saveSearch(
   if (existing) {
     existing.queryJson = paramsToQueryJson(input.params);
     existing.updatedAt = new Date();
+    await em.save(existing);
     return;
   }
   const view = em.create(SavedView, {

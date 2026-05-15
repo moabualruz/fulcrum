@@ -85,7 +85,7 @@ describe("interface REST interface parity", () => {
     db = await createTestOrm();
     const { orgId, projectId } = await createOrgProjectAndSession(db);
     const ctx: AppContext = { orgId, userId: db.seed.userId, projectId: null };
-    const task = await createTask(db.em, ctx, {
+    const created = await createTask(db.em, ctx, {
       projectId,
       title: "REST parity task",
       status: "todo",
@@ -97,6 +97,6 @@ describe("interface REST interface parity", () => {
       title: string;
     }>;
 
-    expect(tasks.find((row) => row.id === task.id)).toMatchObject({ title: "REST parity task" });
+    expect(tasks.find((row) => row.id === created.id)).toMatchObject({ title: "REST parity task" });
   });
 });

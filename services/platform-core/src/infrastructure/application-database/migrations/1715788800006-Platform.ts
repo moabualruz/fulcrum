@@ -372,13 +372,19 @@ export class Platform1715788800006 implements MigrationInterface {
     // skill_conflicts
     await queryRunner.query(`
       CREATE TABLE "skill_conflicts" (
-        "id"         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        "slug"       varchar NOT NULL,
-        "kind"       varchar NOT NULL,
-        "status"     varchar NOT NULL DEFAULT 'open',
-        "audit_note" text,
-        "created_at" timestamptz NOT NULL DEFAULT now(),
-        "updated_at" timestamptz NOT NULL DEFAULT now()
+        "id"                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        "slug"                varchar NOT NULL,
+        "kind"                varchar NOT NULL,
+        "status"              varchar NOT NULL DEFAULT 'open',
+        "local_hash"          varchar,
+        "upstream_hash"       varchar,
+        "base_hash"           varchar,
+        "expected_sha256"     varchar,
+        "actual_sha256"       varchar,
+        "suggested_resolution" text,
+        "audit_note"          text,
+        "created_at"          timestamptz NOT NULL DEFAULT now(),
+        "updated_at"          timestamptz NOT NULL DEFAULT now()
       )
     `);
   }

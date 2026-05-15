@@ -8,7 +8,8 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { DataSource, type DataSourceOptions, Repository } from "typeorm";
-import { PGliteDriver } from "typeorm-pglite";
+import { PGlite } from "@electric-sql/pglite";
+import { EventEmitter } from "events";
 
 import { createDataSourceOptions } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { SchemaMigration } from "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts";
@@ -28,21 +29,68 @@ const MIGRATIONS_PATH = join(process.cwd(), "services/platform-core/src/infrastr
 const DESTRUCTIVE_DOWN_SQL = /\b(drop\s+table|drop\s+column)\b/i;
 const LOSSY_FLAG = /static\s+(?:readonly\s+)?isLossy\s*=\s*true\b/;
 
+/** Build an isolated in-memory PGlite driver (no shared singleton). */
+function buildIsolatedPgDriver(): { driverClass: unknown; close: () => Promise<void> } {
+  let instance: PGlite | null = null;
+  async function getInstance(): Promise<PGlite> {
+    if (!instance) instance = await PGlite.create();
+    return instance;
+  }
+  class IsolatedPool extends EventEmitter {
+    doneCallback() {}
+    async connect(callback: Function) {
+      try { await getInstance(); callback(null, this, this.doneCallback); }
+      catch (error) { callback(error, null, this.doneCallback); }
+    }
+    async query(sqlQuery: string, queryParameters?: unknown, callback?: Function) {
+      const pg = await getInstance();
+      let cb = callback, params = queryParameters as unknown[];
+      if (typeof queryParameters === "function") { cb = queryParameters as Function; params = undefined as unknown as unknown[]; }
+      const hasParams = params !== undefined && Array.isArray(params) && params.length > 0;
+      let finalSql = sqlQuery;
+      if (hasParams && sqlQuery.includes("?")) {
+        let idx = 0;
+        finalSql = sqlQuery.replace(/\?/g, () => `$${++idx}`);
+      }
+      const queryPromise = hasParams
+        ? pg.query(finalSql, params as unknown[])
+        : pg.exec(finalSql).then((r: unknown[]) => (r as Array<{ rows: unknown[] }>)[r.length - 1] || { rows: [] });
+      return queryPromise
+        .then((results: unknown) => { if (cb) cb(null, results); return results; })
+        .catch((error: unknown) => { if (cb) cb(error, null); throw error; });
+    }
+    end(errorCallback: Function) {
+      if (instance) {
+        instance.close().then(() => { instance = null; errorCallback(null); }).catch((e: unknown) => errorCallback(e));
+      } else { errorCallback(null); }
+    }
+  }
+  return {
+    driverClass: class { static Pool = IsolatedPool; },
+    close: async () => { if (instance) { await instance.close(); instance = null; } },
+  };
+}
+
 async function buildDs(): Promise<DataSource> {
-  const driver = new PGliteDriver().driver;
+  const { driverClass, close } = buildIsolatedPgDriver();
+  const opts = createDataSourceOptions([], {});
   const ds = new DataSource({
-    ...createDataSourceOptions([], {}),
-    driver,
+    ...opts,
+    driver: driverClass,
     logging: false,
+    installExtensions: false,
   } as DataSourceOptions);
+  // Store close fn so ds.destroy() also closes the isolated PGlite
+  const origDestroy = ds.destroy.bind(ds);
+  ds.destroy = async () => { await origDestroy(); await close(); };
   await ds.initialize();
   return ds;
 }
 
-function buildService(
+async function buildService(
   ds: DataSource,
   options: import("@platform-core/infrastructure/application-database/migrator-service.ts").MigratorServiceOptions = {},
-): MigratorService {
+): Promise<MigratorService> {
   const schemaMigrationRepo = new (class {
     constructor(private readonly inner: Repository<SchemaMigration>) {}
   })(ds.getRepository(SchemaMigration)) as unknown as import("@platform-core/infrastructure/application-database/repositories/SchemaMigrationRepository.ts").SchemaMigrationRepository;

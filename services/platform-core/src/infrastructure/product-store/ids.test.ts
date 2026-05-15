@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { newUlid, testUlid } from "../../../services/platform-core/src/infrastructure/product-store/ids.ts";
+import { newUlid, testUlid } from "./ids.ts";
 
 const realDateNow = Date.now;
 const realGetRandomValues = crypto.getRandomValues.bind(crypto);

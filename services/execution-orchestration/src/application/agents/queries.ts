@@ -240,7 +240,22 @@ export interface MaskedProfileRow {
 /** Mask secret values and reshape a raw profile row for the UI. */
 export function maskProfile(row: AgentProfileRow): MaskedProfileRow {
   const auth_env: Record<string, string> = {};
-  const vars: string[] = Array.isArray(row.auth_env_vars) ? row.auth_env_vars : [];
+  let rawVars = row.auth_env_vars;
+  // PGlite raw SQL may return PostgreSQL text[] as a string like '{KEY=val,KEY2=val2}'
+  if (typeof rawVars === "string") {
+    const s = (rawVars as string).trim();
+    rawVars = s.startsWith("{") && s.endsWith("}")
+      ? s.slice(1, -1).split(",").map((v) => v.replace(/^"|"$/g, "").replace(/\\"/g, '"')).filter(Boolean)
+      : [];
+  }
+  // TypeORM simple-array may wrap PG text[] in a single-element array like ['{KEY=val}']
+  if (Array.isArray(rawVars) && rawVars.length === 1 && typeof rawVars[0] === "string") {
+    const s = (rawVars[0] as string).trim();
+    if (s.startsWith("{") && s.endsWith("}")) {
+      rawVars = s.slice(1, -1).split(",").map((v) => v.replace(/^"|"$/g, "").replace(/\\"/g, '"')).filter(Boolean);
+    }
+  }
+  const vars: string[] = Array.isArray(rawVars) ? rawVars : [];
   for (const entry of vars) {
     const eq = (entry as string).indexOf("=");
     if (eq === -1) {

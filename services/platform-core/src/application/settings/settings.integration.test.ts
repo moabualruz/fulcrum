@@ -100,7 +100,7 @@ describe("settings commands and queries with migrated PGlite data", () => {
     expect((await listSettingsSecrets(em, appCtx)).credentials).toHaveLength(0);
 
     await em.getConnection().execute(
-      `INSERT INTO error_logs (org_id, user_id, error_message, stack_trace, context, os, fulcrum_version, occurred_at)
+      `INSERT INTO error_logs (org_id, user_id, error_message, stack_trace, context, environment, app_version, occurred_at)
        VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?),
               (?, ?, ?, ?, ?::jsonb, ?, ?, ?)`,
       [
