@@ -121,7 +121,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "symphony:lock",    cmd: ["bun", "test", "tests/execution-orchestration/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
     { name: "symphony:conformance", cmd: ["bun", "test", "services/execution-orchestration/src/infrastructure/agent-runtime/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
     { name: "trpc:permissions", cmd: ["bun", "test", "apps/server/src/trpc/__tests__/app-router-scaffold.test.ts", "apps/server/src/trpc/__tests__/router.test.ts"], tier: "unit", domain: "api" },
-    { name: "application:unit",  cmd: ["bun", "test", "--test-name-pattern", "^(?!.*PGlite socket)", "services"], tier: "unit", domain: "application" },
+    { name: "application:unit",  cmd: ["bun", "test", "--test-name-pattern", "^(?!.*PGlite socket)", "services"], tier: "unit", domain: "application", env: { FULCRUM_REPO_DIR: process.cwd() } },
     { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
     { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
     { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
