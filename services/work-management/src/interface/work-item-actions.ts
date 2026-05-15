@@ -1,4 +1,5 @@
 import type { EntityManager } from "typeorm";
+import type { SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
 
 import type {
   CreateTaskInput,
@@ -20,11 +21,7 @@ export const TASK_STATUSES: readonly TaskStatus[] = [
   "cancelled",
 ] as const;
 
-type SqlExecutorLike = {
-  query<T = unknown>(sql: string, params?: readonly unknown[]): Promise<T[]>;
-};
-
-type TaskActionHandle = EntityManager | { em?: EntityManager } | SqlExecutorLike;
+type TaskActionHandle = EntityManager | { em?: EntityManager } | SqlExecutor;
 
 export async function createTaskAction(
   db: TaskActionHandle,

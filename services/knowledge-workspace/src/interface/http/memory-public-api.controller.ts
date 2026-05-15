@@ -47,8 +47,10 @@ import { MemoryPublicStore } from "@knowledge-workspace/infrastructure/database/
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, MEMORY_KINDS, MEMORY_IMPORTANCE, MEMORY_SOURCE, PublicMemoryKind, PublicMemoryImportance, PublicMemorySource } from "./dto/memory.dto.ts";
-export { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, PublicMemoryKind, PublicMemoryImportance, PublicMemorySource };
+import { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, MEMORY_KINDS, MEMORY_IMPORTANCE, MEMORY_SOURCE } from "./dto/memory.dto.ts";
+import type { PublicMemoryKind, PublicMemoryImportance, PublicMemorySource } from "./dto/memory.dto.ts";
+export { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto };
+export type { PublicMemoryKind, PublicMemoryImportance, PublicMemorySource };
 
 export const MEMORY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.memoryPublicApi.options");
 

@@ -37,8 +37,10 @@ import { TaskPublicStore } from "@work-management/infrastructure/database/task-p
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { TaskListQueryDto, TaskRequestContextDto, TaskManualWorkbenchQueryDto, TaskIdParamsDto, TaskCreateBodyDto, TaskPatchBodyDto, TaskDependenciesBodyDto, TaskParentBodyDto, TaskCsvExportQueryDto, TaskCsvImportBodyDto, TASK_STATUSES, PublicTaskStatus } from "./dto/task.dto.ts";
-export { TaskListQueryDto, TaskRequestContextDto, TaskManualWorkbenchQueryDto, TaskIdParamsDto, TaskCreateBodyDto, TaskPatchBodyDto, TaskDependenciesBodyDto, TaskParentBodyDto, TaskCsvExportQueryDto, TaskCsvImportBodyDto, PublicTaskStatus };
+import { TaskListQueryDto, TaskRequestContextDto, TaskManualWorkbenchQueryDto, TaskIdParamsDto, TaskCreateBodyDto, TaskPatchBodyDto, TaskDependenciesBodyDto, TaskParentBodyDto, TaskCsvExportQueryDto, TaskCsvImportBodyDto, TASK_STATUSES } from "./dto/task.dto.ts";
+import type { PublicTaskStatus } from "./dto/task.dto.ts";
+export { TaskListQueryDto, TaskRequestContextDto, TaskManualWorkbenchQueryDto, TaskIdParamsDto, TaskCreateBodyDto, TaskPatchBodyDto, TaskDependenciesBodyDto, TaskParentBodyDto, TaskCsvExportQueryDto, TaskCsvImportBodyDto };
+export type { PublicTaskStatus };
 
 export const TASK_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.taskPublicApi.options");
 

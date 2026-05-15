@@ -32,8 +32,10 @@ import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/fe
 import { SprintPublicStore } from "@work-management/infrastructure/database/sprint-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 
-import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, SprintStatus } from "./dto/sprint.dto.ts";
-export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, SprintStatus };
+import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto } from "./dto/sprint.dto.ts";
+import type { SprintStatus } from "./dto/sprint.dto.ts";
+export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto };
+export type { SprintStatus };
 
 export const SPRINT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.sprintPublicApi.options");
 

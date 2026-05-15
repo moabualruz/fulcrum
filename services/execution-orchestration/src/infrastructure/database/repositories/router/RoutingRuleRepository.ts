@@ -57,7 +57,7 @@ export class RoutingRuleRepository {
 
   create(data?: DeepPartial<RoutingRule>): RoutingRule {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.routingRules.create(data as any);
+    return this.routingRules.create(data as any) as unknown as RoutingRule;
   }
 
   save(entity: RoutingRule): Promise<RoutingRule> {

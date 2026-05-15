@@ -33,8 +33,10 @@ import { SavedViewPublicStore } from "@work-management/infrastructure/database/s
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto, SAVED_VIEW_SCOPES, SAVED_VIEW_TYPES, PublicSavedViewScope, PublicSavedViewType } from "./dto/saved-view.dto.ts";
-export { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto, PublicSavedViewScope, PublicSavedViewType };
+import { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto, SAVED_VIEW_SCOPES, SAVED_VIEW_TYPES } from "./dto/saved-view.dto.ts";
+import type { PublicSavedViewScope, PublicSavedViewType } from "./dto/saved-view.dto.ts";
+export { SavedViewListQueryDto, CreateSavedViewBodyDto, SavedViewIdParamsDto, PatchSavedViewBodyDto };
+export type { PublicSavedViewScope, PublicSavedViewType };
 
 export const SAVED_VIEW_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.savedViewPublicApi.options");
 

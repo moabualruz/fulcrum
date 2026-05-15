@@ -17,7 +17,7 @@ export class EventRepository {
 
   create(data?: DeepPartial<Event>): Event {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.events.create(data as any);
+    return this.events.create(data as any) as unknown as Event;
   }
 
   save(entity: Event): Promise<Event> {
