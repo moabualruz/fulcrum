@@ -111,6 +111,7 @@ describe("tool-output-router", () => {
     expect(stdout).toContain(`bytes=${big.length}`);
   });
 
+  test("file-redirect tier — huge Bash output saved to file", async () => {
     const huge = "x".repeat(5000);
     const env = {
       tool_name: "Bash",
