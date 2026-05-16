@@ -22,6 +22,10 @@ function makeMockEm(tasks: unknown[] = [], existingCache: unknown = null) {
     persistAndFlush: async (entity: unknown) => {
       persisted.push(entity);
     },
+    save: async (entity: unknown) => {
+      persisted.push(entity);
+      return entity;
+    },
     flush: async () => {},
     upserted,
     persisted,

@@ -32,6 +32,8 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
+    "@nestjs/microservices": "11.1.21",
+    "@nestjs/websockets": "11.1.21",
     "@playwright/test": "1.59.1",
     "@readme/openapi-parser": "6.1.0",
     "@types/bun": "latest",
