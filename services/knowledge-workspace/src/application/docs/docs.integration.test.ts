@@ -91,12 +91,12 @@ describe("application docs commands and queries", () => {
     await expect(getDoc(testDb.em, ctx(), "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).rejects.toBeInstanceOf(AppNotFoundError);
   });
 
-  test("cross-org doc access throws AppForbiddenError", async () => {
+  test("cross-org doc access throws AppNotFoundError", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
     await em.save(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
 
     const other = await createDoc(em, ctx(OTHER_ORG_ID), { title: "Other doc" });
-    await expect(getDoc(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);
+    await expect(getDoc(em, ctx(), other.id)).rejects.toBeInstanceOf(AppNotFoundError);
   });
 });
