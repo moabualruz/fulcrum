@@ -6,6 +6,7 @@ import { createConnectorApiCallerFromEnv } from "@integration-hub/interface/http
 import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";
 import { createNotificationApiCallerFromEnv } from "@notification-center/interface/http/notification-api-client.ts";
 import { createAuditApiClientFromEnv } from "@workflow-coordination/interface/http/audit-api-client.ts";
+import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
 
 export type Pillar14Domain = "runs" | "notify" | "audit" | "webhooks" | "connectors" | "flags";
 
@@ -21,7 +22,23 @@ export interface Pillar14RunOptions {
 type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
 
 const HELP: Record<Pillar14Domain, string> = {
-  runs: "fulcrum runs <list|show|cancel|retry|logs|attach> [--json]",
+  runs: `fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs|attach> [--json]
+
+Subcommands:
+  list [--status <status>]                          List runs
+  show <run-id>                                     Show run detail
+  cancel <run-id>                                   Cancel a run
+  retry <run-id>                                    Retry a failed run
+  dispatch --task <id> [--project <id>] [--agent <name>] [--preview]
+                                                    Dispatch a dependency-aware run (--preview for dry-run)
+  preview --task <id> [--project <id>] [--mode <mode>]
+                                                    Preview dependency tree before dispatching
+  feed [--project <id>] [--run <id>] [--task <id>] [--watch]
+                                                    Live feedback from running dependency executions
+  worker-tick --project <id> [--trace <id>] [--worker <id>]
+                                                    Claim and execute one queued dependency-run worker job
+  logs <run-id> [--follow]                          Show run transcript logs
+  attach <run-id>                                   Attach to a running run (follow logs)`,
   notify: "fulcrum notify <list|mark-read|mark-all-read|mute|watch> [--unread] [--json]",
   audit: "fulcrum audit <query|export|retention> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
@@ -76,15 +93,21 @@ export async function runPillar14Command(
 async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io) {
   const runsCaller = caller.agent_runs ?? caller.runs;
   const orchestrationCaller = caller.orchestration;
+  const depCaller = caller.dependencyExecution;
   if (sub === "list") {
     const status = optionValue(argv, "--status");
-    const result = await runsCaller.list(status ? { status } : undefined);
+    const projectId = optionValue(argv, "--project");
+    const stateFilter = optionValue(argv, "--state") ?? status;
+    const result = await runsCaller.list(compact({
+      status: stateFilter,
+      projectId,
+    }));
     emitJson(result, io);
     return;
   }
-  if (sub === "show") {
+  if (sub === "show" || sub === "status") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
-    requireValue(id, "runs show: missing run id");
+    requireValue(id, `runs ${sub}: missing run id`);
     const run = await runsCaller.get({ id });
     if (!run) {
       emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
@@ -109,9 +132,94 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
     requireValue(taskId, "runs dispatch: missing --task");
     const agentName = optionValue(argv, "--agent");
+    const projectId = optionValue(argv, "--project");
+
+    // --preview flag: show dependency tree without dispatching
+    if (hasFlag(argv, "--preview")) {
+      requireDependencyExecution(depCaller, "runs dispatch --preview");
+      emitJson(await depCaller.previewDependencyRun(compact({
+        mode: "dependency-tree",
+        targetTaskIds: [taskId],
+        projectId,
+      })), io);
+      return;
+    }
+
+    // Prefer dependency-aware dispatch when depCaller is available and projectId is given
+    if (depCaller && projectId) {
+      emitJson(await depCaller.dispatchDependencyRun(compact({
+        workspaceId: "", // filled by server from org context
+        workspaceSlug: "",
+        workspaceName: "",
+        projectId,
+        projectSlug: "",
+        projectName: "",
+        mode: "dependency-aware",
+        agent: agentName ?? "default",
+        targetTaskIds: [taskId],
+      })), io);
+      return;
+    }
+
+    // Fallback to standard dispatch
     const dispatch = orchestrationCaller?.dispatchRun ?? runsCaller?.dispatch;
     if (!dispatch) throw new Error("runs dispatch: orchestration.dispatchRun is unavailable");
-    emitJson(await dispatch({ taskId, agentName }), io);
+    emitJson(await dispatch(compact({ taskId, agentName, projectId })), io);
+    return;
+  }
+  if (sub === "preview") {
+    const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
+    requireValue(taskId, "runs preview: missing --task <id>");
+    const projectId = optionValue(argv, "--project");
+    const mode = optionValue(argv, "--mode") ?? "dependency-tree";
+    requireDependencyExecution(depCaller, "runs preview");
+    emitJson(await depCaller.previewDependencyRun(compact({
+      mode,
+      targetTaskIds: [taskId],
+      projectId,
+    })), io);
+    return;
+  }
+  if (sub === "feed") {
+    const projectId = optionValue(argv, "--project");
+    requireValue(projectId, "runs feed: missing --project <id>");
+    requireDependencyExecution(depCaller, "runs feed");
+    const runId = optionValue(argv, "--run");
+    const taskId = optionValue(argv, "--task");
+    const traceId = optionValue(argv, "--trace");
+    const watch = hasFlag(argv, "--watch");
+    const input = compact({ projectId, runId, taskId, traceId });
+
+    if (watch) {
+      // Poll until executor is inactive
+      const POLL_MS = 1000;
+      const MAX_WAIT_MS = 300_000;
+      const start = Date.now();
+      while (Date.now() - start < MAX_WAIT_MS) {
+        const feedback = await depCaller.loadDependencyRunLiveFeedback(input);
+        emitJson(feedback, io);
+        const status = feedback as { executorStatus?: { active?: boolean } };
+        if (!status.executorStatus?.active) break;
+        await new Promise((r) => setTimeout(r, POLL_MS));
+      }
+    } else {
+      emitJson(await depCaller.loadDependencyRunLiveFeedback(input), io);
+    }
+    return;
+  }
+  if (sub === "worker-tick") {
+    const projectId = optionValue(argv, "--project");
+    requireValue(projectId, "runs worker-tick: missing --project <id>");
+    requireDependencyExecution(depCaller, "runs worker-tick");
+    const traceId = optionValue(argv, "--trace");
+    const workerId = optionValue(argv, "--worker");
+    const runGroupId = optionValue(argv, "--run-group");
+    emitJson(await depCaller.runDependencyRunWorkerTick(compact({
+      projectId,
+      traceId,
+      runGroupId,
+      workerId,
+    })), io);
     return;
   }
   if (sub === "watch") {
@@ -142,6 +250,14 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     return;
   }
   unknown("runs", sub, io);
+}
+
+function requireDependencyExecution(depCaller: any, command: string): asserts depCaller {
+  if (!depCaller) {
+    throw new Error(
+      `${command}: dependency execution API unavailable. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.`,
+    );
+  }
 }
 
 /**
@@ -428,7 +544,7 @@ function positional(argv: readonly string[]): string[] {
   const values: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]!;
-    if (arg === "--json" || arg === "--watch" || arg === "--unread") continue;
+    if (arg === "--json" || arg === "--watch" || arg === "--unread" || arg === "--preview" || arg === "--follow") continue;
     if (arg.startsWith("--")) {
       i += 1;
       continue;
@@ -436,6 +552,10 @@ function positional(argv: readonly string[]): string[] {
     values.push(arg);
   }
   return values;
+}
+
+function compact(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
 function dateOption(argv: readonly string[], flag: string): Date | undefined {
@@ -464,6 +584,7 @@ async function resolveCaller(opts: Pillar14RunOptions): Promise<any> {
   const connectorApiCaller = createConnectorApiCallerFromEnv(opts.env, opts.fetch);
   const notificationApiCaller = createNotificationApiCallerFromEnv(opts.env, opts.fetch);
   const webhookApiCaller = createWebhookApiCallerFromEnv(opts.env, opts.fetch);
+  const workflowApiCaller = createWorkflowApiCallerFromEnv(opts.env, opts.fetch);
   const resolved = {
     ...caller,
     ...(agentRunApiCaller ? {
@@ -477,6 +598,7 @@ async function resolveCaller(opts: Pillar14RunOptions): Promise<any> {
     ...(connectorApiCaller ? { connectors: connectorApiCaller.connectors } : {}),
     ...(notificationApiCaller ? { notify: notificationApiCaller.notify } : {}),
     ...(webhookApiCaller ? { webhooks: webhookApiCaller.webhooks } : {}),
+    ...(workflowApiCaller ? { dependencyExecution: workflowApiCaller.tasks } : {}),
   };
   if (!hasConfiguredCaller(resolved)) {
     throw new Error(
@@ -495,6 +617,7 @@ function hasConfiguredCaller(caller: Record<string, unknown>): boolean {
       caller["audit"] ||
       caller["webhooks"] ||
       caller["connectors"] ||
-      caller["flags"],
+      caller["flags"] ||
+      caller["dependencyExecution"],
   );
 }

@@ -33,7 +33,7 @@ Usage:
   fulcrum docs template list [--json]
   fulcrum symphony runs list --state ready [--json]
   fulcrum agents <list|profile|test> [--json]
-  fulcrum runs <list|show|cancel|retry|logs> [--json]
+  fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs> [--json]
   fulcrum notify list [--unread] [--json|--watch]
   fulcrum settings <list|get|set> [--json]
   fulcrum memory <list|get|add|delete|search|promote> [--json]
