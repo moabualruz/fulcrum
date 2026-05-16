@@ -606,7 +606,7 @@ async function resolveParent(
 }
 
 async function requireDoc(em: EntityManager, orgId: string, docId: string): Promise<Document> {
-  const doc = await em.findOne(Document, { where: { org: { id: orgId }, id: docId, archived: false } as never });
+  const doc = await em.findOne(Document, { where: { org: { id: orgId }, id: docId, archived: false } as never, relations: ["org"] });
   if (!doc) {
     throw new AppNotFoundError("Document not found.");
   }

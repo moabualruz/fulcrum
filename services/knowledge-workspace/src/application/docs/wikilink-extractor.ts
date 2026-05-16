@@ -35,7 +35,7 @@ export async function syncDocWikilinks(
   const slugs = extractWikilinkSlugs(contentJson);
   const existing = await em.find(DocLink, { where: {
     org: { id: orgId },
-    fromDoc: fromDoc.id,
+    fromDoc: { id: fromDoc.id },
     linkKind: "wikilink",
   } as never, relations: ["toDoc"] });
   const wanted = new Set(slugs);

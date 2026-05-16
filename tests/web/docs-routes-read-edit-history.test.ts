@@ -78,6 +78,9 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
   await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url text`);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_json jsonb NOT NULL DEFAULT '{}'::jsonb`);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS context_summary text`);
+  await db.query(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS archived boolean NOT NULL DEFAULT false`);
+  await db.query(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS entity_kind text NOT NULL DEFAULT 'doc'`);
+  await db.query(`ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS entity_id text`);
   await db.query(
     `CREATE TABLE IF NOT EXISTS doc_links (
       id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -286,15 +289,15 @@ describe("docs read/edit/history routes", () => {
     const db = await openIsolatedStore(join(dbDir(), "main"));
     await migrateIsolatedStore(db);
     try {
-      const rows = await db.query<{ body: string; latest: number }>(
-        `SELECT d.body, max(v.version_num)::int AS latest
+      const rows = await db.query<{ body_md: string; latest: number }>(
+        `SELECT d.body_md, max(v.version_num)::int AS latest
            FROM documents d
            JOIN doc_versions v ON v.doc_id = d.id AND v.org_id = d.org_id
           WHERE d.id = $1
-          GROUP BY d.body`,
+          GROUP BY d.body_md`,
         [docId],
       );
-      expect(rows[0]).toEqual({ body: "First body", latest: 3 });
+      expect(rows[0]).toEqual({ body_md: "First body", latest: 3 });
     } finally {
       await db.close();
     }
