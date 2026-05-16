@@ -10,6 +10,22 @@ import { Task } from "@work-management/infrastructure/database/entities/tasks/Ta
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
+function createMapContainer(): DiContainer {
+  const bindings = new Map<unknown, unknown>();
+  return {
+    get: (token: unknown) => {
+      if (bindings.has(token)) return bindings.get(token) as never;
+      throw new Error(`Token not found in container: ${String(token)}`);
+    },
+    has: (token: unknown) => bindings.has(token),
+    bind: (binding: unknown) => {
+      const b = binding as { provide?: unknown; useValue?: unknown };
+      if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+    },
+  };
+}
 
 const createCaller = t.createCallerFactory(appRouter);
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -33,7 +49,7 @@ function mockSession() {
 }
 
 function callerFor(em: EntityManager) {
-  const container = null;
+  const container = createMapContainer();
   container.bind({
     provide: RoutingRuleRepository,
     useValue: em.getRepository(RoutingRule) as RoutingRuleRepository,

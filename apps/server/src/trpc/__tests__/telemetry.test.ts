@@ -5,6 +5,7 @@ import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { TelemetryStore, writeTelemetryEvent } from "@fulcrum/server/trpc/routers/telemetry.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -64,6 +65,21 @@ class SharedMemoryTelemetryStore extends MemoryTelemetryStore {
   }
 }
 
+function createMapContainer(): DiContainer {
+  const bindings = new Map<unknown, unknown>();
+  return {
+    get: (token: unknown) => {
+      if (bindings.has(token)) return bindings.get(token) as never;
+      throw new Error(`Token not found in container: ${String(token)}`);
+    },
+    has: (token: unknown) => bindings.has(token),
+    bind: (binding: unknown) => {
+      const b = binding as { provide?: unknown; useValue?: unknown };
+      if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+    },
+  };
+}
+
 const createCaller = t.createCallerFactory(appRouter);
 let store: MemoryTelemetryStore;
 
@@ -83,7 +99,7 @@ function session() {
 }
 
 function caller(nextStore = store) {
-  const container = null;
+  const container = createMapContainer();
   container.bind({ provide: TelemetryStore, useValue: nextStore });
 
   return createCaller(
