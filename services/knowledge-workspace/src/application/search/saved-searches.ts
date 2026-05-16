@@ -188,6 +188,6 @@ export async function deleteSavedSearch(
     throw new AppForbiddenError("Only the saved search creator can delete it.");
   }
   const em = requireEntityManager(ctx);
-  em.remove(view);
+  await em.remove(view);
   return { ok: true };
 }

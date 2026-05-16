@@ -193,12 +193,6 @@ async function handleMetricsRollup(
     };
   }
 
-  const maybePersistAndFlush = (em as unknown as { persistAndFlush?: (entity: unknown) => Promise<void> }).persistAndFlush;
-  if (maybePersistAndFlush) {
-    await maybePersistAndFlush.call(em, row);
-    return;
-  }
-
   await em.save(row as never);
 }
 

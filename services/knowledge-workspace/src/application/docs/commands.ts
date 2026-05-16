@@ -102,11 +102,7 @@ export async function restoreDocVersionById(
     author: ctx.userId ?? null,
     restoreOf: versionId,
   } as never);
-  if ("persistAndFlush" in em && typeof em.persistAndFlush === "function") {
-    await em.persistAndFlush(newVersion as never);
-  } else {
-    await em.save(newVersion as never);
-  }
+  await em.save(newVersion as never);
   return { id: newVersion.id, versionNum: nextVersionNum, restoredFromVersionId: versionId };
 }
 

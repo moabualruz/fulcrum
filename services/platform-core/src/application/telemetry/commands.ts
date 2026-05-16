@@ -105,7 +105,7 @@ export class MikroTelemetryStore extends TelemetryStore {
   async purge(orgId = this.context.orgId): Promise<number> {
     const em = this.em();
     const rows = await em.find(TelemetryEvent, { org: { id: orgId } } as never);
-    em.remove(rows);
+    await em.remove(rows);
     return rows.length;
   }
 

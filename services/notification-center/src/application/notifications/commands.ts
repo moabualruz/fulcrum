@@ -250,7 +250,7 @@ export async function deleteNotificationRule(
   id: string,
 ): Promise<{ ok: true }> {
   const row = await em.findOne(NotificationRule, { where: { id, org: { id: ctx.orgId }, userId: ctx.userId } as never });
-  if (row) em.remove(row);
+  if (row) await em.remove(row);
   await writeNotificationOutboxEvent(em, {
     orgId: ctx.orgId,
     verb: "notification.rule_deleted",

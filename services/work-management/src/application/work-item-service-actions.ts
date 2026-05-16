@@ -91,12 +91,12 @@ interface TaskScopeRow {
 }
 
 function assertEm(db: DbHandle) {
-  if ("persist" in db && typeof (db as { persist: unknown }).persist === "function") {
+  if ("save" in db && typeof (db as { save: unknown }).save === "function") {
     return db as EntityManager;
   }
   if ("em" in db) {
     const em = (db as { em?: unknown }).em;
-    if (em && typeof (em as { persist?: unknown }).persist === "function") {
+    if (em && typeof (em as { save?: unknown }).save === "function") {
       return em as EntityManager;
     }
   }

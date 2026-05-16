@@ -220,7 +220,7 @@ export class WorkItemCommentService {
   async unsubscribe(orgId: string, taskId: string, userId: string): Promise<void> {
     const watcher = await this.em.findOne(TaskWatcher, { where: { taskId, userId } as never });
     if (watcher) {
-      this.em.remove(watcher);
+      await this.em.remove(watcher);
     }
   }
 
@@ -353,10 +353,10 @@ export class WorkItemCommentService {
       org: { id: orgId },
     } as never });
     for (const reply of replies) {
-      this.em.remove(reply);
+      await this.em.remove(reply);
     }
 
-    this.em.remove(comment);
+    await this.em.remove(comment);
   }
 
   async resolveComment(
@@ -427,7 +427,7 @@ export class WorkItemCommentService {
       emoji,
     } as never });
     if (reaction) {
-      this.em.remove(reaction);
+      await this.em.remove(reaction);
     }
   }
 }

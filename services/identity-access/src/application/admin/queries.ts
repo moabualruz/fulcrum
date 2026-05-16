@@ -232,7 +232,7 @@ class MikroErrorLogStore extends ErrorLogStore {
     const { LessThan } = await import("typeorm");
     const where = input.before ? { org: { id: orgId }, occurredAt: LessThan(input.before) } : { org: { id: orgId } };
     const rows = await this.repo().find({ where: where as never });
-    em.remove(rows);
+    await em.remove(rows);
     return rows.length;
   }
 }

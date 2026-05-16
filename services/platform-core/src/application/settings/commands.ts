@@ -257,6 +257,6 @@ export async function toggleSettingsTelemetryOptIn(em: EntityManager, ctx: AppCo
 
 export async function purgeSettingsTelemetry(em: EntityManager, ctx: AppContext): Promise<{ success: true; rowCount: 0 }> {
   const rows = await em.find(TelemetryEvent, { org: { id: ctx.orgId } } as never);
-  em.remove(rows);
+  await em.remove(rows);
   return { success: true as const, rowCount: 0 as const };
 }

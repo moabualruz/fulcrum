@@ -102,7 +102,7 @@ export async function upgradeAllWebSkills(scope: SkillsWebScope): Promise<SkillR
 export async function uninstallWebSkill(scope: SkillsWebScope, slug: string): Promise<void> {
   const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, slug);
-  em.remove(skill);
+  await em.remove(skill);
 }
 
 export async function updateWebSkillEnabledAgents(

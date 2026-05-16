@@ -90,7 +90,7 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, orgId, id);
     if (!sprint) return null;
     const output = serializeSprint(sprint);
-    this.em.remove(sprint);
+    await this.em.remove(sprint);
     return output;
   }
 

@@ -41,7 +41,7 @@ export async function syncDocWikilinks(
   const wanted = new Set(slugs);
 
   for (const link of existing) {
-    if (!wanted.has(link.toSlug)) em.remove(link);
+    if (!wanted.has(link.toSlug)) await em.remove(link);
   }
 
   for (const slug of slugs) {

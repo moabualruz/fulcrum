@@ -134,7 +134,7 @@ export async function deleteWebhook(
 ): Promise<{ ok: true }> {
   const webhook = await em.findOne(Webhook, { where: { id, org: { id: ctx.orgId } } as never });
   if (!webhook) throw new AppNotFoundError("Webhook not found.");
-  em.remove(webhook);
+  await em.remove(webhook);
   return { ok: true };
 }
 

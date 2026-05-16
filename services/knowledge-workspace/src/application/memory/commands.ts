@@ -79,6 +79,6 @@ export async function deleteMemory(
   id: string,
 ): Promise<{ deleted: true }> {
   const memory = await findMemoryOrThrow(em, ctx.orgId, id);
-  em.remove(memory);
+  await em.remove(memory);
   return { deleted: true };
 }

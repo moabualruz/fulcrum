@@ -124,12 +124,7 @@ export class MemoryService {
       tags: data.tags ?? [],
       sourceRef: data.sourceRef ?? {},
     } as never);
-    if (typeof em.persistAndFlush === "function") {
-      // MikroORM-style compat path (used in unit tests)
-      await em.persistAndFlush(memory);
-    } else {
-      await (this.repo.manager as any).save(memory);
-    }
+    await em.save(memory);
     return memory;
   }
 

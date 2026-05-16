@@ -34,10 +34,6 @@ export interface WebhookDispatcherEntityManager {
   find<T>(entity: { new (...args: never[]): T }, where: unknown): Promise<T[]>;
   create<T>(entity: { new (...args: never[]): T }, data: Partial<T>): T;
   save<T>(entity: T): Promise<T>;
-  /** @deprecated MikroORM compat — use save() */
-  persist?(entity: unknown): void;
-  /** @deprecated MikroORM compat — use save() */
-  flush?(): Promise<void>;
 }
 
 type DispatchableWebhook = Webhook & {
