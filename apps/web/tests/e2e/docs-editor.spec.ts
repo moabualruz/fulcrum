@@ -20,9 +20,9 @@ test.describe("Docs Editor Workflow", () => {
     const firstDoc = page.locator("[data-doc-tree] a").first();
     if (await firstDoc.isVisible()) {
       await firstDoc.click();
-      await page.locator("[data-doc-edit-link]").click();
+      await page.locator("[data-doc-edit]").click();
       await expect(page.locator("[data-doc-editor]")).toBeVisible();
-      await expect(page.locator("[data-editor-toolbar]")).toBeVisible();
+      await expect(page.locator("[data-doc-editor-toolbar]")).toBeVisible();
     }
   });
 
@@ -52,7 +52,7 @@ test.describe("Docs Editor Workflow", () => {
     if (await firstDoc.isVisible()) {
       await firstDoc.click();
       await page.locator("[data-doc-history]").click();
-      await expect(page.locator("[data-version-timeline]")).toBeVisible();
+      await expect(page.locator("[data-doc-history-view]")).toBeVisible();
     }
   });
 
