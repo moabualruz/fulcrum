@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { run } from "./inference.ts";
 import type { InferenceClient } from "@platform-core/application/inference/client.ts";
 import type { HealthResult } from "@platform-core/application/inference/protocol.ts";
 import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
 const health: HealthResult = { status: "ok", backends: ["embedded"], models: [] };
 const cache = {
@@ -262,7 +262,15 @@ describe("fulcrum inference CLI", () => {
 
   test("local inference client resolves token binding before class token", async () => {
     const cap = capture();
-    const container = new Container();
+    const bindings = new Map<unknown, unknown>();
+    const container: DiContainer = {
+      get: (token: unknown) => bindings.get(token) as never,
+      has: (token: unknown) => bindings.has(token),
+      bind: (binding: unknown) => {
+        const b = binding as { provide?: unknown; useValue?: unknown };
+        if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+      },
+    };
     container.bind({
       provide: INFERENCE_CLIENT_TOKEN,
       useValue: {

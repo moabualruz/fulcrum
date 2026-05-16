@@ -99,6 +99,10 @@ function permissionFromMetaOrPath(meta: TrpcProcedureMeta | undefined, path: str
 let _cachedEnforcer: { svc: any; createdAt: number } | null = null;
 const ENFORCER_TTL_MS = 60_000;
 
+export function __resetCachedEnforcerForTest(): void {
+  _cachedEnforcer = null;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getCachedEnforcerService(AdapterCtor: any, EnforcerCtor: any, casbinRepo: any): any {
   const now = Date.now();

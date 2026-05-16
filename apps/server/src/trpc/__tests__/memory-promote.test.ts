@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Session } from "better-auth";
+import type { EntityManager } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -26,7 +27,7 @@ function mockSession(): Session {
   } as unknown as Session;
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: EntityManager) {
   return createCaller(createContext({
     session: mockSession(),
     orgId: ORG_ID,

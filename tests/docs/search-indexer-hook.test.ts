@@ -25,7 +25,7 @@ function mockSession(userId: string, orgId: string): Session {
   } as unknown as Session;
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: import("typeorm").EntityManager) {
   return createCaller(
     createContext({
       session: mockSession(USER_ID, ORG_ID),
@@ -37,7 +37,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
   );
 }
 
-async function installP11SearchColumns(em: import("@mikro-orm/postgresql").EntityManager) {
+async function installP11SearchColumns(em: import("typeorm").EntityManager) {
   await em.getConnection().execute(`
     ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS project_id uuid NULL;
     ALTER TABLE search_documents ADD COLUMN IF NOT EXISTS source_kind text;
@@ -55,7 +55,7 @@ async function installP11SearchColumns(em: import("@mikro-orm/postgresql").Entit
   `);
 }
 
-async function searchRow(em: import("@mikro-orm/postgresql").EntityManager, docId: string) {
+async function searchRow(em: import("typeorm").EntityManager, docId: string) {
   const rows = await em.getConnection().execute<Array<{
     source_kind: string | null;
     source_id: string | null;

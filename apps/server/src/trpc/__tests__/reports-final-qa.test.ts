@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { __setReportsApplicationForTest } from "@fulcrum/server/trpc/routers/reports.ts";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type {
   AppContext,
   ApplyConfiguredUatCodeReviewDecisionInput,

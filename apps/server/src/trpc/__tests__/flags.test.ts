@@ -10,16 +10,13 @@
  *   6. Unauthenticated caller on flags.list → UNAUTHORIZED.
  *
  * Per C6: NO raw SQL strings.
- * Per C7: MikroORM v7 fork() + em.persist/flush pattern.
+ * Per C7: TypeORM EntityManager via createTestOrm() with MikroORM compat shims.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
@@ -39,10 +36,7 @@ const TEST_USER_ID = "00000000-0000-4000-8000-000000000010";
 const TEST_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000011";
 const OTHER_USER_ID = "00000000-0000-4000-8000-000000000020";
 
-let orm: MikroORM;
-let pglite: PGlite;
-let flagRegistry: FlagRegistry;
-let container: Container;
+let testOrm: TestOrm;
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -63,7 +57,7 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em;
+  const em = testOrm.em;
   const flagRepo = em.getRepository(FeatureFlag) as FeatureFlagRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
@@ -74,7 +68,7 @@ function makeCaller(userId: string, orgId: string) {
     session: session as unknown as import("better-auth").Session,
     orgId,
     userId,
-    em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+    em,
     container: (() => {
       const c = null;
       c.bind({ provide: FeatureFlagRepository, useValue: flagRepo });
@@ -89,14 +83,14 @@ function makeCaller(userId: string, orgId: string) {
 
 function makeCallerWithoutContainer(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em;
+  const em = testOrm.em;
 
   return createCaller(
     createContext({
       session: session as unknown as import("better-auth").Session,
       orgId,
       userId,
-      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em,
       container: null,
     }),
   );
@@ -115,21 +109,9 @@ function unauthCaller() {
 }
 
 beforeAll(async () => {
-  pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
+  testOrm = await createTestOrm();
 
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [FeatureFlag, FeatureFlagRollout, Org, User, OrgMember],
-    debug: false,
-  });
-
-  await orm.schema.create();
-
-  // Seed with a forked EM
-  const seedEm = orm.em;
-
+  const seedEm = testOrm.em;
   const now = new Date();
 
   const org = seedEm.create(Org, {
@@ -213,13 +195,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
-  if (pglite) await pglite.close();
+  await destroyTestOrm();
 });
 
 beforeEach(async () => {
   // Wipe feature flags between tests
-  const em = orm.em;
+  const em = testOrm.em;
   await em.nativeDelete(FeatureFlagRollout, {});
   await em.nativeDelete(FeatureFlag, {});
   delete process.env["FULCRUM_FEATURES"];
@@ -289,7 +270,7 @@ describe("flags.set — owner/admin", () => {
     const result = await caller.flags.set({ flag: "router-llm", enabled: true });
     expect(result.ok).toBe(true);
 
-    const em = orm.em;
+    const em = testOrm.em;
     const orgFlag = await em.findOne(FeatureFlag, { where: {
       orgId: TEST_ORG_ID,
       userId: null,
@@ -345,7 +326,7 @@ describe("flags.set — owner/admin", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
 
-    const em = orm.em;
+    const em = testOrm.em;
     const foreignFlag = await em.findOne(FeatureFlag, { where: {
       orgId: OTHER_ORG_ID,
       userId: null,
@@ -371,7 +352,7 @@ describe("flags.set — owner/admin", () => {
     expect(error).not.toBeNull();
     expect(error?.code).toBe("FORBIDDEN");
 
-    const em = orm.em;
+    const em = testOrm.em;
     const foreignUserFlag = await em.findOne(FeatureFlag, { where: {
       orgId: TEST_ORG_ID,
       userId: OTHER_USER_ID,

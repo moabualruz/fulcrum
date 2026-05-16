@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { MikroORM, type EntityManager } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
+import type { EntityManager } from "typeorm";
 import { TRPCError } from "@trpc/server";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
@@ -24,8 +23,7 @@ const OTHER_USER_ID = "00000000-0000-4000-8000-000000000011";
 const TASK_ID = "00000000-0000-4000-8000-000000000020";
 const OTHER_TASK_ID = "00000000-0000-4000-8000-000000000021";
 
-let orm: MikroORM;
-let pglite: PGlite;
+let testOrm: TestOrm;
 
 const createCaller = t.createCallerFactory(notificationsRouter);
 
@@ -44,7 +42,7 @@ function session(userId = USER_ID, orgId = ORG_ID) {
   };
 }
 
-function caller(em: EntityManager = orm.em, userId = USER_ID, orgId = ORG_ID) {
+function caller(em: EntityManager = testOrm.em, userId = USER_ID, orgId = ORG_ID) {
   return createCaller(
     createContext({
       session: session(userId, orgId) as unknown as import("better-auth").Session,
@@ -129,30 +127,15 @@ async function seedNotification(em: EntityManager, input: {
 }
 
 beforeAll(async () => {
-  pglite = new PGlite();
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: new PGliteKyselyDialect(() => pglite),
-    entities: [
-      Org,
-      User,
-      Event,
-      Notification,
-      NotificationRule,
-      NotificationMute,
-      NotificationQuietHours,
-    ],
-  });
-  await orm.schema.create();
+  testOrm = await createTestOrm();
 });
 
 afterAll(async () => {
-  await orm.close(true);
-  await pglite.close();
+  await destroyTestOrm();
 });
 
 beforeEach(async () => {
-  const em = orm.em;
+  const em = testOrm.em;
   await em.nativeDelete(NotificationQuietHours, {});
   await em.nativeDelete(NotificationMute, {});
   await em.nativeDelete(NotificationRule, {});
@@ -160,7 +143,7 @@ beforeEach(async () => {
   await em.nativeDelete(Event, {});
   await em.nativeDelete(User, {});
   await em.nativeDelete(Org, {});
-  await seedBase(orm.em);
+  await seedBase(testOrm.em);
 });
 
 describe("notifications router", () => {
@@ -175,7 +158,7 @@ describe("notifications router", () => {
   });
 
   it("lists caller notifications with unread filter and pagination", async () => {
-    const em = orm.em;
+    const em = testOrm.em;
     const older = await seedNotification(em, { title: "Older", createdAt: new Date("2026-05-02T12:00:00.000Z") });
     await seedNotification(em, { title: "Read", readAt: new Date("2026-05-03T12:00:00.000Z") });
     const newer = await seedNotification(em, { title: "Newer", createdAt: new Date("2026-05-04T12:00:00.000Z") });
@@ -190,7 +173,7 @@ describe("notifications router", () => {
   });
 
   it("marks notifications read and decrements unread count", async () => {
-    const em = orm.em;
+    const em = testOrm.em;
     const notification = await seedNotification(em);
     await seedNotification(em, { title: "Second" });
 
@@ -203,8 +186,8 @@ describe("notifications router", () => {
   });
 
   it("clears all unread notifications with markAllRead", async () => {
-    await seedNotification(orm.em);
-    await seedNotification(orm.em, { title: "Second" });
+    await seedNotification(testOrm.em);
+    await seedNotification(testOrm.em, { title: "Second" });
 
     expect(await caller().markAllRead()).toEqual({ count: 2 });
     expect(await caller().unreadCount()).toEqual({ count: 0 });
@@ -253,7 +236,7 @@ describe("notifications router", () => {
     expect(mute).toMatchObject({ subjectKind: "task", subjectId: TASK_ID, mutedUntil });
 
     await expect(caller().unmute({ subjectKind: "task", subjectId: TASK_ID })).resolves.toEqual({ ok: true });
-    const rows = await orm.em.find(NotificationMute, { userId: USER_ID });
+    const rows = await testOrm.em.find(NotificationMute, { userId: USER_ID });
     expect(rows).toHaveLength(0);
   });
 
@@ -280,12 +263,12 @@ describe("notifications router", () => {
   });
 
   it("does not mark another subject or org notification as read", async () => {
-    const own = await seedNotification(orm.em, { taskId: TASK_ID });
-    const other = await seedNotification(orm.em, { taskId: OTHER_TASK_ID });
+    const own = await seedNotification(testOrm.em, { taskId: TASK_ID });
+    const other = await seedNotification(testOrm.em, { taskId: OTHER_TASK_ID });
 
     await caller().markRead({ id: own.id });
 
-    const otherRow = await orm.em.findOneOrFail(Notification, { id: other.id });
+    const otherRow = await testOrm.em.findOneOrFail(Notification, { id: other.id });
     expect(otherRow.readAt).toBeNull();
   });
 });

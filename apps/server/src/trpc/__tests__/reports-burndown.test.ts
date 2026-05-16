@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
+import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { createTestOrm } from "@test-support/application-database.ts";
@@ -32,7 +32,7 @@ function mockSession() {
   };
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: EntityManager) {
   const container = null;
   const repo = em.getRepository(Task) as TaskRepository;
   container.bind({ provide: TaskRepository, useValue: repo });
@@ -42,7 +42,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
       session: mockSession() as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em,
       container,
     }),
   );
@@ -50,7 +50,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
 
 /** Insert task via raw SQL (MikroORM lazy fields don't persist via em.create). */
 async function insertTask(
-  em: import("@mikro-orm/postgresql").EntityManager,
+  em: EntityManager,
   opts: { sprintId: string; points: number; status?: string; title?: string },
 ): Promise<void> {
   await em.getConnection().execute(

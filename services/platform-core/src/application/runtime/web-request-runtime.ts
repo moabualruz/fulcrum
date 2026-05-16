@@ -62,9 +62,18 @@ export async function createDefaultWebRuntime(): Promise<WebRuntime> {
     createRequestContext: () => {
       // TypeORM EntityManager is not forked — share the manager from DataSource.
       const requestEm = orm.manager;
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { Container } = require("@needle-di/core") as { Container: new () => DiContainer };
-      const container = new Container();
+      const bindings = new Map<unknown, unknown>();
+      const container: DiContainer = {
+        get: (token: unknown) => {
+          if (bindings.has(token)) return bindings.get(token) as never;
+          throw new Error(`Token not found in container: ${String(token)}`);
+        },
+        has: (token: unknown) => bindings.has(token),
+        bind: (binding: unknown) => {
+          const b = binding as { provide?: unknown; useValue?: unknown };
+          if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+        },
+      };
       return { em: requestEm, container };
     },
   };

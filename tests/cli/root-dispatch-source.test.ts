@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { DataSource } from "typeorm";
 import { resolveClientAssetPath, run, buildDbContainer } from "../../apps/cli/src/index.ts";
 
 const originalExit = process.exit;
@@ -154,12 +154,12 @@ describe("root CLI source dispatch", () => {
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-db-container-"));
 
     const { container, cleanup } = await buildDbContainer();
-    const orm = container.get(MikroORM);
+    const ds = container.get(DataSource);
 
-    expect(await orm.em.getConnection().execute("SELECT 1 AS ok")).toEqual([{ ok: 1 }]);
+    expect(await ds.query("SELECT 1 AS ok")).toEqual([{ ok: 1 }]);
 
     await cleanup();
-    expect(await orm.isConnected()).toBe(false);
+    expect(ds.isInitialized).toBe(false);
   });
 
   test("web command validates the real build artifact before serving", async () => {
@@ -169,7 +169,7 @@ describe("root CLI source dispatch", () => {
 
     const { container, cleanup } = await buildDbContainer();
     try {
-      await container.get(MikroORM).migrator.up();
+      await container.get(DataSource).runMigrations();
     } finally {
       await cleanup();
     }

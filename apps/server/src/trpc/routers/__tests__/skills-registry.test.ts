@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";

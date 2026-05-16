@@ -26,7 +26,7 @@ function mockSession(): Session {
   } as unknown as Session;
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: import("typeorm").EntityManager) {
   return createCaller(createContext({
     session: mockSession(),
     orgId: ORG_ID,

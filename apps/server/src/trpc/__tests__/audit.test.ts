@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
+import type { EntityManager } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -33,7 +33,7 @@ function mockSession(userId: string, orgId: string) {
   };
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager, userId: string) {
+function callerFor(em: EntityManager, userId: string) {
   return createCaller(
     createContext({
       session: mockSession(userId, ORG_ID) as unknown as import("better-auth").Session,
@@ -46,7 +46,7 @@ function callerFor(em: import("@mikro-orm/postgresql").EntityManager, userId: st
 }
 
 async function persistEvent(
-  em: import("@mikro-orm/postgresql").EntityManager,
+  em: EntityManager,
   input: {
     id: string;
     userId: string;

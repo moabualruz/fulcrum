@@ -5,7 +5,7 @@
  *   1. After SeedService.run(), sessionRepo.findOne({ user: { email: 'admin@local' } })
  *      returns a row (i.e., the seed planted a session with a valid userId mapping back
  *      to the admin user).
- *   2. AuthService is constructable + init()-able from the needle-di container.
+ *   2. AuthService is constructable + init()-able from the DI container.
  *   3. auth.handler returns a Response (not an unhandled throw) on GET /api/auth/session.
  *   4. MikroOrmBetterAuthAdapter can be instantiated with an EntityManager.
  *   5. Adapter CRUD: account model round-trips via DB (create → findOne → update → delete).
@@ -16,40 +16,25 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
-import { registerDbBindings, SessionRepository } from "@platform-core/infrastructure/application-database/db.module.ts";
-import { DEFAULT_ADMIN_PASSWORD, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { DEFAULT_ADMIN_PASSWORD } from "@platform-core/infrastructure/application-database/seed.ts";
 import { AuthService } from "@identity-access/application/auth/index.ts";
 import { MikroOrmBetterAuthAdapter } from "@identity-access/application/auth/adapter.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
-let orm: MikroORM;
-let container: Container;
+let db: TestOrm;
 let authService: AuthService;
 
 beforeAll(async () => {
-  const pglite = new PGlite();
-  orm = await MikroORM.init(createOrmConfig({ pglite }));
-  await orm.schema.create();
-
-  container = null;
-  registerDbBindings(container, orm);
+  db = await createTestOrm();
 
   // Register + init AuthService (async init required for flag check)
-  authService = new AuthService(orm.em);
+  authService = new AuthService(db.em);
   await authService.init();
-  container.bind({ provide: AuthService, useValue: authService });
-
-  // Run seed so admin@local + local org + session exist
-  const seed = new SeedService(orm.em);
-  await seed.run();
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
+  if (db) await db.close();
 });
 
 afterEach(() => {
@@ -63,7 +48,7 @@ afterEach(() => {
 
 describe("SeedService + SessionRepository integration", () => {
   it("sessionRepo.findOne returns a session for admin@local userId", async () => {
-    const em = orm.em;
+    const em = db.em;
 
     // Find user first (admin@local)
     const { User, Session } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
@@ -83,16 +68,14 @@ describe("SeedService + SessionRepository integration", () => {
 // ─────────────────────────────────────────────────────────────────
 
 describe("AuthService construction", () => {
-  it("AuthService is resolvable from needle-di container", () => {
-    const svc = container.get(AuthService);
-    expect(svc).toBeDefined();
-    expect(svc).toBeInstanceOf(AuthService);
+  it("AuthService is resolvable from DI container", () => {
+    expect(authService).toBeDefined();
+    expect(authService).toBeInstanceOf(AuthService);
   });
 
   it("AuthService exposes a handler property after init()", () => {
-    const svc = container.get(AuthService);
-    expect(svc.handler).toBeDefined();
-    expect(typeof svc.handler).toBe("function");
+    expect(authService.handler).toBeDefined();
+    expect(typeof authService.handler).toBe("function");
   });
 });
 
@@ -102,24 +85,21 @@ describe("AuthService construction", () => {
 
 describe("auth.handler GET /api/auth/session", () => {
   it("returns a Response object (not a throw) on unauthenticated GET /api/auth/get-session", async () => {
-    const svc = container.get(AuthService);
     // Better-Auth exposes /get-session (not /session)
     const request = new Request("http://localhost/api/auth/get-session", {
       method: "GET",
       headers: { "Content-Type": "application/json" },
     });
 
-    const response = await svc.handler(request);
+    const response = await authService.handler(request);
     expect(response).toBeInstanceOf(Response);
     // Unauthenticated get-session returns 200 with null session
     expect(response.status).toBe(200);
   });
 
   it("seeded local admin can sign in with admin@local and writes a session row", async () => {
-    const svc = container.get(AuthService);
-
     // Local-only dev fallback password; seed must create the matching credential account.
-    const response = await svc.handler(new Request("http://localhost/api/auth/sign-in/email", {
+    const response = await authService.handler(new Request("http://localhost/api/auth/sign-in/email", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -133,7 +113,7 @@ describe("auth.handler GET /api/auth/session", () => {
     expect(body.user?.email).toBe("admin@local");
     expect(typeof body.token).toBe("string");
 
-    const em = orm.em;
+    const em = db.em;
     const { Session } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
     const session = await em.findOne(Session, { id: body.token! });
     expect(session).not.toBeNull();
@@ -142,7 +122,7 @@ describe("auth.handler GET /api/auth/session", () => {
     const setCookie = response.headers.get("set-cookie");
     expect(setCookie).toContain(body.token!);
 
-    const sessionResponse = await svc.handler(new Request("http://localhost/api/auth/get-session", {
+    const sessionResponse = await authService.handler(new Request("http://localhost/api/auth/get-session", {
       method: "GET",
       headers: { cookie: setCookie ?? "" },
     }));
@@ -158,13 +138,13 @@ describe("auth.handler GET /api/auth/session", () => {
 
 describe("MikroOrmBetterAuthAdapter", () => {
   it("can be instantiated with EntityManager", () => {
-    const adapter = new MikroOrmBetterAuthAdapter(orm.em);
+    const adapter = new MikroOrmBetterAuthAdapter(db.em);
     expect(adapter).toBeDefined();
     expect(typeof adapter.createAdapter).toBe("function");
   });
 
   it("round-trips user and session models with joins, token aliases, sorting, updates, and deleteMany", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter() as any;
     const email = `adapter-user-${crypto.randomUUID()}@example.com`;
 
@@ -254,7 +234,7 @@ describe("MikroOrmBetterAuthAdapter", () => {
   });
 
   it("round-trips organization member and invitation models through DB-backed update/delete paths", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter() as any;
     const email = `adapter-member-${crypto.randomUUID()}@example.com`;
     const user = await adapter.create({ model: "user", data: { email, name: "Member User" } });
@@ -321,7 +301,7 @@ describe("MikroOrmBetterAuthAdapter", () => {
   });
 
   it("uses the in-memory fallback for unknown models with real Better Auth where operators", async () => {
-    const adapter = new MikroOrmBetterAuthAdapter(orm.em).createAdapter() as any;
+    const adapter = new MikroOrmBetterAuthAdapter(db.em).createAdapter() as any;
     await adapter.create({ model: "rateLimit", data: { id: "rl-1", key: "login:ada", attempts: 1, bucket: "auth" } });
     await adapter.create({ model: "rateLimit", data: { id: "rl-2", key: "login:grace", attempts: 3, bucket: "auth" } });
     await adapter.create({ model: "rateLimit", data: { id: "rl-3", key: "api:ada", attempts: 5, bucket: "api" } });
@@ -363,12 +343,12 @@ describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
   it("create/findOne/update/delete round-trip via DB", async () => {
     // Seed a user first so we have a valid userId
     const { User } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
-    const em = orm.em;
+    const em = db.em;
     const adminUser = await em.findOne(User, { email: "admin@local" });
     expect(adminUser).not.toBeNull();
     const userId = adminUser!.id;
 
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter();
 
     // CREATE
@@ -427,7 +407,7 @@ describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
 
 describe("MikroOrmBetterAuthAdapter — verification model (DB-backed)", () => {
   it("create/findOne/delete round-trip via DB", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter();
 
     const identifier = `test@example.com`;
@@ -485,7 +465,7 @@ describe("MikroOrmBetterAuthAdapter — verification model (DB-backed)", () => {
 
 describe("MikroOrmBetterAuthAdapter — member model DB completeness", () => {
   it("count returns a number (DB path, not in-memory)", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter();
 
     // Just verify count doesn't throw and returns a number
@@ -502,7 +482,7 @@ describe("MikroOrmBetterAuthAdapter — member model DB completeness", () => {
 
 describe("MikroOrmBetterAuthAdapter — invitation model DB completeness", () => {
   it("count returns a number (DB path, not in-memory)", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(orm.em);
+    const mikro = new MikroOrmBetterAuthAdapter(db.em);
     const adapter = mikro.createAdapter();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -522,7 +502,7 @@ describe("saas-auth flag gate", () => {
     const orig = process.env["FULCRUM_FLAG_SAAS_AUTH"];
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     const enabled = await svc.isSaasAuthEnabled();
     expect(enabled).toBe(false);
 
@@ -533,7 +513,7 @@ describe("saas-auth flag gate", () => {
     const orig = process.env["FULCRUM_FLAG_SAAS_AUTH"];
     process.env["FULCRUM_FLAG_SAAS_AUTH"] = "true";
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     const enabled = await svc.isSaasAuthEnabled();
     expect(enabled).toBe(true);
 

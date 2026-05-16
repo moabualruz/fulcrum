@@ -12,16 +12,13 @@
  *   8. orgs.members.remove last owner → BAD_REQUEST.
  *
  * Per C6: NO raw SQL strings.
- * Per C7: MikroORM v7 fork() + em.persist/flush pattern.
+ * Per C7: TypeORM EntityManager via createTestOrm() with MikroORM compat shims.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
@@ -40,7 +37,7 @@ const TEST_GUEST_ID = "9f9e0546-991b-44f5-a206-d1e3ead1db19";
 // Extra member for remove-last-owner test (second owner)
 const TEST_OWNER2_ID = "5249114a-448a-4a87-b27c-777348132275";
 
-let orm: MikroORM;
+let testOrm: TestOrm;
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -61,14 +58,14 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string = TEST_ORG_ID) {
   const session = mockSession(userId, orgId);
-  const em = orm.em;
+  const em = testOrm.em;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
   const ctx = createContext({
     session: session as unknown as import("better-auth").Session,
     orgId,
     userId,
-    em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+    em,
     container: (() => {
       const c = null;
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
@@ -86,19 +83,9 @@ function makeCaller(userId: string, orgId: string = TEST_ORG_ID) {
 }
 
 beforeAll(async () => {
-  const pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
+  testOrm = await createTestOrm();
 
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [Org, User, OrgMember],
-    debug: false,
-  });
-
-  await orm.schema.create();
-
-  const seedEm = orm.em;
+  const seedEm = testOrm.em;
   const now = new Date();
 
   const org = seedEm.create(Org, {
@@ -143,7 +130,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
+  await destroyTestOrm();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -272,7 +259,7 @@ describe("orgs.members.updateRole", () => {
     expect(result.ok).toBe(true);
 
     // Verify via DB
-    const em = orm.em;
+    const em = testOrm.em;
     const membership = await em.findOne(OrgMember, { where: {
       orgId: TEST_ORG_ID,
       userId: TEST_GUEST_ID,
@@ -303,7 +290,7 @@ describe("orgs.members.updateRole", () => {
 describe("orgs.members.remove", () => {
   it("owner can remove a member", async () => {
     // Add a temporary member to remove
-    const addEm = orm.em;
+    const addEm = testOrm.em;
     const tempUserId = "6e599624-560d-4858-b967-f1c2b015790f";
     const tempUser = addEm.create(User, {
       id: tempUserId,
@@ -327,7 +314,7 @@ describe("orgs.members.remove", () => {
     expect(result.ok).toBe(true);
 
     // Verify removed
-    const verifyEm = orm.em;
+    const verifyEm = testOrm.em;
     const membership = await verifyEm.findOne(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: tempUserId,
@@ -337,7 +324,7 @@ describe("orgs.members.remove", () => {
 
   it("admin can remove a member", async () => {
     // Add a temporary guest to remove
-    const addEm = orm.em;
+    const addEm = testOrm.em;
     const tempUserId = "6dfb8d86-5348-4c26-98ac-a1d05b9b8c17";
     const tempUser = addEm.create(User, {
       id: tempUserId,
@@ -397,7 +384,7 @@ describe("orgs.members.remove", () => {
     expect(error?.code).toBe("BAD_REQUEST");
 
     // Restore owner2
-    const restoreEm = orm.em;
+    const restoreEm = testOrm.em;
     const restoredMember = restoreEm.create(OrgMember, {
       userId: TEST_OWNER2_ID,
       orgId: TEST_ORG_ID,

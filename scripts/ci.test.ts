@@ -122,8 +122,8 @@ describe("ci STEPS — tRPC permission gate", () => {
     expect(step!.cmd).toEqual([
       "bun",
       "test",
-      "tests/trpc/app-router-scaffold.test.ts",
-      "tests/trpc/router.test.ts",
+      "apps/server/src/trpc/__tests__/app-router-scaffold.test.ts",
+      "apps/server/src/trpc/__tests__/router.test.ts",
     ]);
   });
 });
@@ -142,12 +142,12 @@ describe("ci STEPS — Phase 09 infrastructure gates", () => {
     expect(STEPS.find((s) => s.name === "migration:downgrade")?.cmd).toEqual([
       "bun",
       "test",
-      "tests/db/migration-downgrade.test.ts",
+      "services/platform-core/src/infrastructure/application-database/migration-downgrade.test.ts",
     ]);
     expect(STEPS.find((s) => s.name === "graceful:shutdown")?.cmd).toEqual([
       "bun",
       "test",
-      "tests/platform-core/platform-operations/shutdown-coordinator.test.ts",
+      "services/platform-core/src/application/platform-operations/shutdown-coordinator.test.ts",
     ]);
   });
 });

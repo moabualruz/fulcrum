@@ -3,6 +3,7 @@ import type { Session as BetterAuthSession } from "better-auth";
 
 import { AppUnauthorizedError } from "@platform-core/domain/errors.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -39,9 +40,14 @@ export async function buildCliTuiCallerContext(container: DiContainer | null): P
   try {
     const dataSource = container.get(DataSource);
     const em = dataSource.manager;
-    const { Container: NeedleDiContainer } = await import("@needle-di/core");
-    const requestContainer = new NeedleDiContainer() as unknown as DiContainer;
-    requestContainer.bind({ provide: DataSource, useValue: dataSource });
+    const requestContainer: DiContainer = {
+      get: (token: unknown) => {
+        if (token === DataSource) return dataSource as never;
+        throw new Error(`Token not found in container: ${String(token)}`);
+      },
+      has: (token: unknown) => token === DataSource,
+      bind: () => {},
+    };
     return { container: requestContainer, em };
   } catch {
     return { container, em: null };

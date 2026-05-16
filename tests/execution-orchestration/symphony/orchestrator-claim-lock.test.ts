@@ -9,110 +9,20 @@
  */
 
 import { afterAll, describe, expect, it } from "bun:test";
-import type { MigrationObject } from "@mikro-orm/core";
-import type { MikroORM, Options } from "@mikro-orm/postgresql";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
-import { Migrator } from "@mikro-orm/migrations";
-import { PGlite } from "@electric-sql/pglite";
+import type { EntityManager } from "typeorm";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
-import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
-import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
-import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
-import { Migration20260501130000_composite_indexes } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130000_composite_indexes.ts";
-import { Migration20260501130100_flag_stubs } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130100_flag_stubs.ts";
-import { Migration20260501140000_schema_migration_ledger } from "@platform-core/infrastructure/application-database/migrations/Migration20260501140000_schema_migration_ledger.ts";
-import { Migration20260501150000_account_verification } from "@platform-core/infrastructure/application-database/migrations/Migration20260501150000_account_verification.ts";
-import { Migration20260502000001_orchestration_workflow_definitions } from "@platform-core/infrastructure/application-database/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
-import { Migration20260502030300_agent_runs_symphony_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
-import { Migration20260502050000_routing_rules } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050000_routing_rules.ts";
-import { Migration20260502050200_skills_registry } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050200_skills_registry.ts";
-import { Migration20260502070100_docs_document_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070100_docs_document_columns.ts";
-import { Migration20260502070200_docs_related_tables } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070200_docs_related_tables.ts";
-import { Migration20260502070400_agent_runs_sandcastle_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
-import { Migration20260502090000_tasks_schema_extension } from "@platform-core/infrastructure/application-database/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import { claimRun, ClaimConflictError } from "@execution-orchestration/infrastructure/agent-runtime/symphony/orchestrator.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
-
-const CLAIM_MIGRATION_NAME = "Migration20260502090100_agent_runs_claimed_by";
-
-interface BlankOrm {
-  orm: MikroORM;
-  pglite: PGlite;
-  close: () => Promise<void>;
-}
-
-async function migrationsList(): Promise<MigrationObject[]> {
-  const migrations: MigrationObject[] = [
-    { name: "Migration20260501104413_auth", class: Migration20260501104413_auth },
-    { name: "Migration20260501120537_events_org_id_backfill", class: Migration20260501120537_events_org_id_backfill },
-    { name: "Migration20260501120538_events_org_id_notnull", class: Migration20260501120538_events_org_id_notnull },
-    { name: "Migration20260501130000_composite_indexes", class: Migration20260501130000_composite_indexes },
-    { name: "Migration20260501130100_flag_stubs", class: Migration20260501130100_flag_stubs },
-    { name: "Migration20260501140000_schema_migration_ledger", class: Migration20260501140000_schema_migration_ledger },
-    { name: "Migration20260501150000_account_verification", class: Migration20260501150000_account_verification },
-    { name: "Migration20260502000001_orchestration_workflow_definitions", class: Migration20260502000001_orchestration_workflow_definitions },
-    { name: "Migration20260502030300_agent_runs_symphony_columns", class: Migration20260502030300_agent_runs_symphony_columns },
-    { name: "Migration20260502050000_routing_rules", class: Migration20260502050000_routing_rules },
-    { name: "Migration20260502050200_skills_registry", class: Migration20260502050200_skills_registry },
-    { name: "Migration20260502070100_docs_document_columns", class: Migration20260502070100_docs_document_columns },
-    { name: "Migration20260502070200_docs_related_tables", class: Migration20260502070200_docs_related_tables },
-    { name: "Migration20260502070400_agent_runs_sandcastle_columns", class: Migration20260502070400_agent_runs_sandcastle_columns },
-    { name: "Migration20260502090000_tasks_schema_extension", class: Migration20260502090000_tasks_schema_extension },
-  ];
-
-  try {
-    const mod = await import(
-      "@platform-core/infrastructure/application-database/migrations/Migration20260502090100_agent_runs_claimed_by.ts"
-    );
-    migrations.push({ name: CLAIM_MIGRATION_NAME, class: mod[CLAIM_MIGRATION_NAME] });
-  } catch (error) {
-    const message = String((error as { message?: unknown }).message ?? error);
-    if (!message.includes("Cannot find module")) throw error;
-  }
-
-  return migrations;
-}
-
-async function buildBlankOrm(): Promise<BlankOrm> {
-  const pglite = new PGlite();
-  const config = createOrmConfig({ pglite });
-
-  config.migrations = {
-    ...((config.migrations ?? {}) as NonNullable<Options["migrations"]>),
-    transactional: false,
-    allOrNothing: false,
-    snapshot: false,
-    migrationsList: await migrationsList(),
-  };
-  config.extensions = [Migrator];
-
-  const orm = await MikroORMRuntime.init(config);
-  return {
-    orm,
-    pglite,
-    close: async () => {
-      await orm.close(true);
-      await (pglite as { close?: () => Promise<void> }).close?.();
-    },
-  };
-}
-
-async function buildMigratedOrm(): Promise<BlankOrm> {
-  const db = await buildBlankOrm();
-  await db.orm.migrator.up();
-  await new SeedService(db.orm.em).run();
-  return db;
-}
 
 function mockSession() {
   return {
@@ -130,9 +40,8 @@ function mockSession() {
 }
 
 async function seedUnclaimedRun(
-  orm: MikroORM,
+  em: EntityManager,
 ): Promise<{ taskId: string; runId: string }> {
-  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const task = em.create(Task, {
@@ -162,9 +71,8 @@ async function seedUnclaimedRun(
 }
 
 async function seedDuplicateUnclaimedRuns(
-  orm: MikroORM,
+  em: EntityManager,
 ): Promise<{ taskId: string; runIds: [string, string] }> {
-  const em = orm.em;
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const task = em.create(Task, {
@@ -208,22 +116,22 @@ async function seedDuplicateUnclaimedRuns(
 }
 
 describe("claimRun — claim-lock state machine", () => {
-  let lastDb: BlankOrm | undefined;
+  let lastDb: TestOrm | undefined;
 
   afterAll(async () => {
     await lastDb?.close();
   });
 
   it("transitions unclaimed → claimed and emits a state_changed event", async () => {
-    lastDb = await buildMigratedOrm();
-    const { taskId, runId } = await seedUnclaimedRun(lastDb.orm);
+    lastDb = await createTestOrm();
+    const { taskId, runId } = await seedUnclaimedRun(lastDb.em);
 
-    const result = await claimRun(lastDb.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+    const result = await claimRun(lastDb.em, DEFAULT_ORG_ID, taskId, "instance-A");
 
     expect(result.runId).toBe(runId);
 
     // Verify DB state: run is now claimed
-    const em = lastDb.orm.em;
+    const em = lastDb.em;
     const run = await em.findOneOrFail(AgentRun, { id: runId });
     expect(run.orchestrationState).toBe("claimed");
 
@@ -238,17 +146,17 @@ describe("claimRun — claim-lock state machine", () => {
   });
 
   it("throws ClaimConflictError when run is already claimed", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId } = await seedUnclaimedRun(db.orm);
+      const { taskId } = await seedUnclaimedRun(db.em);
 
       // First claim succeeds
-      await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+      await claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-A");
 
       // Second claim on same task → ClaimConflictError
       let caught: unknown;
       try {
-        await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-B");
+        await claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-B");
       } catch (error) {
         caught = error;
       }
@@ -260,15 +168,15 @@ describe("claimRun — claim-lock state machine", () => {
   });
 
   it("claims one duplicate unclaimed run instead of updating the whole task set", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId, runIds } = await seedDuplicateUnclaimedRuns(db.orm);
+      const { taskId, runIds } = await seedDuplicateUnclaimedRuns(db.em);
 
-      const result = await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+      const result = await claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-A");
 
       expect(result.runId).toBe(runIds[0]);
 
-      const em = db.orm.em;
+      const em = db.em;
       const claimed = await em.find(AgentRun, {
         task: taskId,
         orchestrationState: "claimed",
@@ -286,23 +194,23 @@ describe("claimRun — claim-lock state machine", () => {
   });
 
   it("rolls back claimed state when state_changed event insert fails", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId, runId } = await seedUnclaimedRun(db.orm);
-      await db.orm.em.getConnection().execute(
+      const { taskId, runId } = await seedUnclaimedRun(db.em);
+      await db.em.getConnection().execute(
         `alter table "events" add constraint "events_reject_state_changed_test" check ("verb" <> 'state_changed')`,
       );
 
       let caught: unknown;
       try {
-        await claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A");
+        await claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-A");
       } catch (error) {
         caught = error;
       }
 
       expect(caught).toBeDefined();
 
-      const em = db.orm.em;
+      const em = db.em;
       const run = await em.findOneOrFail(AgentRun, { id: runId });
       const events = await em.find(Event, {
         subjectKind: "agent_run",
@@ -318,13 +226,13 @@ describe("claimRun — claim-lock state machine", () => {
   });
 
   it("parallel claims: exactly one succeeds, one throws ClaimConflictError; events has exactly one row", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId, runId } = await seedUnclaimedRun(db.orm);
+      const { taskId, runId } = await seedUnclaimedRun(db.em);
 
       const results = await Promise.allSettled([
-        claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-A"),
-        claimRun(db.orm.em, DEFAULT_ORG_ID, taskId, "instance-B"),
+        claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-A"),
+        claimRun(db.em, DEFAULT_ORG_ID, taskId, "instance-B"),
       ]);
 
       const fulfilled = results.filter((r) => r.status === "fulfilled");
@@ -337,7 +245,7 @@ describe("claimRun — claim-lock state machine", () => {
       ).toBeInstanceOf(ClaimConflictError);
 
       // Events table must have exactly one state_changed row after both settle
-      const em = db.orm.em;
+      const em = db.em;
       const events = await em.find(Event, {
         subjectKind: "agent_run",
         subjectId: runId,
@@ -350,12 +258,12 @@ describe("claimRun — claim-lock state machine", () => {
   });
 
   it("claimRun on non-existent taskId throws ClaimConflictError", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
       let caught: unknown;
       try {
         await claimRun(
-          db.orm.em,
+          db.em,
           DEFAULT_ORG_ID,
           "99000000-0000-0000-0000-000000000001",
           "instance-A",
@@ -372,15 +280,15 @@ describe("claimRun — claim-lock state machine", () => {
 
 describe("orchestration.claimRun tRPC procedure", () => {
   it("is callable by authenticated callers and returns runId", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId, runId } = await seedUnclaimedRun(db.orm);
+      const { taskId, runId } = await seedUnclaimedRun(db.em);
       const caller = createCaller(
         createContext({
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );
@@ -398,16 +306,16 @@ describe("orchestration.claimRun tRPC procedure", () => {
   });
 
   it("tRPC procedure returns ClaimConflictError as CONFLICT when already claimed", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const { taskId } = await seedUnclaimedRun(db.orm);
+      const { taskId } = await seedUnclaimedRun(db.em);
 
       const callerA = createCaller(
         createContext({
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );
@@ -422,7 +330,7 @@ describe("orchestration.claimRun tRPC procedure", () => {
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-claim-lock-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );

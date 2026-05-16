@@ -16,11 +16,11 @@ async function writeRunner(dir: string): Promise<string> {
     runner,
     `
 import { PGlite } from ${JSON.stringify(moduleUrl("node_modules/@electric-sql/pglite/dist/index.js"))};
-import { Container } from ${JSON.stringify(moduleUrl("node_modules/@needle-di/core/dist/index.js"))};
-import { MikroORM } from ${JSON.stringify(moduleUrl("node_modules/@mikro-orm/postgresql/index.js"))};
+import { DataSource } from ${JSON.stringify(moduleUrl("node_modules/typeorm/index.mjs"))};
+import { EventEmitter } from "node:events";
 
-import { PGliteKyselyDialect } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/PGliteKyselyDriver.ts"))};
-import { ENTITY_MANAGER_TOKEN } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/db.module.ts"))};
+import { getCoreEntities } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/typeorm.config.ts"))};
+import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/database/typeorm-data-source.ts"))};
 import { Org } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/Org.ts"))};
 import {
   Account,
@@ -31,7 +31,6 @@ import {
   User,
 } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/index.ts"))};
 import { SeedService } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.ts"))};
-import { registerSeedBindings } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.module.ts"))};
 import { NotificationRule } from ${JSON.stringify(moduleUrl("services/notification-center/src/infrastructure/database/entities/notifications/NotificationRule.ts"))};
 
 const dbDir = process.argv[2];
@@ -39,55 +38,83 @@ if (!dbDir) throw new Error("missing db dir");
 
 const pglite = new PGlite(dbDir);
 await pglite.waitReady;
-const dialect = new PGliteKyselyDialect(() => pglite);
-const orm = await MikroORM.init({
-  dbName: "postgres",
-  driverOptions: dialect,
-  entities: [Org, User, Session, Invitation, OrgMember, FeatureFlag, Account, NotificationRule],
-  debug: false,
+
+class EphemeralPool extends EventEmitter {
+  constructor() { super(); this.setMaxListeners(100); this.on("error", () => {}); }
+  doneCallback() {}
+  async connect(callback) {
+    try { callback(null, this, this.doneCallback); }
+    catch (error) { callback(error, null, this.doneCallback); }
+  }
+  async query(sqlQuery, queryParameters, callback) {
+    let cb = callback, params = queryParameters;
+    if (typeof queryParameters === "function") { cb = queryParameters; params = undefined; }
+    const hasParams = params !== undefined && Array.isArray(params) && params.length > 0;
+    let finalSql = sqlQuery;
+    if (hasParams && sqlQuery.includes("?")) {
+      let idx = 0;
+      finalSql = sqlQuery.replace(/\\?/g, () => "$" + (++idx));
+    }
+    const queryPromise = hasParams
+      ? pglite.query(finalSql, params)
+      : pglite.exec(finalSql).then((r) => r[r.length - 1] || { rows: [] });
+    return queryPromise
+      .then((results) => { if (cb) cb(null, results); return results; })
+      .catch((error) => { if (cb) cb(error, null); throw error; });
+  }
+  end(errorCallback) {
+    pglite.close().then(() => errorCallback(null)).catch((e) => errorCallback(e));
+  }
+}
+const driver = class { static Pool = EphemeralPool; };
+
+const ds = new DataSource({
+  type: "postgres",
+  driver,
+  entities: getCoreEntities(),
+  migrations: [
+    ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/migrations"))} + "/*.ts",
+  ],
+  migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+  synchronize: false,
+  installExtensions: false,
+  logging: false,
 });
 
 try {
-  await orm.schema.create();
-  const container = null;
-  container.bind({
-    provide: ENTITY_MANAGER_TOKEN,
-    useValue: orm.em,
-  });
-  registerSeedBindings(container);
+  await ds.initialize();
+  await ds.runMigrations({ transaction: "none" });
 
-  const seed = container.get(SeedService);
+  const seed = new SeedService(ds.manager);
   const first = await seed.run();
-  const afterFirstEm = orm.em;
+  const em = ds.manager;
   const afterFirst = {
-    orgs: await afterFirstEm.count(Org, {}),
-    users: await afterFirstEm.count(User, {}),
-    sessions: await afterFirstEm.count(Session, {}),
-    orgMembers: await afterFirstEm.count(OrgMember, {}),
-    accounts: await afterFirstEm.count(Account, {}),
-    notificationRules: await afterFirstEm.count(NotificationRule, {}),
+    orgs: await em.count(Org, {}),
+    users: await em.count(User, {}),
+    sessions: await em.count(Session, {}),
+    orgMembers: await em.count(OrgMember, {}),
+    accounts: await em.count(Account, {}),
+    notificationRules: await em.count(NotificationRule, {}),
   };
 
   const second = await seed.run();
-  const afterSecondEm = orm.em;
   const afterSecond = {
-    orgs: await afterSecondEm.count(Org, {}),
-    users: await afterSecondEm.count(User, {}),
-    sessions: await afterSecondEm.count(Session, {}),
-    orgMembers: await afterSecondEm.count(OrgMember, {}),
-    accounts: await afterSecondEm.count(Account, {}),
-    notificationRules: await afterSecondEm.count(NotificationRule, {}),
+    orgs: await em.count(Org, {}),
+    users: await em.count(User, {}),
+    sessions: await em.count(Session, {}),
+    orgMembers: await em.count(OrgMember, {}),
+    accounts: await em.count(Account, {}),
+    notificationRules: await em.count(NotificationRule, {}),
   };
 
-  const rules = await afterSecondEm.find(
+  const rules = await em.find(
     NotificationRule,
-    { userId: first.userId },
-    { orderBy: { name: "asc" } },
+    { where: { userId: first.userId }, order: { name: "ASC" } },
   );
 
   console.log(JSON.stringify({ first, second, afterFirst, afterSecond, rules }));
 } finally {
-  await orm.close(true);
+  await ds.destroy();
   await pglite.close();
 }
 `.trimStart(),
@@ -183,11 +210,10 @@ describe("SeedService", () => {
     ]);
   });
 
-  test("creates the session with MikroORM persistAndFlush", async () => {
+  test("creates the session with TypeORM em.save", async () => {
     const source = await Bun.file(join(repoRoot, "services/platform-core/src/infrastructure/application-database/seed.ts")).text();
 
-    expect(source).toContain("await em.persistAndFlush(session)");
-    expect(source).not.toContain("em.persist(session)");
+    expect(source).toContain("await this.em.save(session)");
   });
 
   test.skip("layout-server seed hook deferred to Pillar 13/16", () => {

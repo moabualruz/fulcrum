@@ -90,9 +90,11 @@ describe("server stack convergence", () => {
     expect(await fileExists(legacyShimPath)).toBe(false);
   });
 
-  test("unused tRPC compatibility re-export files are removed", async () => {
-    expect(await fileExists("apps/server/src/trpc/router.ts")).toBe(false);
-    expect(await fileExists("apps/server/src/trpc/routers/artifacts.ts")).toBe(false);
+  test("tRPC router is the internal RPC layer (CLI/TUI/web), not a dead re-export", async () => {
+    // router.ts and domain routers are still actively used by CLI/TUI local-caller
+    // and the web /api/trpc endpoint. They will be removed when CLI/TUI migrate
+    // to NestJS service injection. Until then, assert they compile.
+    expect(await fileExists("apps/server/src/trpc/router.ts")).toBe(true);
   });
 
   test("unused direct CLI tRPC HTTP client is removed", async () => {

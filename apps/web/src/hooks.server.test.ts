@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { afterAll, describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { ACTIVE_PROJECT_COOKIE } from "./lib/state/active-project.ts";
 import { closeDatabase } from "./lib/server/db.ts";

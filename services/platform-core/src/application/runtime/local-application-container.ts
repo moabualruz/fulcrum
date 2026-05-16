@@ -21,9 +21,14 @@ export async function buildLocalApplicationContainer(): Promise<LocalApplication
 
   await dataSource.runMigrations();
 
-  const { Container } = await import("@needle-di/core");
-  const container = new Container();
-  container.bind({ provide: DataSource, useValue: dataSource });
+  const container: DiContainer = {
+    get: (token: unknown) => {
+      if (token === DataSource) return dataSource as never;
+      throw new Error(`Token not found in container: ${String(token)}`);
+    },
+    has: (token: unknown) => token === DataSource,
+    bind: () => {},
+  };
 
   return {
     container,

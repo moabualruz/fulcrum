@@ -1,8 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
@@ -105,7 +103,6 @@ describe("AfterRunMemoryHook", () => {
 });
 
 function createHook(): AfterRunMemoryHook {
-  registerDbBindings(null);
   const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
   // @ts-expect-error — inject underlying TypeORM repo directly (bypass NestJS DI)
   memRepo["memories"] = db.ds.getRepository(Memory);

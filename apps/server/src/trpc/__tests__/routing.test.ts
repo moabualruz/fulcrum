@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
+import type { EntityManager } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
@@ -32,7 +32,7 @@ function mockSession() {
   };
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager) {
+function callerFor(em: EntityManager) {
   const container = null;
   container.bind({
     provide: RoutingRuleRepository,

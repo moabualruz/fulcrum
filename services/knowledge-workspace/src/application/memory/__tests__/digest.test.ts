@@ -14,10 +14,8 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";

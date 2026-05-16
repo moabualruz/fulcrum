@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { HeuristicExtractor } from "../extractor-heuristic.ts";
 import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";

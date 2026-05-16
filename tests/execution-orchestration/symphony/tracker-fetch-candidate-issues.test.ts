@@ -7,33 +7,13 @@
  */
 
 import { afterAll, describe, expect, it } from "bun:test";
-import type { MigrationObject } from "@mikro-orm/core";
-import type { MikroORM, Options } from "@mikro-orm/postgresql";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
-import { Migrator } from "@mikro-orm/migrations";
-import { PGlite } from "@electric-sql/pglite";
+import type { EntityManager } from "typeorm";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
 import type { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
-import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
-import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
-import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
-import { Migration20260501130000_composite_indexes } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130000_composite_indexes.ts";
-import { Migration20260501130100_flag_stubs } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130100_flag_stubs.ts";
-import { Migration20260501140000_schema_migration_ledger } from "@platform-core/infrastructure/application-database/migrations/Migration20260501140000_schema_migration_ledger.ts";
-import { Migration20260501150000_account_verification } from "@platform-core/infrastructure/application-database/migrations/Migration20260501150000_account_verification.ts";
-import { Migration20260502000001_orchestration_workflow_definitions } from "@platform-core/infrastructure/application-database/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
-import { Migration20260502030300_agent_runs_symphony_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
-import { Migration20260502050000_routing_rules } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050000_routing_rules.ts";
-import { Migration20260502050200_skills_registry } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050200_skills_registry.ts";
-import { Migration20260502070100_docs_document_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070100_docs_document_columns.ts";
-import { Migration20260502070200_docs_related_tables } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070200_docs_related_tables.ts";
-import { Migration20260502070400_agent_runs_sandcastle_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
-import { Migration20260502090000_tasks_schema_extension } from "@platform-core/infrastructure/application-database/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import {
   buildCandidateIssuesBaseQuery,
   fetchCandidateIssues,
@@ -43,6 +23,7 @@ import {
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -63,102 +44,6 @@ const RUN_IDS = {
   stalled: "10000000-0000-0000-0000-000000000004",
 } as const;
 
-interface BlankOrm {
-  orm: MikroORM;
-  pglite: PGlite;
-  close: () => Promise<void>;
-}
-
-async function buildBlankOrm(): Promise<BlankOrm> {
-  const pglite = new PGlite();
-  const config = createOrmConfig({ pglite });
-
-  config.migrations = {
-    ...((config.migrations ?? {}) as NonNullable<Options["migrations"]>),
-    transactional: false,
-    allOrNothing: false,
-    snapshot: false,
-    migrationsList: [
-      { name: "Migration20260501104413_auth", class: Migration20260501104413_auth },
-      {
-        name: "Migration20260501120537_events_org_id_backfill",
-        class: Migration20260501120537_events_org_id_backfill,
-      },
-      {
-        name: "Migration20260501120538_events_org_id_notnull",
-        class: Migration20260501120538_events_org_id_notnull,
-      },
-      {
-        name: "Migration20260501130000_composite_indexes",
-        class: Migration20260501130000_composite_indexes,
-      },
-      {
-        name: "Migration20260501130100_flag_stubs",
-        class: Migration20260501130100_flag_stubs,
-      },
-      {
-        name: "Migration20260501140000_schema_migration_ledger",
-        class: Migration20260501140000_schema_migration_ledger,
-      },
-      {
-        name: "Migration20260501150000_account_verification",
-        class: Migration20260501150000_account_verification,
-      },
-      {
-        name: "Migration20260502000001_orchestration_workflow_definitions",
-        class: Migration20260502000001_orchestration_workflow_definitions,
-      },
-      {
-        name: "Migration20260502030300_agent_runs_symphony_columns",
-        class: Migration20260502030300_agent_runs_symphony_columns,
-      },
-      {
-        name: "Migration20260502050000_routing_rules",
-        class: Migration20260502050000_routing_rules,
-      },
-      {
-        name: "Migration20260502050200_skills_registry",
-        class: Migration20260502050200_skills_registry,
-      },
-      {
-        name: "Migration20260502070100_docs_document_columns",
-        class: Migration20260502070100_docs_document_columns,
-      },
-      {
-        name: "Migration20260502070200_docs_related_tables",
-        class: Migration20260502070200_docs_related_tables,
-      },
-      {
-        name: "Migration20260502070400_agent_runs_sandcastle_columns",
-        class: Migration20260502070400_agent_runs_sandcastle_columns,
-      },
-      {
-        name: "Migration20260502090000_tasks_schema_extension",
-        class: Migration20260502090000_tasks_schema_extension,
-      },
-    ] satisfies MigrationObject[],
-  };
-  config.extensions = [Migrator];
-
-  const orm = await MikroORMRuntime.init(config);
-
-  return {
-    orm,
-    pglite,
-    close: async () => {
-      await orm.close(true);
-      await (pglite as { close?: () => Promise<void> }).close?.();
-    },
-  };
-}
-
-async function buildMigratedOrm(): Promise<BlankOrm> {
-  const db = await buildBlankOrm();
-  await db.orm.migrator.up();
-  await new SeedService(db.orm.em).run();
-  return db;
-}
-
 function mockSession() {
   return {
     id: "sess-symphony-test",
@@ -174,8 +59,7 @@ function mockSession() {
   };
 }
 
-async function seedCandidateFixture(orm: MikroORM): Promise<void> {
-  const em = orm.em;
+async function seedCandidateFixture(em: EntityManager): Promise<void> {
   const org = em.getReference(Org, DEFAULT_ORG_ID);
   const tieDate = new Date("2026-01-01T00:00:00.000Z");
 
@@ -282,8 +166,7 @@ async function seedCandidateFixture(orm: MikroORM): Promise<void> {
   /* flushed */
 }
 
-async function seedRunStateFixture(orm: MikroORM): Promise<void> {
-  const em = orm.em;
+async function seedRunStateFixture(em: EntityManager): Promise<void> {
   const org = em.getReference(Org, DEFAULT_ORG_ID);
 
   const taskA = em.create(Task, {
@@ -363,17 +246,17 @@ async function seedRunStateFixture(orm: MikroORM): Promise<void> {
 }
 
 describe("fetchCandidateIssues", () => {
-  let lastDb: BlankOrm | undefined;
+  let lastDb: TestOrm | undefined;
 
   afterAll(async () => {
     await lastDb?.close();
   });
 
   it("returns ready unblocked unclaimed tasks in SPEC order and applies limit", async () => {
-    lastDb = await buildMigratedOrm();
-    await seedCandidateFixture(lastDb.orm);
+    lastDb = await createTestOrm();
+    await seedCandidateFixture(lastDb.em);
 
-    const all = await fetchCandidateIssues(lastDb.orm.em, DEFAULT_ORG_ID, 10);
+    const all = await fetchCandidateIssues(lastDb.em, DEFAULT_ORG_ID, 10);
     expect(all.map((task) => task.id)).toEqual([
       TASK_IDS.highPriority,
       TASK_IDS.candidateB,
@@ -390,7 +273,7 @@ describe("fetchCandidateIssues", () => {
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.running);
     expect(all.map((task) => task.id)).not.toContain(TASK_IDS.retryQueued);
 
-    const limited = await fetchCandidateIssues(lastDb.orm.em, DEFAULT_ORG_ID, 2);
+    const limited = await fetchCandidateIssues(lastDb.em, DEFAULT_ORG_ID, 2);
     expect(limited.map((task) => task.id)).toEqual([
       TASK_IDS.highPriority,
       TASK_IDS.candidateB,
@@ -398,9 +281,9 @@ describe("fetchCandidateIssues", () => {
   });
 
   it("allows tasks whose blockers are already resolved", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      const em = db.orm.em;
+      const em = db.em;
       const org = em.getReference(Org, DEFAULT_ORG_ID);
       const resolved = em.create(Task, {
         id: "00000000-0000-0000-0000-000000000101",
@@ -420,7 +303,7 @@ describe("fetchCandidateIssues", () => {
       });
       await em.save([resolved, eligible]);
 
-      const result = await fetchCandidateIssues(db.orm.em, DEFAULT_ORG_ID, 10);
+      const result = await fetchCandidateIssues(db.em, DEFAULT_ORG_ID, 10);
       expect(result.map((task) => task.id)).toEqual([eligible.id]);
     } finally {
       await db.close();
@@ -428,16 +311,16 @@ describe("fetchCandidateIssues", () => {
   });
 
   it("candidate base query is EXPLAIN-able and shaped for tasks_dispatch_eligible", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedCandidateFixture(db.orm);
-      const em = db.orm.em;
+      await seedCandidateFixture(db.em);
+      const em = db.em;
       const repo = em.getRepository(Task) as TaskRepository;
       const qb = buildCandidateIssuesBaseQuery(repo, DEFAULT_ORG_ID);
       const sql = qb.getQuery();
 
       // C6 carve-out: EXPLAIN is test-only planner introspection. App code uses
-      // the MikroORM QueryBuilder helper under test.
+      // the QueryBuilder helper under test.
       const planRows = (await em
         .getConnection()
         .execute(`explain ${sql}`, qb.getParams() as unknown[])) as Array<{
@@ -461,15 +344,15 @@ describe("fetchCandidateIssues", () => {
 
 describe("orchestration.fetchCandidateIssues tRPC procedure", () => {
   it("is callable by authenticated web/tRPC callers", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedCandidateFixture(db.orm);
+      await seedCandidateFixture(db.em);
       const caller = createCaller(
         createContext({
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-symphony-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );
@@ -492,11 +375,11 @@ describe("orchestration.fetchCandidateIssues tRPC procedure", () => {
 
 describe("fetchIssuesByStates", () => {
   it("returns full run rows with task data for matching orchestration states", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
+      await seedRunStateFixture(db.em);
 
-      const result = await fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [
+      const result = await fetchIssuesByStates(db.em, DEFAULT_ORG_ID, [
         "running",
         "retry_queued",
       ]);
@@ -523,14 +406,14 @@ describe("fetchIssuesByStates", () => {
   });
 
   it("applies limit and returns empty for an empty state list without error", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
+      await seedRunStateFixture(db.em);
 
-      await expect(fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [])).resolves
+      await expect(fetchIssuesByStates(db.em, DEFAULT_ORG_ID, [])).resolves
         .toEqual([]);
 
-      const limited = await fetchIssuesByStates(db.orm.em, DEFAULT_ORG_ID, [
+      const limited = await fetchIssuesByStates(db.em, DEFAULT_ORG_ID, [
         "unclaimed",
         "running",
         "retry_queued",
@@ -546,12 +429,12 @@ describe("fetchIssuesByStates", () => {
   });
 
   it("state filter query is EXPLAIN-able and shaped for Symphony run indexes", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
-      const em = db.orm.em;
+      await seedRunStateFixture(db.em);
+      const em = db.em;
       const dispatchSql =
-        'select * from "agent_runs" where "org_id" = ? and "orchestration_state" in (?, ?) order by "next_retry_at" asc limit ?';
+        'select * from "agent_runs" where "org_id" = $1 and "orchestration_state" in ($2, $3) order by "next_retry_at" asc limit $4';
 
       const dispatchPlanRows = (await em
         .getConnection()
@@ -572,7 +455,7 @@ describe("fetchIssuesByStates", () => {
       expect(dispatchSql).toContain('"orchestration_state" in');
 
       const runningSql =
-        'select * from "agent_runs" where "org_id" = ? and "orchestration_state" = ? order by "started_at" asc limit ?';
+        'select * from "agent_runs" where "org_id" = $1 and "orchestration_state" = $2 order by "started_at" asc limit $3';
       const runningPlanRows = (await em
         .getConnection()
         .execute(`explain ${runningSql}`, [
@@ -596,11 +479,11 @@ describe("fetchIssuesByStates", () => {
 
 describe("fetchIssueStatesByIds", () => {
   it("returns slim id/state rows and omits unknown ids", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
+      await seedRunStateFixture(db.em);
 
-      const result = await fetchIssueStatesByIds(db.orm.em, DEFAULT_ORG_ID, [
+      const result = await fetchIssueStatesByIds(db.em, DEFAULT_ORG_ID, [
         RUN_IDS.retryQueued,
         "10000000-0000-0000-0000-999999999999",
         RUN_IDS.running,
@@ -617,10 +500,10 @@ describe("fetchIssueStatesByIds", () => {
   });
 
   it("returns empty for an empty id list without querying full rows", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
-      await expect(fetchIssueStatesByIds(db.orm.em, DEFAULT_ORG_ID, []))
+      await seedRunStateFixture(db.em);
+      await expect(fetchIssueStatesByIds(db.em, DEFAULT_ORG_ID, []))
         .resolves.toEqual([]);
     } finally {
       await db.close();
@@ -630,15 +513,15 @@ describe("fetchIssueStatesByIds", () => {
 
 describe("orchestration Symphony tracker tRPC procedures", () => {
   it("exposes fetchIssuesByStates and fetchIssueStatesByIds", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     try {
-      await seedRunStateFixture(db.orm);
+      await seedRunStateFixture(db.em);
       const caller = createCaller(
         createContext({
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-symphony-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );

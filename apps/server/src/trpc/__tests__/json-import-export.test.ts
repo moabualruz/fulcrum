@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -41,7 +40,7 @@ function callerFor(repo: TaskRepository) {
       session: mockSession() as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: repo.getEntityManager() as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em: repo.getEntityManager() as any,
       container,
     }),
   );

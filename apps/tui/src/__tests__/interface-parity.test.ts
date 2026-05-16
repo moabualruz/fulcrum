@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { MikroORM } from "typeorm";
 import { readFile } from "node:fs/promises";
 
 import { setTenantSetting } from "@platform-core/application/settings/commands.ts";
@@ -89,7 +88,6 @@ describe("interface TUI interface encapsulation", () => {
       const db = await createTestOrm();
       try {
         const container = createTestContainer(db);
-        container.bind({ provide: MikroORM, useValue: db.orm });
       const created = await createTask(db.em, {
         orgId: db.seed.orgId,
         userId: db.seed.userId,

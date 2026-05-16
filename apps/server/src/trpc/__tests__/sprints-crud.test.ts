@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
@@ -40,7 +39,7 @@ function callerFor(repo: TaskRepository) {
       session: mockSession() as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: repo.getEntityManager() as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em: repo.getEntityManager() as any,
       container,
     }),
   );

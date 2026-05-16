@@ -5,7 +5,10 @@ import type { Component } from "svelte";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
 import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
-import { __resetDefaultOrmForTest, initOrm } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
+import { DataSource, type DataSourceOptions } from "typeorm";
+import { EventEmitter } from "node:events";
+import { getCoreEntities, __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { __setApplicationScopeForTest } from "@fulcrum/web/lib/server/application-scope.ts";
 import * as serverDb from "@fulcrum/web/lib/server/db.ts";
 
@@ -20,7 +23,7 @@ let testCleanups: Array<() => Promise<void> | void> = [];
 
 beforeEach(async () => {
   resetLegacyStore();
-  await __resetDefaultOrmForTest();
+  await __resetDataSourceForTest();
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-doc-routes-"));
   process.env["FULCRUM_HOME"] = scratch;
 });
@@ -30,7 +33,7 @@ afterEach(async () => {
     await cleanup();
   }
   await closeLegacyStore();
-  await __resetDefaultOrmForTest();
+  await __resetDataSourceForTest();
   delete process.env["FULCRUM_HOME"];
   resetLegacyStore();
   rmSync(scratch, { recursive: true, force: true });
@@ -101,9 +104,45 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     )`,
   );
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  // EntityManager for migrated action functions
-  const orm = await initOrm({ pglite });
-  const em = orm.em;
+  // EntityManager for migrated action functions — build DataSource over existing PGlite
+  class EphemeralPool extends EventEmitter {
+    constructor() { super(); this.setMaxListeners(100); this.on("error", () => {}); }
+    doneCallback() {}
+    async connect(callback: Function) {
+      try { callback(null, this, this.doneCallback); }
+      catch (error) { callback(error, null, this.doneCallback); }
+    }
+    async query(sqlQuery: string, queryParameters?: any, callback?: Function) {
+      let cb = callback, params = queryParameters;
+      if (typeof queryParameters === "function") { cb = queryParameters; params = undefined; }
+      const hasParams = params !== undefined && Array.isArray(params) && params.length > 0;
+      let finalSql = sqlQuery;
+      if (hasParams && sqlQuery.includes("?")) {
+        let idx = 0;
+        finalSql = sqlQuery.replace(/\?/g, () => `$${++idx}`);
+      }
+      const queryPromise = hasParams
+        ? pglite.query(finalSql, params)
+        : pglite.exec(finalSql).then((r: any[]) => r[r.length - 1] || { rows: [] });
+      return queryPromise
+        .then((results: unknown) => { if (cb) cb(null, results); return results; })
+        .catch((error: unknown) => { if (cb) cb(error, null); throw error; });
+    }
+    end(errorCallback: Function) {
+      errorCallback(null);
+    }
+  }
+  const driver = class { static Pool = EphemeralPool; };
+  const ds = new DataSource({
+    type: "postgres",
+    driver,
+    entities: getCoreEntities(),
+    synchronize: false,
+    installExtensions: false,
+    logging: false,
+  } as DataSourceOptions);
+  await ds.initialize();
+  const em = ds.manager;
   const linked = await createDocumentAction(em, {
     orgId: org.id,
     projectId: null,
@@ -148,13 +187,13 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     ],
   );
   const restoreScope = __setApplicationScopeForTest({
-    em: orm.em,
+    em: ds.manager,
     orgId: org.id,
     userId: null,
   });
   testCleanups.push(async () => {
     restoreScope();
-    await orm.close(true);
+    await ds.destroy();
     await db.close();
   });
   return { docId: created.id, linkedId: linked.id, orgId: org.id };

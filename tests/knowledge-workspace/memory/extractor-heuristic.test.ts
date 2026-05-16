@@ -1,18 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
 import { HeuristicExtractor } from "@knowledge-workspace/application/memory/extractor-heuristic.ts";
 
 describe("HeuristicExtractor", () => {
-  test("resolves through needle-di", () => {
-    const container = null;
-    container.bind({
-      provide: MemoryRepository,
-      useValue: {} as MemoryRepository,
-    });
-
-    const extractor = container.get(HeuristicExtractor);
+  test("resolves through direct instantiation", () => {
+    const extractor = new HeuristicExtractor({} as MemoryRepository);
 
     expect(extractor).toBeInstanceOf(HeuristicExtractor);
   });

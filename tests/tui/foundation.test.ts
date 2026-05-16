@@ -4,9 +4,6 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
-import { MikroORM } from "@mikro-orm/postgresql";
-
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -16,11 +13,11 @@ import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { createTestContainer } from "@test-support/application-container.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -59,11 +56,8 @@ function fakeCaller(): TuiCaller {
   };
 }
 
-function testContainer(db: TestOrm): Container {
-  const container = null;
-  container.bind({ provide: MikroORM, useValue: db.orm });
-  registerDbBindings(container, db.orm, db.em);
-  return container;
+function testContainer(db: TestOrm) {
+  return createTestContainer(db);
 }
 
 describe("TuiRouter", () => {

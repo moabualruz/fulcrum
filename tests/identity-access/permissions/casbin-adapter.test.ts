@@ -14,14 +14,12 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
 import { newModel } from "casbin";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
 import { CasbinRule } from "@platform-core/infrastructure/application-database/entities/flags/CasbinRule.ts";
 import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { FulcrumCasbinAdapter } from "@identity-access/application/permissions/casbin-adapter.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 /** Standard RBAC model text — same as CasbinEnforcerService uses. */
 const RBAC_MODEL_TEXT = `
@@ -41,26 +39,16 @@ e = some(where (p.eft == allow))
 m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
 `;
 
-let orm: MikroORM;
+let db: TestOrm;
 let adapter: FulcrumCasbinAdapter;
 let repo: CasbinRuleRepository;
 
 beforeAll(async () => {
-  const pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
-
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [CasbinRule],
-    debug: false,
-  });
-
-  await orm.schema.create();
+  db = await createTestOrm();
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
+  if (db) await db.close();
 });
 
 afterEach(() => {
@@ -70,11 +58,11 @@ afterEach(() => {
 
 beforeEach(async () => {
   // Wipe casbin_rule table between tests
-  const em = orm.em;
+  const em = db.em;
   await em.nativeDelete(CasbinRule, {});
 
   // Fresh repo + adapter per test
-  repo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
+  repo = db.em.getRepository(CasbinRule) as CasbinRuleRepository;
   adapter = new FulcrumCasbinAdapter(repo);
 });
 
@@ -195,7 +183,7 @@ describe("FulcrumCasbinAdapter — savePolicy", () => {
     await adapter.savePolicy(model);
 
     // Fresh adapter from same repo — load should see the saved rules
-    const freshRepo = orm.em.getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = db.em.getRepository(CasbinRule) as CasbinRuleRepository;
     const freshAdapter = new FulcrumCasbinAdapter(freshRepo);
     const model2 = newModel(RBAC_MODEL_TEXT);
     await freshAdapter.loadPolicy(model2);

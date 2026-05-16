@@ -13,14 +13,11 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
@@ -47,8 +44,7 @@ const TEST_MEMBERS = [
   [TEST_OTHER_ID, "member"],
 ] as const;
 
-let orm: MikroORM;
-let pglite: PGlite;
+let testOrm: TestOrm;
 let stateDir: string;
 let sharedNative: NativeKeyringAdapter;
 
@@ -86,7 +82,7 @@ function makeCaller(
   orgId: string,
   options: { casbinActions?: string[] } = {},
 ) {
-  const em = orm.em;
+  const em = testOrm.em;
   const credentialRepo = em.getRepository(Credential) as CredentialRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
@@ -123,7 +119,7 @@ function makeCaller(
       session: mockSession(userId, orgId) as unknown as import("better-auth").Session,
       orgId,
       userId,
-      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em,
       container: c,
     }),
   );
@@ -142,21 +138,11 @@ function unauthCaller() {
 }
 
 beforeAll(async () => {
-  pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
+  testOrm = await createTestOrm();
   stateDir = mkdtempSync(join(tmpdir(), "fulcrum-cred-test-"));
   sharedNative = inMemoryNative();
 
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [Org, User, OrgMember, Credential],
-    debug: false,
-  });
-
-  await orm.schema.create();
-
-  const seed = orm.em;
+  const seed = testOrm.em;
   const now = new Date();
   const org = seed.create(Org, {
     id: TEST_ORG_ID,
@@ -187,13 +173,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
-  if (pglite) await pglite.close();
+  await destroyTestOrm();
   if (stateDir) rmSync(stateDir, { recursive: true, force: true });
 });
 
 beforeEach(async () => {
-  const em = orm.em;
+  const em = testOrm.em;
   await em.nativeDelete(Credential, {});
   await em.nativeDelete(OrgMember, {});
   const now = new Date();
@@ -216,7 +201,7 @@ describe("credentials.set", () => {
     expect(r.id).toBeTruthy();
     expect(r.name).toBe("openai");
 
-    const em = orm.em;
+    const em = testOrm.em;
     const row = await em.findOne(Credential, { name: "openai", org: TEST_ORG_ID } as object);
     expect(row).not.toBeNull();
     const ct = (row as Credential).encryptedValue;
@@ -304,7 +289,7 @@ describe("credentials.rotate", () => {
   it("replaces ciphertext and bumps lastUsedAt", async () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "rot", value: "v-old" });
-    const em = orm.em;
+    const em = testOrm.em;
     const before = await em.findOne(Credential, { name: "rot", org: TEST_ORG_ID } as object);
     const ctBefore = Buffer.from((before as Credential).encryptedValue);
 
@@ -326,7 +311,7 @@ describe("credentials.archive / remove", () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "x", value: "v" });
     await caller.credentials.archive({ name: "x" });
-    const em = orm.em;
+    const em = testOrm.em;
     const row = await em.findOne(Credential, { name: "x", org: TEST_ORG_ID } as object);
     expect((row as Credential).archived).toBe(true);
   });
@@ -335,7 +320,7 @@ describe("credentials.archive / remove", () => {
     const caller = makeCaller(TEST_OWNER_ID, TEST_ORG_ID);
     await caller.credentials.set({ name: "rm", value: "v" });
     await caller.credentials.remove({ name: "rm" });
-    const em = orm.em;
+    const em = testOrm.em;
     const row = await em.findOne(Credential, { name: "rm", org: TEST_ORG_ID } as object);
     expect(row).toBeNull();
   });
@@ -352,7 +337,7 @@ describe("credentials casbin-policies integration", () => {
     await caller.credentials.archive({ name: "casbin" });
     await caller.credentials.remove({ name: "casbin" });
 
-    const em = orm.em;
+    const em = testOrm.em;
     const row = await em.findOne(Credential, { name: "casbin", org: TEST_ORG_ID } as object);
     expect(row).toBeNull();
   });
@@ -363,7 +348,7 @@ describe("credentials active membership gate", () => {
     const activeCaller = makeCaller(TEST_MEMBER_ID, TEST_ORG_ID);
     await activeCaller.credentials.set({ name: "stale", value: "plaintext-before-remove" });
 
-    const adminEm = orm.em;
+    const adminEm = testOrm.em;
     await adminEm.nativeDelete(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: TEST_MEMBER_ID,
@@ -385,7 +370,7 @@ describe("credentials active membership gate", () => {
       expect(err?.code).toBe("FORBIDDEN");
     }
 
-    const checkEm = orm.em;
+    const checkEm = testOrm.em;
     const blockedWrite = await checkEm.findOne(Credential, {
       name: "after-removal",
       org: TEST_ORG_ID,

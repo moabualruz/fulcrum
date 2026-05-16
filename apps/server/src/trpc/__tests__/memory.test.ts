@@ -4,6 +4,8 @@ import type { Session } from "better-auth";
 
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
+import type { EntityManager } from "typeorm";
+
 import { createTestOrm } from "@test-support/application-database.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
@@ -31,7 +33,7 @@ function mockSession(userId: string, orgId: string): Session {
 }
 
 function callerFor(
-  em: import("@mikro-orm/postgresql").EntityManager,
+  em: EntityManager,
   orgId = ORG_ID,
 ) {
   return createCaller(

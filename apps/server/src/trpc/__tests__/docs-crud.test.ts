@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "better-auth";
 
+import type { EntityManager } from "typeorm";
+
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Document } from "@knowledge-workspace/infrastructure/database/entities/docs/Document.ts";
 import { DocVersion } from "@knowledge-workspace/infrastructure/database/entities/docs/DocVersion.ts";
@@ -30,7 +32,7 @@ function mockSession(userId: string, orgId: string): Session {
   } as unknown as Session;
 }
 
-function callerFor(em: import("@mikro-orm/postgresql").EntityManager, orgId = ORG_ID) {
+function callerFor(em: EntityManager, orgId = ORG_ID) {
   return createCaller(
     createContext({
       session: mockSession(USER_ID, orgId),

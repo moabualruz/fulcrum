@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import {
   NotificationRuleEngine,
@@ -250,11 +249,9 @@ describe("notification rule engine", () => {
     expect(performance.now() - started).toBeLessThan(50);
   });
 
-  it("is resolvable from a needle-di container without decorator syntax", () => {
-    const container = null;
+  it("is resolvable via direct instantiation without decorator syntax", () => {
+    const engine = new NotificationRuleEngine();
 
-    container.bind({ provide: NotificationRuleEngine, useValue: new NotificationRuleEngine() });
-
-    expect(container.get(NotificationRuleEngine)).toBeInstanceOf(NotificationRuleEngine);
+    expect(engine).toBeInstanceOf(NotificationRuleEngine);
   });
 });

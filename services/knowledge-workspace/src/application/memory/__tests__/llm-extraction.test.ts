@@ -14,10 +14,8 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, mock, spyOn } from "bun:test";
-import { Container } from "@needle-di/core";
 
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
-import { registerDbBindings } from "@platform-core/infrastructure/application-database/db.module.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { MemoryLink } from "@knowledge-workspace/infrastructure/database/entities/memory/MemoryLink.ts";
@@ -363,8 +361,6 @@ function createJob(
   client: InferenceClientLike,
   opts: { onWarning?: (msg: string) => void } = {},
 ): LlmExtractionJob {
-  const container = null;
-  registerDbBindings(container, db.orm, db.orm.em);
   return new LlmExtractionJob(
     db.orm.em,
     client,

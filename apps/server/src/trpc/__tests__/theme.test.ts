@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Container } from "@needle-di/core";
+
 import { TRPCError } from "@trpc/server";
 
 import { appRouter } from "@fulcrum/server/trpc/router.ts";

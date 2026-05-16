@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import type { Session } from "better-auth";
 
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";

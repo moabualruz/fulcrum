@@ -12,13 +12,11 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
 import { AuthService } from "@identity-access/application/auth/index.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
-let orm: MikroORM;
+let db: TestOrm;
 const TEST_BETTER_AUTH_SECRET = ["test", "secret", "123456789012345678901234"].join("-");
 
 // Shared fake DB adapter for standalone auth instances (no ORM required)
@@ -37,13 +35,11 @@ function makeStubAdapter(): unknown {
 }
 
 beforeAll(async () => {
-  const pglite = new PGlite();
-  orm = await MikroORM.init(createOrmConfig({ pglite }));
-  await orm.schema.create();
+  db = await createTestOrm();
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
+  if (db) await db.close();
 });
 
 afterEach(() => {
@@ -108,7 +104,7 @@ function authOptions(svc: AuthService): {
 
 describe("saas-auth flag OFF — OAuth disabled", () => {
   it("POST /api/auth/sign-in/social returns 404 (provider not found)", withSaasAuthFlag(false, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-in/social", {
@@ -122,7 +118,7 @@ describe("saas-auth flag OFF — OAuth disabled", () => {
   }));
 
   it("POST /api/auth/sign-in/social for github returns 404 when saas-auth OFF", withSaasAuthFlag(false, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-in/social", {
@@ -136,7 +132,7 @@ describe("saas-auth flag OFF — OAuth disabled", () => {
   }));
 
   it("POST /api/auth/sign-up/email rejects local-mode unauthenticated signup", withSaasAuthFlag(false, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-up/email", {
@@ -164,7 +160,7 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     process.env["GOOGLE_CLIENT_ID"] = "test-google-client-id";
     process.env["GOOGLE_CLIENT_SECRET"] = "test-google-client-secret";
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-in/social", {
@@ -190,7 +186,7 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     delete process.env["GOOGLE_CLIENT_ID"];
     delete process.env["GOOGLE_CLIENT_SECRET"];
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-in/social", {
@@ -212,7 +208,7 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     process.env["GITHUB_CLIENT_ID"] = "test-github-client-id";
     delete process.env["GITHUB_CLIENT_SECRET"];
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/sign-in/social", {
@@ -235,7 +231,7 @@ describe("saas-auth flag ON — OAuth enabled", () => {
     const origSecret = process.env["GOOGLE_CLIENT_SECRET"];
     process.env["FULCRUM_FLAG_SAAS_AUTH"] = "false";
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
     const offReq = new Request("http://localhost/api/auth/sign-in/social", {
       method: "POST",
@@ -272,7 +268,7 @@ describe("saas-auth flag ON — OAuth enabled", () => {
         GOOGLE_CLIENT_SECRET: "old-google-client-secret",
       },
       async () => {
-        const svc = new AuthService(orm.em);
+        const svc = new AuthService(db.em);
         await svc.init();
 
         process.env["GOOGLE_CLIENT_ID"] = "new-google-client-id";
@@ -301,7 +297,7 @@ describe("BetterAuth runtime config", () => {
         BETTER_AUTH_SECRET: TEST_BETTER_AUTH_SECRET,
       },
       async () => {
-        const svc = new AuthService(orm.em);
+        const svc = new AuthService(db.em);
         await svc.init();
         expect(authOptions(svc).secret).toBe(TEST_BETTER_AUTH_SECRET);
       },
@@ -315,7 +311,7 @@ describe("BetterAuth runtime config", () => {
         BETTER_AUTH_SECRET: undefined,
       },
       async () => {
-        const svc = new AuthService(orm.em);
+        const svc = new AuthService(db.em);
         await expect(svc.init()).rejects.toThrow("BETTER_AUTH_SECRET");
       },
     );
@@ -329,7 +325,7 @@ describe("BetterAuth runtime config", () => {
         FULCRUM_TRUSTED_ORIGINS: "https://app.example.com, https://admin.example.com ,,",
       },
       async () => {
-        const svc = new AuthService(orm.em);
+        const svc = new AuthService(db.em);
         await svc.init();
         expect(authOptions(svc).trustedOrigins).toEqual([
           "https://app.example.com",
@@ -346,7 +342,7 @@ describe("BetterAuth runtime config", () => {
         FULCRUM_TRUSTED_ORIGINS: undefined,
       },
       async () => {
-        const svc = new AuthService(orm.em);
+        const svc = new AuthService(db.em);
         await svc.init();
         expect(authOptions(svc).trustedOrigins).toEqual([
           "http://localhost:5173",
@@ -363,7 +359,7 @@ describe("BetterAuth runtime config", () => {
 
 describe("saas-auth flag OFF — email OTP disabled", () => {
   it("POST /api/auth/email-otp/send-verification-otp returns 404 when saas-auth OFF", withSaasAuthFlag(false, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/email-otp/send-verification-otp", {
@@ -383,7 +379,7 @@ describe("saas-auth flag OFF — email OTP disabled", () => {
 
 describe("saas-auth flag ON — email OTP enabled", () => {
   it("POST /api/auth/email-otp/send-verification-otp returns non-404 when saas-auth ON", withSaasAuthFlag(true, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/email-otp/send-verification-otp", {
@@ -407,7 +403,7 @@ describe("isSaasAuthEnabled() — flag resolution", () => {
     const orig = process.env["FULCRUM_FLAG_SAAS_AUTH"];
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     const enabled = await svc.isSaasAuthEnabled();
     expect(enabled).toBe(false);
 
@@ -421,7 +417,7 @@ describe("isSaasAuthEnabled() — flag resolution", () => {
     const orig = process.env["FULCRUM_FLAG_SAAS_AUTH"];
     process.env["FULCRUM_FLAG_SAAS_AUTH"] = "true";
 
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     const enabled = await svc.isSaasAuthEnabled();
     expect(enabled).toBe(true);
 
@@ -439,7 +435,7 @@ describe("isSaasAuthEnabled() — flag resolution", () => {
 
 describe("saas-auth flag ON — magic-link enabled", () => {
   it("GET /api/auth/magic-link/* route exists when saas-auth ON", withSaasAuthFlag(true, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     // magic-link verify endpoint — plugin registers this route; 400 = route exists
@@ -453,7 +449,7 @@ describe("saas-auth flag ON — magic-link enabled", () => {
   }));
 
   it("GET /api/auth/magic-link/verify returns 404 when saas-auth OFF", withSaasAuthFlag(false, async () => {
-    const svc = new AuthService(orm.em);
+    const svc = new AuthService(db.em);
     await svc.init();
 
     const req = new Request("http://localhost/api/auth/magic-link/verify?token=bad-token", {

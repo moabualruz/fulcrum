@@ -11,16 +11,13 @@
  *   7. auth.whoami without session → UNAUTHORIZED.
  *
  * Per C6: NO raw SQL strings.
- * Per C7: MikroORM v7 fork() + em.persist/flush pattern.
+ * Per C7: TypeORM EntityManager via createTestOrm() with MikroORM compat shims.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { TRPCError } from "@trpc/server";
-import { MikroORM } from "@mikro-orm/postgresql";
-import { PGlite } from "@electric-sql/pglite";
-import { Container } from "@needle-di/core";
 
-import { PGliteKyselyDialect } from "@platform-core/infrastructure/application-database/PGliteKyselyDriver.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
@@ -37,8 +34,7 @@ const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
 const TEST_ADMIN_ID = "c3d4e5f6-a7b8-4c9d-90e1-f2a3b4c5d6e7";
 const TEST_MEMBER_ID = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
 
-let orm: MikroORM;
-let pglite: PGlite;
+let testOrm: TestOrm;
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -59,7 +55,7 @@ function mockSession(userId: string, orgId: string) {
 
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em;
+  const em = testOrm.em;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
   const invitationRepo = em.getRepository(Invitation) as InvitationRepository;
 
@@ -67,7 +63,7 @@ function makeCaller(userId: string, orgId: string) {
     session: session as unknown as import("better-auth").Session,
     orgId,
     userId,
-    em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+    em,
     container: (() => {
       const c = null;
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
@@ -87,14 +83,14 @@ function makeCaller(userId: string, orgId: string) {
 
 function makeCallerWithoutContainer(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
-  const em = orm.em;
+  const em = testOrm.em;
 
   return createCaller(
     createContext({
       session: session as unknown as import("better-auth").Session,
       orgId,
       userId,
-      em: em as unknown as import("@mikro-orm/postgresql").EntityManager,
+      em,
       container: null,
     }),
   );
@@ -127,19 +123,9 @@ function unauthCaller() {
 }
 
 beforeAll(async () => {
-  pglite = new PGlite();
-  const dialect = new PGliteKyselyDialect(() => pglite);
+  testOrm = await createTestOrm();
 
-  orm = await MikroORM.init({
-    dbName: "postgres",
-    driverOptions: dialect,
-    entities: [Org, User, OrgMember, Invitation],
-    debug: false,
-  });
-
-  await orm.schema.create();
-
-  const seedEm = orm.em;
+  const seedEm = testOrm.em;
   const now = new Date();
 
   const org = seedEm.create(Org, {
@@ -206,13 +192,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (orm) await orm.close(true);
-  if (pglite) await pglite.close();
+  await destroyTestOrm();
 });
 
 beforeEach(async () => {
   // Wipe invitations between tests
-  const em = orm.em;
+  const em = testOrm.em;
   await em.nativeDelete(Invitation, {});
 });
 
@@ -297,7 +282,7 @@ describe("auth.invite", () => {
     const result = await caller.auth.invite({ email: "check@test.local", role: "member" });
 
     // Verify via fresh EM
-    const em = orm.em;
+    const em = testOrm.em;
     const inv = await em.findOne(Invitation, { where: { id: result.invitationId } });
     expect(inv).not.toBeNull();
     expect((inv as { email: string }).email).toBe("check@test.local");
@@ -359,13 +344,13 @@ describe("auth.acceptInvite", () => {
     });
 
     // Accept as unauthenticated caller (publicProcedure)
-    const acceptEm = orm.em;
+    const acceptEm = testOrm.em;
     const acceptCaller = createCaller(
       createContext({
         session: null,
         orgId: null,
         userId: null,
-        em: acceptEm as unknown as import("@mikro-orm/postgresql").EntityManager,
+        em: acceptEm,
         container: null,
       }),
     );
@@ -375,7 +360,7 @@ describe("auth.acceptInvite", () => {
     expect(result.orgId).toBe(TEST_ORG_ID);
 
     // Verify OrgMember row created
-    const verifyEm = orm.em;
+    const verifyEm = testOrm.em;
     const member = await verifyEm.findOne(OrgMember, {
       orgId: TEST_ORG_ID,
       userId: result.userId,
@@ -390,7 +375,7 @@ describe("auth.acceptInvite", () => {
 
   it("expired token → BAD_REQUEST", async () => {
     // Manually insert an expired invitation
-    const em = orm.em;
+    const em = testOrm.em;
     const pastDate = new Date(Date.now() - 1000); // 1 second ago
     const plainToken = "expired-plain-token-12345678901234567890";
     const { createHash } = await import("node:crypto");
@@ -406,13 +391,13 @@ describe("auth.acceptInvite", () => {
     });
     await em.save(inv);
 
-    const acceptEm = orm.em;
+    const acceptEm = testOrm.em;
     const caller = createCaller(
       createContext({
         session: null,
         orgId: null,
         userId: null,
-        em: acceptEm as unknown as import("@mikro-orm/postgresql").EntityManager,
+        em: acceptEm,
         container: null,
       }),
     );
@@ -428,13 +413,13 @@ describe("auth.acceptInvite", () => {
   });
 
   it("invalid/unknown token → BAD_REQUEST", async () => {
-    const acceptEm = orm.em;
+    const acceptEm = testOrm.em;
     const caller = createCaller(
       createContext({
         session: null,
         orgId: null,
         userId: null,
-        em: acceptEm as unknown as import("@mikro-orm/postgresql").EntityManager,
+        em: acceptEm,
         container: null,
       }),
     );
@@ -457,26 +442,26 @@ describe("auth.acceptInvite", () => {
       role: "member",
     });
 
-    const firstAcceptEm = orm.em;
+    const firstAcceptEm = testOrm.em;
     const firstCaller = createCaller(
       createContext({
         session: null,
         orgId: null,
         userId: null,
-        em: firstAcceptEm as unknown as import("@mikro-orm/postgresql").EntityManager,
+        em: firstAcceptEm,
         container: null,
       }),
     );
     await firstCaller.auth.acceptInvite({ token });
 
     // Try to accept again
-    const secondAcceptEm = orm.em;
+    const secondAcceptEm = testOrm.em;
     const secondCaller = createCaller(
       createContext({
         session: null,
         orgId: null,
         userId: null,
-        em: secondAcceptEm as unknown as import("@mikro-orm/postgresql").EntityManager,
+        em: secondAcceptEm,
         container: null,
       }),
     );

@@ -10,32 +10,12 @@ import { afterAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { MigrationObject } from "@mikro-orm/core";
-import type { MikroORM, Options } from "@mikro-orm/postgresql";
-import { MikroORM as MikroORMRuntime } from "@mikro-orm/postgresql";
-import { Migrator } from "@mikro-orm/migrations";
-import { PGlite } from "@electric-sql/pglite";
+import type { EntityManager } from "typeorm";
 
-import { createOrmConfig } from "@platform-core/infrastructure/application-database/mikro-orm.config.ts";
-import { DEFAULT_ORG_ID, SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { AgentRun } from "@execution-orchestration/infrastructure/database/entities/orchestration/AgentRun.ts";
-import { Migration20260501104413_auth } from "@platform-core/infrastructure/application-database/migrations/Migration20260501104413_auth.ts";
-import { Migration20260501120537_events_org_id_backfill } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120537_events_org_id_backfill.ts";
-import { Migration20260501120538_events_org_id_notnull } from "@platform-core/infrastructure/application-database/migrations/Migration20260501120538_events_org_id_notnull.ts";
-import { Migration20260501130000_composite_indexes } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130000_composite_indexes.ts";
-import { Migration20260501130100_flag_stubs } from "@platform-core/infrastructure/application-database/migrations/Migration20260501130100_flag_stubs.ts";
-import { Migration20260501140000_schema_migration_ledger } from "@platform-core/infrastructure/application-database/migrations/Migration20260501140000_schema_migration_ledger.ts";
-import { Migration20260501150000_account_verification } from "@platform-core/infrastructure/application-database/migrations/Migration20260501150000_account_verification.ts";
-import { Migration20260502000001_orchestration_workflow_definitions } from "@platform-core/infrastructure/application-database/migrations/Migration20260502000001_orchestration_workflow_definitions.ts";
-import { Migration20260502030300_agent_runs_symphony_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502030300_agent_runs_symphony_columns.ts";
-import { Migration20260502050000_routing_rules } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050000_routing_rules.ts";
-import { Migration20260502050200_skills_registry } from "@platform-core/infrastructure/application-database/migrations/Migration20260502050200_skills_registry.ts";
-import { Migration20260502070100_docs_document_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070100_docs_document_columns.ts";
-import { Migration20260502070200_docs_related_tables } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070200_docs_related_tables.ts";
-import { Migration20260502070400_agent_runs_sandcastle_columns } from "@platform-core/infrastructure/application-database/migrations/Migration20260502070400_agent_runs_sandcastle_columns.ts";
-import { Migration20260502090000_tasks_schema_extension } from "@platform-core/infrastructure/application-database/migrations/Migration20260502090000_tasks_schema_extension.ts";
 import {
   createWorkspace,
   destroyWorkspace,
@@ -44,104 +24,13 @@ import {
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 const TASK_ID = "12345678-90ab-cdef-0000-000000000001";
 const RUN_ID = "90000000-0000-0000-0000-000000000001";
 const createCaller = t.createCallerFactory(appRouter);
 
-interface BlankOrm {
-  orm: MikroORM;
-  pglite: PGlite;
-  close: () => Promise<void>;
-}
-
-async function buildMigratedOrm(): Promise<BlankOrm> {
-  const pglite = new PGlite();
-  const config = createOrmConfig({ pglite });
-
-  config.migrations = {
-    ...((config.migrations ?? {}) as NonNullable<Options["migrations"]>),
-    transactional: false,
-    allOrNothing: false,
-    snapshot: false,
-    migrationsList: [
-      { name: "Migration20260501104413_auth", class: Migration20260501104413_auth },
-      {
-        name: "Migration20260501120537_events_org_id_backfill",
-        class: Migration20260501120537_events_org_id_backfill,
-      },
-      {
-        name: "Migration20260501120538_events_org_id_notnull",
-        class: Migration20260501120538_events_org_id_notnull,
-      },
-      {
-        name: "Migration20260501130000_composite_indexes",
-        class: Migration20260501130000_composite_indexes,
-      },
-      {
-        name: "Migration20260501130100_flag_stubs",
-        class: Migration20260501130100_flag_stubs,
-      },
-      {
-        name: "Migration20260501140000_schema_migration_ledger",
-        class: Migration20260501140000_schema_migration_ledger,
-      },
-      {
-        name: "Migration20260501150000_account_verification",
-        class: Migration20260501150000_account_verification,
-      },
-      {
-        name: "Migration20260502000001_orchestration_workflow_definitions",
-        class: Migration20260502000001_orchestration_workflow_definitions,
-      },
-      {
-        name: "Migration20260502030300_agent_runs_symphony_columns",
-        class: Migration20260502030300_agent_runs_symphony_columns,
-      },
-      {
-        name: "Migration20260502050000_routing_rules",
-        class: Migration20260502050000_routing_rules,
-      },
-      {
-        name: "Migration20260502050200_skills_registry",
-        class: Migration20260502050200_skills_registry,
-      },
-      {
-        name: "Migration20260502070100_docs_document_columns",
-        class: Migration20260502070100_docs_document_columns,
-      },
-      {
-        name: "Migration20260502070200_docs_related_tables",
-        class: Migration20260502070200_docs_related_tables,
-      },
-      {
-        name: "Migration20260502070400_agent_runs_sandcastle_columns",
-        class: Migration20260502070400_agent_runs_sandcastle_columns,
-      },
-      {
-        name: "Migration20260502090000_tasks_schema_extension",
-        class: Migration20260502090000_tasks_schema_extension,
-      },
-    ] satisfies MigrationObject[],
-  };
-  config.extensions = [Migrator];
-
-  const orm = await MikroORMRuntime.init(config);
-  await orm.migrator.up();
-  await new SeedService(orm.em).run();
-
-  return {
-    orm,
-    pglite,
-    close: async () => {
-      await orm.close(true);
-      await (pglite as { close?: () => Promise<void> }).close?.();
-    },
-  };
-}
-
-async function seedRun(orm: MikroORM): Promise<AgentRun> {
-  const em = orm.em;
+async function seedRun(em: EntityManager): Promise<AgentRun> {
   const org = em.getReference(Org, DEFAULT_ORG_ID);
   const task = em.create(Task, {
     id: TASK_ID,
@@ -257,19 +146,19 @@ describe("sanitizeWorkspaceKey", () => {
 });
 
 describe("Symphony workspace lifecycle", () => {
-  let lastDb: BlankOrm | undefined;
+  let lastDb: TestOrm | undefined;
 
   afterAll(async () => {
     await lastDb?.close();
   });
 
   it("creates an org-scoped directory and stores workspacePath on claim", async () => {
-    lastDb = await buildMigratedOrm();
+    lastDb = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(lastDb.orm);
+      const run = await seedRun(lastDb.em);
       const workspacePath = await createWorkspace(run, {
-        em: lastDb.orm.em,
+        em: lastDb.em,
         root,
       });
 
@@ -278,7 +167,7 @@ describe("Symphony workspace lifecycle", () => {
       );
       expect(await exists(workspacePath)).toBe(true);
 
-      const reloaded = await lastDb.orm.em.findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await lastDb.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBe(workspacePath);
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -286,16 +175,16 @@ describe("Symphony workspace lifecycle", () => {
   });
 
   it("removes workspace directory and clears workspacePath on release", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
-      const workspacePath = await createWorkspace(run, { em: db.orm.em, root });
+      const run = await seedRun(db.em);
+      const workspacePath = await createWorkspace(run, { em: db.em, root });
 
-      await destroyWorkspace(run, { em: db.orm.em, root, keepOnFailure: false });
+      await destroyWorkspace(run, { em: db.em, root, keepOnFailure: false });
 
       expect(await exists(workspacePath)).toBe(false);
-      const reloaded = await db.orm.em.findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await db.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBeNull();
     } finally {
       await db.close();
@@ -304,17 +193,17 @@ describe("Symphony workspace lifecycle", () => {
   });
 
   it("keeps failed workspaces when keepOnFailure is enabled", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
-      const workspacePath = await createWorkspace(run, { em: db.orm.em, root });
+      const run = await seedRun(db.em);
+      const workspacePath = await createWorkspace(run, { em: db.em, root });
       run.orchestrationState = "failed";
 
-      await destroyWorkspace(run, { em: db.orm.em, root, keepOnFailure: true });
+      await destroyWorkspace(run, { em: db.em, root, keepOnFailure: true });
 
       expect(await exists(workspacePath)).toBe(true);
-      const reloaded = await db.orm.em.findOneOrFail(AgentRun, RUN_ID);
+      const reloaded = await db.em.findOneOrFail(AgentRun, RUN_ID);
       expect(reloaded.workspacePath).toBe(workspacePath);
     } finally {
       await db.close();
@@ -323,10 +212,10 @@ describe("Symphony workspace lifecycle", () => {
   });
 
   it("removes a workspace without an entity manager", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
+      const run = await seedRun(db.em);
       const workspacePath = await createWorkspace(run, { root });
 
       await destroyWorkspace(run, { root });
@@ -340,14 +229,14 @@ describe("Symphony workspace lifecycle", () => {
   });
 
   it("refuses to remove a workspace path outside the org root", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
+      const run = await seedRun(db.em);
       run.workspacePath = tmpdir();
 
       await expect(
-        destroyWorkspace(run, { em: db.orm.em, root }),
+        destroyWorkspace(run, { em: db.em, root }),
       ).rejects.toThrow(/outside org root/i);
     } finally {
       await db.close();
@@ -356,15 +245,15 @@ describe("Symphony workspace lifecycle", () => {
   });
 
   it("refuses to remove the org workspace root itself", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
+      const run = await seedRun(db.em);
       run.workspacePath = join(root, DEFAULT_ORG_ID);
       await mkdir(run.workspacePath, { recursive: true });
 
       await expect(
-        destroyWorkspace(run, { em: db.orm.em, root }),
+        destroyWorkspace(run, { em: db.em, root }),
       ).rejects.toThrow(/outside org root/i);
       expect(await exists(run.workspacePath)).toBe(true);
     } finally {
@@ -376,17 +265,17 @@ describe("Symphony workspace lifecycle", () => {
 
 describe("orchestration.getWorkspacePath tRPC procedure", () => {
   it("returns the workspace path for an org-scoped run", async () => {
-    const db = await buildMigratedOrm();
+    const db = await createTestOrm();
     const root = await mkdtemp(join(tmpdir(), "fulcrum-workspaces-"));
     try {
-      const run = await seedRun(db.orm);
-      const workspacePath = await createWorkspace(run, { em: db.orm.em, root });
+      const run = await seedRun(db.em);
+      const workspacePath = await createWorkspace(run, { em: db.em, root });
       const caller = createCaller(
         createContext({
           session: mockSession() as unknown as import("better-auth").Session,
           orgId: DEFAULT_ORG_ID,
           userId: "user-workspace-test",
-          em: db.orm.em,
+          em: db.em,
           container: null,
         }),
       );
