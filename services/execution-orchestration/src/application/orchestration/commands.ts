@@ -39,18 +39,13 @@ export async function claimRunState(
     });
     if (!candidate) throw new OrchestrationStateMutationConflict(taskId);
 
-    const result = await agentRunRepo.update(
+    await agentRunRepo.update(
       { id: candidate.id, orchestrationState: "unclaimed" } as never,
       { orchestrationState: "claimed", claimedBy: instanceId } as never,
     );
-    // PGlite doesn't return affected count; verify the update took effect
-    if (result.affected !== undefined && result.affected === 0) {
-      throw new OrchestrationStateMutationConflict(taskId);
-    }
-    if (result.affected === undefined) {
-      const verify = await agentRunRepo.findOne({ where: { id: candidate.id, orchestrationState: "claimed" } as never });
-      if (!verify) throw new OrchestrationStateMutationConflict(taskId);
-    }
+    // PGlite may report affected=0 even on success — always verify via read
+    const verify = await agentRunRepo.findOne({ where: { id: candidate.id, orchestrationState: "claimed" } as never });
+    if (!verify) throw new OrchestrationStateMutationConflict(taskId);
 
     await tx.save(Event, {
       org: { id: orgId } as typeof Org.prototype,

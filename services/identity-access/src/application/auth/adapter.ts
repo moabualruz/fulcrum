@@ -561,6 +561,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!user) return null;
       const mapped = this.mapUserFromBetterAuth(upd);
       Object.assign(user, mapped);
+      await em.save(user);
       return this.mapUserToBetterAuth(user) as unknown as T;
     }
 
@@ -572,6 +573,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!session) return null;
       const mapped = this.mapSessionFromBetterAuth(upd);
       Object.assign(session, mapped);
+      await em.save(session);
       return this.mapSessionToBetterAuth(session) as unknown as T;
     }
 
@@ -582,6 +584,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!member) return null;
       const mapped = this.mapMemberFromBetterAuth(upd);
       Object.assign(member, mapped);
+      await em.save(member);
       return this.mapMemberToBetterAuth(member) as unknown as T;
     }
 
@@ -592,6 +595,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!inv) return null;
       const mapped = this.mapInvitationFromBetterAuth(upd);
       Object.assign(inv, mapped);
+      await em.save(inv);
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
 
@@ -602,6 +606,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!account) return null;
       const mapped = this.mapAccountFromBetterAuth(upd);
       Object.assign(account, mapped);
+      await em.save(account);
       return this.mapAccountToBetterAuth(account) as unknown as T;
     }
 
@@ -612,6 +617,7 @@ export class MikroOrmBetterAuthAdapter {
       if (!verification) return null;
       const mapped = this.mapVerificationFromBetterAuth(upd);
       Object.assign(verification, mapped);
+      await em.save(verification);
       return this.mapVerificationToBetterAuth(verification) as unknown as T;
     }
 

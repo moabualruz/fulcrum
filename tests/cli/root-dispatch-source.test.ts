@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DataSource } from "typeorm";
@@ -165,7 +165,9 @@ describe("root CLI source dispatch", () => {
   test("web command validates the real build artifact before serving", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-cli-web-missing-build-"));
     previousFulcrumHome = process.env.FULCRUM_HOME;
-    process.env.FULCRUM_HOME = join(scratch, "fulcrum-home");
+    const fulcrumHome = join(scratch, "fulcrum-home");
+    await mkdir(fulcrumHome, { recursive: true });
+    process.env.FULCRUM_HOME = fulcrumHome;
 
     const { container, cleanup } = await buildDbContainer();
     try {
@@ -180,13 +182,18 @@ describe("root CLI source dispatch", () => {
     );
   });
 
-  test("web command rejects pending migrations before serving assets", async () => {
+  test("web command rejects missing build before serving assets even on fresh DB", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-cli-web-pending-migrations-"));
     previousFulcrumHome = process.env.FULCRUM_HOME;
-    process.env.FULCRUM_HOME = join(scratch, "fulcrum-home");
+    const fulcrumHome = join(scratch, "fulcrum-home");
+    await mkdir(fulcrumHome, { recursive: true });
+    process.env.FULCRUM_HOME = fulcrumHome;
+    process.chdir(scratch);
 
+    // buildLocalApplicationContainer auto-runs migrations, so pending state
+    // is never reached. The next gate — missing build artifacts — fires instead.
     await expect(run(["web"])).rejects.toThrow(
-      "migrations pending:",
+      "web build missing",
     );
   });
 

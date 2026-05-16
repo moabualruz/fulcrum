@@ -88,8 +88,8 @@ export class FulcrumCasbinAdapter implements Adapter {
     const em: EntityManager = (this._repo as unknown as { em: EntityManager }).em;
 
     await em.transaction(async (txEm: EntityManager) => {
-      // Clear existing policies via entity class reference.
-      await txEm.delete(CasbinRule, {} as never);
+      // Clear existing policies via TRUNCATE (TypeORM rejects empty criteria in delete).
+      await txEm.getRepository(CasbinRule).clear();
 
       // Re-insert from model
       const sections = ["p", "g"];

@@ -221,7 +221,7 @@ describe("Symphony workspace lifecycle", () => {
       await destroyWorkspace(run, { root });
 
       expect(await exists(workspacePath)).toBe(false);
-      expect(run.workspacePath).toBeUndefined();
+      expect(run.workspacePath).toBeNull();
     } finally {
       await db.close();
       await rm(root, { recursive: true, force: true });

@@ -468,38 +468,34 @@ describe("passkey WebAuthn helpers", () => {
   test("MikroOrmPasskeyStore.saveChallenge replaces challenge inside one transaction", async () => {
     const calls: string[] = [];
     const txEm = {
-      nativeDelete: async () => {
+      delete: async () => {
         calls.push("delete");
       },
       create: (_entity: unknown, value: unknown) => {
         calls.push("create");
         return value;
       },
-      persist: () => {
-        calls.push("persist");
-      },
-      flush: async () => {
-        calls.push("flush");
+      save: async (entity: unknown) => {
+        calls.push("save");
+        return entity;
       },
     };
     const em = {
-      transactional: async (callback: (em: typeof txEm) => Promise<void>) => {
+      transaction: async (callback: (em: typeof txEm) => Promise<void>) => {
         calls.push("transaction:start");
         await callback(txEm);
         calls.push("transaction:end");
       },
-      nativeDelete: async () => {
+      delete: async () => {
         calls.push("outer:delete");
       },
       create: () => {
         calls.push("outer:create");
         return {};
       },
-      persist: () => {
-        calls.push("outer:persist");
-      },
-      flush: async () => {
-        calls.push("outer:flush");
+      save: async (entity: unknown) => {
+        calls.push("outer:save");
+        return entity;
       },
     };
     const store = new MikroOrmPasskeyStore(em as never);
@@ -517,8 +513,7 @@ describe("passkey WebAuthn helpers", () => {
       "transaction:start",
       "delete",
       "create",
-      "persist",
-      "flush",
+      "save",
       "transaction:end",
     ]);
   });
@@ -534,15 +529,13 @@ describe("passkey WebAuthn helpers", () => {
         calls.push("create");
         return value;
       },
-      persist: () => {
-        calls.push("persist");
-      },
-      flush: async () => {
-        calls.push("flush");
+      save: async (entity: unknown) => {
+        calls.push("save");
+        return entity;
       },
     };
     const em = {
-      transactional: async (callback: (em: typeof txEm) => Promise<void>) => {
+      transaction: async (callback: (em: typeof txEm) => Promise<void>) => {
         calls.push("transaction:start");
         await callback(txEm);
         calls.push("transaction:end");
@@ -555,11 +548,9 @@ describe("passkey WebAuthn helpers", () => {
         calls.push("outer:create");
         return {};
       },
-      persist: () => {
-        calls.push("outer:persist");
-      },
-      flush: async () => {
-        calls.push("outer:flush");
+      save: async (entity: unknown) => {
+        calls.push("outer:save");
+        return entity;
       },
     };
     const store = new MikroOrmPasskeyStore(em as never);
@@ -575,8 +566,7 @@ describe("passkey WebAuthn helpers", () => {
       "transaction:start",
       "findOne",
       "create",
-      "persist",
-      "flush",
+      "save",
       "transaction:end",
     ]);
   });
@@ -594,12 +584,13 @@ describe("passkey WebAuthn helpers", () => {
         calls.push("findOne");
         return txRow;
       },
-      flush: async () => {
-        calls.push("flush");
+      save: async (entity: unknown) => {
+        calls.push("save");
+        return entity;
       },
     };
     const em = {
-      transactional: async (callback: (em: typeof txEm) => Promise<void>) => {
+      transaction: async (callback: (em: typeof txEm) => Promise<void>) => {
         calls.push("transaction:start");
         await callback(txEm);
         calls.push("transaction:end");
@@ -608,8 +599,9 @@ describe("passkey WebAuthn helpers", () => {
         calls.push("outer:findOne");
         return txRow;
       },
-      flush: async () => {
-        calls.push("outer:flush");
+      save: async (entity: unknown) => {
+        calls.push("outer:save");
+        return entity;
       },
     };
     const store = new MikroOrmPasskeyStore(em as never);
@@ -619,7 +611,7 @@ describe("passkey WebAuthn helpers", () => {
     expect(calls).toEqual([
       "transaction:start",
       "findOne",
-      "flush",
+      "save",
       "transaction:end",
     ]);
   });

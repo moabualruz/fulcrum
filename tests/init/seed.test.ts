@@ -73,7 +73,7 @@ const ds = new DataSource({
   driver,
   entities: getCoreEntities(),
   migrations: [
-    ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/migrations"))} + "/*.ts",
+    ${JSON.stringify(join(repoRoot, "services/platform-core/src/infrastructure/application-database/migrations"))} + "/*.ts",
   ],
   migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
   synchronize: false,
@@ -115,7 +115,7 @@ try {
   console.log(JSON.stringify({ first, second, afterFirst, afterSecond, rules }));
 } finally {
   await ds.destroy();
-  await pglite.close();
+  await pglite.close().catch(() => {});
 }
 `.trimStart(),
   );

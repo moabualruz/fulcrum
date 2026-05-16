@@ -288,7 +288,12 @@ async function drainPersist(em: EntityManager & Record<string, unknown>, ds: Dat
 
 function patchEntityManager(target: EntityManager & Record<string, unknown>, ds: DataSource): void {
   function normalizeFindOptions(entityClass: Function, options: any): any {
-    if (!options || typeof options !== "object") return options;
+    if (!options) return options;
+    // MikroORM allows findOne(Entity, id) with a raw string/number — convert to TypeORM { where: { id } }
+    if (typeof options === "string" || typeof options === "number") {
+      return { where: { id: options } };
+    }
+    if (typeof options !== "object") return options;
     let normalized = options;
     if (!("where" in options) && !("take" in options) && !("skip" in options) &&
         !("order" in options) && !("relations" in options) && !("select" in options)) {
@@ -363,10 +368,41 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
   }
   const origTransaction = target.transaction.bind(target);
   (target as any).transaction = async (cb: (txEm: EntityManager) => Promise<unknown>) => {
+    await drainPersist(target, ds);
     return origTransaction(async (txEm: EntityManager) => {
       patchEntityManager(txEm as EntityManager & Record<string, unknown>, ds);
       return cb(txEm);
     });
+  };
+  // Patch em.update to return proper affected count (PGlite returns undefined)
+  const origUpdate = target.update.bind(target);
+  (target as any).update = async (entityClass: Function, criteria: any, partialEntity: any) => {
+    await drainPersist(target, ds);
+    const result = await origUpdate(entityClass as any, criteria, partialEntity);
+    if (result.affected === undefined) {
+      // PGlite doesn't return affected count — compute from matched rows
+      try {
+        const where = (typeof criteria === "string" || typeof criteria === "number")
+          ? { id: criteria } : criteria;
+        result.affected = await ds.getRepository(entityClass as any).count({ where });
+      } catch { result.affected = 0; }
+    }
+    return result;
+  };
+  // Patch em.delete to return proper affected count (PGlite returns undefined)
+  const origDelete = target.delete.bind(target);
+  (target as any).delete = async (entityClass: Function, criteria: any) => {
+    await drainPersist(target, ds);
+    const countBefore = (() => {
+      try {
+        const where = (typeof criteria === "string" || typeof criteria === "number")
+          ? { id: criteria } : criteria;
+        return ds.getRepository(entityClass as any).count({ where });
+      } catch { return Promise.resolve(0); }
+    })();
+    const [count, result] = await Promise.all([countBefore, origDelete(entityClass as any, criteria)]);
+    if (result.affected === undefined) result.affected = count;
+    return result;
   };
   // MikroORM em.getReference(Entity, id) → create a proxy with just the id set
   if (!target.getReference) {

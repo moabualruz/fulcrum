@@ -355,6 +355,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
           accessToken: metadata,
           updatedAt: now,
         });
+        await em.save(existing);
       } else {
         const row = em.create(Account, {
           userId: credential.userId,
@@ -383,6 +384,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
         accessToken: credentialMetadataToString({ ...credential, counter }),
         updatedAt: new Date(),
       });
+      await em.save(row);
     });
   }
 }

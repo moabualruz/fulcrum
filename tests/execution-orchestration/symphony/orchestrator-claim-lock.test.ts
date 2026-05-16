@@ -108,9 +108,8 @@ async function seedDuplicateUnclaimedRuns(
       sandboxMode: "host",
       iterationCount: 0,
     });
-    em.persist(run);
+    await em.save(run);
   }
-  /* flushed */
 
   return { taskId: task.id, runIds: [runInputs[0].id, runInputs[1].id] };
 }
@@ -221,6 +220,10 @@ describe("claimRun — claim-lock state machine", () => {
       expect(run.orchestrationState).toBe("unclaimed");
       expect(events).toHaveLength(0);
     } finally {
+      // Drop the test constraint so it doesn't leak into subsequent tests (shared PGlite)
+      await db.em.getConnection().execute(
+        `alter table "events" drop constraint if exists "events_reject_state_changed_test"`,
+      ).catch(() => {});
       await db.close();
     }
   });

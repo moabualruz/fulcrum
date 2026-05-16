@@ -61,8 +61,8 @@ beforeEach(async () => {
   const em = db.em;
   await em.nativeDelete(CasbinRule, {});
 
-  // Fresh repo + adapter per test
-  repo = db.em.getRepository(CasbinRule) as CasbinRuleRepository;
+  // Fresh repo + adapter per test — wrap in CasbinRuleRepository
+  repo = new CasbinRuleRepository(db.em.getRepository(CasbinRule));
   adapter = new FulcrumCasbinAdapter(repo);
 });
 
@@ -183,7 +183,7 @@ describe("FulcrumCasbinAdapter — savePolicy", () => {
     await adapter.savePolicy(model);
 
     // Fresh adapter from same repo — load should see the saved rules
-    const freshRepo = db.em.getRepository(CasbinRule) as CasbinRuleRepository;
+    const freshRepo = new CasbinRuleRepository(db.em.getRepository(CasbinRule));
     const freshAdapter = new FulcrumCasbinAdapter(freshRepo);
     const model2 = newModel(RBAC_MODEL_TEXT);
     await freshAdapter.loadPolicy(model2);

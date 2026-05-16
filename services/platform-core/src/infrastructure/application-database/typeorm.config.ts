@@ -226,7 +226,7 @@ export function createDataSourceOptions(
   return {
     type: "postgres",
     ...(database.backend === "pglite"
-      ? { driver: new PGliteDriver({ dataDir: database.dataDir }).driver }
+      ? { driver: new PGliteDriver({ dataDir: database.dataDir }).driver, installExtensions: false }
       : { url: database.url }),
     entities: [...getCoreEntities(), ...extraEntities],
     migrations: [__dirname + "/migrations/*.{ts,js}"],
