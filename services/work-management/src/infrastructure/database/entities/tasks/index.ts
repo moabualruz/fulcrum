@@ -44,3 +44,4 @@ export { FieldDependencyRule } from "./FieldDependencyRule.ts";
 export { YjsSnapshot } from "./YjsSnapshot.ts";
 export { TaskTemplate } from "./TaskTemplate.ts";
 export { TaskRecurrenceRule } from "./TaskRecurrenceRule.ts";
+export { TimeEntry } from "./TimeEntry.ts";

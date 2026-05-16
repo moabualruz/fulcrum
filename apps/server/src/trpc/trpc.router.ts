@@ -57,6 +57,7 @@ import { searchRouter } from "./routers/search.ts";
 import { connectorsRouter } from "./routers/connectors.ts";
 import { doctorRouter } from "./routers/doctor.ts";
 import { invitationsRouter } from "./routers/invitations.ts";
+import { timeEntriesRouter } from "./routers/time-entries.ts";
 
 import { z } from "zod";
 
@@ -138,6 +139,7 @@ export class TrpcRouter implements OnModuleInit {
       planning: planningRouter,
       review: reviewRouter,
       credentials: credentialsRouter,
+      timeEntries: timeEntriesRouter,
       db: dbRouter,
       health: healthRouter,
       runsSubscriptions: runsSubscriptionRouter,
