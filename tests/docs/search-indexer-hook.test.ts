@@ -56,23 +56,29 @@ async function installP11SearchColumns(em: import("typeorm").EntityManager) {
 }
 
 async function searchRow(em: import("typeorm").EntityManager, docId: string) {
-  const rows = await em.getConnection().execute<Array<{
+  const rows = await em.query(
+    `SELECT source_kind, source_id, entity_kind, entity_id, title, body, labels, metadata, archived
+       FROM search_documents
+      WHERE org_id = $1 AND source_kind = 'doc' AND source_id = $2`,
+    [ORG_ID, docId],
+  ) as Array<{
     source_kind: string | null;
     source_id: string | null;
     entity_kind: string;
     entity_id: string;
     title: string | null;
     body: string | null;
-    labels: string[];
-    metadata: Record<string, unknown>;
+    labels: string | string[];
+    metadata: Record<string, unknown> | string;
     archived: boolean;
-  }>>(
-    `SELECT source_kind, source_id, entity_kind, entity_id, title, body, labels, metadata, archived
-       FROM search_documents
-      WHERE org_id = ? AND source_kind = 'doc' AND source_id = ?`,
-    [ORG_ID, docId],
-  );
-  return rows[0];
+  }>;
+  if (!rows[0]) return undefined;
+  const row = rows[0];
+  return {
+    ...row,
+    labels: typeof row.labels === "string" ? row.labels.replace(/[{}]/g, "").split(",").filter(Boolean) : row.labels,
+    metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
+  };
 }
 
 describe("docs search index hook", () => {
