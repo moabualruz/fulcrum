@@ -14,10 +14,10 @@ test.describe("PM Board Workflow", () => {
   test("creates a task from board column inline form", async ({ page }) => {
     await page.goto("/boards");
     const todoColumn = page.locator('[data-board-column="todo"]');
-    await todoColumn.locator("[data-add-card]").click();
-    await todoColumn.locator("[data-new-card-title]").fill("E2E board task");
-    await todoColumn.locator("[data-new-card-submit]").click();
-    await expect(todoColumn.locator('[data-card-title="E2E board task"]')).toBeVisible();
+    const addForm = todoColumn.locator("[data-board-column-add]");
+    await addForm.locator("[data-board-column-input]").fill("E2E board task");
+    await addForm.locator('button[type="submit"]').click();
+    await expect(todoColumn.locator("text=E2E board task")).toBeVisible();
   });
 
   test("opens task detail sheet on card click", async ({ page }) => {
@@ -26,7 +26,7 @@ test.describe("PM Board Workflow", () => {
     if (await card.isVisible()) {
       await card.click();
       await expect(page.locator("[data-board-sheet]")).toBeVisible();
-      await expect(page.locator("[data-sheet-title]")).toBeVisible();
+      await expect(page.locator("[data-testid="task-detail-title"]")).toBeVisible();
     }
   });
 
@@ -47,7 +47,7 @@ test.describe("PM Board Workflow", () => {
     if (await card.isVisible()) {
       await card.focus();
       await page.keyboard.press("ArrowRight");
-      await expect(page.locator("[data-move-announcement]")).toBeVisible();
+      await expect(page.locator("[data-keyboard-announcer]")).toBeVisible();
     }
   });
 
