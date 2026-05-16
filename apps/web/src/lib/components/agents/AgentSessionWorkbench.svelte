@@ -20,6 +20,7 @@
 
 <section
   data-agent-session-workbench
+  data-session-workbench
   data-session-status={model.connection.status}
   class={cn("rounded-lg border border-border bg-background p-4")}
 >
@@ -55,7 +56,7 @@
 
   <div class={cn("mt-4 grid gap-4 md:grid-cols-3")}>
     <div data-session-selectors class={cn("space-y-3")}>
-      <div>
+      <div data-mode-selector>
         <h3 class={cn("text-sm font-medium")}>Modes</h3>
         {#if model.modes.length === 0}
           <p class={cn("text-xs text-muted-foreground")}>None</p>
@@ -69,7 +70,7 @@
           </div>
         {/if}
       </div>
-      <div>
+      <div data-model-picker>
         <h3 class={cn("text-sm font-medium")}>Models</h3>
         {#if model.models.length === 0}
           <p class={cn("text-xs text-muted-foreground")}>None</p>
@@ -85,7 +86,7 @@
       </div>
     </div>
 
-    <div data-session-traffic class={cn("space-y-2")}>
+    <div data-session-traffic data-traffic-monitor class={cn("space-y-2")}>
       <h3 class={cn("text-sm font-medium")}>Traffic</h3>
       <dl class={cn("grid grid-cols-2 gap-2 text-xs")}>
         <div><dt class={cn("text-muted-foreground")}>Total</dt><dd>{model.traffic.summary.total}</dd></div>
@@ -130,7 +131,7 @@
   </div>
 
   {#if model.permission}
-    <div data-session-permission class={cn("mt-4 rounded-md border border-border p-3")}>
+    <div data-session-permission data-permission-dialog class={cn("mt-4 rounded-md border border-border p-3")}>
       <h3 class={cn("text-sm font-medium")}>{model.permission.toolCall.title}</h3>
       <div class={cn("mt-2 flex flex-wrap gap-2")}>
         {#each model.permission.options as option}
@@ -143,7 +144,7 @@
   {/if}
 
   {#if model.resumableSessions.length > 0}
-    <div data-session-resume class={cn("mt-4 rounded-md border border-border p-3")}>
+    <div data-session-resume data-session-list class={cn("mt-4 rounded-md border border-border p-3")}>
       <h3 class={cn("text-sm font-medium")}>Resumable sessions</h3>
       <ol class={cn("mt-2 space-y-2")}>
         {#each model.resumableSessions as session}
