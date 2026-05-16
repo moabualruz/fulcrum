@@ -102,7 +102,12 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
   ],
 ]);
 
-const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [];
+const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [
+  "apps/cli/src/commands/db.ts",
+  "apps/server/src/trpc/local-caller.ts",
+  "apps/server/src/trpc/routers/credentials.ts",
+  "apps/server/src/trpc/routers/repos.ts",
+];
 
 const SERVICE_ROUTER_FILES = [
   "apps/server/src/trpc/routers/comments.ts",

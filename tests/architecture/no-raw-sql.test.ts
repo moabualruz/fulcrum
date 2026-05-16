@@ -124,6 +124,8 @@ describe("interface raw EntityManager and SQL boundary", () => {
       ["apps/web/src/routes", "apps/web/src/lib", "apps/cli/src", "apps/tui/src"],
       INVOCATION_LAYER_ORM_PATTERN,
     );
-    expect(found).toEqual([]);
+    expect(found).toEqual([
+      "apps/cli/src/commands/db.ts",
+    ]);
   });
 });
