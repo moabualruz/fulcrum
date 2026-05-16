@@ -26,7 +26,7 @@ describe("planning artifact previews", () => {
         },
         {
           kind: "boilerplate",
-          path: "tests/services/review-planning/technical-planning-cycle.test.ts",
+          path: "tests/planning-review/technical-planning-cycle.test.ts",
         },
       ],
     });
@@ -67,10 +67,10 @@ describe("planning artifact previews", () => {
       },
       {
         kind: "boilerplate",
-        path: "tests/services/review-planning/technical-planning-cycle.test.ts",
+        path: "tests/planning-review/technical-planning-cycle.test.ts",
         mode: "test-file",
         urlPath: undefined,
-        run: { command: "bun", args: ["test", "tests/services/review-planning/technical-planning-cycle.test.ts"] },
+        run: { command: "bun", args: ["test", "tests/planning-review/technical-planning-cycle.test.ts"] },
       },
     ]);
     expect(previews[0]?.reviewChecks.join("\n")).toContain("Prototype demonstrates the intended user flow");

@@ -19,6 +19,8 @@ eval-results/
 .codex/
 coverage/
 test-results/
+memory:/
+tests/.tmp-*/
 
 # Preserved temporary upstream repositories and baseline-copy experiments for
 # Phase 9.6 copy-first workflow/value mapping. Do not track archive folders;

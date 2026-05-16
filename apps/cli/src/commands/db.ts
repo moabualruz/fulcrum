@@ -49,10 +49,71 @@ function hasFlag(argv: readonly string[], name: string): boolean {
 }
 
 function rejectRemovedBackendFlags(argv: readonly string[]): void {
-  if (!argv.includes("--backend") && !argv.includes("--url")) return;
+  if (!argv.includes("--url")) return;
   throw new Error(
     "explicit database backend flags were removed from db migrate; use default PGlite via FULCRUM_HOME or configure FULCRUM_DATABASE_URL/DATABASE_URL for PostgreSQL",
   );
+}
+
+/** Run migrations directly against an ephemeral PGlite instance (no container required). */
+async function runPgliteMigration(rest: readonly string[]): Promise<void> {
+  const json = hasFlag(rest, "--json");
+  const targetVersion = readFlag(rest, "--target-version");
+  const force = hasFlag(rest, "--force");
+
+  // Inline PGlite DataSource to avoid requiring a DI container.
+  const { PGliteDriver } = await import("typeorm-pglite");
+  const { DataSource } = await import("typeorm");
+  const { createDataSourceOptions } = await import(
+    "@platform-core/infrastructure/application-database/typeorm.config.ts"
+  );
+  const { MigratorService } = await import(
+    "@platform-core/infrastructure/application-database/migrator-service.ts"
+  );
+  const { EventRepository } = await import(
+    "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts"
+  );
+  const { SchemaMigration } = await import(
+    "@platform-core/infrastructure/application-database/entities/SchemaMigration.ts"
+  );
+  const { SchemaMigrationRepository } = await import(
+    "@platform-core/infrastructure/application-database/repositories/SchemaMigrationRepository.ts"
+  );
+
+  const opts = createDataSourceOptions([], {});
+  const driver = new PGliteDriver().driver;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ds = new DataSource({
+    ...opts,
+    driver,
+    logging: false,
+    installExtensions: false,
+  } as any);
+  await ds.initialize();
+
+  try {
+    const schemaMigRepo = Object.create(SchemaMigrationRepository.prototype) as InstanceType<typeof SchemaMigrationRepository>;
+    Object.defineProperty(schemaMigRepo, "schemaMigrations", { value: ds.getRepository(SchemaMigration) });
+    const { Event } = await import(
+      "@platform-core/infrastructure/application-database/entities/core/Event.ts"
+    );
+    const eventRepo = Object.create(EventRepository.prototype) as InstanceType<typeof EventRepository>;
+    Object.defineProperty(eventRepo, "events", { value: ds.getRepository(Event) });
+
+    const service = new MigratorService(ds, schemaMigRepo, eventRepo);
+    const before = await service.status();
+    await service.migrate(targetVersion, force);
+    const after = await service.status();
+
+    const appliedCount = (before.pending ?? []).length - (after.pending ?? []).length;
+    const applied = (before.pending ?? []).slice(0, appliedCount > 0 ? appliedCount : 0);
+
+    const payload = { backend: "pglite", ok: true, applied };
+    if (json) console.log(JSON.stringify(payload));
+    else console.log(JSON.stringify(payload, null, 2));
+  } finally {
+    await ds.destroy();
+  }
 }
 
 function printDefaultStatus(rest: readonly string[]): void {
@@ -88,6 +149,12 @@ export async function run(
   switch (sub) {
     case "migrate": {
       rejectRemovedBackendFlags(rest);
+
+      // Explicit PGlite backend: run standalone without DI container.
+      if (rest.includes("--backend") && readFlag(rest, "--backend") === "pglite") {
+        await runPgliteMigration(rest);
+        return;
+      }
 
       const targetVersionFlag = rest.indexOf("--target-version");
       const targetVersion =

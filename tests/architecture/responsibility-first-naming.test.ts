@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 const ROOT = process.cwd();
 const SCAN_ROOTS = ["apps", "services", "tests"];
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".svelte", ".json", ".sql"]);
-const SELF = "tests/infrastructure/responsibility-first-naming.test.ts";
+const SELF = "tests/architecture/responsibility-first-naming.test.ts";
 const RESPONSIBILITY_GUARDS = new Set([
   SELF,
   "tests/architecture/repo-structure.test.ts",

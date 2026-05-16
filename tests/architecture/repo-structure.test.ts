@@ -5,11 +5,11 @@ import { describe, expect, test } from "bun:test";
 const ROOT = process.cwd();
 
 const EMPTY_DIR_ALLOWLIST = new Set([
-  "tests/scripts/license-audit.fixtures/invalid-json",
-  "tests/scripts/license-audit.fixtures/missing-license",
-  "tests/scripts/license-audit.fixtures/multi-license",
-  "tests/scripts/license-audit.fixtures/pretend-agpl",
-  "tests/scripts/license-audit.fixtures/pretend-mit",
+  "tests/architecture/license-audit.fixtures/invalid-json",
+  "tests/architecture/license-audit.fixtures/missing-license",
+  "tests/architecture/license-audit.fixtures/multi-license",
+  "tests/architecture/license-audit.fixtures/pretend-agpl",
+  "tests/architecture/license-audit.fixtures/pretend-mit",
 ]);
 
 const GENERATED_OR_VENDOR_DIRS = new Set([
