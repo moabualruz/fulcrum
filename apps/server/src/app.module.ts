@@ -1,7 +1,6 @@
 import "reflect-metadata";
 
 import { Module } from "@nestjs/common";
-import { TRPCModule } from "nestjs-trpc";
 
 import { ApplicationDatabaseModule } from "@platform-core/infrastructure/database/typeorm-root.module.ts";
 import { CredentialPublicApiModule } from "@platform-core/interface/http/credential-public-api.controller.ts";
@@ -44,12 +43,13 @@ import { TemplatePublicApiModule } from "@work-management/interface/http/templat
 import { TaskPublicApiModule } from "@work-management/interface/http/task-public-api.controller.ts";
 import { WorkflowSettingsPublicApiModule } from "@work-management/interface/http/workflow-settings-public-api.controller.ts";
 import { WorkflowCycleModule } from "@workflow-coordination/interface/http/workflow-cycle.module.ts";
+import { TrpcModule } from "./trpc/trpc.module.ts";
 
 export class AppModule {}
 
 Module({
   imports: [
-    TRPCModule.forRoot({ basePath: "/trpc" }),
+    TrpcModule,
     ApplicationDatabaseModule,
     CredentialPublicApiModule,
     DoctorPublicApiModule,
