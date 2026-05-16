@@ -26,7 +26,7 @@ test.describe("PM Board Workflow", () => {
     if (await card.isVisible()) {
       await card.click();
       await expect(page.locator("[data-board-sheet]")).toBeVisible();
-      await expect(page.locator("[data-testid="task-detail-title"]")).toBeVisible();
+      await expect(page.locator("[data-testid='task-detail-title']")).toBeVisible();
     }
   });
 
