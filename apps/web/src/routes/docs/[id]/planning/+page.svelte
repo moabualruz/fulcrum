@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { PageData } from "./$types";
 
-  export let data: PageData;
+  interface Props { data: PageData; }
+  const { data }: Props = $props();
 
   const doc = data.doc;
   const bodyPreview = doc.bodyMd.length > 500 ? doc.bodyMd.slice(0, 500) + "…" : doc.bodyMd;

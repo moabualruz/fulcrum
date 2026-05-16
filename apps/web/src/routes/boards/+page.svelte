@@ -10,8 +10,12 @@
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
+  import ListView from "$lib/components/board/ListView.svelte";
+  import SpreadsheetView from "$lib/components/board/SpreadsheetView.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
+  import { page } from "$app/state";
+  import { cn } from "$lib/utils.js";
 
   interface Props {
     data: {
@@ -21,6 +25,11 @@
     };
   }
   const { data }: Props = $props();
+
+  type ViewMode = "board" | "list" | "spreadsheet";
+  let viewMode = $state<ViewMode>(
+    (page.url.searchParams.get("view") as ViewMode) || "board"
+  );
 
   let resolvedTasks = $state<BoardTask[]>([]);
 
@@ -124,6 +133,26 @@
 
 <header data-board-header class="mb-3 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">Board</h1>
+  <nav data-view-switcher class={cn("flex items-center gap-1 rounded-md border border-border p-0.5")} aria-label="View mode">
+    {#each [
+      { id: "board", label: "Board", icon: "▦" },
+      { id: "list", label: "List", icon: "☰" },
+      { id: "spreadsheet", label: "Table", icon: "▤" },
+    ] as view (view.id)}
+      <button
+        type="button"
+        data-view={view.id}
+        class={cn(
+          "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+          viewMode === view.id
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        )}
+        onclick={() => { viewMode = view.id as ViewMode; }}
+        aria-pressed={viewMode === view.id}
+      >{view.icon} {view.label}</button>
+    {/each}
+  </nav>
 </header>
 
 {#await data.streamed.data}
@@ -146,19 +175,33 @@
     </form>
   </header>
 
-  <div data-board-grid class="flex gap-3 overflow-x-auto pb-2" onkeydown={onCardKeydown} role="presentation">
-    {#each TASK_STATUSES as status (status)}
-      <BoardColumn
-        {status}
-        label={describeStatus(status)}
-        tasks={snapshot.groups[status]}
-        allTasks={resolvedTasks}
-        onCardEdit={openSheet}
-        onMove={onMove}
-        onCreate={(title) => onCreate(status, title)}
-      />
-    {/each}
-  </div>
+  {#if viewMode === "board"}
+    <div data-board-grid class="flex gap-3 overflow-x-auto pb-2" onkeydown={onCardKeydown} role="presentation">
+      {#each TASK_STATUSES as status (status)}
+        <BoardColumn
+          {status}
+          label={describeStatus(status)}
+          tasks={snapshot.groups[status]}
+          allTasks={resolvedTasks}
+          onCardEdit={openSheet}
+          onMove={onMove}
+          onCreate={(title) => onCreate(status, title)}
+        />
+      {/each}
+    </div>
+  {:else if viewMode === "list"}
+    <ListView
+      tasks={resolvedTasks}
+      onEdit={openSheet}
+      onStatusChange={(taskId, status) => onMove({ taskId, fromStatus: "todo", toStatus: status })}
+    />
+  {:else if viewMode === "spreadsheet"}
+    <SpreadsheetView
+      tasks={resolvedTasks}
+      onEdit={openSheet}
+      onStatusChange={(taskId, status) => onMove({ taskId, fromStatus: "todo", toStatus: status })}
+    />
+  {/if}
 
   <BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onClose={closeSheet} />
   <KeyboardMoveAnnouncer message={announcement} />
