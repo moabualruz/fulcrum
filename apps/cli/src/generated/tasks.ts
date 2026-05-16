@@ -1,8 +1,4 @@
 import { Command, Option } from "commander";
-import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
-import { createTaskApiCallerFromEnv } from "@work-management/interface/http/task-api-client.ts";
-
-type JsonRecord = Record<string, unknown>;
 
 export function createTasksCommand(): Command {
   const command = new Command("tasks");
@@ -11,15 +7,9 @@ export function createTasksCommand(): Command {
   const bulkDeleteCommand = command.command("bulk-delete");
   bulkDeleteCommand.description("tasks bulkDelete");
   bulkDeleteCommand.option("--json", "Emit JSON output");
-  bulkDeleteCommand.option("--ids <ids>", "comma-separated task ids");
-  bulkDeleteCommand.option("--project-id <string>", "project-id");
   bulkDeleteCommand.action(async (options) => {
     try {
-      const result = [];
-      for (const id of requiredCsvOption(options, "ids")) {
-        result.push(await taskClient().delete(compact({ id, projectId: options.projectId }) as JsonRecord & { id: string }));
-      }
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.bulkDelete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -34,19 +24,9 @@ export function createTasksCommand(): Command {
   const bulkUpdateCommand = command.command("bulk-update");
   bulkUpdateCommand.description("tasks bulkUpdate");
   bulkUpdateCommand.option("--json", "Emit JSON output");
-  bulkUpdateCommand.option("--ids <ids>", "comma-separated task ids");
-  bulkUpdateCommand.option("--project-id <string>", "project-id");
-  bulkUpdateCommand.option("--title <string>", "title");
-  bulkUpdateCommand.option("--status <string>", "status");
-  bulkUpdateCommand.option("--priority <number>", "priority", Number.parseFloat);
   bulkUpdateCommand.action(async (options) => {
     try {
-      const patch = taskPatchOptions(options);
-      const result = [];
-      for (const id of requiredCsvOption(options, "ids")) {
-        result.push(await taskClient().update(compact({ id, projectId: options.projectId, ...patch }) as JsonRecord & { id: string }));
-      }
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.bulkUpdate requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -61,27 +41,14 @@ export function createTasksCommand(): Command {
   const createCommand = command.command("create");
   createCommand.description("tasks create");
   createCommand.option("--json", "Emit JSON output");
-  createCommand.option("--title <string>", "title");
-  createCommand.option("--project-id <string>", "project-id");
   createCommand.option("--assignee-id <string>", "assignee-id");
   createCommand.option("--description <string>", "description");
   createCommand.option("--description-text <string>", "description-text");
   createCommand.option("--points <number>", "points", Number.parseFloat);
   createCommand.option("--priority <number>", "priority", Number.parseFloat);
-  createCommand.option("--status <string>", "status");
   createCommand.action(async (options) => {
     try {
-      const result = await taskClient().create(compact({
-        title: requiredOption(options, "title"),
-        projectId: options.projectId,
-        description: options.description,
-        descriptionText: options.descriptionText,
-        points: options.points,
-        priority: options.priority,
-        status: options.status,
-        assigneeId: options.assigneeId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -96,15 +63,9 @@ export function createTasksCommand(): Command {
   const deleteCommand = command.command("delete");
   deleteCommand.description("tasks delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "task id");
-  deleteCommand.option("--project-id <string>", "project-id");
   deleteCommand.action(async (options) => {
     try {
-      const result = await taskClient().delete(compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-      }) as JsonRecord & { id: string });
-      printGeneratedResult(result ?? { ok: true }, options);
+      throw new Error("Generated tRPC invocation for tasks.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -126,14 +87,7 @@ export function createTasksCommand(): Command {
   dependencyRunLiveFeedbackCommand.option("--trace-id <string>", "trace-id");
   dependencyRunLiveFeedbackCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().dependencyRunLiveFeedback(compact({
-        projectId: requiredOption(options, "projectId"),
-        traceId: options.traceId,
-        runGroupId: options.runGroupId,
-        runId: options.runId,
-        taskId: options.taskId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.dependencyRunLiveFeedback requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -160,14 +114,7 @@ export function createTasksCommand(): Command {
         await runGeneratedSubscriptionWatch({ procedurePath: "tasks.dependencyRunLiveFeedbackStream" });
         return;
       }
-      const result = await workflowTasks().dependencyRunLiveFeedback(compact({
-        projectId: requiredOption(options, "projectId"),
-        traceId: options.traceId,
-        runGroupId: options.runGroupId,
-        runId: options.runId,
-        taskId: options.taskId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.dependencyRunLiveFeedbackStream requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -182,30 +129,9 @@ export function createTasksCommand(): Command {
   const dispatchDependencyRunCommand = command.command("dispatch-dependency-run");
   dispatchDependencyRunCommand.description("tasks dispatchDependencyRun");
   dispatchDependencyRunCommand.option("--json", "Emit JSON output");
-  dispatchDependencyRunCommand.addOption(new Option("--mode <choice>", "mode").choices(["task","board"]).default("task"));
-  dispatchDependencyRunCommand.option("--target-task-ids <ids>", "comma-separated target task ids");
-  dispatchDependencyRunCommand.option("--project-id <string>", "project-id");
-  dispatchDependencyRunCommand.option("--workspace-id <string>", "workspace-id");
-  dispatchDependencyRunCommand.option("--workspace-slug <string>", "workspace-slug");
-  dispatchDependencyRunCommand.option("--workspace-name <string>", "workspace-name");
-  dispatchDependencyRunCommand.option("--project-slug <string>", "project-slug");
-  dispatchDependencyRunCommand.option("--project-name <string>", "project-name");
-  dispatchDependencyRunCommand.option("--trace-id <string>", "trace-id");
-  dispatchDependencyRunCommand.option("--agent <string>", "agent");
-  dispatchDependencyRunCommand.option("--model <string>", "model");
-  dispatchDependencyRunCommand.option("--prompt <string>", "prompt");
   dispatchDependencyRunCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().dispatchDependencyRun(compact({
-        ...workflowMetadata(options),
-        mode: options.mode ?? "task",
-        targetTaskIds: requiredCsvOption(options, "targetTaskIds"),
-        traceId: options.traceId,
-        agent: requiredOption(options, "agent"),
-        model: options.model,
-        prompt: options.prompt,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.dispatchDependencyRun requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -220,15 +146,9 @@ export function createTasksCommand(): Command {
   const getCommand = command.command("get");
   getCommand.description("tasks get");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "task id");
-  getCommand.option("--project-id <string>", "project-id");
   getCommand.action(async (options) => {
     try {
-      const result = await taskClient().get(compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-      }) as JsonRecord & { id: string });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -244,14 +164,9 @@ export function createTasksCommand(): Command {
   listCommand.description("tasks list");
   listCommand.option("--json", "Emit JSON output");
   listCommand.option("--include-deleted", "include-deleted");
-  listCommand.option("--project-id <string>", "project-id");
   listCommand.action(async (options) => {
     try {
-      const result = await taskClient().list(compact({
-        projectId: options.projectId,
-        includeDeleted: options.includeDeleted,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -266,15 +181,9 @@ export function createTasksCommand(): Command {
   const listChildrenCommand = command.command("list-children");
   listChildrenCommand.description("tasks listChildren");
   listChildrenCommand.option("--json", "Emit JSON output");
-  listChildrenCommand.option("--id <string>", "task id");
-  listChildrenCommand.option("--project-id <string>", "project-id");
   listChildrenCommand.action(async (options) => {
     try {
-      const result = await taskClient().listChildren(compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-      }) as JsonRecord & { id: string });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.listChildren requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -292,38 +201,10 @@ export function createTasksCommand(): Command {
   manualWorkbenchCommand.option("--project-capabilities-estimate-enabled", "project-capabilities-estimate-enabled");
   manualWorkbenchCommand.option("--project-id <string>", "project-id");
   manualWorkbenchCommand.option("--trace-id <string>", "trace-id");
-  manualWorkbenchCommand.option("--statuses <ids>", "comma-separated statuses");
-  manualWorkbenchCommand.option("--state-groups <ids>", "comma-separated state groups");
-  manualWorkbenchCommand.option("--labels <ids>", "comma-separated labels");
-  manualWorkbenchCommand.option("--assignee-ids <ids>", "comma-separated assignee ids");
-  manualWorkbenchCommand.option("--cycle-ids <ids>", "comma-separated cycle ids");
-  manualWorkbenchCommand.option("--module-ids <ids>", "comma-separated module ids");
-  manualWorkbenchCommand.option("--task-types <ids>", "comma-separated task types");
-  manualWorkbenchCommand.option("--priorities <ids>", "comma-separated priorities");
-  manualWorkbenchCommand.option("--search <string>", "search");
   manualWorkbenchCommand.addOption(new Option("--view-mode <choice>", "view-mode").choices(["board","list","table"]));
   manualWorkbenchCommand.action(async (options) => {
     try {
-      const result = await taskClient().manualWorkbench(compact({
-        projectId: options.projectId,
-        traceId: options.traceId,
-        viewMode: options.viewMode,
-        filters: compact({
-          statuses: csvOption(options, "statuses"),
-          stateGroups: csvOption(options, "stateGroups"),
-          labels: csvOption(options, "labels"),
-          assigneeIds: csvOption(options, "assigneeIds"),
-          cycleIds: csvOption(options, "cycleIds"),
-          moduleIds: csvOption(options, "moduleIds"),
-          taskTypes: csvOption(options, "taskTypes"),
-          priorities: numericCsvOption(options, "priorities"),
-          search: options.search,
-        }),
-        projectCapabilities: {
-          estimateEnabled: options.projectCapabilitiesEstimateEnabled === true,
-        },
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.manualWorkbench requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -340,17 +221,10 @@ export function createTasksCommand(): Command {
   previewDependencyRunCommand.option("--json", "Emit JSON output");
   previewDependencyRunCommand.addOption(new Option("--mode <choice>", "mode").choices(["task","board"]));
   previewDependencyRunCommand.option("--project-id <string>", "project-id");
-  previewDependencyRunCommand.option("--target-task-ids <ids>", "comma-separated target task ids");
   previewDependencyRunCommand.option("--trace-id <string>", "trace-id");
   previewDependencyRunCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().previewDependencyRun(compact({
-        projectId: requiredOption(options, "projectId"),
-        mode: options.mode ?? "task",
-        targetTaskIds: requiredCsvOption(options, "targetTaskIds"),
-        traceId: options.traceId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.previewDependencyRun requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -370,13 +244,6 @@ export function createTasksCommand(): Command {
   recordQaReviewCommand.option("--feedback-agent <string>", "feedback-agent");
   recordQaReviewCommand.option("--feedback-model <string>", "feedback-model");
   recordQaReviewCommand.option("--project-id <string>", "project-id");
-  recordQaReviewCommand.option("--workspace-id <string>", "workspace-id");
-  recordQaReviewCommand.option("--workspace-slug <string>", "workspace-slug");
-  recordQaReviewCommand.option("--workspace-name <string>", "workspace-name");
-  recordQaReviewCommand.option("--project-slug <string>", "project-slug");
-  recordQaReviewCommand.option("--project-name <string>", "project-name");
-  recordQaReviewCommand.option("--task-id <string>", "task-id");
-  recordQaReviewCommand.option("--review-text <string>", "review-text");
   recordQaReviewCommand.addOption(new Option("--review-type <choice>", "review-type").choices(["plan","code","spec"]));
   recordQaReviewCommand.option("--reviewer-agent <string>", "reviewer-agent");
   recordQaReviewCommand.option("--run-id <string>", "run-id");
@@ -384,21 +251,7 @@ export function createTasksCommand(): Command {
   recordQaReviewCommand.option("--trace-id <string>", "trace-id");
   recordQaReviewCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().recordQaReview(compact({
-        ...workflowMetadata(options),
-        taskId: requiredOption(options, "taskId"),
-        runId: options.runId,
-        traceId: options.traceId,
-        reviewType: options.reviewType ?? "code",
-        reviewerAgent: options.reviewerAgent,
-        reviewText: requiredOption(options, "reviewText"),
-        feedbackAgent: options.feedbackAgent,
-        feedbackModel: options.feedbackModel,
-        baseline: options.baseline,
-        checkpointId: options.checkpointId,
-        summary: options.summary,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.recordQaReview requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -414,7 +267,6 @@ export function createTasksCommand(): Command {
   runAutomatedFeedbackLoopCommand.description("tasks runAutomatedFeedbackLoop");
   runAutomatedFeedbackLoopCommand.option("--json", "Emit JSON output");
   runAutomatedFeedbackLoopCommand.option("--cwd <string>", "cwd");
-  runAutomatedFeedbackLoopCommand.option("--copy-to-worktree <paths>", "comma-separated paths to copy to worktree");
   runAutomatedFeedbackLoopCommand.option("--feedback-agent <string>", "feedback-agent");
   runAutomatedFeedbackLoopCommand.option("--feedback-model <string>", "feedback-model");
   runAutomatedFeedbackLoopCommand.option("--max-iterations <number>", "max-iterations", Number.parseFloat);
@@ -426,20 +278,7 @@ export function createTasksCommand(): Command {
   runAutomatedFeedbackLoopCommand.option("--worker-id <string>", "worker-id");
   runAutomatedFeedbackLoopCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().runAutomatedFeedbackLoop(compact({
-        ...workflowMetadata(options),
-        traceId: options.traceId,
-        runGroupId: options.runGroupId,
-        workerId: options.workerId,
-        cwd: options.cwd,
-        copyToWorktree: csvOption(options, "copyToWorktree"),
-        reviewType: options.reviewType ?? "code",
-        reviewerAgent: options.reviewerAgent,
-        feedbackAgent: options.feedbackAgent,
-        feedbackModel: options.feedbackModel,
-        maxIterations: options.maxIterations,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.runAutomatedFeedbackLoop requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -461,14 +300,7 @@ export function createTasksCommand(): Command {
   runDependencyRunWorkerTickCommand.option("--worker-id <string>", "worker-id");
   runDependencyRunWorkerTickCommand.action(async (options) => {
     try {
-      const result = await workflowTasks().runDependencyRunWorkerTick(compact({
-        projectId: requiredOption(options, "projectId"),
-        traceId: options.traceId,
-        runGroupId: options.runGroupId,
-        workerId: options.workerId,
-        cwd: options.cwd,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.runDependencyRunWorkerTick requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -483,19 +315,9 @@ export function createTasksCommand(): Command {
   const setDependenciesCommand = command.command("set-dependencies");
   setDependenciesCommand.description("tasks setDependencies");
   setDependenciesCommand.option("--json", "Emit JSON output");
-  setDependenciesCommand.option("--id <string>", "task id");
-  setDependenciesCommand.option("--project-id <string>", "project-id");
-  setDependenciesCommand.option("--blocks <ids>", "comma-separated blocked task ids");
-  setDependenciesCommand.option("--blocked-by <ids>", "comma-separated dependency task ids");
   setDependenciesCommand.action(async (options) => {
     try {
-      const result = await taskClient().setDependencies(compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-        blocks: csvOption(options, "blocks"),
-        blocked_by: csvOption(options, "blockedBy"),
-      }) as JsonRecord & { id: string });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.setDependencies requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -510,19 +332,9 @@ export function createTasksCommand(): Command {
   const setParentCommand = command.command("set-parent");
   setParentCommand.description("tasks setParent");
   setParentCommand.option("--json", "Emit JSON output");
-  setParentCommand.option("--id <string>", "task id");
-  setParentCommand.option("--parent-id <string>", "parent task id");
-  setParentCommand.option("--project-id <string>", "project-id");
-  setParentCommand.option("--clear-parent", "clear parent task");
   setParentCommand.action(async (options) => {
     try {
-      const input = compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-      }) as JsonRecord & { id: string };
-      input.parentId = options.clearParent === true ? null : requiredOption(options, "parentId");
-      const result = await taskClient().setParent(input);
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.setParent requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -537,23 +349,9 @@ export function createTasksCommand(): Command {
   const updateCommand = command.command("update");
   updateCommand.description("tasks update");
   updateCommand.option("--json", "Emit JSON output");
-  updateCommand.option("--id <string>", "task id");
-  updateCommand.option("--project-id <string>", "project-id");
-  updateCommand.option("--title <string>", "title");
-  updateCommand.option("--description <string>", "description");
-  updateCommand.option("--description-text <string>", "description-text");
-  updateCommand.option("--points <number>", "points", Number.parseFloat);
-  updateCommand.option("--priority <number>", "priority", Number.parseFloat);
-  updateCommand.option("--status <string>", "status");
-  updateCommand.option("--assignee-id <string>", "assignee-id");
   updateCommand.action(async (options) => {
     try {
-      const result = await taskClient().update(compact({
-        id: requiredOption(options, "id"),
-        projectId: options.projectId,
-        ...taskPatchOptions(options),
-      }) as JsonRecord & { id: string });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for tasks.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -566,97 +364,6 @@ export function createTasksCommand(): Command {
   });
 
   return command;
-}
-
-function taskClient() {
-  const caller = createTaskApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL with FULCRUM_ORG_ID and FULCRUM_USER_ID.");
-  }
-  return caller.tasks;
-}
-
-function workflowTasks() {
-  const caller = createWorkflowApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Workflow API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
-  }
-  return caller.tasks;
-}
-
-function taskPatchOptions(options: Record<string, unknown>): JsonRecord {
-  return compact({
-    title: options.title,
-    description: options.description,
-    descriptionText: options.descriptionText,
-    points: options.points,
-    priority: options.priority,
-    status: options.status,
-    assigneeId: options.assigneeId,
-  });
-}
-
-function workflowMetadata(options: Record<string, unknown>): JsonRecord {
-  const projectId = requiredOption(options, "projectId");
-  const workspaceId = stringOption(options, "workspaceId") ??
-    process.env["FULCRUM_WORKSPACE_ID"] ??
-    process.env["FULCRUM_ORG_ID"] ??
-    "local-workspace";
-  const workspaceSlug = stringOption(options, "workspaceSlug") ??
-    process.env["FULCRUM_WORKSPACE_SLUG"] ??
-    slugOf(workspaceId);
-  const workspaceName = stringOption(options, "workspaceName") ??
-    process.env["FULCRUM_WORKSPACE_NAME"] ??
-    titleOf(workspaceSlug);
-  return {
-    workspaceId,
-    workspaceSlug,
-    workspaceName,
-    projectId,
-    projectSlug: stringOption(options, "projectSlug") ?? process.env["FULCRUM_PROJECT_SLUG"] ?? slugOf(projectId),
-    projectName: stringOption(options, "projectName") ?? process.env["FULCRUM_PROJECT_NAME"] ?? titleOf(projectId),
-  };
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = stringOption(options, key);
-  if (!value) throw new Error(`${key} is required.`);
-  return value;
-}
-
-function requiredCsvOption(options: Record<string, unknown>, key: string): string[] {
-  const values = csvOption(options, key);
-  if (values.length === 0) throw new Error(`${key} is required.`);
-  return values;
-}
-
-function stringOption(options: Record<string, unknown>, key: string): string | null {
-  const value = options[key];
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function csvOption(options: Record<string, unknown>, key: string): string[] {
-  return (stringOption(options, key) ?? "").split(",").map((part) => part.trim()).filter(Boolean);
-}
-
-function numericCsvOption(options: Record<string, unknown>, key: string): number[] {
-  return csvOption(options, key).map((part) => Number.parseInt(part, 10)).filter(Number.isInteger);
-}
-
-function compact(input: JsonRecord): JsonRecord {
-  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined && value !== null));
-}
-
-function printGeneratedResult(result: unknown, options: Record<string, unknown>): void {
-  console.log(JSON.stringify(result, null, options.json === true ? 0 : 2));
-}
-
-function slugOf(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "workspace";
-}
-
-function titleOf(value: string): string {
-  return value.trim() || "Workspace";
 }
 
 async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {

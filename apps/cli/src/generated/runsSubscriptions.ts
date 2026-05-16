@@ -1,6 +1,4 @@
-import { Command } from "commander";
-
-import { createSubscriptionEventApiCallerFromEnv } from "@platform-core/interface/http/subscription-event-api-client.ts";
+import { Command, Option } from "commander";
 
 export function createRunsSubscriptionsCommand(): Command {
   const command = new Command("runsSubscriptions");
@@ -14,14 +12,10 @@ export function createRunsSubscriptionsCommand(): Command {
   onRunUpdateCommand.action(async (options) => {
     try {
       if (options.watch === true) {
-        await subscriptionClient().runsSubscriptions.onRunUpdate({
-          runId: requiredOption(options, "runId"),
-          signal: abortSignalFromInterrupt(),
-          onEvent: (event) => console.log(JSON.stringify(event)),
-        });
+        await runGeneratedSubscriptionWatch({ procedurePath: "runsSubscriptions.onRunUpdate" });
         return;
       }
-      throw new Error("runsSubscriptions.onRunUpdate is a stream. Use --watch to consume JSON-line events.");
+      throw new Error("Generated tRPC invocation for runsSubscriptions.onRunUpdate requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -36,22 +30,12 @@ export function createRunsSubscriptionsCommand(): Command {
   return command;
 }
 
-function subscriptionClient() {
-  const caller = createSubscriptionEventApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Subscription event API caller is not configured. Set FULCRUM_SERVER_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
-  }
-  return caller;
-}
-
-function abortSignalFromInterrupt(): AbortSignal {
-  const controller = new AbortController();
-  process.once("SIGINT", () => controller.abort());
-  return controller.signal;
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = options[key];
-  if (typeof value === "string" && value.trim()) return value;
-  throw new Error(`${key} is required.`);
+async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {
+  const shutdown = new Promise<void>((resolve) => {
+    process.once("SIGINT", () => resolve());
+  });
+  await Promise.race([
+    shutdown,
+    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
+  ]);
 }

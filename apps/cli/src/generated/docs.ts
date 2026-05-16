@@ -1,33 +1,15 @@
 import { Command, Option } from "commander";
-import { createDocumentApiCallerFromEnv } from "@knowledge-workspace/interface/http/document-api-client.ts";
 
 export function createDocsCommand(): Command {
   const command = new Command("docs");
   command.description("Generated docs commands.");
 
-  const commentsCommand = command.command("comments");
-  commentsCommand.description("Generated docs comment commands.");
-
-  const commentsCreateCommand = commentsCommand.command("create");
+  const commentsCreateCommand = command.command("comments create");
   commentsCreateCommand.description("docs comments create");
   commentsCreateCommand.option("--json", "Emit JSON output");
-  commentsCreateCommand.option("--doc-id <string>", "doc id");
-  commentsCreateCommand.option("--author-id <string>", "author id");
-  commentsCreateCommand.option("--body-md <string>", "comment markdown");
-  commentsCreateCommand.option("--parent-comment-id <string>", "parent comment id");
-  commentsCreateCommand.option("--selection-json <json>", "selection JSON object");
-  commentsCreateCommand.option("--trace-id <string>", "trace id");
   commentsCreateCommand.action(async (options) => {
     try {
-      const result = await documentClient().createComment(compact({
-        docId: requiredOption(options, "docId"),
-        authorId: requiredOption(options, "authorId"),
-        bodyMd: requiredOption(options, "bodyMd"),
-        parentCommentId: options.parentCommentId,
-        selection: jsonObjectOption(options, "selectionJson"),
-        traceId: options.traceId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.comments.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -39,14 +21,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const commentsDeleteCommand = commentsCommand.command("delete");
+  const commentsDeleteCommand = command.command("comments delete");
   commentsDeleteCommand.description("docs comments delete");
   commentsDeleteCommand.option("--json", "Emit JSON output");
-  commentsDeleteCommand.option("--comment-id <string>", "comment id");
   commentsDeleteCommand.action(async (options) => {
     try {
-      const result = await documentClient().deleteComment({ commentId: requiredOption(options, "commentId") });
-      printGeneratedResult(result ?? { ok: true }, options);
+      throw new Error("Generated tRPC invocation for docs.comments.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -58,18 +38,13 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const commentsListCommand = commentsCommand.command("list");
+  const commentsListCommand = command.command("comments list");
   commentsListCommand.description("docs comments list");
   commentsListCommand.option("--json", "Emit JSON output");
-  commentsListCommand.option("--doc-id <string>", "doc id");
   commentsListCommand.option("--resolved", "resolved");
   commentsListCommand.action(async (options) => {
     try {
-      const result = await documentClient().listComments(compact({
-        docId: requiredOption(options, "docId"),
-        resolved: options.resolved === true ? true : undefined,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.comments.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -81,18 +56,13 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const commentsResolveCommand = commentsCommand.command("resolve");
+  const commentsResolveCommand = command.command("comments resolve");
   commentsResolveCommand.description("docs comments resolve");
   commentsResolveCommand.option("--json", "Emit JSON output");
-  commentsResolveCommand.option("--comment-id <string>", "comment id");
   commentsResolveCommand.option("--resolved", "resolved");
   commentsResolveCommand.action(async (options) => {
     try {
-      const result = await documentClient().resolveComment({
-        commentId: requiredOption(options, "commentId"),
-        resolved: options.resolved !== false,
-      });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.comments.resolve requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -104,172 +74,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const commentsUpdateCommand = commentsCommand.command("update");
+  const commentsUpdateCommand = command.command("comments update");
   commentsUpdateCommand.description("docs comments update");
   commentsUpdateCommand.option("--json", "Emit JSON output");
-  commentsUpdateCommand.option("--comment-id <string>", "comment id");
-  commentsUpdateCommand.option("--body-md <string>", "comment markdown");
-  commentsUpdateCommand.option("--selection-json <json>", "selection JSON object");
-  commentsUpdateCommand.option("--status <string>", "status");
   commentsUpdateCommand.action(async (options) => {
     try {
-      const result = await documentClient().updateComment(compact({
-        commentId: requiredOption(options, "commentId"),
-        bodyMd: options.bodyMd,
-        selection: jsonObjectOption(options, "selectionJson"),
-        status: options.status,
-      }));
-      printGeneratedResult(result, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const attachmentsCommand = command.command("attachments");
-  attachmentsCommand.description("Generated docs attachment commands.");
-
-  const attachmentsCreateCommand = attachmentsCommand.command("create");
-  attachmentsCreateCommand.description("docs attachments create");
-  attachmentsCreateCommand.option("--json", "Emit JSON output");
-  attachmentsCreateCommand.option("--doc-id <string>", "doc id");
-  attachmentsCreateCommand.option("--file-name <string>", "file name");
-  attachmentsCreateCommand.option("--mime-type <string>", "MIME type");
-  attachmentsCreateCommand.option("--size-bytes <number>", "size in bytes", Number.parseFloat);
-  attachmentsCreateCommand.option("--storage-path <string>", "storage path");
-  attachmentsCreateCommand.option("--checksum-sha256 <string>", "SHA-256 checksum");
-  attachmentsCreateCommand.option("--trace-id <string>", "trace id");
-  attachmentsCreateCommand.action(async (options) => {
-    try {
-      const result = await documentClient().createAttachment(compact({
-        docId: requiredOption(options, "docId"),
-        fileName: requiredOption(options, "fileName"),
-        mimeType: requiredOption(options, "mimeType"),
-        sizeBytes: requiredNumberOption(options, "sizeBytes"),
-        storagePath: requiredOption(options, "storagePath"),
-        checksumSha256: options.checksumSha256,
-        traceId: options.traceId,
-      }));
-      printGeneratedResult(result, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const attachmentsListCommand = attachmentsCommand.command("list");
-  attachmentsListCommand.description("docs attachments list");
-  attachmentsListCommand.option("--json", "Emit JSON output");
-  attachmentsListCommand.option("--doc-id <string>", "doc id");
-  attachmentsListCommand.action(async (options) => {
-    try {
-      const result = await documentClient().listAttachments({ docId: requiredOption(options, "docId") });
-      printGeneratedResult(result, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const attachmentsDeleteCommand = attachmentsCommand.command("delete");
-  attachmentsDeleteCommand.description("docs attachments delete");
-  attachmentsDeleteCommand.option("--json", "Emit JSON output");
-  attachmentsDeleteCommand.option("--attachment-id <string>", "attachment id");
-  attachmentsDeleteCommand.action(async (options) => {
-    try {
-      const result = await documentClient().deleteAttachment({ attachmentId: requiredOption(options, "attachmentId") });
-      printGeneratedResult(result ?? { ok: true }, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const collaborationCommand = command.command("collaboration");
-  collaborationCommand.description("Generated docs collaboration commands.");
-
-  const collaborationListCommand = collaborationCommand.command("list");
-  collaborationListCommand.description("docs collaboration list");
-  collaborationListCommand.option("--json", "Emit JSON output");
-  collaborationListCommand.option("--doc-id <string>", "doc id");
-  collaborationListCommand.action(async (options) => {
-    try {
-      const result = await documentClient().listCollaborationStates({ docId: requiredOption(options, "docId") });
-      printGeneratedResult(result, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const collaborationUpdateCommand = collaborationCommand.command("update");
-  collaborationUpdateCommand.description("docs collaboration update");
-  collaborationUpdateCommand.option("--json", "Emit JSON output");
-  collaborationUpdateCommand.option("--doc-id <string>", "doc id");
-  collaborationUpdateCommand.option("--provider <string>", "provider");
-  collaborationUpdateCommand.option("--state-vector <string>", "state vector");
-  collaborationUpdateCommand.option("--document-state <string>", "document state");
-  collaborationUpdateCommand.option("--active-client-ids-json <json>", "active client IDs JSON array");
-  collaborationUpdateCommand.option("--trace-id <string>", "trace id");
-  collaborationUpdateCommand.action(async (options) => {
-    try {
-      const result = await documentClient().updateCollaborationState(compact({
-        docId: requiredOption(options, "docId"),
-        provider: requiredOption(options, "provider"),
-        stateVector: options.stateVector,
-        documentState: options.documentState,
-        activeClientIds: jsonArrayOption(options, "activeClientIdsJson"),
-        traceId: options.traceId,
-      }) as Record<string, unknown> & { provider: string });
-      printGeneratedResult(result, options);
-    } catch (error) {
-      if (options.json === true) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-        process.exitCode = 1;
-        return;
-      }
-      throw error;
-    }
-  });
-
-  const collaborationDeleteCommand = collaborationCommand.command("delete");
-  collaborationDeleteCommand.description("docs collaboration delete");
-  collaborationDeleteCommand.option("--json", "Emit JSON output");
-  collaborationDeleteCommand.option("--doc-id <string>", "doc id");
-  collaborationDeleteCommand.option("--provider <string>", "provider");
-  collaborationDeleteCommand.action(async (options) => {
-    try {
-      const result = await documentClient().deleteCollaborationState({
-        docId: requiredOption(options, "docId"),
-        provider: requiredOption(options, "provider"),
-      });
-      printGeneratedResult(result ?? { ok: true }, options);
+      throw new Error("Generated tRPC invocation for docs.comments.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -284,23 +94,15 @@ export function createDocsCommand(): Command {
   const createCommand = command.command("create");
   createCommand.description("docs create");
   createCommand.option("--json", "Emit JSON output");
-  createCommand.option("--title <string>", "title");
-  createCommand.option("--project-id <string>", "project-id");
   createCommand.option("--body-md <string>", "body-md");
-  createCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices(["page", "wiki", "note", "template"]));
-  createCommand.option("--scope <string>", "scope");
+  createCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
+  createCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   createCommand.option("--sort-position <number>", "sort-position", Number.parseFloat);
   createCommand.option("--source-id <string>", "source-id");
   createCommand.option("--source-kind <string>", "source-kind");
   createCommand.action(async (options) => {
     try {
-      const result = await documentClient().create(compact({
-        projectId: options.projectId,
-        title: requiredOption(options, "title"),
-        type: options.docType,
-        bodyMd: options.bodyMd,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.create requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -315,12 +117,10 @@ export function createDocsCommand(): Command {
   const deleteCommand = command.command("delete");
   deleteCommand.description("docs delete");
   deleteCommand.option("--json", "Emit JSON output");
-  deleteCommand.option("--id <string>", "doc id");
   deleteCommand.option("--hard", "hard");
   deleteCommand.action(async (options) => {
     try {
-      const result = await documentClient().delete({ id: requiredOption(options, "id") });
-      printGeneratedResult(result ?? { ok: true }, options);
+      throw new Error("Generated tRPC invocation for docs.delete requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -335,11 +135,9 @@ export function createDocsCommand(): Command {
   const getCommand = command.command("get");
   getCommand.description("docs get");
   getCommand.option("--json", "Emit JSON output");
-  getCommand.option("--id <string>", "doc id");
   getCommand.action(async (options) => {
     try {
-      const result = await documentClient().get({ id: requiredOption(options, "id") });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -351,17 +149,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const linksCommand = command.command("links");
-  linksCommand.description("Generated docs link commands.");
-
-  const linksListBacklinksCommand = linksCommand.command("list-backlinks");
+  const linksListBacklinksCommand = command.command("links list-backlinks");
   linksListBacklinksCommand.description("docs links listBacklinks");
   linksListBacklinksCommand.option("--json", "Emit JSON output");
-  linksListBacklinksCommand.option("--doc-id <string>", "doc id");
   linksListBacklinksCommand.action(async (options) => {
     try {
-      const result = await documentClient().listBacklinks({ docId: requiredOption(options, "docId") });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.links.listBacklinks requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -373,14 +166,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const linksListForwardLinksCommand = linksCommand.command("list-forward-links");
+  const linksListForwardLinksCommand = command.command("links list-forward-links");
   linksListForwardLinksCommand.description("docs links listForwardLinks");
   linksListForwardLinksCommand.option("--json", "Emit JSON output");
-  linksListForwardLinksCommand.option("--doc-id <string>", "doc id");
   linksListForwardLinksCommand.action(async (options) => {
     try {
-      const result = await documentClient().listForwardLinks({ docId: requiredOption(options, "docId") });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.links.listForwardLinks requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -396,19 +187,13 @@ export function createDocsCommand(): Command {
   listCommand.description("docs list");
   listCommand.option("--json", "Emit JSON output");
   listCommand.option("--archived", "archived");
-  listCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices(["page", "wiki", "note", "template"]));
+  listCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
   listCommand.option("--limit <number>", "limit", Number.parseFloat);
   listCommand.option("--offset <number>", "offset", Number.parseFloat);
-  listCommand.option("--org-id <string>", "org-id");
-  listCommand.option("--project-id <string>", "project-id");
-  listCommand.option("--scope <string>", "scope");
+  listCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   listCommand.action(async (options) => {
     try {
-      const result = await documentClient().list(compact({
-        orgId: options.orgId,
-        projectId: options.projectId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -420,19 +205,13 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const templatesCommand = command.command("templates");
-  templatesCommand.description("Generated docs template commands.");
-
-  const templatesListCommand = templatesCommand.command("list");
+  const templatesListCommand = command.command("templates list");
   templatesListCommand.description("docs templates list");
   templatesListCommand.option("--json", "Emit JSON output");
   templatesListCommand.option("--project-id <string>", "project-id");
   templatesListCommand.action(async (options) => {
     try {
-      const result = await documentClient().listTemplates(compact({
-        projectId: options.projectId,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.templates.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -444,18 +223,14 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const templatesResolveCommand = templatesCommand.command("resolve");
+  const templatesResolveCommand = command.command("templates resolve");
   templatesResolveCommand.description("docs templates resolve");
   templatesResolveCommand.option("--json", "Emit JSON output");
-  templatesResolveCommand.option("--doc-type <string>", "doc-type");
+  templatesResolveCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
   templatesResolveCommand.option("--project-id <string>", "project-id");
   templatesResolveCommand.action(async (options) => {
     try {
-      const result = await documentClient().resolveTemplate(compact({
-        projectId: options.projectId,
-        docType: options.docType,
-      }));
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.templates.resolve requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -470,19 +245,9 @@ export function createDocsCommand(): Command {
   const updateCommand = command.command("update");
   updateCommand.description("docs update");
   updateCommand.option("--json", "Emit JSON output");
-  updateCommand.option("--id <string>", "doc id");
-  updateCommand.option("--title <string>", "title");
-  updateCommand.option("--body-md <string>", "body-md");
-  updateCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices(["page", "wiki", "note", "template"]));
   updateCommand.action(async (options) => {
     try {
-      const result = await documentClient().update(compact({
-        id: requiredOption(options, "id"),
-        title: options.title,
-        type: options.docType,
-        bodyMd: options.bodyMd,
-      }) as Record<string, unknown> & { id: string });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.update requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -494,23 +259,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const versionsCommand = command.command("versions");
-  versionsCommand.description("Generated docs version commands.");
-
-  const versionsDiffCommand = versionsCommand.command("diff");
+  const versionsDiffCommand = command.command("versions diff");
   versionsDiffCommand.description("docs versions diff");
   versionsDiffCommand.option("--json", "Emit JSON output");
-  versionsDiffCommand.option("--doc-id <string>", "doc id");
-  versionsDiffCommand.option("--from-version <number>", "from version", Number.parseFloat);
-  versionsDiffCommand.option("--to-version <number>", "to version", Number.parseFloat);
   versionsDiffCommand.action(async (options) => {
     try {
-      const result = await documentClient().diffVersions({
-        docId: requiredOption(options, "docId"),
-        fromVersion: requiredNumberOption(options, "fromVersion"),
-        toVersion: requiredNumberOption(options, "toVersion"),
-      });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.versions.diff requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -522,18 +276,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const versionsGetCommand = versionsCommand.command("get");
+  const versionsGetCommand = command.command("versions get");
   versionsGetCommand.description("docs versions get");
   versionsGetCommand.option("--json", "Emit JSON output");
-  versionsGetCommand.option("--doc-id <string>", "doc id");
-  versionsGetCommand.option("--version <number>", "version", Number.parseFloat);
   versionsGetCommand.action(async (options) => {
     try {
-      const result = await documentClient().getVersion({
-        docId: requiredOption(options, "docId"),
-        version: requiredNumberOption(options, "version"),
-      });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.versions.get requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -545,14 +293,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const versionsListCommand = versionsCommand.command("list");
+  const versionsListCommand = command.command("versions list");
   versionsListCommand.description("docs versions list");
   versionsListCommand.option("--json", "Emit JSON output");
-  versionsListCommand.option("--doc-id <string>", "doc id");
   versionsListCommand.action(async (options) => {
     try {
-      const result = await documentClient().listVersions({ docId: requiredOption(options, "docId") });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.versions.list requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -564,18 +310,12 @@ export function createDocsCommand(): Command {
     }
   });
 
-  const versionsRestoreCommand = versionsCommand.command("restore");
+  const versionsRestoreCommand = command.command("versions restore");
   versionsRestoreCommand.description("docs versions restore");
   versionsRestoreCommand.option("--json", "Emit JSON output");
-  versionsRestoreCommand.option("--doc-id <string>", "doc id");
-  versionsRestoreCommand.option("--version <number>", "version", Number.parseFloat);
   versionsRestoreCommand.action(async (options) => {
     try {
-      const result = await documentClient().restoreVersion({
-        docId: requiredOption(options, "docId"),
-        version: requiredNumberOption(options, "version"),
-      });
-      printGeneratedResult(result, options);
+      throw new Error("Generated tRPC invocation for docs.versions.restore requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -588,57 +328,4 @@ export function createDocsCommand(): Command {
   });
 
   return command;
-}
-
-function documentClient() {
-  const caller = createDocumentApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Document API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
-  }
-  return caller.docs;
-}
-
-function printGeneratedResult(result: unknown, options: { json?: boolean }): void {
-  if (options.json === true) console.log(JSON.stringify(result));
-  else console.log(result);
-}
-
-function compact(input: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(input).filter(([, value]) =>
-      value !== undefined && value !== null && (!Array.isArray(value) || value.length > 0)
-    ),
-  );
-}
-
-function jsonObjectOption(options: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
-  const value = options[key];
-  if (typeof value !== "string" || !value.trim()) return undefined;
-  const parsed = JSON.parse(value) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${key} must be a JSON object.`);
-  }
-  return parsed as Record<string, unknown>;
-}
-
-function jsonArrayOption(options: Record<string, unknown>, key: string): unknown[] | undefined {
-  const value = options[key];
-  if (typeof value !== "string" || !value.trim()) return undefined;
-  const parsed = JSON.parse(value) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${key} must be a JSON array.`);
-  }
-  return parsed;
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = options[key];
-  if (typeof value === "string" && value.trim()) return value;
-  throw new Error(`${key} is required.`);
-}
-
-function requiredNumberOption(options: Record<string, unknown>, key: string): number {
-  const value = options[key];
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  throw new Error(`${key} is required.`);
 }

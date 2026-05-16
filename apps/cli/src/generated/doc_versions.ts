@@ -1,5 +1,4 @@
-import { Command } from "commander";
-import { createDocumentApiCallerFromEnv } from "@knowledge-workspace/interface/http/document-api-client.ts";
+import { Command, Option } from "commander";
 
 export function createDocVersionsCommand(): Command {
   const command = new Command("doc_versions");
@@ -11,12 +10,17 @@ export function createDocVersionsCommand(): Command {
   diffCommand.option("--document-id <string>", "document-id");
   diffCommand.option("--version-id <string>", "version-id");
   diffCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await documentClient().diffVersionById({
-        docId: requiredOption(options, "documentId"),
-        versionId: requiredOption(options, "versionId"),
-      })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for doc_versions.diff requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const getCommand = command.command("get");
@@ -25,12 +29,17 @@ export function createDocVersionsCommand(): Command {
   getCommand.option("--document-id <string>", "document-id");
   getCommand.option("--version-id <string>", "version-id");
   getCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await documentClient().getVersionById({
-        docId: requiredOption(options, "documentId"),
-        versionId: requiredOption(options, "versionId"),
-      })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for doc_versions.get requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const listCommand = command.command("list");
@@ -38,9 +47,17 @@ export function createDocVersionsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.option("--document-id <string>", "document-id");
   listCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await documentClient().listVersions({ docId: requiredOption(options, "documentId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for doc_versions.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const restoreCommand = command.command("restore");
@@ -49,49 +66,18 @@ export function createDocVersionsCommand(): Command {
   restoreCommand.option("--document-id <string>", "document-id");
   restoreCommand.option("--version-id <string>", "version-id");
   restoreCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await documentClient().restoreVersionById({
-        docId: requiredOption(options, "documentId"),
-        versionId: requiredOption(options, "versionId"),
-      })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for doc_versions.restore requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;
-}
-
-async function runGeneratedAction(
-  options: { json?: boolean },
-  action: () => Promise<unknown>,
-): Promise<void> {
-  try {
-    printGeneratedResult(await action(), options);
-  } catch (error) {
-    if (options.json === true) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
-  }
-}
-
-function documentClient() {
-  const caller = createDocumentApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Document API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
-  }
-  return caller.docs;
-}
-
-function printGeneratedResult(result: unknown, options: { json?: boolean }): void {
-  if (options.json === true) console.log(JSON.stringify(result));
-  else console.log(result);
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = options[key];
-  if (typeof value === "string" && value.trim()) return value;
-  throw new Error(`${key} is required.`);
 }

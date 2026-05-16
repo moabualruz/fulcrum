@@ -1,79 +1,112 @@
 import { Command, Option } from "commander";
-import { createInferenceApiCallerFromEnv } from "@platform-core/interface/http/inference-api-client.ts";
-
-type CliOptions = Record<string, unknown> & { json?: boolean };
 
 export function createInferenceCommand(): Command {
   const command = new Command("inference");
   command.description("Generated inference commands.");
 
-  const backendsCommand = command.command("backends");
-  backendsCommand.description("Generated inference backend commands.");
-
-  const backendsListCommand = backendsCommand.command("list");
+  const backendsListCommand = command.command("backends list");
   backendsListCommand.description("inference backends list");
   backendsListCommand.option("--json", "Emit JSON output");
-  backendsListCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().backends.list());
+  backendsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.backends.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const backendsProbeCommand = backendsCommand.command("probe");
+  const backendsProbeCommand = command.command("backends probe");
   backendsProbeCommand.description("inference backends probe");
   backendsProbeCommand.option("--json", "Emit JSON output");
-  backendsProbeCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().backends.probe());
+  backendsProbeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.backends.probe requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const classifyCommand = command.command("classify");
   classifyCommand.description("inference classify");
   classifyCommand.option("--json", "Emit JSON output");
   classifyCommand.option("--text <string>", "text");
-  classifyCommand.option("--labels <csv>", "Comma-separated labels");
-  classifyCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().classify({
-        text: requiredOption(options, "text"),
-        labels: csvOption(options, "labels"),
-      })
-    );
+  classifyCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.classify requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const configCommand = command.command("config");
-  configCommand.description("Generated inference configuration commands.");
-
-  const configGetCommand = configCommand.command("get");
+  const configGetCommand = command.command("config get");
   configGetCommand.description("inference config get");
   configGetCommand.option("--json", "Emit JSON output");
-  configGetCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().config.get());
+  configGetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.config.get requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const configSetCommand = configCommand.command("set");
+  const configSetCommand = command.command("config set");
   configSetCommand.description("inference config set");
   configSetCommand.option("--json", "Emit JSON output");
   configSetCommand.addOption(new Option("--feature <choice>", "feature").choices(["embeddings","router-llm","memory-llm-extract","classify","tokenize"]));
-  configSetCommand.addOption(new Option("--backend <choice>", "backend").choices(["embedded","ollama","lm-studio","openai-compatible"]));
-  configSetCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().config.set({
-        feature: requiredOption(options, "feature"),
-        backend: requiredOption(options, "backend"),
-      })
-    );
+  configSetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.config.set requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const embedCommand = command.command("embed");
   embedCommand.description("inference embed");
   embedCommand.option("--json", "Emit JSON output");
-  embedCommand.option("--text <string>", "Text to embed");
   embedCommand.option("--model <string>", "model");
-  embedCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().embed(compact({
-        texts: [requiredOption(options, "text")],
-        model: options.model,
-      }) as { texts: string[]; model?: string })
-    );
+  embedCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.embed requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const generateCommand = command.command("generate");
@@ -83,88 +116,131 @@ export function createInferenceCommand(): Command {
   generateCommand.option("--options-model <string>", "options-model");
   generateCommand.option("--options-temperature <number>", "options-temperature", Number.parseFloat);
   generateCommand.option("--prompt <string>", "prompt");
-  generateCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().generate({
-        prompt: requiredOption(options, "prompt"),
-        options: compact({
-          maxTokens: options.optionsMaxTokens,
-          model: options.optionsModel,
-          temperature: options.optionsTemperature,
-        }),
-      })
-    );
+  generateCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.generate requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const healthCommand = command.command("health");
   healthCommand.description("inference health");
   healthCommand.option("--json", "Emit JSON output");
-  healthCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().health());
+  healthCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.health requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const modelsCommand = command.command("models");
-  modelsCommand.description("Generated inference model commands.");
-
-  const modelsListCommand = modelsCommand.command("list");
+  const modelsListCommand = command.command("models list");
   modelsListCommand.description("inference models list");
   modelsListCommand.option("--json", "Emit JSON output");
-  modelsListCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().models.list());
+  modelsListCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.models.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const modelsPullCommand = modelsCommand.command("pull");
+  const modelsPullCommand = command.command("models pull");
   modelsPullCommand.description("inference models pull");
   modelsPullCommand.option("--json", "Emit JSON output");
-  modelsPullCommand.option("--watch", "Stream model-pull events as JSON lines");
+  modelsPullCommand.option("--watch", "Stream subscription events as JSON lines");
   modelsPullCommand.option("--force", "force");
   modelsPullCommand.option("--model-id <string>", "model-id");
-  modelsPullCommand.action(async (options: CliOptions & { watch?: boolean; force?: boolean }) => {
-    await runGeneratedAction(options, async () => {
-      const result = await inferenceClient().models.pull({
-        modelId: requiredOption(options, "modelId"),
-        force: options.force === true,
-      });
-      if (options.watch === true && Array.isArray(result)) {
-        for (const event of result) console.log(JSON.stringify(event));
-        return undefined;
+  modelsPullCommand.action(async (options) => {
+    try {
+      if (options.watch === true) {
+        await runGeneratedSubscriptionWatch({ procedurePath: "inference.models.pull" });
+        return;
       }
-      return result;
-    });
+      throw new Error("Generated tRPC invocation for inference.models.pull requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const modelsRmCommand = modelsCommand.command("rm");
+  const modelsRmCommand = command.command("models rm");
   modelsRmCommand.description("inference models rm");
   modelsRmCommand.option("--json", "Emit JSON output");
+  modelsRmCommand.option("--force", "force");
   modelsRmCommand.option("--model-id <string>", "model-id");
-  modelsRmCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().models.rm({ modelId: requiredOption(options, "modelId") })
-    );
+  modelsRmCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.models.rm requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const providerCommand = command.command("provider");
-  providerCommand.description("Generated inference provider commands.");
-
-  const providerSetCommand = providerCommand.command("set");
+  const providerSetCommand = command.command("provider set");
   providerSetCommand.description("inference provider set");
   providerSetCommand.option("--json", "Emit JSON output");
   providerSetCommand.option("--key <string>", "key");
   providerSetCommand.option("--url <string>", "url");
-  providerSetCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().provider.set({
-        key: requiredOption(options, "key"),
-        url: requiredOption(options, "url"),
-      })
-    );
+  providerSetCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.provider.set requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
-  const providerTestCommand = providerCommand.command("test");
+  const providerTestCommand = command.command("provider test");
   providerTestCommand.description("inference provider test");
   providerTestCommand.option("--json", "Emit JSON output");
-  providerTestCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () => await inferenceClient().provider.test());
+  providerTestCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.provider.test requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const tokenizeCommand = command.command("tokenize");
@@ -172,70 +248,29 @@ export function createInferenceCommand(): Command {
   tokenizeCommand.option("--json", "Emit JSON output");
   tokenizeCommand.option("--model <string>", "model");
   tokenizeCommand.option("--text <string>", "text");
-  tokenizeCommand.action(async (options: CliOptions) => {
-    await runGeneratedAction(options, async () =>
-      await inferenceClient().tokenize(compact({
-        model: options.model,
-        text: requiredOption(options, "text"),
-      }) as { text: string; model?: string })
-    );
+  tokenizeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for inference.tokenize requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;
 }
 
-async function runGeneratedAction(
-  options: { json?: boolean },
-  action: () => Promise<unknown>,
-): Promise<void> {
-  try {
-    const result = await action();
-    if (result !== undefined) printGeneratedResult(result, options);
-  } catch (error) {
-    if (options.json === true) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
-  }
-}
-
-function inferenceClient() {
-  const caller = createInferenceApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Inference API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
-  }
-  return caller.inference;
-}
-
-function printGeneratedResult(result: unknown, options: { json?: boolean }): void {
-  if (options.json === true) {
-    console.log(JSON.stringify(result));
-    return;
-  }
-  if (typeof result === "string") console.log(result);
-  else console.log(JSON.stringify(result));
-}
-
-function compact(input: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(input).filter(([, value]) =>
-      value !== undefined && value !== null && (!Array.isArray(value) || value.length > 0)
-    ),
-  );
-}
-
-function csvOption(options: Record<string, unknown>, key: string): string[] {
-  const value = requiredOption(options, key);
-  const labels = value.split(",").map((entry) => entry.trim()).filter(Boolean);
-  if (labels.length === 0) throw new Error(`${key} must include at least one value.`);
-  return labels;
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = options[key];
-  if (typeof value === "string" && value.trim()) return value;
-  throw new Error(`${key} is required.`);
+async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {
+  const shutdown = new Promise<void>((resolve) => {
+    process.once("SIGINT", () => resolve());
+  });
+  await Promise.race([
+    shutdown,
+    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
+  ]);
 }

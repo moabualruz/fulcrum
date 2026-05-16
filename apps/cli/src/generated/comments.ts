@@ -1,7 +1,4 @@
-import { Command } from "commander";
-import { createTaskCommentApiCallerFromEnv } from "@work-management/interface/http/task-comment-api-client.ts";
-
-type JsonRecord = Record<string, unknown>;
+import { Command, Option } from "commander";
 
 export function createCommentsCommand(): Command {
   const command = new Command("comments");
@@ -13,29 +10,36 @@ export function createCommentsCommand(): Command {
   addReactionCommand.option("--comment-id <string>", "comment-id");
   addReactionCommand.option("--emoji <string>", "emoji");
   addReactionCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().addReaction({
-        commentId: requiredOption(options, "commentId"),
-        emoji: requiredOption(options, "emoji"),
-      })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.addReaction requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const createCommand = command.command("create");
   createCommand.description("comments create");
   createCommand.option("--json", "Emit JSON output");
-  createCommand.option("--body-json <json>", "comment body JSON");
-  createCommand.option("--body-md <string>", "comment markdown");
   createCommand.option("--parent-comment-id <string>", "parent-comment-id");
   createCommand.option("--task-id <string>", "task-id");
   createCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().create(compact({
-        taskId: requiredOption(options, "taskId"),
-        body: commentBody(options),
-        parentCommentId: options.parentCommentId,
-      }))
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.create requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const deleteCommand = command.command("delete");
@@ -43,9 +47,17 @@ export function createCommentsCommand(): Command {
   deleteCommand.option("--json", "Emit JSON output");
   deleteCommand.option("--comment-id <string>", "comment-id");
   deleteCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().delete({ commentId: requiredOption(options, "commentId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.delete requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const listCommand = command.command("list");
@@ -53,9 +65,17 @@ export function createCommentsCommand(): Command {
   listCommand.option("--json", "Emit JSON output");
   listCommand.option("--task-id <string>", "task-id");
   listCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().list({ taskId: requiredOption(options, "taskId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const removeReactionCommand = command.command("remove-reaction");
@@ -64,12 +84,17 @@ export function createCommentsCommand(): Command {
   removeReactionCommand.option("--comment-id <string>", "comment-id");
   removeReactionCommand.option("--emoji <string>", "emoji");
   removeReactionCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().removeReaction({
-        commentId: requiredOption(options, "commentId"),
-        emoji: requiredOption(options, "emoji"),
-      })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.removeReaction requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const resolveCommand = command.command("resolve");
@@ -77,9 +102,17 @@ export function createCommentsCommand(): Command {
   resolveCommand.option("--json", "Emit JSON output");
   resolveCommand.option("--comment-id <string>", "comment-id");
   resolveCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().resolve({ commentId: requiredOption(options, "commentId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.resolve requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const subscribeCommand = command.command("subscribe");
@@ -87,9 +120,17 @@ export function createCommentsCommand(): Command {
   subscribeCommand.option("--json", "Emit JSON output");
   subscribeCommand.option("--task-id <string>", "task-id");
   subscribeCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().subscribe({ taskId: requiredOption(options, "taskId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.subscribe requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const threadedCommand = command.command("threaded");
@@ -97,9 +138,17 @@ export function createCommentsCommand(): Command {
   threadedCommand.option("--json", "Emit JSON output");
   threadedCommand.option("--task-id <string>", "task-id");
   threadedCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().threaded({ taskId: requiredOption(options, "taskId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.threaded requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const unresolveCommand = command.command("unresolve");
@@ -107,9 +156,17 @@ export function createCommentsCommand(): Command {
   unresolveCommand.option("--json", "Emit JSON output");
   unresolveCommand.option("--comment-id <string>", "comment-id");
   unresolveCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().unresolve({ commentId: requiredOption(options, "commentId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.unresolve requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const unsubscribeCommand = command.command("unsubscribe");
@@ -117,9 +174,17 @@ export function createCommentsCommand(): Command {
   unsubscribeCommand.option("--json", "Emit JSON output");
   unsubscribeCommand.option("--task-id <string>", "task-id");
   unsubscribeCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().unsubscribe({ taskId: requiredOption(options, "taskId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.unsubscribe requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   const watchersCommand = command.command("watchers");
@@ -127,65 +192,18 @@ export function createCommentsCommand(): Command {
   watchersCommand.option("--json", "Emit JSON output");
   watchersCommand.option("--task-id <string>", "task-id");
   watchersCommand.action(async (options) => {
-    await runGeneratedAction(options, async () =>
-      await commentClient().watchers({ taskId: requiredOption(options, "taskId") })
-    );
+    try {
+      throw new Error("Generated tRPC invocation for comments.watchers requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
   });
 
   return command;
-}
-
-async function runGeneratedAction(
-  options: { json?: boolean },
-  action: () => Promise<unknown>,
-): Promise<void> {
-  try {
-    printGeneratedResult(await action(), options);
-  } catch (error) {
-    if (options.json === true) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
-  }
-}
-
-function commentClient() {
-  const caller = createTaskCommentApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Comment API caller is not configured. Set FULCRUM_SERVER_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
-  }
-  return caller.comments;
-}
-
-function commentBody(options: Record<string, unknown>): JsonRecord {
-  const bodyJson = options["bodyJson"];
-  if (typeof bodyJson === "string" && bodyJson.trim()) {
-    const parsed = JSON.parse(bodyJson) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as JsonRecord;
-    throw new Error("bodyJson must be a JSON object.");
-  }
-
-  return { bodyMd: requiredOption(options, "bodyMd") };
-}
-
-function printGeneratedResult(result: unknown, options: { json?: boolean }): void {
-  if (options.json === true) console.log(JSON.stringify(result));
-  else console.log(result);
-}
-
-function requiredOption(options: Record<string, unknown>, key: string): string {
-  const value = options[key];
-  if (typeof value === "string" && value.trim()) return value;
-  throw new Error(`${key} is required.`);
-}
-
-function compact(input: JsonRecord): JsonRecord {
-  return Object.fromEntries(
-    Object.entries(input).filter(([, value]) =>
-      value !== undefined && value !== null && (!Array.isArray(value) || value.length > 0)
-    ),
-  );
 }

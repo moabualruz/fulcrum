@@ -1,6 +1,4 @@
-import { Command } from "commander";
-
-import { createSubscriptionEventApiCallerFromEnv } from "@platform-core/interface/http/subscription-event-api-client.ts";
+import { Command, Option } from "commander";
 
 export function createNotifySubscriptionsCommand(): Command {
   const command = new Command("notifySubscriptions");
@@ -13,13 +11,10 @@ export function createNotifySubscriptionsCommand(): Command {
   onNewNotificationCommand.action(async (options) => {
     try {
       if (options.watch === true) {
-        await subscriptionClient().notifySubscriptions.onNewNotification({
-          signal: abortSignalFromInterrupt(),
-          onEvent: (event) => console.log(JSON.stringify(event)),
-        });
+        await runGeneratedSubscriptionWatch({ procedurePath: "notifySubscriptions.onNewNotification" });
         return;
       }
-      throw new Error("notifySubscriptions.onNewNotification is a stream. Use --watch to consume JSON-line events.");
+      throw new Error("Generated tRPC invocation for notifySubscriptions.onNewNotification requires an explicit surface adapter.");
     } catch (error) {
       if (options.json === true) {
         const message = error instanceof Error ? error.message : String(error);
@@ -34,16 +29,12 @@ export function createNotifySubscriptionsCommand(): Command {
   return command;
 }
 
-function subscriptionClient() {
-  const caller = createSubscriptionEventApiCallerFromEnv();
-  if (!caller) {
-    throw new Error("Subscription event API caller is not configured. Set FULCRUM_SERVER_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
-  }
-  return caller;
-}
-
-function abortSignalFromInterrupt(): AbortSignal {
-  const controller = new AbortController();
-  process.once("SIGINT", () => controller.abort());
-  return controller.signal;
+async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {
+  const shutdown = new Promise<void>((resolve) => {
+    process.once("SIGINT", () => resolve());
+  });
+  await Promise.race([
+    shutdown,
+    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
+  ]);
 }

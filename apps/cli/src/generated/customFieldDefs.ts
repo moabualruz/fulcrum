@@ -1,6 +1,4 @@
-import { Command } from "commander";
-import { createCustomFieldApiCallerFromEnv } from "@work-management/interface/http/custom-field-api-client.ts";
-import { runGeneratedAction } from "./custom_fields.ts";
+import { Command, Option } from "commander";
 
 export function createCustomFieldDefsCommand(): Command {
   const command = new Command("customFieldDefs");
@@ -9,19 +7,18 @@ export function createCustomFieldDefsCommand(): Command {
   const listCommand = command.command("list");
   listCommand.description("customFieldDefs list");
   listCommand.option("--json", "Emit JSON output");
-  listCommand.option("--project-id <string>", "project-id");
-  listCommand.option("--entity-type <string>", "entity-type");
   listCommand.action(async (options) => {
-    await runGeneratedAction(options, async () => {
-      const caller = createCustomFieldApiCallerFromEnv();
-      if (!caller) {
-        throw new Error("Custom field API caller is not configured. Set FULCRUM_SERVER_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
+    try {
+      throw new Error("Generated tRPC invocation for customFieldDefs.list requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
       }
-      return await caller.customFieldDefs.list({
-        projectId: options.projectId,
-        entityType: options.entityType,
-      });
-    });
+      throw error;
+    }
   });
 
   return command;
