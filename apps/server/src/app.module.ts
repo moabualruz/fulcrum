@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import { Module } from "@nestjs/common";
+import { TRPCModule } from "nestjs-trpc";
 
 import { ApplicationDatabaseModule } from "@platform-core/infrastructure/database/typeorm-root.module.ts";
 import { CredentialPublicApiModule } from "@platform-core/interface/http/credential-public-api.controller.ts";
@@ -48,6 +49,7 @@ export class AppModule {}
 
 Module({
   imports: [
+    TRPCModule.forRoot({ basePath: "/trpc" }),
     ApplicationDatabaseModule,
     CredentialPublicApiModule,
     DoctorPublicApiModule,
