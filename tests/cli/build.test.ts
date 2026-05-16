@@ -15,7 +15,19 @@ async function buildBinary(): Promise<{
   await rm(BINARY, { force: true });
 
   const proc = Bun.spawn(
-    ["bun", "build", "--compile", "apps/cli/src/main.ts", "--outfile", BINARY],
+    [
+      "bun", "build", "--compile",
+      "--external", "@grpc/proto-loader",
+      "--external", "@grpc/grpc-js",
+      "--external", "amqplib",
+      "--external", "amqp-connection-manager",
+      "--external", "kafkajs",
+      "--external", "mqtt",
+      "--external", "nats",
+      "--external", "@nestjs/websockets",
+      "--external", "ioredis",
+      "apps/cli/src/main.ts", "--outfile", BINARY,
+    ],
     {
       cwd: process.cwd(),
       stdout: "pipe",
