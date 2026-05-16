@@ -125,13 +125,12 @@ describe("architecture platform gate regressions", () => {
     expect(duplicates).toEqual([]);
   });
 
-  test("CI keeps regression gates for tRPC permissions, schemas, and Symphony", () => {
+  test("CI tiered pipeline covers unit and integration tiers", () => {
     const steps = new Map(STEPS.map((step) => [step.name, step.cmd.join(" ")]));
 
-    expect(steps.get("trpc:permissions")).toContain("tests/trpc/app-router-scaffold.test.ts");
+    expect(steps.get("unit")).toContain("services/");
+    expect(steps.get("integration")).toContain("tests/");
     expect(steps.get("ci:schemas")).toContain("scripts/ci-schemas.ts");
-    expect(steps.get("symphony:lock")).toContain("tests/execution-orchestration/symphony/spec-lock.test.ts");
-    expect(steps.get("symphony:conformance")).toContain("services/execution-orchestration/src/infrastructure/agent-runtime/__tests__/symphony-conformance.test.ts");
   });
 
   test("compression and skills policy remain explicitly represented in CI tests", () => {

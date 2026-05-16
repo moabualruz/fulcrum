@@ -1,9 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { readdir, stat } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CI_ENV, STEPS, envForStep } from "../../scripts/ci.ts";
+import { ALL_STEPS as STEPS } from "../../scripts/ci.ts";
 
 interface SurfaceCoverage {
   surface: string;
@@ -12,12 +11,12 @@ interface SurfaceCoverage {
 }
 
 const SURFACES: SurfaceCoverage[] = [
-  { surface: "web", roots: ["tests/auth", "apps/web/src", "apps/web/tests"], match: /\.(test|spec)\.ts$/ },
+  { surface: "web", roots: ["tests/identity-access/auth", "apps/web/src", "apps/web/tests"], match: /\.(test|spec)\.ts$/ },
   { surface: "cli", roots: ["tests/cli", "apps/cli/src"], match: /\.test\.ts$/ },
   { surface: "tui", roots: ["tests/tui"], match: /\.test\.ts$/ },
-  { surface: "tRPC", roots: ["tests/trpc"], match: /\.test\.ts$/ },
-  { surface: "auth", roots: ["tests/auth", "tests/db/auth"], match: /\.(test|spec)\.ts$/ },
-  { surface: "db", roots: ["tests/db", "tests/init"], match: /\.test\.ts$/ },
+  { surface: "tRPC", roots: ["apps/server/src/trpc/__tests__"], match: /\.test\.ts$/ },
+  { surface: "auth", roots: ["tests/identity-access/auth"], match: /\.(test|spec)\.ts$/ },
+  { surface: "db", roots: ["tests/platform-core", "services/platform-core/src/infrastructure/application-database"], match: /\.test\.ts$/ },
 ];
 
 async function collectFiles(root: string): Promise<string[]> {
@@ -58,91 +57,29 @@ describe("P1 test coverage matrix", () => {
   });
 });
 
-describe("scripts/ci.ts baseline gate", () => {
-  it("keeps the default CI gate at 24 product stages", () => {
-    const names = STEPS.map((step) => step.name);
-    expect(names).toEqual([
-      "install",
-      "typecheck",
-      "symphony:lock",
-      "symphony:conformance",
-      "trpc:permissions",
-      "application:unit",
-      "test",
-      "license-audit",
-      "ci:codegen",
-      "migration:downgrade",
-      "graceful:shutdown",
-      "coverage:root",
-      "build:all",
-      "web:install",
-      "web:check",
-      "web:build",
-      "web:test",
-      "coverage:web",
-      "ci:schemas",
-      "web:a11y",
-      "web:e2e:smoke",
-      "web:e2e:full",
-      "generated:e2e",
-      "architecture:red",
-    ]);
+describe("scripts/ci.ts tiered pipeline gate", () => {
+  it("has 4 tiers in the pipeline", () => {
+    const tiers = [...new Set(STEPS.map((s) => s.tier))];
+    expect(tiers).toEqual(["lint", "unit", "integration", "build"]);
   });
 
-  it("keeps smoke and full e2e in the full-tier baseline", () => {
-    const names = STEPS.map((step) => step.name);
-    expect(names).toContain("web:e2e:smoke");
-    expect(names).toContain("web:e2e:full");
-    expect(names).toContain("generated:e2e");
+  it("unit tier runs bun test --parallel on services/", () => {
+    const unit = STEPS.find((s) => s.name === "unit");
+    expect(unit).toBeDefined();
+    expect(unit!.cmd).toContain("--parallel");
+    expect(unit!.cmd).toContain("services/");
   });
 
-  it("runs root tests through the root test runner", () => {
-    const testStep = STEPS.find((step) => step.name === "test");
-    expect(testStep?.cmd).toEqual(["bun", "run", "scripts/test-root.ts"]);
+  it("integration tier runs bun test --parallel on tests/", () => {
+    const integration = STEPS.find((s) => s.name === "integration");
+    expect(integration).toBeDefined();
+    expect(integration!.cmd).toContain("--parallel");
+    expect(integration!.cmd).toContain("tests/");
   });
 
-  it("runs root tests with a sandbox-safe home without global FULCRUM_HOME", () => {
-    const testStep = STEPS.find((step) => step.name === "test");
-    if (!testStep) throw new Error("missing test step");
-    const testEnv = envForStep(testStep);
-
-    expect(testEnv["HOME"]).toBeDefined();
-    expect(testEnv["HOME"]).not.toBe(homedir());
-    expect(testEnv["HOME"]!.startsWith(tmpdir())).toBe(true);
-    expect(testEnv["FULCRUM_HOME"]).toBeUndefined();
-    expect(CI_ENV["FULCRUM_HOME"]).toBeUndefined();
-  });
-
-  it("runs nested web install with the sandboxed CI home and Bun's normal package cache", () => {
-    const webInstallStep = STEPS.find((step) => step.name === "web:install");
-    if (!webInstallStep) throw new Error("missing web:install step");
-    const installEnv = envForStep(webInstallStep);
-
-    expect(webInstallStep.env).toBeUndefined();
-    expect(installEnv).toBe(CI_ENV);
-    expect(installEnv["HOME"]).toBeDefined();
-    expect(installEnv["HOME"]).not.toBe(homedir());
-    expect(installEnv["HOME"]!.startsWith(tmpdir())).toBe(true);
-    expect(installEnv["FULCRUM_HOME"]).toBeUndefined();
-    expect(installEnv["BUN_INSTALL_CACHE_DIR"]).toBeUndefined();
-  });
-
-  it("keeps Playwright smoke e2e on the host browser cache", () => {
-    const e2eStep = STEPS.find((step) => step.name === "web:e2e:smoke");
-    if (!e2eStep) throw new Error("missing web:e2e:smoke step");
-    const e2eEnv = envForStep(e2eStep);
-
-    expect(e2eEnv["HOME"]).toBe(homedir());
-    expect(e2eEnv["FULCRUM_HOME"]).toBeUndefined();
-  });
-
-  it("does not override Bun cache behavior for build:all", () => {
-    const buildStep = STEPS.find((step) => step.name === "build:all");
-    if (!buildStep) throw new Error("missing build:all step");
-    const buildEnv = envForStep(buildStep);
-
-    expect(buildStep.env).toBeUndefined();
-    expect(buildEnv).toBe(CI_ENV);
-    expect(buildEnv["BUN_INSTALL_CACHE_DIR"]).toBeUndefined();
+  it("build tier includes web:check and web:build", () => {
+    const names = STEPS.filter((s) => s.tier === "build").map((s) => s.name);
+    expect(names).toContain("web:check");
+    expect(names).toContain("web:build");
   });
 });

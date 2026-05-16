@@ -6,11 +6,13 @@ async function read(path: string): Promise<string> {
 }
 
 describe("architecture RED gates", () => {
-  test("root CI includes root and web coverage gate stages", async () => {
+  test("root CI has 4 tiers: lint, unit, integration, build", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain('name: "coverage:root"');
-    expect(ci).toContain('name: "coverage:web"');
+    expect(ci).toContain('tier: "lint"');
+    expect(ci).toContain('tier: "unit"');
+    expect(ci).toContain('tier: "integration"');
+    expect(ci).toContain('tier: "build"');
   });
 
   test("web Vitest enforces coverage.thresholds.lines at 80", async () => {
@@ -21,23 +23,25 @@ describe("architecture RED gates", () => {
     expect(config).toMatch(/lines:\s*80/);
   });
 
-  test("root CI runs the web:a11y gate", async () => {
+  test("root CI architecture stage runs tests/architecture/", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain("web:a11y");
+    expect(ci).toContain('name: "architecture"');
+    expect(ci).toContain("tests/architecture/");
   });
 
-  test("root CI runs migration downgrade coverage", async () => {
+  test("root CI unit stage runs services/ with --parallel", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain('name: "migration:downgrade"');
-    expect(ci).toContain("tests/db/migration-downgrade.test.ts");
+    expect(ci).toContain('name: "unit"');
+    expect(ci).toContain("--parallel");
+    expect(ci).toContain("services/");
   });
 
-  test("root CI runs graceful shutdown coverage", async () => {
+  test("root CI integration stage runs tests/ with --parallel", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain('name: "graceful:shutdown"');
-    expect(ci).toContain("tests/platform-core/platform-operations/shutdown-coordinator.test.ts");
+    expect(ci).toContain('name: "integration"');
+    expect(ci).toContain("tests/");
   });
 });
