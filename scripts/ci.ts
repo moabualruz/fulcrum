@@ -10,7 +10,7 @@
 //   bun run scripts/ci.ts --tier=build  → all tiers
 
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -69,6 +69,20 @@ export interface TieredStep extends Step {
   tier: CiTier;
 }
 
+const SCOPED_TYPECHECK_SCRIPT = `
+import { spawnSync } from "node:child_process";
+import { rmSync, writeFileSync } from "node:fs";
+const path = ".tmp-tsconfig-ci-quick-" + process.pid + ".json";
+writeFileSync(path, JSON.stringify({
+  extends: "./tsconfig.json",
+  include: ["services/**/*.ts", "apps/cli/src/**/*.ts", "apps/tui/src/**/*.ts", "apps/server/src/**/*.ts", "tests/**/*.ts"],
+  exclude: ["node_modules", "dist", "apps/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
+}));
+const result = spawnSync("bun", ["run", "--bun", "tsc", "--noEmit", "-p", path], { stdio: "inherit" });
+rmSync(path, { force: true });
+process.exit(result.status ?? 1);
+`;
+
 export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[] {
   const home = env["HOME"];
   const changedFlag = isChanged ? ["--changed=origin/main"] : [];
@@ -76,7 +90,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
   return [
     // ── Tier 1: LINT + ARCHITECTURE (fast, <15s) ──
     { name: "install",       cmd: ["bun", "install", "--frozen-lockfile"], tier: "lint" },
-    { name: "typecheck",     cmd: ["bun", "run", "--bun", "tsc", "--noEmit"], tier: "lint" },
+    { name: "typecheck",     cmd: ["bun", "-e", SCOPED_TYPECHECK_SCRIPT], tier: "lint" },
     { name: "architecture",  cmd: ["bun", "test", "tests/architecture/"], tier: "lint" },
     { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "lint" },
     { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "lint" },

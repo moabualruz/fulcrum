@@ -1,4 +1,3 @@
-// SessionStart — warn if tags / graphify-out are stale or missing.
 // Cross-platform stat via Node fs.
 
 import { stat } from "node:fs/promises";
@@ -20,10 +19,6 @@ export async function runHook(): Promise<void> {
     } catch {}
   } else {
     messages.push("No ctags index — run: ctags -R --exclude=.git --exclude=node_modules .");
-  }
-
-  if (!(await exists("graphify-out"))) {
-    messages.push("No graphify graph — run: graphify build .");
   }
 
   if (messages.length > 0) {

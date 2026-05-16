@@ -1,4 +1,3 @@
-// Stop / SessionEnd — rebuild ctags + graphify only when
 // HEAD changed or working tree is dirty. SHA cached under os.tmpdir().
 
 import { tmpdir } from "node:os";
@@ -26,9 +25,6 @@ export async function runHook(): Promise<void> {
 
   if (await which("ctags")) {
     tasks.push(run(["ctags", "-R", "--exclude=.git", "--exclude=node_modules", "."]));
-  }
-  if (await which("graphify")) {
-    tasks.push(run(["graphify", "build", "."]));
   }
   const results = await Promise.allSettled(tasks);
   if (process.env["FULCRUM_DEBUG"]) {

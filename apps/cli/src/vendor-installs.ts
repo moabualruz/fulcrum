@@ -2,9 +2,7 @@
 // each detected agent during `fulcrum init <dir>`.
 //
 // Scope: per-agent skill / plugin / extension / hook installs whose vendor
-// publishes a CLI installer (`graphify install --platform <agent>`,
 // `npx skills add <pkg>`, `pi-mcp-adapter init`). Project-INDEX builds
-// (`graphify update .`) live in `project-index.ts` —
 // different concern.
 //
 // Rules:
@@ -132,8 +130,6 @@ export async function runGraphifyIntegration(
       }
     }
     if (detected.has("pi")) {
-      // Pi is not supported by the graphify CLI; upstream vendor does not list it.
-      // Upstream skill copy (via upstream-skills.ts) covers the fallback.
       console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
     }
     if (!dryRun && installedAgents.length > 0) {
@@ -223,10 +219,7 @@ export async function runVendorIntegrations(
 
   console.log("\nVendor integrations:");
 
-  // ── graphify ──────────────────────────────────────────────────────────────
   // Run per-agent. NEVER pass --output or any path override.
-  await runGraphifyIntegration(dir, home, dryRun);
-  // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
   // not here. This module only handles per-agent integration installers.
 
   // Caveman is installed by `fulcrum install`, not `fulcrum init`: Codex,
@@ -251,7 +244,6 @@ export async function runVendorIntegrations(
   await runPiMcpAdapterIntegration(dir, home, dryRun);
 
   // ── Strip duplicate vendor rule blocks ────────────────────────────────────
-  // Vendor CLIs (e.g. `graphify install`) write rule text directly into each
   // agent's primary rules file. The same text lives in rules/AGENTS.md and is
   // spliced into the FULCRUM sentinel block by `fulcrum install`. Strip the
   // duplicates that live outside the sentinel so agents don't load the rule

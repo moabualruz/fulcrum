@@ -48,6 +48,21 @@ export class ErrorLog {
   @Column({ type: "text", name: "stack_trace", nullable: true })
   stackTrace?: string;
 
+  @Column({ type: "varchar", nullable: true })
+  os?: string;
+
+  @Column({ type: "varchar", nullable: true })
+  arch?: string;
+
+  @Column({ type: "varchar", name: "bun_version", nullable: true })
+  bunVersion?: string;
+
+  @Column({ type: "varchar", name: "fulcrum_version", nullable: true })
+  fulcrumVersion?: string;
+
+  @Column({ type: "varchar", name: "recent_cli_command", nullable: true })
+  recentCliCommand?: string;
+
   @Column({ type: "jsonb" })
   context: Record<string, unknown> = {};
 }
