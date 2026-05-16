@@ -46,7 +46,7 @@ function fakeEntityManager(rows: ReturnType<typeof webhook>[]): WebhookDispatche
     persist(entity) {
       persisted.push(entity);
     },
-    async flush() {},
+    async save() {},
   } as WebhookDispatcherEntityManager & { persisted: unknown[] };
 }
 

@@ -85,7 +85,7 @@ export async function dispatchWebhookEvent(input: DispatchWebhookEventInput): Pr
       payload: input.payload,
       fetch: fetchImpl,
       now,
-      flush: async () => {},
+      save: async () => {},
     });
   }
 
@@ -98,7 +98,7 @@ async function deliverWithRetry(input: {
   payload: Record<string, unknown>;
   fetch: WebhookFetch;
   now: () => Date;
-  flush: () => Promise<void>;
+  save: () => Promise<void>;
 }): Promise<void> {
   const body = JSON.stringify(input.payload);
   const secret = await resolveWebhookSecret(input.webhook.encryptedSecret);
@@ -123,7 +123,7 @@ async function deliverWithRetry(input: {
         input.delivery.error = null;
         input.delivery.nextRetryAt = null;
         input.webhook.lastDeliveryAt = input.now();
-        await input.flush();
+        await input.save();
         return;
       }
 
@@ -136,13 +136,13 @@ async function deliverWithRetry(input: {
     if (attempt >= WEBHOOK_MAX_ATTEMPTS) {
       input.delivery.status = WebhookDeliveryStatus.Failed;
       input.delivery.nextRetryAt = null;
-      await input.flush();
+      await input.save();
       return;
     }
 
     input.delivery.status = WebhookDeliveryStatus.Retrying;
     input.delivery.nextRetryAt = new Date(input.now().getTime() + backoffMsForAttempt(attempt));
-    await input.flush();
+    await input.save();
   }
 }
 
