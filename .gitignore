@@ -1,4 +1,5 @@
 .claude/
+.sandcastle/
 node_modules/
 dist/
 *.tsbuildinfo
