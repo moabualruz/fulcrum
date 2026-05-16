@@ -408,4 +408,64 @@
   .doc-editor__error {
     color: hsl(var(--destructive, 0 84% 60%));
   }
+
+  :global(.callout) {
+    border-left: 4px solid;
+    border-radius: 0.375rem;
+    margin: 0.75rem 0;
+    padding: 0.75rem 1rem;
+  }
+  :global(.callout--info) { background: #eff6ff; border-color: #3b82f6; }
+  :global(.callout--warning) { background: #fffbeb; border-color: #f59e0b; }
+  :global(.callout--tip) { background: #ecfdf5; border-color: #10b981; }
+  :global(.callout--danger) { background: #fef2f2; border-color: #ef4444; }
+
+  :global(.doc-editor__content details) {
+    border: 1px solid hsl(var(--border, 214 32% 91%));
+    border-radius: 0.375rem;
+    margin: 0.75rem 0;
+    padding: 0.5rem 0.75rem;
+  }
+  :global(.doc-editor__content details summary) {
+    cursor: pointer;
+    font-weight: 500;
+    padding: 0.25rem 0;
+  }
+
+  :global(.columns-layout) {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    margin: 0.75rem 0;
+  }
+  :global(.column) {
+    border: 1px dashed hsl(var(--border, 214 32% 91%));
+    border-radius: 0.375rem;
+    min-height: 3rem;
+    padding: 0.5rem;
+  }
+
+  :global(.embed-wrapper) {
+    border-radius: 0.5rem;
+    margin: 0.75rem 0;
+    overflow: hidden;
+  }
+  :global(.embed-wrapper iframe) {
+    border: none;
+    display: block;
+    width: 100%;
+  }
+
+  :global(.status-badge) {
+    border-radius: 0.25rem;
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.125rem 0.5rem;
+  }
+  :global(.status-badge--blue) { background: #dbeafe; color: #1d4ed8; }
+  :global(.status-badge--green) { background: #dcfce7; color: #166534; }
+  :global(.status-badge--yellow) { background: #fef9c3; color: #854d0e; }
+  :global(.status-badge--red) { background: #fee2e2; color: #991b1b; }
+  :global(.status-badge--gray) { background: #f3f4f6; color: #374151; }
 </style>

@@ -37,6 +37,11 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "mermaid", label: "Mermaid diagram", aliases: ["diagram", "flowchart"] },
   { id: "sketch", label: "Sketch", aliases: ["excalidraw", "drawing"] },
   { id: "file", label: "File attachment", aliases: ["attachment", "upload"] },
+  { id: "callout", label: "Callout", aliases: ["info", "warning", "tip", "note", "alert"] },
+  { id: "details", label: "Toggle / Details", aliases: ["collapse", "accordion", "expand", "spoiler"] },
+  { id: "columns", label: "Columns", aliases: ["multi-column", "layout", "side-by-side"] },
+  { id: "embed", label: "Embed", aliases: ["youtube", "figma", "loom", "iframe", "video"] },
+  { id: "status", label: "Status badge", aliases: ["badge", "tag", "chip"] },
 ];
 
 export const TableCell = Node.create({
@@ -84,6 +89,112 @@ export const NarrationBlockNode = Node.create({
   ],
 });
 
+export const CalloutNode = Node.create({
+  name: "callout",
+  group: "block",
+  content: "block+",
+  defining: true,
+  addAttributes: () => ({
+    type: { default: "info" },
+  }),
+  parseHTML: () => [{ tag: "div[data-callout]" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "div",
+    { ...HTMLAttributes, "data-callout": node.attrs.type, class: `callout callout--${node.attrs.type}` },
+    0,
+  ],
+});
+
+export const DetailsNode = Node.create({
+  name: "details",
+  group: "block",
+  content: "block+",
+  defining: true,
+  addAttributes: () => ({
+    summary: { default: "Toggle" },
+    open: { default: false },
+  }),
+  parseHTML: () => [{ tag: "details" }],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "details",
+    { ...HTMLAttributes, open: node.attrs.open || undefined },
+    ["summary", {}, node.attrs.summary ?? "Toggle"],
+    ["div", { class: "details-content" }, 0],
+  ],
+});
+
+export const ColumnBlockNode = Node.create({
+  name: "columnBlock",
+  group: "block",
+  content: "column+",
+  isolating: true,
+  parseHTML: () => [{ tag: "div[data-columns]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    { ...HTMLAttributes, "data-columns": "true", class: "columns-layout" },
+    0,
+  ],
+});
+
+export const ColumnNode = Node.create({
+  name: "column",
+  content: "block+",
+  isolating: true,
+  parseHTML: () => [{ tag: "div[data-column]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "div",
+    { ...HTMLAttributes, "data-column": "true", class: "column" },
+    0,
+  ],
+});
+
+export const EmbedNode = Node.create({
+  name: "embed",
+  group: "block",
+  atom: true,
+  addAttributes: () => ({
+    src: { default: "" },
+    provider: { default: "generic" },
+    title: { default: "" },
+    width: { default: "100%" },
+    height: { default: "400" },
+  }),
+  parseHTML: () => [{ tag: "div[data-embed]" }],
+  renderHTML: ({ node }) => [
+    "div",
+    { "data-embed": node.attrs.provider, class: "embed-wrapper" },
+    ["iframe", {
+      src: node.attrs.src,
+      title: node.attrs.title || "Embedded content",
+      width: node.attrs.width,
+      height: node.attrs.height,
+      frameborder: "0",
+      allowfullscreen: "true",
+      loading: "lazy",
+    }],
+  ],
+});
+
+export const StatusNode = Node.create({
+  name: "status",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes: () => ({
+    label: { default: "In Progress" },
+    color: { default: "blue" },
+  }),
+  parseHTML: () => [{ tag: "span[data-status]" }],
+  renderHTML: ({ node }) => [
+    "span",
+    {
+      "data-status": node.attrs.color,
+      class: `status-badge status-badge--${node.attrs.color}`,
+    },
+    node.attrs.label,
+  ],
+});
+
 export function getSlashMenuItems(): SlashMenuItem[] {
   return SLASH_MENU_ITEMS;
 }
@@ -122,6 +233,12 @@ export function createDocEditorExtensions(): Extension[] {
     Table,
     TableRow,
     TableCell,
+    CalloutNode,
+    DetailsNode,
+    ColumnBlockNode,
+    ColumnNode,
+    EmbedNode,
+    StatusNode,
   ] as Extension[];
 }
 
@@ -172,6 +289,33 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
       return chain.insertContent({ type: "excalidraw" }).run();
     case "file":
       return chain.insertContent({ type: "fileAttachment", attrs: { uploading: true } }).run();
+    case "callout":
+      return chain.insertContent({
+        type: "callout",
+        attrs: { type: "info" },
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Callout text" }] }],
+      }).run();
+    case "details":
+      return chain.insertContent({
+        type: "details",
+        attrs: { summary: "Click to expand", open: false },
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Hidden content" }] }],
+      }).run();
+    case "columns":
+      return chain.insertContent({
+        type: "columnBlock",
+        content: [
+          { type: "column", content: [{ type: "paragraph", content: [{ type: "text", text: "Column 1" }] }] },
+          { type: "column", content: [{ type: "paragraph", content: [{ type: "text", text: "Column 2" }] }] },
+        ],
+      }).run();
+    case "embed": {
+      const src = typeof window !== "undefined" ? window.prompt("Embed URL (YouTube, Figma, etc.)") : null;
+      if (!src) return false;
+      return chain.insertContent({ type: "embed", attrs: { src, provider: detectProvider(src) } }).run();
+    }
+    case "status":
+      return chain.insertContent({ type: "status", attrs: { label: "In Progress", color: "blue" } }).run();
     default:
       return false;
   }
@@ -209,6 +353,18 @@ function deleteSlashQuery(editor: Editor): void {
     from: blockStart + slashIndex,
     to: from,
   });
+}
+
+function detectProvider(url: string): string {
+  if (/youtube\.com|youtu\.be/.test(url)) return "youtube";
+  if (/figma\.com/.test(url)) return "figma";
+  if (/loom\.com/.test(url)) return "loom";
+  if (/vimeo\.com/.test(url)) return "vimeo";
+  if (/codepen\.io/.test(url)) return "codepen";
+  if (/codesandbox\.io/.test(url)) return "codesandbox";
+  if (/miro\.com/.test(url)) return "miro";
+  if (/airtable\.com/.test(url)) return "airtable";
+  return "generic";
 }
 
 function tableContent(): JSONContent {
