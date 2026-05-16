@@ -45,7 +45,6 @@ fulcrum/
 │   └── hooks/
 │       ├── audit-log.ts                # PostToolUse Bash — append command + exit code to log
 │       ├── format.ts                   # PostToolUse Write|Edit — run language formatter
-│       ├── index-check.ts              # SessionStart — warn if tags/graphify stale
 │       ├── lint-gate.ts                # PostToolUse Write|Edit — block if lint fails (exit 2)
 │       ├── pm-policy.ts                # PreToolUse Bash — refuse wrong package manager (exit 2)
 │       ├── test-on-edit.ts             # PostToolUse Write|Edit — run project-configured tests (opt-in)

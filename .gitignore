@@ -6,14 +6,10 @@ eval-results/
 .DS_Store
 
 # Vendor agent-integration files written into project root by tools like
-# `graphify install` / `npx skills add`. Same rule text lives in
-# rules/AGENTS.md → spliced user-globally by `fulcrum install`; the
-# vendor's project-root copy is redundant for this repo.
+# `npx skills add`. Same rule text lives in rules/AGENTS.md → spliced
+# user-globally by `fulcrum install`; vendor's project-root copy is redundant.
 /.gemini/
 /.opencode/
-
-# Vendor project-index outputs (vendor-controlled paths).
-/graphify-out/
 .claude/settings.local.json
 .claude/.cache/
 .codex/

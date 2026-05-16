@@ -74,7 +74,6 @@
 
 ## 8. Codebase exploration
 
-- `graphify build .` then queries — when question structural ("who calls X", "what implements Y"). Instead of `rg` walks across many files. Why: code graph answers in one query what `rg` answers in many.
 - `ctags -R` — when navigating large C/C++/Go/Rust tree without LSP. Instead of repeated `rg` for symbols. Why: `ctags` indexes definitions; `rg` finds every textual match including comments and strings.
 
 ## 9. Library & external knowledge
@@ -102,7 +101,5 @@
 
 Rule text owned here; same content spliced into every agent via FULCRUM sentinel block. Vendor installers may write hooks in settings files — those stay. Duplicate rule TEXT outside sentinel block stripped by `fulcrum install` automatically.
 
-- **graphify** — when `graphify-out/` exists in project, read `graphify-out/GRAPH_REPORT.md` before answering architecture or codebase questions; navigate `graphify-out/wiki/index.md` instead of reading raw files when it exists. Why: graph answers structural questions 71× fewer tokens than grepping raw files. Trigger: architecture question + `graphify-out/` present. [source: https://github.com/safishamsi/graphify]
-  - (graphify also installs PreToolUse hook before every Glob/Grep call — that hook config managed by `graphify install`, not this file.)
 - **ast-grep** — (TBD: vendor skill installs slash-command trigger; no separate rules-file behavioral rule published.)
 - **caveman** — (rule is §0b above: always-on caveman ultra; vendor config lock in `~/.config/caveman/config.json`.)

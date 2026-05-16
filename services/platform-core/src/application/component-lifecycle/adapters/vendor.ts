@@ -4,7 +4,6 @@ import { removeUpstreamSkills, syncUpstreamSkills } from "@fulcrum/cli/upstream-
 import { removeCavemanCopies } from "@fulcrum/cli/uninstall.ts";
 import {
   runAstGrepIntegration,
-  runGraphifyIntegration,
   runPiMcpAdapterIntegration,
   runTavilyIntegration,
 } from "@fulcrum/cli/vendor-installs.ts";
@@ -26,7 +25,6 @@ export type VendorComponent =
   | "caveman"
   | "cloudflare"
   | "superpowers"
-  | "graphify"
   | "ast-grep"
   | "tavily"
   | "pi-mcp-adapter";
@@ -43,8 +41,6 @@ export function classifyVendorComponent(componentId: string): VendorComponent {
       return "cloudflare";
     case "package.superpowers":
       return "superpowers";
-    case "package.graphify":
-      return "graphify";
     case "package.ast-grep":
       return "ast-grep";
     case "package.tavily":
@@ -95,8 +91,6 @@ async function installVendor(
     case "superpowers":
       await installSuperpowersPackage({ dryRun, agents });
       return;
-    case "graphify":
-      await runGraphifyIntegration(process.cwd(), process.env["HOME"] ?? "", dryRun);
       return;
     case "ast-grep":
       await runAstGrepIntegration(process.cwd(), dryRun);
@@ -132,8 +126,6 @@ async function removeVendor(
     case "superpowers":
       await uninstallSuperpowersPackage({ dryRun, agents });
       return;
-    case "graphify":
-      console.log("     · graphify removal is manual: vendor installer does not publish a safe uninstall command");
       return;
     case "ast-grep":
       console.log("     · ast-grep removal is manual: npx skills add does not publish a safe uninstall command");

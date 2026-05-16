@@ -181,7 +181,6 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
   vendorPackageComponent("caveman"),
   vendorPackageComponent("cloudflare"),
   vendorPackageComponent("superpowers"),
-  vendorPackageComponent("graphify"),
   vendorPackageComponent("ast-grep"),
   vendorPackageComponent("tavily"),
   vendorPackageComponent("pi-mcp-adapter"),
@@ -258,7 +257,6 @@ function vendorPackageComponent(
     | "caveman"
     | "cloudflare"
     | "superpowers"
-    | "graphify"
     | "ast-grep"
     | "tavily"
     | "pi-mcp-adapter",

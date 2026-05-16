@@ -311,7 +311,6 @@ async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string
   return runProc(cmd, { timeoutMs: 60_000 });
 }
 
-
 function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
 }
@@ -433,13 +432,11 @@ const CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman";
 // Add new vendors here when their rule text is mirrored into rules/AGENTS.md.
 // ---------------------------------------------------------------------------
 const VENDOR_RULE_HEADINGS: ReadonlyArray<string> = [
-  "# graphify",
 ];
 
 /**
  * Strip vendor-installed rule blocks that live OUTSIDE the FULCRUM sentinel.
  *
- * Vendor installers (e.g. `graphify install`) write a rule block directly into
  * the agent's primary rules file. The same rule text lives in rules/AGENTS.md
  * and is spliced into the FULCRUM sentinel block by `fulcrum install`. The
  * duplicate outside the sentinel wastes context and can conflict.

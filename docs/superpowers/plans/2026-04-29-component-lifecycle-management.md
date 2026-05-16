@@ -2269,9 +2269,6 @@ describe("vendor component adapter", () => {
       'review_due = "2026-07-27"',
       'vendor_canonical_agents = ["claude-code"]',
       "",
-      "[skills.graphify]",
-      'source = "https://github.com/safishamsi/graphify"',
-      'subpath = "graphify/skill.md"',
       'ref = "main"',
       'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
       'license = "MIT"',
@@ -2297,7 +2294,6 @@ describe("vendor component adapter", () => {
 
     expect(logs.some((line) => line.includes("claude plugin install cloudflare@cloudflare"))).toBe(true);
     expect(logs.some((line) => line.includes("wrangler"))).toBe(true);
-    expect(logs.some((line) => line.includes("graphify"))).toBe(false);
     expect(await Bun.file(join(home, ".claude", "skills", "wrangler")).exists()).toBe(false);
   });
 
@@ -2351,14 +2347,12 @@ export async function uninstallCloudflarePackage(opts?: { dryRun?: boolean }): P
 export async function installSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 export async function uninstallSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 
-
 // apps/cli/src/install.ts
 export async function installCaveman(home: string, opts?: { dryRun?: boolean }): Promise<void>
 
 // apps/cli/src/uninstall.ts
 export async function removeCavemanCopies(home: string, opts?: { dryRun?: boolean }): Promise<void>
 ```
-
 
 - [x] **Step 4: Add upstream filtering tests**
 
@@ -2382,9 +2376,6 @@ test("syncUpstreamSkillsBySource installs only matching source entries", async (
     'review_due = "2026-07-27"',
     'vendor_canonical_agents = ["claude-code"]',
     "",
-    "[skills.graphify]",
-    'source = "https://github.com/safishamsi/graphify"',
-    'subpath = "graphify/skill.md"',
     'ref = "main"',
     'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
     'license = "MIT"',
@@ -2408,7 +2399,6 @@ test("syncUpstreamSkillsBySource installs only matching source entries", async (
   }
 
   expect(logs.some((line) => line.includes("wrangler"))).toBe(true);
-  expect(logs.some((line) => line.includes("graphify"))).toBe(false);
 });
 ```
 

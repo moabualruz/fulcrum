@@ -59,7 +59,6 @@ function walk(dir: string): string[] {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      if (entry === "node_modules" || entry === ".svelte-kit" || entry === "dist" || entry === "graphify-out") continue;
       files.push(...walk(full));
     } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
       files.push(full);

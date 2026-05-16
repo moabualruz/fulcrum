@@ -1,4 +1,3 @@
-// Tests for the index-check hook — warns on missing/stale ctags + graphify-out.
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdtemp, rm, writeFile, mkdir, utimes, unlink } from "node:fs/promises";
@@ -18,7 +17,6 @@ afterAll(async () => {
 });
 
 async function reset() {
-  for (const p of ["tags", "graphify-out"]) {
     const full = join(TMP, p);
     if (existsSync(full)) {
       try { await rm(full, { recursive: true, force: true }); } catch {}
@@ -51,22 +49,17 @@ describe("index-check", () => {
     expect(r.stdout).toContain("No ctags index");
   });
 
-  test("no graphify-out dir in cwd → stdout contains 'No graphify graph'", async () => {
     await reset();
     const r = await runIdxCheck();
     expect(r.exit).toBe(0);
-    expect(r.stdout).toContain("No graphify graph");
   });
 
-  test("fresh tags + graphify-out dir → both warnings suppressed, no output", async () => {
     await reset();
     await writeFile(join(TMP, "tags"), "");
-    await mkdir(join(TMP, "graphify-out"), { recursive: true });
     const r = await runIdxCheck();
     expect(r.exit).toBe(0);
     expect(r.stdout).not.toContain("ctags index is");
     expect(r.stdout).not.toContain("No ctags index");
-    expect(r.stdout).not.toContain("No graphify graph");
     expect(r.stdout.trim()).toBe("");
   });
 
@@ -74,7 +67,6 @@ describe("index-check", () => {
     await reset();
     const tagsPath = join(TMP, "tags");
     await writeFile(tagsPath, "");
-    await mkdir(join(TMP, "graphify-out"), { recursive: true });
     const old = new Date(Date.now() - 2 * 3600 * 1000);
     await utimes(tagsPath, old, old);
     const r = await runIdxCheck();

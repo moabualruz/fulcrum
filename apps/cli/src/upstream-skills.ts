@@ -40,7 +40,6 @@ export interface UpstreamSkillLockEntry {
   claude_plugin?: ClaudePluginDescriptor;
   /**
    * Agents whose vendor publishes a per-agent canonical installer (e.g.
-   * `graphify install --platform <agent>`). For those agents the upstream
    * sync stays out of the way — vendor's own write into the agent's
    * top-level skills directory is the source of truth. Empty/absent means
    * the file-copy mirror runs for every detected agent into the same
@@ -550,7 +549,6 @@ async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolea
  *
  * For Claude / Codex / OpenCode / Pi: `<agent>/skills/<name>/SKILL.md`.
  * For Gemini: `~/.gemini/skills/<name>/SKILL.md` — the same path
- * `graphify install --platform gemini` uses (Gemini auto-discovers SKILL.md
  * trees from this dir, no extension wrapper needed).
  *
  * Note: this is NOT the same as `agent.skillsDir(home)` for Gemini —
@@ -682,7 +680,6 @@ export async function syncUpstreamSkills(
       if (!repoDir) continue;
 
       // Vendor-canonical gate: when the upstream skill ships a per-agent
-      // installer (e.g. `graphify install --platform <agent>`), the vendor's
       // canonical placement under <agent>/skills/<name>/ is the source of
       // truth. Stay out for those agents — fulcrum-upstream/<name>/ here
       // would create a duplicate that triggers "Skill conflict detected"

@@ -106,11 +106,9 @@ describe("install source helpers", () => {
   it("strips known vendor rule blocks only outside the Fulcrum sentinel", async () => {
     const target = join(scratch, "agent.md");
     await writeFile(target, [
-      "# graphify",
       "outside duplicate",
       "",
       `${BEGIN}`,
-      "# graphify",
       "inside managed block",
       `${END}`,
       "",
@@ -137,10 +135,8 @@ describe("install source helpers", () => {
     expect(await text(noVendor)).toBe("# user heading\nkeep me\n");
 
     const dryRunTarget = join(scratch, "dry-run-vendor.md");
-    await writeFile(dryRunTarget, "# graphify\nmanaged duplicate\n");
     const logs = await captureLogs(() => stripVendorRuleBlocks(dryRunTarget, true));
     expect(logs.join("\n")).toContain("would strip vendor rule blocks");
-    expect(await text(dryRunTarget)).toBe("# graphify\nmanaged duplicate\n");
   });
 
   it("guards the shared ~/.agents path and seeds tool-output policy idempotently", async () => {

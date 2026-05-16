@@ -13,7 +13,6 @@ export async function which(cmd: string): Promise<string | null> {
 }
 
 // Path-exists check that returns true for files OR directories. Bun.file().exists()
-// returns false for directories, which silently broke index-check's graphify-out probe.
 export async function exists(path: string): Promise<boolean> {
   try { await stat(path); return true; } catch { return false; }
 }

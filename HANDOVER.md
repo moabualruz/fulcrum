@@ -18,8 +18,8 @@ The foundation layer (cross-agent install, hooks, skills, rules, output policy, 
 
 
 - **Bootstraps projects** (`fulcrum init <dir>`) in three vendor-canonical phases:
-  1. **Vendor integrations** — `graphify install --platform <agent>` per detected agent (Claude Code/Codex/OpenCode/Gemini); `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
-  2. **Strip duplicate vendor rule blocks** — vendor CLIs (`graphify install`) write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
+  1. **Vendor integrations** — `npx skills add` for ast-grep and tavily; caveman is handled only by `fulcrum install` per-agent mirrors; `pi install npm:pi-mcp-adapter` + `pi-mcp-adapter init` for Pi; defers context7 OAuth to manual `npx ctx7 setup`.
+  2. **Strip duplicate vendor rule blocks** — vendor CLIs may write rule text outside our `BEGIN/END FULCRUM RULES` sentinel; the same content lives in `rules/AGENTS.md` and is spliced inside the sentinel; `stripVendorRuleBlocks` removes the duplicate so agents don't load the rule twice. Vendor-installed hooks/settings remain untouched.
 
 - **Manages MCPs** (`fulcrum mcp list/register/unregister/enable/disable [--all]`) via a TOML registry at `~/.fulcrum/state/global/mcp-registry.toml`. DeepWiki is now a normal registry builtin (not a special-case installer). Per-agent `applyToAgents` writes the canonical MCP shape with bearer auth wired:
   - Codex TOML: emits `bearer_token_env_var = "<VAR>"` for HTTP servers with a single `auth_env_var`.
@@ -51,7 +51,7 @@ fulcrum (Bun binary; ~60–120 MB per platform)
 │                              run vendor-canonical agent installers; strip
 │                              duplicate vendor rule blocks; build project indices.
 ├── fulcrum init reindex [DIR] [--dry-run]
-│                            — re-run project indices only (graphify update .,
+│                            — re-run project indices only.
 ├── fulcrum install [--profile minimal|rules-only|full]
 │                  [--with-project DIR] [--dry-run]
 │                  [--no-skills] [--no-upstream-skills]
@@ -124,7 +124,7 @@ src/
 │   └── proc.ts                         # which, exists, run, spawnDetached
 ├── cli/
 │   ├── init.ts init.test.ts            # bootstrap + reindex subcommand
-│   ├── vendor-installs.ts              # graphify/caveman/ast-grep/tavily/pi-mcp-adapter installers
+│   ├── vendor-installs.ts              # caveman/ast-grep/tavily/pi-mcp-adapter installers
 │   ├── vendor-rules.test.ts            # stripVendorRuleBlocks behavior
 │   ├── install.ts install.test.ts      # cross-agent install + stripVendorRuleBlocks
 │   ├── uninstall.ts uninstall.test.ts  # conservative removal + vendor canonical uninstall
@@ -168,7 +168,7 @@ rules/AGENTS.md + .original.md          # behavioral rules body (≤ 200 lines);
                                         # spliced into agent rules files via
                                         # BEGIN/END FULCRUM RULES sentinel.
                                         # §12 carries vendor-tool behavioral rules
-                                        # (graphify, etc) — single source.
+                                        # — single source.
 skills/
 ├── _template/SKILL.md                  # required shape
 ├── <name>/SKILL.md × N                 # authored; .original.md beside each
@@ -466,7 +466,7 @@ brew install ripgrep fd fzf jq yq bat sd eza zoxide xh gh just mise direnv \
   semgrep phpstan
 pipx install pip-audit lizard          # or: python3 -m pip install --user
 cargo install cargo-deny
-uv tool install graphifyy tavily-cli
+uv tool install tavily-cli
 go install github.com/cloudflare/cloudflare-go/cmd/flarectl@latest   # optional; symlink onto PATH
 brew install usql                                                    # optional
 ```
@@ -600,10 +600,9 @@ Per-skill harnesses: `scripts/eval-skill-{claude,codex,gemini,opencode,pi}.sh <s
 - **Claude Code MCP removal is still vendor-dependent.** Registry writes use `claude mcp add`; removal follows the registry path and may still require manual `claude mcp remove -s user <name>` if Claude CLI state diverges.
 - **OpenCode is archived** (2025-09-18). Successor: Charm's Crush. `shims/opencode/fulcrum.ts` targets last-stable OpenCode; Crush's plugin contract may differ.
 - **Pi has no Fulcrum-published Pi extension** — `pi-mcp-adapter` is vendored from `nicobailon/pi-mcp-adapter` (community, not Pi vendor). We use it as MCP infrastructure but it's not a vendor-official asset.
-- **graphify does not list Pi as a supported agent.** Init falls back to file-copy mirror at `~/.pi/agent/skills/graphify/`. The lock entry's `vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]` excludes pi.
 - **`dist/` is gitignored.** Fresh clone needs Bun (`bash scripts/install.sh`) or `FULCRUM_RELEASE_TAG=...` to fetch a release artifact.
 - **Skill content correctness is the author's job.** Lint validates frontmatter shape only. Vendor-first policy minimizes this risk for new skills (use vendor-published source, never re-author).
-- **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` written by `graphify install` are .gitignored rather than stripped (vendor controls those by design).
+- **stripVendorRuleBlocks scope = user-global rules files only.** Project-root `CLAUDE.md` / `GEMINI.md` are .gitignored rather than stripped.
 - **Claude Code stores HTTP MCP tokens verbatim in `~/.claude.json`.** `claude mcp add --header` does not interpolate `${VAR}`. `applyToClaudeCode` expands the env var at install time and writes the literal token; the file is your primary leak surface for tokens of MCPs you've enabled for Claude Code. Other agents (codex `bearer_token_env_var`, gemini/opencode/pi `${VAR}`/`{env:VAR}`) keep tokens in env, not on disk.
 - **No automatic vendor-URL drift detection.** When a vendor retires an MCP host (cloudflare-logpush did this — moved from `logpush.mcp.cloudflare.com` to `logs.mcp.cloudflare.com`), `fulcrum doctor --probe` will flag `handshake:fail` once you run it, but the drift surfaces only as user-visible breakage. No periodic upstream-diff alarm yet.
 

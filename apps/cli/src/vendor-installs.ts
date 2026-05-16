@@ -99,49 +99,6 @@ function recordVendorComponent(componentId: string, agentIds: readonly AgentId[]
   }
 }
 
-export async function runGraphifyIntegration(
-  dir: string,
-  home: string,
-  dryRun: boolean,
-): Promise<boolean> {
-  const detected = await detectedAgentIds(home);
-  const hasGraphify = !!(await which("graphify"));
-  const installedAgents: AgentId[] = [];
-
-  if (hasGraphify) {
-    if (detected.has("claude-code")) {
-      if (await vendorRun("graphify: Claude Code", ["graphify", "claude", "install"], dir, dryRun)) {
-        installedAgents.push("claude-code");
-      }
-    }
-    if (detected.has("codex")) {
-      if (await vendorRun("graphify: Codex CLI", ["graphify", "install", "--platform", "codex"], dir, dryRun)) {
-        installedAgents.push("codex");
-      }
-    }
-    if (detected.has("opencode")) {
-      if (await vendorRun("graphify: OpenCode", ["graphify", "install", "--platform", "opencode"], dir, dryRun)) {
-        installedAgents.push("opencode");
-      }
-    }
-    if (detected.has("gemini")) {
-      if (await vendorRun("graphify: Gemini CLI", ["graphify", "install", "--platform", "gemini"], dir, dryRun)) {
-        installedAgents.push("gemini");
-      }
-    }
-    if (detected.has("pi")) {
-      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
-    }
-    if (!dryRun && installedAgents.length > 0) {
-      recordVendorComponent("package.graphify", installedAgents);
-    }
-    return installedAgents.length > 0;
-  }
-
-  console.log("  · graphify not on PATH — skipping graphify integrations");
-  return false;
-}
-
 export async function runAstGrepIntegration(dir: string, dryRun: boolean): Promise<boolean> {
   const hasNpx = !!(await which("npx"));
   if (!hasNpx) return false;

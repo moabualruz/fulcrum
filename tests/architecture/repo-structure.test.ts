@@ -16,7 +16,6 @@ const GENERATED_OR_VENDOR_DIRS = new Set([
   ".git",
   ".svelte-kit",
   "dist",
-  "graphify-out",
   "node_modules",
   "target",
   "vendor",

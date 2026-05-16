@@ -77,7 +77,6 @@ async function trackedSqlFileViolations(root = process.cwd()): Promise<string[]>
     ".scratch",
     ".svelte-kit",
     "dist",
-    "graphify-out",
     "node_modules",
     "target",
   ]);
