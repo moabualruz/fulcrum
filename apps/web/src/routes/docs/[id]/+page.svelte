@@ -85,12 +85,18 @@
 		{/if}
 	</div>
 
-	{#if attachments.length > 0}
-		<section data-doc-attachments class={cn("mt-8 border-t border-border pt-5")}>
-			<div class={cn("mb-3 flex items-center justify-between gap-3")}>
-				<h2 class={cn("text-sm font-semibold text-muted-foreground")}>Attachments</h2>
+	<section data-doc-attachments class={cn("mt-8 border-t border-border pt-5")}>
+		<div class={cn("mb-3 flex items-center justify-between gap-3")}>
+			<h2 class={cn("text-sm font-semibold text-muted-foreground")}>Attachments</h2>
+			<div class={cn("flex items-center gap-2")}>
 				<span class={cn("text-xs text-muted-foreground")}>{attachments.length} total</span>
+				<form method="POST" action="?/uploadAttachment" enctype="multipart/form-data" class={cn("flex items-center gap-1")}>
+					<input data-attachment-upload type="file" name="file" required class={cn("text-xs file:mr-2 file:rounded file:border-0 file:bg-primary file:px-2 file:py-1 file:text-xs file:text-primary-foreground")} />
+					<button type="submit" class={cn("rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground")}>Upload</button>
+				</form>
 			</div>
+		</div>
+		{#if attachments.length > 0}
 			<div class={cn("flex flex-col divide-y divide-border rounded-md border border-border")}>
 				{#each attachments as attachment (attachment.id)}
 					<a
@@ -106,8 +112,8 @@
 					</a>
 				{/each}
 			</div>
-		</section>
-	{/if}
+		{/if}
+	</section>
 
 	<section data-doc-comments class={cn("mt-8 border-t border-border pt-5")}>
 		<div class={cn("mb-4 flex items-center justify-between gap-3")}>

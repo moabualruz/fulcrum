@@ -178,6 +178,24 @@ export const actions = {
     }).catch(mapDocumentNotFound);
     throw redirect(303, `/docs/${event.params.id}`);
   },
+  uploadAttachment: async (event: ActionEvent) => {
+    const form = await event.request.formData();
+    const file = form.get("file") as File | null;
+    if (!file || file.size === 0) return fail(400, { message: "File is required." });
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const api = createDocumentApiForEvent(event);
+    await api.docs.uploadAttachment({
+      id: event.params.id!,
+      file: {
+        buffer,
+        originalname: file.name,
+        mimetype: file.type,
+        size: file.size,
+      },
+    }).catch(mapDocumentNotFound);
+    throw redirect(303, `/docs/${event.params.id}`);
+  },
 };
 
 function mapDocumentNotFound(errorValue: unknown): never {

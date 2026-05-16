@@ -9,6 +9,7 @@
 	import WipChart from "$lib/components/reports/WipChart.svelte";
 	import ForecastChart from "$lib/components/reports/ForecastChart.svelte";
 	import ReportDatePicker from "$lib/components/reports/ReportDatePicker.svelte";
+	import ReviewWorkbench from "$lib/components/review/ReviewWorkbench.svelte";
 	import { page } from "$app/state";
 
 	type ReviewWorkbenchFile = {
@@ -1100,6 +1101,10 @@
 			{/if}
 
 			{#if form?.mode === "reviewWorkbench" && form.ok && form.reviewWorkbench}
+				<ReviewWorkbench model={form.reviewWorkbench} />
+				<!-- Legacy inline render preserved below for data debugging -->
+				<details class={cn("mt-2")}>
+					<summary class={cn("text-xs text-muted-foreground cursor-pointer")}>Raw review data</summary>
 				<div data-review-workbench-result data-review-workbench-editor class={cn("overflow-hidden rounded-md border border-border")}>
 					<div class={cn("grid gap-px bg-border lg:grid-cols-[260px_minmax(0,1fr)_340px]")}>
 						<aside data-review-file-tree class={cn("min-h-[520px] bg-background")}>
@@ -1286,6 +1291,7 @@
 						</section>
 					</div>
 				</div>
+				</details>
 			{:else if form?.mode === "reviewWorkbench" && !form.ok}
 				<div data-review-workbench-error class={cn("rounded-md border border-destructive/40 p-3 text-sm text-destructive")}>
 					{form.message}
