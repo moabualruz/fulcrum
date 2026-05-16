@@ -42,7 +42,26 @@ rg -l "kysely" apps/web/src/ apps/cli/src/ apps/tui/src/ --type ts --glob '!*.te
 ## Remaining Items
 - None — zero direct ORM imports in any app surface production code.
 
-## Verification Command
+## Deeper Boundary Audit (2026-05-16 re-verification)
+
+### Direct entity/infrastructure imports
+```
+rg 'from.*infrastructure/database/entities' apps/web/src/ apps/cli/src/ apps/tui/src/ --type ts --glob '!*.test.*'
+→ 0 matches
+```
+
+### Application-layer imports (acceptable per DDD)
+Web imports `@platform-core/application/runtime/`, `@platform-core/application/orm-helpers.ts`, `@platform-core/application/legacy/orm-web-adapter.ts` — these are application-layer re-exports, not direct DB access.
+CLI imports `@platform-core/application/runtime/`, `@platform-core/application/db/`, `@platform-core/application/runtime-support/` — application-layer.
+TUI imports application-layer callers only.
+
+### Legacy orm-helpers.ts (apps/web/src/lib/server/)
+Re-exports `sqlAccess`, `appendEventOrm`, `enqueueJobOrm`, `indexSearchDocumentOrm` from platform-core application layer. Not direct entity/DB access. Migration debt: should eventually route through service interfaces.
+
+## Verification Commands
 ```bash
-rg -l "from.*(typeorm|@mikro-orm|kysely)" apps/web/src/ apps/cli/src/ apps/tui/src/ --type ts --type svelte --glob '!*.test.ts' --glob '!*.spec.ts'
+# Zero ORM framework imports
+rg -l "from.*(typeorm|@mikro-orm|kysely)" apps/web/src/ apps/cli/src/ apps/tui/src/ --type ts --glob '!*.test.*'
+# Zero direct entity imports
+rg 'from.*infrastructure/database/entities' apps/web/src/ apps/cli/src/ apps/tui/src/ --type ts --glob '!*.test.*'
 ```

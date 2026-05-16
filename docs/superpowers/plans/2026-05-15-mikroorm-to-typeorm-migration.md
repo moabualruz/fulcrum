@@ -1,5 +1,7 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup Plan
 
+> **Status: COMPLETED (2026-05-16).** All tasks in this plan have been executed. MikroORM fully removed, TypeORM in place, platform-core split into bounded services, tRPC consolidated as NestJS-native dual-exposure, DTOs extracted. Verification: zero `@mikro-orm` production imports, zero `.sql` migrations, zero `needle-di` imports, `bun run ci` tiers 1-6 pass. Tracker evidence at `09.6-COPY-FIRST-GOAL-TRACKER.md`. Task checkboxes below were not individually ticked during execution but work is verified complete by architecture tests + CI.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace MikroORM v7 with TypeORM, split platform-core god module, extract DTOs, consolidate tRPC, remove stubs, co-locate tests. Full NestJS architecture cleanup.
