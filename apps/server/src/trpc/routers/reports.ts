@@ -26,6 +26,7 @@ import {
   getCycleTimeReport,
   getLeadTimeReport,
   getProgressRollupReport,
+  getSprintBurndown,
   getStaleIssuesReport,
   getThroughputReport,
   getVelocityReport,
@@ -76,13 +77,23 @@ function parseDateRange(dr: { start: string; end: string }): { start: Date; end:
 export const reportsRouter = t.router({
 
   burndown: permissionedProcedure({ resource: "reports", action: "list" })
-    .input(ScopeWithDateRangeSchema)
+    .input(z.union([
+      z.object({ projectId: z.string().uuid(), sprintId: z.string().uuid() }),
+      ScopeWithDateRangeSchema,
+    ]))
     .query(async ({ ctx, input }) => {
       const em = requireEm(ctx);
+      if ("sprintId" in input && "projectId" in input) {
+        return getSprintBurndown(em, { orgId: ctx.orgId, userId: ctx.userId }, {
+          projectId: (input as { projectId: string }).projectId,
+          sprintId: (input as { sprintId: string }).sprintId,
+        });
+      }
+      const scopedInput = input as { scopeType: string; scopeId?: string; dateRange: { start: string; end: string } };
       return getBurndownReport(em, { orgId: ctx.orgId, userId: ctx.userId }, {
-        scopeType: input.scopeType,
-        scopeId: input.scopeId,
-        dateRange: parseDateRange(input.dateRange),
+        scopeType: scopedInput.scopeType as import("@work-management/application/reports/types.ts").ReportScopeType,
+        scopeId: scopedInput.scopeId,
+        dateRange: parseDateRange(scopedInput.dateRange),
       });
     }),
 

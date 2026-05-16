@@ -6,7 +6,7 @@ import { Event } from "@platform-core/infrastructure/application-database/entiti
 import { RoutingRule } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
+import { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
 import { RoutingRuleSource, type RoutingConditions } from "@execution-orchestration/domain/routing.ts";
 import { ROUTING_EVENT_VERB, RoutingEventPayloadSchema } from "@fulcrum/server/router/routing-event-payload.ts";
 import type { RoutingRuleRecord } from "@fulcrum/server/router/rules-engine.ts";
@@ -427,7 +427,7 @@ export function serializeRoutingRule(rule: RoutingRule): RoutingRuleDto {
 }
 
 function routingRuleRepository(em: EntityManager): RoutingRuleRepository {
-  return em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+  return new RoutingRuleRepository(em.getRepository(RoutingRule));
 }
 
 function eventRepository(em: EntityManager): EventRepository {
@@ -440,7 +440,7 @@ async function configureRouting(em: EntityManager): Promise<void> {
     import("@fulcrum/server/router/rules-engine.ts"),
     import("@fulcrum/server/router/telemetry.ts"),
   ]);
-  const routingRules = routingRuleRepository(em);
+  const routingRules = new RoutingRuleRepository(em.getRepository(RoutingRule));
   configureAutoAssign({});
   configureRulesEngine({
     routingRuleRepository: routingRules,

@@ -107,6 +107,7 @@ export class WorkCycleService {
       throw new AppConflictError("at_most_one_active");
     }
     sprint.status = SprintStatus.active;
+    await this.em.save(sprint);
     await emitSprintEvent(ctx, {
       verb: "sprint.started",
       sprint,
