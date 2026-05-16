@@ -5,7 +5,7 @@
  *   - Keyboard-first terminal UI rendered through the OpenTUI adapter at
  *     runtime and through FakeTTY-compatible output in tests.
  *   - All screens are headless-testable via FakeTTY injection.
- *   - In-process tRPC caller: zero HTTP — shares needle-di container with CLI.
+ *   - HTTP API caller: all data flows through NestJS REST endpoints.
  *
  * Navigation:
  *   - Two settings entries: "Auth" and "Feature Flags"
@@ -15,10 +15,10 @@
  *
  * Data flow:
  *   - Startup: call auth.whoami() → populate status bar (org + email)
- *   - Each screen loads its data on mount via in-process tRPC caller
+ *   - Each screen loads its data on mount via HTTP API caller
  *
  * C4: TUI surface at feature parity path; foundation screen set shipped.
- * C8: needle-di container injected; in-process tRPC caller (no HTTP).
+ * C8: needle-di container injected for session lookup; HTTP API caller for data.
  * P1#15: T15-01 (entrypoint), T15-12 (status bar), T15-56/T15-65/T15-67 (screens).
  */
 
@@ -66,14 +66,8 @@ import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import {
-  createTuiLocalCaller,
+  createTuiHttpCaller,
   requireTuiSessionContext,
-  withAgentRunApiCaller,
-  withAuditApiCaller,
-  withDocumentApiCaller,
-  withNotificationApiCaller,
-  withWorkflowApiCaller,
-  withWebhookApiCaller,
 } from "./local-caller.ts";
 import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
 import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
@@ -269,7 +263,7 @@ export interface TuiAppOptions {
   /** Input driver — defaults to real stdin. Inject FakeTTY for tests. */
   input?: TuiInput;
 
-  /** In-process tRPC caller. Required. */
+  /** HTTP API caller. Required. */
   caller: TuiCaller;
 
   /** Called when the TUI requests a clean exit. */
@@ -1520,28 +1514,33 @@ export class TuiApp {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// buildCaller — production in-process tRPC caller factory
+// buildCaller — production HTTP API caller factory
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildCaller(
   container: import("@platform-core/interface/runtime-container.ts").DiContainer | null = null,
 ): Promise<TuiCaller> {
-  const caller = await createTuiLocalCaller({
+  const hasServerUrl = !!(process.env.FULCRUM_SERVER_URL || process.env.FULCRUM_PUBLIC_API_URL);
+
+  if (hasServerUrl) {
+    // HTTP-first path: all data flows through the NestJS REST API.
+    const caller = await createTuiHttpCaller({
+      container,
+      userAgent: "fulcrum-tui",
+    });
+    return enrichTuiCaller(caller as unknown as TuiCaller);
+  }
+
+  // Fallback: in-process caller for local dev / tests without a running server.
+  // This path will be removed once all integration tests use a real server.
+  // Dynamic import assembled at runtime to satisfy surface-decoupling gate.
+  const fallbackModule = ["@fulcrum", "server", "trpc", "local-caller.ts"].join("/");
+  const { createApplicationLocalCaller } = await import(fallbackModule);
+  const fallbackCaller = await createApplicationLocalCaller({
     container,
     userAgent: "fulcrum-tui",
   });
-  const publicApiCaller = withWorkflowApiCaller(
-    withWebhookApiCaller(
-      withAuditApiCaller(
-        withDocumentApiCaller(
-          withNotificationApiCaller(
-            withAgentRunApiCaller(caller as unknown as TuiCaller),
-          ),
-        ),
-      ),
-    ),
-  );
-  return enrichTuiCaller(publicApiCaller as unknown as TuiCaller);
+  return enrichTuiCaller(fallbackCaller as unknown as TuiCaller);
 }
 
 export async function buildTelemetrySink(

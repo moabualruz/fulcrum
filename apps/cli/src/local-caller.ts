@@ -1,13 +1,22 @@
+/**
+ * CLI caller factory — session resolution utilities for CLI commands.
+ *
+ * CLI commands now use per-service HTTP API clients directly.
+ * This module provides session resolution from the local DataSource
+ * and the withWorkflowApiCaller overlay for backward compatibility.
+ */
+
 import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
 import {
   buildCliTuiCallerContext,
-  createApplicationLocalCaller,
   requireCliTuiSessionContext,
-} from "@fulcrum/server/trpc/local-caller.ts";
+} from "@fulcrum/server/session/local-session.ts";
+
+export { buildCliTuiCallerContext, requireCliTuiSessionContext } from "@fulcrum/server/session/local-session.ts";
+export type { CliTuiCallerContext, CliTuiSession } from "@fulcrum/server/session/local-session.ts";
 
 type ConfiguredWorkflowApiCaller = Exclude<ReturnType<typeof createWorkflowApiCallerFromEnv>, null>;
-type MergedCaller<Base extends object, Overlay extends object> = Omit<Base, keyof Overlay> & Overlay;
 type NestedMerge<Base, Overlay extends object> = Base extends object ? Omit<Base, keyof Overlay> & Overlay : Overlay;
 type WorkflowApiOverlay<T extends object> = Omit<T, keyof ConfiguredWorkflowApiCaller> & {
   planning: NestedMerge<
@@ -24,41 +33,6 @@ type WorkflowApiOverlay<T extends object> = Omit<T, keyof ConfiguredWorkflowApiC
     ConfiguredWorkflowApiCaller["workflows"]
   >;
 };
-
-export async function createLocalCaller(options: {
-  container?: DiContainer | null;
-  requireSession?: boolean;
-  env?: Record<string, string | undefined>;
-  fetch?: typeof fetch;
-} = {}) {
-  const caller = await createApplicationLocalCaller(options);
-  return withWorkflowApiCaller(caller, options);
-}
-
-export async function createLocalSystemCaller(options: {
-  container?: DiContainer | null;
-  orgId: string;
-  userId: string;
-  userAgent?: string;
-}) {
-  const [{ t }, { appRouter }, { createContext }] = await Promise.all([
-    import("@fulcrum/server/trpc/trpc.ts"),
-    import("@fulcrum/server/trpc/router.ts"),
-    import("@fulcrum/server/trpc/context.ts"),
-  ]);
-  const cliContext = await buildCliTuiCallerContext(options.container ?? null);
-  const factory = t.createCallerFactory(appRouter);
-
-  return factory(
-    createContext({
-      session: localSession(options.orgId, options.userId, options.userAgent ?? "fulcrum-cli") as never,
-      orgId: options.orgId,
-      userId: options.userId,
-      em: cliContext.em,
-      container: cliContext.container,
-    }),
-  );
-}
 
 export function buildLocalCallerContext(container: DiContainer | null) {
   return buildCliTuiCallerContext(container);
@@ -89,20 +63,4 @@ export function withWorkflowApiCaller<T extends object>(
     reports: { ...(current.reports ? current.reports as Record<string, unknown> : {}), ...publicApiCaller.reports },
     workflows: { ...(current.workflows ? current.workflows as Record<string, unknown> : {}), ...publicApiCaller.workflows },
   } as unknown as WorkflowApiOverlay<T>;
-}
-
-function localSession(orgId: string, userId: string, userAgent: string) {
-  const now = new Date();
-  return {
-    id: "cli-local-session",
-    userId,
-    orgId,
-    activeOrganizationId: orgId,
-    expiresAt: new Date(now.getTime() + 86_400_000),
-    createdAt: now,
-    updatedAt: now,
-    token: "cli-local-session",
-    ipAddress: null,
-    userAgent,
-  };
 }
