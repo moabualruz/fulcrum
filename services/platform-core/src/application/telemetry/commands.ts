@@ -82,6 +82,7 @@ export class MikroTelemetryStore extends TelemetryStore {
     if (existing) {
       existing.value = value;
       existing.updatedAt = new Date();
+      await em.save(existing);
     } else {
       await em.save(em.create(TenantSetting, { orgId, key: TELEMETRY_OPT_IN_KEY, value }));
     }
