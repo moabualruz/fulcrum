@@ -54,7 +54,7 @@ export async function writeDocVersion(
   const now = input.now ?? new Date();
   const latest = await em.findOne(DocVersion, { where: {
     org: { id: input.orgId },
-    doc: input.doc.id,
+    doc: { id: input.doc.id },
   } as never, order: { versionNum: "DESC" } });
   const versionNum = (latest?.versionNum ?? 0) + 1;
   const cadence = snapshotEvery(input.snapshotEvery);
