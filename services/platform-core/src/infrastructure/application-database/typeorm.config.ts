@@ -102,6 +102,9 @@ import { Webhook } from "@notification-center/infrastructure/database/entities/n
 import { WebhookDelivery } from "@notification-center/infrastructure/database/entities/notifications/WebhookDelivery.ts";
 import { WebhookRuleConfig } from "@notification-center/infrastructure/database/entities/notifications/WebhookRuleConfig.ts";
 
+// agent-client-protocol owned entities
+import { AcpSession } from "@agent-client-protocol/infrastructure/database/entities/AcpSession.ts";
+
 // workflow-coordination owned entities
 import { ArtifactRetentionPolicy } from "@workflow-coordination/infrastructure/database/entities/artifacts/ArtifactRetentionPolicy.ts";
 import { AuditEvent } from "@workflow-coordination/infrastructure/database/entities/audit/AuditEvent.ts";
@@ -305,6 +308,8 @@ export function getCoreEntities(): (Function | EntitySchema)[] {
     RoutingAudit,
     RoutingDraft,
     RoutingRule,
+    // agent-client-protocol
+    AcpSession,
     // integration-hub
     BitbucketIssue,
     BitbucketPullRequest,

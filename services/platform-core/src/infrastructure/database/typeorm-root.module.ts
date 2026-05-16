@@ -64,6 +64,9 @@ import { EdgeRepository } from "@execution-orchestration/infrastructure/database
 // integration-hub owned repositories
 import { RepoRepository } from "@integration-hub/infrastructure/database/repositories/repos/RepoRepository.ts";
 
+// agent-client-protocol owned repositories
+import { AcpSessionRepository } from "@agent-client-protocol/infrastructure/database/repositories/AcpSessionRepository.ts";
+
 // workflow-coordination owned repositories
 import { ArtifactRepository } from "@workflow-coordination/infrastructure/database/repositories/artifacts/ArtifactRepository.ts";
 
@@ -112,12 +115,15 @@ export const ALL_REPOSITORIES = [
   EdgeRepository,
   // integration-hub
   RepoRepository,
+  // agent-client-protocol
+  AcpSessionRepository,
   // workflow-coordination
   ArtifactRepository,
 ] as const;
 
 // Re-export repositories for consumers
 export {
+  AcpSessionRepository,
   OrgRepository,
   UserRepository,
   SessionRepository,
