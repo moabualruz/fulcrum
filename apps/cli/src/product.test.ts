@@ -1720,6 +1720,142 @@ describe("fulcrum product CLI", () => {
     });
   });
 
+  test("product review preview/session save/load/annotate route through reports caller", async () => {
+    const calls: Array<{ method: string; input: unknown }> = [];
+    const caller = {
+      reports: {
+        reviewWorkbench: async (input: Record<string, unknown>) => {
+          calls.push({ method: "reviewWorkbench", input });
+          return { projectId: input["projectId"], traceId: input["traceId"], summary: { fileCount: 0 } };
+        },
+        saveReviewWorkbenchSession: async (input: Record<string, unknown>) => {
+          calls.push({ method: "saveReviewWorkbenchSession", input });
+          return { projectId: input["projectId"], traceId: input["traceId"], status: "saved", revision: input["revision"] };
+        },
+        loadReviewWorkbenchSession: async (input: Record<string, unknown>) => {
+          calls.push({ method: "loadReviewWorkbenchSession", input });
+          return { projectId: input["projectId"], traceId: input["traceId"], status: "loaded", revision: 1 };
+        },
+        appendReviewWorkbenchAnnotation: async (input: Record<string, unknown>) => {
+          calls.push({ method: "appendReviewWorkbenchAnnotation", input });
+          return { projectId: input["projectId"], traceId: input["traceId"], status: "annotated" };
+        },
+      },
+    };
+
+    const previewIo = testIo();
+    await runProduct([
+      "review", "preview",
+      "--project", "99999999-9999-4999-8999-999999999999",
+      "--trace", "trace_review_preview",
+      "--json",
+    ], { ...previewIo.opts, caller });
+    expect(previewIo.exits).toEqual([]);
+    expect(JSON.parse(previewIo.out[0]!)).toMatchObject({
+      projectId: "99999999-9999-4999-8999-999999999999",
+      traceId: "trace_review_preview",
+    });
+
+    const saveIo = testIo();
+    await runProduct([
+      "review", "session", "save",
+      "--project", "99999999-9999-4999-8999-999999999999",
+      "--trace", "trace_review_save",
+      "--revision", "3",
+      "--summary", "Looks good overall",
+      "--json",
+    ], { ...saveIo.opts, caller });
+    expect(saveIo.exits).toEqual([]);
+    expect(JSON.parse(saveIo.out[0]!)).toMatchObject({ status: "saved", revision: 3 });
+
+    const loadIo = testIo();
+    await runProduct([
+      "review", "session", "load",
+      "--project", "99999999-9999-4999-8999-999999999999",
+      "--trace", "trace_review_load",
+      "--json",
+    ], { ...loadIo.opts, caller });
+    expect(loadIo.exits).toEqual([]);
+    expect(JSON.parse(loadIo.out[0]!)).toMatchObject({ status: "loaded", revision: 1 });
+
+    const annotateIo = testIo();
+    await runProduct([
+      "review", "session", "annotate",
+      "--project", "99999999-9999-4999-8999-999999999999",
+      "--trace", "trace_review_annotate",
+      "--file", "src/main.ts",
+      "--line", "42",
+      "--body", "Consider extracting this into a helper.",
+      "--severity", "warning",
+      "--json",
+    ], { ...annotateIo.opts, caller });
+    expect(annotateIo.exits).toEqual([]);
+    expect(JSON.parse(annotateIo.out[0]!)).toMatchObject({ status: "annotated" });
+
+    expect(calls).toEqual([
+      {
+        method: "reviewWorkbench",
+        input: {
+          projectId: "99999999-9999-4999-8999-999999999999",
+          traceId: "trace_review_preview",
+          files: [],
+          annotations: [],
+        },
+      },
+      {
+        method: "saveReviewWorkbenchSession",
+        input: {
+          projectId: "99999999-9999-4999-8999-999999999999",
+          traceId: "trace_review_save",
+          revision: 3,
+          summary: "Looks good overall",
+          files: [],
+          annotations: [],
+        },
+      },
+      {
+        method: "loadReviewWorkbenchSession",
+        input: {
+          projectId: "99999999-9999-4999-8999-999999999999",
+          traceId: "trace_review_load",
+        },
+      },
+      {
+        method: "appendReviewWorkbenchAnnotation",
+        input: {
+          projectId: "99999999-9999-4999-8999-999999999999",
+          traceId: "trace_review_annotate",
+          filePath: "src/main.ts",
+          lineStart: 42,
+          lineEnd: 42,
+          text: "Consider extracting this into a helper.",
+          severity: "warning",
+        },
+      },
+    ]);
+  });
+
+  test("product review session annotate rejects invalid severity", async () => {
+    const caller = {
+      reports: {
+        appendReviewWorkbenchAnnotation: async () => ({}),
+      },
+    };
+    const io = testIo();
+    await runProduct([
+      "review", "session", "annotate",
+      "--project", "p1",
+      "--trace", "t1",
+      "--file", "src/main.ts",
+      "--line", "1",
+      "--body", "note",
+      "--severity", "critical",
+      "--json",
+    ], { ...io.opts, caller });
+    expect(io.exits).toEqual([1]);
+    expect(io.err[0]).toContain("--severity must be info, warning, or error");
+  });
+
   test("invalid product arguments exit 2 with validation error", async () => {
     const io = testIo();
     await runProduct(["tasks", "create", "--project", "alpha"], {

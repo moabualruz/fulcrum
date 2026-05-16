@@ -112,6 +112,10 @@ Usage:
   fulcrum product planning freeform-prompt --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--json]
   fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
   fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+  fulcrum product review preview --project <id> [--trace <id>] [--json]
+  fulcrum product review session save --project <id> --trace <id> --revision <N> --summary <text> [--json]
+  fulcrum product review session load --project <id> --trace <id> [--json]
+  fulcrum product review session annotate --project <id> --trace <id> --file <path> --line <N> --body <text> [--severity info|warning|error] [--json]
   fulcrum product workflows acceptance-cycle run --file <payload.json> [--json]
 `;
 
@@ -135,6 +139,7 @@ const VALUE_FLAGS = new Set<string>([
   "--decorations",
   "--diff-file",
   "--doc",
+  "--doc-ids",
   "--feedback",
   "--feedback-agent",
   "--feedback-model",
@@ -142,6 +147,7 @@ const VALUE_FLAGS = new Set<string>([
   "--line-end",
   "--line-start",
   "--kind",
+  "--line",
   "--limit",
   "--copy-to-worktree",
   "--max-doc-chars",
@@ -159,6 +165,7 @@ const VALUE_FLAGS = new Set<string>([
   "--permission",
   "--review",
   "--review-file",
+  "--revision",
   "--reviewer-agent",
   "--runner",
   "--run-group",
@@ -262,6 +269,8 @@ export async function run(argv: readonly string[], opts: ProductRunOptions = {})
           return await runContext(caller!, rest, io);
         case "reports":
           return await runReports(caller!, rest, io);
+        case "review":
+          return await runReview(caller!, rest, io);
         case "planning":
           return await runPlanning(caller!, rest, io);
         case "workflows":
@@ -473,6 +482,38 @@ async function runReports(caller: ProductCaller, argv: readonly string[], io: Io
     }
     default:
       return usage(io, `fulcrum product reports: unknown verb '${sub ?? ""}'`);
+  }
+}
+
+async function runReview(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
+  const [sub, ...rest] = argv;
+  switch (sub) {
+    case "preview": {
+      const reviewWorkbench = requireReports(caller).reviewWorkbench;
+      if (!reviewWorkbench) throw new Error("review preview caller is not configured");
+      return printValue(await reviewWorkbench(reviewPreviewInput(rest)), rest, io.print);
+    }
+    case "session": {
+      const [mode, ...sessionRest] = rest;
+      if (mode === "save") {
+        const save = requireReports(caller).saveReviewWorkbenchSession;
+        if (!save) throw new Error("review session save caller is not configured");
+        return printValue(await save(reviewSessionSaveInput(sessionRest)), sessionRest, io.print);
+      }
+      if (mode === "load") {
+        const load = requireReports(caller).loadReviewWorkbenchSession;
+        if (!load) throw new Error("review session load caller is not configured");
+        return printValue(await load(reviewSessionLoadInput(sessionRest)), sessionRest, io.print);
+      }
+      if (mode === "annotate") {
+        const annotate = requireReports(caller).appendReviewWorkbenchAnnotation;
+        if (!annotate) throw new Error("review session annotate caller is not configured");
+        return printValue(await annotate(reviewSessionAnnotateInput(sessionRest)), sessionRest, io.print);
+      }
+      return usage(io, "usage: fulcrum product review session <save|load|annotate>");
+    }
+    default:
+      return usage(io, `fulcrum product review: unknown verb '${sub ?? ""}'`);
   }
 }
 
@@ -941,6 +982,52 @@ function reviewWorkbenchSessionAnnotateInput(argv: readonly string[]): Record<st
     viewedFilePaths: csvFlag(flagValue(argv, "--viewed-files")),
     hideViewedFiles: argv.includes("--hide-viewed") ? true : undefined,
     searchQuery: flagValue(argv, "--search"),
+  });
+}
+
+// ── W5 review shorthand input builders ──────────────────────────────
+
+function reviewPreviewInput(argv: readonly string[]): Record<string, unknown> {
+  return compact({
+    projectId: requiredFlag(argv, "--project"),
+    traceId: flagValue(argv, "--trace"),
+    files: [],
+    annotations: [],
+  });
+}
+
+function reviewSessionSaveInput(argv: readonly string[]): Record<string, unknown> {
+  return compact({
+    projectId: requiredFlag(argv, "--project"),
+    traceId: requiredFlag(argv, "--trace"),
+    revision: requiredNumberFlag(argv, "--revision"),
+    summary: requiredFlag(argv, "--summary"),
+    files: [],
+    annotations: [],
+  });
+}
+
+function reviewSessionLoadInput(argv: readonly string[]): Record<string, unknown> {
+  return compact({
+    projectId: requiredFlag(argv, "--project"),
+    traceId: requiredFlag(argv, "--trace"),
+  });
+}
+
+function reviewSessionAnnotateInput(argv: readonly string[]): Record<string, unknown> {
+  const severity = flagValue(argv, "--severity");
+  if (severity && severity !== "info" && severity !== "warning" && severity !== "error") {
+    throw new Error("--severity must be info, warning, or error");
+  }
+  const lineNum = requiredNumberFlag(argv, "--line");
+  return compact({
+    projectId: requiredFlag(argv, "--project"),
+    traceId: requiredFlag(argv, "--trace"),
+    filePath: requiredFlag(argv, "--file"),
+    lineStart: lineNum,
+    lineEnd: lineNum,
+    text: requiredFlag(argv, "--body"),
+    severity,
   });
 }
 
