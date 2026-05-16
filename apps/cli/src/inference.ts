@@ -142,6 +142,12 @@ function resolveServices(opts: InferenceRunOptions): {
   if (opts.lifecycle && opts.client) {
     return { lifecycle: opts.lifecycle as Required<InferenceCliLifecycle>, client: opts.client };
   }
+  // Client-only mode: caller supplied a client directly without a lifecycle
+  // (e.g. status/models/embed commands that don't need process control).
+  if (opts.client && !opts.lifecycle) {
+    const stubLifecycle = {} as Required<InferenceCliLifecycle>;
+    return { lifecycle: stubLifecycle, client: opts.client };
+  }
   const container = opts.container;
   if (!container) {
     throw new Error("InferenceRunOptions requires either {lifecycle, client} or a container");

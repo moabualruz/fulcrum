@@ -16,10 +16,14 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
   async list(orgId: string, projectId?: string | null): Promise<DocTemplateRow[]> {
     const { DocTemplate } = await import("@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, unknown> = projectId
-      ? { org: { id: orgId }, $or: [{ projectId }, { projectId: null }] } as any
-      : { org: { id: orgId }, projectId: null } as any;
+    // TypeORM OR conditions use an array of conditions (each element is ANDed
+    // within itself, and OR-ed across elements). MikroORM $or is invalid here.
+    const where = projectId
+      ? [
+          { org: { id: orgId }, projectId } as Record<string, unknown>,
+          { org: { id: orgId }, projectId: null } as Record<string, unknown>,
+        ]
+      : [{ org: { id: orgId }, projectId: null } as Record<string, unknown>];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows = await this.em.find(DocTemplate, { where: where as any, order: { docType: "ASC" } });
