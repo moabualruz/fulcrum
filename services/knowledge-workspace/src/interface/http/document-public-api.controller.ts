@@ -194,6 +194,42 @@ export class DocumentPublicApiService {
     return attachment;
   }
 
+  async uploadAttachment(
+    params: DocumentIdParamsDto,
+    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    orgId: string,
+  ): Promise<unknown> {
+    const { storeFile } = await import("@knowledge-workspace/infrastructure/storage/local-file-storage.ts");
+    const stored = await storeFile(file.buffer, file.originalname, orgId);
+    const attachment = await this.requireStore().createAttachment({
+      docId: params.id,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      sizeBytes: stored.sizeBytes,
+      storagePath: stored.storagePath,
+      checksumSha256: stored.checksumSha256,
+    });
+    if (!attachment) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
+    return attachment;
+  }
+
+  async downloadAttachment(params: DocumentAttachmentIdParamsDto): Promise<{ buffer: Buffer; fileName: string; mimeType: string } | null> {
+    const store = this.requireStore();
+    const attachments = await store.listAttachments({ docId: "" });
+    const attachment = (attachments as Array<{ id: string; storagePath?: string; storage_path?: string; fileName?: string; file_name?: string; mimeType?: string; mime_type?: string }>)
+      .find((a) => a.id === params.attachmentId);
+    if (!attachment) return null;
+    const storagePath = attachment.storagePath ?? attachment.storage_path ?? "";
+    if (!storagePath) return null;
+    const { retrieveFile } = await import("@knowledge-workspace/infrastructure/storage/local-file-storage.ts");
+    const buffer = await retrieveFile(storagePath);
+    return {
+      buffer,
+      fileName: attachment.fileName ?? attachment.file_name ?? "download",
+      mimeType: attachment.mimeType ?? attachment.mime_type ?? "application/octet-stream",
+    };
+  }
+
   async deleteAttachment(params: DocumentAttachmentIdParamsDto): Promise<void> {
     const attachment = await this.requireStore().deleteAttachment({ attachmentId: params.attachmentId });
     if (!attachment) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
