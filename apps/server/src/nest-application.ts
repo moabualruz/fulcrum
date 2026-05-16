@@ -5,6 +5,7 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module.ts";
+import { TrpcRouter } from "./trpc/trpc.router.ts";
 
 export interface FulcrumNestApplicationOptions {
   logger?: false | LogLevel[];
@@ -47,6 +48,9 @@ export async function createFulcrumNestApplication(
     .build();
   const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
   SwaggerModule.setup(options.openApiPath ?? "openapi", app, openApiDocument);
+
+  const trpcRouter = app.get(TrpcRouter);
+  await trpcRouter.applyMiddleware(app);
 
   return app;
 }
