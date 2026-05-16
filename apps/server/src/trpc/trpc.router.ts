@@ -37,6 +37,7 @@ import { templatesRouter } from "./routers/templates.ts";
 import { recurrenceRouter } from "./routers/recurrence.ts";
 import { automationsRouter } from "./routers/automations.ts";
 import { planningRouter } from "./routers/planning.ts";
+import { reviewRouter } from "./routers/review.ts";
 import {
   runsSubscriptionRouter,
   notifySubscriptionRouter,
@@ -135,6 +136,7 @@ export class TrpcRouter implements OnModuleInit {
       recurrence: recurrenceRouter,
       automations: automationsRouter,
       planning: planningRouter,
+      review: reviewRouter,
       credentials: credentialsRouter,
       db: dbRouter,
       health: healthRouter,
