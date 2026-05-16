@@ -3,7 +3,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { __setReportsApplicationForTest } from "@fulcrum/server/trpc/routers/reports.ts";
+import { __setReviewApplicationForTest as __setReportsApplicationForTest } from "@fulcrum/server/trpc/routers/review.ts";
 import type { EntityManager } from "typeorm";
 import type {
   AppContext,
