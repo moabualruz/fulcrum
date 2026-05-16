@@ -38,7 +38,7 @@ Usage:
   fulcrum settings <list|get|set> [--json]
   fulcrum memory <list|get|add|delete|search|promote> [--json]
   fulcrum search query <query> [--json]
-  fulcrum artifacts <list|show|download|archive|unarchive|delete> [--json]
+  fulcrum artifacts <list|show|upload|accept|reject|download|archive|unarchive|delete> [--json]
   fulcrum components status [--json]
   fulcrum doctor [--json]
   fulcrum completion --shell <bash|zsh|fish|powershell>

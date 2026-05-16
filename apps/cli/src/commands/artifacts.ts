@@ -8,6 +8,9 @@ type ArtifactsCaller = {
   artifacts: {
     list(input: Record<string, unknown>): Promise<unknown[]>;
     get(input: { id: string }): Promise<unknown>;
+    upload(input: Record<string, unknown>): Promise<unknown>;
+    accept(input: { id: string }): Promise<unknown>;
+    reject(input: { id: string }): Promise<unknown>;
     download(input: { id: string }): Promise<unknown>;
     archive(input: { id: string }): Promise<unknown>;
     unarchive(input: { id: string }): Promise<unknown>;
@@ -29,6 +32,9 @@ const HELP = `fulcrum artifacts
 Usage:
   fulcrum artifacts list [--project-id <id>] [--run-id <id>] [--task-id <id>] [--archived] [--mime <type>] [--json]
   fulcrum artifacts show <id> [--json]
+  fulcrum artifacts upload --filename <name> --mime <type> --size-bytes <n> [--project-id <id>] [--task-id <id>] [--run-id <id>] [--doc-id <id>] [--metadata <json>] [--json]
+  fulcrum artifacts accept <id> [--json]
+  fulcrum artifacts reject <id> [--json]
   fulcrum artifacts download <id> [--json]
   fulcrum artifacts archive <id> [--json]
   fulcrum artifacts unarchive <id> [--json]
@@ -56,6 +62,21 @@ export async function run(argv: readonly string[], opts: ArtifactsRunOptions = {
         })), rest, io.print);
       case "show":
         return printOutput(await caller!.artifacts.get({ id: requiredArg(rest, "show", "<id>") }), rest, io.print);
+      case "upload":
+        return printOutput(await caller!.artifacts.upload(compact({
+          filename: requiredFlag(rest, "--filename", "upload"),
+          mime: requiredFlag(rest, "--mime", "upload"),
+          sizeBytes: requiredFlag(rest, "--size-bytes", "upload"),
+          projectId: flagValue(rest, "--project-id"),
+          taskId: flagValue(rest, "--task-id"),
+          runId: flagValue(rest, "--run-id"),
+          docId: flagValue(rest, "--doc-id"),
+          metadataJson: jsonFlag(rest, "--metadata"),
+        })), rest, io.print);
+      case "accept":
+        return printOutput(await caller!.artifacts.accept({ id: requiredArg(rest, "accept", "<id>") }), rest, io.print);
+      case "reject":
+        return printOutput(await caller!.artifacts.reject({ id: requiredArg(rest, "reject", "<id>") }), rest, io.print);
       case "download":
         return printOutput(await caller!.artifacts.download({ id: requiredArg(rest, "download", "<id>") }), rest, io.print);
       case "archive":
@@ -107,6 +128,24 @@ function flagValue(argv: readonly string[], flag: string): string | undefined {
   if (index < 0) return undefined;
   const value = argv[index + 1];
   return value && !value.startsWith("-") ? value : undefined;
+}
+
+function requiredFlag(argv: readonly string[], flag: string, command: string): string {
+  const value = flagValue(argv, flag);
+  if (value === undefined) throw new Error(`fulcrum artifacts ${command}: missing required flag ${flag}`);
+  return value;
+}
+
+function jsonFlag(argv: readonly string[], flag: string): Record<string, unknown> | undefined {
+  const value = flagValue(argv, flag);
+  if (value === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("expected object");
+    return parsed as Record<string, unknown>;
+  } catch (err) {
+    throw new Error(`invalid ${flag} JSON: ${(err as Error).message}`);
+  }
 }
 
 function compact(input: Record<string, unknown>): Record<string, unknown> {
