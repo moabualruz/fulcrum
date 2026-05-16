@@ -153,15 +153,14 @@ describe("TuiApp foundation behavior", () => {
     const db = await createTestOrm();
     try {
       const em = db.em;
-      const user = await em.findOneOrFail(User, { id: db.seed.userId });
-      em.persist(em.create(Account, {
+      const user = await em.findOneOrFail(User, { where: { id: db.seed.userId } });
+      await em.getRepository(Account).save({
         userId: user.id,
         providerId: "passkey",
         accountId: "credential-a",
         createdAt: new Date(),
         updatedAt: new Date(),
-      }));
-      /* flushed */
+      });
 
       const caller = await buildCaller(testContainer(db));
       const whoami = await caller.auth.whoami();
@@ -204,8 +203,8 @@ describe("TuiApp foundation behavior", () => {
     const db = await createTestOrm();
     try {
       const em = db.em;
-      const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
-      const user = await em.findOneOrFail(User, { id: db.seed.userId });
+      const org = await em.findOneOrFail(Org, { where: { id: db.seed.orgId } });
+      const user = await em.findOneOrFail(User, { where: { id: db.seed.userId } });
       const app = new TuiApp({
         output: new FakeTTY(),
         caller: await buildCaller(testContainer(db)),
@@ -215,7 +214,7 @@ describe("TuiApp foundation behavior", () => {
       await app.mount();
       await app.navigateTo("auth");
 
-      const rows = await em.find(TelemetryEvent, { org });
+      const rows = await em.find(TelemetryEvent, { where: { org: { id: org.id } } });
       expect(rows).toHaveLength(2);
       expect(rows.map((row) => row.kind)).toEqual(["local_telemetry", "local_telemetry"]);
       expect(rows.map((row) => row.payload["screen_key"])).toContain("nav");
