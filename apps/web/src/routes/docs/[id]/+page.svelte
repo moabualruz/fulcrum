@@ -55,6 +55,11 @@
 				class={cn(buttonVariants({ variant: "ghost" }), "text-xs")}
 			>History</a>
 			<a
+				data-doc-plan
+				href="/planning?docId={doc.id}"
+				class={cn(buttonVariants({ variant: "outline" }))}
+			>Plan from this doc</a>
+			<a
 				data-doc-edit
 				href="/docs/{doc.id}/edit"
 				class={cn(buttonVariants({ variant: "outline" }))}
@@ -91,6 +96,7 @@
 					<a
 						data-doc-attachment={attachment.id}
 						href={attachment.href}
+						download={attachment.fileName}
 						class={cn("flex items-center justify-between gap-4 px-3 py-2 text-sm hover:bg-muted")}
 					>
 						<span class={cn("min-w-0 truncate font-medium")}>{attachment.fileName}</span>
