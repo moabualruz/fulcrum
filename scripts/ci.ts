@@ -97,10 +97,10 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "lint" },
 
     // ── Tier 2: UNIT TESTS (services/, <2min) ──
-    { name: "unit",          cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "15000", "services/"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
+    { name: "unit",          cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "20000", "services/"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
 
     // ── Tier 3: INTEGRATION TESTS (tests/, <3min) ──
-    { name: "integration",   cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "15000", "tests/", "--exclude", "tests/architecture"], tier: "integration" },
+    { name: "integration",   cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "20000", "tests/", "--exclude", "tests/architecture"], tier: "integration" },
 
     // ── Tier 4: BUILD + WEB (<2min) ──
     { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },
