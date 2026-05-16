@@ -33,6 +33,34 @@ export const actions: Actions = {
     );
   },
 
+  startGuidedPlanning: async ({ request, locals }) => {
+    const form = await request.formData();
+    const agentName = (form.get("agentName") as string) ?? "";
+    const userPrompt = (form.get("userPrompt") as string) ?? "";
+    const modeId = (form.get("modeId") as string) || undefined;
+    const modelId = (form.get("modelId") as string) || undefined;
+    const permissionMode = (form.get("permissionMode") as string) || "review_each_tool";
+    const cwd = (form.get("cwd") as string) || process.cwd();
+    if (!agentName || !userPrompt)
+      return { success: false, message: "agent and prompt are required" };
+    const { em, ctx } = await requestServiceScope(locals);
+    const { startGuidedAcpPlanningSession } = await import(
+      "@planning-review/application/acp-guided-planning-actions.ts"
+    );
+    const result = await startGuidedAcpPlanningSession(em, {
+      orgId: ctx.orgId,
+      userId: ctx.userId,
+      acpSessionId: `acp-${Date.now()}`,
+      agentName,
+      cwd,
+      userPrompt,
+      modeId,
+      modelId,
+      permissionMode: permissionMode as "review_each_tool" | "allow_workspace" | "read_only",
+    });
+    return actionOk(`Planning session started (trace: ${result.traceId ?? "none"})`);
+  },
+
   dispatch: async ({ request, locals }) => {
     const form = await request.formData();
     const agent = (form.get("agent") as string | null) ?? "";

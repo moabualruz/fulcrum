@@ -41,6 +41,47 @@
     <AgentSessionWorkbench model={payload.sessionWorkbench} />
   </div>
 
+  <!-- W2: ACP bridge → persisted planning session -->
+  <details data-acp-planning-bridge class={cn("mb-4 rounded-lg border border-border")}>
+    <summary class={cn("cursor-pointer px-4 py-2 text-sm font-medium")}>Start Guided Planning Session</summary>
+    <form method="POST" action="?/startGuidedPlanning" use:enhance class={cn("grid gap-3 p-4 pt-2")}>
+      <div class={cn("grid gap-3 sm:grid-cols-2")}>
+        <label class={cn("grid gap-1 text-sm")}>
+          <span class={cn("text-muted-foreground")}>Agent</span>
+          <select name="agentName" required class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each payload.profiles as profile}
+              <option value={profile.name}>{profile.name}</option>
+            {/each}
+          </select>
+        </label>
+        <label class={cn("grid gap-1 text-sm")}>
+          <span class={cn("text-muted-foreground")}>Mode</span>
+          <input name="modeId" value="planning" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("grid gap-1 text-sm")}>
+          <span class={cn("text-muted-foreground")}>Model</span>
+          <input name="modelId" value="" placeholder="(default)" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("grid gap-1 text-sm")}>
+          <span class={cn("text-muted-foreground")}>Permission</span>
+          <select name="permissionMode" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}>
+            <option value="review_each_tool">Review Each Tool</option>
+            <option value="allow_workspace">Allow Workspace</option>
+            <option value="read_only">Read Only</option>
+          </select>
+        </label>
+      </div>
+      <label class={cn("grid gap-1 text-sm")}>
+        <span class={cn("text-muted-foreground")}>Prompt</span>
+        <textarea name="userPrompt" rows="2" required placeholder="Describe what to plan..." class={cn("rounded-md border border-input bg-background px-3 py-2 text-sm")}></textarea>
+      </label>
+      <input type="hidden" name="cwd" value={typeof window !== 'undefined' ? '' : ''} />
+      <button type="submit" class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground")}>
+        Start Planning
+      </button>
+    </form>
+  </details>
+
   {#if payload.profiles.length === 0}
     <div data-agents-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>
       No agent profiles registered. Use <code>fulcrum agents add</code> to register one.
