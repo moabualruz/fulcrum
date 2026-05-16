@@ -322,6 +322,11 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'sync-repo' -d '
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'unregister' -d 'repos unregister'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'repos')"
+complete -c fulcrum -n "__fish_use_subcommand" -a 'review' -d 'fulcrum review'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'apply-auto-decision' -d 'review apply-auto-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'build-uat-handoff' -d 'review build-uat-handoff'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'record-uat-decision' -d 'review record-uat-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'routing' -d 'fulcrum routing'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'config update-llm-gate' -d 'routing config update-llm-gate'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'create' -d 'routing create'

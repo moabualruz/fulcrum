@@ -12,7 +12,7 @@ _fulcrum() {
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   domain="${COMP_WORDS[1]}"
   if [[ ${COMP_CWORD} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W 'agent_runs agents artifacts audit auth automations backup comments connectors context credentials customFieldDefs dataExport dataImport db doc_comments doc_links doc_versions docs doctor errorLogs flags fulcrum_skills health inference invitations memories notify notifySubscriptions orchestrationSubscriptions orgs planning projects recurrence relationships repo_branches repo_commits reports repos routing runsSubscriptions saved_views search sprints taskCustomFields tasks telemetry templates theme webhooks workflows' -- "$cur") )
+    COMPREPLY=( $(compgen -W 'agent_runs agents artifacts audit auth automations backup comments connectors context credentials customFieldDefs dataExport dataImport db doc_comments doc_links doc_versions docs doctor errorLogs flags fulcrum_skills health inference invitations memories notify notifySubscriptions orchestrationSubscriptions orgs planning projects recurrence relationships repo_branches repo_commits reports repos review routing runsSubscriptions saved_views search sprints taskCustomFields tasks telemetry templates theme webhooks workflows' -- "$cur") )
     return 0
   fi
   case "$domain" in
@@ -451,6 +451,15 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'repos')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
+    review)
+      local verbs='apply-auto-decision build-uat-handoff record-uat-decision'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
