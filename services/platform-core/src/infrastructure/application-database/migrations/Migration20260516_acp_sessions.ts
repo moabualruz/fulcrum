@@ -12,6 +12,25 @@ export class Migration20260516AcpSessionColumns1778623200002
   name = "Migration20260516AcpSessionColumns1778623200002";
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    const tableExists = await queryRunner.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_name = 'fulcrum_acp_sessions'`,
+    );
+    if (!tableExists || (tableExists as unknown[]).length === 0) {
+      await queryRunner.query(`
+        CREATE TABLE fulcrum_acp_sessions (
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          project_id varchar,
+          trace_id varchar,
+          agent_name varchar NOT NULL DEFAULT '',
+          status varchar NOT NULL DEFAULT 'active',
+          mode varchar,
+          model varchar,
+          traffic_log jsonb NOT NULL DEFAULT '[]',
+          created_at timestamp NOT NULL DEFAULT now(),
+          updated_at timestamp NOT NULL DEFAULT now()
+        )
+      `);
+    }
     await queryRunner.query(
       `ALTER TABLE fulcrum_acp_sessions ADD COLUMN IF NOT EXISTS org_id varchar`,
     );
