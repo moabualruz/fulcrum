@@ -51,7 +51,7 @@ async function createProjectAndTask(em: TestOrm["em"]) {
 }
 
 describe("application runs commands and queries", () => {
-  test("dispatchRun, listRuns, and getRun round-trip through MikroORM", async () => {
+  test("dispatchRun, listRuns, and getRun round-trip", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
     const created = await dispatchRun(em, ctx(), {

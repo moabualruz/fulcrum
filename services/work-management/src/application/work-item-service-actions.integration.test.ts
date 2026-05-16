@@ -40,7 +40,7 @@ async function taskEvents(em: TestOrm["em"], taskId: string): Promise<Array<{ ve
   ) as Array<{ verb: string; payload: Record<string, unknown> }>;
 }
 
-describe("task service actions with real MikroORM persistence", () => {
+describe("task service actions with real persistence", () => {
   test("creates, updates, moves status, deletes, and records task events", async () => {
     const testDb = await freshDb();
     const em = testDb.em;

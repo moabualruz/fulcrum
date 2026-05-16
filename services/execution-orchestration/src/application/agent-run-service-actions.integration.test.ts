@@ -55,7 +55,7 @@ async function eventRows(em: TestOrm["em"], subjectId?: string): Promise<Array<{
     params,) as Array<{ verb: string; payload: Record<string, unknown> }>;
 }
 
-describe("run service actions with real MikroORM persistence", () => {
+describe("run service actions with real persistence", () => {
   test("dispatches, enqueues, cancels, retries, and records events", async () => {
     const testDb = await freshDb();
     const em = testDb.em;

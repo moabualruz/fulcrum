@@ -27,7 +27,7 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
 }
 
 describe("application docs commands and queries", () => {
-  test("createDoc, listDocs, and getDoc round-trip through MikroORM", async () => {
+  test("createDoc, listDocs, and getDoc round-trip through persistence", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
 
@@ -94,8 +94,7 @@ describe("application docs commands and queries", () => {
   test("cross-org doc access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
-    em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    /* flushed */
+    await em.save(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
 
     const other = await createDoc(em, ctx(OTHER_ORG_ID), { title: "Other doc" });
     await expect(getDoc(em, ctx(), other.id)).rejects.toBeInstanceOf(AppForbiddenError);

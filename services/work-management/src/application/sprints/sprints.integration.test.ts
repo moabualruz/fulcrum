@@ -27,7 +27,7 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
 }
 
 describe("application sprints commands and queries", () => {
-  test("createSprint, listSprints, and getSprint round-trip through MikroORM", async () => {
+  test("createSprint, listSprints, and getSprint round-trip through persistence", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
     const created = await createSprint(em, ctx(), {
@@ -60,8 +60,7 @@ describe("application sprints commands and queries", () => {
   test("cross-org sprint access throws AppForbiddenError", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
-    em.persist(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
-    await (em as any).flush();
+    await em.save(em.create(Org, { id: OTHER_ORG_ID, name: "Other", slug: "other", createdAt: new Date(), updatedAt: new Date() }));
     const other = await createSprint(em, ctx(OTHER_ORG_ID), {
       name: "Other sprint",
       projectId: ctx().projectId!,

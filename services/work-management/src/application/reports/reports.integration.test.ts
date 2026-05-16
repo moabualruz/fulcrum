@@ -27,7 +27,7 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
 }
 
 describe("application reports commands and queries", () => {
-  test("createReportSnapshot, listReportSnapshots, and getReportSnapshot round-trip through MikroORM", async () => {
+  test("createReportSnapshot, listReportSnapshots, and getReportSnapshot round-trip", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
     const created = await createReportSnapshot(em, ctx(), {
@@ -81,13 +81,12 @@ describe("application reports commands and queries", () => {
     expect(fallback.at(0)).toMatchObject({ pointsRemaining: 8, ideal: 8 });
     expect(fallback.at(1)).toMatchObject({ pointsRemaining: 5 });
 
-    em.persist(em.create(MetricsCache, {
+    await em.save(em.create(MetricsCache, {
       projectId: ctx().projectId!,
       sprint,
       date: new Date("2026-05-02T00:00:00Z"),
       pointsRemaining: 4,
     }));
-    await (em as any).flush();
 
     const cached = await getSprintBurndown(em, ctx(), { projectId: ctx().projectId!, sprintId: sprint.id });
     expect(cached.find((point) => point.date === "2026-05-02")).toMatchObject({ pointsRemaining: 4 });

@@ -10,7 +10,7 @@
  *   3. removeFilteredPolicy removes matching rows only.
  *   4. savePolicy flushes model policies back to DB.
  *   5. Round-trip: add p-rule + g-rule, loadPolicy → both present.
- * Uses MikroORM repository operations with a fresh fork per test.
+ * Uses TypeORM repository operations against PGlite.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
@@ -59,7 +59,7 @@ afterEach(() => {
 beforeEach(async () => {
   // Wipe casbin_rule table between tests
   const em = db.em;
-  await em.nativeDelete(CasbinRule, {});
+  await em.query('DELETE FROM "casbin_rule"');
 
   // Fresh repo + adapter per test — wrap in CasbinRuleRepository
   repo = new CasbinRuleRepository(db.em.getRepository(CasbinRule));

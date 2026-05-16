@@ -207,7 +207,7 @@ describe("ContextAssembler", () => {
 
       const { bundle, snapshotId } = await assembler.assemble(TASK_ID);
 
-      const snapshot = await db.orm.em.findOneOrFail(
+      const snapshot = await db.em.findOneOrFail(
         ContextSnapshot,
         { id: snapshotId },
       );
@@ -411,9 +411,9 @@ function sliceSizes(bundle: ContextBundle): Record<ContextSliceKey, number> {
 }
 
 async function seedIntegrationRows(db: TestOrm): Promise<void> {
-  const em = db.orm.em;
+  const em = db.em;
   const org = em.getReference(Org, ORG_ID);
-  em.persist(em.create(Task, {
+  await em.save(em.create(Task, {
     id: TASK_ID,
     org,
     customFields: {
@@ -422,7 +422,7 @@ async function seedIntegrationRows(db: TestOrm): Promise<void> {
       projectId: PROJECT_ID,
     },
   }));
-  em.persist(em.create(Memory, {
+  await em.save(em.create(Memory, {
     id: "55555555-5555-5555-5555-555555555555",
     org,
     projectId: PROJECT_ID,
@@ -437,13 +437,12 @@ async function seedIntegrationRows(db: TestOrm): Promise<void> {
     createdAt: new Date("2026-05-02T00:00:00.000Z"),
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  await (em as any).flush();
 }
 
 async function seedLazyTaskRows(db: TestOrm): Promise<void> {
-  const em = db.orm.em;
+  const em = db.em;
   const org = em.getReference(Org, ORG_ID);
-  em.persist(em.create(Task, {
+  await em.save(em.create(Task, {
     id: TASK_ID,
     org,
     customFields: {
@@ -452,7 +451,7 @@ async function seedLazyTaskRows(db: TestOrm): Promise<void> {
       projectId: PROJECT_ID,
     },
   }));
-  em.persist(em.create(Document, {
+  await em.save(em.create(Document, {
     id: "66666666-6666-6666-6666-666666666666",
     org,
     projectId: PROJECT_ID,
@@ -469,7 +468,6 @@ async function seedLazyTaskRows(db: TestOrm): Promise<void> {
     externalId: null,
     updatedAt: new Date("2026-05-02T00:00:00.000Z"),
   }));
-  await (em as any).flush();
 }
 
 /**
@@ -477,7 +475,7 @@ async function seedLazyTaskRows(db: TestOrm): Promise<void> {
  * Bypasses NestJS DI container (which is null in tests) by wiring repos directly.
  */
 function buildAssembler(db: TestOrm, retrieverOverride?: { retrieve: Function }): ContextAssembler {
-  const em = db.orm.em;
+  const em = db.em;
 
   // MemoryRetriever backed by real DB MemoryRepository
   let retriever: any;
@@ -500,7 +498,7 @@ function buildAssembler(db: TestOrm, retrieverOverride?: { retrieve: Function })
   // Document repo adapter: wraps em.find
   const documentRepository = {
     find: async (where?: unknown, _opts?: unknown) => {
-      // Ignore MikroORM $or — just find by projectId + not archived
+      // query by projectId + not archived
       const w: any = { archived: false };
       if (where && typeof where === "object") {
         const criteria = where as any;

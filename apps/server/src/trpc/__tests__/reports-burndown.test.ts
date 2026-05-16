@@ -64,7 +64,7 @@ function callerFor(em: EntityManager) {
   );
 }
 
-/** Insert task via raw SQL (MikroORM lazy fields don't persist via em.create). */
+/** Insert task via raw SQL (lazy fields don't persist via em.create). */
 async function insertTask(
   em: EntityManager,
   opts: { sprintId: string; points: number; status?: string; title?: string },

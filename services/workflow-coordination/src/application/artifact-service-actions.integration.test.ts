@@ -81,7 +81,7 @@ async function insertArtifact(
   return id;
 }
 
-describe("artifact service with real MikroORM persistence", () => {
+describe("artifact service with real persistence", () => {
   test("lists, filters, reads detail content, computes stats, and deletes rows", async () => {
     const testDb = await freshDb();
     const em = testDb.em;

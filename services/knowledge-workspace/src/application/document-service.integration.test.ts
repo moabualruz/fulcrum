@@ -33,10 +33,9 @@ async function ensureUser(
   const existing = await em.findOne(User, { where: { id } });
   if (existing) {
     existing.role = role;
-    /* flushed */
     return;
   }
-  em.persist(em.create(User, {
+  await em.save(em.create(User, {
     id,
     orgId: DEFAULT_ORG_ID,
     email: `${id.slice(-8)}@local.test`,
@@ -45,7 +44,6 @@ async function ensureUser(
     createdAt: new Date(),
     updatedAt: new Date(),
   } as never));
-  /* flushed */
 }
 
 async function createProject(em: TestOrm["em"], name = "DocumentService class project"): Promise<string> {
@@ -65,7 +63,7 @@ function wikilink(slug: string): Record<string, unknown> {
   };
 }
 
-describe("DocumentService class with real MikroORM persistence", () => {
+describe("DocumentService class with real persistence", () => {
   test("creates parent and child docs, filters lists, updates body/content, and deletes softly/hard", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
@@ -251,7 +249,7 @@ describe("DocumentService class with real MikroORM persistence", () => {
       slug: doc.id,
       externalId: null,
     });
-    em.persist(em.create(DocLink, {
+    await em.save(em.create(DocLink, {
       org: em.getReference(Org, DEFAULT_ORG_ID),
       fromDoc: em.getReference(Document, doc.id),
       toDoc: null,
@@ -259,7 +257,6 @@ describe("DocumentService class with real MikroORM persistence", () => {
       linkKind: "wikilink",
       createdAt: new Date(),
     } as never));
-    /* flushed */
     expect(await service.listForwardLinks(DEFAULT_ORG_ID, doc.id)).toEqual([{
       toDocId: null,
       toSlug: "missing-slug",

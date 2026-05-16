@@ -14,12 +14,12 @@ afterEach(async () => {
 
 async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org }> {
   db = await createTestOrm();
-  const em = db.orm.em;
+  const em = db.em;
   const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
   return { db, em, org };
 }
 
-describe("audit MikroORM entities", () => {
+describe("audit entities", () => {
   it("persists and reloads AuditEvent with org/project FK", async () => {
     const { em, org } = await setup();
 
@@ -38,7 +38,7 @@ describe("audit MikroORM entities", () => {
 
     const reloaded = await em.findOneOrFail(AuditEvent, {
       action: "task.created",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
 
     expect(reloaded.org.id).toBe(org.id);
     expect(reloaded.projectId).toBe("project-audit");
@@ -61,7 +61,7 @@ describe("audit MikroORM entities", () => {
 
     const reloaded = await em.findOneOrFail(AuditExport, {
       requestedByUserId: "user-1",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
 
     expect(reloaded.org.id).toBe(org.id);
     expect(reloaded.projectId).toBe("project-audit");

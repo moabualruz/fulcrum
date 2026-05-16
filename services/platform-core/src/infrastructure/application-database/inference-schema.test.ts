@@ -13,7 +13,7 @@ import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.
 
 function metadataFor(em: EntityManager, entity: EntityName<unknown>) {
   const meta = (em as any).getMetadata().get(entity);
-  // Build a properties map from TypeORM ColumnMetadata for MikroORM-style access
+  // Build a properties map from TypeORM ColumnMetadata
   const properties: Record<string, {
     fieldNames?: string[];
     length?: number;

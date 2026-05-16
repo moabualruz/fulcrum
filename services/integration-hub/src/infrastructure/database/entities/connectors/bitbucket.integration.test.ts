@@ -21,12 +21,12 @@ afterEach(async () => {
 
 async function setup(): Promise<{ db: TestOrm; em: EntityManager; org: Org }> {
   db = await createTestOrm();
-  const em = db.orm.em;
+  const em = db.em;
   const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
   return { db, em, org };
 }
 
-describe("connector domain MikroORM entities", () => {
+describe("connector domain entities", () => {
   it("persists and reloads BitbucketPullRequest and BitbucketIssue with org/project FKs", async () => {
     const { em, org } = await setup();
 
@@ -56,10 +56,10 @@ describe("connector domain MikroORM entities", () => {
 
     const reloadedPr = await em.findOneOrFail(BitbucketPullRequest, {
       pullRequestId: "bb-pr-42",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
     const reloadedIssue = await em.findOneOrFail(BitbucketIssue, {
       issueId: "bb-issue-7",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
 
     expect(reloadedPr.org.id).toBe(org.id);
     expect(reloadedPr.projectId).toBe("project-alpha");
@@ -96,10 +96,10 @@ describe("connector domain MikroORM entities", () => {
 
     const reloadedMr = await em.findOneOrFail(GitlabMergeRequest, {
       mergeRequestIid: "12",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
     const reloadedIssue = await em.findOneOrFail(GitlabIssue, {
       issueIid: "33",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
 
     expect(reloadedMr.org.id).toBe(org.id);
     expect(reloadedMr.projectId).toBe("project-beta");
@@ -124,7 +124,7 @@ describe("connector domain MikroORM entities", () => {
 
     const reloaded = await em.findOneOrFail(GithubConnectorState, {
       installationId: "installation-9",
-    }, { populate: ["org"] });
+    }, { relations: ["org"] });
 
     expect(reloaded.org.id).toBe(org.id);
     expect(reloaded.projectId).toBe("project-gamma");

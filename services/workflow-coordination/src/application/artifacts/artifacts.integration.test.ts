@@ -52,7 +52,7 @@ async function createArtifactGraph(em: TestOrm["em"]) {
 }
 
 describe("application artifacts commands and queries", () => {
-  test("createArtifact, listArtifacts, and getArtifact round-trip through MikroORM", async () => {
+  test("createArtifact, listArtifacts, and getArtifact round-trip", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
     const created = await createArtifact(em, ctx(), {

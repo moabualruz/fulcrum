@@ -10,7 +10,7 @@
  *   6. Unauthenticated caller on flags.list → UNAUTHORIZED.
  *
  * Per C6: NO raw SQL strings.
- * Per C7: TypeORM EntityManager via createTestOrm() with MikroORM compat shims.
+ * Per C7: TypeORM EntityManager via createTestOrm() with compat shims.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";

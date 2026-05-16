@@ -8,7 +8,7 @@
  *   4. Flag ON + no Casbin rule for subject: falls through to Better-Auth path (allowed).
  *   5. CasbinEnforcerService.enforce() returns true for owner wildcard policy.
  *   6. CasbinEnforcerService.enforce() returns false for deny rule.
- * Uses MikroORM repository operations with a fresh fork per test.
+ * Uses TypeORM repository operations against PGlite.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
@@ -38,7 +38,7 @@ afterEach(() => {
 
 beforeEach(async () => {
   const em = db.em;
-  await em.nativeDelete(CasbinRule, {});
+  await em.query('DELETE FROM "casbin_rule"');
   repo = new CasbinRuleRepository(db.em.getRepository(CasbinRule));
 });
 

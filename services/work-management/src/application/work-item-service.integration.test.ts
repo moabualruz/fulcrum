@@ -30,7 +30,7 @@ async function createProject(em: TestOrm["em"], name = "WorkItemService class pr
   return id;
 }
 
-describe("WorkItemService class with real MikroORM persistence", () => {
+describe("WorkItemService class with real persistence", () => {
   test("creates, lists, gets, updates, soft-deletes, and includes deleted tasks only when requested", async () => {
     const testDb = await freshDb();
     const em = testDb.em;
@@ -213,7 +213,7 @@ describe("WorkItemService class with real MikroORM persistence", () => {
     const sourceFieldId = randomUUID();
     const targetFieldId = randomUUID();
 
-    em.persist(em.create(FieldDependencyRule, {
+    await em.save(em.create(FieldDependencyRule, {
       id: randomUUID(),
       org: em.getReference(Org, DEFAULT_ORG_ID),
       projectId,
@@ -223,7 +223,6 @@ describe("WorkItemService class with real MikroORM persistence", () => {
       action: "require",
       createdAt: new Date(),
     } as never));
-    await (em as any).flush();
 
     await em.getConnection().execute(
       `UPDATE tasks SET custom_fields = ?::jsonb WHERE id = ?`,
