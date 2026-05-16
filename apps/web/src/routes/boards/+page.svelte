@@ -12,6 +12,8 @@
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
   import ListView from "$lib/components/board/ListView.svelte";
   import SpreadsheetView from "$lib/components/board/SpreadsheetView.svelte";
+  import GanttView from "$lib/components/tasks/GanttView.svelte";
+  import CalendarView from "$lib/components/tasks/CalendarView.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
   import { page } from "$app/state";
@@ -26,7 +28,7 @@
   }
   const { data }: Props = $props();
 
-  type ViewMode = "board" | "list" | "spreadsheet";
+  type ViewMode = "board" | "list" | "spreadsheet" | "gantt" | "calendar";
   let viewMode = $state<ViewMode>(
     (page.url.searchParams.get("view") as ViewMode) || "board"
   );
@@ -138,6 +140,8 @@
       { id: "board", label: "Board", icon: "▦" },
       { id: "list", label: "List", icon: "☰" },
       { id: "spreadsheet", label: "Table", icon: "▤" },
+      { id: "gantt", label: "Gantt", icon: "▬" },
+      { id: "calendar", label: "Calendar", icon: "📅" },
     ] as view (view.id)}
       <button
         type="button"
@@ -201,6 +205,10 @@
       onEdit={openSheet}
       onStatusChange={(taskId, status) => onMove({ taskId, fromStatus: "todo", toStatus: status })}
     />
+  {:else if viewMode === "gantt"}
+    <GanttView tasks={resolvedTasks} />
+  {:else if viewMode === "calendar"}
+    <CalendarView tasks={resolvedTasks} />
   {/if}
 
   <BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onClose={closeSheet} />
