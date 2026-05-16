@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { TRPCError } from "@trpc/server";
 
-import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { CustomFieldDef } from "@work-management/infrastructure/database/entities/tasks/CustomFieldDef.ts";
 import { Task } from "@work-management/infrastructure/database/entities/tasks/Task.ts";
 import { TaskRepository } from "@work-management/infrastructure/database/repositories/tasks/TaskRepository.ts";
@@ -55,7 +54,7 @@ function callerFor(repo: TaskRepository, orgId = ORG_ID) {
       session: mockSession(USER_ID, orgId) as unknown as import("better-auth").Session,
       orgId,
       userId: USER_ID,
-      em: repo.getEntityManager() as any,
+      em: repo.manager as any,
       container,
     }),
   );
@@ -72,9 +71,9 @@ async function createField(
     position?: number;
   },
 ): Promise<CustomFieldDef> {
-  const em = repo.getEntityManager();
-  const field = em.create(CustomFieldDef, {
-    org: em.getReference(Org, ORG_ID),
+  const em = repo.manager;
+  const field = em.getRepository(CustomFieldDef).create({
+    org: { id: ORG_ID } as any,
     projectId: PROJECT_ID,
     slug: input.slug,
     name: input.name,

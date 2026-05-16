@@ -56,7 +56,7 @@ function callerFor(repo: TaskRepository) {
       session: mockSession() as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: repo.getEntityManager() as any,
+      em: repo.manager as any,
       container,
     }),
   );
@@ -78,19 +78,20 @@ describe("JSON import/export tRPC procedures", () => {
       const caller = callerFor(repo);
 
       const task = await caller.tasks.create({ title: "Export me", status: "ready" });
-      em.create(User, {
-        id: USER_ID,
-        orgId: ORG_ID,
-        email: "json-import-export@example.com",
-        role: "owner",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      /* flushed */
-      await em.getConnection().execute(
+      await em.save(
+        em.getRepository(User).create({
+          id: USER_ID,
+          orgId: ORG_ID,
+          email: "json-import-export@example.com",
+          role: "owner",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      );
+      await em.query(
         `
           insert into credentials (id, org_id, user_id, name, encrypted_value, algo, kdf, provider, archived)
-          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `,
         [
           "00000000-0000-4000-8000-000000000099",

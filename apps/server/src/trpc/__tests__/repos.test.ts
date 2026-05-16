@@ -78,10 +78,10 @@ describe("repos tRPC procedures", () => {
         remoteUrl: "https://example.test/beta.git",
       });
 
-      const events = await db.em.find(Event, {
+      const events = await db.em.find(Event, { where: {
         org: ORG_ID,
         verb: "repo.registered",
-      } as never);
+      } } as never);
       expect(events.map((event) => event.subjectId).sort()).toEqual(
         [local.id, remote.id].sort(),
       );
@@ -93,27 +93,28 @@ describe("repos tRPC procedures", () => {
   test("list and get are org-scoped and hide archived repos by default", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Repo) as RepoRepository;
+      const repo = new RepoRepository(db.em.getRepository(Repo));
       const now = new Date();
-      repo.getEntityManager().persist(repo.getEntityManager().create(Org, {
-        id: OTHER_ORG_ID,
-        name: "Other Org",
-        slug: "other-org",
-        createdAt: now,
-        updatedAt: now,
-      }));
-      await repo.getEntityManager().flush();
+      await db.em.save(
+        db.em.getRepository(Org).create({
+          id: OTHER_ORG_ID,
+          name: "Other Org",
+          slug: "other-org",
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
       const caller = callerFor(db);
       const otherCaller = callerFor(db, OTHER_ORG_ID);
 
-      const alpha = repo.create({
+      const alpha = await repo.create({
         orgId: ORG_ID,
         name: "Alpha",
         slug: "alpha",
         kind: "local",
         localPath: "/work/alpha",
       });
-      repo.create({
+      await repo.create({
         orgId: OTHER_ORG_ID,
         name: "Other",
         slug: "other",
@@ -139,15 +140,14 @@ describe("repos tRPC procedures", () => {
   test("sync marks repo syncing and emits an event", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Repo) as RepoRepository;
+      const repo = new RepoRepository(db.em.getRepository(Repo));
       const caller = callerFor(db);
-      const alpha = repo.create({
+      const alpha = await repo.create({
         orgId: ORG_ID,
         name: "Alpha",
         slug: "alpha-sync",
         kind: "local",
       });
-      await repo.getEntityManager().flush();
 
       const synced = await caller.repos.sync({ id: alpha.id });
 
@@ -155,12 +155,12 @@ describe("repos tRPC procedures", () => {
         id: alpha.id,
         syncStatus: "syncing",
       });
-      const events = await db.em.find(Event, {
+      const events = await db.em.find(Event, { where: {
         org: ORG_ID,
         verb: "repo.sync.requested",
         subjectKind: "repo",
         subjectId: alpha.id,
-      } as never);
+      } } as never);
       expect(events).toHaveLength(1);
     } finally {
       await db.close();
@@ -170,15 +170,14 @@ describe("repos tRPC procedures", () => {
   test("unregister archives repo and emits an event", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Repo) as RepoRepository;
+      const repo = new RepoRepository(db.em.getRepository(Repo));
       const caller = callerFor(db);
-      const alpha = repo.create({
+      const alpha = await repo.create({
         orgId: ORG_ID,
         name: "Alpha",
         slug: "alpha-remove",
         kind: "local",
       });
-      await repo.getEntityManager().flush();
 
       const removed = await caller.repos.unregister({ id: alpha.id });
 
@@ -187,12 +186,12 @@ describe("repos tRPC procedures", () => {
         archived: true,
       });
       expect(await caller.repos.list()).toEqual([]);
-      const events = await db.em.find(Event, {
+      const events = await db.em.find(Event, { where: {
         org: ORG_ID,
         verb: "repo.unregistered",
         subjectKind: "repo",
         subjectId: alpha.id,
-      } as never);
+      } } as never);
       expect(events).toHaveLength(1);
     } finally {
       await db.close();

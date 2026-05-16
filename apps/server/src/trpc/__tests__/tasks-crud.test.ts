@@ -54,7 +54,7 @@ function callerFor(repo: TaskRepository, orgId = ORG_ID) {
       session: mockSession(USER_ID, orgId) as unknown as import("better-auth").Session,
       orgId,
       userId: USER_ID,
-      em: repo.getEntityManager() as any,
+      em: repo.manager as any,
       container,
     }),
   );
@@ -226,12 +226,12 @@ describe("tasks subtasks and dependencies tRPC", () => {
         "Task parent cycle rejected.",
       );
 
-      const events = await repo.getEntityManager().find(Event, {
+      const events = await repo.manager.find(Event, { where: {
         org: ORG_ID,
         verb: "parent_changed",
         subjectKind: "task",
         subjectId: b.id,
-      } as never);
+      } } as never);
       expect(events).toHaveLength(1);
     } finally {
       await db.close();
@@ -318,12 +318,12 @@ describe("tasks subtasks and dependencies tRPC", () => {
         dependencies: { blocks: [blocked.id], blocked_by: [] },
       });
 
-      const events = await repo.getEntityManager().find(Event, {
+      const events = await repo.manager.find(Event, { where: {
         org: ORG_ID,
         verb: "dependency_updated",
         subjectKind: "task",
         subjectId: blocked.id,
-      } as never);
+      } } as never);
       expect(events).toHaveLength(1);
     } finally {
       await db.close();
@@ -354,11 +354,11 @@ describe("tasks bulk operations tRPC", () => {
       expect((await Promise.all(tasks.map((task) => caller.tasks.get({ id: task.id })))).map((task) => task?.status))
         .toEqual(["in_review", "in_review", "in_review"]);
 
-      const events = await repo.getEntityManager().find(Event, {
+      const events = await repo.manager.find(Event, { where: {
         org: ORG_ID,
         verb: "bulk_updated",
         subjectKind: "task",
-      } as never);
+      } } as never);
       expect(events.map((event) => event.subjectId).sort()).toEqual(tasks.map((task) => task.id).sort());
 
       await expect(
@@ -404,12 +404,12 @@ describe("tasks bulk operations tRPC", () => {
       const caller = callerFor(repo);
       const projectId = "33333333-3333-4333-8333-333333333333";
       const sprintId = "44444444-4444-4444-8444-444444444444";
-      await repo.getEntityManager().getConnection().execute(
-        `insert into projects (id, org_id, name) values (?, ?, ?)`,
+      await repo.manager.query(
+        `insert into projects (id, org_id, name) values ($1, $2, $3)`,
         [projectId, ORG_ID, "Bulk Project"],
       );
-      await repo.getEntityManager().getConnection().execute(
-        `insert into sprints (id, org_id, project_id, name, start_date, end_date) values (?, ?, ?, ?, ?, ?)`,
+      await repo.manager.query(
+        `insert into sprints (id, org_id, project_id, name, start_date, end_date) values ($1, $2, $3, $4, $5, $6)`,
         [sprintId, ORG_ID, projectId, "Sprint Bulk", "2026-05-01", "2026-05-14"],
       );
       const tasks = await Promise.all([
@@ -424,8 +424,8 @@ describe("tasks bulk operations tRPC", () => {
         }),
       ).resolves.toEqual({ updated: 2 });
 
-      const rows = await repo.getEntityManager().getConnection().execute(
-        `select id, project_id, sprint_id from tasks where id in (?, ?) order by id`,
+      const rows = await repo.manager.query(
+        `select id, project_id, sprint_id from tasks where id in ($1, $2) order by id`,
         tasks.map((task) => task.id),
       );
       expect(rows).toEqual(

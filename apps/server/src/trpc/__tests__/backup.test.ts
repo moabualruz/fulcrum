@@ -52,7 +52,7 @@ function callerFor(repo: TaskRepository) {
       session: mockSession(USER_ID, ORG_ID) as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: repo.getEntityManager() as any,
+      em: repo.manager as any,
       container,
     }),
   );

@@ -55,7 +55,7 @@ function callerFor(repo: TaskRepository) {
       session: mockSession() as unknown as import("better-auth").Session,
       orgId: ORG_ID,
       userId: USER_ID,
-      em: repo.getEntityManager() as any,
+      em: repo.manager as any,
       container,
     }),
   );
@@ -153,15 +153,15 @@ describe("sprints tRPC CRUD", () => {
       const task = await caller.tasks.create({ title: "Sprint task" });
 
       await expect(caller.sprints.addTask({ sprintId: sprint.id, taskId: task.id })).resolves.toEqual({ moved: true });
-      let rows = await repo.getEntityManager().getConnection().execute(
-        `select sprint_id from tasks where id = ?`,
+      let rows = await repo.manager.query(
+        `select sprint_id from tasks where id = $1`,
         [task.id],
       );
       expect(rows).toHaveLength(1);
       expect(rows[0]!.sprint_id).toBe(sprint.id);
 
       await expect(caller.sprints.removeTask({ sprintId: sprint.id, taskId: task.id })).resolves.toEqual({ moved: true });
-      rows = await repo.getEntityManager().getConnection().execute(`select sprint_id from tasks where id = ?`, [task.id]);
+      rows = await repo.manager.query(`select sprint_id from tasks where id = $1`, [task.id]);
       expect(rows).toHaveLength(1);
       expect(rows[0]!.sprint_id).toBeNull();
     } finally {
@@ -190,8 +190,8 @@ describe("sprints tRPC CRUD", () => {
         caller.sprints.close({ id: sprint.id, unfinishedDisposition: "backlog" }),
       ).resolves.toMatchObject({ closed: true, sprint: { id: sprint.id, status: "completed" } });
 
-      const rows = await repo.getEntityManager().getConnection().execute(
-        `select id, sprint_id from tasks where id in (?, ?) order by id`,
+      const rows = await repo.manager.query(
+        `select id, sprint_id from tasks where id in ($1, $2) order by id`,
         [done.id, todo.id],
       );
       expect(rows).toEqual([
@@ -199,7 +199,7 @@ describe("sprints tRPC CRUD", () => {
         { id: todo.id, sprint_id: null },
       ].sort((a, b) => a.id.localeCompare(b.id)));
 
-      const metrics = await repo.getEntityManager().findOneOrFail(MetricsCache, { sprint: sprint.id } as never);
+      const metrics = await repo.manager.findOneOrFail(MetricsCache, { where: { sprint: sprint.id } } as never);
       expect(metrics).toMatchObject({
         projectId: PROJECT_ID,
         completedCount: 1,
@@ -208,12 +208,12 @@ describe("sprints tRPC CRUD", () => {
         wipCount: 0,
       });
 
-      const event = await repo.getEntityManager().findOneOrFail(Event, {
+      const event = await repo.manager.findOneOrFail(Event, { where: {
         org: ORG_ID,
         verb: "sprint.closed",
         subjectKind: "sprint",
         subjectId: sprint.id,
-      } as never);
+      } } as never);
       expect(event.payload).toMatchObject({
         sprint_id: sprint.id,
         project_id: PROJECT_ID,
