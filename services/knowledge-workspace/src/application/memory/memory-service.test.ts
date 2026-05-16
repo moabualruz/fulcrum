@@ -47,6 +47,7 @@ interface MockEm {
   persistAndFlush: ReturnType<typeof mock>;
   removeAndFlush: ReturnType<typeof mock>;
   flush: ReturnType<typeof mock>;
+  save: ReturnType<typeof mock>;
   nativeUpdate: ReturnType<typeof mock>;
 }
 
@@ -55,6 +56,7 @@ function makeMockRepo(memories: Memory[] = []): MemoryRepository & { _em: MockEm
     persistAndFlush: mock(async () => {}),
     removeAndFlush: mock(async () => {}),
     flush: mock(async () => {}),
+    save: mock(async (entity: unknown) => entity),
     nativeUpdate: mock(async () => 1),
   };
   const repo = {
@@ -145,7 +147,7 @@ describe("MemoryService", () => {
   describe("create()", () => {
     test("persists memory with correct fields", async () => {
       const repo = makeMockRepo();
-      const persistAndFlush = repo._em.persistAndFlush;
+      const save = repo._em.save;
       const service = new MemoryService(repo);
 
       const result = await service.create("org-1", {
@@ -156,7 +158,7 @@ describe("MemoryService", () => {
         source: "manual",
       });
 
-      expect(persistAndFlush).toHaveBeenCalled();
+      expect(save).toHaveBeenCalled();
       expect(result.body).toBe("new insight");
       expect(result.importance).toBe("high");
     });
