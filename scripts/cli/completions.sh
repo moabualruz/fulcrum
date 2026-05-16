@@ -456,7 +456,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     review)
-      local verbs='apply-auto-decision build-uat-handoff record-uat-decision'
+      local verbs='append-review-workbench-annotation apply-configured-uat-code-review-decision final-qa final-qa-feedback-gate load-review-workbench-session record-uat-code-review-decision review-workbench run-generated-e2e-regression-tests save-review-workbench-session uat-code-review-handoff'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

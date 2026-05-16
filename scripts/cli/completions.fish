@@ -323,9 +323,16 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'unregister' -d 
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'repos')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'review' -d 'fulcrum review'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'apply-auto-decision' -d 'review apply-auto-decision'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'build-uat-handoff' -d 'review build-uat-handoff'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'record-uat-decision' -d 'review record-uat-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'append-review-workbench-annotation' -d 'review append-review-workbench-annotation'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'apply-configured-uat-code-review-decision' -d 'review apply-configured-uat-code-review-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'final-qa' -d 'review final-qa'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'final-qa-feedback-gate' -d 'review final-qa-feedback-gate'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'load-review-workbench-session' -d 'review load-review-workbench-session'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'record-uat-code-review-decision' -d 'review record-uat-code-review-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'review-workbench' -d 'review review-workbench'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'run-generated-e2e-regression-tests' -d 'review run-generated-e2e-regression-tests'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'save-review-workbench-session' -d 'review save-review-workbench-session'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'uat-code-review-handoff' -d 'review uat-code-review-handoff'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'routing' -d 'fulcrum routing'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'config update-llm-gate' -d 'routing config update-llm-gate'

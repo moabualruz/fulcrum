@@ -258,7 +258,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     review)
-      local -a values=('apply-auto-decision:fulcrum review apply-auto-decision' 'build-uat-handoff:fulcrum review build-uat-handoff' 'record-uat-decision:fulcrum review record-uat-decision' '--json:option')
+      local -a values=('append-review-workbench-annotation:fulcrum review append-review-workbench-annotation' 'apply-configured-uat-code-review-decision:fulcrum review apply-configured-uat-code-review-decision' 'final-qa:fulcrum review final-qa' 'final-qa-feedback-gate:fulcrum review final-qa-feedback-gate' 'load-review-workbench-session:fulcrum review load-review-workbench-session' 'record-uat-code-review-decision:fulcrum review record-uat-code-review-decision' 'review-workbench:fulcrum review review-workbench' 'run-generated-e2e-regression-tests:fulcrum review run-generated-e2e-regression-tests' 'save-review-workbench-session:fulcrum review save-review-workbench-session' 'uat-code-review-handoff:fulcrum review uat-code-review-handoff' '--json:option')
       _describe 'command or option' values
       ;;
     routing)
