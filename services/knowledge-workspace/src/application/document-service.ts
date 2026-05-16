@@ -216,7 +216,7 @@ export class DocumentService {
 
     if (hard) {
       await removeDocIndex(this.em, ctx.orgId, doc.id);
-      this.em.remove(doc);
+      await this.em.remove(doc);
       return { deleted: true };
     }
 
