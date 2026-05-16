@@ -53,7 +53,7 @@ describe("ci:codegen snapshot gate", () => {
     const names = STEPS.map((step) => step.name);
 
     expect(names).toContain("ci:codegen");
-    expect(names.indexOf("ci:codegen")).toBeLessThan(names.indexOf("build:all"));
+    expect(names.indexOf("ci:codegen")).toBeLessThan(names.indexOf("build"));
 
     const step = STEPS.find((candidate) => candidate.name === "ci:codegen");
     expect(step?.cmd).toEqual(["bun", "run", "scripts/ci/codegen.ts"]);

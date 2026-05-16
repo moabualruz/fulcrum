@@ -61,7 +61,7 @@ const CHECKPOINTS: UatCheckpoint[] = [
     name: "Repo REST and tRPC Sync",
     layers: ["integration"],
     evidence: [
-      { path: "apps/server/src/api/__tests__/repos.api.test.ts", patterns: [/tRPC caller/, /queued status/, /404/] },
+      { path: "apps/server/src/api/__tests__/repos.api.test.ts", patterns: [/createController/, /queued/, /NotFoundException/] },
       { path: "apps/server/src/trpc/routers/repos.ts", patterns: [/syncRepo/, /statusRepo/, /resource: "repos", action: "sync"/] },
     ],
   },

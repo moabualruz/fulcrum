@@ -139,9 +139,9 @@ describe("fulcrum db command source behavior", () => {
     expect(result.stdout).toContain("--yes-reset-local-state");
   });
 
-  test("migrate rejects explicit product database backend flags before touching migrations", async () => {
-    await expect(run(["migrate", "--backend", "sqlite"], null)).rejects.toThrow(
-      "FULCRUM_DATABASE_URL",
+  test("migrate rejects removed --url flag before touching migrations", async () => {
+    await expect(run(["migrate", "--url", "postgres://localhost/test"], null)).rejects.toThrow(
+      "explicit database backend flags were removed",
     );
   });
 

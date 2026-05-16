@@ -38,23 +38,25 @@ function makeFakeRun(overrides: Partial<{
 
 function makeFakeEm(runs: ReturnType<typeof makeFakeRun>[]) {
   return {
-    fork: () => ({
-      find: mock(async () => runs),
-    }),
+    find: mock(async () => runs),
   };
 }
 
 function makeFilteringFakeEm(runs: ReturnType<typeof makeFakeRun>[]) {
   return {
-    fork: () => ({
-      find: mock(async (_Entity: unknown, criteria: Record<string, unknown>) => {
-        const startedAt = criteria["startedAt"] as { $lt: Date };
-        return runs.filter((run) =>
-          run.org.id === criteria["org"] &&
-          run.orchestrationState === criteria["orchestrationState"] &&
-          run.startedAt.getTime() < startedAt.$lt.getTime()
-        );
-      }),
+    find: mock(async (_Entity: unknown, options: Record<string, unknown>) => {
+      // TypeORM passes { where: { org: { id }, orchestrationState, startedAt: LessThan(cutoff) } }
+      const where = (options["where"] ?? options) as Record<string, unknown>;
+      const orgWhere = where["org"] as { id: string } | string;
+      const orgId = typeof orgWhere === "string" ? orgWhere : orgWhere?.id;
+      const startedAt = where["startedAt"] as { _value: Date } | { $lt: Date };
+      // TypeORM LessThan stores the value in _value
+      const cutoff = "_value" in startedAt ? startedAt._value : startedAt.$lt;
+      return runs.filter((run) =>
+        run.org.id === orgId &&
+        run.orchestrationState === where["orchestrationState"] &&
+        run.startedAt.getTime() < cutoff.getTime()
+      );
     }),
   };
 }
@@ -120,22 +122,23 @@ describe("scanForStalledRuns", () => {
   test("queries with the correct stall criteria (org + orchestrationState + startedAt filter)", async () => {
     const fakeFind = mock(async () => []);
     const fakeEm = {
-      fork: () => ({ find: fakeFind }),
+      find: fakeFind,
     };
 
     await scanForStalledRuns(fakeEm as never, "org-5", DEFAULT_CONFIG, mock(async () => {}));
 
     expect(fakeFind).toHaveBeenCalledTimes(1);
-    const [, criteria] = fakeFind.mock.calls[0]! as unknown as [
+    const [, options] = fakeFind.mock.calls[0]! as unknown as [
       unknown,
-      Record<string, unknown>,
+      { where: Record<string, unknown> },
     ];
-    expect(criteria["org"]).toBe("org-5");
-    expect(criteria["orchestrationState"]).toBe("running");
-    // startedAt.$lt must be in the past relative to call time
-    const stallBefore = (criteria["startedAt"] as { $lt: Date })["$lt"];
-    expect(stallBefore).toBeInstanceOf(Date);
-    expect(stallBefore.getTime()).toBeLessThan(Date.now());
+    const where = options.where;
+    expect(where["org"]).toEqual({ id: "org-5" });
+    expect(where["orchestrationState"]).toBe("running");
+    // TypeORM LessThan wraps the value in _value
+    const startedAt = where["startedAt"] as { _value: Date };
+    expect(startedAt._value).toBeInstanceOf(Date);
+    expect(startedAt._value.getTime()).toBeLessThan(Date.now());
   });
 
   test("passes config and em ref to onStalled", async () => {

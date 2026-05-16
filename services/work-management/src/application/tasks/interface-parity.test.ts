@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 import { run as runTasksCommand } from "@fulcrum/cli/commands/tasks.ts";
-import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
+import { createApplicationLocalCaller } from "@fulcrum/server/trpc/local-caller.ts";
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { bindTestRuntimeOrm, createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
@@ -44,7 +44,7 @@ describe("tasks cross-interface parity", () => {
     }));
     await sessionEm.flush();
 
-    const localCaller = await createLocalCaller({ container, requireSession: true });
+    const localCaller = await createApplicationLocalCaller({ container, requireSession: true });
     const trpcTask = await localCaller.tasks.get({ id: created.id }) as TaskDto;
 
     const cliLines: string[] = [];

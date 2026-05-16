@@ -361,9 +361,9 @@ describe("fulcrum db migration command", () => {
     expect(Array.isArray(payload.pending)).toBe(true);
   });
 
-  it("migrate rejects removed --backend flag", async () => {
+  it("migrate rejects removed --url flag", async () => {
     await expect(
-      runDbCommand(["migrate", "--backend", "pglite", "--json"], null),
+      runDbCommand(["migrate", "--url", "postgres://localhost/test", "--json"], null),
     ).rejects.toThrow(/explicit database backend flags were removed/);
   });
 });

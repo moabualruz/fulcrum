@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { DataSource } from "typeorm";
 
 import { run as runSprintsCommand } from "@fulcrum/cli/commands/sprints.ts";
-import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
+import { createApplicationLocalCaller } from "@fulcrum/server/trpc/local-caller.ts";
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
@@ -56,7 +56,7 @@ describe("sprints cross-interface parity", () => {
     });
     await ensureSession(db);
 
-    const localCaller = await createLocalCaller({ container, requireSession: true });
+    const localCaller = await createApplicationLocalCaller({ container, requireSession: true });
     const trpcSprint = await localCaller.sprints.get({ id: created.id }) as SprintDto;
 
     const cliLines: string[] = [];

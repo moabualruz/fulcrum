@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { DataSource } from "typeorm";
 
 import { run as runArtifactsCommand } from "@fulcrum/cli/commands/artifacts.ts";
-import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
+import { createApplicationLocalCaller } from "@fulcrum/server/trpc/local-caller.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
@@ -75,7 +75,7 @@ describe("artifacts cross-interface parity", () => {
     });
     await ensureSession(db, orgId);
 
-    const localCaller = await createLocalCaller({ container, requireSession: true });
+    const localCaller = await createApplicationLocalCaller({ container, requireSession: true });
     const trpcArtifact = await localCaller.artifacts.get({ id: created.id }) as ArtifactView;
 
     const cliLines: string[] = [];

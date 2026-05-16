@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { DataSource } from "typeorm";
 
 import { run as runSettingsCommand } from "@fulcrum/cli/settings.ts";
-import { createLocalCaller } from "@fulcrum/cli/local-caller.ts";
+import { createApplicationLocalCaller } from "@fulcrum/server/trpc/local-caller.ts";
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm, type TestOrm } from "@test-support/index.ts";
 import { buildCaller } from "@fulcrum/tui/index.ts";
@@ -51,7 +51,7 @@ describe("settings cross-interface parity", () => {
     await ensureSession(db);
     const appSetting = await getTenantSetting(db.em, ctx, "public-api");
 
-    const localCaller = await createLocalCaller({ container, requireSession: true });
+    const localCaller = await createApplicationLocalCaller({ container, requireSession: true });
     const trpcFlag = ((await localCaller.flags.list()) as Array<{ name: string; enabled: boolean }>)
       .find((flag) => flag.name === "public-api");
 
