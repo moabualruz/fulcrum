@@ -72,6 +72,10 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
     async close() { await pglite.close(); },
   };
   await migrateIsolatedStore(db);
+  // Bring legacy PGlite schema up to current TypeORM entity definitions.
+  await db.query(`ALTER TABLE orgs ADD COLUMN IF NOT EXISTS avatar_url text`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS name text`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url text`);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS content_json jsonb NOT NULL DEFAULT '{}'::jsonb`);
   await db.query(`ALTER TABLE documents ADD COLUMN IF NOT EXISTS context_summary text`);
   await db.query(
@@ -97,12 +101,16 @@ async function seedDocs(): Promise<{ docId: string; linkedId: string; orgId: str
       doc_id text NOT NULL REFERENCES documents(id),
       version_num int NOT NULL,
       snapshot jsonb,
+      delta jsonb,
       body_md_snapshot text,
+      yjs_state bytea,
+      author_id text,
       restore_of text REFERENCES doc_versions(id),
       created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (doc_id, version_num)
     )`,
   );
+  await db.query(`ALTER TABLE doc_links ADD COLUMN IF NOT EXISTS anchor text`);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   // EntityManager for migrated action functions — build DataSource over existing PGlite
   class EphemeralPool extends EventEmitter {

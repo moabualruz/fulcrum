@@ -400,7 +400,7 @@ export class DocumentService {
   }>> {
     const links = await this.em.find(DocLink, { where: {
       org: { id: orgId },
-      toDoc: docId,
+      toDoc: { id: docId },
       linkKind: "wikilink",
     } as never, relations: ["fromDoc"], order: { createdAt: "ASC", id: "ASC" } });
 
@@ -423,7 +423,7 @@ export class DocumentService {
   }>> {
     const links = await this.em.find(DocLink, { where: {
       org: { id: orgId },
-      fromDoc: docId,
+      fromDoc: { id: docId },
       linkKind: "wikilink",
     } as never, relations: ["toDoc"], order: { createdAt: "ASC", id: "ASC" } });
 
@@ -578,7 +578,7 @@ async function findDocByInput(
   return em.findOne(Document, { where: {
     ...where,
     ...(input.includeArchived ? {} : { archived: false }),
-  } as never });
+  } as never, relations: ["org"] });
 }
 
 async function upsertSearchDocument(

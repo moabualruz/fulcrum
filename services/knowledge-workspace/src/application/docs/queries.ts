@@ -24,9 +24,11 @@ export async function getDoc(em: EntityManager, ctx: AppContext, input: GetDocIn
   if (normalized.id) {
     const doc = await em.findOne(Document, { where: { id: normalized.id } as never });
     if (!doc) throw new AppNotFoundError(`Document not found: ${normalized.id}`);
-    if (doc.org.id !== ctx.orgId) throw new AppForbiddenError(`Document does not belong to org: ${ctx.orgId}`);
     if (doc.archived) throw new AppNotFoundError(`Document not found: ${normalized.id}`);
-    return serializeDoc(doc);
+    // Full entity load for serialization via DocumentService (includes org relation).
+    const docDto = await new DocumentService(em).get(ctx.orgId, { id: normalized.id });
+    if (!docDto) throw new AppForbiddenError(`Document does not belong to org: ${ctx.orgId}`);
+    return docDto;
   }
   return await new DocumentService(em).get(ctx.orgId, normalized);
 }
@@ -48,7 +50,7 @@ export async function listDocVersions(
   await assertDocBelongsToOrg(em, ctx, docId);
   const versions = await em.find(DocVersion, { where: {
     org: { id: ctx.orgId },
-    doc: docId,
+    doc: { id: docId },
   } as never, relations: ["author", "restoreOf"], order: { versionNum: "DESC" } });
   return versions.map(serializeVersionForApplication);
 }
@@ -124,10 +126,8 @@ function requiredUserContext(ctx: AppContext): { orgId: string; userId: string; 
 
 async function assertDocBelongsToOrg(em: EntityManager, ctx: AppContext, docId: string): Promise<void> {
   const doc = await em.findOne(Document, {
-    id: docId,
-    org: { id: ctx.orgId },
-    archived: false,
-  } as never);
+    where: { id: docId, org: { id: ctx.orgId }, archived: false } as never,
+  });
   if (!doc) throw new AppNotFoundError(`Document not found: ${docId}`);
 }
 
