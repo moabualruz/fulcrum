@@ -26,7 +26,7 @@ export class NotificationQuietHours {
   userId!: string;
 
   /** IANA timezone (e.g. "America/New_York"). */
-  @Column({ type: "varchar", default: "UTC" })
+  @Column({ type: "varchar", name: "timezone", default: "UTC" })
   tz: string = "UTC";
 
   @Column({ type: "integer", name: "start_hour" })

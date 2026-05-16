@@ -31,6 +31,22 @@ import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { SecretsKeyringToken } from "@platform-core/application/secrets/keyring.ts";
 import type { NativeKeyringAdapter } from "@platform-core/application/secrets/keyring.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
+function createMapContainer(): DiContainer {
+  const bindings = new Map<unknown, unknown>();
+  return {
+    get: (token: unknown) => {
+      if (bindings.has(token)) return bindings.get(token) as never;
+      throw new Error(`Token not found: ${String(token)}`);
+    },
+    has: (token: unknown) => bindings.has(token),
+    bind: (binding: unknown) => {
+      const b = binding as { provide?: unknown; useValue?: unknown };
+      if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+    },
+  };
+}
 
 const TEST_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const TEST_OWNER_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
@@ -86,7 +102,7 @@ function makeCaller(
   const credentialRepo = em.getRepository(Credential) as CredentialRepository;
   const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
 
-  const c = null;
+  const c = createMapContainer();
   c.bind({ provide: CredentialRepository, useValue: credentialRepo });
   c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
   c.bind({

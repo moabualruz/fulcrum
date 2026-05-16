@@ -29,6 +29,22 @@ import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
+
+function createMapContainer(): DiContainer {
+  const bindings = new Map<unknown, unknown>();
+  return {
+    get: (token: unknown) => {
+      if (bindings.has(token)) return bindings.get(token) as never;
+      throw new Error(`Token not found: ${String(token)}`);
+    },
+    has: (token: unknown) => bindings.has(token),
+    bind: (binding: unknown) => {
+      const b = binding as { provide?: unknown; useValue?: unknown };
+      if (b?.provide !== undefined) bindings.set(b.provide, b.useValue);
+    },
+  };
+}
 
 const TEST_ORG_ID = "00000000-0000-4000-8000-000000000001";
 const OTHER_ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -70,7 +86,7 @@ function makeCaller(userId: string, orgId: string) {
     userId,
     em,
     container: (() => {
-      const c = null;
+      const c = createMapContainer();
       c.bind({ provide: FeatureFlagRepository, useValue: flagRepo });
       c.bind({ provide: OrgMemberRepository, useValue: orgMemberRepo });
       c.bind({ provide: FlagRegistry, useValue: freshRegistry });

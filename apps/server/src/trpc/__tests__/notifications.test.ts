@@ -88,7 +88,10 @@ async function seedBase(em: EntityManager) {
     createdAt: now,
     updatedAt: now,
   });
-  await em.save([org, otherOrg, user, otherUser]);
+  await em.save(org);
+  await em.save(otherOrg);
+  await em.save(user);
+  await em.save(otherUser);
 }
 
 async function seedNotification(em: EntityManager, input: {
@@ -100,7 +103,7 @@ async function seedNotification(em: EntityManager, input: {
   readAt?: Date | null;
   createdAt?: Date;
 } = {}) {
-  const org = await em.findOneOrFail(Org, { id: input.orgId ?? ORG_ID });
+  const org = await em.findOneOrFail(Org, { where: { id: input.orgId ?? ORG_ID } });
   const event = em.create(Event, {
     id: crypto.randomUUID(),
     org,
@@ -122,7 +125,8 @@ async function seedNotification(em: EntityManager, input: {
     readAt: input.readAt ?? null,
     createdAt: input.createdAt ?? new Date(),
   });
-  await em.save([event, notification]);
+  await em.save(event);
+  await em.save(notification);
   return notification;
 }
 

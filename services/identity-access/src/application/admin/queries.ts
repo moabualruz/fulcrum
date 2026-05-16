@@ -541,6 +541,7 @@ async function upsertRollout(
     };
   }
   (rollout as { updatedAt: Date }).updatedAt = new Date();
+  await em.save(rollout);
 }
 
 export async function listFeatureFlags(ctx: AdminAppContext) {
@@ -566,6 +567,7 @@ export async function setFeatureFlag(
   const existing = await em.findOne(FeatureFlag, { where: { flag: input.flag, orgId: targetOrgId, userId: scopedUserId } as never });
   if (existing) {
     (existing as { enabled: boolean }).enabled = input.enabled;
+    await em.save(existing);
   } else {
     const row = em.create(FeatureFlag, {
       flag: input.flag,

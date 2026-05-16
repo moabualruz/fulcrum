@@ -123,6 +123,7 @@ export async function acceptInvitation(
   }
 
   (invitation as { acceptedAt: Date }).acceptedAt = new Date();
+  await em.save(invitation);
 
   return {
     userId: user.id,

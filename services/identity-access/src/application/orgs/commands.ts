@@ -14,6 +14,7 @@ export async function updateOrg(
   const org = await em.findOne(Org, { where: { id: ctx.orgId } as never });
   if (!org) throw new AppNotFoundError(`Org ${ctx.orgId} not found.`);
   org.name = input.name;
+  await em.save(org);
   return { ok: true };
 }
 
@@ -26,6 +27,7 @@ export async function updateOrgMemberRole(
   const member = await em.findOne(OrgMember, { where: { orgId: ctx.orgId, userId: input.userId } as never });
   if (!member) throw new AppNotFoundError(`User ${input.userId} is not a member of this org.`);
   member.role = input.role;
+  await em.save(member);
   return { ok: true };
 }
 
@@ -39,10 +41,10 @@ export async function removeOrgMember(
   if (!member) throw new AppNotFoundError(`User ${input.userId} is not a member of this org.`);
 
   if (member.role === "owner") {
-    const ownerCount = await em.count(OrgMember, { orgId: ctx.orgId, role: "owner" } as never);
+    const ownerCount = await em.count(OrgMember, { where: { orgId: ctx.orgId, role: "owner" } });
     if (ownerCount <= 1) throw new AppValidationError("Cannot remove the last owner of an org.");
   }
 
-  em.remove(member);
+  await em.getRepository(OrgMember).delete({ id: member.id });
   return { ok: true };
 }
