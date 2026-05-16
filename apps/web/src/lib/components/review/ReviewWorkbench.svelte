@@ -1,9 +1,4 @@
 <script lang="ts">
-  /**
-   * ReviewWorkbench — Plannotator-derived review editor adapted to Svelte.
-   * Provenance: Plannotator packages/review-editor/components/ (commit 4c8338f)
-   * Adapted: React → Svelte 5 runes, Plannotator data model → Fulcrum review tRPC API
-   */
   import { cn } from "$lib/utils.js";
 
   interface ReviewFile {
