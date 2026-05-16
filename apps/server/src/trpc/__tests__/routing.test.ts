@@ -52,7 +52,7 @@ function callerFor(em: EntityManager) {
   const container = createMapContainer();
   container.bind({
     provide: RoutingRuleRepository,
-    useValue: em.getRepository(RoutingRule) as RoutingRuleRepository,
+    useValue: new RoutingRuleRepository(em.getRepository(RoutingRule)),
   });
 
   return createCaller(
