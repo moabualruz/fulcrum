@@ -133,7 +133,7 @@ describe("loadWorkflowDef", () => {
 describe("orchestration.renderPromptPreview", () => {
   it("renders a strict prompt preview for web workflow editors", async () => {
     db = await createTestOrm();
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db, createTestContainer(db));
 
     const result = await caller.orchestration.renderPromptPreview({
       orgId: DEFAULT_ORG_ID,
@@ -156,7 +156,7 @@ describe("orchestration.renderPromptPreview", () => {
 
   it("propagates strict template errors through tRPC", async () => {
     db = await createTestOrm();
-    const caller = await createTestCaller(createTestContainer(db));
+    const caller = await createTestCaller(db, createTestContainer(db));
 
     await expect(caller.orchestration.renderPromptPreview({
       orgId: DEFAULT_ORG_ID,
