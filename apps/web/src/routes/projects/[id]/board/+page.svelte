@@ -11,6 +11,8 @@
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
+  import DependencyTree from "$lib/components/board/DependencyTree.svelte";
+  import type { DependencyTreeTask } from "$lib/components/board/DependencyTree.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
 
   type ManualWorkbenchPayload = {
@@ -66,6 +68,60 @@
   let sheetOpen = $state(false);
   let selectedTask = $state<BoardTask | null>(null);
   let announcement = $state<string | null>(null);
+
+  let runPreviewOpen = $state(false);
+  let runPreviewTaskId = $state<string | null>(null);
+  let runPreviewTasks = $state<DependencyTreeTask[]>([]);
+  let runPreviewTargetIds = $state<string[]>([]);
+  let runPreviewWarnings = $state<string[]>([]);
+  let runPreviewBlocked = $state(false);
+  let runPreviewLoading = $state(false);
+  let runDispatchLoading = $state(false);
+
+  async function openRunPreview(taskId: string): Promise<void> {
+    runPreviewTaskId = taskId;
+    runPreviewLoading = true;
+    runPreviewOpen = true;
+    try {
+      const res = await postForm("runPreview", { taskIds: taskId });
+      const result = await res.json();
+      if (result.type === "success" && result.data?.preview) {
+        const preview = result.data.preview;
+        runPreviewTasks = preview.tasks ?? [];
+        runPreviewTargetIds = preview.targetTaskIds ?? [taskId];
+        runPreviewWarnings = preview.warnings ?? [];
+        runPreviewBlocked = preview.blocked ?? false;
+      } else {
+        runPreviewWarnings = [result.data?.message ?? "Failed to load preview"];
+        runPreviewBlocked = true;
+      }
+    } catch {
+      runPreviewWarnings = ["Failed to load dependency preview"];
+      runPreviewBlocked = true;
+    } finally {
+      runPreviewLoading = false;
+    }
+  }
+
+  function closeRunPreview(): void {
+    runPreviewOpen = false;
+    runPreviewTaskId = null;
+    runPreviewTasks = [];
+    runPreviewTargetIds = [];
+    runPreviewWarnings = [];
+    runPreviewBlocked = false;
+  }
+
+  async function confirmRunDispatch(): Promise<void> {
+    if (!runPreviewTaskId || runPreviewBlocked) return;
+    runDispatchLoading = true;
+    try {
+      await postForm("run", { taskIds: runPreviewTaskId, agent: "codex" });
+      closeRunPreview();
+    } finally {
+      runDispatchLoading = false;
+    }
+  }
 
   const snapshot = $derived(buildBoardSnapshot(resolvedTasks));
   const swimlaneLabel = $derived(swimlane === "none" ? "All tasks" : swimlane === "assignee" ? "By assignee" : "By label");
@@ -212,6 +268,50 @@
     {/each}
   </div>
 
-  <BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onClose={closeSheet} />
+  <BoardSheet open={sheetOpen} task={selectedTask} {onSave} {onDelete} onRun={(id) => { closeSheet(); openRunPreview(id); }} onClose={closeSheet} />
+
+  {#if runPreviewOpen}
+    <div
+      data-run-preview-overlay
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/40"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Run dependency preview"
+    >
+      <div class="w-full max-w-lg rounded-lg border border-border bg-background p-5 shadow-lg">
+        <header class="mb-3 flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Run Preview</h2>
+          <button type="button" onclick={closeRunPreview} class="text-muted-foreground hover:text-foreground" aria-label="close">×</button>
+        </header>
+
+        {#if runPreviewLoading}
+          <p class="text-sm text-muted-foreground">Loading dependency tree...</p>
+        {:else}
+          <DependencyTree
+            tasks={runPreviewTasks}
+            targetTaskIds={runPreviewTargetIds}
+            warnings={runPreviewWarnings}
+            blocked={runPreviewBlocked}
+          />
+
+          <footer class="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onclick={closeRunPreview}
+              class="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"
+            >Cancel</button>
+            <button
+              type="button"
+              data-run-dispatch-confirm
+              disabled={runPreviewBlocked || runDispatchLoading}
+              onclick={confirmRunDispatch}
+              class="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >{runDispatchLoading ? "Dispatching..." : "Dispatch Run"}</button>
+          </footer>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
   <KeyboardMoveAnnouncer message={announcement} />
 {/await}

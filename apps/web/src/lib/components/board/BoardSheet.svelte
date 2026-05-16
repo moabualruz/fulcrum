@@ -13,10 +13,11 @@
     task: BoardTask | null;
     onSave?: (input: { id: string; title: string; status: TaskStatus; priority: number; description: string | null }) => void;
     onDelete?: (id: string) => void;
+    onRun?: (taskId: string) => void;
     onClose?: () => void;
   }
 
-  const { open, task, onSave, onDelete, onClose }: Props = $props();
+  const { open, task, onSave, onDelete, onRun, onClose }: Props = $props();
 
   const isStatus = (s: string): s is TaskStatus => (TASK_STATUSES as readonly string[]).includes(s);
   const fieldCls = "mt-1 w-full rounded border border-border bg-background p-2";
@@ -115,6 +116,7 @@
 
       <div class="flex items-center gap-2">
         <button type="submit" data-board-sheet-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+        <button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} class={cn(buttonVariants({ variant: "outline" }))}>Run</button>
         <button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
       </div>
     </form>
