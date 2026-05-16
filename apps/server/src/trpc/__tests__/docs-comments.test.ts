@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { EntityManager } from "typeorm";
+import { In, type EntityManager } from "typeorm";
 import type { Session } from "better-auth";
 
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
@@ -129,11 +129,11 @@ describe("docs.comments tRPC", () => {
         bodyMd: "Reply note",
       });
 
-      expect(await em.count(DocComment, { id: { $in: [root.id, reply.id] } } as never)).toBe(2);
+      expect(await em.count(DocComment, { where: { id: In([root.id, reply.id]) } })).toBe(2);
 
       await caller.docs.comments.delete({ id: root.id });
 
-      expect(await em.count(DocComment, { id: { $in: [root.id, reply.id] } } as never)).toBe(0);
+      expect(await em.count(DocComment, { where: { id: In([root.id, reply.id]) } })).toBe(0);
       expect(await caller.docs.comments.list({ docId: doc.id })).toEqual([]);
     } finally {
       await db.close();
