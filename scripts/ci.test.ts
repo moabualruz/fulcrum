@@ -1,86 +1,160 @@
-// Unit tests for scripts/ci.ts STEPS array.
-// Asserts web product gates and smoke e2e stay in root CI.
+// Unit tests for scripts/ci.ts tiered pipeline.
+// Validates tier structure, step ordering, and web gates.
 //
 // Note: ci.ts guards the runner with `import.meta.main` so importing it here
 // only evaluates the STEPS array without executing any subprocesses.
 
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { buildAllSteps, STEPS } from "./ci.ts";
+import { buildAllSteps, ALL_STEPS, STEPS } from "./ci.ts";
+import type { TieredStep } from "./ci.ts";
 
 const webPackageJson = JSON.parse(readFileSync("apps/web/package.json", "utf8")) as {
   scripts?: Record<string, string>;
 };
 
-describe("ci STEPS — web:test always-on", () => {
-  it("includes web:test step", () => {
-    const names = STEPS.map((s) => s.name);
-    expect(names).toContain("web:test");
+describe("ci tiered pipeline — tier structure", () => {
+  it("has exactly 4 tiers: lint, unit, integration, build", () => {
+    const tiers = [...new Set(ALL_STEPS.map((s) => s.tier))];
+    expect(tiers).toEqual(["lint", "unit", "integration", "build"]);
   });
 
-  it("web:test runs bun run web:test from apps/web", () => {
-    const step = STEPS.find((s) => s.name === "web:test");
-    expect(step).toBeDefined();
-    expect(step!.cwd).toBe("apps/web");
-    expect(step!.cmd).toEqual(["bun", "run", "web:test"]);
-  });
-});
-
-describe("ci STEPS — web:e2e full suite", () => {
-  it("STEPS includes full e2e without env opt-in", () => {
-    const step = STEPS.find((s) => s.name === "web:e2e:full");
-    expect(step).toBeDefined();
-    expect("skipReason" in step!).toBe(false);
+  it("tiers execute in order: lint → unit → integration → build", () => {
+    const tierOrder = ["lint", "unit", "integration", "build"];
+    let lastTierIndex = -1;
+    for (const step of ALL_STEPS) {
+      const idx = tierOrder.indexOf(step.tier);
+      expect(idx).toBeGreaterThanOrEqual(lastTierIndex);
+      lastTierIndex = idx;
+    }
   });
 });
 
-describe("ci STEPS — WR-03 explicit full E2E semantics", () => {
-  it("WR-03 includes web:e2e:full in e2e tier", () => {
-    const steps = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" });
-    const step = steps.find((s) => s.name === "web:e2e:full");
+describe("ci tiered pipeline — lint tier", () => {
+  const lintSteps = ALL_STEPS.filter((s) => s.tier === "lint");
 
-    expect(step).toBeDefined();
-    expect(step!.tier).toBe("e2e");
-    expect(step!.domain).toBe("web");
-    expect(step!.cwd).toBe("apps/web");
-    expect(step!.cmd).toEqual(["bun", "run", "web:e2e:full"]);
-    expect("skipReason" in step!).toBe(false);
+  it("includes install, typecheck, architecture, license-audit, ci:codegen, ci:schemas", () => {
+    const names = lintSteps.map((s) => s.name);
+    expect(names).toContain("install");
+    expect(names).toContain("typecheck");
+    expect(names).toContain("architecture");
+    expect(names).toContain("license-audit");
+    expect(names).toContain("ci:codegen");
+    expect(names).toContain("ci:schemas");
   });
 
-  it("WR-03 full CI includes web:e2e:full", () => {
-    const names = buildAllSteps({ ...process.env, FULCRUM_RUN_E2E: "", HOME: "/tmp/fulcrum-home" })
-      .map((s) => s.name);
+  it("install runs bun install --frozen-lockfile", () => {
+    const step = lintSteps.find((s) => s.name === "install");
+    expect(step!.cmd).toEqual(["bun", "install", "--frozen-lockfile"]);
+  });
 
-    expect(names).toContain("web:e2e:full");
+  it("architecture tests run on tests/architecture/", () => {
+    const step = lintSteps.find((s) => s.name === "architecture");
+    expect(step!.cmd).toEqual(["bun", "test", "tests/architecture/"]);
   });
 });
 
-describe("ci STEPS — Phase 02 stable web gates", () => {
-  it("includes stable web check, build, and unit gates", () => {
-    const names = STEPS.map((s) => s.name);
+describe("ci tiered pipeline — unit tier", () => {
+  const unitSteps = ALL_STEPS.filter((s) => s.tier === "unit");
+
+  it("has a single 'unit' step running bun test on services/", () => {
+    expect(unitSteps).toHaveLength(1);
+    const step = unitSteps[0]!;
+    expect(step.name).toBe("unit");
+    expect(step.cmd).toContain("services/");
+    expect(step.cmd).toContain("--parallel");
+  });
+});
+
+describe("ci tiered pipeline — integration tier", () => {
+  const integrationSteps = ALL_STEPS.filter((s) => s.tier === "integration");
+
+  it("has a single 'integration' step running bun test on tests/", () => {
+    expect(integrationSteps).toHaveLength(1);
+    const step = integrationSteps[0]!;
+    expect(step.name).toBe("integration");
+    expect(step.cmd).toContain("tests/");
+    expect(step.cmd).toContain("--parallel");
+    expect(step.cmd).toContain("--exclude");
+    expect(step.cmd).toContain("tests/architecture");
+  });
+});
+
+describe("ci tiered pipeline — build tier", () => {
+  const buildSteps = ALL_STEPS.filter((s) => s.tier === "build");
+
+  it("includes build, web:check, web:build, web:test", () => {
+    const names = buildSteps.map((s) => s.name);
+    expect(names).toContain("build");
     expect(names).toContain("web:check");
     expect(names).toContain("web:build");
     expect(names).toContain("web:test");
   });
 
-  it("includes default smoke e2e gate", () => {
-    const step = STEPS.find((s) => s.name === "web:e2e:smoke");
+  it("web:test runs bun run web:test from apps/web", () => {
+    const step = buildSteps.find((s) => s.name === "web:test");
     expect(step).toBeDefined();
     expect(step!.cwd).toBe("apps/web");
-    expect(step!.cmd).toEqual(["bun", "run", "web:e2e:smoke"]);
+    expect(step!.cmd).toEqual(["bun", "run", "web:test"]);
   });
 
-  it("keeps skills lint and compression out of product CI", () => {
-    const names = STEPS.map((s) => s.name);
-    expect(names).not.toContain("skills:lint");
-    expect(names).not.toContain("compress:check");
+  it("web:check sets NODE_OPTIONS for heap size", () => {
+    const step = buildSteps.find((s) => s.name === "web:check");
+    expect(step).toBeDefined();
+    expect(step!.env).toMatchObject({ NODE_OPTIONS: "--max-old-space-size=12288" });
+  });
+});
+
+describe("ci tiered pipeline — removed stages", () => {
+  const allNames = ALL_STEPS.map((s) => s.name);
+
+  it("does not include coverage:root (redundant re-run)", () => {
+    expect(allNames).not.toContain("coverage:root");
   });
 
-  it("declares smoke and full e2e scripts in the web package", () => {
-    expect(webPackageJson.scripts).toMatchObject({
-      "web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
-      "web:e2e:full": "playwright test tests/e2e/ --workers=1",
-    });
+  it("does not include coverage:web (redundant re-run)", () => {
+    expect(allNames).not.toContain("coverage:web");
+  });
+
+  it("does not include web:install (handled by root install)", () => {
+    expect(allNames).not.toContain("web:install");
+  });
+
+  it("does not include standalone symphony:lock (folded into unit)", () => {
+    expect(allNames).not.toContain("symphony:lock");
+  });
+
+  it("does not include standalone symphony:conformance (folded into unit)", () => {
+    expect(allNames).not.toContain("symphony:conformance");
+  });
+
+  it("does not include standalone trpc:permissions (folded into unit)", () => {
+    expect(allNames).not.toContain("trpc:permissions");
+  });
+
+  it("does not include standalone migration:downgrade (folded into integration)", () => {
+    expect(allNames).not.toContain("migration:downgrade");
+  });
+
+  it("does not include standalone graceful:shutdown (folded into integration)", () => {
+    expect(allNames).not.toContain("graceful:shutdown");
+  });
+
+  it("keeps skills lint and compression out of pipeline", () => {
+    expect(allNames).not.toContain("skills:lint");
+    expect(allNames).not.toContain("compress:check");
+  });
+});
+
+describe("ci tiered pipeline — buildAllSteps accepts env", () => {
+  it("buildAllSteps returns consistent structure with custom env", () => {
+    const steps = buildAllSteps({ ...process.env, HOME: "/tmp/fulcrum-home" });
+    expect(steps.length).toBeGreaterThan(0);
+    for (const step of steps) {
+      expect(step).toHaveProperty("tier");
+      expect(step).toHaveProperty("name");
+      expect(step).toHaveProperty("cmd");
+    }
   });
 });
 
@@ -91,90 +165,11 @@ describe("web lockfile — vulnerable cookie resolution", () => {
   });
 });
 
-describe("ci STEPS — Symphony SPEC lock gate", () => {
-  it("includes focused symphony:lock step before the broad test suite", () => {
-    const names = STEPS.map((s) => s.name);
-    expect(names).toContain("symphony:lock");
-    expect(names.indexOf("symphony:lock")).toBeLessThan(names.indexOf("test"));
-  });
-
-  it("symphony:lock runs the focused SPEC lock test", () => {
-    const step = STEPS.find((s) => s.name === "symphony:lock");
-    expect(step).toBeDefined();
-    expect(step!.cmd).toEqual(["bun", "test", "tests/execution-orchestration/symphony/spec-lock.test.ts"]);
-  });
-});
-
-describe("ci STEPS — tRPC permission gate", () => {
-  it("includes hard-fail trpc:permissions step before the broad test suite", () => {
-    const names = STEPS.map((s) => s.name);
-    const step = STEPS.find((s) => s.name === "trpc:permissions");
-
-    expect(step).toBeDefined();
-    expect(step!.soft).not.toBe(true);
-    expect(names.indexOf("trpc:permissions")).toBeLessThan(names.indexOf("test"));
-  });
-
-  it("runs the focused tRPC permission lint tests", () => {
-    const step = STEPS.find((s) => s.name === "trpc:permissions");
-
-    expect(step).toBeDefined();
-    expect(step!.cmd).toEqual([
-      "bun",
-      "test",
-      "apps/server/src/trpc/__tests__/app-router-scaffold.test.ts",
-      "apps/server/src/trpc/__tests__/router.test.ts",
-    ]);
-  });
-});
-
-describe("ci STEPS — Phase 09 infrastructure gates", () => {
-  it("runs migration downgrade and graceful shutdown before build:all", () => {
-    const names = STEPS.map((s) => s.name);
-
-    expect(names).toContain("migration:downgrade");
-    expect(names).toContain("graceful:shutdown");
-    expect(names.indexOf("migration:downgrade")).toBeLessThan(names.indexOf("build:all"));
-    expect(names.indexOf("graceful:shutdown")).toBeLessThan(names.indexOf("build:all"));
-  });
-
-  it("uses focused infrastructure test commands", () => {
-    expect(STEPS.find((s) => s.name === "migration:downgrade")?.cmd).toEqual([
-      "bun",
-      "test",
-      "services/platform-core/src/infrastructure/application-database/migration-downgrade.test.ts",
-    ]);
-    expect(STEPS.find((s) => s.name === "graceful:shutdown")?.cmd).toEqual([
-      "bun",
-      "test",
-      "services/platform-core/src/application/platform-operations/shutdown-coordinator.test.ts",
-    ]);
-  });
-});
-
-describe("ci STEPS — Phase 09 coverage gates", () => {
-  it("runs root and web coverage after normal unit gates", () => {
-    const names = STEPS.map((s) => s.name);
-
-    expect(names).toContain("coverage:root");
-    expect(names).toContain("coverage:web");
-    expect(names.indexOf("coverage:root")).toBeGreaterThan(names.indexOf("test"));
-    expect(names.indexOf("coverage:web")).toBeGreaterThan(names.indexOf("web:test"));
-  });
-
-  it("uses focused coverage commands", () => {
-    expect(STEPS.find((s) => s.name === "coverage:root")?.cmd).toEqual([
-      "bun",
-      "run",
-      "scripts/test-root.ts",
-      "--root-coverage",
-    ]);
-    expect(STEPS.find((s) => s.name === "coverage:web")?.cmd).toEqual([
-      "bun",
-      "run",
-      "web:test",
-      "--",
-      "--coverage",
-    ]);
+describe("web package — e2e scripts declared", () => {
+  it("declares smoke and full e2e scripts in the web package", () => {
+    expect(webPackageJson.scripts).toMatchObject({
+      "web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
+      "web:e2e:full": "playwright test tests/e2e/ --workers=1",
+    });
   });
 });

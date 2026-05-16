@@ -1,3 +1,9 @@
+ci:
+    bun run scripts/ci.ts
+
+ci-fast:
+    bun run scripts/ci.ts --changed
+
 sync-symphony:
     #!/usr/bin/env bash
     set -euo pipefail
