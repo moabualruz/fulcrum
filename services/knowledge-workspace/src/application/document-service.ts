@@ -578,7 +578,7 @@ async function findDocByInput(
   return em.findOne(Document, { where: {
     ...where,
     ...(input.includeArchived ? {} : { archived: false }),
-  } as never, relations: ["org"] });
+  } as never, relations: ["org", "parent"] });
 }
 
 async function upsertSearchDocument(
