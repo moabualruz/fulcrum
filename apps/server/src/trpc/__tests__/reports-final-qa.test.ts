@@ -483,7 +483,7 @@ describe("reports final QA tRPC", () => {
   test("delegates final QA report building to shared application action with project and trace scope", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.finalQa({
+    const result = await trpc.review.finalQa({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-final-qa",
     });
@@ -511,7 +511,7 @@ describe("reports final QA tRPC", () => {
   test("delegates final QA feedback gate to shared application action with loop options", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.finalQaFeedbackGate({
+    const result = await trpc.review.finalQaFeedbackGate({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-feedback-gate",
       workerId: "worker-trpc",
@@ -553,7 +553,7 @@ describe("reports final QA tRPC", () => {
   test("delegates UAT/code review handoff to shared application action with project and trace scope", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.uatCodeReviewHandoff({
+    const result = await trpc.review.uatCodeReviewHandoff({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-uat",
     });
@@ -581,7 +581,7 @@ describe("reports final QA tRPC", () => {
   test("delegates UAT/code review decisions to shared application action with project and trace scope", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.recordUatCodeReviewDecision({
+    const result = await trpc.review.recordUatCodeReviewDecision({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
       decision: "approve_without_manual_review",
@@ -619,7 +619,7 @@ describe("reports final QA tRPC", () => {
   test("delegates generated E2E regression runs to shared application action with project and trace scope", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.runGeneratedE2eRegressionTests({
+    const result = await trpc.review.runGeneratedE2eRegressionTests({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
       runner: "playwright",
@@ -653,7 +653,7 @@ describe("reports final QA tRPC", () => {
   test("delegates configured auto-decisions to shared application action with project and trace scope", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.applyConfiguredUatCodeReviewDecision({
+    const result = await trpc.review.applyConfiguredUatCodeReviewDecision({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-auto",
       taskIds: ["11111111-1111-4111-8111-111111111111"],
@@ -686,7 +686,7 @@ describe("reports final QA tRPC", () => {
   test("delegates review workbench building to shared review workbench application model", async () => {
     const trpc = caller();
 
-    const result = await trpc.reports.reviewWorkbench({
+    const result = await trpc.review.reviewWorkbench({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-review",
       reviewId: "review-trpc-1",
@@ -722,7 +722,7 @@ describe("reports final QA tRPC", () => {
   test("delegates persisted review workbench sessions to shared application actions", async () => {
     const trpc = caller();
 
-    const saved = await trpc.reports.saveReviewWorkbenchSession({
+    const saved = await trpc.review.saveReviewWorkbenchSession({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-review-session",
       reviewId: "review-trpc-session",
@@ -767,7 +767,7 @@ describe("reports final QA tRPC", () => {
       searchQuery: "trace",
     });
 
-    const loaded = await trpc.reports.loadReviewWorkbenchSession({
+    const loaded = await trpc.review.loadReviewWorkbenchSession({
       projectId: PROJECT_ID,
       reviewId: "review-trpc-session",
       searchQuery: "trace",
@@ -797,7 +797,7 @@ describe("reports final QA tRPC", () => {
       searchQuery: "trace",
     });
 
-    const annotated = await trpc.reports.appendReviewWorkbenchAnnotation({
+    const annotated = await trpc.review.appendReviewWorkbenchAnnotation({
       projectId: PROJECT_ID,
       reviewId: "review-trpc-session",
       annotationId: "ann-trpc-added",
