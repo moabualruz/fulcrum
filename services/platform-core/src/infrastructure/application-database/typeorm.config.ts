@@ -428,6 +428,11 @@ export async function initDataSource(
   options?: Partial<DataSourceOptions>,
 ): Promise<DataSource> {
   if (defaultDataSource?.isInitialized) return defaultDataSource;
+  const config = resolveDatabaseConfig();
+  if (config.backend === "pglite") {
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(config.dataDir, { recursive: true });
+  }
   defaultDataSource = new DataSource({
     ...createDataSourceOptions(),
     ...options,
