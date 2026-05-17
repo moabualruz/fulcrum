@@ -54,6 +54,8 @@ export class DocumentCreateBodyDto {
   type?: PublicDocumentType;
   bodyMd?: string;
   frontmatter?: Record<string, unknown>;
+  parentId?: string | null;
+  sortPosition?: number;
 }
 
 export class DocumentPatchBodyDto {
@@ -61,6 +63,8 @@ export class DocumentPatchBodyDto {
   type?: PublicDocumentType;
   bodyMd?: string;
   frontmatter?: Record<string, unknown>;
+  parentId?: string | null;
+  sortPosition?: number;
 }
 
 export class DocumentCommentCreateBodyDto {

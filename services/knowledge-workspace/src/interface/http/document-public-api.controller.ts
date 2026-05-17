@@ -73,6 +73,8 @@ export class DocumentPublicApiService {
       docType: body.type,
       bodyMd: body.bodyMd,
       frontmatter: body.frontmatter,
+      parentId: body.parentId,
+      sortPosition: body.sortPosition,
     };
     if (body.projectId !== undefined) input["projectId"] = body.projectId;
     const doc = await this.requireApplication().create(input);
@@ -95,6 +97,8 @@ export class DocumentPublicApiService {
       docType: body.type,
       bodyMd: body.bodyMd,
       frontmatter: body.frontmatter,
+      parentId: body.parentId,
+      sortPosition: body.sortPosition,
     });
     if (!doc) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return normalizeDocument(doc);
@@ -594,6 +598,10 @@ IsOptional()(DocumentCreateBodyDto.prototype, "bodyMd");
 IsString()(DocumentCreateBodyDto.prototype, "bodyMd");
 IsOptional()(DocumentCreateBodyDto.prototype, "frontmatter");
 IsObject()(DocumentCreateBodyDto.prototype, "frontmatter");
+IsOptional()(DocumentCreateBodyDto.prototype, "parentId");
+IsString()(DocumentCreateBodyDto.prototype, "parentId");
+IsOptional()(DocumentCreateBodyDto.prototype, "sortPosition");
+IsNumber()(DocumentCreateBodyDto.prototype, "sortPosition");
 
 IsOptional()(DocumentPatchBodyDto.prototype, "title");
 IsString()(DocumentPatchBodyDto.prototype, "title");
@@ -604,6 +612,10 @@ IsOptional()(DocumentPatchBodyDto.prototype, "bodyMd");
 IsString()(DocumentPatchBodyDto.prototype, "bodyMd");
 IsOptional()(DocumentPatchBodyDto.prototype, "frontmatter");
 IsObject()(DocumentPatchBodyDto.prototype, "frontmatter");
+IsOptional()(DocumentPatchBodyDto.prototype, "parentId");
+IsString()(DocumentPatchBodyDto.prototype, "parentId");
+IsOptional()(DocumentPatchBodyDto.prototype, "sortPosition");
+IsNumber()(DocumentPatchBodyDto.prototype, "sortPosition");
 
 IsString()(DocumentCommentCreateBodyDto.prototype, "authorId");
 MinLength(1)(DocumentCommentCreateBodyDto.prototype, "authorId");

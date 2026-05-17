@@ -195,7 +195,7 @@ describe("document public Nest API", () => {
     await expect(controller.getDocument({ id: DOC_ID })).resolves.toEqual(expect.objectContaining({ id: DOC_ID }));
     await expect(controller.patchDocument(
       { id: DOC_ID },
-      { title: "Updated", type: "adr", frontmatter: { kind: "adr", labels: ["beta"] } },
+      { title: "Updated", type: "adr", frontmatter: { kind: "adr", labels: ["beta"] }, parentId: null, sortPosition: 1.5 },
     )).resolves.toEqual(
       expect.objectContaining({ title: "Updated", type: "page" }),
     );
@@ -215,6 +215,8 @@ describe("document public Nest API", () => {
       docType: "adr",
       bodyMd: undefined,
       frontmatter: { kind: "adr", labels: ["beta"] },
+      parentId: null,
+      sortPosition: 1.5,
     });
     expect(remove).toHaveBeenCalledWith({ id: DOC_ID });
   });
@@ -435,6 +437,8 @@ describe("document public Nest API", () => {
       title: "Updated",
       type: "adr",
       frontmatter: { kind: "adr", labels: ["beta"] },
+      parentId: DOC_ID,
+      sortPosition: 1.5,
     });
     const invalidPatch = Object.assign(new DocumentPatchBodyDto(), { title: "" });
     const commentBody = Object.assign(new DocumentCommentCreateBodyDto(), { authorId: "user-1", bodyMd: "note" });
