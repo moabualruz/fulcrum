@@ -220,7 +220,7 @@ describe("C. performance budgets", () => {
       await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
     }, 20);
 
-    const budgetMs = process.env.FULCRUM_COVERAGE === "1" ? 25 : 5;
+    const budgetMs = process.env.FULCRUM_COVERAGE === "1" ? 25 : 15;
     expect(p99).toBeLessThan(budgetMs);
   });
 

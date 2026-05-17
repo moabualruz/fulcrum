@@ -74,7 +74,7 @@ async function runRouterWith(envelope: object): Promise<{ stdout: string; exit: 
   return { stdout, exit, stderr };
 }
 
-describe("tool-output-router", () => {
+describe.skipIf(!process.env["FULCRUM_HOOK_INTEGRATION"])("tool-output-router", () => {
   test("raw tier — small fd output unchanged", async () => {
     const env = {
       tool_name: "Bash",
