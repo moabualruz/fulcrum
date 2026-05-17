@@ -23,6 +23,7 @@
 
 	let selectedVersion = $state<number | null>(null);
 	let diffView = $state(false);
+	let showDiff = $state(true);
 
 	function selectVersion(version: number): void {
 		selectedVersion = version;
@@ -32,6 +33,24 @@
 	const selectedData = $derived(
 		data.versions.find((v) => v.version === selectedVersion),
 	);
+
+	const diffLines = $derived(() => {
+		if (!selectedData || !data.doc.bodyMd) return [];
+		const current = (data.doc.bodyMd ?? "").split("\n");
+		const old = (selectedData.body ?? "").split("\n");
+		const lines: Array<{ type: "same" | "add" | "remove"; text: string }> = [];
+		const maxLen = Math.max(current.length, old.length);
+		for (let i = 0; i < maxLen; i++) {
+			const c = current[i];
+			const o = old[i];
+			if (c === o) lines.push({ type: "same", text: c ?? "" });
+			else {
+				if (o !== undefined) lines.push({ type: "remove", text: o });
+				if (c !== undefined) lines.push({ type: "add", text: c });
+			}
+		}
+		return lines;
+	});
 </script>
 
 <header
@@ -86,23 +105,48 @@
 			<div data-version-detail class={cn("flex flex-col gap-4")}>
 				<div class={cn("flex items-center justify-between")}>
 					<h2 class={cn("text-lg font-semibold")}>Version {selectedData.version}</h2>
-					<form method="POST" action="?/restore" use:enhance>
-						<input type="hidden" name="version" value={selectedData.version} />
-						<button
-							type="submit"
-							data-restore-version
-							data-restore-btn
-							class={cn(buttonVariants({ variant: "outline" }))}
-						>Restore this version</button>
-					</form>
+					<div class={cn("flex items-center gap-2")}>
+						<button type="button" onclick={() => { showDiff = !showDiff; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
+							{showDiff ? "Raw" : "Diff"}
+						</button>
+						<form method="POST" action="?/restore" use:enhance>
+							<input type="hidden" name="version" value={selectedData.version} />
+							<button
+								type="submit"
+								data-restore-version
+								data-restore-btn
+								class={cn(buttonVariants({ variant: "outline" }))}
+							>Restore this version</button>
+						</form>
+					</div>
 				</div>
-				<div class={cn("rounded-md border border-border p-4")}>
-					<h3 data-version-title class={cn("mb-2 text-sm font-medium")}>{selectedData.title}</h3>
-					<pre
-						data-version-body
-						class={cn("whitespace-pre-wrap text-sm text-muted-foreground")}
-					>{selectedData.body}</pre>
-				</div>
+				{#if showDiff}
+					<div data-version-diff class={cn("rounded-md border border-border overflow-hidden font-mono text-xs leading-5")}>
+						{#each diffLines as line, i (i)}
+							<div class={cn("px-3 py-0 flex gap-2", {
+								"bg-green-50 text-green-800": line.type === "add",
+								"bg-red-50 text-red-800": line.type === "remove",
+								"text-muted-foreground": line.type === "same",
+							})}>
+								<span class={cn("w-5 shrink-0 text-right select-none text-muted-foreground")}>
+									{line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}
+								</span>
+								<pre class={cn("flex-1 whitespace-pre-wrap")}>{line.text}</pre>
+							</div>
+						{/each}
+						{#if diffLines.length === 0}
+							<p class={cn("px-3 py-4 text-center text-muted-foreground")}>No differences</p>
+						{/if}
+					</div>
+				{:else}
+					<div class={cn("rounded-md border border-border p-4")}>
+						<h3 data-version-title class={cn("mb-2 text-sm font-medium")}>{selectedData.title}</h3>
+						<pre
+							data-version-body
+							class={cn("whitespace-pre-wrap text-sm text-muted-foreground")}
+						>{selectedData.body}</pre>
+					</div>
+				{/if}
 			</div>
 		{/if}
 		{#if data.diffHtml}
