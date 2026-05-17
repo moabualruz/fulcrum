@@ -129,6 +129,11 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /                                                         landing
 /docs                                                     public docs
 /changelog
+
+# System surfaces (internal previews + platform shells)
+/desktop                                                  desktop-shell preview (Tauri window chrome, gated by FULCRUM_FEATURES=desktop-app)
+/os-widgets                                               gallery of macOS-style OS-level surfaces (tray menu, native notification, dock badge); internal preview only; not part of web shell production routes
+/                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 
 URL invariants:
@@ -406,6 +411,8 @@ Segments left → right:
 
 Never collapses. Never scrolls. Only mode segment changes color.
 
+**Modes pill (trailing).** When focus enters a step that supports mode affordances, the status footer surfaces a trailing pill `[ Modes ]` containing the long-form mode-row. On TUI, the same pill renders in the footer as `[ ✋ ▶ 💬 :ai ]`.
+
 ---
 
 ## 8. CLI subcommand tree (mirrors stage nav)
@@ -534,7 +541,7 @@ Per research-05 §3.5. OpenTUI host shell, screens implemented as components. Th
 | Operate | `:plugins` | per-agent plugin scope | toggle / update / install-across |
 | Operate | `:audit` | audit log | trace-linked |
 | Operate | `:logs` | live log tail | follow + filter |
-| System | `:ai` | inline AI Assist pane | TUI-native; no web drawer; auto-injected `[ :ai ]` foot seg on every screen |
+| System | `:ai` | inline AI Assist pane (TUI-native, inline screen swap, NOT a web drawer overlay) | TUI-native; no web drawer; auto-injected `[ :ai ]` foot seg on every screen; explicitly listed per OD pass-5 |
 | System | `:agents` | CLI agent registry | unlimited entries · `a` add · `d` set default |
 | System | `:routes` | default agent per action | `e` edit · `o` override · `r` reset |
 | System | `:settings` | settings | 8 sections: General · Appearance · Keyboard · Privacy · Integrations · AI agents · Account · Danger |
@@ -591,6 +598,8 @@ Same trace ID surfaces in 4 places (research-04 §15):
 
 Click any of them → same trace explorer view (span tree + linked artifacts + audit slice + linked runs).
 
+**Mode-row × trace.** Every of the 24 stage-list surfaces (post-pass-2) now carries the mode-row at step-level; the trace ID echoes into each mode-button's `aria-describedby` so screen readers announce `[mode], trace tr_8f29a4c`.
+
 ---
 
 ## 12. Sources
@@ -622,3 +631,5 @@ Click any of them → same trace explorer view (span tree + linked artifacts + a
 ### 12.4 Transformation note
 
 Every web route, CLI command, and TUI screen currently shipped in `apps/web/src/routes/**`, `apps/cli/src/commands/**`, `apps/tui/src/screens/**` is preserved under the new IA. See [PRODUCT.md § Transformation Discipline](PRODUCT.md) for the per-cluster carry-over table. Renames are 301-redirected for one minor version with deprecation banner.
+
+> 2026-05-18 OD pass: route tree gains `/desktop`, `/os-widgets`, `/` (landing).

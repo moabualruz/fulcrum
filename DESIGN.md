@@ -33,7 +33,7 @@ Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-res
 | `surface-overlay` | `oklch(0.99 0.002 270 / 0.92)` | `oklch(0.14 0.005 270 / 0.92)` | Modal backdrops, drawer scrim |
 | `fg` | `oklch(0.18 0.01 270)` | `oklch(0.96 0.005 270)` | Primary text |
 | `fg-subtle` | `oklch(0.42 0.01 270)` | `oklch(0.72 0.005 270)` | Secondary text, labels |
-| `fg-muted` | `oklch(0.58 0.01 270)` | `oklch(0.55 0.005 270)` | Tertiary, captions, hints |
+| `fg-muted` | `oklch(0.58 0.01 270)` | `oklch(0.66 0.005 270)` /* bumped 0.62 → 0.66 to clear 0.45 lightness-delta heuristic against --surface-sunken (oklch 0.175). 2026-05-18. */ | Tertiary, captions, hints |
 | `fg-disabled` | `oklch(0.72 0.01 270)` | `oklch(0.38 0.005 270)` | Disabled controls |
 | `fg-inverse` | `oklch(0.99 0.002 270)` | `oklch(0.14 0.005 270)` | Text on accent fills |
 | `border` | `oklch(0.90 0.005 270)` | `oklch(0.28 0.005 270)` | Default borders |
@@ -334,6 +334,26 @@ Universal — on every step header (task card, doc block, review item, artifact 
 
 Keyboard: `p` Play / `d` Discuss / `⌘/` drawer / `c` clone (on focused row).
 
+### 4.13 Mode affordance row
+
+Universal per-step affordance, rendered in three forms depending on density and context. All forms use `role="toolbar" aria-label="Step modes"` and the canonical CSS classes `.mode-row`, `.mode-row.compact`, `.mode-row.tight`, `.mode-btn`, `.mode-btn.assist`.
+
+- **Long** (per-card / per-row primary): all 4 buttons with labels: `✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist`.
+- **Compact** (dense lists, board cards, timeline lanes): icon-only `✋ ▶ 💬 ⊞`, 24×24 min target size.
+- **Tight** (settings rows, doc surfaces where Manual/Assist would be noise): `▶ Suggest / 💬 Discuss` only.
+
+### 4.14 Skip-link
+
+`<a href="#main" class="skip-link">Skip to content</a>` immediately after `<body>` on every top-level page. CSS: off-screen by default, on `:focus` jumps to `left: 16px; top: 8px; z-index: 1000; padding: 8px 14px; background: var(--surface-elevated); border: 1px solid var(--accent); color: var(--accent);`.
+
+### 4.15 Empty-state pattern
+
+Container with `data-state="empty"` toggles between list view and empty-state block. CSS: `:where([data-state="empty"]) .list { display: none; } :where([data-state="empty"]) .empty-state { display: block; }`. Empty-state shape: H2 (what's missing) + paragraph (why + next step) + 1-2 action buttons.
+
+### 4.16 Agent avatar
+
+Flat `color-mix(in oklch, var(--<role>) 18%, var(--surface))` background + monogram letter in `var(--fg)`, `font-weight: 600`. NO gradients. Roles map: `cl` (Claude) → `--accent`, `gp` (general-purpose) → `--success`, `ge` (Gemini) → `--info` (fall back to `--accent`), `oc` (OpenCode) → `--warn`, `pi` (Pi) → `--purple`, `cx` (Codex) → `--danger`.
+
 ### 4.12 Command palette (`⌘K`)
 
 Per research-01 §12 and research-07 §1.6 (Plane Power-K). Context-aware, stateful menus.
@@ -355,6 +375,8 @@ Per research-01 §12 and research-07 §1.6 (Plane Power-K). Context-aware, state
 - **State-change motion:** drawer slide (200 ms), modal scale-in 0.96 → 1.0 + opacity (180 ms), peek-overview lift (180 ms), tooltip fade (120 ms), toast slide-in from bottom-right (180 ms).
 - **Streaming motion:** run-feed line slide-in from top (120 ms), tool-call card expand (150 ms), permission prompt slide-in inline (200 ms).
 - **`prefers-reduced-motion: reduce`** collapses every motion to opacity-only 80 ms (research-06 §2).
+
+> **Reduced-motion guarantee.** Every animated/transitioned property MUST inherit `@media (prefers-reduced-motion: reduce)` overrides. Implementation: `* { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }` inside the media query. `scroll-behavior: auto;` on `html` when reduced motion is preferred.
 
 ---
 
@@ -399,6 +421,8 @@ Three modes (compact / cozy / comfortable). Settings → Display. Default = cozy
 | Row height | 20px | 24px | 28px |
 | Card padding | 8px | 12px | 16px |
 | Sidebar item height | 24px | 28px | 32px |
+
+> **Tap targets.** Minimum 24×24 CSS pixels per WCAG 2.5.8. Icon-only `.mode-btn` honours this via `min-width: 24px; min-height: 24px;` even when the visible glyph is 16px.
 
 ---
 
@@ -451,6 +475,12 @@ Per research-04 § Doctor / Audit / Error logs.
 
 ---
 
+### 10.5 AI Assist segment identity (exception)
+
+> The footer `.seg.assist` segment carries a subtle 4-8% accent-tinted vertical gradient + an inset top highlight + a radial accent glow at the leading edge. This is **the only place** glassmorphism / gradient is permitted decoratively. It serves as the cross-surface visual identity for the AI Assist surface; do NOT generalize.
+
+---
+
 ## 11. Onboarding (first-run)
 
 Per PRODUCT.md + research convergence (Linear empty cycle / Devin empty session):
@@ -476,6 +506,7 @@ Codified anti-references from PRODUCT.md + research convergence:
 - No coloured side-stripe borders.
 - No gradient text.
 - No default glassmorphism.
+- No gradient agent-disc avatars.
 - No hero illustrations.
 - No persistent welcome banners after first session.
 - No telemetry without opt-in (research-04 §14).
@@ -497,6 +528,7 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 8. **AI Assist** reachable in one keystroke from anywhere (`⌘/` web, `⌘/` TUI, `fulcrum ai` CLI). Entry point lives as the **right-most segment of the status footer** (web), the **right-most tab** of the bottom tab bar (mobile), and the **right-most segment of the terminal footer** (TUI). Never decorative; always accent-tinted left-border so it reads as the primary AI affordance.
 9. **Multi-CLI agent registry** is global to the workspace, scope-aware in the UI. Every Play / Discuss / Send invocation goes through an agent picker showing the default-routed agent first plus all other configured agents (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`, custom). Users can configure unlimited agents. MCP servers and plugins are **per agent** until cross-agent install is supported — the Operate → MCP and Operate → Plugins surfaces show a scope chip per agent, never a global list.
 10. **Top-right system icons** in the scope bar have defined behavior: `search` opens ⌘K palette · `bell` opens the Notifications popover (tabbed, with mark-all-read) · `settings` opens the Display popover (theme / density / mode / motion / sidebar) · `?` opens the keyboard cheatsheet overlay · avatar opens the Account popover (workspace switcher, account, API keys, CLI agents, MCP, plugins, sign out). Each icon has a labelled tooltip and `aria-expanded` state. They are never used as decorative chrome.
+11. **Viewport ladder.** 320 / 768 / 1024 / 1440 / 1920. Top-level shells wrap in `<main class="shell" style="container-type: inline-size;">`. `@container (max-width: 1023px)` collapses sidebar + repositions stage-rail to bottom. `@container (max-width: 767px)` shrinks scope-bar + status-footer typography. Mobile-specific surfaces (`mobile-*.html`) skip the container query and use viewport-px directly.
 
 ---
 
@@ -531,3 +563,5 @@ Each section of this DESIGN.md cites the dossier it draws from.
 ### 14.4 Transformation note
 
 This DESIGN.md is **additive** over the current Fulcrum codebase. Every visual decision here is a transformation of an existing surface (current sidebar nav → workflow stages; current settings tabs → inheritance chips; current trace ID in URL → copyable badge), not a removal. The component vocabulary in §4 is meant to be applied to every existing route in `apps/web/src/routes/**` via the carry-over table in [PRODUCT.md § Transformation Discipline](PRODUCT.md).
+
+> 2026-05-18 OD pass: validated against rendered prototype (38 files → 41 files including ai-assist, desktop-shell, os-widgets, landing). All deltas in this revision are additive.

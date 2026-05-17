@@ -42,6 +42,42 @@ One sentence naming the next workflow action.
 [ Primary button: do the action ]   Press <key> to do it via keyboard.
 ```
 
+### Canonical HTML shape
+
+```
+<H2>{What's missing}</H2>
+<P>{Why it's empty}. {What to do next}.</P>
+<button>{Primary action}</button>
+<button>{Secondary action}</button>
+```
+
+### Worked examples per stage list (matches empty-states.html pattern)
+
+- **capture-drafts**:
+  - H2: `No drafts yet.`
+  - P: `Drafts collect half-formed ideas. Press c to capture, or hand off from intake.`
+  - Buttons: `New draft`, `Open inbox`
+- **plan-prototypes**:
+  - H2: `No prototypes yet.`
+  - P: `Prototypes appear when a planning session ships a draft. Start one to seed this list.`
+  - Buttons: `Start planning`, `Open templates`
+- **build-list**:
+  - H2: `No tasks yet.`
+  - P: `Materialize an approved plan, or press c to create a task directly.`
+  - Buttons: `Materialize plan`, `New task`
+- **review-queue**:
+  - H2: `No reviews waiting.`
+  - P: `Items appear here when a task moves to in-review. Push something forward.`
+  - Buttons: `Open board`, `View completed`
+- **ship-archive**:
+  - H2: `No releases shipped.`
+  - P: `Approved reviews send artifacts here. Cut a release once review is green.`
+  - Buttons: `Open Ship`, `View artifacts`
+- **operate-alerts**:
+  - H2: `No alerts firing.`
+  - P: `Doctor is quiet. Re-probe to refresh, or open telemetry for trends.`
+  - Buttons: `Re-probe`, `Open telemetry`
+
 ### Per-surface copy
 
 **Capture (no docs yet):**
@@ -196,6 +232,12 @@ One sentence naming the next workflow action.
 
 ## 5. Mode affordance copy
 
+### Three forms (per-step row)
+
+- **Long** (per-card / per-row primary): `✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist` (full labels — keep verbatim).
+- **Compact** (dense lists, board cards, timeline lanes): glyph-only with `title="<long-name>"`. Examples: `title="✋ Manual"`, `title="▶ Play (handoff to AI)"`, `title="💬 Discuss"`, `title="⊞ AI Assist"`.
+- **Tight** (settings rows, doc surfaces): `▶ Suggest / 💬 Discuss` only. Drop Manual/Assist where they would be noise.
+
 ### ▶ Play picker popover
 
 The picker is dynamic — it lists every CLI agent the user has configured, with the default-routed agent for this action kind marked. There is no separate "model" line because the agent registry already pairs each agent with its model.
@@ -274,6 +316,8 @@ Lock these strings. No synonyms.
 | `unknown` | Unknown | Was unknown |
 
 Never `In Flight`, `WIP`, `Doing`, `Stuck`, `Done!`. Never localize the verb inflection inconsistently.
+
+> Lowercase, hyphenated. Any non-canonical synonym is a copy bug. Secondary descriptors live in `<span class="desc">` after the canonical pill. Canonical 8-state vocab: `queued / running / waiting-input / passing / failing / completed / cancelled / blocked`.
 
 ---
 
@@ -439,3 +483,5 @@ Set later via `fulcrum config telemetry on|anon|off` or
 ### 14.4 Transformation note
 
 The copy templates above are **additive**: every existing user-facing string in the codebase (`apps/web/src/lib/**`, `apps/cli/src/**`, `apps/tui/src/**`) is reviewed against these templates and replaced if it violates them. Strings that match are kept. No feature is removed; the words around the features are sharpened.
+
+> 2026-05-18 OD pass: status vocab enforced across all 35 OD frames; empty-state template applied across 15 stage lists; mode affordance copy promoted to 3 forms.
