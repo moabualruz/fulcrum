@@ -156,7 +156,8 @@ describe("root CLI source dispatch", () => {
     const { container, cleanup } = await buildDbContainer();
     const ds = container.get(DataSource);
 
-    expect(await ds.query("SELECT 1 AS ok")).toEqual([{ ok: 1 }]);
+    const rows = await ds.query("SELECT 1 AS ok") as Array<{ ok: number }>;
+    expect(rows).toEqual([{ ok: 1 }]);
 
     await cleanup();
     expect(ds.isInitialized).toBe(false);

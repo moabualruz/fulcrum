@@ -20,14 +20,14 @@ describe("tasks cross-interface parity", () => {
   test("application-created task reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    bindTestRuntimeOrm(container, db);
+    bindTestRuntimeOrm(container, db.ds);
     const ctx: AppContext = {
       orgId: db.seed.orgId,
       userId: db.seed.userId,
       projectId: null,
     };
 
-    const created = await createTask(db.ds, ctx, {
+    const created = await createTask(db.em, ctx, {
       title: "Cross-interface task",
       status: "todo",
     });

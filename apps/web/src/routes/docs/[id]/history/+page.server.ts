@@ -117,7 +117,7 @@ export const actions = {
       const { em, ctx } = await requestAppScope(event.locals as Parameters<typeof requestAppScope>[0]);
       const { DocumentService } = await import("@knowledge-workspace/application/document-service.ts");
       await new DocumentService(em).restoreVersion(
-        { orgId: ctx.orgId, userId: ctx.userId ?? "" },
+        { em, orgId: ctx.orgId, userId: ctx.userId ?? "" },
         event.params.id,
         version,
       ).catch(() => { throw error(404, "Document version not found"); });

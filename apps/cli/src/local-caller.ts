@@ -38,8 +38,8 @@ type WorkflowApiOverlay<T extends object> = Omit<T, keyof ConfiguredWorkflowApiC
 export async function createLocalCaller(input?: DiContainer | LocalCallerOptions | null) {
   const { createApplicationLocalCaller } = await import("@fulcrum/server/trpc/local-caller.ts");
   const options: LocalCallerOptions = input && typeof input === "object" && "container" in input
-    ? input
-    : { container: input ?? undefined };
+    ? (input as LocalCallerOptions)
+    : { container: (input as DiContainer | undefined) ?? undefined };
   return createApplicationLocalCaller(options);
 }
 

@@ -48,10 +48,10 @@ describe("runs cross-interface parity", () => {
   test("application-created run reads identically through tRPC, CLI JSON, and TUI caller", async () => {
     db = await createTestOrm();
     const container = createTestContainer(db);
-    bindTestRuntimeOrm(container, db);
+    bindTestRuntimeOrm(container, db.ds);
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
-    const created = await dispatchRun(db.ds, ctx, {
+    const created = await dispatchRun(db.em, ctx, {
       agentName: "codex",
       prompt: "architecture.5-run-parity",
     });
