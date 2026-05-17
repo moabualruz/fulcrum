@@ -107,6 +107,7 @@ const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [
   "apps/server/src/trpc/routers/credentials.ts",
   "apps/server/src/trpc/routers/repos.ts",
   "apps/server/src/trpc/routers/time-entries.ts",
+  "apps/web/src/routes/tasks/[id]/+page.server.ts",
 ];
 
 const SERVICE_ROUTER_FILES = [
