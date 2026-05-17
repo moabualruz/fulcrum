@@ -1,6 +1,6 @@
 # Fulcrum
 
-> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Runs entirely on your machine with PGlite. SaaS-ready schema from day one.
+> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Defaults to embedded PGlite and switches to PostgreSQL with `FULCRUM_DATABASE_URL` or `DATABASE_URL`. SaaS-ready schema from day one.
 
 Fulcrum is a full-stack Agent OS that combines Jira-style task management, Confluence-style docs, agent orchestration (Symphony), inference sidecar, memory/context engine, search, notifications, and developer tooling (CLI + TUI + Web) into a single local-first platform.
 
@@ -37,13 +37,13 @@ cd fulcrum
 bun install
 
 # Run the web app (local dev — no auth required)
-cd src/web && bun run dev
+bun --cwd apps/web run dev
 # → http://localhost:5173
 
 # Or use the CLI
-bun run src/index.ts doctor
-bun run src/index.ts projects list --json
-bun run src/index.ts tasks create --title "My first task" --json
+bun run apps/cli/src/main.ts doctor
+bun run apps/cli/src/main.ts projects list --json
+bun run apps/cli/src/main.ts work create --project <project-id> --title "My first task" --json
 ```
 
 ## Supported Agents
@@ -59,6 +59,24 @@ Fulcrum manages configuration for 5 CLI coding agents:
 | Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/` | TypeScript extension | `pi-mcp-adapter` |
 
 ## Architecture
+
+Runtime surfaces are first-class local apps:
+
+| Path | Role |
+|---|---|
+| `apps/web` | SvelteKit client and local web UI. `fulcrum web` serves its built output locally. |
+| `apps/cli` | Bun CLI app and `fulcrum` binary entrypoint. |
+| `apps/tui` | OpenTUI client. Runs in-process against local application callers. |
+| `apps/server` | Local server adapters: Hono REST API, tRPC router, routing engine, Yjs/runtime adapters. |
+| `services/*/src/application` | Bounded-service application workflows, DTOs, validation, command/query services. Interfaces call here. |
+| `services/*/src/domain` | Bounded-service domain models, value types, and pure rules. |
+| `services/*/src/infrastructure` | Bounded-service adapters for persistence, messaging, external tools, and runtime integrations. |
+| `services/*/src/interface` | Bounded-service API/presentation adapters when a service owns an interface contract. |
+| `src/db` | ORM entities, repositories, migrations, DB composition. |
+| `src/domain` | Domain enums/value types and pure domain helpers. |
+| `tests` | Cross-interface, e2e, integration, migration, and parity tests. |
+
+Root `package.json` declares `apps/*` as the Bun workspace set. Clients stay local-first: CLI and TUI use in-process callers by default; web runs through local SvelteKit dev or `fulcrum web`; server code provides local REST/tRPC/Yjs adapters without requiring a remote service.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -115,6 +133,7 @@ keyring-windows, report-llm-narration, notify-webhook
 ```bash
 # Project management
 fulcrum projects list|create|delete --json
+fulcrum work create --project <project-id> --title <title> --json
 fulcrum tasks list|create|update|delete --json
 fulcrum sprints list|create|close --json
 
@@ -123,6 +142,8 @@ fulcrum docs list|create|update --json
 
 # Search
 fulcrum search "query" --json
+fulcrum search "query" --all-projects --json
+fulcrum search "query" --global --json
 
 # Agent operations
 fulcrum agent list|test --json
@@ -147,8 +168,8 @@ The SvelteKit web app runs at `http://localhost:5173` in dev mode.
 **No login required in local/dev mode.** Set `FULCRUM_REQUIRE_AUTH=1` for SaaS mode with Better-Auth.
 
 Key pages:
-- `/` — Dashboard with project/task/doc/run metrics
-- `/projects` — Project list and creation
+- `/` — Current-scope dashboard with project/task/doc/run metrics
+- `/projects` — Project hierarchy, portfolio view, and creation
 - `/projects/<id>/board` — Kanban board
 - `/docs` — Document browser and TipTap editor
 - `/search` — Full-text search with facets
@@ -163,7 +184,7 @@ Key pages:
 fulcrum tui
 ```
 
-44 screens covering all features. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes.
+Project-first workbench covering tasks, docs, runs, search, notifications, memory, and reports. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes. Global or all-project views are explicit modes, not silent defaults.
 
 ## Development
 
@@ -171,8 +192,8 @@ fulcrum tui
 bun install                  # Install deps
 bun run --bun tsc --noEmit   # Typecheck
 bun run scripts/test-root.ts # Run root tests
-cd src/web && bun run dev    # Dev server
-cd src/web && bun run web:e2e # Playwright e2e tests
+bun --cwd apps/web run dev    # Dev server
+bun --cwd apps/web run web:e2e # Playwright e2e tests
 ```
 
 ## Docs
@@ -180,7 +201,7 @@ cd src/web && bun run web:e2e # Playwright e2e tests
 - [User Guide](docs/user-guide.md)
 - [Developer Guide](docs/developer-guide.md)
 - [Test Gaps](docs/TEST-GAPS.md) — documented integration/e2e test coverage gaps
-- [HANDOVER](HANDOVER.md) — live state snapshot
+- [Roadmap](.planning/ROADMAP.md) — phase status and blockers
 - [AGENTS](AGENTS.md) — project rules for AI agents
 
 ## License

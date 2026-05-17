@@ -18,11 +18,13 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'agents'" -a 'list-profiles'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'agents'" -a 'test-profile' -d 'agents test-profile'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'agents'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'artifacts' -d 'fulcrum artifacts'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'accept' -d 'artifacts accept'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'archive' -d 'artifacts archive'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'delete' -d 'artifacts delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'download' -d 'artifacts download'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'get' -d 'artifacts get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'list' -d 'artifacts list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'reject' -d 'artifacts reject'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'unarchive' -d 'artifacts unarchive'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -a 'upload' -d 'artifacts upload'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'artifacts'" -l json -d option
@@ -39,10 +41,32 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'auth'" -a 'accept-invite' -
 complete -c fulcrum -n "__fish_seen_subcommand_from 'auth'" -a 'invite' -d 'auth invite'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'auth'" -a 'whoami' -d 'auth whoami'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'auth'" -l json -d option
+complete -c fulcrum -n "__fish_use_subcommand" -a 'automations' -d 'fulcrum automations'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -a 'create' -d 'automations create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -a 'delete' -d 'automations delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -a 'list' -d 'automations list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -a 'templates' -d 'automations templates'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -a 'update' -d 'automations update'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'" -l json -d option
+complete -c fulcrum -n "__fish_seen_subcommand_from 'automations'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'automations')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'backup' -d 'fulcrum backup'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'backup'" -a 'create' -d 'backup create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'backup'" -a 'restore' -d 'backup restore'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'backup'" -l json -d option
+complete -c fulcrum -n "__fish_use_subcommand" -a 'comments' -d 'fulcrum comments'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'add-reaction' -d 'comments add-reaction'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'create' -d 'comments create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'delete' -d 'comments delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'list' -d 'comments list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'remove-reaction' -d 'comments remove-reaction'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'resolve' -d 'comments resolve'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'subscribe' -d 'comments subscribe'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'threaded' -d 'comments threaded'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'unresolve' -d 'comments unresolve'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'unsubscribe' -d 'comments unsubscribe'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'watchers' -d 'comments watchers'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -l json -d option
+complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'comments')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'connectors' -d 'fulcrum connectors'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'disable' -d 'connectors disable'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'enable' -d 'connectors enable'
@@ -66,14 +90,6 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'credentials'" -a 'rotate' -
 complete -c fulcrum -n "__fish_seen_subcommand_from 'credentials'" -a 'set' -d 'credentials set'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'credentials'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'credentials'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'credentials')"
-complete -c fulcrum -n "__fish_use_subcommand" -a 'custom_fields' -d 'fulcrum custom_fields'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -a 'create' -d 'custom_fields create'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -a 'delete' -d 'custom_fields delete'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -a 'list' -d 'custom_fields list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -a 'reorder' -d 'custom_fields reorder'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -a 'update' -d 'custom_fields update'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'" -l json -d option
-complete -c fulcrum -n "__fish_seen_subcommand_from 'custom_fields'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'custom_fields')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'customFieldDefs' -d 'fulcrum customFieldDefs'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'customFieldDefs'" -a 'list' -d 'customFieldDefs list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'customFieldDefs'" -l json -d option
@@ -92,6 +108,7 @@ complete -c fulcrum -n "__fish_use_subcommand" -a 'doc_comments' -d 'fulcrum doc
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'create' -d 'doc_comments create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'delete' -d 'doc_comments delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'list' -d 'doc_comments list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'resolve' -d 'doc_comments resolve'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -a 'update' -d 'doc_comments update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_comments'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'doc_comments')"
@@ -102,6 +119,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_links'" -a 'list' -d 'd
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_links'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_links'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'doc_links')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'doc_versions' -d 'fulcrum doc_versions'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'diff' -d 'doc_versions diff'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'get' -d 'doc_versions get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'list' -d 'doc_versions list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'doc_versions'" -a 'restore' -d 'doc_versions restore'
@@ -151,8 +169,12 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -a 'set-rollout' -d
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'flags'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'flags')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'fulcrum_skills' -d 'fulcrum fulcrum_skills'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'conflicts list' -d 'fulcrum_skills conflicts list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'conflicts override' -d 'fulcrum_skills conflicts override'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'install' -d 'fulcrum_skills install'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'list' -d 'fulcrum_skills list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'lock override' -d 'fulcrum_skills lock override'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'registry list' -d 'fulcrum_skills registry list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'resolve-conflict' -d 'fulcrum_skills resolve-conflict'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'sync' -d 'fulcrum_skills sync'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'fulcrum_skills'" -a 'uninstall' -d 'fulcrum_skills uninstall'
@@ -164,6 +186,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'health'" -a 'ping' -d 'heal
 complete -c fulcrum -n "__fish_seen_subcommand_from 'health'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'inference' -d 'fulcrum inference'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'inference'" -a 'backends list' -d 'inference backends list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'inference'" -a 'backends probe' -d 'inference backends probe'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'inference'" -a 'classify' -d 'inference classify'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'inference'" -a 'config get' -d 'inference config get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'inference'" -a 'config set' -d 'inference config set'
@@ -190,39 +213,11 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'create' -d '
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'delete' -d 'memories delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'get' -d 'memories get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'list' -d 'memories list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'promote' -d 'memories promote'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'search' -d 'memories search'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -a 'update' -d 'memories update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'memories'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'memories')"
-complete -c fulcrum -n "__fish_use_subcommand" -a 'memory' -d 'fulcrum memory'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'create' -d 'memory create'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'delete' -d 'memory delete'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'get' -d 'memory get'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'list' -d 'memory list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'search' -d 'memory search'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -a 'update' -d 'memory update'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'" -l json -d option
-complete -c fulcrum -n "__fish_seen_subcommand_from 'memory'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'memory')"
-complete -c fulcrum -n "__fish_use_subcommand" -a 'notifications' -d 'fulcrum notifications'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'channels config' -d 'notifications channels config'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'channels list' -d 'notifications channels list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'channels test' -d 'notifications channels test'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'list' -d 'notifications list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'mark-all-read' -d 'notifications mark-all-read'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'mark-read' -d 'notifications mark-read'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'mute' -d 'notifications mute'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'mutes list' -d 'notifications mutes list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'quiet-hours get' -d 'notifications quiet-hours get'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'quiet-hours set' -d 'notifications quiet-hours set'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'rules create' -d 'notifications rules create'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'rules delete' -d 'notifications rules delete'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'rules get' -d 'notifications rules get'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'rules list' -d 'notifications rules list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'rules update' -d 'notifications rules update'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'unmute' -d 'notifications unmute'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -a 'unread-count' -d 'notifications unread-count'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'" -l json -d option
-complete -c fulcrum -n "__fish_seen_subcommand_from 'notifications'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'notifications')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'notify' -d 'fulcrum notify'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notify'" -a 'channels config' -d 'notify channels config'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notify'" -a 'channels list' -d 'notify channels list'
@@ -258,6 +253,15 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'orgs'" -a 'members remove' 
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orgs'" -a 'members update-role' -d 'orgs members update-role'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orgs'" -a 'update' -d 'orgs update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orgs'" -l json -d option
+complete -c fulcrum -n "__fish_use_subcommand" -a 'planning' -d 'fulcrum planning'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'build-freeform-docs-planning-prompt' -d 'planning build-freeform-docs-planning-prompt'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'generate-technical-planning-cycle' -d 'planning generate-technical-planning-cycle'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'materialize-approved-plan-breakdown' -d 'planning materialize-approved-plan-breakdown'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'preview-approved-plan-breakdown' -d 'planning preview-approved-plan-breakdown'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'restart-planning-cycle-from-updates' -d 'planning restart-planning-cycle-from-updates'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'start-freeform-work-from-docs' -d 'planning start-freeform-work-from-docs'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -a 'start-guided-acp-planning-session' -d 'planning start-guided-acp-planning-session'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'planning'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'projects' -d 'fulcrum projects'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'" -a 'create' -d 'projects create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'" -a 'delete' -d 'projects delete'
@@ -267,6 +271,22 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'" -a 'stats' -d 'p
 complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'" -a 'update' -d 'projects update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'projects'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'projects')"
+complete -c fulcrum -n "__fish_use_subcommand" -a 'recurrence' -d 'fulcrum recurrence'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'recurrence'" -a 'create' -d 'recurrence create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'recurrence'" -a 'delete' -d 'recurrence delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'recurrence'" -a 'list' -d 'recurrence list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'recurrence'" -l json -d option
+complete -c fulcrum -n "__fish_seen_subcommand_from 'recurrence'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'recurrence')"
+complete -c fulcrum -n "__fish_use_subcommand" -a 'relationships' -d 'fulcrum relationships'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'blocked-items' -d 'relationships blocked-items'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'blockers' -d 'relationships blockers'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'create' -d 'relationships create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'delete' -d 'relationships delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'list-blocked-by' -d 'relationships list-blocked-by'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'list-for-task' -d 'relationships list-for-task'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'mark-as-duplicate' -d 'relationships mark-as-duplicate'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -a 'summary' -d 'relationships summary'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'relationships'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'repo_branches' -d 'fulcrum repo_branches'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_branches'" -a 'get' -d 'repo_branches get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_branches'" -a 'list' -d 'repo_branches list'
@@ -278,19 +298,50 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_commits'" -a 'list' -d
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_commits'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repo_commits'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'repo_commits')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'reports' -d 'fulcrum reports'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'blocked-items' -d 'reports blocked-items'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'burndown' -d 'reports burndown'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'burnup' -d 'reports burnup'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'cfd' -d 'reports cfd'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'cycle-time' -d 'reports cycle-time'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'export-csv' -d 'reports export-csv'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'lead-time' -d 'reports lead-time'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'progress-rollup' -d 'reports progress-rollup'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'stale-issues' -d 'reports stale-issues'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'throughput' -d 'reports throughput'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'velocity' -d 'reports velocity'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'wip-over-time' -d 'reports wip-over-time'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -a 'workload' -d 'reports workload'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'reports'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'repos' -d 'fulcrum repos'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'get' -d 'repos get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'list' -d 'repos list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'register' -d 'repos register'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'status-repo' -d 'repos status-repo'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'sync' -d 'repos sync'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'sync-repo' -d 'repos sync-repo'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -a 'unregister' -d 'repos unregister'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'repos'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'repos')"
+complete -c fulcrum -n "__fish_use_subcommand" -a 'review' -d 'fulcrum review'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'append-review-workbench-annotation' -d 'review append-review-workbench-annotation'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'apply-configured-uat-code-review-decision' -d 'review apply-configured-uat-code-review-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'final-qa' -d 'review final-qa'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'final-qa-feedback-gate' -d 'review final-qa-feedback-gate'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'load-review-workbench-session' -d 'review load-review-workbench-session'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'record-uat-code-review-decision' -d 'review record-uat-code-review-decision'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'review-workbench' -d 'review review-workbench'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'run-generated-e2e-regression-tests' -d 'review run-generated-e2e-regression-tests'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'save-review-workbench-session' -d 'review save-review-workbench-session'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -a 'uat-code-review-handoff' -d 'review uat-code-review-handoff'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'review'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'routing' -d 'fulcrum routing'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'config update-llm-gate' -d 'routing config update-llm-gate'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'create' -d 'routing create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'delete' -d 'routing delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'drafts approve' -d 'routing drafts approve'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'drafts delete' -d 'routing drafts delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'drafts list' -d 'routing drafts list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'drafts update' -d 'routing drafts update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'dry-run' -d 'routing dry-run'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'get' -d 'routing get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'list' -d 'routing list'
@@ -298,14 +349,6 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'test' -d 'rou
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -a 'update' -d 'routing update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'routing')"
-complete -c fulcrum -n "__fish_use_subcommand" -a 'runs' -d 'fulcrum runs'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -a 'cancel' -d 'runs cancel'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -a 'create' -d 'runs create'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -a 'get' -d 'runs get'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -a 'list' -d 'runs list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -a 'retry' -d 'runs retry'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'" -l json -d option
-complete -c fulcrum -n "__fish_seen_subcommand_from 'runs'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'runs')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'runsSubscriptions' -d 'fulcrum runsSubscriptions'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -a 'on-run-update' -d 'runsSubscriptions on-run-update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -l json -d option
@@ -320,21 +363,14 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'saved_views'" -l json -d op
 complete -c fulcrum -n "__fish_seen_subcommand_from 'saved_views'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'saved_views')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'search' -d 'fulcrum search'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'query' -d 'search query'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'record-click' -d 'search record-click'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'saved-create' -d 'search saved-create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'saved-delete' -d 'search saved-delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'saved-list' -d 'search saved-list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'saved-update' -d 'search saved-update'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'snapshot' -d 'search snapshot'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -a 'suggest' -d 'search suggest'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'search'" -l json -d option
-complete -c fulcrum -n "__fish_use_subcommand" -a 'skills' -d 'fulcrum skills'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'install' -d 'skills install'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'list' -d 'skills list'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'resolve-conflict' -d 'skills resolve-conflict'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'sync' -d 'skills sync'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'uninstall' -d 'skills uninstall'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -a 'upgrade' -d 'skills upgrade'
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'" -l json -d option
-complete -c fulcrum -n "__fish_seen_subcommand_from 'skills'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'skills')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'sprints' -d 'fulcrum sprints'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'sprints'" -a 'add-task' -d 'sprints add-task'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'sprints'" -a 'close' -d 'sprints close'
@@ -356,13 +392,22 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'bulk-delete' -d
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'bulk-update' -d 'tasks bulk-update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'create' -d 'tasks create'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'delete' -d 'tasks delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'dependency-run-live-feedback' -d 'tasks dependency-run-live-feedback'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'dependency-run-live-feedback-stream' -d 'tasks dependency-run-live-feedback-stream'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'dispatch-dependency-run' -d 'tasks dispatch-dependency-run'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'get' -d 'tasks get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'list' -d 'tasks list'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'list-children' -d 'tasks list-children'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'manual-workbench' -d 'tasks manual-workbench'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'preview-dependency-run' -d 'tasks preview-dependency-run'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'record-qa-review' -d 'tasks record-qa-review'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'run-automated-feedback-loop' -d 'tasks run-automated-feedback-loop'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'run-dependency-run-worker-tick' -d 'tasks run-dependency-run-worker-tick'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'set-dependencies' -d 'tasks set-dependencies'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'set-parent' -d 'tasks set-parent'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -a 'update' -d 'tasks update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -l json -d option
+complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'" -l watch -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'tasks'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'tasks')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'telemetry' -d 'fulcrum telemetry'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'telemetry'" -a 'opt-in' -d 'telemetry opt-in'
@@ -370,10 +415,20 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'telemetry'" -a 'opt-out' -d
 complete -c fulcrum -n "__fish_seen_subcommand_from 'telemetry'" -a 'purge' -d 'telemetry purge'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'telemetry'" -a 'status' -d 'telemetry status'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'telemetry'" -l json -d option
+complete -c fulcrum -n "__fish_use_subcommand" -a 'templates' -d 'fulcrum templates'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'apply-template' -d 'templates apply-template'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'create' -d 'templates create'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'delete' -d 'templates delete'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'list' -d 'templates list'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -a 'set-default' -d 'templates set-default'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'" -l json -d option
+complete -c fulcrum -n "__fish_seen_subcommand_from 'templates'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'templates')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'theme' -d 'fulcrum theme'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'get' -d 'theme get'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'get-theme' -d 'theme get-theme'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'list-themes' -d 'theme list-themes'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'set-theme' -d 'theme set-theme'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -a 'update' -d 'theme update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'theme'" -l json -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'webhooks' -d 'fulcrum webhooks'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'" -a 'create' -d 'webhooks create'
@@ -385,3 +440,14 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'" -a 'list' -d 'we
 complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'" -a 'update' -d 'webhooks update'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'webhooks'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'webhooks')"
+complete -c fulcrum -n "__fish_use_subcommand" -a 'workflows' -d 'fulcrum workflows'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'get-default' -d 'workflows get-default'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'get-enabled-task-types' -d 'workflows get-enabled-task-types'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'get-methodology' -d 'workflows get-methodology'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'get-transitions' -d 'workflows get-transitions'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'run-acceptance-cycle' -d 'workflows run-acceptance-cycle'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'update-enabled-task-types' -d 'workflows update-enabled-task-types'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'update-methodology' -d 'workflows update-methodology'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'update-transitions' -d 'workflows update-transitions'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -a 'validate-transition' -d 'workflows validate-transition'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'workflows'" -l json -d option

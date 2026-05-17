@@ -7,7 +7,7 @@ import {
   runWebDoctorChecks,
   buildDefaultWebDoctorConfig,
   type WebDoctorConfig,
-} from "../../src/doctor/checks/web.ts";
+} from "@platform-core/application/health-checks/checks/web.ts";
 
 describe("web.tauri_build check", () => {
   test("skips when desktop-app feature is OFF", async () => {
@@ -26,7 +26,7 @@ describe("web.tauri_build check", () => {
     const cfg: WebDoctorConfig = {
       ...buildDefaultWebDoctorConfig(),
       desktopAppEnabled: true,
-      checkTauriBinary: async () => ({ present: true, path: "/app/src-tauri/target/release/fulcrum" }),
+      checkTauriBinary: async () => ({ present: true, path: "/app/apps/desktop/src-tauri/target/release/fulcrum" }),
     };
     const result = await runWebDoctorChecks(cfg);
     const check = result.checks.find((c) => c.name === "tauri_build");

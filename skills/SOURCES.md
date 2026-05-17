@@ -59,8 +59,6 @@
 
 | Tool | Status | Source / Plan | Notes |
 |---|---|---|---|
-| `repomix` | ✍️ planned | [yamadashy/repomix — repomix-explorer](https://github.com/yamadashy/repomix/tree/main/.claude/skills/repomix-explorer) | Upstream layout is guide markdown today, not a clean installable skill folder. Track as authored `skills/repomix/` work instead of promising upstream install. |
-| `graphify` | ✅ | [safishamsi/graphify — skill.md](https://github.com/safishamsi/graphify/blob/v5/graphify/skill.md) | Per-agent variants. Knowledge-graph extraction + BFS/DFS. |
 | `semgrep` | ✅ | [semgrep/skills](https://github.com/semgrep/skills) | Three SKILL.md: `semgrep`, `code-security`, `llm-security`. |
 | `lizard` | ✍️ shipped | [`skills/lizard/SKILL.md`](lizard/SKILL.md) + [`evals/lizard.json`](../evals/lizard.json) | Authored 2026-04-28. 7 patterns + 7 anti-patterns; CCN, length, params, baseline diff. 20-entry eval (12/8). |
 

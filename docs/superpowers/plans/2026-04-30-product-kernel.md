@@ -16,8 +16,8 @@
 - `HANDOVER.md`
 - `docs/superpowers/specs/2026-04-30-product-kernel-research-design.md`
 - `src/components/ledger.ts`
-- `src/cli/component.ts`
-- `src/index.ts`
+- `apps/cli/src/component.ts`
+- `apps/cli/src/main.ts`
 - `package.json`
 
 ## Best-In-Class Defaults
@@ -114,17 +114,17 @@ Create:
 - `src/product-kernel/events.test.ts`
 - `src/product-kernel/jobs.test.ts`
 - `src/product-kernel/context.test.ts`
-- `src/web/src/lib/product-queries.test.ts`
-- `src/web/src/lib/state/fulcrum-store.test.ts`
-- `src/cli/product.ts` - CLI entry for early product-kernel commands.
-- `src/web/` - SvelteKit app after compatibility gate passes.
+- `apps/web/src/lib/product-queries.test.ts`
+- `apps/web/src/lib/state/fulcrum-store.test.ts`
+- `apps/cli/src/product.ts` - CLI entry for early product-kernel commands.
+- `apps/web/` - SvelteKit app after compatibility gate passes.
 
 Modify:
 
 - `package.json` - add gated dependencies only after compatibility spike.
-- `src/index.ts` - add `fulcrum product` command after CLI tests exist.
-- `src/cli/doctor.ts` - report product-kernel database health after schema exists.
-- `src/cli/uninstall.ts` - purge product-kernel state only with existing purge policy.
+- `apps/cli/src/main.ts` - add `fulcrum product` command after CLI tests exist.
+- `apps/cli/src/doctor.ts` - report product-kernel database health after schema exists.
+- `apps/cli/src/uninstall.ts` - purge product-kernel state only with existing purge policy.
 - `HANDOVER.md` - keep product-kernel status current.
 
 ## Parallel Execution
@@ -310,7 +310,7 @@ If PGlite test fails because Bun cannot load or persist PGlite reliably, stop th
 ## Task 2: UI Compatibility Spike
 
 **Files:**
-- Create: `src/web/README.md`
+- Create: `apps/web/README.md`
 - Modify: `package.json`
 
 - [ ] **Step 1: Add Svelte tooling**
@@ -332,11 +332,11 @@ Run:
 bunx shadcn-svelte@latest init
 ```
 
-Choose SvelteKit, TypeScript, Tailwind, and project-local component output under `src/web/lib/components/ui`.
+Choose SvelteKit, TypeScript, Tailwind, and project-local component output under `apps/web/lib/components/ui`.
 
 - [ ] **Step 3: Record spike result**
 
-Create `src/web/README.md`:
+Create `apps/web/README.md`:
 
 ```md
 # Fulcrum Web
@@ -361,7 +361,7 @@ Expected: TypeScript passes.
 Run:
 
 ```bash
-rg -n "export const load|<script|product-kernel|agent_runs|tasks|documents" src/web
+rg -n "export const load|<script|product-kernel|agent_runs|tasks|documents" apps/web
 ```
 
 Expected: no product route/component behavior exists in Task 2. No-output/exit-1 from `rg` is acceptable because it means no matches. If this command finds product behavior, delete/move that behavior to Task 11 and add RED tests there first.
@@ -771,9 +771,9 @@ Expected: no duplicate claims in local tests.
 ## Task 9: Early CLI Surface
 
 **Files:**
-- Create: `src/cli/product.ts`
-- Create: `src/cli/product.test.ts`
-- Modify: `src/index.ts`
+- Create: `apps/cli/src/product.ts`
+- Create: `apps/cli/src/product.test.ts`
+- Modify: `apps/cli/src/main.ts`
 
 - [ ] **Step 1: Write CLI tests**
 
@@ -791,14 +791,14 @@ fulcrum product context assemble --task <id>
 Run:
 
 ```bash
-bun test src/cli/product.test.ts
+bun test apps/cli/src/product.test.ts
 ```
 
 Expected RED: fails because `fulcrum product` dispatch and product CLI handlers are compile-only skeletons, return the wrong exit/output, or are not wired. A missing-module import error is not enough; create throwing skeleton exports and rerun until the test fails on missing behavior.
 
 - [ ] **Step 3: Add dispatcher**
 
-Modify `src/index.ts` to dispatch `product` to `src/cli/product.ts`.
+Modify `apps/cli/src/main.ts` to dispatch `product` to `apps/cli/src/product.ts`.
 
 - [ ] **Step 4: Implement minimum commands**
 
@@ -809,8 +809,8 @@ Implement only init, project list, search, and context assembly. Do not add full
 Run:
 
 ```bash
-bun test src/cli/product.test.ts
-bun run src/index.ts product init --json
+bun test apps/cli/src/product.test.ts
+bun run apps/cli/src/main.ts product init --json
 ```
 
 Expected: JSON output parses with `jq`.
@@ -818,22 +818,22 @@ Expected: JSON output parses with `jq`.
 ## Task 10: Doctor And Uninstall Integration
 
 **Files:**
-- Modify: `src/cli/doctor.ts`
-- Modify: `src/cli/doctor.test.ts`
-- Modify: `src/cli/uninstall.ts`
-- Modify: `src/cli/uninstall.test.ts`
+- Modify: `apps/cli/src/doctor.ts`
+- Modify: `apps/cli/src/doctor.test.ts`
+- Modify: `apps/cli/src/uninstall.ts`
+- Modify: `apps/cli/src/uninstall.test.ts`
 - Modify: `HANDOVER.md`
 
 - [ ] **Step 1: Write RED doctor/uninstall tests**
 
-Modify `src/cli/doctor.test.ts` and `src/cli/uninstall.test.ts` first. Add assertions that doctor reports product-kernel engine/schema/row counts/latest event timestamp and that default uninstall preserves product state while `--purge` removes only managed product state.
+Modify `apps/cli/src/doctor.test.ts` and `apps/cli/src/uninstall.test.ts` first. Add assertions that doctor reports product-kernel engine/schema/row counts/latest event timestamp and that default uninstall preserves product state while `--purge` removes only managed product state.
 
 - [ ] **Step 2: Run RED doctor/uninstall tests**
 
 Run:
 
 ```bash
-bun test src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 ```
 
 Expected RED: fails because product-kernel doctor/uninstall behavior is missing from existing commands or compile-only skeletons throw `not implemented`. The test must fail on missing product-kernel behavior, not on syntax/import errors.
@@ -851,7 +851,7 @@ Default uninstall keeps product DB. `--purge` removes product DB/artifacts under
 Run:
 
 ```bash
-bun test src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 ```
 
 Expected: default uninstall preserves product state; purge removes only managed product state.
@@ -859,31 +859,31 @@ Expected: default uninstall preserves product state; purge removes only managed 
 ## Task 11: Web Shell And State Bridge
 
 **Files:**
-- Create: `src/web/`
-- Create: `src/web/src/lib/state/fulcrum-store.ts`
-- Create: `src/web/src/lib/state/fulcrum-store.test.ts`
-- Create: `src/web/src/lib/product-queries.ts`
-- Create: `src/web/src/lib/product-queries.test.ts`
-- Create: `src/web/src/routes/+layout.svelte`
-- Create: `src/web/src/routes/+page.svelte`
-- Create: `src/web/src/routes/projects/+page.svelte`
-- Create: `src/web/src/routes/docs/+page.svelte`
-- Create: `src/web/src/routes/boards/+page.svelte`
-- Create: `src/web/src/routes/runs/+page.svelte`
+- Create: `apps/web/`
+- Create: `apps/web/src/lib/state/fulcrum-store.ts`
+- Create: `apps/web/src/lib/state/fulcrum-store.test.ts`
+- Create: `apps/web/src/lib/product-queries.ts`
+- Create: `apps/web/src/lib/product-queries.test.ts`
+- Create: `apps/web/src/routes/+layout.svelte`
+- Create: `apps/web/src/routes/+page.svelte`
+- Create: `apps/web/src/routes/projects/+page.svelte`
+- Create: `apps/web/src/routes/docs/+page.svelte`
+- Create: `apps/web/src/routes/boards/+page.svelte`
+- Create: `apps/web/src/routes/runs/+page.svelte`
 
 - [ ] **Step 1: Write RED web state/query tests**
 
 Create tests for:
 
-- `src/web/src/lib/state/fulcrum-store.test.ts` - Svelte-readable wrapper reflects `createFulcrumStore` changes.
-- `src/web/src/lib/product-queries.test.ts` - project/docs/board/run view query helpers read from product-kernel repositories instead of static data.
+- `apps/web/src/lib/state/fulcrum-store.test.ts` - Svelte-readable wrapper reflects `createFulcrumStore` changes.
+- `apps/web/src/lib/product-queries.test.ts` - project/docs/board/run view query helpers read from product-kernel repositories instead of static data.
 
 - [ ] **Step 2: Run RED web tests**
 
 Run:
 
 ```bash
-bun test src/web/src/lib/state/fulcrum-store.test.ts src/web/src/lib/product-queries.test.ts
+bun test apps/web/src/lib/state/fulcrum-store.test.ts apps/web/src/lib/product-queries.test.ts
 ```
 
 Expected RED: fails because web state/query helpers are compile-only skeletons that throw `not implemented` or return static/fake data. A missing-module import error is not enough; create throwing skeleton exports and rerun until the test fails on missing behavior.

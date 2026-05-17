@@ -52,7 +52,7 @@ bun test src/product-kernel/events.test.ts
 bun test src/product-kernel/search.test.ts
 bun test src/product-kernel/context.test.ts
 bun test src/product-kernel/jobs.test.ts
-bun test src/cli/product.test.ts src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test apps/cli/src/product.test.ts apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 bun run --bun tsc --noEmit
 bun run ci
 ```
@@ -76,8 +76,8 @@ fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 
 ## Web shell
 
-A SvelteKit 2 + shadcn-svelte web shell ships under `src/web/`, backed by the same PGlite product DB the CLI uses (`${FULCRUM_HOME}/state/product/db/main`). It surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail with cancel/retry), `/search` (full-text), and a global cmd+K command palette. Form actions return a uniform `ActionResult` shape that the layout's `Toaster` bridge surfaces as success/error toasts. Heavy queries stream via SvelteKit's `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill the pending branch.
+A SvelteKit 2 + shadcn-svelte web shell ships under `apps/web/`, backed by the same PGlite product DB the CLI uses (`${FULCRUM_HOME}/state/product/db/main`). It surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail with cancel/retry), `/search` (full-text), and a global cmd+K command palette. Form actions return a uniform `ActionResult` shape that the layout's `Toaster` bridge surfaces as success/error toasts. Heavy queries stream via SvelteKit's `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill the pending branch.
 
 ## Web shell testing
 
-Vitest + Playwright scaffold for the web shell under `src/web/`. Unit tests cover store logic, filtering, validation, and component rendering. E2E tests run against a temp PGlite instance and verify the user journey: create project → task → drag → search → toast. Run `bun run web:test` for units; `FULCRUM_RUN_E2E=1 bun run web:e2e` for e2e. See `src/web/README.md` for full invocation details.
+Vitest + Playwright scaffold for the web shell under `apps/web/`. Unit tests cover store logic, filtering, validation, and component rendering. E2E tests run against a temp PGlite instance and verify the user journey: create project → task → drag → search → toast. Run `bun run web:test` for units; `FULCRUM_RUN_E2E=1 bun run web:e2e` for e2e. See `apps/web/README.md` for full invocation details.

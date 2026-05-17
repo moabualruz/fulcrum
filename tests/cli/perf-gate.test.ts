@@ -62,7 +62,7 @@ describe("P14 perf gate — codegen", () => {
 // ─── 2. CLI module import latency ────────────────────────────────────────────
 
 describe("P14 perf gate — CLI module cold import", () => {
-  it("importing src/cli/index.ts in a fresh Bun subprocess takes <1s", async () => {
+  it("importing apps/cli/src/index.ts in a fresh Bun subprocess takes <1s", async () => {
     // A 1-second guard on cold import is generous; real target is 300ms for full
     // `fulcrum tasks list --json` invocation once binary is compiled.
     const ONE_SECOND = 1_000;
@@ -70,7 +70,7 @@ describe("P14 perf gate — CLI module cold import", () => {
       [
         "bun",
         "--eval",
-        "import('./src/cli/index.ts').then(() => process.exit(0)).catch(() => process.exit(1))",
+        "import('./apps/cli/src/index.ts').then(() => process.exit(0)).catch(() => process.exit(1))",
       ],
       ROOT,
     );
@@ -84,7 +84,7 @@ describe("P14 perf gate — CLI module cold import", () => {
   it("generated-domains.ts imports synchronously with no side effects", () => {
     const start = performance.now();
     // require() is synchronous — verifies no async top-level work
-    const mod = require("../../src/cli/generated-domains.ts");
+    const mod = require("../../apps/cli/src/generated-domains.ts");
     const elapsedMs = performance.now() - start;
 
     expect(Array.isArray(mod.GENERATED_DOMAIN_COMMANDS)).toBe(true);
@@ -98,7 +98,7 @@ describe("P14 perf gate — CLI module cold import", () => {
 
 describe("P14 perf gate — domain coverage completeness", () => {
   it("GENERATED_DOMAIN_COMMANDS contains all 15 P14 domains", () => {
-    const { GENERATED_DOMAIN_COMMANDS } = require("../../src/cli/generated-domains.ts");
+    const { GENERATED_DOMAIN_COMMANDS } = require("../../apps/cli/src/generated-domains.ts");
     const domains = GENERATED_DOMAIN_COMMANDS as readonly string[];
 
     // P14 canonical domain set (issue 13)
@@ -129,7 +129,7 @@ describe("P14 perf gate — domain coverage completeness", () => {
   });
 
   it("GENERATED_DOMAIN_COMMANDS has at least 15 entries (completeness lower bound)", () => {
-    const { GENERATED_DOMAIN_COMMANDS } = require("../../src/cli/generated-domains.ts");
+    const { GENERATED_DOMAIN_COMMANDS } = require("../../apps/cli/src/generated-domains.ts");
     expect((GENERATED_DOMAIN_COMMANDS as readonly string[]).length).toBeGreaterThanOrEqual(15);
   });
 });

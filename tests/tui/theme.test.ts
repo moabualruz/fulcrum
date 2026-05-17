@@ -7,7 +7,7 @@ import {
   checkTuiThemePreset,
   truncateAnsi,
   type TenantThemeSettings,
-} from "../../src/tui/theme/index.ts";
+} from "@fulcrum/tui/theme/index.ts";
 
 class MemorySettings implements TenantThemeSettings {
   readonly rows = new Map<string, string>();

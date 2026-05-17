@@ -20,7 +20,7 @@ Five caveman skills are installed: `caveman`, `caveman-commit`, `caveman-help`, 
 
 ## Default mode lock
 
-`lockCavemanUltra()` in `src/cli/install.ts` writes `~/.config/caveman/config.json` with `{"defaultMode": "ultra"}` — idempotent, skips if already set to `ultra`. Resolution order:
+`lockCavemanUltra()` in `apps/cli/src/install.ts` writes `~/.config/caveman/config.json` with `{"defaultMode": "ultra"}` — idempotent, skips if already set to `ultra`. Resolution order:
 
 1. Environment: `CAVEMAN_DEFAULT_MODE=<mode>` (wins)
 2. Config file: `~/.config/caveman/config.json` `defaultMode` field
@@ -96,4 +96,4 @@ Lint passes on either the original or compressed form (frontmatter rules apply t
 - `rules/AGENTS.md` §0b — output-style rule (caveman ultra always-on, articles dropped, code blocks / paths / commands / URLs preserved verbatim, opt-out recovery).
 - `HANDOVER.md` §6.1 — caveman integration checklist (completed).
 - `scripts/compress-with-caveman.sh` — wrapper script that calls caveman CLI to compress markdown files in-place.
-- `src/cli/install.ts` `installCaveman()` and `lockCavemanUltra()` — per-agent caveman install logic and default-mode lock.
+- `apps/cli/src/install.ts` `installCaveman()` and `lockCavemanUltra()` — per-agent caveman install logic and default-mode lock.

@@ -1,0 +1,34 @@
+{
+  "common": {
+    "save": "[ar]Save"
+  },
+  "settings": {
+    "i18n": {
+      "title": "[ar]Language"
+    },
+    "theme": {
+      "title": "[ar]Theme"
+    },
+    "telemetry": {
+      "title": "[ar]Telemetry"
+    },
+    "errors": {
+      "title": "[ar]Errors"
+    },
+    "backups": {
+      "title": "[ar]Backups"
+    },
+    "data": {
+      "title": "[ar]Data"
+    },
+    "secrets": {
+      "title": "[ar]Secrets"
+    },
+    "audit": {
+      "title": "[ar]Audit"
+    }
+  },
+  "tasks": {
+    "noDueDate": "[ar]No due date"
+  }
+}

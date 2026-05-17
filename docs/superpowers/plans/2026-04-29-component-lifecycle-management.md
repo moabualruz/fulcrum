@@ -67,13 +67,11 @@ hooks.tool-output-router
 skills.authored
 skills.upstream
 package.caveman
-package.repomix
 package.cloudflare
 package.superpowers
 mcp.deepwiki
 mcp.registry
 mcp.github
-mcp.repomix
 mcp.semgrep
 mcp.context7
 mcp.tavily
@@ -117,7 +115,6 @@ Current package matrix to preserve:
 | `skills.authored` | Claude Code plugin `fulcrum@fulcrum`; Gemini extension `fulcrum-skills` | Codex/OpenCode/Pi under `<agent>/skills/fulcrum/<name>/`; refresh Claude plugin cache/marketplace package after install |
 | `skills.upstream` | Per-entry `claude_plugin`; per-entry `vendor_canonical_agents` skip list | Vendor-placement skill copies into Codex/OpenCode/Pi and Gemini `~/.gemini/skills`; Pi may use frontmatter name when it differs from lock entry |
 | `package.caveman` | Claude Code plugin `caveman@caveman`; Gemini extension from `JuliusBrussee/caveman` | Codex/OpenCode/Pi direct official repo mirrors, including skills, rules, commands, hooks, scripts, metadata, assets, and shared caveman config `defaultMode: "ultra"` |
-| `package.repomix` | Claude Code plugins `repomix-mcp`, `repomix-commands`, `repomix-explorer` | Codex/Gemini/OpenCode/Pi mirrors for skills, MCP config, commands/prompts, rules, metadata, and explorer support; Pi records standalone explorer-agent as unsupported |
 | `package.cloudflare` | Claude Code plugin `cloudflare@cloudflare` | Full non-Claude package mirrors plus vendor-placement skills; package parity verifies commands, rules, MCP metadata, skills, metadata, and runtime assets |
 | `package.superpowers` | Claude Code plugin, Gemini extension, OpenCode plugin, Pi `pi install` packages when `pi` exists | Codex full package mirror; Pi full package mirror when `pi` is not available |
 
@@ -154,19 +151,15 @@ Completed in main:
 Next runtime wave — maximize parallelism:
   Worker F1: skills/authored + upstream filtering helpers
     Worktree: ~/.config/superpowers/worktrees/fulcrum/component-skills-vendor
-    Owns: src/cli/skills.ts, src/cli/upstream-skills.ts, related tests
-    Verifies: bun test src/cli/skills.test.ts src/cli/upstream-skills.test.ts
+    Owns: apps/cli/src/skills.ts, apps/cli/src/upstream-skills.ts, related tests
+    Verifies: bun test apps/cli/src/skills.test.ts apps/cli/src/upstream-skills.test.ts
 
-  Worker F2: vendor package helpers + Repomix package relocation
     Worktree: ~/.config/superpowers/worktrees/fulcrum/component-package-vendors
-    Owns: src/cli/vendor-packages.ts, src/cli/repomix-package.ts, src/cli/install.ts, src/cli/uninstall.ts, related tests
-    Verifies: bun test src/cli/vendor-packages.test.ts src/cli/repomix-package.test.ts src/cli/install.test.ts src/cli/uninstall.test.ts
 
   Worker F3: component vendor adapter + executor dispatch
     Worktree: ~/.config/superpowers/worktrees/fulcrum/component-vendor-adapter
     Depends on: F1/F2 helper signatures, but can start with failing tests and type-only imports while helpers are in flight.
     Owns: src/components/adapters/vendor.ts, src/components/adapters/vendor.test.ts, src/components/executor.ts
-    Verifies: bun test src/components/adapters/vendor.test.ts src/cli/skills.test.ts src/cli/upstream-skills.test.ts src/cli/vendor-packages.test.ts src/cli/repomix-package.test.ts src/cli/install.test.ts src/cli/uninstall.test.ts
 
   Parent in main while F workers run:
     Keep plan/checklist current, resolve helper-interface conflicts, review worker diffs, run focused integration tests after merge-back.
@@ -175,18 +168,18 @@ After Task 8 merge-back — reassess dependency graph:
   Parallel if independent:
     Worker S: component status + doctor read paths
       Worktree: ~/.config/superpowers/worktrees/fulcrum/component-status-doctor
-      Owns: src/cli/component.ts, src/cli/component.test.ts, src/cli/doctor.ts, src/cli/doctor.test.ts
-      Verifies: bun test src/cli/component.test.ts src/cli/doctor.test.ts
+      Owns: apps/cli/src/component.ts, apps/cli/src/component.test.ts, apps/cli/src/doctor.ts, apps/cli/src/doctor.test.ts
+      Verifies: bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts
 
     Worker D: docs alignment for component lifecycle
       Worktree: ~/.config/superpowers/worktrees/fulcrum/component-docs
       Owns: docs/user-guide.md, docs/developer-guide.md, HANDOVER.md
-      Verifies: docs grep checks plus bun run src/index.ts --help
+      Verifies: docs grep checks plus bun run apps/cli/src/main.ts --help
 
   Sequential after Task 8 and status interfaces settle:
     Worker W: install/uninstall compatibility wrappers
       Worktree: ~/.config/superpowers/worktrees/fulcrum/component-wrappers
-      Owns: src/cli/install.ts, src/cli/uninstall.ts, wrapper tests
+      Owns: apps/cli/src/install.ts, apps/cli/src/uninstall.ts, wrapper tests
       Verifies: wrapper tests, dry-run smoke, existing install/uninstall tests
 
 Final parent gate:
@@ -215,8 +208,6 @@ Final report: changed files, commands run, pass/fail output, unresolved risks, d
 ```bash
 fulcrum component list
 fulcrum component list --json
-fulcrum component info package.repomix
-fulcrum component info package.repomix --json
 ```
 
 Human list output:
@@ -229,7 +220,6 @@ Fulcrum components:
   skills.authored        Fulcrum-authored skills
   skills.upstream        pinned vendor skills
   package.caveman        caveman cross-agent output compression
-  package.repomix        Repomix plugin/package surfaces
   mcp.context7           Context7 MCP registry entry
 
 Use: fulcrum component info <id>
@@ -240,9 +230,7 @@ JSON list output:
 ```json
 [
   {
-    "id": "package.repomix",
     "kind": "package",
-    "description": "Repomix managed plugin, skill, agent, and MCP surfaces",
     "defaultProfile": true
   }
 ]
@@ -251,8 +239,6 @@ JSON list output:
 ### Planning
 
 ```bash
-fulcrum component plan install package.repomix --agent codex --json
-fulcrum component plan remove package.repomix --agent codex --json
 ```
 
 Plan JSON shape:
@@ -260,20 +246,15 @@ Plan JSON shape:
 ```json
 {
   "operation": "install",
-  "target": "package.repomix",
   "profile": null,
   "agents": ["codex"],
   "actions": [
     {
-      "id": "package.repomix:codex:skill-mirror",
-      "componentId": "package.repomix",
       "agentId": "codex",
       "kind": "directory-copy",
       "phase": "apply",
-      "target": "~/.codex/skills/repomix",
       "change": "create-or-update",
       "risk": "managed",
-      "reason": "Repomix vendor-derived skills are mirrored to Codex because Codex has no Repomix plugin primitive."
     }
   ],
   "warnings": []
@@ -283,8 +264,6 @@ Plan JSON shape:
 ### Applying
 
 ```bash
-fulcrum component install package.repomix --agent codex
-fulcrum component remove package.repomix --agent codex
 fulcrum component install profile.default
 fulcrum component install profile.verify-all
 ```
@@ -295,21 +274,17 @@ fulcrum component install profile.verify-all
 
 ```bash
 fulcrum component status
-fulcrum component status package.repomix
-fulcrum component status package.repomix --agent codex --json
 ```
 
 Status JSON shape:
 
 ```json
 {
-  "componentId": "package.repomix",
   "status": "installed",
   "surfaces": [
     {
       "agentId": "codex",
       "kind": "directory-copy",
-      "target": "~/.codex/skills/repomix",
       "state": "present",
       "managed": true,
       "modified": false
@@ -362,25 +337,24 @@ src/components/ledger.test.ts
 src/components/executor.test.ts
 src/components/adapters/hooks.test.ts
 src/components/adapters/mcp.test.ts
-src/cli/component.ts
-src/cli/component.test.ts
+apps/cli/src/component.ts
+apps/cli/src/component.test.ts
 ```
 
 Modify:
 
 ```text
-src/index.ts
-src/cli/install.ts
-src/cli/uninstall.ts
-src/cli/hooks.ts
-src/cli/mcp-cmd.ts
-src/cli/mcp-registry.ts
-src/cli/skills.ts
-src/cli/upstream-skills.ts
-src/cli/vendor-packages.ts
-src/cli/repomix-package.ts
-src/cli/doctor.ts
-src/cli/doctor.test.ts
+apps/cli/src/main.ts
+apps/cli/src/install.ts
+apps/cli/src/uninstall.ts
+apps/cli/src/hooks.ts
+apps/cli/src/mcp-cmd.ts
+apps/cli/src/mcp-registry.ts
+apps/cli/src/skills.ts
+apps/cli/src/upstream-skills.ts
+apps/cli/src/vendor-packages.ts
+apps/cli/src/doctor.ts
+apps/cli/src/doctor.test.ts
 docs/user-guide.md
 docs/developer-guide.md
 HANDOVER.md
@@ -578,7 +552,6 @@ describe("component catalog", () => {
     expect(ids).toContain("skills.authored");
     expect(ids).toContain("skills.upstream");
     expect(ids).toContain("package.caveman");
-    expect(ids).toContain("package.repomix");
     expect(ids).toContain("package.cloudflare");
     expect(ids).toContain("package.superpowers");
     expect(ids).toContain("mcp.deepwiki");
@@ -784,15 +757,9 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
     }],
   },
   {
-    id: "package.repomix",
     kind: "package",
-    description: "Repomix plugin/package surfaces",
     surfaces: [{
-      id: "package.repomix:install",
-      componentId: "package.repomix",
       kind: "vendor-command",
-      target: "agent-repomix-surfaces",
-      ownerKey: "fulcrum:package:repomix",
       removePolicy: "managed-only",
     }],
   },
@@ -1378,14 +1345,14 @@ git commit -m "feat(component): record managed state"
 ### Task 4: CLI For List, Info, And Plan
 
 **Files:**
-- Create: `src/cli/component.ts`
-- Create: `src/cli/component.test.ts`
-- Modify: `src/index.ts`
+- Create: `apps/cli/src/component.ts`
+- Create: `apps/cli/src/component.test.ts`
+- Modify: `apps/cli/src/main.ts`
 
 - [x] **Step 1: Write failing CLI tests**
 
 ```typescript
-// src/cli/component.test.ts
+// apps/cli/src/component.test.ts
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1415,13 +1382,10 @@ describe("fulcrum component CLI", () => {
     await run(["list", "--json"]);
     const parsed = JSON.parse(output.join("\n")) as Array<{ id: string }>;
     expect(parsed.some((entry) => entry.id === "profile.default")).toBe(true);
-    expect(parsed.some((entry) => entry.id === "package.repomix")).toBe(true);
   });
 
   test("info --json prints one component", async () => {
-    await run(["info", "package.repomix", "--json"]);
     const parsed = JSON.parse(output.join("\n")) as { id: string; surfaces: unknown[] };
-    expect(parsed.id).toBe("package.repomix");
     expect(parsed.surfaces.length).toBeGreaterThan(0);
   });
 
@@ -1439,15 +1403,15 @@ describe("fulcrum component CLI", () => {
 Run:
 
 ```bash
-bun test src/cli/component.test.ts
+bun test apps/cli/src/component.test.ts
 ```
 
-Expected: FAIL because `src/cli/component.ts` does not exist.
+Expected: FAIL because `apps/cli/src/component.ts` does not exist.
 
 - [x] **Step 3: Implement list/info/plan CLI**
 
 ```typescript
-// src/cli/component.ts
+// apps/cli/src/component.ts
 import { ALL_AGENT_IDS, type AgentId } from "./mcp-registry.ts";
 import { ALL_COMPONENTS, getComponent } from "../components/catalog.ts";
 import { planComponentOperation } from "../components/planner.ts";
@@ -1538,7 +1502,7 @@ export async function run(args: string[]): Promise<void> {
 }
 ```
 
-Update `src/index.ts`:
+Update `apps/cli/src/main.ts`:
 
 ```typescript
 case "component": {
@@ -1561,7 +1525,7 @@ Add help lines:
 Run:
 
 ```bash
-bun test src/cli/component.test.ts src/components/catalog.test.ts src/components/planner.test.ts
+bun test apps/cli/src/component.test.ts src/components/catalog.test.ts src/components/planner.test.ts
 ```
 
 Expected: PASS.
@@ -1569,7 +1533,7 @@ Expected: PASS.
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/cli/component.ts src/cli/component.test.ts src/index.ts
+git add apps/cli/src/component.ts apps/cli/src/component.test.ts apps/cli/src/main.ts
 git commit -m "feat(component): expose lifecycle planning cli"
 ```
 
@@ -1580,12 +1544,12 @@ git commit -m "feat(component): expose lifecycle planning cli"
 - Create: `src/components/executor.test.ts`
 - Create: `src/components/adapters/hooks.ts`
 - Create: `src/components/adapters/hooks.test.ts`
-- Modify: `src/cli/component.ts`
-- Modify: `src/cli/hooks.ts`
+- Modify: `apps/cli/src/component.ts`
+- Modify: `apps/cli/src/hooks.ts`
 
 - [x] **Step 1: Export reusable hook recipe operations**
 
-Before writing component adapter tests, expose these functions from `src/cli/hooks.ts`:
+Before writing component adapter tests, expose these functions from `apps/cli/src/hooks.ts`:
 
 ```typescript
 export async function enableHookRecipe(name: RecipeName, targetAgents: Set<AgentId>): Promise<void> {
@@ -1842,7 +1806,7 @@ export async function executeComponentPlan(plan: ComponentPlan, opts: ExecuteOpt
 
 - [x] **Step 7: Wire component install/remove/enable/disable CLI for hook components**
 
-In `src/cli/component.ts`, add:
+In `apps/cli/src/component.ts`, add:
 
 ```typescript
 async function cmdApply(operation: "install" | "remove" | "enable" | "disable", args: string[]): Promise<void> {
@@ -1868,7 +1832,7 @@ if (sub === "install" || sub === "remove" || sub === "enable" || sub === "disabl
 Run:
 
 ```bash
-bun test src/components/adapters/hooks.test.ts src/components/executor.test.ts src/cli/component.test.ts src/cli/hooks.test.ts
+bun test src/components/adapters/hooks.test.ts src/components/executor.test.ts apps/cli/src/component.test.ts apps/cli/src/hooks.test.ts
 ```
 
 Expected: PASS.
@@ -1876,7 +1840,7 @@ Expected: PASS.
 - [x] **Step 9: Commit**
 
 ```bash
-git add src/components/executor.ts src/components/executor.test.ts src/components/adapters/hooks.ts src/components/adapters/hooks.test.ts src/cli/component.ts src/cli/hooks.ts
+git add src/components/executor.ts src/components/executor.test.ts src/components/adapters/hooks.ts src/components/adapters/hooks.test.ts apps/cli/src/component.ts apps/cli/src/hooks.ts
 git commit -m "feat(component): execute hook lifecycle actions"
 ```
 
@@ -1886,8 +1850,8 @@ git commit -m "feat(component): execute hook lifecycle actions"
 - Create: `src/components/adapters/mcp.ts`
 - Create: `src/components/adapters/mcp.test.ts`
 - Modify: `src/components/executor.ts`
-- Modify: `src/cli/mcp-registry.ts`
-- Modify: `src/cli/mcp-cmd.ts`
+- Modify: `apps/cli/src/mcp-registry.ts`
+- Modify: `apps/cli/src/mcp-cmd.ts`
 
 - [x] **Step 1: Write failing MCP adapter tests**
 
@@ -2014,7 +1978,7 @@ if (action.kind === "mcp-registry-entry" || action.kind === "mcp-agent-config") 
 Run:
 
 ```bash
-bun test src/components/adapters/mcp.test.ts src/cli/mcp-registry.test.ts src/cli/mcp-cmd.test.ts
+bun test src/components/adapters/mcp.test.ts apps/cli/src/mcp-registry.test.ts apps/cli/src/mcp-cmd.test.ts
 ```
 
 Expected: PASS.
@@ -2022,7 +1986,7 @@ Expected: PASS.
 - [x] **Step 5: Commit**
 
 ```bash
-git add src/components/adapters/mcp.ts src/components/adapters/mcp.test.ts src/components/executor.ts src/cli/mcp-registry.ts src/cli/mcp-cmd.ts
+git add src/components/adapters/mcp.ts src/components/adapters/mcp.test.ts src/components/executor.ts apps/cli/src/mcp-registry.ts apps/cli/src/mcp-cmd.ts
 git commit -m "feat(component): manage mcp lifecycle actions"
 ```
 
@@ -2034,19 +1998,19 @@ git commit -m "feat(component): manage mcp lifecycle actions"
 - Create: `src/components/adapters/sentinel.test.ts`
 - Create: `src/components/adapters/files.test.ts`
 - Modify: `src/components/executor.ts`
-- Modify: `src/cli/install.ts`
-- Modify: `src/cli/uninstall.ts`
+- Modify: `apps/cli/src/install.ts`
+- Modify: `apps/cli/src/uninstall.ts`
 
 - [x] **Step 1: Export reusable rules and policy helpers**
 
-From `src/cli/install.ts`, export:
+From `apps/cli/src/install.ts`, export:
 
 ```typescript
 export async function installRulesBlocks(home: string, dryRun = false): Promise<void>
 export async function installToolOutputPolicy(dryRun = false): Promise<void>
 ```
 
-From `src/cli/uninstall.ts`, export:
+From `apps/cli/src/uninstall.ts`, export:
 
 ```typescript
 export async function removeRulesBlocks(home: string): Promise<void>
@@ -2181,7 +2145,7 @@ if (action.kind === "policy-seed") {
 Run:
 
 ```bash
-bun test src/components/adapters/sentinel.test.ts src/components/adapters/files.test.ts src/cli/install.test.ts src/cli/uninstall.test.ts
+bun test src/components/adapters/sentinel.test.ts src/components/adapters/files.test.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts
 ```
 
 Expected: PASS.
@@ -2189,7 +2153,7 @@ Expected: PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/components/adapters/sentinel.ts src/components/adapters/files.ts src/components/adapters/sentinel.test.ts src/components/adapters/files.test.ts src/components/executor.ts src/cli/install.ts src/cli/uninstall.ts
+git add src/components/adapters/sentinel.ts src/components/adapters/files.ts src/components/adapters/sentinel.test.ts src/components/adapters/files.test.ts src/components/executor.ts apps/cli/src/install.ts apps/cli/src/uninstall.ts
 git commit -m "feat(component): manage rules and policy surfaces"
 ```
 
@@ -2199,12 +2163,11 @@ git commit -m "feat(component): manage rules and policy surfaces"
 - Create: `src/components/adapters/vendor.ts`
 - Create: `src/components/adapters/vendor.test.ts`
 - Modify: `src/components/executor.ts`
-- Modify: `src/cli/skills.ts`
-- Modify: `src/cli/upstream-skills.ts`
-- Modify: `src/cli/vendor-packages.ts`
-- Modify: `src/cli/repomix-package.ts`
-- Modify: `src/cli/install.ts`
-- Modify: `src/cli/uninstall.ts`
+- Modify: `apps/cli/src/skills.ts`
+- Modify: `apps/cli/src/upstream-skills.ts`
+- Modify: `apps/cli/src/vendor-packages.ts`
+- Modify: `apps/cli/src/install.ts`
+- Modify: `apps/cli/src/uninstall.ts`
 
 - [x] **Step 1: Write failing first-party-vs-mirror contract tests**
 
@@ -2264,37 +2227,24 @@ describe("vendor component adapter", () => {
     expect(classifyVendorComponent("skills.authored")).toBe("skills-authored");
     expect(classifyVendorComponent("skills.upstream")).toBe("skills-upstream");
     expect(classifyVendorComponent("package.caveman")).toBe("caveman");
-    expect(classifyVendorComponent("package.repomix")).toBe("repomix");
     expect(classifyVendorComponent("package.cloudflare")).toBe("cloudflare");
     expect(classifyVendorComponent("package.superpowers")).toBe("superpowers");
   });
 
-  test("Repomix package installs Claude plugins and mirrors non-Claude surfaces", async () => {
     await mkdir(join(home, ".claude"), { recursive: true });
     await mkdir(join(home, ".codex"), { recursive: true });
     await mkdir(join(home, ".gemini"), { recursive: true });
     await mkdir(join(home, ".config", "opencode"), { recursive: true });
     await mkdir(join(home, ".pi", "agent"), { recursive: true });
-    await mkdir(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands"), { recursive: true });
-    await mkdir(join(home, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents"), { recursive: true });
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-local.md"), "---\ndescription: Pack local\n---\n\nRun local repomix.\n");
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-commands", "1.0.2", "commands", "pack-remote.md"), "---\ndescription: Pack remote\n---\n\nRun remote repomix.\n");
-    await writeFile(join(home, ".claude", "plugins", "cache", "repomix", "repomix-explorer", "1.1.0", "agents", "explorer.md"), "---\nname: explorer\n---\n\nExplore with repomix.\n");
 
     const whichSpy = spyOn(proc, "which").mockImplementation(async (cmd: string) => cmd === "claude" ? "/usr/local/bin/claude" : null);
     const runSpy = spyOn(proc, "run").mockResolvedValue({ exit: 0, stdout: "", stderr: "" });
     try {
-      await applyVendorAction(action("package.repomix"), false);
     } finally {
       whichSpy.mockRestore();
       runSpy.mockRestore();
     }
 
-    expect(runSpy.mock.calls.map((call) => call[0])).toContainEqual(["claude", "plugin", "install", "repomix-mcp@repomix"]);
-    expect(await readFile(join(home, ".codex", "skills", "repomix-pack-local", "SKILL.md"), "utf8")).toContain("Run local repomix.");
-    expect(await readFile(join(home, ".gemini", "extensions", "repomix", "gemini-extension.json"), "utf8")).toContain("\"repomix\"");
-    expect(await readFile(join(home, ".config", "opencode", "agents", "repomix-explorer.md"), "utf8")).toContain("Explore with repomix.");
-    expect(await readFile(join(home, ".pi", "agent", "skills", "repomix-explorer", "SKILL.md"), "utf8")).toContain("Explore with repomix.");
   });
 
   test("Cloudflare package uses Claude plugin and mirrors only Cloudflare upstream skills to non-Claude agents", async () => {
@@ -2319,9 +2269,6 @@ describe("vendor component adapter", () => {
       'review_due = "2026-07-27"',
       'vendor_canonical_agents = ["claude-code"]',
       "",
-      "[skills.graphify]",
-      'source = "https://github.com/safishamsi/graphify"',
-      'subpath = "graphify/skill.md"',
       'ref = "main"',
       'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
       'license = "MIT"',
@@ -2347,7 +2294,6 @@ describe("vendor component adapter", () => {
 
     expect(logs.some((line) => line.includes("claude plugin install cloudflare@cloudflare"))).toBe(true);
     expect(logs.some((line) => line.includes("wrangler"))).toBe(true);
-    expect(logs.some((line) => line.includes("graphify"))).toBe(false);
     expect(await Bun.file(join(home, ".claude", "skills", "wrangler")).exists()).toBe(false);
   });
 
@@ -2385,41 +2331,33 @@ Expected: FAIL because `src/components/adapters/vendor.ts` does not exist and pa
 Ensure these functions are exported and stable:
 
 ```typescript
-// src/cli/skills.ts
+// apps/cli/src/skills.ts
 export async function syncSkills(opts?: { dryRun?: boolean }): Promise<void>
 export async function removeAuthoredSkills(opts?: { dryRun?: boolean }): Promise<void>
 
-// src/cli/upstream-skills.ts
+// apps/cli/src/upstream-skills.ts
 export async function syncUpstreamSkills(opts?: { dryRun?: boolean; updatePins?: boolean }): Promise<void>
 export async function syncUpstreamSkillsBySource(source: string, opts?: { dryRun?: boolean; updatePins?: boolean; lockPath?: string }): Promise<void>
 export async function syncUpstreamSkillsByNames(names: readonly string[], opts?: { dryRun?: boolean; updatePins?: boolean; lockPath?: string }): Promise<void>
 export async function removeUpstreamSkills(opts?: { dryRun?: boolean; source?: string; names?: readonly string[] }): Promise<void>
 
-// src/cli/vendor-packages.ts
+// apps/cli/src/vendor-packages.ts
 export async function installCloudflarePackage(opts?: { dryRun?: boolean }): Promise<void>
 export async function uninstallCloudflarePackage(opts?: { dryRun?: boolean }): Promise<void>
 export async function installSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 export async function uninstallSuperpowersPackage(opts?: { dryRun?: boolean }): Promise<void>
 
-// src/cli/repomix-package.ts
-export async function installRepomixClaudePlugins(opts?: { dryRun?: boolean }): Promise<void>
-export async function uninstallRepomixClaudePlugins(opts?: { dryRun?: boolean }): Promise<void>
-export async function installRepomixPackageMirrors(opts?: { dryRun?: boolean }): Promise<void>
-export async function uninstallRepomixPackageMirrors(opts?: { dryRun?: boolean }): Promise<void>
-
-// src/cli/install.ts
+// apps/cli/src/install.ts
 export async function installCaveman(home: string, opts?: { dryRun?: boolean }): Promise<void>
 
-// src/cli/uninstall.ts
+// apps/cli/src/uninstall.ts
 export async function removeCavemanCopies(home: string, opts?: { dryRun?: boolean }): Promise<void>
 ```
-
-Keep current aggregate functions by calling these exported units. Move Repomix Claude plugin installation/removal out of private install/uninstall helpers into `src/cli/repomix-package.ts` so `package.repomix` can install/remove the full Repomix package surface without requiring `mcp.registry`.
 
 - [x] **Step 4: Add upstream filtering tests**
 
 ```typescript
-// src/cli/upstream-skills.test.ts
+// apps/cli/src/upstream-skills.test.ts
 import { syncUpstreamSkillsBySource } from "./upstream-skills.ts";
 
 test("syncUpstreamSkillsBySource installs only matching source entries", async () => {
@@ -2438,9 +2376,6 @@ test("syncUpstreamSkillsBySource installs only matching source entries", async (
     'review_due = "2026-07-27"',
     'vendor_canonical_agents = ["claude-code"]',
     "",
-    "[skills.graphify]",
-    'source = "https://github.com/safishamsi/graphify"',
-    'subpath = "graphify/skill.md"',
     'ref = "main"',
     'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
     'license = "MIT"',
@@ -2464,7 +2399,6 @@ test("syncUpstreamSkillsBySource installs only matching source entries", async (
   }
 
   expect(logs.some((line) => line.includes("wrangler"))).toBe(true);
-  expect(logs.some((line) => line.includes("graphify"))).toBe(false);
 });
 ```
 
@@ -2487,18 +2421,12 @@ import {
   uninstallSuperpowersPackage,
 } from "../../cli/vendor-packages.ts";
 import {
-  installRepomixClaudePlugins,
-  installRepomixPackageMirrors,
-  uninstallRepomixClaudePlugins,
-  uninstallRepomixPackageMirrors,
-} from "../../cli/repomix-package.ts";
 import type { ComponentAction } from "../types.ts";
 
 type VendorComponent =
   | "skills-authored"
   | "skills-upstream"
   | "caveman"
-  | "repomix"
   | "cloudflare"
   | "superpowers";
 
@@ -2506,7 +2434,6 @@ export function classifyVendorComponent(componentId: string): VendorComponent {
   if (componentId === "skills.authored") return "skills-authored";
   if (componentId === "skills.upstream") return "skills-upstream";
   if (componentId === "package.caveman") return "caveman";
-  if (componentId === "package.repomix") return "repomix";
   if (componentId === "package.cloudflare") return "cloudflare";
   if (componentId === "package.superpowers") return "superpowers";
   throw new Error(`unsupported vendor component: ${componentId}`);
@@ -2521,14 +2448,9 @@ export async function applyVendorAction(action: ComponentAction, dryRun: boolean
   if (kind === "caveman") return installing
     ? installCaveman(process.env["HOME"] ?? "", { dryRun })
     : removeCavemanCopies(process.env["HOME"] ?? "", { dryRun });
-  if (kind === "repomix") {
     if (installing) {
-      await installRepomixClaudePlugins({ dryRun });
-      await installRepomixPackageMirrors({ dryRun });
       return;
     }
-    await uninstallRepomixClaudePlugins({ dryRun });
-    await uninstallRepomixPackageMirrors({ dryRun });
     return;
   }
   if (kind === "cloudflare") {
@@ -2560,15 +2482,13 @@ if (action.kind === "skill-sync" || action.kind === "upstream-skill-sync" || act
 Run:
 
 ```bash
-bun run --bun src/index.ts component install package.repomix --agent codex --dry-run
-bun run --bun src/index.ts component install package.cloudflare --all-agents --dry-run
-bun run --bun src/index.ts component remove package.superpowers --agent pi --dry-run
+bun run --bun apps/cli/src/main.ts component install package.cloudflare --all-agents --dry-run
+bun run --bun apps/cli/src/main.ts component remove package.superpowers --agent pi --dry-run
 ```
 
 Expected:
 
 ```text
-DRY RUN package.repomix:install:codex:install create-or-update vendor-command agent-repomix-surfaces
 DRY RUN package.cloudflare:install:claude-code:install create-or-update vendor-command agent-cloudflare-surfaces
 DRY RUN package.superpowers:install:pi:remove remove vendor-command agent-superpowers-surfaces
 ```
@@ -2580,7 +2500,6 @@ The exact action IDs may differ if the planner uses surface IDs, but output must
 Run:
 
 ```bash
-bun test src/components/adapters/vendor.test.ts src/cli/skills.test.ts src/cli/upstream-skills.test.ts src/cli/vendor-packages.test.ts src/cli/repomix-package.test.ts src/cli/install.test.ts src/cli/uninstall.test.ts
 ```
 
 Expected: PASS.
@@ -2588,21 +2507,20 @@ Expected: PASS.
 - [x] **Step 8: Commit**
 
 ```bash
-git add src/components/adapters/vendor.ts src/components/adapters/vendor.test.ts src/components/executor.ts src/cli/skills.ts src/cli/upstream-skills.ts src/cli/vendor-packages.ts src/cli/repomix-package.ts src/cli/install.ts src/cli/uninstall.ts
 git commit -m "feat(component): manage skills and vendor packages"
 ```
 
 ### Task 9: Status Command And Doctor Integration
 
 **Files:**
-- Modify: `src/cli/component.ts`
-- Modify: `src/cli/component.test.ts`
-- Modify: `src/cli/doctor.ts`
-- Modify: `src/cli/doctor.test.ts`
+- Modify: `apps/cli/src/component.ts`
+- Modify: `apps/cli/src/component.test.ts`
+- Modify: `apps/cli/src/doctor.ts`
+- Modify: `apps/cli/src/doctor.test.ts`
 
 - [x] **Step 1: Write failing status CLI test**
 
-Add to `src/cli/component.test.ts`:
+Add to `apps/cli/src/component.test.ts`:
 
 ```typescript
 test("status --json reports ledger component state", async () => {
@@ -2619,7 +2537,7 @@ test("status --json reports ledger component state", async () => {
 
 - [x] **Step 2: Implement status**
 
-In `src/cli/component.ts`:
+In `apps/cli/src/component.ts`:
 
 ```typescript
 async function cmdStatus(args: string[]): Promise<void> {
@@ -2658,7 +2576,7 @@ if (sub === "status") return cmdStatus(args.slice(1));
 
 - [x] **Step 3: Write failing doctor test**
 
-Add a doctor report assertion in `src/cli/doctor.test.ts`:
+Add a doctor report assertion in `apps/cli/src/doctor.test.ts`:
 
 ```typescript
 test("doctor reports component lifecycle state", async () => {
@@ -2692,7 +2610,7 @@ Build it by opening `ComponentLedger`, counting catalog entries and installed le
 Run:
 
 ```bash
-bun test src/cli/component.test.ts src/cli/doctor.test.ts
+bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts
 ```
 
 Expected: PASS.
@@ -2700,21 +2618,21 @@ Expected: PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/cli/component.ts src/cli/component.test.ts src/cli/doctor.ts src/cli/doctor.test.ts
+git add apps/cli/src/component.ts apps/cli/src/component.test.ts apps/cli/src/doctor.ts apps/cli/src/doctor.test.ts
 git commit -m "feat(component): report managed lifecycle state"
 ```
 
 ### Task 10: Compatibility Wrappers For Install And Uninstall
 
 **Files:**
-- Modify: `src/cli/install.ts`
-- Modify: `src/cli/install.test.ts`
-- Modify: `src/cli/uninstall.ts`
-- Modify: `src/cli/uninstall.test.ts`
+- Modify: `apps/cli/src/install.ts`
+- Modify: `apps/cli/src/install.test.ts`
+- Modify: `apps/cli/src/uninstall.ts`
+- Modify: `apps/cli/src/uninstall.test.ts`
 
 - [x] **Step 1: Write failing install wrapper test**
 
-Add to `src/cli/install.test.ts`:
+Add to `apps/cli/src/install.test.ts`:
 
 ```typescript
 test("install dry-run delegates to component default profile when enabled", async () => {
@@ -2734,7 +2652,7 @@ During the transition this can first assert a compatibility note, then tighten t
 
 - [x] **Step 2: Implement wrapper after all adapters pass**
 
-In `src/cli/install.ts`, after parsing flags, replace procedural body with:
+In `apps/cli/src/install.ts`, after parsing flags, replace procedural body with:
 
 ```typescript
 const { planComponentOperation } = await import("../components/planner.ts");
@@ -2776,7 +2694,7 @@ Map:
 
 - [x] **Step 3: Write failing uninstall wrapper test**
 
-Add to `src/cli/uninstall.test.ts`:
+Add to `apps/cli/src/uninstall.test.ts`:
 
 ```typescript
 test("uninstall dry-run delegates to component default profile removal", async () => {
@@ -2794,7 +2712,7 @@ test("uninstall dry-run delegates to component default profile removal", async (
 
 - [x] **Step 4: Implement uninstall wrapper**
 
-In `src/cli/uninstall.ts`, after parsing flags:
+In `apps/cli/src/uninstall.ts`, after parsing flags:
 
 ```typescript
 const { planComponentOperation } = await import("../components/planner.ts");
@@ -2821,7 +2739,7 @@ Preserve current default: caveman remains installed unless `--include-caveman`.
 Run:
 
 ```bash
-bun test src/cli/install.test.ts src/cli/uninstall.test.ts src/components/planner.test.ts src/components/executor.test.ts
+bun test apps/cli/src/install.test.ts apps/cli/src/uninstall.test.ts src/components/planner.test.ts src/components/executor.test.ts
 ```
 
 Expected: PASS.
@@ -2829,7 +2747,7 @@ Expected: PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-git add src/cli/install.ts src/cli/install.test.ts src/cli/uninstall.ts src/cli/uninstall.test.ts src/components/planner.ts src/components/executor.ts
+git add apps/cli/src/install.ts apps/cli/src/install.test.ts apps/cli/src/uninstall.ts apps/cli/src/uninstall.test.ts src/components/planner.ts src/components/executor.ts
 git commit -m "refactor(component): route install through lifecycle engine"
 ```
 
@@ -2927,10 +2845,6 @@ Use `fulcrum install` for normal default setup. Use `fulcrum component` when you
 
 ```bash
 fulcrum component list
-fulcrum component info package.repomix
-fulcrum component status package.repomix --json
-fulcrum component install package.repomix --agent codex
-fulcrum component remove package.repomix --agent codex --dry-run
 fulcrum component disable mcp.github --all-agents
 fulcrum component enable hooks.format --agent gemini
 ```
@@ -2954,7 +2868,6 @@ Adapters own surface-specific behavior:
 - `adapters/mcp.ts` delegates to MCP registry and DeepWiki helpers.
 - `adapters/sentinel.ts` manages rules sentinel blocks.
 - `adapters/files.ts` manages policy files and remove-vs-purge behavior.
-- `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
 Add new managed parts by adding a catalog entry, adapter support if the surface kind is new, planner tests, executor tests, and doctor status coverage.
 ```
@@ -3006,7 +2919,7 @@ bun test \
   src/components/adapters/files.test.ts \
   src/components/adapters/vendor.test.ts \
   src/components/remove-safety.test.ts \
-  src/cli/component.test.ts
+  apps/cli/src/component.test.ts
 ```
 
 Expected: PASS.
@@ -3015,16 +2928,15 @@ Expected: PASS.
 
 ```bash
 bun test \
-  src/cli/install.test.ts \
-  src/cli/uninstall.test.ts \
-  src/cli/hooks.test.ts \
-  src/cli/mcp-registry.test.ts \
-  src/cli/mcp-cmd.test.ts \
-  src/cli/skills.test.ts \
-  src/cli/upstream-skills.test.ts \
-  src/cli/vendor-packages.test.ts \
-  src/cli/repomix-package.test.ts \
-  src/cli/doctor.test.ts
+  apps/cli/src/install.test.ts \
+  apps/cli/src/uninstall.test.ts \
+  apps/cli/src/hooks.test.ts \
+  apps/cli/src/mcp-registry.test.ts \
+  apps/cli/src/mcp-cmd.test.ts \
+  apps/cli/src/skills.test.ts \
+  apps/cli/src/upstream-skills.test.ts \
+  apps/cli/src/vendor-packages.test.ts \
+  apps/cli/src/doctor.test.ts
 ```
 
 Expected: PASS.
@@ -3049,11 +2961,11 @@ Expected:
 - [x] **Step 4: Run dry-run smoke**
 
 ```bash
-bun run src/index.ts component list --json
-bun run src/index.ts component plan install profile.default --json
-bun run src/index.ts component install hooks.format --agent codex --dry-run
-bun run src/index.ts install --dry-run
-bun run src/index.ts uninstall --dry-run
+bun run apps/cli/src/main.ts component list --json
+bun run apps/cli/src/main.ts component plan install profile.default --json
+bun run apps/cli/src/main.ts component install hooks.format --agent codex --dry-run
+bun run apps/cli/src/main.ts install --dry-run
+bun run apps/cli/src/main.ts uninstall --dry-run
 ```
 
 Expected:

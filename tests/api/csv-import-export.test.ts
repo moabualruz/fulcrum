@@ -1,105 +1,110 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { createPublicApiRouter } from "../../src/api/hono.ts";
+import "reflect-metadata";
 
-const ORG_ID = "11111111-1111-4111-8111-111111111111";
+import { describe, expect, it } from "bun:test";
+import { UnprocessableEntityException } from "@nestjs/common";
 
-function req(method: string, path: string, body?: unknown): Request {
-  const headers: Record<string, string> = {
-    Authorization: `Bearer test-jwt:${ORG_ID}`,
-  };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+import { exportGenericCsv } from "../../services/integration-hub/src/application/external-connectors/csv.ts";
+import { createTaskCsvApplication } from "@work-management/application/tasks/csv.ts";
+import {
+  TaskPublicApiController,
+  TaskPublicApiService,
+} from "@work-management/interface/http/task-public-api.controller.ts";
 
-  return new Request(`http://localhost${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+
+function controller(): TaskPublicApiController {
+  return new TaskPublicApiController(
+    new TaskPublicApiService({
+      featuresEnv: "public-api,import-csv,export-csv",
+      csvApplication: createTaskCsvApplication(),
+    }),
+  );
 }
 
 describe("P13#14 CSV import/export for tasks", () => {
-  let originalFeatures: string | undefined;
-
-  beforeEach(() => {
-    originalFeatures = process.env["FULCRUM_FEATURES"];
-    process.env["FULCRUM_FEATURES"] = "public-api,import-csv,export-csv";
-  });
-
-  afterEach(() => {
-    if (originalFeatures === undefined) {
-      delete process.env["FULCRUM_FEATURES"];
-    } else {
-      process.env["FULCRUM_FEATURES"] = originalFeatures;
-    }
-  });
-
   it("exports tasks to CSV with download headers", async () => {
-    const app = createPublicApiRouter();
+    const api = controller();
+    const headers = new Map<string, string>();
 
-    await app.fetch(req("POST", "/api/v1/tasks", {
-      orgId: ORG_ID,
-      title: "CSV export task",
-      status: "in_progress",
-    }));
+    await api.importTasksCsv({
+      entity: "tasks",
+      projectId: PROJECT_ID,
+      csv: "external_id,title,status\nEXT-0,CSV export task,in_progress",
+    });
+    const csv = await api.exportTasksCsv(
+      { entity: "tasks", projectId: PROJECT_ID },
+      { setHeader: (name, value) => headers.set(name, value) },
+    );
 
-    const res = await app.fetch(req("GET", `/api/v1/connectors/export-csv?entity=tasks&projectId=${ORG_ID}`));
-
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("text/csv");
-    expect(res.headers.get("content-disposition")).toContain("attachment; filename=\"tasks.csv\"");
-
-    const csv = await res.text();
+    expect(headers.get("content-type")).toContain("text/csv");
+    expect(headers.get("content-disposition")).toContain('attachment; filename="tasks.csv"');
     expect(csv.split("\n")[0]).toBe("id,external_id,title,status,created_at");
     expect(csv).toContain("CSV export task");
     expect(csv).toContain("in_progress");
   });
 
   it("imports tasks from CSV and skips duplicate external IDs", async () => {
-    const app = createPublicApiRouter();
+    const api = controller();
     const csv = [
       "external_id,title,status",
       "EXT-1,Imported one,todo",
       "EXT-2,Imported two,done",
     ].join("\n");
 
-    const first = await app.fetch(req("POST", "/api/v1/connectors/import-csv", {
-      entity: "tasks",
-      projectId: ORG_ID,
-      csv,
-    }));
-    const second = await app.fetch(req("POST", "/api/v1/connectors/import-csv", {
-      entity: "tasks",
-      projectId: ORG_ID,
-      csv,
-    }));
+    const first = await api.importTasksCsv({ entity: "tasks", projectId: PROJECT_ID, csv });
+    const second = await api.importTasksCsv({ entity: "tasks", projectId: PROJECT_ID, csv });
 
-    expect(first.status).toBe(200);
-    expect(await first.json()).toEqual({ created: 2, skipped: 0, errors: [] });
-    expect(second.status).toBe(200);
-    expect(await second.json()).toEqual({ created: 0, skipped: 2, errors: [] });
+    expect(first).toEqual({ created: 2, skipped: 0, errors: [] });
+    expect(second).toEqual({ created: 0, skipped: 2, errors: [] });
 
-    const exported = await app.fetch(req("GET", `/api/v1/connectors/export-csv?entity=tasks&projectId=${ORG_ID}`));
-    const text = await exported.text();
-    expect(text).toContain("EXT-1");
-    expect(text).toContain("Imported one");
-    expect(text).toContain("EXT-2");
-    expect(text).toContain("Imported two");
+    const exported = await api.exportTasksCsv({ entity: "tasks", projectId: PROJECT_ID });
+    expect(exported).toContain("EXT-1");
+    expect(exported).toContain("Imported one");
+    expect(exported).toContain("EXT-2");
+    expect(exported).toContain("Imported two");
   });
 
   it("returns validation errors for malformed CSV", async () => {
-    const app = createPublicApiRouter();
+    const api = controller();
 
-    const res = await app.fetch(req("POST", "/api/v1/connectors/import-csv", {
-      entity: "tasks",
-      projectId: ORG_ID,
-      csv: "external_id,status\nEXT-1,todo",
-    }));
+    try {
+      await api.importTasksCsv({
+        entity: "tasks",
+        projectId: PROJECT_ID,
+        csv: "external_id,status\nEXT-1,todo",
+      });
+      throw new Error("Expected malformed CSV to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).getResponse()).toEqual({
+        error: {
+          code: "VALIDATION_ERROR",
+          columns: ["title"],
+        },
+      });
+    }
+  });
 
-    expect(res.status).toBe(422);
-    expect(await res.json()).toEqual({
-      error: {
-        code: "VALIDATION_ERROR",
-        columns: ["title"],
-      },
-    });
+  it("redacts credential-like CSV columns with the shared export policy", () => {
+    const csv = exportGenericCsv(
+      [
+        {
+          id: "cred-1",
+          name: "openai",
+          encrypted_value: "ciphertext",
+          token: "tok-secret",
+          secret: "raw-secret",
+          password: "pw-secret",
+        },
+      ],
+      ["id", "name", "encrypted_value", "token", "secret", "password"],
+    );
+
+    expect(csv.split("\n")[0]).toBe("id,name");
+    expect(csv).toContain("openai");
+    expect(csv).not.toContain("ciphertext");
+    expect(csv).not.toContain("tok-secret");
+    expect(csv).not.toContain("raw-secret");
+    expect(csv).not.toContain("pw-secret");
   });
 });

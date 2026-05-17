@@ -49,7 +49,7 @@ describe("CLI codegen", () => {
     const outDir = await mkdtemp(join(tmpdir(), "fulcrum-codegen-snapshot-"));
     try {
       await generateCliFiles({
-        routerPath: join(root, "src/server/trpc/router.ts"),
+        routerPath: join(root, "apps/server/src/trpc/router.ts"),
         outDir,
         useAst: true,
       });
@@ -66,7 +66,7 @@ describe("CLI codegen", () => {
     const first = await mkdtemp(join(tmpdir(), "fulcrum-codegen-first-"));
     const second = await mkdtemp(join(tmpdir(), "fulcrum-codegen-second-"));
     try {
-      const routerPath = join(root, "src/server/trpc/router.ts");
+      const routerPath = join(root, "apps/server/src/trpc/router.ts");
       await generateCliFiles({ routerPath, outDir: first, useAst: true });
       await generateCliFiles({ routerPath, outDir: second, useAst: true });
 
@@ -81,13 +81,13 @@ describe("CLI codegen", () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-codegen-docs-"));
     try {
       await generateCliFiles({
-        routerPath: join(root, "src/server/trpc/router.ts"),
+        routerPath: join(root, "apps/server/src/trpc/router.ts"),
         outDir: scratch,
         useAst: true,
       });
 
       const generated = await readFile(join(scratch, "docs.ts"), "utf8");
-      const committed = await readFile(join(root, "src/cli/generated/docs.ts"), "utf8");
+      const committed = await readFile(join(root, "apps/cli/src/generated/docs.ts"), "utf8");
       expect(committed).toBe(generated);
     } finally {
       await rm(scratch, { recursive: true, force: true });
@@ -98,7 +98,7 @@ describe("CLI codegen", () => {
     const outDir = await mkdtemp(join(tmpdir(), "fulcrum-codegen-imported-"));
     try {
       await generateCliFiles({
-        routerPath: join(root, "src/server/trpc/router.ts"),
+        routerPath: join(root, "apps/server/src/trpc/router.ts"),
         outDir,
         useAst: true,
       });

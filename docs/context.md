@@ -55,12 +55,10 @@ Each agent own primary context file. See [agents.md](agents.md) for per-agent pa
 
 Every behavioral rule lives in `rules/AGENTS.md` (compressed; `rules/AGENTS.original.md` is verbose source). `fulcrum install` splices verbatim into every detected agent's primary rules file inside `<!-- BEGIN FULCRUM RULES --> … <!-- END FULCRUM RULES -->` sentinel block.
 
-Vendor installers (e.g. `graphify install`) may write rules directly into same file — creates duplicates. `fulcrum init` (via `runVendorIntegrations`) strips known vendor rule blocks outside FULCRUM sentinel after vendor commands run. Vendor hooks/settings files (PreToolUse, `.codex/hooks.json`) preserved — only rule TEXT block removed.
-
 **Rule ownership:**
 - Behavioral rule text → `rules/AGENTS.md` (single source of truth)
 - Hook registrations → vendor settings files (managed by vendor CLI)
-- Sentinel splice → `src/cli/install.ts` (`spliceSentinel`)
-- Vendor block strip → `src/cli/install.ts` (`stripVendorRuleBlocks`), called from `src/cli/init-vendor.ts`
+- Sentinel splice → `apps/cli/src/install.ts` (`spliceSentinel`)
+- Vendor block strip → `apps/cli/src/install.ts` (`stripVendorRuleBlocks`), called from `apps/cli/src/init-vendor.ts`
 
 **Adding new vendor rule:** append to `rules/AGENTS.original.md` §12, run compress, add heading string to `VENDOR_RULE_HEADINGS` in `install.ts`.

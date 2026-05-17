@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { TuiApp, type TuiCaller } from "../../src/tui/index.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { TuiApp, type TuiCaller } from "@fulcrum/tui/index.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 describe("TuiApp bell counter poll", () => {
   test("status bar loads notify.unreadCount and polls every 60 seconds", async () => {

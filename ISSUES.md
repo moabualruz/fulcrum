@@ -143,7 +143,7 @@ Evidence:
 
 - `fulcrum install` currently splices rules, installs caveman, syncs authored skills, syncs upstream skills, installs vendor capability packages, and registers MCPs unless flags opt out.
 - `~/.codex/config.toml` now has many Fulcrum MCP blocks.
-- After moving Fulcrum authored skills away, Codex still sees 43 skill metadata files from system, superpowers, caveman, Cloudflare, Semgrep, Repomix, Playwright, and plugin cache sources.
+- After moving Fulcrum authored skills away, Codex still sees 43 skill metadata files from system, superpowers, caveman, Cloudflare, Semgrep, Playwright, and plugin cache sources.
 
 Root cause:
 
@@ -198,7 +198,7 @@ Evidence:
 - `claude mcp get deepwiki` showed DeepWiki connected.
 - Gemini, OpenCode, and Pi configs also contained DeepWiki entries.
 - `bun run src/index.ts mcp list --json` did not include `deepwiki`; `doctor --json` did not report it under `.mcp.servers`.
-- `src/cli/mcp-builtins.ts` does not include a DeepWiki builtin, and `MINIMAL_DEFAULT_MCPS` is `["context7", "repomix"]`, while `docs/mcp.md` says the default set is DeepWiki + context7.
+- `src/cli/mcp-builtins.ts` does not include a DeepWiki builtin, and `MINIMAL_DEFAULT_MCPS` does not match `docs/mcp.md`, which says the default set is DeepWiki + context7.
 - `src/cli/install.ts` still calls `installDeepwikiMcp()` as a special case before registry setup.
 - DeepWiki service/transport was not the failure: `mcp__deepwiki__read_wiki_structure` returned pages for `openai/openai-python`.
 - DeepWiki result failure for `moabualruz/fulcrum` was repository indexing/scope: the MCP returned `Repository not found. Visit https://deepwiki.com/moabualruz/fulcrum to index it.`

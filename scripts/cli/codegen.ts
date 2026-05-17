@@ -103,7 +103,7 @@ export async function generateCliFiles(options: GenerateCliFilesOptions): Promis
 
   if (options.completionsDir !== undefined) {
     const completionsDir = resolve(options.completionsDir);
-    const { emitCompletionScripts } = await import("../../src/cli/completion.ts");
+    const { emitCompletionScripts } = await import("@fulcrum/cli/completion.ts");
     const scripts = emitCompletionScripts(domains);
     await mkdir(completionsDir, { recursive: true });
     await Promise.all([
@@ -230,6 +230,23 @@ type ExtractorContext = {
   imports: Map<string, VariableDeclaration>;
 };
 
+const WORKSPACE_IMPORT_PREFIXES: Record<string, string> = {
+  "@agent-client-protocol/": "services/agent-client-protocol/src/",
+  "@execution-orchestration/": "services/execution-orchestration/src/",
+  "@fulcrum/cli/": "apps/cli/src/",
+  "@fulcrum/server/": "apps/server/src/",
+  "@fulcrum/tui/": "apps/tui/src/",
+  "@fulcrum/web/": "apps/web/src/",
+  "@identity-access/": "services/identity-access/src/",
+  "@integration-hub/": "services/integration-hub/src/",
+  "@knowledge-workspace/": "services/knowledge-workspace/src/",
+  "@notification-center/": "services/notification-center/src/",
+  "@planning-review/": "services/planning-review/src/",
+  "@platform-core/": "services/platform-core/src/",
+  "@workflow-coordination/": "services/workflow-coordination/src/",
+  "@work-management/": "services/work-management/src/",
+};
+
 function createExtractorContext(source: SourceFile, project: Project): ExtractorContext {
   const variables = new Map<string, VariableDeclaration>();
   const schemas = new Map<string, AstSchema>();
@@ -248,10 +265,11 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
 
     for (const declaration of current.getImportDeclarations()) {
       const specifier = declaration.getModuleSpecifierValue();
-      if (!specifier.startsWith(".")) continue;
+      const importedPath = resolveImportPath(path, specifier);
+      if (importedPath === null) continue;
       let imported: SourceFile;
       try {
-        imported = project.addSourceFileAtPath(resolve(dirname(path), specifier));
+        imported = project.addSourceFileAtPath(importedPath);
       } catch {
         continue;
       }
@@ -262,6 +280,36 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
         const importedDeclaration = lookupVariable(importedName, imported, context);
         if (importedDeclaration) {
           imports.set(bindingKey(current, localName), importedDeclaration);
+        }
+      }
+    }
+
+    for (const declaration of current.getExportDeclarations()) {
+      const specifier = declaration.getModuleSpecifierValue();
+      if (specifier === undefined) continue;
+      const exportedPath = resolveImportPath(path, specifier);
+      if (exportedPath === null) continue;
+      let exported: SourceFile;
+      try {
+        exported = project.addSourceFileAtPath(exportedPath);
+      } catch {
+        continue;
+      }
+      collect(exported);
+      const namedExports = declaration.getNamedExports();
+      if (namedExports.length === 0) {
+        for (const item of exported.getVariableDeclarations()) {
+          const exportedDeclaration = lookupVariable(item.getName(), exported, context) ?? item;
+          imports.set(bindingKey(current, item.getName()), exportedDeclaration);
+        }
+        continue;
+      }
+      for (const item of namedExports) {
+        const exportedName = item.getName();
+        const localName = item.getAliasNode()?.getText() ?? exportedName;
+        const exportedDeclaration = lookupVariable(exportedName, exported, context);
+        if (exportedDeclaration) {
+          imports.set(bindingKey(current, localName), exportedDeclaration);
         }
       }
     }
@@ -277,6 +325,16 @@ function createExtractorContext(source: SourceFile, project: Project): Extractor
     }
   }
   return context;
+}
+
+function resolveImportPath(fromPath: string, specifier: string): string | null {
+  if (specifier.startsWith(".")) return resolve(dirname(fromPath), specifier);
+  for (const [prefix, target] of Object.entries(WORKSPACE_IMPORT_PREFIXES)) {
+    if (specifier.startsWith(prefix)) {
+      return resolve(process.cwd(), target, specifier.slice(prefix.length));
+    }
+  }
+  return null;
 }
 
 function bindingKey(source: SourceFile, name: string): string {
@@ -597,7 +655,7 @@ function emitDomain(domain: DomainMetadata): string {
       lines.push(`        return;`);
       lines.push(`      }`);
     }
-    lines.push(`      throw new Error(${JSON.stringify(`Generated tRPC invocation for ${procedurePath} is not wired yet.`)});`);
+    lines.push(`      throw new Error(${JSON.stringify(`Generated tRPC invocation for ${procedurePath} requires an explicit surface adapter.`)});`);
     lines.push(`    } catch (error) {`);
     lines.push(`      if (options.json === true) {`);
     lines.push(`        const message = error instanceof Error ? error.message : String(error);`);
@@ -621,7 +679,7 @@ function emitDomain(domain: DomainMetadata): string {
     lines.push("  });");
     lines.push("  await Promise.race([");
     lines.push("    shutdown,");
-    lines.push("    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} is not wired yet.`)),");
+    lines.push("    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),");
     lines.push("  ]);");
     lines.push("}");
     lines.push("");
@@ -671,8 +729,8 @@ function camel(value: string): string {
 if (import.meta.main) {
   const args = new Set(Bun.argv.slice(2));
   const root = resolve(import.meta.dir, "../..");
-  const routerPath = join(root, "src/server/trpc/router.ts");
-  const outDir = join(root, "src/cli/generated");
+  const routerPath = join(root, "apps/server/src/trpc/router.ts");
+  const outDir = join(root, "apps/cli/src/generated");
   const completionsDir = join(root, "scripts/cli");
   const start = performance.now();
   await generateCliFiles({ routerPath, outDir, completionsDir, useAst: !args.has("--no-ast") });

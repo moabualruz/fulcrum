@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { performance } from "node:perf_hooks";
 
-import { DOC_TYPES } from "../../src/db/entities/docs/enums.ts";
-import { Renderer } from "../../src/tui/renderer.ts";
+import { DOC_TYPES } from "@knowledge-workspace/infrastructure/database/entities/docs/enums.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   DocsReaderEditorScreen,
   renderMarkdown,
-} from "../../src/tui/screens/docs-reader-editor.ts";
-import { DocsTreeScreen, type DocsTreeItem } from "../../src/tui/screens/docs-tree.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/screens/docs-reader-editor.ts";
+import { DocsTreeScreen, type DocsTreeItem } from "@fulcrum/tui/screens/docs-tree.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });

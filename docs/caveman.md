@@ -34,7 +34,7 @@ Always removes `~/.config/caveman/config.json` (the defaultMode lock).
 
 ## Default mode lock
 
-`lockCavemanUltra()` in `src/cli/install.ts` writes `~/.config/caveman/config.json` with `{"defaultMode": "ultra"}` — idempotent, skips if already set. Resolution order:
+`lockCavemanUltra()` in `apps/cli/src/install.ts` writes `~/.config/caveman/config.json` with `{"defaultMode": "ultra"}` — idempotent, skips if already set. Resolution order:
 
 1. Environment: `CAVEMAN_DEFAULT_MODE=<mode>` (wins)
 2. Config file: `~/.config/caveman/config.json` `defaultMode` field
@@ -110,4 +110,4 @@ Persistent: `CAVEMAN_DEFAULT_MODE=full` in shell env (wins over config-file lock
 - `rules/AGENTS.md` §0b — output-style rule (caveman ultra always-on).
 - `HANDOVER.md` §6.1 — integration checklist (complete).
 - `scripts/compress-with-caveman.sh` — wrapper; calls caveman CLI.
-- `src/cli/install.ts` — `installCaveman()` + `lockCavemanUltra()` logic.
+- `apps/cli/src/install.ts` — `installCaveman()` + `lockCavemanUltra()` logic.

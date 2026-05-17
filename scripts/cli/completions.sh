@@ -12,7 +12,7 @@ _fulcrum() {
   prev="${COMP_WORDS[COMP_CWORD-1]}"
   domain="${COMP_WORDS[1]}"
   if [[ ${COMP_CWORD} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W 'agent_runs agents artifacts audit auth backup connectors context credentials custom_fields customFieldDefs dataExport dataImport db doc_comments doc_links doc_versions docs doctor errorLogs flags fulcrum_skills health inference invitations memories memory notifications notify notifySubscriptions orchestrationSubscriptions orgs projects repo_branches repo_commits reports repos routing runs runsSubscriptions saved_views search skills sprints taskCustomFields tasks telemetry theme webhooks' -- "$cur") )
+    COMPREPLY=( $(compgen -W 'agent_runs agents artifacts audit auth automations backup comments connectors context credentials customFieldDefs dataExport dataImport db doc_comments doc_links doc_versions docs doctor errorLogs flags fulcrum_skills health inference invitations memories notify notifySubscriptions orchestrationSubscriptions orgs planning projects recurrence relationships repo_branches repo_commits reports repos review routing runsSubscriptions saved_views search sprints taskCustomFields tasks telemetry templates theme webhooks workflows' -- "$cur") )
     return 0
   fi
   case "$domain" in
@@ -39,7 +39,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     artifacts)
-      local verbs='archive delete download get list unarchive upload'
+      local verbs='accept archive delete download get list reject unarchive upload'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -69,11 +69,37 @@ _fulcrum() {
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
+    automations)
+      local verbs='create delete list templates update'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
+        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'automations')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
     backup)
       local verbs='create restore'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
+    comments)
+      local verbs='add-reaction create delete list remove-reaction resolve subscribe threaded unresolve unsubscribe watchers'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
+        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'comments')" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -109,19 +135,6 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'credentials')" -- "$cur") )
-        return 0
-      fi
-      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
-      ;;
-    custom_fields)
-      local verbs='create delete list reorder update'
-      local flags='--json'
-      if [[ "$cur" == --* ]]; then
-        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
-        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'custom_fields')" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -167,7 +180,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     doc_comments)
-      local verbs='create delete list update'
+      local verbs='create delete list resolve update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -193,7 +206,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     doc_versions)
-      local verbs='get list restore'
+      local verbs='diff get list restore'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -254,7 +267,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     fulcrum_skills)
-      local verbs='install list resolve-conflict sync uninstall upgrade'
+      local verbs='conflicts list conflicts override install list lock override registry list resolve-conflict sync uninstall upgrade'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -276,7 +289,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     inference)
-      local verbs='backends list classify config get config set embed generate health models list models pull models rm provider set provider test tokenize'
+      local verbs='backends list backends probe classify config get config set embed generate health models list models pull models rm provider set provider test tokenize'
       local flags='--json --watch'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -298,7 +311,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     memories)
-      local verbs='create delete get list search update'
+      local verbs='create delete get list promote search update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -306,32 +319,6 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'memories')" -- "$cur") )
-        return 0
-      fi
-      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
-      ;;
-    memory)
-      local verbs='create delete get list search update'
-      local flags='--json'
-      if [[ "$cur" == --* ]]; then
-        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
-        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'memory')" -- "$cur") )
-        return 0
-      fi
-      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
-      ;;
-    notifications)
-      local verbs='channels config channels list channels test list mark-all-read mark-read mute mutes list quiet-hours get quiet-hours set rules create rules delete rules get rules list rules update unmute unread-count'
-      local flags='--json'
-      if [[ "$cur" == --* ]]; then
-        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
-        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'notifications')" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -376,6 +363,15 @@ _fulcrum() {
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
+    planning)
+      local verbs='build-freeform-docs-planning-prompt generate-technical-planning-cycle materialize-approved-plan-breakdown preview-approved-plan-breakdown restart-planning-cycle-from-updates start-freeform-work-from-docs start-guided-acp-planning-session'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
     projects)
       local verbs='create delete get list stats update'
       local flags='--json'
@@ -385,6 +381,28 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'projects')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
+    recurrence)
+      local verbs='create delete list'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
+        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'recurrence')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
+    relationships)
+      local verbs='blocked-items blockers create delete list-blocked-by list-for-task mark-as-duplicate summary'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -416,7 +434,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     reports)
-      local verbs='burndown'
+      local verbs='blocked-items burndown burnup cfd cycle-time export-csv lead-time progress-rollup stale-issues throughput velocity wip-over-time workload'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -425,7 +443,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     repos)
-      local verbs='get list register sync unregister'
+      local verbs='get list register status-repo sync sync-repo unregister'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -437,8 +455,17 @@ _fulcrum() {
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
+    review)
+      local verbs='append-review-workbench-annotation apply-configured-uat-code-review-decision final-qa final-qa-feedback-gate load-review-workbench-session record-uat-code-review-decision review-workbench run-generated-e2e-regression-tests save-review-workbench-session uat-code-review-handoff'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
     routing)
-      local verbs='create delete dry-run get list test update'
+      local verbs='config update-llm-gate create delete drafts approve drafts delete drafts list drafts update dry-run get list test update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -446,19 +473,6 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'routing')" -- "$cur") )
-        return 0
-      fi
-      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
-      ;;
-    runs)
-      local verbs='cancel create get list retry'
-      local flags='--json'
-      if [[ "$cur" == --* ]]; then
-        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
-        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'runs')" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -486,23 +500,10 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     search)
-      local verbs='query saved-create saved-delete saved-list saved-update suggest'
+      local verbs='query record-click saved-create saved-delete saved-list saved-update snapshot suggest'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
-      ;;
-    skills)
-      local verbs='install list resolve-conflict sync uninstall upgrade'
-      local flags='--json'
-      if [[ "$cur" == --* ]]; then
-        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
-        return 0
-      fi
-      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
-        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'skills')" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
@@ -530,8 +531,8 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     tasks)
-      local verbs='bulk-delete bulk-update create delete get list list-children set-dependencies set-parent update'
-      local flags='--json'
+      local verbs='bulk-delete bulk-update create delete dependency-run-live-feedback dependency-run-live-feedback-stream dispatch-dependency-run get list list-children manual-workbench preview-dependency-run record-qa-review run-automated-feedback-loop run-dependency-run-worker-tick set-dependencies set-parent update'
+      local flags='--json --watch'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
         return 0
@@ -551,8 +552,21 @@ _fulcrum() {
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
+    templates)
+      local verbs='apply-template create delete list set-default'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
+        return 0
+      fi
+      if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
+        COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'templates')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
     theme)
-      local verbs='get-theme list-themes set-theme'
+      local verbs='get get-theme list-themes set-theme update'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -569,6 +583,15 @@ _fulcrum() {
       fi
       if [[ "$prev" == "get" || "$prev" == "delete" || "$prev" == "update" ]]; then
         COMPREPLY=( $(compgen -W "$(_fulcrum_dynamic_ids 'webhooks')" -- "$cur") )
+        return 0
+      fi
+      COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
+      ;;
+    workflows)
+      local verbs='get-default get-enabled-task-types get-methodology get-transitions run-acceptance-cycle update-enabled-task-types update-methodology update-transitions validate-transition'
+      local flags='--json'
+      if [[ "$cur" == --* ]]; then
+        COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
         return 0
       fi
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )

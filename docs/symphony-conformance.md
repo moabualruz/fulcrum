@@ -98,6 +98,11 @@ Test ID: symphony-conformance-18
 | tracker.ts | fetchCandidateIssues | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
 | tracker.ts | fetchIssuesByStates | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
 | tracker.ts | fetchIssueStatesByIds | §Issue tracker client with candidate fetch + state refresh + terminal fetch |
+| workflow-runtime.ts | createWorkflowRuntimeReloader | §Dynamic `WORKFLOW.md` watch/reload/re-apply for config and prompt |
+| workflow-runtime.ts | loadWorkflowRuntime | §Workflow path selection supports explicit runtime path and cwd default |
+| workflow-runtime.ts | WorkflowConfigError | §Typed config layer with defaults and `$` resolution |
+| workflow-runtime.ts | WorkflowFrontmatterError | §`WORKFLOW.md` loader with YAML front matter + prompt body split |
+| workflow-runtime.ts | WorkflowNotFoundError | §Workflow path selection supports explicit runtime path and cwd default |
 | workspace.ts | createWorkspace | §Workspace manager with sanitized per-issue workspaces |
 | workspace.ts | destroyWorkspace | §Workspace cleanup for terminal issues |
 | workspace.ts | getWorkspacePath | §Workspace manager with sanitized per-issue workspaces |
@@ -120,3 +125,15 @@ Source: `vendor/openai-symphony/SPEC.md` section 7.1 Issue Orchestration States 
 | `timed_out` | section 7.2 `TimedOut` | Terminal run-attempt reason after timeout handling. |
 | `stalled` | section 7.2 `Stalled` | Terminal run-attempt reason after stall reconciliation. |
 | `cancelled` | section 7.2 `CanceledByReconciliation` | Fulcrum spelling uses D1 lowercase snake-case; maps to Symphony's reconciliation cancellation terminal reason. |
+
+## Approval/Sandbox Posture (D-09)
+
+Fulcrum implements the following defaults per SPEC §5.3.6 and §1 (implementation-defined posture):
+
+| Field | Default | Notes |
+|---|---|---|
+| `codex.command` | `codex app-server` | Shell command launched via `bash -lc` in the per-issue workspace. |
+| `codex.approval_policy` | `auto` (implementation-defined) | No interactive approval required by default; agents run autonomously. Operators override via `WORKFLOW.md` `codex.approval_policy`. |
+| `codex.thread_sandbox` | `noSandbox` (host mode) | Default is host-trust mode with an explicit trust-boundary warning on startup. Operators configure Docker/Podman/Vercel/Daytona/Modal/E2B via feature flags. |
+| `codex.turn_sandbox_policy` | implementation-defined | Pass-through to app-server; not enforced by Fulcrum orchestrator. |
+| `noSandbox` host boundary | Trust warning emitted | `src/orchestration/sandbox-runner.ts` emits a visible warning when `noSandbox` is the effective provider, reminding operators that agent commands run with host OS access. |

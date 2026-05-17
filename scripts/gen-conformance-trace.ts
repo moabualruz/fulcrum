@@ -28,9 +28,10 @@ const CORE_FILES = [
   "workspace.ts",
   "prompt.ts",
   "retry.ts",
+  "workflow-runtime.ts",
 ] as const;
 
-const SYMPHONY_DIR = "src/orchestration/symphony";
+const SYMPHONY_DIR = "services/execution-orchestration/src/infrastructure/agent-runtime/symphony";
 
 const specPath = join(process.cwd(), "vendor/openai-symphony/SPEC.md");
 const tracePath = join(process.cwd(), "docs/symphony-conformance.md");
@@ -75,6 +76,13 @@ export const FUNCTION_SPEC_MAP: Record<string, { file: string; specSection: stri
   // retry.ts
   calcRetryDelay: { file: "retry.ts", specSection: "§Configurable retry backoff cap (agent.max_retry_backoff_ms, default 5m)" },
   scheduleRetry: { file: "retry.ts", specSection: "§Exponential retry queue with continuation retries after normal exit" },
+
+  // workflow-runtime.ts
+  loadWorkflowRuntime: { file: "workflow-runtime.ts", specSection: "§Workflow path selection supports explicit runtime path and cwd default" },
+  createWorkflowRuntimeReloader: { file: "workflow-runtime.ts", specSection: "§Dynamic `WORKFLOW.md` watch/reload/re-apply for config and prompt" },
+  WorkflowNotFoundError: { file: "workflow-runtime.ts", specSection: "§Workflow path selection supports explicit runtime path and cwd default" },
+  WorkflowFrontmatterError: { file: "workflow-runtime.ts", specSection: "§`WORKFLOW.md` loader with YAML front matter + prompt body split" },
+  WorkflowConfigError: { file: "workflow-runtime.ts", specSection: "§Typed config layer with defaults and `$` resolution" },
 };
 
 // ---------------------------------------------------------------------------
@@ -231,6 +239,18 @@ export function renderTrace(
     "| `timed_out` | section 7.2 `TimedOut` | Terminal run-attempt reason after timeout handling. |",
     "| `stalled` | section 7.2 `Stalled` | Terminal run-attempt reason after stall reconciliation. |",
     "| `cancelled` | section 7.2 `CanceledByReconciliation` | Fulcrum spelling uses D1 lowercase snake-case; maps to Symphony's reconciliation cancellation terminal reason. |",
+    "",
+    "## Approval/Sandbox Posture (D-09)",
+    "",
+    "Fulcrum implements the following defaults per SPEC §5.3.6 and §1 (implementation-defined posture):",
+    "",
+    "| Field | Default | Notes |",
+    "|---|---|---|",
+    "| `codex.command` | `codex app-server` | Shell command launched via `bash -lc` in the per-issue workspace. |",
+    "| `codex.approval_policy` | `auto` (implementation-defined) | No interactive approval required by default; agents run autonomously. Operators override via `WORKFLOW.md` `codex.approval_policy`. |",
+    "| `codex.thread_sandbox` | `noSandbox` (host mode) | Default is host-trust mode with an explicit trust-boundary warning on startup. Operators configure Docker/Podman/Vercel/Daytona/Modal/E2B via feature flags. |",
+    "| `codex.turn_sandbox_policy` | implementation-defined | Pass-through to app-server; not enforced by Fulcrum orchestrator. |",
+    "| `noSandbox` host boundary | Trust warning emitted | `services/execution-orchestration/src/infrastructure/agent-runtime/sandbox-runner.ts` emits a visible warning when `noSandbox` is the effective provider, reminding operators that agent commands run with host OS access. |",
     "",
   ];
 

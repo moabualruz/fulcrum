@@ -2,13 +2,13 @@
 
 ## Overview
 
-Fulcrum is a local-first Agent OS. Everything runs on your machine — no cloud dependency. The embedded PGlite database handles all storage. SaaS features (multi-tenant auth, remote telemetry, etc.) are shipped but disabled behind feature flags.
+Fulcrum = local-first Agent OS. Everything runs on machine — no cloud. Embedded PGlite handles all storage. SaaS features shipped but disabled behind feature flags.
 
 ## Core Features (Always On)
 
 ### Project Management
 
-Create projects, manage tasks with kanban boards, plan sprints, track velocity.
+Create projects, manage tasks w/ kanban, plan sprints, track velocity.
 
 ```bash
 fulcrum projects create --name "My App" --json
@@ -16,22 +16,22 @@ fulcrum tasks create --title "Set up CI" --project my-app --status todo --json
 fulcrum tasks list --project my-app --status in_progress --json
 ```
 
-**Web:** `/projects/<id>/board` — drag-and-drop kanban board with custom columns.
+**Web:** `/projects/<id>/board` — drag-drop kanban w/ custom columns.
 
 ### Documents
 
-TipTap-based rich text editor with version history, comments, and templates.
+TipTap rich text editor w/ version history, comments, templates.
 
 ```bash
 fulcrum docs create --title "Architecture" --type decision --json
 fulcrum docs list --json
 ```
 
-**Web:** `/docs/<id>/edit` — full editor with autosave, `/docs/<id>/history` — version diffs.
+**Web:** `/docs/<id>/edit` — editor w/ autosave, `/docs/<id>/history` — version diffs.
 
 ### Search
 
-Full-text search across tasks, docs, and memories. Faceted filtering by kind, project, date range.
+Full-text search across tasks, docs, memories. Faceted filtering by kind, project, date range.
 
 ```bash
 fulcrum search "database migration" --json
@@ -41,7 +41,7 @@ fulcrum search "database migration" --json
 
 ### Agent Orchestration (Symphony)
 
-Dispatch agent runs, monitor progress, handle retries and stalls.
+Dispatch agent runs, monitor progress, handle retries/stalls.
 
 ```bash
 fulcrum runs list --json
@@ -49,7 +49,7 @@ fulcrum runs logs <run-id>
 fulcrum agent list --json
 ```
 
-**Web:** `/orchestration` — live run queue with claim-state badges, cancel/retry controls.
+**Web:** `/orchestration` — live run queue w/ claim-state badges, cancel/retry controls.
 
 ### Memory & Context
 
@@ -60,7 +60,7 @@ fulcrum memory list --json
 fulcrum memory search "TypeScript patterns" --json
 ```
 
-**Web:** `/memory` — browsable memory list with importance scores and source links.
+**Web:** `/memory` — browsable list w/ importance scores, source links.
 
 ### Repository Supervision
 
@@ -71,11 +71,11 @@ fulcrum repos add --path /path/to/repo --name my-repo
 fulcrum repos list --json
 ```
 
-**Web:** `/repos/<id>/files` — lazy-loading file tree with syntax highlighting.
+**Web:** `/repos/<id>/files` — lazy-loading file tree w/ syntax highlighting.
 
 ### Notifications & Audit
 
-Rule-based notification engine. In-app inbox. Full audit log with CSV/JSON export.
+Rule-based notification engine. In-app inbox. Full audit log w/ CSV/JSON export.
 
 ```bash
 fulcrum notifications list --json
@@ -83,22 +83,22 @@ fulcrum audit query --kind task --json
 fulcrum audit export --format csv --output audit.csv
 ```
 
-**Web:** `/inbox` — notification feed with mark-read. `/audit` — filterable event log.
+**Web:** `/inbox` — notification feed w/ mark-read. `/audit` — filterable event log.
 
 ### Doctor
 
-Health checks across all 17 subsystems. Recovery hints for failures.
+Health checks across all 17 subsystems. Recovery hints on failure.
 
 ```bash
 fulcrum doctor --json
 fulcrum doctor --subsystem inference
 ```
 
-**Web:** `/doctor` — dashboard with auto-refresh every 30s. No auth required.
+**Web:** `/doctor` — dashboard w/ auto-refresh every 30s. No auth required.
 
 ### Backups
 
-Local backup and restore. Full data export.
+Local backup/restore. Full data export.
 
 ```bash
 fulcrum backup --output /tmp/fulcrum-backup.tar.gz
@@ -107,31 +107,31 @@ fulcrum restore --input /tmp/fulcrum-backup.tar.gz
 
 ## Gated Features
 
-Enable with `FULCRUM_FEATURES=<flag1>,<flag2>` environment variable.
+Enable w/ `FULCRUM_FEATURES=<flag1>,<flag2>` env var.
 
 ### i18n (`i18n`)
 
-Locale selector (English, Arabic, French). RTL layout support. Intl date/number formatting.
+Locale selector (English, Arabic, French). RTL layout. Intl date/number formatting.
 
 ### Semantic Search (`embeddings`)
 
-Hybrid BM25 + cosine similarity search. Requires inference sidecar for embeddings.
+Hybrid BM25 + cosine similarity. Requires inference sidecar for embeddings.
 
 ### Experiments / A/B Testing (`experiments`)
 
-Create experiments with variants and rollout percentages. Track assignment counts and conversion metrics.
+Create experiments w/ variants, rollout percentages. Track assignments, conversion metrics.
 
 ### PWA Offline Mode (`pwa-offline`)
 
-Service worker caches app shell. Background sync queues offline mutations. `/offline` fallback page.
+Service worker caches app shell. Background sync queues offline mutations. `/offline` fallback.
 
 ### Desktop App (`desktop-app`)
 
-Tauri v2 wrapper. Native drag-and-drop artifact upload. Auto-update.
+Tauri v2 wrapper. Native drag-drop artifact upload. Auto-update.
 
 ### Real-Time Collaboration (`real-time-collab-server`)
 
-Yjs + Hocuspocus CRDT sync for TipTap editor. Collab cursors with name badges. Presence avatars.
+Yjs + Hocuspocus CRDT sync for TipTap. Collab cursors w/ name badges. Presence avatars.
 
 ### SaaS Auth (`saas-auth`)
 
@@ -139,15 +139,15 @@ OAuth (Google, GitHub), magic-link login, signup flow, billing placeholder.
 
 ### Public API (`public-api`)
 
-OpenAPI 3.1 REST API at `/api/v1`. API key management. OpenAPI spec viewer.
+OpenAPI 3.1 REST at `/api/v1`. API key management. Spec viewer.
 
 ### CSV Import/Export (`export-csv`, `import-csv`)
 
-Export tasks/docs/memories as CSV. Import with column mapper.
+Export tasks/docs/memories as CSV. Import w/ column mapper.
 
 ### External Importers (`import-linear`, `import-jira`, `import-plane`)
 
-Import projects and tasks from Linear, Jira, or Plane with field mapping.
+Import projects/tasks from Linear, Jira, Plane w/ field mapping.
 
 ### Remote Telemetry (`telemetry-remote`)
 
@@ -155,19 +155,19 @@ HMAC-signed batch POST of telemetry events to user-configured endpoint.
 
 ### Remote Error Reporting (`error-reporting-remote`)
 
-Crash reports with scrubbed stack traces. HMAC-signed POST.
+Crash reports w/ scrubbed stack traces. HMAC-signed POST.
 
 ### Vault Integration (`vault-integration`)
 
-HashiCorp Vault KV v2 and AWS Secrets Manager as secret providers.
+HashiCorp Vault KV v2 + AWS Secrets Manager as secret providers.
 
 ### Scheduled Backups (`scheduled-backups`)
 
-Cron-based backups to S3, R2, GCS, or Azure Blob Storage.
+Cron-based backups to S3, R2, GCS, Azure Blob Storage.
 
 ### LLM Sprint Narrative (`report-llm-narration`)
 
-AI-generated sprint retrospective narrative using inference sidecar.
+AI-generated sprint retro narrative via inference sidecar.
 
 ## Configuration
 
@@ -183,8 +183,8 @@ AI-generated sprint retrospective narrative using inference sidecar.
 
 ### Three Surfaces
 
-Every feature ships on all three surfaces:
+Every feature ships on all three:
 
 1. **Web** — SvelteKit app at `localhost:5173`
 2. **CLI** — `fulcrum <command> [--json]`
-3. **TUI** — `fulcrum tui` — full terminal UI with 44 screens
+3. **TUI** — `fulcrum tui` — full terminal UI w/ 44 screens

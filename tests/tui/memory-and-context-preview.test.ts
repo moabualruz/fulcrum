@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
-import { ContextPreviewScreen } from "../../src/tui/screens/context-preview.ts";
-import { MemoryBrowserScreen } from "../../src/tui/screens/memory-browser.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { ContextPreviewScreen } from "@fulcrum/tui/screens/context-preview.ts";
+import { MemoryBrowserScreen } from "@fulcrum/tui/screens/memory-browser.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 140, rows: 40 });

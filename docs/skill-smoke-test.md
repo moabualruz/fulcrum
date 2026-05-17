@@ -55,7 +55,7 @@ Both plain English; no tool name itself.
 
 ## Cross-refs
 
-- `fulcrum skills lint` — frontmatter validator (`src/cli/skills.ts`)
+- `fulcrum skills lint` — frontmatter validator (`apps/cli/src/skills.ts`)
 - `scripts/eval-skill-claude.sh` — trigger-rate harness (Claude Code)
 - `scripts/eval-skill-codex.sh` — trigger-rate harness (Codex CLI)
 - `scripts/eval-skill-gemini.sh` — trigger-rate harness (Gemini CLI)

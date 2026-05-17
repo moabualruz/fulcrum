@@ -113,7 +113,6 @@ EXPECT: 17
 RECORD: row 7 of result table
 ```
 
-Expected builtins: deepwiki, github, repomix, semgrep, context7, tavily, playwright, dart, cloudflare-docs, cloudflare-workers-bindings, cloudflare-workers-builds, cloudflare-observability, cloudflare-radar, cloudflare-logpush, cloudflare-browser, cloudflare-containers, cloudflare-ai-gateway.
 
 ---
 

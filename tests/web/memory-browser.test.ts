@@ -9,11 +9,11 @@ import {
   optimisticMemoryAction,
   scoreMemoryForConfig,
   shouldConfirmMetadataEdit,
-} from "../../src/web/src/lib/memory/memory-browser.ts";
+} from "@fulcrum/web/lib/memory/memory-browser.ts";
 
 describe("web memory browser routes", () => {
   test("/memory page wires list/search filters and bulk actions to memory tRPC", async () => {
-    const source = await readFile("src/web/src/routes/memory/+page.svelte", "utf8");
+    const source = await readFile("apps/web/src/routes/memory/+page.svelte", "utf8");
 
     expect(source).toContain("data-memory-browser");
     expect(source).toContain("memory.list");
@@ -32,7 +32,7 @@ describe("web memory browser routes", () => {
   });
 
   test("/memory/[id] page renders detail, links, guarded metadata edit, and actions", async () => {
-    const source = await readFile("src/web/src/routes/memory/[id]/+page.svelte", "utf8");
+    const source = await readFile("apps/web/src/routes/memory/[id]/+page.svelte", "utf8");
 
     expect(source).toContain("data-memory-detail");
     expect(source).toContain("memory.get");
@@ -46,7 +46,7 @@ describe("web memory browser routes", () => {
   });
 
   test("project settings memory tab saves memory_config controls", async () => {
-    const source = await readFile("src/web/src/routes/projects/[id]/settings/memory/+page.svelte", "utf8");
+    const source = await readFile("apps/web/src/routes/projects/[id]/settings/memory/+page.svelte", "utf8");
 
     expect(source).toContain("data-project-memory-settings");
     expect(source).toContain("bm25_weight");

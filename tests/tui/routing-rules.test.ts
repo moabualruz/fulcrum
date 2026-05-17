@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   RoutingRulesScreen,
   type RoutingRuleFormInput,
   type RoutingRulesScreenOptions,
-  type TuiRoutingDecision,
+  type TuiEnrichedDecision,
   type TuiRoutingRule,
-} from "../../src/tui/screens/routing-rules.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+} from "@fulcrum/tui/screens/routing-rules.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 140, rows: 40 });
@@ -36,19 +36,25 @@ function rule(overrides: Partial<TuiRoutingRule> = {}): TuiRoutingRule {
   };
 }
 
-function decision(overrides: Partial<TuiRoutingDecision> = {}): TuiRoutingDecision {
+function decision(overrides: Partial<TuiEnrichedDecision> = {}): TuiEnrichedDecision {
   return {
-    ruleId: RULE_ID,
-    source: "rule",
-    agent: "codex",
+    status: "matched",
+    matchedRuleId: RULE_ID,
+    draftId: null,
+    factsUsed: {},
     confidence: 1,
+    backend: null,
+    model: null,
+    whyUnmatched: null,
+    evidence: [],
     ...overrides,
   };
 }
 
-function fakeCaller(): RoutingRulesScreenOptions["caller"] & { calls: Array<{ procedure: string; input: unknown }> } {
+function fakeCaller(seedDrafts: TuiEnrichedDecision[] = []): RoutingRulesScreenOptions["caller"] & { calls: Array<{ procedure: string; input: unknown }> } {
   const calls: Array<{ procedure: string; input: unknown }> = [];
   const rows = [rule()];
+  const drafts = [...seedDrafts];
 
   return {
     calls,
@@ -85,9 +91,29 @@ function fakeCaller(): RoutingRulesScreenOptions["caller"] & { calls: Array<{ pr
         if (index >= 0) rows.splice(index, 1);
         return { ok: true as const };
       },
+      test: async (input: { taskId: string }) => {
+        calls.push({ procedure: "routing.test", input });
+        return decision();
+      },
       dryRun: async (input: { taskJson: Record<string, unknown> }) => {
         calls.push({ procedure: "routing.dryRun", input });
-        return decision({ agent: "claude-code", source: "rule" });
+        return decision();
+      },
+      drafts: {
+        list: async () => { calls.push({ procedure: "routing.drafts.list", input: {} }); return drafts; },
+        approve: async (input: { draftId: string }) => {
+          calls.push({ procedure: "routing.drafts.approve", input });
+          const index = drafts.findIndex((draft) => draft.draftId === input.draftId);
+          if (index >= 0) drafts.splice(index, 1);
+          return { ok: true as const };
+        },
+        delete: async (input: { draftId: string }) => {
+          calls.push({ procedure: "routing.drafts.delete", input });
+          const index = drafts.findIndex((draft) => draft.draftId === input.draftId);
+          if (index >= 0) drafts.splice(index, 1);
+          return { ok: true as const };
+        },
+        update: async (input: Record<string, unknown>) => { calls.push({ procedure: "routing.drafts.update", input }); return { ok: true as const }; },
       },
     },
   };
@@ -176,5 +202,110 @@ describe("RoutingRulesScreen", () => {
       input: { id: "00000000-0000-4000-8000-000000000002" },
     });
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("High priority bugs");
+  });
+
+  test("loads drafts tab, approves and deletes drafts through the caller", async () => {
+    const caller = fakeCaller([
+      decision({ draftId: "draft-a", status: "recommended", confidence: 0.72, backend: "ollama" }),
+      decision({ draftId: "draft-b", status: "conflict", confidence: 0.41, backend: "embedded" }),
+    ]);
+    const screen = new RoutingRulesScreen({ caller });
+
+    await screen.load();
+    await screen.handleKey("l");
+    const draftsOutput = renderPlain((renderer) => screen.render(renderer));
+    expect(draftsOutput).toContain("Draft ID");
+    expect(draftsOutput).toContain("draft-a");
+    expect(draftsOutput).toContain("review_needed");
+    expect(draftsOutput).toContain("ollama");
+
+    await screen.handleKey("a");
+    expect(caller.calls.at(-1)).toEqual({
+      procedure: "routing.drafts.approve",
+      input: { draftId: "draft-a" },
+    });
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("draft-a");
+
+    await screen.handleKey("d");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Delete routing rule? draft draft-b");
+    await screen.handleKey("y");
+    expect(caller.calls.at(-1)).toEqual({
+      procedure: "routing.drafts.delete",
+      input: { draftId: "draft-b" },
+    });
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("No drafts");
+  });
+
+  test("raw JSON test flow validates invalid input and dry-runs normalized task facts", async () => {
+    const caller = fakeCaller();
+    const screen = new RoutingRulesScreen({ caller });
+
+    await screen.load();
+    await screen.handleKey("l");
+    await screen.handleKey("l");
+    await screen.handleKey("t");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Raw JSON Test Input");
+
+    await screen.submitDryRun({ kind: "incident", priority: "high", tags: ["ops"] });
+    const output = renderPlain((renderer) => screen.render(renderer));
+    expect(output).toContain("Route Test");
+    expect(output).toContain("Status: matched");
+    expect(caller.calls.at(-1)).toEqual({
+      procedure: "routing.dryRun",
+      input: { taskJson: { kind: "incident", priority: "high", tags: ["ops"] } },
+    });
+  });
+
+  test("viewport scrolling keeps the cursor visible and project scoped rules render as project", async () => {
+    const caller = fakeCaller();
+    const screen = new RoutingRulesScreen({ caller, projectId: "project-1", viewportRows: 1 });
+
+    await screen.load();
+    await screen.submitRuleForm({
+      name: "Ignored outside overlay",
+      projectId: "project-1",
+    });
+    await screen.handleKey("n");
+    await screen.submitRuleForm({
+      name: "Project rule",
+      projectId: "project-1",
+      actionAgent: "claude-code",
+      priority: 1,
+    });
+    await screen.handleKey("j");
+
+    const output = renderPlain((renderer) => screen.render(renderer));
+    expect(caller.calls[0]).toEqual({
+      procedure: "routing.list",
+      input: { projectId: "project-1" },
+    });
+    expect(output).toContain("project");
+    expect(output).not.toContain("Bug triage");
+  });
+
+  test("backends tab reflects feature flags and input mode from the real environment", async () => {
+    const previousFeatures = process.env.FULCRUM_FEATURES;
+    const previousInputMode = process.env.FULCRUM_LLM_INPUT_MODE;
+    process.env.FULCRUM_FEATURES = "router-llm,other";
+    process.env.FULCRUM_LLM_INPUT_MODE = "facts_only";
+    try {
+      const screen = new RoutingRulesScreen({ caller: fakeCaller() });
+      await screen.load();
+      await screen.handleKey("l");
+      await screen.handleKey("l");
+      await screen.handleKey("l");
+
+      const output = renderPlain((renderer) => screen.render(renderer));
+      expect(output).toContain("Inference Backends");
+      expect(output).toContain("LLM Routing");
+      expect(output).toContain("enabled");
+      expect(output).toContain("facts_only");
+      expect(output).toContain("OpenAI-compatible");
+    } finally {
+      if (previousFeatures === undefined) delete process.env.FULCRUM_FEATURES;
+      else process.env.FULCRUM_FEATURES = previousFeatures;
+      if (previousInputMode === undefined) delete process.env.FULCRUM_LLM_INPUT_MODE;
+      else process.env.FULCRUM_LLM_INPUT_MODE = previousInputMode;
+    }
   });
 });

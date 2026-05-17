@@ -15,8 +15,6 @@ brew install \
 
 ```bash
 pip install semgrep lizard
-npm install -g repomix ctx7 @playwright/cli
-uv tool install graphifyy tavily-cli
 ```
 
 | Tool | Replaces | Agent use |
@@ -49,8 +47,6 @@ Fulcrum treats the toolchain above as external setup. `fulcrum doctor` reports p
 | Tool | Install | Provides |
 |---|---|---|
 | `ast-grep` | `brew install ast-grep` | Structural AST pattern search + skill |
-| `repomix` | `npm install -g repomix` | Pack repo into context + skill |
-| `graphify` | `uv tool install graphifyy` | Code knowledge graph + skill |
 | `semgrep` | `pip install semgrep` | SAST scan, 1000+ rules, no account, local |
 | `lizard` | `pip install lizard` | Cyclomatic complexity + function length, JSON output, 27 languages |
 

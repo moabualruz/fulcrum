@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 
-import { resolveClientAssetPath } from "../../src/cli/index.ts";
+import { resolveClientAssetPath } from "@fulcrum/cli/index.ts";
 
 describe("resolveClientAssetPath", () => {
   const clientRoot = resolve("/tmp/fulcrum-web-client");

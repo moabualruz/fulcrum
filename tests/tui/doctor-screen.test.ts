@@ -4,16 +4,16 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
-import { Renderer } from "../../src/tui/renderer.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
   DoctorScreen,
   evaluateOpenTuiGate,
   runOpenTuiSnapshotGate,
   OPENTUI_GATE_THRESHOLD,
   TuiDoctorCheckSchema,
-} from "../../src/tui/screens/doctor.ts";
-import type { DoctorCheckResult } from "../../src/doctor/types.ts";
+} from "@fulcrum/tui/screens/doctor.ts";
+import type { DoctorCheckResult } from "@platform-core/interface/doctor-results.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

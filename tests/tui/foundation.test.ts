@@ -4,23 +4,20 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { TRPCError } from "@trpc/server";
-import { Container } from "@needle-di/core";
-import { MikroORM } from "@mikro-orm/postgresql";
-
-import { t } from "../../src/trpc/trpc.ts";
-import { appRouter } from "../../src/trpc/router.ts";
-import { createContext } from "../../src/trpc/context.ts";
-import { buildCaller, TuiApp, type TuiCaller } from "../../src/tui/index.ts";
-import { TuiRouter } from "../../src/tui/router.ts";
-import { SubscriptionBridge } from "../../src/tui/subscriptions.ts";
-import { JsonlCrashLog } from "../../src/tui/crashlog.ts";
-import { DbTelemetrySink, MemoryTelemetrySink } from "../../src/tui/telemetry.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
-import { registerDbBindings } from "../../src/db/db.module.ts";
-import { Org, User } from "../../src/db/entities/auth/index.ts";
-import { Account } from "../../src/db/entities/auth/Account.ts";
-import { TelemetryEvent } from "../../src/db/entities/platform/TelemetryEvent.ts";
-import { createTestOrm, type TestOrm } from "../../src/test-utils/db.ts";
+import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { createContext } from "@fulcrum/server/trpc/context.ts";
+import { buildCaller, TuiApp, type TuiCaller } from "@fulcrum/tui/index.ts";
+import { TuiRouter } from "@fulcrum/tui/router.ts";
+import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
+import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
+import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
+import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
+import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { createTestContainer } from "@test-support/application-container.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
 
@@ -59,11 +56,8 @@ function fakeCaller(): TuiCaller {
   };
 }
 
-function testContainer(db: TestOrm): Container {
-  const container = new Container();
-  container.bind({ provide: MikroORM, useValue: db.orm });
-  registerDbBindings(container, db.orm, db.em);
-  return container;
+function testContainer(db: TestOrm) {
+  return createTestContainer(db);
 }
 
 describe("TuiRouter", () => {
@@ -158,16 +152,15 @@ describe("TuiApp foundation behavior", () => {
   it("production caller resolves local seeded session, org name, passkeys, and flags from DB context", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
-      const user = await em.findOneOrFail(User, { id: db.seed.userId });
-      em.persist(em.create(Account, {
+      const em = db.em;
+      const user = await em.findOneOrFail(User, { where: { id: db.seed.userId } });
+      await em.getRepository(Account).save({
         userId: user.id,
         providerId: "passkey",
         accountId: "credential-a",
         createdAt: new Date(),
         updatedAt: new Date(),
-      }));
-      await em.flush();
+      });
 
       const caller = await buildCaller(testContainer(db));
       const whoami = await caller.auth.whoami();
@@ -209,9 +202,9 @@ describe("TuiApp foundation behavior", () => {
   it("DB telemetry sink inserts a telemetry_events row per render", async () => {
     const db = await createTestOrm();
     try {
-      const em = db.em.fork();
-      const org = await em.findOneOrFail(Org, { id: db.seed.orgId });
-      const user = await em.findOneOrFail(User, { id: db.seed.userId });
+      const em = db.em;
+      const org = await em.findOneOrFail(Org, { where: { id: db.seed.orgId } });
+      const user = await em.findOneOrFail(User, { where: { id: db.seed.userId } });
       const app = new TuiApp({
         output: new FakeTTY(),
         caller: await buildCaller(testContainer(db)),
@@ -221,7 +214,7 @@ describe("TuiApp foundation behavior", () => {
       await app.mount();
       await app.navigateTo("auth");
 
-      const rows = await em.find(TelemetryEvent, { org });
+      const rows = await em.find(TelemetryEvent, { where: { org: { id: org.id } } });
       expect(rows).toHaveLength(2);
       expect(rows.map((row) => row.kind)).toEqual(["local_telemetry", "local_telemetry"]);
       expect(rows.map((row) => row.payload["screen_key"])).toContain("nav");
@@ -289,16 +282,26 @@ describe("SubscriptionBridge", () => {
 
 describe("TUI in-process tRPC caller smoke", () => {
   it("tasks.list returns typed data with session and is forbidden without session", async () => {
-    const authed = createCaller(
-      createContext({
-        session: mockSession() as unknown as import("better-auth").Session,
-        orgId: "org-tui",
-        userId: "user-tui",
-        em: null,
-        container: null,
-      }),
-    );
-    await expect(authed.tasks.list()).resolves.toEqual([]);
+    const db = await createTestOrm();
+    try {
+      const authed = createCaller(
+        createContext({
+          session: {
+            ...mockSession(),
+            userId: db.seed.userId,
+            orgId: db.seed.orgId,
+            activeOrganizationId: db.seed.orgId,
+          } as unknown as import("better-auth").Session,
+          orgId: db.seed.orgId,
+          userId: db.seed.userId,
+          em: db.em,
+          container: testContainer(db),
+        }),
+      );
+      await expect(authed.tasks.list()).resolves.toEqual([]);
+    } finally {
+      await db.close();
+    }
 
     const bad = createCaller(
       createContext({

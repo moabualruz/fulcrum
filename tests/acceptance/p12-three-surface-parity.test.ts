@@ -18,11 +18,11 @@
 import { describe, expect, it, beforeEach } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { run as runNotifyCli } from "../../src/cli/notify.ts";
-import { run as runAuditCli, type AuditClient } from "../../src/cli/audit.ts";
-import { NotificationsScreen, type TuiNotification } from "../../src/tui/screens/notifications.ts";
-import { AuditLogScreen, type TuiAuditRow } from "../../src/tui/screens/audit.ts";
-import type { Renderer } from "../../src/tui/renderer.ts";
+import { run as runNotifyCli } from "@fulcrum/cli/notify.ts";
+import { run as runAuditCli, type AuditClient } from "@fulcrum/cli/audit.ts";
+import { NotificationsScreen, type TuiNotification } from "@fulcrum/tui/screens/notifications.ts";
+import { AuditLogScreen, type TuiAuditRow } from "@fulcrum/tui/screens/audit.ts";
+import type { Renderer } from "@fulcrum/tui/renderer.ts";
 
 const ROOT = join(import.meta.dir, "../..");
 
@@ -71,19 +71,19 @@ function notification(overrides: Partial<TuiNotification> = {}): TuiNotification
 
 describe("P12 Web surface — route files exist", () => {
   it("inbox route: +page.svelte exists", () => {
-    expect(existsSync(join(ROOT, "src/web/src/routes/inbox/+page.svelte"))).toBe(true);
+    expect(existsSync(join(ROOT, "apps/web/src/routes/inbox/+page.svelte"))).toBe(true);
   });
 
   it("inbox route: +page.server.ts exists", () => {
-    expect(existsSync(join(ROOT, "src/web/src/routes/inbox/+page.server.ts"))).toBe(true);
+    expect(existsSync(join(ROOT, "apps/web/src/routes/inbox/+page.server.ts"))).toBe(true);
   });
 
   it("audit route: +page.svelte exists", () => {
-    expect(existsSync(join(ROOT, "src/web/src/routes/audit/+page.svelte"))).toBe(true);
+    expect(existsSync(join(ROOT, "apps/web/src/routes/audit/+page.svelte"))).toBe(true);
   });
 
   it("audit route: +page.server.ts exists", () => {
-    expect(existsSync(join(ROOT, "src/web/src/routes/audit/+page.server.ts"))).toBe(true);
+    expect(existsSync(join(ROOT, "apps/web/src/routes/audit/+page.server.ts"))).toBe(true);
   });
 });
 
@@ -105,7 +105,7 @@ describe("P12 CLI surface — fulcrum notify", () => {
   });
 
   it("notify exports run function (module contract)", async () => {
-    const mod = await import("../../src/cli/notify.ts");
+    const mod = await import("@fulcrum/cli/notify.ts");
     expect(typeof mod.run).toBe("function");
   });
 });
@@ -165,12 +165,12 @@ describe("P12 CLI surface — fulcrum audit", () => {
   });
 
   it("audit exports run function (module contract)", async () => {
-    const mod = await import("../../src/cli/audit.ts");
+    const mod = await import("@fulcrum/cli/audit.ts");
     expect(typeof mod.run).toBe("function");
   });
 
   it("audit CLI exports AuditClient type (TypeScript shape contract)", async () => {
-    const mod = await import("../../src/cli/audit.ts");
+    const mod = await import("@fulcrum/cli/audit.ts");
     // run signature must accept 2 args
     expect(mod.run.length).toBeGreaterThanOrEqual(1);
   });

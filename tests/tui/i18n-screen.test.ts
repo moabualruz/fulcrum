@@ -1,6 +1,6 @@
 /**
  * TDD — i18n screen gating.
- * RED written first; GREEN by src/tui/screens/i18n-screen.ts.
+ * RED written first; GREEN by apps/tui/src/screens/i18n-screen.ts.
  *
  * Acceptance criteria covered:
  *  - i18n OFF → screen hidden, "Feature disabled" banner
@@ -17,8 +17,8 @@ import {
   selectLocale,
   i18nTabVisible,
   SETTINGS_KEY_LOCALE,
-} from "../../src/tui/screens/i18n-screen.ts";
-import { resetFeaturesCache } from "../../src/flags/index.ts";
+} from "@fulcrum/tui/screens/i18n-screen.ts";
+import { resetFeaturesCache } from "@platform-core/application/feature-flags/index.ts";
 
 // Minimal in-memory SettingsService for tests.
 function makeSettings(initial: Record<string, string> = {}): {
@@ -95,6 +95,14 @@ describe("i18n screen — flag ON", () => {
     const settings = makeSettings();
     const result = await renderI18nScreen({ settings, env });
     expect(result.locales).toContain("fr");
+  });
+
+  test("renderI18nScreen includes en, fr, and ar in locales list", async () => {
+    const settings = makeSettings();
+    const result = await renderI18nScreen({ settings, env });
+    expect(result.locales).toContain("en");
+    expect(result.locales).toContain("fr");
+    expect(result.locales).toContain("ar");
   });
 
   test("i18nTabVisible returns true when flag ON", () => {

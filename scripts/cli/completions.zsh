@@ -7,7 +7,7 @@ _fulcrum_dynamic_ids() {
 
 _fulcrum() {
   local -a domains
-  domains=('agent_runs:fulcrum agent_runs' 'agents:fulcrum agents' 'artifacts:fulcrum artifacts' 'audit:fulcrum audit' 'auth:fulcrum auth' 'backup:fulcrum backup' 'connectors:fulcrum connectors' 'context:fulcrum context' 'credentials:fulcrum credentials' 'custom_fields:fulcrum custom_fields' 'customFieldDefs:fulcrum customFieldDefs' 'dataExport:fulcrum dataExport' 'dataImport:fulcrum dataImport' 'db:fulcrum db' 'doc_comments:fulcrum doc_comments' 'doc_links:fulcrum doc_links' 'doc_versions:fulcrum doc_versions' 'docs:fulcrum docs' 'doctor:fulcrum doctor' 'errorLogs:fulcrum errorLogs' 'flags:fulcrum flags' 'fulcrum_skills:fulcrum fulcrum_skills' 'health:fulcrum health' 'inference:fulcrum inference' 'invitations:fulcrum invitations' 'memories:fulcrum memories' 'memory:fulcrum memory' 'notifications:fulcrum notifications' 'notify:fulcrum notify' 'notifySubscriptions:fulcrum notifySubscriptions' 'orchestrationSubscriptions:fulcrum orchestrationSubscriptions' 'orgs:fulcrum orgs' 'projects:fulcrum projects' 'repo_branches:fulcrum repo_branches' 'repo_commits:fulcrum repo_commits' 'reports:fulcrum reports' 'repos:fulcrum repos' 'routing:fulcrum routing' 'runs:fulcrum runs' 'runsSubscriptions:fulcrum runsSubscriptions' 'saved_views:fulcrum saved_views' 'search:fulcrum search' 'skills:fulcrum skills' 'sprints:fulcrum sprints' 'taskCustomFields:fulcrum taskCustomFields' 'tasks:fulcrum tasks' 'telemetry:fulcrum telemetry' 'theme:fulcrum theme' 'webhooks:fulcrum webhooks')
+  domains=('agent_runs:fulcrum agent_runs' 'agents:fulcrum agents' 'artifacts:fulcrum artifacts' 'audit:fulcrum audit' 'auth:fulcrum auth' 'automations:fulcrum automations' 'backup:fulcrum backup' 'comments:fulcrum comments' 'connectors:fulcrum connectors' 'context:fulcrum context' 'credentials:fulcrum credentials' 'customFieldDefs:fulcrum customFieldDefs' 'dataExport:fulcrum dataExport' 'dataImport:fulcrum dataImport' 'db:fulcrum db' 'doc_comments:fulcrum doc_comments' 'doc_links:fulcrum doc_links' 'doc_versions:fulcrum doc_versions' 'docs:fulcrum docs' 'doctor:fulcrum doctor' 'errorLogs:fulcrum errorLogs' 'flags:fulcrum flags' 'fulcrum_skills:fulcrum fulcrum_skills' 'health:fulcrum health' 'inference:fulcrum inference' 'invitations:fulcrum invitations' 'memories:fulcrum memories' 'notify:fulcrum notify' 'notifySubscriptions:fulcrum notifySubscriptions' 'orchestrationSubscriptions:fulcrum orchestrationSubscriptions' 'orgs:fulcrum orgs' 'planning:fulcrum planning' 'projects:fulcrum projects' 'recurrence:fulcrum recurrence' 'relationships:fulcrum relationships' 'repo_branches:fulcrum repo_branches' 'repo_commits:fulcrum repo_commits' 'reports:fulcrum reports' 'repos:fulcrum repos' 'review:fulcrum review' 'routing:fulcrum routing' 'runsSubscriptions:fulcrum runsSubscriptions' 'saved_views:fulcrum saved_views' 'search:fulcrum search' 'sprints:fulcrum sprints' 'taskCustomFields:fulcrum taskCustomFields' 'tasks:fulcrum tasks' 'telemetry:fulcrum telemetry' 'templates:fulcrum templates' 'theme:fulcrum theme' 'webhooks:fulcrum webhooks' 'workflows:fulcrum workflows')
   if (( CURRENT == 2 )); then
     _describe 'fulcrum command' domains
     return
@@ -26,7 +26,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     artifacts)
-      local -a values=('archive:fulcrum artifacts archive' 'delete:fulcrum artifacts delete' 'download:fulcrum artifacts download' 'get:fulcrum artifacts get' 'list:fulcrum artifacts list' 'unarchive:fulcrum artifacts unarchive' 'upload:fulcrum artifacts upload' '--json:option')
+      local -a values=('accept:fulcrum artifacts accept' 'archive:fulcrum artifacts archive' 'delete:fulcrum artifacts delete' 'download:fulcrum artifacts download' 'get:fulcrum artifacts get' 'list:fulcrum artifacts list' 'reject:fulcrum artifacts reject' 'unarchive:fulcrum artifacts unarchive' 'upload:fulcrum artifacts upload' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'artifacts')
         return
@@ -41,8 +41,24 @@ _fulcrum() {
       local -a values=('accept-invite:fulcrum auth accept-invite' 'invite:fulcrum auth invite' 'whoami:fulcrum auth whoami' '--json:option')
       _describe 'command or option' values
       ;;
+    automations)
+      local -a values=('create:fulcrum automations create' 'delete:fulcrum automations delete' 'list:fulcrum automations list' 'templates:fulcrum automations templates' 'update:fulcrum automations update' '--json:option')
+      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
+        _values 'ids' $(_fulcrum_dynamic_ids 'automations')
+        return
+      fi
+      _describe 'command or option' values
+      ;;
     backup)
       local -a values=('create:fulcrum backup create' 'restore:fulcrum backup restore' '--json:option')
+      _describe 'command or option' values
+      ;;
+    comments)
+      local -a values=('add-reaction:fulcrum comments add-reaction' 'create:fulcrum comments create' 'delete:fulcrum comments delete' 'list:fulcrum comments list' 'remove-reaction:fulcrum comments remove-reaction' 'resolve:fulcrum comments resolve' 'subscribe:fulcrum comments subscribe' 'threaded:fulcrum comments threaded' 'unresolve:fulcrum comments unresolve' 'unsubscribe:fulcrum comments unsubscribe' 'watchers:fulcrum comments watchers' '--json:option')
+      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
+        _values 'ids' $(_fulcrum_dynamic_ids 'comments')
+        return
+      fi
       _describe 'command or option' values
       ;;
     connectors)
@@ -61,14 +77,6 @@ _fulcrum() {
       local -a values=('archive:fulcrum credentials archive' 'get:fulcrum credentials get' 'list:fulcrum credentials list' 'remove:fulcrum credentials remove' 'rotate:fulcrum credentials rotate' 'set:fulcrum credentials set' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'credentials')
-        return
-      fi
-      _describe 'command or option' values
-      ;;
-    custom_fields)
-      local -a values=('create:fulcrum custom_fields create' 'delete:fulcrum custom_fields delete' 'list:fulcrum custom_fields list' 'reorder:fulcrum custom_fields reorder' 'update:fulcrum custom_fields update' '--json:option')
-      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'custom_fields')
         return
       fi
       _describe 'command or option' values
@@ -94,7 +102,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     doc_comments)
-      local -a values=('create:fulcrum doc_comments create' 'delete:fulcrum doc_comments delete' 'list:fulcrum doc_comments list' 'update:fulcrum doc_comments update' '--json:option')
+      local -a values=('create:fulcrum doc_comments create' 'delete:fulcrum doc_comments delete' 'list:fulcrum doc_comments list' 'resolve:fulcrum doc_comments resolve' 'update:fulcrum doc_comments update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'doc_comments')
         return
@@ -110,7 +118,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     doc_versions)
-      local -a values=('get:fulcrum doc_versions get' 'list:fulcrum doc_versions list' 'restore:fulcrum doc_versions restore' '--json:option')
+      local -a values=('diff:fulcrum doc_versions diff' 'get:fulcrum doc_versions get' 'list:fulcrum doc_versions list' 'restore:fulcrum doc_versions restore' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'doc_versions')
         return
@@ -146,7 +154,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     fulcrum_skills)
-      local -a values=('install:fulcrum fulcrum_skills install' 'list:fulcrum fulcrum_skills list' 'resolve-conflict:fulcrum fulcrum_skills resolve-conflict' 'sync:fulcrum fulcrum_skills sync' 'uninstall:fulcrum fulcrum_skills uninstall' 'upgrade:fulcrum fulcrum_skills upgrade' '--json:option')
+      local -a values=('conflicts list:fulcrum fulcrum_skills conflicts list' 'conflicts override:fulcrum fulcrum_skills conflicts override' 'install:fulcrum fulcrum_skills install' 'list:fulcrum fulcrum_skills list' 'lock override:fulcrum fulcrum_skills lock override' 'registry list:fulcrum fulcrum_skills registry list' 'resolve-conflict:fulcrum fulcrum_skills resolve-conflict' 'sync:fulcrum fulcrum_skills sync' 'uninstall:fulcrum fulcrum_skills uninstall' 'upgrade:fulcrum fulcrum_skills upgrade' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'fulcrum_skills')
         return
@@ -158,7 +166,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     inference)
-      local -a values=('backends list:fulcrum inference backends list' 'classify:fulcrum inference classify' 'config get:fulcrum inference config get' 'config set:fulcrum inference config set' 'embed:fulcrum inference embed' 'generate:fulcrum inference generate' 'health:fulcrum inference health' 'models list:fulcrum inference models list' 'models pull:fulcrum inference models pull' 'models rm:fulcrum inference models rm' 'provider set:fulcrum inference provider set' 'provider test:fulcrum inference provider test' 'tokenize:fulcrum inference tokenize' '--json:option' '--watch:option')
+      local -a values=('backends list:fulcrum inference backends list' 'backends probe:fulcrum inference backends probe' 'classify:fulcrum inference classify' 'config get:fulcrum inference config get' 'config set:fulcrum inference config set' 'embed:fulcrum inference embed' 'generate:fulcrum inference generate' 'health:fulcrum inference health' 'models list:fulcrum inference models list' 'models pull:fulcrum inference models pull' 'models rm:fulcrum inference models rm' 'provider set:fulcrum inference provider set' 'provider test:fulcrum inference provider test' 'tokenize:fulcrum inference tokenize' '--json:option' '--watch:option')
       _describe 'command or option' values
       ;;
     invitations)
@@ -170,25 +178,9 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     memories)
-      local -a values=('create:fulcrum memories create' 'delete:fulcrum memories delete' 'get:fulcrum memories get' 'list:fulcrum memories list' 'search:fulcrum memories search' 'update:fulcrum memories update' '--json:option')
+      local -a values=('create:fulcrum memories create' 'delete:fulcrum memories delete' 'get:fulcrum memories get' 'list:fulcrum memories list' 'promote:fulcrum memories promote' 'search:fulcrum memories search' 'update:fulcrum memories update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'memories')
-        return
-      fi
-      _describe 'command or option' values
-      ;;
-    memory)
-      local -a values=('create:fulcrum memory create' 'delete:fulcrum memory delete' 'get:fulcrum memory get' 'list:fulcrum memory list' 'search:fulcrum memory search' 'update:fulcrum memory update' '--json:option')
-      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'memory')
-        return
-      fi
-      _describe 'command or option' values
-      ;;
-    notifications)
-      local -a values=('channels config:fulcrum notifications channels config' 'channels list:fulcrum notifications channels list' 'channels test:fulcrum notifications channels test' 'list:fulcrum notifications list' 'mark-all-read:fulcrum notifications mark-all-read' 'mark-read:fulcrum notifications mark-read' 'mute:fulcrum notifications mute' 'mutes list:fulcrum notifications mutes list' 'quiet-hours get:fulcrum notifications quiet-hours get' 'quiet-hours set:fulcrum notifications quiet-hours set' 'rules create:fulcrum notifications rules create' 'rules delete:fulcrum notifications rules delete' 'rules get:fulcrum notifications rules get' 'rules list:fulcrum notifications rules list' 'rules update:fulcrum notifications rules update' 'unmute:fulcrum notifications unmute' 'unread-count:fulcrum notifications unread-count' '--json:option')
-      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'notifications')
         return
       fi
       _describe 'command or option' values
@@ -213,12 +205,28 @@ _fulcrum() {
       local -a values=('get:fulcrum orgs get' 'members list:fulcrum orgs members list' 'members remove:fulcrum orgs members remove' 'members update-role:fulcrum orgs members update-role' 'update:fulcrum orgs update' '--json:option')
       _describe 'command or option' values
       ;;
+    planning)
+      local -a values=('build-freeform-docs-planning-prompt:fulcrum planning build-freeform-docs-planning-prompt' 'generate-technical-planning-cycle:fulcrum planning generate-technical-planning-cycle' 'materialize-approved-plan-breakdown:fulcrum planning materialize-approved-plan-breakdown' 'preview-approved-plan-breakdown:fulcrum planning preview-approved-plan-breakdown' 'restart-planning-cycle-from-updates:fulcrum planning restart-planning-cycle-from-updates' 'start-freeform-work-from-docs:fulcrum planning start-freeform-work-from-docs' 'start-guided-acp-planning-session:fulcrum planning start-guided-acp-planning-session' '--json:option')
+      _describe 'command or option' values
+      ;;
     projects)
       local -a values=('create:fulcrum projects create' 'delete:fulcrum projects delete' 'get:fulcrum projects get' 'list:fulcrum projects list' 'stats:fulcrum projects stats' 'update:fulcrum projects update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'projects')
         return
       fi
+      _describe 'command or option' values
+      ;;
+    recurrence)
+      local -a values=('create:fulcrum recurrence create' 'delete:fulcrum recurrence delete' 'list:fulcrum recurrence list' '--json:option')
+      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
+        _values 'ids' $(_fulcrum_dynamic_ids 'recurrence')
+        return
+      fi
+      _describe 'command or option' values
+      ;;
+    relationships)
+      local -a values=('blocked-items:fulcrum relationships blocked-items' 'blockers:fulcrum relationships blockers' 'create:fulcrum relationships create' 'delete:fulcrum relationships delete' 'list-blocked-by:fulcrum relationships list-blocked-by' 'list-for-task:fulcrum relationships list-for-task' 'mark-as-duplicate:fulcrum relationships mark-as-duplicate' 'summary:fulcrum relationships summary' '--json:option')
       _describe 'command or option' values
       ;;
     repo_branches)
@@ -238,29 +246,25 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     reports)
-      local -a values=('burndown:fulcrum reports burndown' '--json:option')
+      local -a values=('blocked-items:fulcrum reports blocked-items' 'burndown:fulcrum reports burndown' 'burnup:fulcrum reports burnup' 'cfd:fulcrum reports cfd' 'cycle-time:fulcrum reports cycle-time' 'export-csv:fulcrum reports export-csv' 'lead-time:fulcrum reports lead-time' 'progress-rollup:fulcrum reports progress-rollup' 'stale-issues:fulcrum reports stale-issues' 'throughput:fulcrum reports throughput' 'velocity:fulcrum reports velocity' 'wip-over-time:fulcrum reports wip-over-time' 'workload:fulcrum reports workload' '--json:option')
       _describe 'command or option' values
       ;;
     repos)
-      local -a values=('get:fulcrum repos get' 'list:fulcrum repos list' 'register:fulcrum repos register' 'sync:fulcrum repos sync' 'unregister:fulcrum repos unregister' '--json:option')
+      local -a values=('get:fulcrum repos get' 'list:fulcrum repos list' 'register:fulcrum repos register' 'status-repo:fulcrum repos status-repo' 'sync:fulcrum repos sync' 'sync-repo:fulcrum repos sync-repo' 'unregister:fulcrum repos unregister' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'repos')
         return
       fi
       _describe 'command or option' values
       ;;
-    routing)
-      local -a values=('create:fulcrum routing create' 'delete:fulcrum routing delete' 'dry-run:fulcrum routing dry-run' 'get:fulcrum routing get' 'list:fulcrum routing list' 'test:fulcrum routing test' 'update:fulcrum routing update' '--json:option')
-      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'routing')
-        return
-      fi
+    review)
+      local -a values=('append-review-workbench-annotation:fulcrum review append-review-workbench-annotation' 'apply-configured-uat-code-review-decision:fulcrum review apply-configured-uat-code-review-decision' 'final-qa:fulcrum review final-qa' 'final-qa-feedback-gate:fulcrum review final-qa-feedback-gate' 'load-review-workbench-session:fulcrum review load-review-workbench-session' 'record-uat-code-review-decision:fulcrum review record-uat-code-review-decision' 'review-workbench:fulcrum review review-workbench' 'run-generated-e2e-regression-tests:fulcrum review run-generated-e2e-regression-tests' 'save-review-workbench-session:fulcrum review save-review-workbench-session' 'uat-code-review-handoff:fulcrum review uat-code-review-handoff' '--json:option')
       _describe 'command or option' values
       ;;
-    runs)
-      local -a values=('cancel:fulcrum runs cancel' 'create:fulcrum runs create' 'get:fulcrum runs get' 'list:fulcrum runs list' 'retry:fulcrum runs retry' '--json:option')
+    routing)
+      local -a values=('config update-llm-gate:fulcrum routing config update-llm-gate' 'create:fulcrum routing create' 'delete:fulcrum routing delete' 'drafts approve:fulcrum routing drafts approve' 'drafts delete:fulcrum routing drafts delete' 'drafts list:fulcrum routing drafts list' 'drafts update:fulcrum routing drafts update' 'dry-run:fulcrum routing dry-run' 'get:fulcrum routing get' 'list:fulcrum routing list' 'test:fulcrum routing test' 'update:fulcrum routing update' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'runs')
+        _values 'ids' $(_fulcrum_dynamic_ids 'routing')
         return
       fi
       _describe 'command or option' values
@@ -278,15 +282,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     search)
-      local -a values=('query:fulcrum search query' 'saved-create:fulcrum search saved-create' 'saved-delete:fulcrum search saved-delete' 'saved-list:fulcrum search saved-list' 'saved-update:fulcrum search saved-update' 'suggest:fulcrum search suggest' '--json:option')
-      _describe 'command or option' values
-      ;;
-    skills)
-      local -a values=('install:fulcrum skills install' 'list:fulcrum skills list' 'resolve-conflict:fulcrum skills resolve-conflict' 'sync:fulcrum skills sync' 'uninstall:fulcrum skills uninstall' 'upgrade:fulcrum skills upgrade' '--json:option')
-      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
-        _values 'ids' $(_fulcrum_dynamic_ids 'skills')
-        return
-      fi
+      local -a values=('query:fulcrum search query' 'record-click:fulcrum search record-click' 'saved-create:fulcrum search saved-create' 'saved-delete:fulcrum search saved-delete' 'saved-list:fulcrum search saved-list' 'saved-update:fulcrum search saved-update' 'snapshot:fulcrum search snapshot' 'suggest:fulcrum search suggest' '--json:option')
       _describe 'command or option' values
       ;;
     sprints)
@@ -302,7 +298,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     tasks)
-      local -a values=('bulk-delete:fulcrum tasks bulk-delete' 'bulk-update:fulcrum tasks bulk-update' 'create:fulcrum tasks create' 'delete:fulcrum tasks delete' 'get:fulcrum tasks get' 'list:fulcrum tasks list' 'list-children:fulcrum tasks list-children' 'set-dependencies:fulcrum tasks set-dependencies' 'set-parent:fulcrum tasks set-parent' 'update:fulcrum tasks update' '--json:option')
+      local -a values=('bulk-delete:fulcrum tasks bulk-delete' 'bulk-update:fulcrum tasks bulk-update' 'create:fulcrum tasks create' 'delete:fulcrum tasks delete' 'dependency-run-live-feedback:fulcrum tasks dependency-run-live-feedback' 'dependency-run-live-feedback-stream:fulcrum tasks dependency-run-live-feedback-stream' 'dispatch-dependency-run:fulcrum tasks dispatch-dependency-run' 'get:fulcrum tasks get' 'list:fulcrum tasks list' 'list-children:fulcrum tasks list-children' 'manual-workbench:fulcrum tasks manual-workbench' 'preview-dependency-run:fulcrum tasks preview-dependency-run' 'record-qa-review:fulcrum tasks record-qa-review' 'run-automated-feedback-loop:fulcrum tasks run-automated-feedback-loop' 'run-dependency-run-worker-tick:fulcrum tasks run-dependency-run-worker-tick' 'set-dependencies:fulcrum tasks set-dependencies' 'set-parent:fulcrum tasks set-parent' 'update:fulcrum tasks update' '--json:option' '--watch:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'tasks')
         return
@@ -313,8 +309,16 @@ _fulcrum() {
       local -a values=('opt-in:fulcrum telemetry opt-in' 'opt-out:fulcrum telemetry opt-out' 'purge:fulcrum telemetry purge' 'status:fulcrum telemetry status' '--json:option')
       _describe 'command or option' values
       ;;
+    templates)
+      local -a values=('apply-template:fulcrum templates apply-template' 'create:fulcrum templates create' 'delete:fulcrum templates delete' 'list:fulcrum templates list' 'set-default:fulcrum templates set-default' '--json:option')
+      if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
+        _values 'ids' $(_fulcrum_dynamic_ids 'templates')
+        return
+      fi
+      _describe 'command or option' values
+      ;;
     theme)
-      local -a values=('get-theme:fulcrum theme get-theme' 'list-themes:fulcrum theme list-themes' 'set-theme:fulcrum theme set-theme' '--json:option')
+      local -a values=('get:fulcrum theme get' 'get-theme:fulcrum theme get-theme' 'list-themes:fulcrum theme list-themes' 'set-theme:fulcrum theme set-theme' 'update:fulcrum theme update' '--json:option')
       _describe 'command or option' values
       ;;
     webhooks)
@@ -323,6 +327,10 @@ _fulcrum() {
         _values 'ids' $(_fulcrum_dynamic_ids 'webhooks')
         return
       fi
+      _describe 'command or option' values
+      ;;
+    workflows)
+      local -a values=('get-default:fulcrum workflows get-default' 'get-enabled-task-types:fulcrum workflows get-enabled-task-types' 'get-methodology:fulcrum workflows get-methodology' 'get-transitions:fulcrum workflows get-transitions' 'run-acceptance-cycle:fulcrum workflows run-acceptance-cycle' 'update-enabled-task-types:fulcrum workflows update-enabled-task-types' 'update-methodology:fulcrum workflows update-methodology' 'update-transitions:fulcrum workflows update-transitions' 'validate-transition:fulcrum workflows validate-transition' '--json:option')
       _describe 'command or option' values
       ;;
   esac

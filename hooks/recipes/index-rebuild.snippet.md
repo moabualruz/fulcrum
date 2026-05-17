@@ -1,7 +1,5 @@
 ### `index-rebuild` registration
 
-Runs after the agent finishes a turn; rebuilds ctags / graphify / repomix only when HEAD changed or working tree dirty.
-
 **Claude Code** — `~/.claude/settings.json`
 ```json
 { "hooks": { "Stop": [

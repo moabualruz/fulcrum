@@ -13,12 +13,14 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { FakeTTY, stripAnsi } from "../../src/tui/testing/fake-tty.ts";
-import { TuiApp } from "../../src/tui/index.ts";
-import type { TuiCaller } from "../../src/tui/index.ts";
-import { AuthScreen } from "../../src/tui/screens/auth.ts";
-import { FlagsScreen } from "../../src/tui/screens/flags.ts";
-import { Renderer } from "../../src/tui/renderer.ts";
+import { FakeTTY, stripAnsi } from "@fulcrum/tui/testing/fake-tty.ts";
+import { launchTui, TuiApp } from "@fulcrum/tui/index.ts";
+import type { TuiCaller } from "@fulcrum/tui/index.ts";
+import { AuthScreen } from "@fulcrum/tui/screens/auth.ts";
+import { FlagsScreen } from "@fulcrum/tui/screens/flags.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
+import type { TuiCrashLog } from "@fulcrum/tui/crashlog.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test doubles
@@ -142,6 +144,279 @@ describe("TuiApp — headless mount", () => {
 
     expect(app.screen).toBe("nav");
     app.stop();
+  });
+
+  it("falls back to local unauthenticated status when whoami fails", async () => {
+    const tty = new FakeTTY();
+    const app = new TuiApp({
+      output: tty,
+      caller: {
+        ...fakeCaller(),
+        auth: {
+          whoami: async () => {
+            throw new Error("auth service unavailable");
+          },
+        },
+      },
+    });
+
+    await app.mount();
+
+    expect(app.statusBarInfo).toEqual({ email: "(unauthenticated)", orgId: "local" });
+    expect(tty.plainText()).toContain("(unauthenticated)");
+    app.stop();
+  });
+
+  it("mount attaches input and stop detaches it", async () => {
+    const tty = new FakeTTY();
+    let exits = 0;
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+      onExit: () => {
+        exits += 1;
+      },
+    });
+
+    await app.mount();
+    tty.inject("q");
+    await Bun.sleep(0);
+
+    expect(exits).toBe(1);
+    app.stop();
+    tty.inject("q");
+    await Bun.sleep(0);
+    expect(exits).toBe(1);
+    expect(app.isRunning).toBe(false);
+  });
+
+  it("launchTui mounts the supplied headless output", async () => {
+    const tty = new FakeTTY();
+
+    const app = await launchTui({ output: tty, caller: fakeCaller() });
+
+    expect(app.isRunning).toBe(true);
+    expect(tty.plainText()).toContain("Fulcrum TUI");
+    app.stop();
+  });
+
+  it("records telemetry for normal and crashed renders", async () => {
+    const tty = new FakeTTY();
+    const telemetry = new MemoryTelemetrySink();
+    const crashRows: Array<{ message: string; screenKey: string; route?: string }> = [];
+    const crashLog: TuiCrashLog = {
+      write: async (error, context) => {
+        crashRows.push({
+          message: error instanceof Error ? error.message : String(error),
+          screenKey: context.screenKey,
+          route: context.route,
+        });
+      },
+    };
+    const app = new TuiApp({
+      output: tty,
+      caller: fakeCaller(),
+      telemetry,
+      crashLog,
+      routes: [{
+        path: "/broken",
+        screenKey: "broken-route",
+        title: "Broken",
+        render: () => {
+          throw new Error("route render failed");
+        },
+      }],
+    });
+
+    await app.mount();
+    await app.navigatePath("/broken");
+
+    expect(tty.plainText()).toContain("TUI error");
+    expect(tty.plainText()).toContain("route render failed");
+    expect(crashRows).toEqual([{ message: "route render failed", screenKey: "broken-route", route: "/broken" }]);
+    expect(telemetry.rows.some((row) => row.screenKey === "broken-route" && row.route === "/broken")).toBe(true);
+    app.stop();
+  });
+});
+
+describe("TuiApp — real keyboard workflows", () => {
+  it("uses j/k/enter to open a domain screen and escape back to navigation", async () => {
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        ...fakeCaller(),
+        projects: { list: async () => [{ id: "proj-1", name: "Roadmap" }] },
+        tasks: { list: async () => [{ id: "task-1", title: "Manual audit", status: "open" }] },
+      },
+    });
+
+    await app.mount();
+    tty.inject("j");
+    await Bun.sleep(0);
+    tty.inject("\r");
+    await Bun.sleep(0);
+
+    expect(tty.plainText()).toContain("Tasks");
+    expect(tty.plainText()).toContain("Manual audit  [open]  task-1");
+
+    tty.inject("/");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Command palette");
+
+    tty.inject("\x1b");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Domain nav");
+    app.stop();
+  });
+
+  it("runs configured single-key actions before screen routing", async () => {
+    const tty = new FakeTTY();
+    let created = 0;
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+      keybindings: {
+        "task.create": { context: "global", key: "x" },
+      },
+      actions: {
+        CreateItem: async () => {
+          created += 1;
+        },
+      },
+    });
+
+    await app.mount();
+    tty.inject("x");
+    await Bun.sleep(0);
+
+    expect(created).toBe(1);
+    expect(app.screen).toBe("nav");
+    app.stop();
+  });
+
+  it("opens new document fallback and returns to nav from keyboard", async () => {
+    const tty = new FakeTTY();
+    const app = new TuiApp({ output: tty, input: tty, caller: fakeCaller() });
+
+    await app.mount();
+    tty.inject("n");
+    await Bun.sleep(0);
+
+    expect(app.screen).toBe("new-doc");
+    expect(tty.plainText()).toContain("Docs service not available");
+
+    tty.inject("q");
+    await Bun.sleep(0);
+    expect(app.screen).toBe("nav");
+    app.stop();
+  });
+});
+
+describe("TuiApp — path router", () => {
+  it("renders configured routes and not-found routes through navigatePath", async () => {
+    const tty = new FakeTTY();
+    const telemetry = new MemoryTelemetrySink();
+    const app = new TuiApp({
+      output: tty,
+      caller: fakeCaller(),
+      telemetry,
+      routes: [{
+        path: "/projects/proj-1",
+        screenKey: "project-detail",
+        title: "Project detail",
+        render: () => "Project detail: Roadmap",
+      }],
+    });
+
+    await app.mount();
+    await app.navigatePath("/projects/proj-1");
+    expect(tty.plainText()).toContain("Project detail: Roadmap");
+
+    await app.navigatePath("/missing");
+    expect(tty.plainText()).toContain("Unknown route: /missing");
+    expect(telemetry.rows.some((row) => row.screenKey === "not-found" && row.route === "/missing")).toBe(true);
+    app.stop();
+  });
+
+  it("throws a clear error when path navigation is used without routes", async () => {
+    const app = new TuiApp({ output: new FakeTTY(), caller: fakeCaller() });
+
+    await expect(app.navigatePath("/anything")).rejects.toThrow("TUI path router has no routes.");
+    app.stop();
+  });
+});
+
+describe("TuiApp — inference workflow", () => {
+  it("renders health extras, models, routing, external provider state, and pull progress", async () => {
+    const previousFeatures = process.env["FULCRUM_FEATURES"];
+    const previousUrl = process.env["FULCRUM_INFERENCE_URL"];
+    const previousKey = process.env["FULCRUM_INFERENCE_API_KEY"];
+    process.env["FULCRUM_FEATURES"] = "external-llm-provider";
+    process.env["FULCRUM_INFERENCE_URL"] = "http://127.0.0.1:11434";
+    process.env["FULCRUM_INFERENCE_API_KEY"] = "secret";
+
+    async function* pullEvents() {
+      yield { pct: 50, downloaded: 5, total: 10 };
+      yield { pct: 100, downloaded: 10, total: 10 };
+    }
+
+    const tty = new FakeTTY({ columns: 120, rows: 40 });
+    const app = new TuiApp({
+      output: tty,
+      caller: {
+        ...fakeCaller(),
+        inference: {
+          health: async () => ({
+            status: "ok",
+            active_requests: 2,
+            ops_last_10s: 11,
+            embed_hit_rate: 75,
+            gen_hit_rate: 50,
+            cache_db_size: 4096,
+          }),
+          models: {
+            list: async () => [{ id: "llama3", kind: "generate", downloaded: false, active: false, sizeBytes: 2048 }],
+            pull: async () => pullEvents(),
+          },
+          config: {
+            get: async () => ({ tasks: "local", docs: "external" }),
+            set: async () => ({ ok: true }),
+          },
+        },
+      },
+    });
+
+    try {
+      await app.navigateTo("inference");
+      let text = tty.plainText();
+      expect(text).toContain("Inference:ok");
+      expect(text).toContain("In-flight:");
+      expect(text).toContain("2");
+      expect(text).toContain("11 ops/s");
+      expect(text).toContain("75%");
+      expect(text).toContain("4 KiB");
+      expect(text).toContain("llama3  generate  Download 2048 bytes");
+      expect(text).toContain("tasks: local");
+      expect(text).toContain("http://127.0.0.1:11434");
+      expect(text).toContain("API Key");
+
+      await app.pullInferenceModel("llama3");
+      text = tty.plainText();
+      expect(text).toContain("Last download llama3 100%");
+      expect(text).toContain("llama3  generate  downloaded 2048 bytes");
+    } finally {
+      if (previousFeatures === undefined) delete process.env["FULCRUM_FEATURES"];
+      else process.env["FULCRUM_FEATURES"] = previousFeatures;
+      if (previousUrl === undefined) delete process.env["FULCRUM_INFERENCE_URL"];
+      else process.env["FULCRUM_INFERENCE_URL"] = previousUrl;
+      if (previousKey === undefined) delete process.env["FULCRUM_INFERENCE_API_KEY"];
+      else process.env["FULCRUM_INFERENCE_API_KEY"] = previousKey;
+      app.stop();
+    }
   });
 });
 

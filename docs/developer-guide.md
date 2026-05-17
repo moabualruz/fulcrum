@@ -45,8 +45,6 @@ fulcrum/
 │   └── hooks/
 │       ├── audit-log.ts                # PostToolUse Bash — append command + exit code to log
 │       ├── format.ts                   # PostToolUse Write|Edit — run language formatter
-│       ├── index-check.ts              # SessionStart — warn if tags/graphify stale
-│       ├── index-rebuild.ts            # Stop — rebuild ctags + graphify + repomix on HEAD change
 │       ├── lint-gate.ts                # PostToolUse Write|Edit — block if lint fails (exit 2)
 │       ├── pm-policy.ts                # PreToolUse Bash — refuse wrong package manager (exit 2)
 │       ├── test-on-edit.ts             # PostToolUse Write|Edit — run project-configured tests (opt-in)
@@ -130,9 +128,9 @@ bun run release vX.Y.Z --gh   # also create GitHub release and upload dist/*
 ### Run from source
 
 ```bash
-bun run src/index.ts doctor           # any subcommand
-bun run src/index.ts install --dry-run
-bun run src/index.ts hook format      # test a hook (reads stdin JSON)
+bun run apps/cli/src/main.ts doctor           # any subcommand
+bun run apps/cli/src/main.ts install --dry-run
+bun run apps/cli/src/main.ts hook format      # test a hook (reads stdin JSON)
 ```
 
 ### CI stages
@@ -179,9 +177,6 @@ The minimal profile covers rules, policy, MCP registry setup, and recommended MC
 4. **Caveman ultra lock** — write `~/.config/caveman/config.json` with `{"defaultMode":"ultra"}` (idempotent).
 5. **Authored skills** — `fulcrum skills sync` distributes per-agent: Claude Code via `claude plugin marketplace add moabualruz/fulcrum && claude plugin install fulcrum@fulcrum` (skills surface as `/fulcrum:<name>`); OpenCode/Pi mirror to `<skills-root>/fulcrum/<name>/`; Gemini to `~/.gemini/extensions/fulcrum-skills/skills/<name>/`; Codex global scope is opt-in (`--codex-global`) or project-local (`--codex-project <dir>`). Legacy `~/.claude/skills/fulcrum/*` is removed after plugin install succeeds. Generated mirrors exclude `.original.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree folders.
 6. **Upstream skills** — `fulcrum skills upstream` clones pinned repos, verifies `subpath_sha256`, installs to vendor placement (`<agent>/skills/<name>/`, Gemini `~/.gemini/skills/<name>/`). The component/full-profile path excludes sources owned by installed packages, currently Cloudflare, so package-mounted skills do not duplicate standalone upstream skills.
-7. **Recommended MCPs** — DeepWiki and Repomix are registry builtins and recommended defaults; Pi entries go through `pi-mcp-adapter` auto-install.
-8. **Builtin MCPs** — register 17 builtin entries in `~/.fulcrum/state/global/mcp-registry.toml`; recommended default state enables `deepwiki` and `repomix`, while `--no-default-mcps` registers without changing enable state and `--enable-all-mcps` enables all builtins.
-9. **Vendor packages** — install Caveman, Repomix, Cloudflare, and Superpowers through official installers first, then mirror complete plugin/extension/package payloads to supported CLIs that lack a first-party or generic installer. Package adapters also write loadable skill mirrors and native MCP config for package `.mcp.json` / `mcp.json` manifests. Repomix MCP is default-enabled; other package MCPs stay disabled by default when CLI/skill surfaces cover the same work. Package parity reports cover payload mirrors plus adapted skills, rules/context, MCPs, commands/prompts, agents, hooks, tools/scripts, metadata, and assets.
 
 `fulcrum uninstall` is conservative by default: removes managed rules blocks, hook registrations, hook snippets/markers, `skills/fulcrum/`, legacy `skills/fulcrum-upstream/` namespaces, Gemini managed extensions, Gemini `@AGENTS.md` import, and registry MCP entries. Keeps edited policy files, vendor-placed third-party skills, and caveman unless `--purge` / `--include-caveman` flags are passed.
 
@@ -191,15 +186,15 @@ The minimal profile covers rules, policy, MCP registry setup, and recommended MC
 
 ### Hook dispatcher
 
-Hooks are TypeScript subcommands of the `fulcrum` binary. The CLI dispatcher routes `fulcrum hook <name>` to the handler in `src/hooks/<name>.ts`.
+Hooks are TypeScript subcommands of the `fulcrum` binary. The CLI dispatcher routes `fulcrum hook <name>` to the handler in `services/platform-core/src/application/agent-hooks/<name>.ts`.
 
 Each handler:
-1. Reads stdin as a JSON hook event envelope via `readHookEvent()` from `src/utils/io.ts`.
+1. Reads stdin as a JSON hook event envelope via `readHookEvent()` from `services/platform-core/src/application/runtime-support/hook-event-io.ts`.
 2. Extracts the relevant fields (`tool_input`, `tool_response`, `cwd`, etc.).
 3. Performs its action (spawn formatter, run lint, check policy, write log, etc.).
 4. Writes output per the hook contract (stdout for context injection, stderr for diagnostics, exit 2 to block).
 
-`deriveTool()` in `src/utils/io.ts` normalises Pi's proxy-shape `mcp(...)` calls to canonical `mcp__<server>__<tool>` form so `tool-output-router` policies apply to Pi without duplication.
+`deriveTool()` in `services/platform-core/src/application/runtime-support/hook-event-io.ts` normalises Pi's proxy-shape `mcp(...)` calls to canonical `mcp__<server>__<tool>` form so `tool-output-router` policies apply to Pi without duplication.
 
 Three agents (Claude Code, Codex, Gemini) call `fulcrum hook <name>` directly from native hook config. OpenCode and Pi use TypeScript shims (`shims/{opencode,pi}/fulcrum.ts`) that re-dispatch to the same binary.
 
@@ -218,7 +213,7 @@ The registry lives at `~/.fulcrum/state/global/mcp-registry.toml`. Schema versio
 
 ### Component lifecycle engine
 
-`src/components/catalog.ts` declares every managed component and profile. `planner.ts` converts desired operations into action plans. `executor.ts` applies plans through adapters and records state in `~/.fulcrum/state/global/components.db`.
+`services/platform-core/src/application/component-lifecycle/catalog.ts` declares every managed component and profile. `planner.ts` converts desired operations into action plans. `executor.ts` applies plans through adapters and records state in `~/.fulcrum/state/global/components.db`.
 
 Adapters own surface-specific behavior:
 
@@ -226,7 +221,6 @@ Adapters own surface-specific behavior:
 - `adapters/mcp.ts` delegates to the MCP registry.
 - `adapters/sentinel.ts` manages rules sentinel blocks.
 - `adapters/files.ts` manages policy files and remove-vs-purge behavior.
-- `adapters/vendor.ts` delegates to skills, upstream skills, caveman, Repomix, Cloudflare, and Superpowers helpers.
 
 The public CLI is `fulcrum component list/info/plan/status/install/remove/enable/disable`. `fulcrum install` and `fulcrum uninstall` are compatibility wrappers over component profiles; install defaults to `profile.minimal`, while `--profile full` keeps the historical `profile.default` bootstrap.
 
@@ -258,7 +252,7 @@ author_class = "vendor"
 
 ### Doctor reporting shape
 
-`DoctorReport` (from `src/cli/doctor.ts`):
+`DoctorReport` (from `apps/cli/src/doctor.ts`):
 
 ```typescript
 interface DoctorReport {
@@ -281,7 +275,7 @@ interface DoctorReport {
 
 ## Adding a new hook recipe
 
-1. **Write the handler** at `src/hooks/<name>.ts`. Contract:
+1. **Write the handler** at `services/platform-core/src/application/agent-hooks/<name>.ts`. Contract:
    - Read stdin via `readHookEvent()`.
    - All work in TypeScript; shell-out only for external CLIs.
    - Write diagnostics to stderr; context injection to stdout.
@@ -289,7 +283,7 @@ interface DoctorReport {
    - Fail-open: missing tool → exit 0 (log to stderr).
    - Target <200ms for PreToolUse, <500ms for PostToolUse.
 
-2. **Register in the CLI dispatcher** (`src/index.ts`) under the `hook` subcommand.
+2. **Register in the CLI dispatcher** (`apps/cli/src/main.ts`) under the `hook` subcommand.
 
 3. **Add the recipe table entry** in `docs/hooks.md §5` (name, lifecycle, purpose, blocks?).
 
@@ -297,15 +291,15 @@ interface DoctorReport {
 
 5. **Register in hooks.ts** in the `RECIPES` table so `fulcrum hooks enable/disable <name>` can write native configs.
 
-6. **Write tests** at `src/hooks/<name>.test.ts`. Minimum: stdin envelope parse, happy-path behavior, missing-tool fail-open.
+6. **Write tests** at `services/platform-core/src/application/agent-hooks/<name>.test.ts`. Minimum: stdin envelope parse, happy-path behavior, missing-tool fail-open.
 
 7. **Run `bun run ci`** to confirm all six stages pass.
 
 Example skeleton:
 
 ```typescript
-// src/hooks/my-hook.ts
-import { readHookEvent } from "../utils/io.ts";
+// services/platform-core/src/application/agent-hooks/my-hook.ts
+import { readHookEvent } from "@platform-core/application/runtime-support/hook-event-io.ts";
 
 const event = await readHookEvent(process.stdin);
 if (!event) process.exit(0);
@@ -319,7 +313,7 @@ process.exit(0);
 
 ## Adding a new managed MCP
 
-1. **Add the builtin definition** in `src/cli/mcp-builtins.ts`:
+1. **Add the builtin definition** in `apps/cli/src/mcp-builtins.ts`:
 
 ```typescript
 {
@@ -334,13 +328,13 @@ process.exit(0);
 }
 ```
 
-2. **Update `fulcrum doctor`** in `src/cli/doctor.ts` to probe the server if HTTP, and report `auth_status`.
+2. **Update `fulcrum doctor`** in `apps/cli/src/doctor.ts` to probe the server if HTTP, and report `auth_status`.
 
 3. **Add auth entry** to `docs/mcp.md §5` table.
 
 4. **Add a catalogue entry** in `docs/mcp.md §3`.
 
-5. **Write or update tests** in `src/cli/mcp-registry.test.ts` and `src/cli/mcp-cmd.test.ts`.
+5. **Write or update tests** in `apps/cli/src/mcp-registry.test.ts` and `apps/cli/src/mcp-cmd.test.ts`.
 
 6. **Run `bun run ci`**.
 
@@ -454,25 +448,25 @@ This checks out the tree SHA, computes `subpath_sha256`, and writes it back.
 ### What tests exist
 
 - `src/agents/registry.test.ts` — AGENTS array invariants (all 5 present, rootDir unique).
-- `src/utils/io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
-- `src/cli/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
-- `src/cli/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
-- `src/cli/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
-- `src/cli/upstream-skills.test.ts` — `subpath_sha256` verify + mismatch exit.
-- `src/cli/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.
-- `src/cli/mcp-cmd.test.ts` — CLI verb round-trip.
-- `src/cli/doctor.test.ts` — report shape, tool detection, caveman section, Pi adapter.
-- `src/cli/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
-- `src/cli/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
-- `src/cli/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
-- `src/components/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
-- `src/hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
+- `services/platform-core/src/application/runtime-support/hook-event-io.test.ts` — `readHookEvent` parse + `deriveTool` Pi proxy normalisation.
+- `apps/cli/src/install.test.ts` — `assertNotAgentsPath`, `lockCavemanUltra`, sentinel-splice idempotency.
+- `apps/cli/src/uninstall.test.ts` — removal of managed artifacts; edited policy preserved.
+- `apps/cli/src/hooks.test.ts` — enable/disable detection-aware + `--all` overrides.
+- `apps/cli/src/upstream-skills.test.ts` — `subpath_sha256` verify + mismatch exit.
+- `apps/cli/src/mcp-registry.test.ts` — round-trip register/unregister, enable/disable, apply/remove.
+- `apps/cli/src/mcp-cmd.test.ts` — CLI verb round-trip.
+- `apps/cli/src/doctor.test.ts` — report shape, tool detection, caveman section, Pi adapter.
+- `apps/cli/src/package-surfaces.test.ts` — package surface discovery and source-only exclusions.
+- `apps/cli/src/package-mirror.test.ts` — per-agent mirror target planning and unsupported surface records.
+- `apps/cli/src/package-parity.test.ts` — source-vs-installed parity, missing targets, source-backup leaks.
+- `services/platform-core/src/application/component-lifecycle/*.test.ts` — component catalog, planner, executor, ledger, and surface adapters.
+- `services/platform-core/src/application/agent-hooks/*.test.ts` — per-hook stdin parse, happy path, fail-open on missing tool.
 
 ### Running tests
 
 ```bash
 bun test                                 # full test suite
-bun test src/cli/install.test.ts         # single file
+bun test apps/cli/src/install.test.ts         # single file
 bun test --watch                         # watch mode
 ```
 

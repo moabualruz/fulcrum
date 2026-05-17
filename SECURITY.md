@@ -30,3 +30,11 @@ Security reports are in scope when they affect:
 - Backup, restore, import, or export paths that can expose private data.
 
 Out-of-scope examples: spam, social engineering without a technical exploit, denial-of-service requiring unrealistic local machine access, and reports against unsupported versions.
+
+## Phase 3 Security Finding Closure Evidence
+
+- **CR-01 path traversal:** `src/orchestration/symphony/workspace.ts` validates workspace paths with normalized `realpath` resolution before recursive deletion.
+- **CR-02 dashboard XSS:** `src/orchestration/symphony/http-server.ts` escapes dashboard issue identifiers, states, and generated timestamps before HTML rendering.
+- **CR-03 deterministic IDs:** `src/orchestration/symphony/linear-tracker.ts` derives candidate IDs from deterministic input and has no module-level mutable counter.
+- **CR-04 approval race:** `src/orchestration/symphony/app-server-client.ts` fails closed on missing approval policy and timeout by returning `deny`, not `approve`.
+- **WR-05 cleanup validation:** `sweepTerminalWorkspaces()` calls `assertWorkspacePathInOrgRoot()` before `rm(..., { recursive: true })`.

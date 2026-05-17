@@ -7,6 +7,18 @@
 
 import { mkdir } from "node:fs/promises";
 
+const OPTIONAL_NEST_TRANSPORT_EXTERNALS = [
+  "@nestjs/platform-socket.io",
+  "@grpc/grpc-js",
+  "@grpc/proto-loader",
+  "kafkajs",
+  "nats",
+  "amqplib",
+  "amqp-connection-manager",
+  "ioredis",
+  "mqtt",
+];
+
 const TARGETS: Array<{ target: string; out: string }> = [
   { target: "bun-darwin-arm64",     out: "dist/fulcrum-darwin-arm64" },
   { target: "bun-darwin-x64",       out: "dist/fulcrum-darwin-x64" },
@@ -21,7 +33,18 @@ for (const { target, out } of TARGETS) {
   const t0 = Date.now();
   process.stdout.write(`→ ${target} ... `);
   const proc = Bun.spawn(
-    ["bun", "build", "--compile", "--minify", `--target=${target}`, "src/index.ts", "--outfile", out],
+    [
+      "bun",
+      "build",
+      "--compile",
+      "--minify",
+      `--target=${target}`,
+      "--external=@opentui/core-*",
+      ...OPTIONAL_NEST_TRANSPORT_EXTERNALS.map((pkg) => `--external=${pkg}`),
+      "apps/cli/src/main.ts",
+      "--outfile",
+      out,
+    ],
     { stdout: "pipe", stderr: "pipe" },
   );
   const exit = await proc.exited;

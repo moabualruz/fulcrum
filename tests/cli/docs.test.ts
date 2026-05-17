@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
+import type { DocsRunOptions } from "@fulcrum/cli/commands/docs.ts";
 
 const DOC = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -54,14 +55,17 @@ function fakeCaller() {
   };
 }
 
-async function runDocs(args: readonly string[], caller = fakeCaller()) {
-  const { run } = await import("../../src/cli/commands/docs.ts");
+async function runDocsWithOptions(
+  args: readonly string[],
+  options: DocsRunOptions = {},
+) {
+  const { run } = await import("@fulcrum/cli/commands/docs.ts");
   const lines: string[] = [];
   const errors: string[] = [];
   let exitCode: number | undefined;
 
   await run(args, {
-    caller,
+    ...options,
     print: (line) => lines.push(line),
     printErr: (line) => errors.push(line),
     exit: (code) => {
@@ -69,11 +73,18 @@ async function runDocs(args: readonly string[], caller = fakeCaller()) {
     },
   });
 
-  return { caller, lines, errors, exitCode };
+  return { lines, errors, exitCode };
+}
+
+async function runDocs(args: readonly string[], caller = fakeCaller()) {
+  return {
+    caller,
+    ...await runDocsWithOptions(args, { caller }),
+  };
 }
 
 describe("docs CLI commands", () => {
-  test("list/get/create/delete/search call docs procedures and print JSON", async () => {
+  test("list/get/create/delete/search call docs command boundary and print JSON", async () => {
     const caller = fakeCaller();
 
     const list = await runDocs(["list", "--type", "adr", "--scope", "global", "--limit", "25", "--json"], caller);
@@ -186,5 +197,64 @@ describe("docs CLI commands", () => {
     expect(result.exitCode).toBe(1);
     expect(caller.calls).toEqual([]);
     expect(result.errors.join("\n")).toContain("--yes");
+  });
+
+  test("routes through the document public API when no caller is injected", async () => {
+    const requests: Array<[string, string, unknown?]> = [];
+    const fetchFn = (async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      requests.push([method, url, body]);
+
+      if (url.includes("/api/v1/docs/templates")) {
+        return Response.json([{ id: "template-1", title: "Default note" }]);
+      }
+      if (url.endsWith(`/api/v1/docs/${DOC.id}/versions`)) {
+        return Response.json([{ id: "version-1", docId: DOC.id, version: 1 }]);
+      }
+      if (method === "POST" && url.endsWith("/api/v1/docs")) {
+        return Response.json({ ...DOC, ...body, id: "created-doc" });
+      }
+      if (url.startsWith("http://127.0.0.1:3210/api/v1/docs?")) {
+        return Response.json([DOC]);
+      }
+      return Response.json(DOC);
+    }) as typeof fetch;
+    const options: DocsRunOptions = {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: fetchFn,
+    };
+
+    const list = await runDocsWithOptions(["list", "--type", "adr", "--json"], options);
+    const get = await runDocsWithOptions(["get", "my-adr", "--json"], options);
+    const create = await runDocsWithOptions(["create", "--title", "New doc", "--body", "# New", "--json"], options);
+    const versions = await runDocsWithOptions(["versions", "list", DOC.id, "--json"], options);
+    const templates = await runDocsWithOptions(["template", "list", "--json"], options);
+
+    expect([list, get, create, versions, templates].every((result) => result.exitCode === undefined)).toBe(true);
+    expect(JSON.parse(list.lines[0] as string)[0].slug).toBe("my-adr");
+    expect(JSON.parse(get.lines[0] as string).id).toBe(DOC.id);
+    expect(JSON.parse(create.lines[0] as string)).toMatchObject({ id: "created-doc", title: "New doc", bodyMd: "# New" });
+    expect(JSON.parse(versions.lines[0] as string)).toEqual([{ id: "version-1", docId: DOC.id, version: 1 }]);
+    expect(JSON.parse(templates.lines[0] as string)).toEqual([{ id: "template-1", title: "Default note" }]);
+    expect(requests).toEqual([
+      ["GET", "http://127.0.0.1:3210/api/v1/docs?orgId=org-1&type=adr", undefined],
+      ["GET", "http://127.0.0.1:3210/api/v1/docs?orgId=org-1", undefined],
+      ["POST", "http://127.0.0.1:3210/api/v1/docs", { title: "New doc", bodyMd: "# New" }],
+      ["GET", `http://127.0.0.1:3210/api/v1/docs/${DOC.id}/versions`, undefined],
+      ["GET", "http://127.0.0.1:3210/api/v1/docs/templates", undefined],
+    ]);
+  });
+
+  test("fails fast when the document public API is not configured", async () => {
+    const result = await runDocsWithOptions(["list", "--json"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.lines).toEqual([]);
+    expect(result.errors.join("\n")).toContain("Document API caller is not configured");
   });
 });

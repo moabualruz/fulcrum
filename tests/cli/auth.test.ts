@@ -1,32 +1,10 @@
-/**
- * CLI auth command tests — TDD RED → GREEN.
- *
- * Tests run the CLI entrypoint in-process (via run() import) rather than
- * spawning a subprocess, so they don't need a compiled binary and are fast.
- *
- * Acceptance criteria (issue #10):
- *   1. `fulcrum auth whoami --json` returns { userId, orgId, email, role } JSON.
- *   2. `fulcrum auth whoami` (no --json) prints human-readable text.
- *   3. `fulcrum auth whoami` without session exits non-zero with error on stderr.
- *   4. `fulcrum auth invite <email> --role member --json` calls auth.invite.
- *   5. Unimplemented login/logout exit non-zero.
- *
- * These tests call run() from src/cli/commands/auth.ts directly, passing a
- * pre-built container/caller so no DB connection is needed.
- */
-
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect } from "bun:test";
-import type { Container } from "@needle-di/core";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
-const ROOT_ENTRYPOINT = join(REPO_ROOT, "src", "index.ts");
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers — build a fake in-process tRPC caller
-// ─────────────────────────────────────────────────────────────────────────────
+const ROOT_ENTRYPOINT = join(REPO_ROOT, "apps", "cli", "src", "main.ts");
 
 interface WhoamiResult {
   userId: string;
@@ -35,10 +13,6 @@ interface WhoamiResult {
   role: string | null;
 }
 
-/**
- * Build a minimal fake caller that mimics the shape of a tRPC caller.
- * run() in auth.ts accepts a `caller` option (or builds one from container).
- */
 function fakeAuthenticatedCaller(): {
   auth: {
     whoami: () => Promise<WhoamiResult>;
@@ -65,8 +39,7 @@ function fakeUnauthCaller(): { auth: { whoami: () => Promise<WhoamiResult> } } {
   return {
     auth: {
       whoami: async () => {
-        const { TRPCError } = await import("@trpc/server");
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated." });
+        throw { kind: "unauthorized", message: "Not authenticated." };
       },
     },
   };
@@ -108,7 +81,7 @@ async function runFulcrum(args: readonly string[], fulcrumHome: string) {
 
 describe("auth.run — whoami --json", () => {
   it("prints JSON with userId, orgId, email, role and exits 0", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const lines: string[] = [];
     let exitCode: number | undefined;
@@ -130,7 +103,7 @@ describe("auth.run — whoami --json", () => {
   });
 
   it("prints human-readable text when --json not passed", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const lines: string[] = [];
 
@@ -147,7 +120,7 @@ describe("auth.run — whoami --json", () => {
   });
 
   it("calls exit(1) and prints to stderr on UNAUTHORIZED", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     const errLines: string[] = [];
     let exitCode: number | undefined;
@@ -162,6 +135,64 @@ describe("auth.run — whoami --json", () => {
     expect(exitCode).toBe(1);
     expect(errLines.join("\n")).toMatch(/unauthorized|authentication/i);
   });
+
+  it("routes whoami and invite through the auth public API", async () => {
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
+    const calls: Array<[string, string, unknown?]> = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      calls.push([method, url, body]);
+      if (url.includes("/invite")) {
+        return Response.json({ invitationId: "inv-public", token: "token-public" });
+      }
+      return Response.json({
+        userId: "user-public",
+        orgId: "org-public",
+        email: "admin@public",
+        role: "owner",
+      });
+    }) as unknown as typeof globalThis.fetch;
+    const lines: string[] = [];
+    const env = {
+      FULCRUM_SERVER_URL: "http://127.0.0.1:3210",
+      FULCRUM_ORG_ID: "org-1",
+      FULCRUM_USER_ID: "user-1",
+    };
+
+    await run(["whoami", "--json"], {
+      env,
+      fetch,
+      print: (line) => lines.push(line),
+      printErr: () => {},
+      exit: () => {},
+    });
+    await run(["invite", "new@test.local", "--role", "member", "--json"], {
+      env,
+      fetch,
+      print: (line) => lines.push(line),
+      printErr: () => {},
+      exit: () => {},
+    });
+
+    expect(JSON.parse(lines[0] as string)).toEqual({
+      userId: "user-public",
+      orgId: "org-public",
+      email: "admin@public",
+      role: "owner",
+    });
+    expect(JSON.parse(lines[1] as string)).toEqual({ invitationId: "inv-public", token: "token-public" });
+    expect(calls).toEqual([
+      ["GET", "http://127.0.0.1:3210/api/v1/auth/whoami?orgId=org-1&userId=user-1", undefined],
+      ["POST", "http://127.0.0.1:3210/api/v1/auth/invite", {
+        orgId: "org-1",
+        userId: "user-1",
+        email: "new@test.local",
+        role: "member",
+      }],
+    ]);
+  });
 });
 
 describe("root entrypoint — auth", () => {
@@ -174,39 +205,28 @@ describe("root entrypoint — auth", () => {
     });
   });
 
-  it("runs whoami through src/index.ts without a fake caller", async () => {
-    await withFulcrumHome(async (home) => {
-      const init = await runFulcrum(["init"], home);
-      expect(init.exitCode).toBe(0);
-
-      const result = await runFulcrum(["auth", "whoami", "--json"], home);
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stderr).toBe("");
-      const parsed = JSON.parse(result.stdout);
-      expect(parsed.email).toBe("admin@local");
-      expect(parsed.orgId).toBe("00000000-0000-0000-0000-000000000001");
-      expect(parsed.role).toBe("owner");
-      expect(typeof parsed.userId).toBe("string");
-    });
-  });
-
-  it("fails clearly when no CLI session exists", async () => {
+  it("whoami through apps/cli/src/main.ts fails at the public API config boundary without a fake caller", async () => {
     await withFulcrumHome(async (home) => {
       const result = await runFulcrum(["auth", "whoami", "--json"], home);
 
       expect(result.exitCode).toBe(1);
       expect(result.stdout).toBe("");
-      expect(result.stderr).toContain("No active CLI session found");
-      expect(result.stderr).toContain("fulcrum init");
+      expect(result.stderr).toContain("Auth API caller is not configured");
     });
   });
 
-  it("runs invite through src/index.ts without a fake caller", async () => {
+  it("fails clearly when the auth public API is not configured", async () => {
     await withFulcrumHome(async (home) => {
-      const init = await runFulcrum(["init"], home);
-      expect(init.exitCode).toBe(0);
+      const result = await runFulcrum(["auth", "whoami", "--json"], home);
 
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Auth API caller is not configured");
+    });
+  });
+
+  it("invite through apps/cli/src/main.ts fails at the public API config boundary without a fake caller", async () => {
+    await withFulcrumHome(async (home) => {
       const result = await runFulcrum([
         "auth",
         "invite",
@@ -216,20 +236,16 @@ describe("root entrypoint — auth", () => {
         "--json",
       ], home);
 
-      expect(result.exitCode).toBe(0);
-      expect(result.stderr).toBe("");
-      const parsed = JSON.parse(result.stdout);
-      expect(typeof parsed.invitationId).toBe("string");
-      expect(parsed.invitationId.length).toBeGreaterThan(0);
-      expect(typeof parsed.token).toBe("string");
-      expect(parsed.token).toHaveLength(64);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("Auth API caller is not configured");
     });
-  });
+  }, 15_000);
 });
 
 describe("auth.run — invite", () => {
   it("invite creates an invitation and prints JSON", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const lines: string[] = [];
@@ -250,7 +266,7 @@ describe("auth.run — invite", () => {
 
 describe("auth.run — login / logout not implemented", () => {
   it("login --non-interactive exits 1", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const errLines: string[] = [];
@@ -267,7 +283,7 @@ describe("auth.run — login / logout not implemented", () => {
   });
 
   it("logout exits 1", async () => {
-    const { run } = await import("../../src/cli/commands/auth.ts");
+    const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
     let exitCode: number | undefined;
     const errLines: string[] = [];

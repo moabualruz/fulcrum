@@ -1,30 +1,33 @@
-# Product Kernel
+# Product Store
 
-Local-first product kernel for Fulcrum. Powers supervisor, task system, agent runs, memory, artifacts, context engine per `HANDOVER.md` §6. Impl under `src/product-kernel/`, exposed via `fulcrum product …`.
+Local-first product-store infrastructure for Fulcrum. Powers supervisor, task system, agent runs, memory, artifacts, and context engine per `HANDOVER.md` §6. Implementation lives under `services/platform-core/src/infrastructure/product-store/`, exposed via `fulcrum product …`.
 
-## Operator modes
+## Database Selection
 
-Two engines, one driver contract (`ProductDb` in `src/product-kernel/db/types.ts`):
+Fulcrum uses one Postgres-compatible database selection path (`resolveDatabaseConfig` in `services/platform-core/src/application/db/database-config.ts`):
 
-- **Local default — PGlite.** Embedded Postgres, no separate process. DB files at `~/.fulcrum/state/product/db/main`. Ships w/ Fulcrum binary; no install beyond `bun add @electric-sql/pglite`.
-- **Team / SaaS — PostgreSQL.** Set `DATABASE_URL` to server conn string, use `openPostgres(url)`. Same SQL both engines; only behavior split in `claimJob` (Postgres uses `FOR UPDATE SKIP LOCKED`; PGlite uses single-process txns, documented in code).
+- **Local default — PGlite.** No separate database service. When no URL is configured, runtime uses `${FULCRUM_HOME:-~/.fulcrum}/pglite.data`.
+- **PostgreSQL server — local power, self-hosted, or SaaS.** Set `FULCRUM_DATABASE_URL` or `DATABASE_URL` to a `postgres://` or `postgresql://` connection string. CLI status, doctor, Nest/TypeORM startup, and application DB helpers select PostgreSQL without code changes.
+- **Explicit PGlite socket — tests/specialized runtime only.** `FULCRUM_TYPEORM_PGLITE_SOCKET_URL` may point Nest TypeORM at a prestarted PGlite socket. Normal local startup manages that socket automatically.
+
+Invalid non-PostgreSQL URLs fail early instead of silently falling back to PGlite.
 
 State paths (override root w/ `FULCRUM_HOME`):
 
 | Path                                       | Contents                                |
 | ------------------------------------------ | --------------------------------------- |
-| `~/.fulcrum/state/product/db/main`         | PGlite data directory                   |
+| `~/.fulcrum/pglite.data`                   | Default PGlite data directory           |
 | `~/.fulcrum/state/product/artifacts`       | Artifact bodies (per-file storage)      |
 
-`fulcrum product init` creates PGlite dir, runs migrations, ensures `default` local org. `fulcrum doctor` reports engine + schema + row counts. `fulcrum uninstall --purge` removes `~/.fulcrum/state/product/`.
+`fulcrum product init` creates the selected local database when needed, runs migrations, and ensures the `default` local org. `fulcrum doctor` reports selected engine, schema count, row counts, and redacts PostgreSQL credentials. `fulcrum uninstall --purge` removes local Fulcrum state.
 
 ## Schema
 
-Migrations under `src/product-kernel/db/migrations/`:
+Migration modules under `services/platform-core/src/infrastructure/product-store/db/migrations/`:
 
-- `0001_product_kernel.sql` — `orgs`, `projects`, `repos`, `documents`, `tasks`, `memories`, `agent_runs`, `artifacts`, `edges`, `events`. ULID text PKs, `timestamptz` everywhere.
-- `0002_search.sql` — `search_documents` read model w/ generated `tsvector search_vector` column + GIN index.
-- `0003_jobs.sql` — local queue w/ status CHECK constraint + claim index.
+- `0001_product_kernel.ts` — `orgs`, `projects`, `repos`, `documents`, `tasks`, `memories`, `agent_runs`, `artifacts`, `edges`, `events`. ULID text PKs, `timestamptz` everywhere.
+- `0002_search.ts` — `search_documents` read model w/ generated `tsvector search_vector` column + GIN index.
+- `0003_jobs.ts` — local queue w/ status CHECK constraint + claim index.
 
 Runner idempotent: re-run applies only new migrations, tracks in `schema_migrations`.
 
@@ -44,15 +47,15 @@ LLM-side reasoning over kernel data → do at agent layer; kernel no call models
 Run before depending on each layer:
 
 ```bash
-bun test src/product-kernel/compat.test.ts
-bun test src/product-kernel/markdown.test.ts
-bun test src/product-kernel/state.test.ts
-bun test src/product-kernel/db/migrate.test.ts
-bun test src/product-kernel/events.test.ts
-bun test src/product-kernel/search.test.ts
-bun test src/product-kernel/context.test.ts
-bun test src/product-kernel/jobs.test.ts
-bun test src/cli/product.test.ts src/cli/doctor.test.ts src/cli/uninstall.test.ts
+bun test services/platform-core/src/infrastructure/product-store/compat.test.ts
+bun test services/platform-core/src/infrastructure/product-store/markdown.test.ts
+bun test services/platform-core/src/infrastructure/product-store/state.test.ts
+bun test services/platform-core/src/infrastructure/product-store/db/migrate.test.ts
+bun test services/platform-core/src/infrastructure/product-store/events.test.ts
+bun test services/platform-core/src/infrastructure/product-store/search.test.ts
+bun test services/platform-core/src/infrastructure/product-store/context.test.ts
+bun test services/platform-core/src/infrastructure/product-store/jobs.test.ts
+bun test apps/cli/src/product.test.ts apps/cli/src/doctor.test.ts apps/cli/src/uninstall.test.ts
 bun run --bun tsc --noEmit
 bun run ci
 ```
@@ -76,4 +79,4 @@ fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
 
 ## Web shell
 
-SvelteKit 2 + shadcn-svelte web shell at `src/web/`, same PGlite product DB CLI uses (`${FULCRUM_HOME}/state/product/db/main`). Surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail w/ cancel/retry), `/search` (full-text), global cmd+K palette. Form actions return uniform `ActionResult` shape; layout `Toaster` bridge surfaces success/error toasts. Heavy queries stream via SvelteKit `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill pending branch.
+SvelteKit 2 + shadcn-svelte web shell at `apps/web/`, backed by the same selected database path as CLI and server runtime. Surfaces all CLI domains as interactive views: `/` dashboard, `/projects`, `/docs` (Markdown editor), `/boards` (drag/drop kanban), `/runs` (filterable run list + detail w/ cancel/retry), `/search` (full-text), global cmd+K palette. Form actions return uniform `ActionResult` shape; layout `Toaster` bridge surfaces success/error toasts. Heavy queries stream via SvelteKit `streamed` loader so route headers paint while data resolves; `RouteSkeleton` placeholders fill pending branch.

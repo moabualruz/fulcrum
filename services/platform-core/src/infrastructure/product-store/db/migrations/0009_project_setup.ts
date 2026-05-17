@@ -1,0 +1,6 @@
+import type { ProductStoreMigration } from "./types.ts";
+
+export const migration: ProductStoreMigration = {
+  name: "0009_project_setup.sql",
+  sql: "-- workflow-completeness workflow milestone: project hierarchy and setup policy metadata.\n-- Additive only; safe for existing local databases.\n\nALTER TABLE projects\n  ADD COLUMN IF NOT EXISTS parent_id text REFERENCES projects(id),\n  ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'project',\n  ADD COLUMN IF NOT EXISTS path text,\n  ADD COLUMN IF NOT EXISTS depth integer NOT NULL DEFAULT 0,\n  ADD COLUMN IF NOT EXISTS module_policy jsonb NOT NULL DEFAULT '{}'::jsonb,\n  ADD COLUMN IF NOT EXISTS template_id text,\n  ADD COLUMN IF NOT EXISTS workflow_id text;\n\nCREATE INDEX IF NOT EXISTS projects_org_parent_idx\n  ON projects (org_id, parent_id);\n\nCREATE INDEX IF NOT EXISTS projects_org_path_idx\n  ON projects (org_id, path);\n\nCREATE INDEX IF NOT EXISTS repos_org_project_idx\n  ON repos (org_id, project_id);\n\nALTER TABLE tasks\n  ADD COLUMN IF NOT EXISTS task_type text NOT NULL DEFAULT 'task';\n\nALTER TABLE tasks\n  DROP CONSTRAINT IF EXISTS tasks_task_type_check;\n\nALTER TABLE tasks\n  ADD CONSTRAINT tasks_task_type_check\n  CHECK (task_type IN ('initiative','epic','story','task','subtask','bug','chore'));\n",
+};

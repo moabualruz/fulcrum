@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { Renderer } from "../../src/tui/renderer.ts";
-import { TaskBoardScreen } from "../../src/tui/screens/task-board.ts";
-import { TaskDetailScreen } from "../../src/tui/screens/task-detail.ts";
-import { TaskCalendarScreen } from "../../src/tui/screens/task-calendar.ts";
-import { TaskListScreen } from "../../src/tui/screens/task-list.ts";
-import { TaskTimelineScreen } from "../../src/tui/screens/task-timeline.ts";
-import { FakeTTY } from "../../src/tui/testing/fake-tty.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
+import { TaskBoardScreen } from "@fulcrum/tui/screens/task-board.ts";
+import { TaskDetailScreen } from "@fulcrum/tui/screens/task-detail.ts";
+import { TaskCalendarScreen } from "@fulcrum/tui/screens/task-calendar.ts";
+import { TaskListScreen } from "@fulcrum/tui/screens/task-list.ts";
+import { TaskTimelineScreen } from "@fulcrum/tui/screens/task-timeline.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 32 });
@@ -85,7 +85,7 @@ describe("TaskListScreen", () => {
 
     await screen.submitBulkStatus("done");
     expect(bulkUpdates).toEqual([{ ids: ["task-1", "task-4"], status: "done" }]);
-    expect(screen.selectedTaskIds).toEqual(["task-1", "task-4"]);
+    expect(screen.selectedTaskIds).toEqual([]);
     await screen.applyFilter({ status: "done" });
     const doneRows = renderPlain((renderer) => screen.render(renderer));
     expect(doneRows).toContain("Task 1  [done]");

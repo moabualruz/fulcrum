@@ -1,12 +1,12 @@
 # Fulcrum User Guide
 
-> See also: [developer-guide.md](developer-guide.md) | [contributing.md](contributing.md) | [HANDOVER.md](../HANDOVER.md) for current state
+> See also: [developer-guide.md](developer-guide.md) | [contributing.md](contributing.md) | [ROADMAP.md](../.planning/ROADMAP.md) for current phase status.
 
 ---
 
 ## What Fulcrum is
 
-Fulcrum is a local-first CLI Agent OS that installs a shared foundation across every AI coding agent you use — Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI. It wires the same behavioral rules, hook recipes, skills (slash commands), and MCP servers into all five agents from a single install command, so you get consistent tooling behavior regardless of which agent you open. Fulcrum does **not** run agents, manage cloud jobs, or touch your code — it manages the configuration layer that sits between you and those agents.
+Fulcrum is a local-first Agent OS for supervising repositories, project hierarchy, work items, docs, memory, context, artifacts, automations, notifications, and agent runs. It still installs a shared foundation across Claude Code, Codex CLI, Gemini CLI, OpenCode, and Pi CLI, but the product workflow is project-first: work, docs, runs, artifacts, memory, and reports should have a current project or an explicit All projects/global scope.
 
 **What Fulcrum does:**
 - Splices a shared rules block into each agent's primary config file (idempotent, preserves your content).
@@ -16,13 +16,13 @@ Fulcrum is a local-first CLI Agent OS that installs a shared foundation across e
 - Installs managed packages with full payload mirrors plus loadable skill and native MCP adapters where the target agent lacks the vendor's package primitive.
 - Installs caveman output-compression cross-agent with `defaultMode: ultra`.
 - Reports environment, component, package-parity, MCP, skill-budget, and toolchain health via `fulcrum doctor`.
+- Provides project-first Web, CLI, and TUI workflows for creating scoped work, dispatching agent runs, reviewing artifacts, promoting memory, and tracing audit evidence.
 
 **What Fulcrum does NOT do:**
-- Run or invoke agents on your behalf.
 - Manage cloud deployments, CI pipelines, or hosted infrastructure.
 - Store secrets — auth credentials are your responsibility (see [§ Auth setup](#auth-setup)).
 - Replace per-project `AGENTS.md` — it bootstraps one but you maintain it.
-- Implement the future Agent OS layers (task system, memory, artifact tracking) — those are placeholders; see [HANDOVER.md §6](../HANDOVER.md).
+- Treat global scope as an implicit default for mutating workflows. Use a project, subproject, or explicit All projects/global mode.
 
 ---
 
@@ -98,7 +98,7 @@ grep -q "fulcrum-secrets/env.sh" ~/.zshrc \
 source ~/.zshrc
 ```
 
-Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md). The full machine setup checklist is in [HANDOVER.md §7](../HANDOVER.md).
+Full per-MCP auth requirements are in [docs/mcp.md §5](mcp.md).
 
 ### Bootstrap a project
 
@@ -203,7 +203,6 @@ fulcrum mcp disable github --all-agents
 
 Set the required env vars before enabling an MCP that needs auth (see [docs/mcp.md §5](mcp.md)).
 
-Available builtin MCPs: `deepwiki`, `github`, `repomix`, `semgrep`, `context7`, `tavily`, `playwright`, `dart`, `cloudflare-docs`, `cloudflare-workers-bindings`, `cloudflare-workers-builds`, `cloudflare-observability`, `cloudflare-radar`, `cloudflare-logpush`, `cloudflare-browser`, `cloudflare-containers`, `cloudflare-ai-gateway`.
 
 ### Doctor
 
@@ -342,7 +341,7 @@ A: Only when installing from a published release (`FULCRUM_RELEASE_TAG=...`). Bu
 
 ## Pointers
 
-- **Current state / outstanding work:** [HANDOVER.md](../HANDOVER.md)
+- **Current phase status / outstanding work:** [ROADMAP.md](../.planning/ROADMAP.md)
 - **Contributing code to Fulcrum:** [developer-guide.md](developer-guide.md) and [contributing.md](contributing.md)
 - **Per-agent translation:** [docs/agents.md](agents.md)
 - **Capability toolchain:** [docs/capabilities.md](capabilities.md)

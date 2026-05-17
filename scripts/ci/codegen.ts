@@ -73,14 +73,14 @@ export async function runCodegenSnapshotGate(root = resolve(import.meta.dir, "..
   try {
     await runSchemaRegistryCheck(root);
     await generateCliFiles({
-      routerPath: join(root, "src/server/trpc/router.ts"),
+      routerPath: join(root, "apps/server/src/trpc/router.ts"),
       outDir: freshDir,
       completionsDir: freshCompletionsDir,
       useAst: true,
     });
     await assertCompletionScriptsNonEmpty(freshCompletionsDir);
     return await checkGeneratedSnapshot({
-      committedDir: join(root, "src/cli/generated"),
+      committedDir: join(root, "apps/cli/src/generated"),
       freshDir,
     });
   } finally {
