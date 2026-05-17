@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 
 // Tests for saas-auth gate on billing settings page.
 
-describe("/settings/billing — isSaasAuthEnabled() and load()", () => {
+describe("/settings/billing — _isSaasAuthEnabled() and load()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
   const origFlag = process.env["FULCRUM_FLAG_SAAS_AUTH"];
 
@@ -14,18 +14,18 @@ describe("/settings/billing — isSaasAuthEnabled() and load()", () => {
     else process.env["FULCRUM_FLAG_SAAS_AUTH"] = origFlag;
   });
 
-  test("isSaasAuthEnabled OFF by default", async () => {
+  test("_isSaasAuthEnabled OFF by default", async () => {
     delete process.env["FULCRUM_FEATURES"];
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(false);
+    expect(mod._isSaasAuthEnabled()).toBe(false);
   });
 
-  test("isSaasAuthEnabled ON when FULCRUM_FEATURES=saas-auth", async () => {
+  test("_isSaasAuthEnabled ON when FULCRUM_FEATURES=saas-auth", async () => {
     process.env["FULCRUM_FEATURES"] = "saas-auth";
     delete process.env["FULCRUM_FLAG_SAAS_AUTH"];
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isSaasAuthEnabled()).toBe(true);
+    expect(mod._isSaasAuthEnabled()).toBe(true);
   });
 
   test("load throws 404 when saas-auth OFF (with session)", async () => {

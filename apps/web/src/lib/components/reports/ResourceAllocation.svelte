@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * ResourceAllocation.svelte — Cross-project team allocation table (Plan 05-13, D-96).
+   * ResourceAllocation.svelte — Cross-project team allocation table (workflow milestone, D-96).
    *
    * Shows team members × projects × allocated points.
    * >100% row indicates over-allocation (highlighted).

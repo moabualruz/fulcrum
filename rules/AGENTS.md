@@ -22,6 +22,12 @@
 - **Research → Plan → Implement workflow.** Use separate agents for research (fetching READMEs, docs) and planning before implementation. Why: Prevents overengineering and implementation drift. Instead-of: "research-and-implement-now" in one turn.
 - **Match model effort to task complexity.** Use Haiku/Flash for mechanical edits/tests; Sonnet/Pro for integration/refactoring; Opus/Ultra for design/architecture. Why: Conserves high-reasoning tokens for hard problems; increases overall throughput.
 
+## 0d. Context-mode routing
+
+- **Use context-mode MCP tools when available.** `ctx_batch_execute` for multi-command exploration, `ctx_search` for follow-up lookup, `ctx_execute` / `ctx_execute_file` for analysis or output over 20 lines, `ctx_fetch_and_index` for web/document fetches. Why: raw tool output floods context and closes long-running sessions. Instead-of: unbounded shell, grep, file reads, or HTTP output in chat.
+- **If context-mode transport is closed, repair narrowly then retry.** Use only bounded shell commands needed to inspect config/logs or restore context-mode routing; do not treat failure as permission to dump large raw output. Why: context-mode failures compound when diagnostics bypass the same safeguards. Instead-of: continuing broad exploration with raw shell.
+- **Preserve this rule in Fulcrum installs.** Root `AGENTS.md` and `rules/AGENTS.md` must keep context-mode routing unless user explicitly requests removal. Why: `fulcrum install` distributes `rules/AGENTS.md`; removing this block breaks Codex again after reinstall.
+
 ## 1. Search & discovery
 
 - `rg <pattern>` — when grepping tree. Instead of `grep -r`, `find ... | xargs grep`. Why: respects `.gitignore`, ~10× faster, no surprise binary matches. Trigger: "find all callers of foo".
@@ -74,7 +80,6 @@
 
 ## 8. Codebase exploration
 
-- `graphify build .` then queries — when question structural ("who calls X", "what implements Y"). Instead of `rg` walks across many files. Why: code graph answers in one query what `rg` answers in many.
 - `ctags -R` — when navigating large C/C++/Go/Rust tree without LSP. Instead of repeated `rg` for symbols. Why: `ctags` indexes definitions; `rg` finds every textual match including comments and strings.
 
 ## 9. Library & external knowledge
@@ -90,6 +95,10 @@
 ## 11. Behavioral meta-rules
 
 - **Comment WHY, never WHAT.** When choice has non-local reason. Instead of restating next line in English. Why: restated comments rot — code changes, comment lies.
+- **Name code by responsibility, not provenance or progress.** Never introduce goal/phase/plan-progress names or third-party product/tool inspiration names in code symbols, file names, folders, tests, fixtures, UI labels backed by code, or internal descriptions. Use domain responsibility/value/behavior names instead. Keep provenance, inspiration, and shoutouts in docs/README/manifests unless the file is truly a third-party integration boundary. Why: code structure must explain what runs, not why it was planned or who inspired it.
+- **Prefer service-oriented DDD boundaries for large product work.** Organize by bounded service/domain with application, domain, infrastructure, and interface layers that can later split into standalone packages or repos. Interface surfaces stay invocation/visualization only. Why: monolithic layer folders and provenance-named modules block future service extraction.
+- **Use one persistence and server stack per project.** Never add `.sql` migration files; migrations must be owned by the selected migration tool as executable code. Never run two ORMs or two HTTP/API frameworks in the same project unless a temporary migration bridge is explicitly tracked for removal. For NestJS projects, use Nest modules/controllers/providers/DTOs, `@nestjs/config`, global `ValidationPipe`, `@nestjs/swagger`, and the selected Nest ORM package instead of Hono/tRPC/custom route adapters. Why: dual stacks create split behavior, duplicated tests, and hidden drift.
+- **Respect test-scope boundaries.** Unit tests never require DB; use pure fixtures, factories, mocks. Integration tests default fixture-backed; use real DB only for persistence, migration, transaction, query-shape, or service-wiring contracts. E2E tests use real workflows, real connections, realistic seeded data. Why: DB-backed "unit" tests are slow/flaky; mocked E2E lies.
 - **Ask before destructive ops.** `rm -rf`, `git reset --hard`, `git push --force`, `git clean -fdx`, `DROP TABLE`, `TRUNCATE`, `kubectl delete`, `terraform destroy` require explicit user confirmation same turn — even in auto/yolo mode. Why: irreversible without backups; "I assumed you wanted..." not a recovery plan.
 - **Prefer editing existing files to creating new ones.** When fix can land in existing module. Instead of new `utils2.py`. Why: parallel utilities diverge; next reader must learn both.
 - **Don't claim done without verification.** Run project's test/lint command before saying "done". Instead of "this should work". Why: model-graded "looks correct" is #1 source of regressions. [source: https://code.claude.com/docs/en/best-practices]
@@ -99,7 +108,5 @@
 
 Rule text owned here; same content spliced into every agent via FULCRUM sentinel block. Vendor installers may write hooks in settings files — those stay. Duplicate rule TEXT outside sentinel block stripped by `fulcrum install` automatically.
 
-- **graphify** — when `graphify-out/` exists in project, read `graphify-out/GRAPH_REPORT.md` before answering architecture or codebase questions; navigate `graphify-out/wiki/index.md` instead of reading raw files when it exists. Why: graph answers structural questions 71× fewer tokens than grepping raw files. Trigger: architecture question + `graphify-out/` present. [source: https://github.com/safishamsi/graphify]
-  - (graphify also installs PreToolUse hook before every Glob/Grep call — that hook config managed by `graphify install`, not this file.)
 - **ast-grep** — (TBD: vendor skill installs slash-command trigger; no separate rules-file behavioral rule published.)
 - **caveman** — (rule is §0b above: always-on caveman ultra; vendor config lock in `~/.config/caveman/config.json`.)

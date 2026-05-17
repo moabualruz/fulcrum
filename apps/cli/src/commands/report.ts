@@ -24,16 +24,20 @@
  *   --days <n>         Date range in days
  */
 
-import type { Container } from "@needle-di/core";
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createReportApiCallerFromEnv,
+  type ReportApiEnvironment,
+} from "@work-management/interface/http/report-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
+type ReportsCaller = { reports: Record<string, (...args: unknown[]) => Promise<unknown>> };
 
 export interface ReportRunOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   caller?: { reports: Record<string, (...args: any[]) => Promise<any>> };
-  container?: Container | null;
+  env?: ReportApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -175,10 +179,12 @@ function outputData(data: any, format: string, type: ReportType, print: (line: s
   }
 }
 
-async function resolveCaller(opts: ReportRunOptions): Promise<ReportRunOptions["caller"] & object> {
-  if (opts.caller) return opts.caller as object & { reports: Record<string, (...args: unknown[]) => Promise<unknown>> };
+async function resolveCaller(opts: ReportRunOptions): Promise<ReportsCaller> {
+  if (opts.caller) return opts.caller;
 
-  return await createLocalCaller({ container: opts.container, requireSession: false }) as object & {
-    reports: Record<string, (...args: unknown[]) => Promise<unknown>>;
-  };
+  const apiCaller = createReportApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Report API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.");
+  }
+  return apiCaller as ReportsCaller;
 }

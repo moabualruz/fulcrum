@@ -1,4 +1,9 @@
 .claude/
+.sandcastle/
+.scratch/
+.planning/
+.tmp-pruner-test/
+vendor/
 node_modules/
 dist/
 *.tsbuildinfo
@@ -6,15 +11,24 @@ eval-results/
 .DS_Store
 
 # Vendor agent-integration files written into project root by tools like
-# `graphify install` / `npx skills add`. Same rule text lives in
-# rules/AGENTS.md → spliced user-globally by `fulcrum install`; the
-# vendor's project-root copy is redundant for this repo.
+# `npx skills add`. Same rule text lives in rules/AGENTS.md → spliced
+# user-globally by `fulcrum install`; vendor's project-root copy is redundant.
 /.gemini/
 /.opencode/
-
-# Vendor project-index outputs (vendor-controlled paths).
-/graphify-out/
 .claude/settings.local.json
 .claude/.cache/
 .codex/
 coverage/
+test-results/
+**/target/
+memory:/
+tests/.tmp-*/
+
+# Preserved temporary upstream repositories and baseline-copy experiments for
+# Phase 9.6 copy-first workflow/value mapping. Do not track archive folders;
+# track only copied/adapted files after they land in Fulcrum's real source tree.
+/.scratch/upstream-product-replacement/
+
+# Manual smoke session runtime homes (PGlite data, logs, etc.) — track only
+# the curated critique/screenshot/logs evidence, not the live PGlite snapshot.
+/.scratch/manual-smoke-*/home/

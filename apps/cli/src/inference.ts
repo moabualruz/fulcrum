@@ -1,10 +1,14 @@
-import { Container } from "@needle-di/core";
-import { InferenceClient, type InferenceLifecycleLike } from "@/inference/client.ts";
+import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
+import { InferenceClient, type InferenceLifecycleLike } from "@platform-core/application/inference/client.ts";
+import {
+  createInferenceApiCallerFromEnv,
+  type InferenceApiEnvironment,
+} from "@platform-core/interface/http/inference-api-client.ts";
 import {
   InferenceLifecycle,
   type InferenceStatus,
   type InferenceStopResult,
-} from "@/inference/lifecycle.ts";
+} from "@platform-core/application/inference/lifecycle.ts";
 import {
   ClassifyResultSchema,
   EmbedResultSchema,
@@ -18,9 +22,9 @@ import {
   type InferenceModel,
   type ModelPullProgress,
   type TokenizeResult,
-} from "@/inference/protocol.ts";
-import { INFERENCE_CLIENT_TOKEN } from "@/inference/tokens.ts";
-import type { BackendHealth } from "@/inference/backends/types.ts";
+} from "@platform-core/application/inference/protocol.ts";
+import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
+import type { BackendHealth } from "@platform-core/application/inference/backends/types.ts";
 
 const HELP = `fulcrum inference
 
@@ -75,12 +79,17 @@ interface InferenceCliCaller {
       set(input: { feature: string; backend: string }): Promise<unknown>;
     };
     backends?: {
+      list?: () => Promise<unknown>;
       probe(): Promise<BackendHealth[]>;
+    };
+    provider?: {
+      set(input: { url: string; key: string }): Promise<unknown>;
+      test(): Promise<unknown>;
     };
   };
 }
 
-type ProgressSource = AsyncIterable<unknown> | {
+type ProgressSource = AsyncIterable<unknown> | Iterable<unknown> | {
   subscribe(opts: {
     next(value: unknown): void;
     error(error: unknown): void;
@@ -88,15 +97,23 @@ type ProgressSource = AsyncIterable<unknown> | {
   }): { unsubscribe(): void };
 };
 
-function isSubscribableProgress(source: ProgressSource): source is Exclude<ProgressSource, AsyncIterable<unknown>> {
+function isSubscribableProgress(
+  source: ProgressSource,
+): source is { subscribe(opts: { next(value: unknown): void; error(error: unknown): void; complete(): void }): { unsubscribe(): void } } {
   return typeof (source as { subscribe?: unknown }).subscribe === "function";
+}
+
+function isIterableProgress(source: ProgressSource): source is AsyncIterable<unknown> | Iterable<unknown> {
+  return Symbol.asyncIterator in Object(source) || Symbol.iterator in Object(source);
 }
 
 export interface InferenceRunOptions {
   lifecycle?: InferenceCliLifecycle;
   client?: InferenceCliClient;
   caller?: InferenceCliCaller;
-  container?: Container;
+  container?: DiContainer;
+  env?: InferenceApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -108,7 +125,7 @@ function hasFlag(argv: readonly string[], flag: string): boolean {
   return argv.includes(`--${flag}`);
 }
 
-function resolveContainerClient(container: Container): InferenceCliClient {
+function resolveContainerClient(container: DiContainer): InferenceCliClient {
   if (container.has(INFERENCE_CLIENT_TOKEN)) {
     return container.get(INFERENCE_CLIENT_TOKEN);
   }
@@ -122,11 +139,28 @@ function resolveServices(opts: InferenceRunOptions): {
   lifecycle: Required<InferenceCliLifecycle>;
   client: InferenceCliClient;
 } {
-  const container = opts.container ?? new Container();
+  if (opts.lifecycle && opts.client) {
+    return { lifecycle: opts.lifecycle as Required<InferenceCliLifecycle>, client: opts.client };
+  }
+  // Client-only mode: caller supplied a client directly without a lifecycle
+  // (e.g. status/models/embed commands that don't need process control).
+  if (opts.client && !opts.lifecycle) {
+    const stubLifecycle = {} as Required<InferenceCliLifecycle>;
+    return { lifecycle: stubLifecycle, client: opts.client };
+  }
+  const container = opts.container;
+  if (!container) {
+    throw new Error("InferenceRunOptions requires either {lifecycle, client} or a container");
+  }
   const lifecycle = opts.lifecycle ?? container.get(InferenceLifecycle);
   const fullLifecycle = lifecycle as Required<InferenceCliLifecycle>;
   const client = opts.client ?? (opts.lifecycle ? new InferenceClient({ lifecycle: fullLifecycle }) : resolveContainerClient(container));
   return { lifecycle: fullLifecycle, client };
+}
+
+function resolveApiCaller(opts: InferenceRunOptions): InferenceCliCaller | null {
+  if (opts.caller) return opts.caller;
+  return createInferenceApiCallerFromEnv(opts.env, opts.fetch) as unknown as InferenceCliCaller | null;
 }
 
 export async function run(argv: readonly string[], opts: InferenceRunOptions = {}): Promise<void> {
@@ -203,16 +237,17 @@ async function runStatus(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const health = opts.caller
-    ? await opts.caller.inference.health()
+  const caller = resolveApiCaller(opts);
+  const health = caller
+    ? await caller.inference.health()
     : await resolveServices(opts).client.call("health", {});
 
   let backends: BackendHealth[] | undefined;
-  if (opts.caller?.inference.backends) {
-    backends = await opts.caller.inference.backends.probe();
+  if (caller?.inference.backends?.probe) {
+    backends = await caller.inference.backends.probe();
   } else {
     try {
-      const { probeConfiguredBackends: probe } = await import("@/inference/backend-probes.ts");
+      const { probeConfiguredBackends: probe } = await import("@platform-core/application/inference/backend-probes.ts");
       backends = await probe();
     } catch {
       // Non-fatal: backends not available from this context
@@ -271,8 +306,9 @@ async function runModelsList(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const models = opts.caller
-    ? await requireCallerModels(opts.caller).list()
+  const caller = resolveApiCaller(opts);
+  const models = caller
+    ? await requireCallerModels(caller).list()
     : await listModelsWithClient(resolveServices(opts).client);
   const payload = (models as InferenceModel[]).map(toCliModel);
 
@@ -297,8 +333,9 @@ async function runModelsPull(
   const force = hasFlag(argv, "force");
   const modelId = argv.filter((arg) => arg !== "--force")[0];
   if (!modelId) throw new Error("models pull requires model id");
-  const events = opts.caller
-    ? await requireCallerModels(opts.caller).pull({ modelId, force })
+  const caller = resolveApiCaller(opts);
+  const events = caller
+    ? await requireCallerModels(caller).pull({ modelId, force })
     : pullModelWithClient(resolveServices(opts).client, modelId, force);
 
   for await (const event of iterateProgress(events)) {
@@ -314,8 +351,9 @@ async function runModelsRm(
   const json = hasFlag(argv, "json");
   const modelId = argv.filter((arg) => arg !== "--json")[0];
   if (!modelId) throw new Error("models rm requires model id");
-  const result = opts.caller
-    ? await requireCallerModels(opts.caller).rm({ modelId })
+  const caller = resolveApiCaller(opts);
+  const result = caller
+    ? await requireCallerModels(caller).rm({ modelId })
     : await rmModelWithClient(resolveServices(opts).client, modelId);
 
   if (json) {
@@ -327,14 +365,16 @@ async function runModelsRm(
 
 function requireCallerModels(caller: InferenceCliCaller): NonNullable<InferenceCliCaller["inference"]["models"]> {
   if (!caller.inference.models) {
-    throw new Error("models command requires inference.models tRPC caller");
+    throw new Error("models command requires inference.models API caller");
   }
   return caller.inference.models;
 }
 
 async function* iterateProgress(source: ProgressSource): AsyncIterable<unknown> {
-  if (Symbol.asyncIterator in Object(source)) {
-    yield* (source as AsyncIterable<unknown>);
+  if (isIterableProgress(source)) {
+    for await (const event of source) {
+      yield event;
+    }
     return;
   }
 
@@ -379,8 +419,9 @@ async function runEmbed(
   const { values, model } = parseModelArgs(argv.filter((arg) => arg !== "--json"));
   const text = values.join(" ").trim();
   if (!text) throw new Error("embed requires text");
-  const payload = EmbedResultSchema.parse(opts.caller
-    ? await opts.caller.inference.embed({ texts: [text], model })
+  const caller = resolveApiCaller(opts);
+  const payload = EmbedResultSchema.parse(caller
+    ? await caller.inference.embed({ texts: [text], model })
     : await embedWithClient(resolveServices(opts).client, text, model));
 
   if (json) {
@@ -400,8 +441,9 @@ async function runGenerate(
   const prompt = values.join(" ").trim();
   if (!prompt) throw new Error("generate requires prompt");
   const options: GenerateOptions = schema ? { schema } : {};
-  const payload = GenerateResultSchema.parse(opts.caller
-    ? await opts.caller.inference.generate({ prompt, options })
+  const caller = resolveApiCaller(opts);
+  const payload = GenerateResultSchema.parse(caller
+    ? await caller.inference.generate({ prompt, options })
     : await generateWithClient(resolveServices(opts).client, prompt, options));
   if (json) {
     opts.print(JSON.stringify(payload));
@@ -421,8 +463,9 @@ async function runClassify(
   if (!text) throw new Error("classify requires text");
   if (labels.length === 0) throw new Error("classify requires --labels");
 
-  const payload = ClassifyResultSchema.parse(opts.caller
-    ? await classifyWithCaller(opts.caller, text, labels)
+  const caller = resolveApiCaller(opts);
+  const payload = ClassifyResultSchema.parse(caller
+    ? await classifyWithCaller(caller, text, labels)
     : await classifyWithClient(resolveServices(opts).client, text, labels));
 
   if (json) {
@@ -444,8 +487,9 @@ async function runTokenize(
   const text = values.join(" ").trim();
   if (!text) throw new Error("tokenize requires text");
 
-  const payload = TokenizeResultSchema.parse(opts.caller
-    ? await tokenizeWithCaller(opts.caller, text, model)
+  const caller = resolveApiCaller(opts);
+  const payload = TokenizeResultSchema.parse(caller
+    ? await tokenizeWithCaller(caller, text, model)
     : await tokenizeWithClient(resolveServices(opts).client, text, model));
 
   if (json) {
@@ -462,7 +506,7 @@ async function embedWithClient(
   model?: string,
 ): Promise<EmbedResult> {
   if (!client.embed) {
-    throw new Error("embed requires a tRPC caller or inference client embed method");
+    throw new Error("embed requires a configured inference API caller or inference client embed method");
   }
   return client.embed([text], { model });
 }
@@ -517,7 +561,7 @@ async function classifyWithCaller(
   labels: string[],
 ): Promise<unknown> {
   if (!caller.inference.classify) {
-    throw new Error("classify requires inference.classify tRPC caller");
+    throw new Error("classify requires inference.classify API caller");
   }
   return caller.inference.classify({ text, labels });
 }
@@ -528,7 +572,7 @@ async function tokenizeWithCaller(
   model?: string,
 ): Promise<unknown> {
   if (!caller.inference.tokenize) {
-    throw new Error("tokenize requires inference.tokenize tRPC caller");
+    throw new Error("tokenize requires inference.tokenize API caller");
   }
   return caller.inference.tokenize({ text, model });
 }
@@ -539,7 +583,7 @@ async function classifyWithClient(
   labels: string[],
 ): Promise<ClassifyResult> {
   if (!client.classify) {
-    throw new Error("classify requires a tRPC caller or inference client classify method");
+    throw new Error("classify requires a configured inference API caller or inference client classify method");
   }
   return client.classify(text, labels);
 }
@@ -550,7 +594,7 @@ async function tokenizeWithClient(
   model?: string,
 ): Promise<TokenizeResult> {
   if (!client.tokenize) {
-    throw new Error("tokenize requires a tRPC caller or inference client tokenize method");
+    throw new Error("tokenize requires a configured inference API caller or inference client tokenize method");
   }
   return client.tokenize(text, model);
 }
@@ -583,14 +627,14 @@ async function generateWithClient(
   options?: GenerateOptions,
 ): Promise<GenerateResult> {
   if (!client.generate) {
-    throw new Error("generate requires a tRPC caller or inference client generate method");
+    throw new Error("generate requires a configured inference API caller or inference client generate method");
   }
   return client.generate(prompt, options);
 }
 
 async function listModelsWithClient(client: InferenceCliClient): Promise<InferenceModel[]> {
   if (!client.listModels) {
-    throw new Error("models list requires a tRPC caller or inference client listModels method");
+    throw new Error("models list requires a configured inference API caller or inference client listModels method");
   }
   return client.listModels();
 }
@@ -601,7 +645,7 @@ function pullModelWithClient(
   force: boolean,
 ): AsyncIterable<ModelPullProgress> {
   if (!client.pullModel) {
-    throw new Error("models pull requires a tRPC caller or inference client pullModel method");
+    throw new Error("models pull requires a configured inference API caller or inference client pullModel method");
   }
   return client.pullModel(modelId, { force });
 }
@@ -611,7 +655,7 @@ async function rmModelWithClient(
   modelId: string,
 ): Promise<{ ok: boolean }> {
   if (!client.rmModel) {
-    throw new Error("models rm requires a tRPC caller or inference client rmModel method");
+    throw new Error("models rm requires a configured inference API caller or inference client rmModel method");
   }
   return client.rmModel(modelId);
 }
@@ -645,8 +689,9 @@ async function runConfigList(
 ): Promise<void> {
   const json = hasFlag(argv, "json");
 
-  if (opts.caller?.inference.config) {
-    const map = await opts.caller.inference.config.get();
+  const caller = resolveApiCaller(opts);
+  if (caller?.inference.config) {
+    const map = await caller.inference.config.get();
     if (json) {
       opts.print(JSON.stringify(map));
     } else {
@@ -657,8 +702,7 @@ async function runConfigList(
     return;
   }
 
-  // Fallback: read from routing-config module directly
-  const { getRoutingConfig } = await import("@/inference/routing-config.ts");
+  const { getRoutingConfig } = await import("@platform-core/application/inference/routing-config.ts");
   const map = getRoutingConfig();
   if (json) {
     opts.print(JSON.stringify(map));
@@ -677,15 +721,15 @@ async function runConfigSet(
   if (!feature) throw new Error("config set requires <feature>");
   if (!backend) throw new Error("config set requires <backend>");
 
-  if (opts.caller?.inference.config) {
-    await opts.caller.inference.config.set({ feature, backend });
+  const caller = resolveApiCaller(opts);
+  if (caller?.inference.config) {
+    await caller.inference.config.set({ feature, backend });
     opts.print(`${feature}: ${backend}`);
     return;
   }
 
-  // Fallback: write to routing-config module directly
-  const { setRoutingConfig } = await import("@/inference/routing-config.ts");
-  const { BACKEND_IDS } = await import("@/inference/backends/types.ts");
+  const { setRoutingConfig } = await import("@platform-core/application/inference/routing-config.ts");
+  const { BACKEND_IDS } = await import("@platform-core/application/inference/backends/types.ts");
   if (!BACKEND_IDS.includes(backend as never)) {
     throw new Error(`invalid backend '${backend}'; valid: ${BACKEND_IDS.join(", ")}`);
   }
@@ -706,7 +750,13 @@ async function runConfigSetProvider(
   if (!url) throw new Error("config set-provider requires --url");
   if (!key) throw new Error("config set-provider requires --key");
 
-  // Persist to env (config store override path per issue notes)
+  const caller = resolveApiCaller(opts);
+  if (caller?.inference.provider?.set) {
+    await caller.inference.provider.set({ url, key });
+    opts.print(`provider configured url=${url}`);
+    return;
+  }
+
   process.env["FULCRUM_INFERENCE_URL"] = url;
   process.env["FULCRUM_INFERENCE_API_KEY"] = key;
   opts.print(`provider configured url=${url}`);
@@ -717,11 +767,23 @@ async function runConfigTestProvider(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
+  const caller = resolveApiCaller(opts);
+  if (caller?.inference.provider?.test) {
+    const result = await caller.inference.provider.test();
+    if (json) {
+      opts.print(JSON.stringify(result));
+    } else {
+      const record = result as { ok?: boolean; latency_ms?: number; error?: string };
+      opts.print(record.ok ? `provider ok latency=${record.latency_ms}ms` : `provider error: ${record.error}`);
+    }
+    return;
+  }
+
   const features = (process.env["FULCRUM_FEATURES"] ?? "")
     .split(",").map((s) => s.trim()).filter(Boolean);
   const flagEnabled = features.includes("external-llm-provider");
 
-  const { OpenAICompatibleBackend } = await import("@/inference/backends/openai-compatible.ts");
+  const { OpenAICompatibleBackend } = await import("@platform-core/application/inference/backends/openai-compatible.ts");
   const backend = new OpenAICompatibleBackend({ flagEnabled });
   const result = await backend.testConnection();
 

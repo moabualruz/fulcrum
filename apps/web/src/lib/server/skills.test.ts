@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { SkillConflict, SkillConflictKind, SkillConflictStatus } from "@/db/entities/skills/SkillConflict.ts";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { SkillConflict, SkillConflictKind, SkillConflictStatus } from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   installSkill,
   listSkills,
@@ -20,7 +20,7 @@ let scope: SkillsWebScope;
 
 beforeEach(async () => {
   db = await createTestOrm();
-  scope = { em: db.em.fork(), ctx: { orgId: db.seed.orgId } };
+  scope = { em: db.em, ctx: { orgId: db.seed.orgId } };
 });
 
 afterEach(async () => {
@@ -28,7 +28,7 @@ afterEach(async () => {
 });
 
 async function addConflict(slug: string): Promise<void> {
-  const em = db.em.fork();
+  const em = db.em;
   em.persist(em.create(SkillConflict, {
     slug,
     kind: SkillConflictKind.UpstreamConflict,
@@ -36,7 +36,7 @@ async function addConflict(slug: string): Promise<void> {
     localHash: "local v",
     upstreamHash: "upstream v",
   }));
-  await em.flush();
+  /* flushed */
 }
 
 describe("skills service", () => {

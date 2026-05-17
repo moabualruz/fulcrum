@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createDoctorApiCallerFromEnv,
+  type DoctorApiEnvironment,
+} from "@platform-core/interface/http/doctor-api-client.ts";
+import { formatApiError } from "../api-errors.ts";
 
 type DoctorCaller = {
   doctor: {
@@ -12,7 +13,8 @@ type DoctorCaller = {
 
 export interface DoctorRunOptions {
   caller?: DoctorCaller;
-  container?: Container | null;
+  env?: DoctorApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -63,7 +65,9 @@ export async function run(argv: readonly string[], opts: DoctorRunOptions = {}):
 
 async function resolveCaller(opts: DoctorRunOptions): Promise<DoctorCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: false }) as unknown as DoctorCaller;
+  const apiCaller = createDoctorApiCallerFromEnv(opts.env, opts.fetch);
+  if (apiCaller) return apiCaller as DoctorCaller;
+  throw new Error("Doctor API caller is not configured");
 }
 
 function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
@@ -71,6 +75,5 @@ function printOutput(value: unknown, argv: readonly string[], print: (line: stri
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

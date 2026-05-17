@@ -1,7 +1,7 @@
 /**
  * Re-export from canonical service layer.
  * Web consumers use $lib/server/artifacts — this file preserves that alias.
- * Actual logic lives in src/services/artifacts.ts.
+ * Actual logic lives in workflow coordination service modules.
  */
 export {
   type ArtifactRow,
@@ -12,4 +12,4 @@ export {
   readArtifactDetail,
   deleteArtifactAction,
   getArtifactStats,
-} from "@/services/artifacts.ts";
+} from "@workflow-coordination/interface/artifact-records.ts";

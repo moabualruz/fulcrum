@@ -17,7 +17,7 @@ beforeEach(() => {
       ctx: { orgId: "org1", userId: "user1", projectId },
     }),
   }));
-  mock.module("@/application/context/queries.ts", () => ({
+  mock.module("@knowledge-workspace/application/context/queries.ts", () => ({
     loadContextPreviewOptions: async (_em: unknown, _ctx: unknown, selectedProjectId: string | null) => ({
       projects: [{ id: "project-1", name: "Project 1" }],
       tasks: selectedProjectId ? [{ id: "task-1", title: "Task 1", status: "ready" }] : [],

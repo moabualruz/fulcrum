@@ -1,16 +1,11 @@
-/**
- * Settings → Theme page server.
- *
- * Pillar 16: web shell rebuild — theme customisation UI.
- * Stores per-org theme settings via tRPC theme.* procedures.
- * Falls back to defaults when no settings persisted yet.
- */
-
 import { fail, redirect } from "@sveltejs/kit";
 import { THEME_DEFAULTS, type ThemeSettings } from "./theme";
+import { createThemeSettingsApiCaller } from "@platform-core/interface/http/theme-settings-api-client.ts";
 
 interface RouteLocals {
   session: unknown;
+  orgId?: string;
+  userId?: string;
 }
 
 interface LoadEvent {
@@ -24,65 +19,35 @@ interface ActionEvent extends LoadEvent {
   request: LoadEvent["request"] & { formData(): Promise<FormData> };
 }
 
-// ── tRPC helpers ──────────────────────────────────────────────────────────────
+type ThemeSettingsCaller = ReturnType<typeof createThemeSettingsApiCaller>;
 
 function getBaseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
+  return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${url.protocol}//${url.host}`;
 }
 
-async function trpcGet(
-  fetchFn: typeof fetch,
-  origin: string,
-  procedure: string,
-  cookie: string,
-): Promise<unknown> {
-  const res = await fetchFn(`${origin}/api/trpc/${procedure}?input=%7B%7D`, {
-    method: "GET",
-    credentials: "include",
-    headers: { "content-type": "application/json", cookie },
+function createThemeCaller(event: LoadEvent): ThemeSettingsCaller | null {
+  const orgId = event.locals.orgId ?? process.env["FULCRUM_ORG_ID"];
+  const userId = event.locals.userId ?? process.env["FULCRUM_USER_ID"];
+  if (!orgId || !userId) return null;
+
+  const cookie = event.request.headers.get("cookie") ?? "";
+  return createThemeSettingsApiCaller({
+    baseUrl: getBaseUrl(event.url),
+    orgId,
+    userId,
+    fetch: event.fetch,
+    headers: cookie ? { cookie } : undefined,
   });
-  if (!res.ok) return null;
-  const body = await res.json().catch(() => null);
-  const d = (body as { result?: { data?: { json?: unknown } } })?.result?.data;
-  if (d !== undefined && "json" in (d as object)) return (d as { json: unknown }).json;
-  return d ?? null;
 }
-
-async function trpcPost(
-  fetchFn: typeof fetch,
-  origin: string,
-  procedure: string,
-  input: unknown,
-  cookie: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetchFn(`${origin}/api/trpc/${procedure}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json", cookie },
-    body: JSON.stringify({ json: input }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const msg =
-      (body as { error?: { json?: { message?: string } } })?.error?.json?.message ?? "Request failed";
-    return { ok: false, error: msg };
-  }
-  return { ok: true };
-}
-
-// ── Load ──────────────────────────────────────────────────────────────────────
 
 export async function load(event: LoadEvent) {
-  const { locals, fetch: fetchFn, request, url } = event;
+  const { locals } = event;
 
   if (!locals.session) {
     throw redirect(302, "/auth/login");
   }
 
-  const cookie = request.headers.get("cookie") ?? "";
-  const origin = getBaseUrl(url);
-
-  const remote = await trpcGet(fetchFn, origin, "theme.get", cookie);
+  const remote = await createThemeCaller(event)?.theme.get().catch(() => null);
   const settings: ThemeSettings = remote
     ? { ...THEME_DEFAULTS, ...(remote as Partial<ThemeSettings>) }
     : { ...THEME_DEFAULTS };
@@ -90,17 +55,9 @@ export async function load(event: LoadEvent) {
   return { settings };
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-
 export const actions = {
-  /**
-   * save — persist theme settings.
-   */
   save: async (event: ActionEvent) => {
-    const { fetch: fetchFn, request, url } = event;
-    const origin = getBaseUrl(url);
-    const cookie = request.headers.get("cookie") ?? "";
-    const form = await request.formData();
+    const form = await event.request.formData();
 
     const settings: ThemeSettings = {
       accentHue: Number(form.get("accentHue") ?? THEME_DEFAULTS.accentHue),
@@ -114,25 +71,30 @@ export const actions = {
       preset: (form.get("preset") as ThemeSettings["preset"]) ?? THEME_DEFAULTS.preset,
     };
 
-    const result = await trpcPost(fetchFn, origin, "theme.update", settings, cookie);
-    if (!result.ok) {
-      return fail(400, { saveError: result.error, settings });
+    const caller = createThemeCaller(event);
+    if (!caller) {
+      return fail(503, { saveError: "Theme settings API caller is not configured.", settings });
+    }
+
+    try {
+      await caller.theme.update(settings as unknown as Record<string, unknown>);
+    } catch (error) {
+      return fail(400, { saveError: error instanceof Error ? error.message : "Request failed", settings });
     }
 
     return { saved: true, settings };
   },
 
-  /**
-   * reset — restore defaults.
-   */
   reset: async (event: ActionEvent) => {
-    const { fetch: fetchFn, request, url } = event;
-    const origin = getBaseUrl(url);
-    const cookie = request.headers.get("cookie") ?? "";
+    const caller = createThemeCaller(event);
+    if (!caller) {
+      return fail(503, { saveError: "Theme settings API caller is not configured.", settings: THEME_DEFAULTS });
+    }
 
-    const result = await trpcPost(fetchFn, origin, "theme.update", THEME_DEFAULTS, cookie);
-    if (!result.ok) {
-      return fail(400, { saveError: result.error, settings: THEME_DEFAULTS });
+    try {
+      await caller.theme.update(THEME_DEFAULTS as unknown as Record<string, unknown>);
+    } catch (error) {
+      return fail(400, { saveError: error instanceof Error ? error.message : "Request failed", settings: THEME_DEFAULTS });
     }
 
     return { saved: true, settings: THEME_DEFAULTS };

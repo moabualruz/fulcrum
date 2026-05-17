@@ -134,13 +134,73 @@ describe("search CLI commands", () => {
     });
   });
 
-  it("rejects unknown kind before calling tRPC", async () => {
+  it("rejects unknown kind before calling the command caller", async () => {
     const caller = fakeCaller();
     const result = await runSearch(["foo", "--kind", "unknown", "--json"], caller);
 
     expect(result.exitCode).toBe(1);
     expect(caller.calls).toEqual([]);
     expect(result.errors.join("\n")).toContain("unknown --kind");
+  });
+
+  it("routes search query through the configured public API", async () => {
+    const { run } = await import("@fulcrum/cli/commands/search.ts");
+    const lines: string[] = [];
+    const errors: string[] = [];
+    const calls: Array<{ url: string; method: string | undefined; authorization: string | null }> = [];
+
+    await run(["query", "kernel", "--kind", "task", "--project", "project-1", "--limit", "5", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+        FULCRUM_API_TOKEN: "token-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          authorization: new Headers(init?.headers).get("authorization"),
+        });
+        return Response.json([{ id: "hit-1", title: "Kernel" }]);
+      }) as typeof fetch,
+      print: (line) => lines.push(line),
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(errors).toEqual([]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/search?q=kernel&org_id=org-1&project_id=project-1&kind=task&limit=5",
+        method: "GET",
+        authorization: "Bearer token-1",
+      },
+    ]);
+    expect(JSON.parse(lines[0] as string)).toEqual([{ id: "hit-1", title: "Kernel" }]);
+  });
+
+  it("search query requires a configured public API without injected caller", async () => {
+    const { run } = await import("@fulcrum/cli/commands/search.ts");
+    const errors: string[] = [];
+    let exitCode: number | undefined;
+
+    await run(["query", "kernel", "--json"], {
+      env: {},
+      fetch: (async () => {
+        throw new Error("fetch should not run without API configuration");
+      }) as unknown as typeof fetch,
+      print: () => {},
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        exitCode = code;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(errors.join("\n")).toContain("Search API caller is not configured");
   });
 
   it("runs suggestions and saved search commands", async () => {
@@ -187,6 +247,48 @@ describe("search CLI commands", () => {
     expect(JSON.parse(created.lines[0] as string).id).toBe("task-created");
     expect(unknown.exitCode).toBe(1);
     expect(unknown.errors.join("\n")).toContain("unknown cmdk command");
+  });
+
+  it("routes cmdk create-task through the configured task public API", async () => {
+    const { runCmdk } = await import("@fulcrum/cli/commands/search.ts");
+    const lines: string[] = [];
+    const errors: string[] = [];
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runCmdk(["create-task", "--args", "{\"title\":\"Created from cmdk\"}", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json({ id: "task-created", title: "Created from cmdk" });
+      }) as typeof fetch,
+      print: (line) => lines.push(line),
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        throw new Error(`unexpected exit ${code}`);
+      },
+    });
+
+    expect(errors).toEqual([]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/tasks?orgId=org-1&userId=user-1",
+        method: "POST",
+        body: {
+          title: "Created from cmdk",
+          orgId: "org-1",
+          userId: "user-1",
+        },
+      },
+    ]);
+    expect(JSON.parse(lines[0] as string)).toEqual({ id: "task-created", title: "Created from cmdk" });
   });
 
   it("--semantic with embeddings disabled returns FeatureDisabledError", async () => {

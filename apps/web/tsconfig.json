@@ -1,6 +1,7 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
+		"baseUrl": ".",
 		"rewriteRelativeImportExtensions": true,
 		"allowJs": true,
 		"checkJs": true,
@@ -11,7 +12,30 @@
 		"sourceMap": true,
 		"strict": true,
 		"moduleResolution": "bundler",
-		"types": ["bun"]
+		"types": ["bun"],
+		"paths": {
+			"@agent-client-protocol/*": ["../../services/agent-client-protocol/src/*"],
+			"@execution-orchestration/*": ["../../services/execution-orchestration/src/*"],
+			"@fulcrum/cli": ["../cli/src"],
+			"@fulcrum/cli/*": ["../cli/src/*"],
+			"@fulcrum/server": ["../server/src"],
+			"@fulcrum/server/*": ["../server/src/*"],
+			"@fulcrum/tui": ["../tui/src"],
+			"@fulcrum/tui/*": ["../tui/src/*"],
+			"@fulcrum/web": ["src"],
+			"@fulcrum/web/*": ["src/*"],
+			"@identity-access/*": ["../../services/identity-access/src/*"],
+			"@integration-hub/*": ["../../services/integration-hub/src/*"],
+			"@knowledge-workspace/*": ["../../services/knowledge-workspace/src/*"],
+			"@notification-center/*": ["../../services/notification-center/src/*"],
+			"@planning-review/*": ["../../services/planning-review/src/*"],
+			"@platform-core/*": ["../../services/platform-core/src/*"],
+			"@test-support/*": ["../../tests/support/*"],
+			"@workflow-coordination/*": ["../../services/workflow-coordination/src/*"],
+			"@work-management/*": ["../../services/work-management/src/*"],
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"]
+		}
 	},
 	"exclude": [
 		"node_modules/**",

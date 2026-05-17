@@ -1,19 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockDb = {
-  query: vi.fn(),
-  close: vi.fn(),
+const scope = {
+  em: { marker: "em" },
+  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
 };
-vi.mock("$lib/server/db", () => ({
-  openIsolatedStore: vi.fn(() => Promise.resolve(mockDb)),
+const mocks = {
+  scope,
+  requestServiceScope: vi.fn(async () => scope),
+  createSettingsDataExport: vi.fn(async (_em, _ctx, input: { kinds?: readonly string[] }) => {
+    const output: Record<string, unknown[]> = {};
+    for (const kind of input.kinds?.length ? input.kinds : ["projects", "tasks"]) output[kind] = [];
+    return output;
+  }),
+  preflightSettingsDataImport: vi.fn((input: unknown) => ({
+    preflightSummary: Object.fromEntries(
+      Object.entries(input && typeof input === "object" ? input as Record<string, unknown> : {})
+        .filter(([, value]) => Array.isArray(value))
+        .map(([key, value]) => [key, (value as unknown[]).length]),
+    ),
+  })),
+  importSettingsData: vi.fn(async (_em, _ctx, input: unknown) => ({
+    imported: true,
+    totalRows: Object.values(input && typeof input === "object" ? input as Record<string, unknown> : {})
+      .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0),
+  })),
+  SETTINGS_ENTITY_KINDS: ["projects", "tasks", "credentials", "feature_flags", "tenant_settings"] as const,
+};
+
+vi.mock("$lib/server/request-service-scope", () => ({
+  requestServiceScope: mocks.requestServiceScope,
+}));
+
+vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
+  createSettingsDataExport: mocks.createSettingsDataExport,
+  preflightSettingsDataImport: mocks.preflightSettingsDataImport,
+  importSettingsData: mocks.importSettingsData,
+  SETTINGS_ENTITY_KINDS: mocks.SETTINGS_ENTITY_KINDS,
 }));
 
 import { actions } from "./+page.server.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDb.query.mockResolvedValue([]);
-  mockDb.close.mockResolvedValue(undefined);
 });
 
 function makeRequest(body: Record<string, string | File | string[]>) {
@@ -30,7 +58,6 @@ function makeRequest(body: Record<string, string | File | string[]>) {
 
 describe("/settings/data actions", () => {
   it("export: returns JSON data", async () => {
-    mockDb.query.mockResolvedValue([{ id: "1", name: "test" }]);
     const result = await actions.export(makeRequest({}));
     expect(result).toMatchObject({ exported: true });
     expect(typeof result.data).toBe("string");
@@ -39,11 +66,11 @@ describe("/settings/data actions", () => {
   });
 
   it("export: only selected kinds", async () => {
-    mockDb.query.mockResolvedValue([]);
     const result = await actions.export(makeRequest({ kinds: ["projects"] }));
     expect(result).toMatchObject({ exported: true });
     const parsed = JSON.parse(result.data as string);
     expect(Object.keys(parsed)).toContain("projects");
+    expect(Object.keys(parsed)).not.toContain("tasks");
   });
 
   it("preflight: fails with no file", async () => {

@@ -26,10 +26,10 @@
 import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile, mkdtemp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { which, run as runProc } from "@/utils/proc.ts";
-import { pruneSourceBackupFiles } from "@/utils/source-clean.ts";
-import { AGENTS } from "@/agents/registry.ts";
-import { patchJsonOwnedKey, patchTomlOwnedKey } from "@/utils/config-patcher.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
+import { pruneSourceBackupFiles } from "@platform-core/application/runtime-support/source-backup-pruner.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
+import { patchJsonOwnedKey, patchTomlOwnedKey } from "@platform-core/application/runtime-support/configuration-patcher.ts";
 import { FULCRUM_RULES_BEGIN as BEGIN, FULCRUM_RULES_END as END, replaceSentinelBlock } from "./vendor-rules.ts";
 
 // ---------------------------------------------------------------------------
@@ -311,7 +311,6 @@ async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string
   return runProc(cmd, { timeoutMs: 60_000 });
 }
 
-
 function repoRoot(): string {
   return process.env["FULCRUM_REPO_DIR"] ?? process.cwd();
 }
@@ -433,13 +432,11 @@ const CAVEMAN_REPO = "https://github.com/JuliusBrussee/caveman";
 // Add new vendors here when their rule text is mirrored into rules/AGENTS.md.
 // ---------------------------------------------------------------------------
 const VENDOR_RULE_HEADINGS: ReadonlyArray<string> = [
-  "# graphify",
 ];
 
 /**
  * Strip vendor-installed rule blocks that live OUTSIDE the FULCRUM sentinel.
  *
- * Vendor installers (e.g. `graphify install`) write a rule block directly into
  * the agent's primary rules file. The same rule text lives in rules/AGENTS.md
  * and is spliced into the FULCRUM sentinel block by `fulcrum install`. The
  * duplicate outside the sentinel wastes context and can conflict.
@@ -893,8 +890,8 @@ export async function run(args: string[]): Promise<void> {
   }
 
   console.log(`2/4  Installing component profile ${target}`);
-  const { planComponentOperation } = await import("@/components/planner.ts");
-  const { executeComponentPlan } = await import("@/components/executor.ts");
+  const { planComponentOperation } = await import("@platform-core/application/component-lifecycle/planner.ts");
+  const { executeComponentPlan } = await import("@platform-core/application/component-lifecycle/executor.ts");
   const plan = planComponentOperation({
     operation: "install",
     target,

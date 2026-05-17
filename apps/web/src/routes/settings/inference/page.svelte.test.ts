@@ -163,7 +163,7 @@ describe("/settings/inference +page.svelte", () => {
     expect(body).toContain("external-llm-provider");
   });
 
-  test("renders error card when sidecar down", () => {
+  test("renders error card when public API is unavailable", () => {
     const { body } = render(Page, {
       props: { data: pageData(makeData({ error: "Connection refused", health: null })) },
     });

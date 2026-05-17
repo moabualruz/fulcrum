@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { run as runAgents } from "../../apps/cli/src/commands/agents.ts";
 import { run as runSprintsCommand } from "../../apps/cli/src/commands/sprints.ts";
 import { run as runSprintsLegacy } from "../../apps/cli/src/sprints.ts";
-import { createTaskCsvApplication } from "../../src/application/tasks/csv.ts";
+import { createTaskCsvApplication } from "@work-management/application/tasks/csv.ts";
 
 const originalEnv = { ...process.env };
 
@@ -57,7 +57,7 @@ describe("sprints command source", () => {
   function caller() {
     return {
       sprints: {
-        list: async (input?: Record<string, unknown>) => ({ list: input }),
+        list: async (input?: Record<string, unknown>) => [{ list: input }],
         get: async (input: unknown) => ({ get: input }),
         create: async (input: unknown) => ({ create: input }),
         update: async (input: unknown) => ({ update: input }),
@@ -95,6 +95,64 @@ describe("sprints command source", () => {
     expect(err).toContain("--capacity must be an integer");
     expect(err).toContain("unknown command 'wat'");
     expect(s.exits).toEqual([1, 1, 1, 2]);
+  });
+
+  it("routes hand-authored sprint commands through the configured public API", async () => {
+    const s = io();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+    const opts = {
+      ...s.opts,
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        const body = init?.body ? JSON.parse(String(init.body)) : null;
+        calls.push({ url: String(url), method: init?.method, body });
+        if (String(url).includes("/tasks/task-1")) return Response.json({ id: "assignment-1", taskId: "task-1" });
+        if (String(url).endsWith("/tasks")) return Response.json({ id: "assignment-1", taskId: body?.taskId });
+        if (init?.method === "POST") return Response.json({ id: "sprint-created" });
+        if (init?.method === "PATCH") return Response.json({ id: "sprint-1", name: body?.name ?? "Sprint 1" });
+        if (init?.method === "DELETE") return new Response(null, { status: 204 });
+        if (String(url).includes("/sprint-1")) return Response.json({ id: "sprint-1", name: "Sprint 1" });
+        return Response.json({ data: [{ id: "sprint-1" }] });
+      }) as typeof fetch,
+    };
+
+    await runSprintsCommand(["list", "--project", "project-1", "--status", "active", "--json"], opts);
+    await runSprintsCommand(["create", "--project", "project-1", "--name", "Sprint 1", "--start", "2026-05-01", "--end", "2026-05-14", "--json"], opts);
+    await runSprintsCommand(["get", "sprint-1", "--json"], opts);
+    await runSprintsCommand(["update", "sprint-1", "--name", "Sprint 1 revised", "--json"], opts);
+    await runSprintsCommand(["add-task", "--sprint-id", "sprint-1", "--task-id", "task-1", "--json"], opts);
+    await runSprintsCommand(["remove-task", "--sprint-id", "sprint-1", "--task-id", "task-1", "--json"], opts);
+    await runSprintsCommand(["delete", "sprint-1", "--json"], opts);
+
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
+      ["GET", "http://127.0.0.1:3210/api/v1/sprints?orgId=org-1&projectId=project-1&status=active"],
+      ["POST", "http://127.0.0.1:3210/api/v1/sprints"],
+      ["GET", "http://127.0.0.1:3210/api/v1/sprints/sprint-1?orgId=org-1"],
+      ["PATCH", "http://127.0.0.1:3210/api/v1/sprints/sprint-1"],
+      ["POST", "http://127.0.0.1:3210/api/v1/sprints/sprint-1/tasks"],
+      ["DELETE", "http://127.0.0.1:3210/api/v1/sprints/sprint-1/tasks/task-1?orgId=org-1"],
+      ["DELETE", "http://127.0.0.1:3210/api/v1/sprints/sprint-1?orgId=org-1"],
+    ]);
+    expect(calls[1]?.body).toMatchObject({ orgId: "org-1", projectId: "project-1", name: "Sprint 1" });
+    expect(calls[3]?.body).toMatchObject({ orgId: "org-1", name: "Sprint 1 revised" });
+    expect(calls[4]?.body).toMatchObject({ orgId: "org-1", taskId: "task-1" });
+  });
+
+  it("requires the configured sprint public API when no caller is injected", async () => {
+    const s = io();
+    await runSprintsCommand(["list", "--json"], {
+      ...s.opts,
+      env: {},
+      fetch: (async () => {
+        throw new Error("unexpected fetch");
+      }) as unknown as typeof fetch,
+    });
+
+    expect(s.exits).toEqual([1]);
+    expect(s.stderr.join("\n")).toContain("Sprint API caller is not configured");
   });
 
   it("covers legacy sprint move command", async () => {

@@ -6,6 +6,8 @@ import {
   nextTaskSelection,
   loadVisibleTaskColumns,
   saveVisibleTaskColumns,
+  submitBulkTaskCustomFieldPatch,
+  submitBulkTaskMutation,
 } from "./task-table.ts";
 
 type TaskTableProps = {
@@ -127,12 +129,12 @@ describe("TaskTable component (SSR)", () => {
     expect(body).toMatch(/data-task-group-count[^>]*>2</);
   });
 
-  test("renders inline status editor that posts tasks.update", () => {
+  test("renders inline status editor with a responsibility-named intent", () => {
     const { body } = render(TaskTable, { props: { tasks: TASKS } });
 
     expect(body).toContain('data-inline-status="task-late"');
     expect(body).toContain('name="intent"');
-    expect(body).toContain('value="tasks.update"');
+    expect(body).toContain('value="update-task-status"');
     expect(body).toContain('name="status"');
   });
 
@@ -198,7 +200,7 @@ describe("TaskTable bulk selection helpers", () => {
     expect([...selection.selectedIds]).toEqual(["task-late", "task-middle"]);
   });
 
-  test("buildBulkMutationRequest targets real tRPC bulk update, move, and delete mutations", () => {
+  test("buildBulkMutationRequest targets public task and sprint operations", () => {
     expect(
       buildBulkMutationRequest({
         action: "status",
@@ -206,8 +208,19 @@ describe("TaskTable bulk selection helpers", () => {
         value: "blocked",
       }),
     ).toEqual({
-      procedure: "tasks.bulkUpdate",
+      kind: "update",
       input: { ids: ["task-a", "task-b"], patch: { status: "blocked" } },
+    });
+
+    expect(
+      buildBulkMutationRequest({
+        action: "assignee",
+        ids: ["task-a", "task-b"],
+        value: "user-1",
+      }),
+    ).toEqual({
+      kind: "update",
+      input: { ids: ["task-a", "task-b"], patch: { assigneeId: "user-1" } },
     });
 
     expect(
@@ -217,8 +230,8 @@ describe("TaskTable bulk selection helpers", () => {
         value: { projectId: "project-1", sprintId: "sprint-1" },
       }),
     ).toEqual({
-      procedure: "tasks.bulkUpdate",
-      input: { ids: ["task-a", "task-b"], patch: { projectId: "project-1", sprintId: "sprint-1" } },
+      kind: "assignSprint",
+      input: { ids: ["task-a", "task-b"], sprintId: "sprint-1" },
     });
 
     expect(
@@ -228,13 +241,84 @@ describe("TaskTable bulk selection helpers", () => {
         value: "sprint-2",
       }),
     ).toEqual({
-      procedure: "tasks.bulkUpdate",
-      input: { ids: ["task-a", "task-b"], patch: { sprintId: "sprint-2" } },
+      kind: "assignSprint",
+      input: { ids: ["task-a", "task-b"], sprintId: "sprint-2" },
     });
 
     expect(buildBulkMutationRequest({ action: "delete", ids: ["task-a"], value: null })).toEqual({
-      procedure: "tasks.bulkDelete",
+      kind: "delete",
       input: { ids: ["task-a"] },
+    });
+  });
+
+  test("submitBulkTaskMutation fans out to public task and sprint APIs", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await submitBulkTaskMutation(fetchFn, {
+      kind: "update",
+      input: { ids: ["task-a"], patch: { status: "done", priority: 3 } },
+    }, { orgId: "org-1", userId: "user-1", projectId: "project-1" });
+    await submitBulkTaskMutation(fetchFn, {
+      kind: "assignSprint",
+      input: { ids: ["task-a"], sprintId: "sprint-1" },
+    }, { orgId: "org-1", userId: "user-1" });
+    await submitBulkTaskMutation(fetchFn, {
+      kind: "delete",
+      input: { ids: ["task-a"] },
+    }, { orgId: "org-1", userId: "user-1", projectId: "project-1" });
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["PATCH", "/api/v1/tasks/task-a"],
+      ["POST", "/api/v1/sprints/sprint-1/tasks"],
+      ["DELETE", "/api/v1/tasks/task-a?orgId=org-1&userId=user-1&projectId=project-1"],
+    ]);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      orgId: "org-1",
+      userId: "user-1",
+      projectId: "project-1",
+      status: "done",
+      priority: 3,
+    });
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      orgId: "org-1",
+      taskId: "task-a",
+    });
+  });
+
+  test("submitBulkTaskCustomFieldPatch fans out public task custom field updates", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchFn = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init: init ?? {} });
+      return new Response(JSON.stringify({ taskId: "task-a", customFields: { severity: "critical" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await submitBulkTaskCustomFieldPatch(
+      fetchFn,
+      ["task-a", "task-b"],
+      { "field-severity": "critical" },
+      { orgId: "org-1", userId: "user-1", projectId: "project-1" },
+    );
+
+    expect(calls.map((call) => [call.init.method, call.url])).toEqual([
+      ["POST", "/api/v1/task-custom-fields/set"],
+      ["POST", "/api/v1/task-custom-fields/set"],
+    ]);
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      orgId: "org-1",
+      userId: "user-1",
+      taskId: "task-a",
+      fieldId: "field-severity",
+      value: "critical",
     });
   });
 });

@@ -1,15 +1,16 @@
 /**
  * Search sub-router — query + suggest + saved searches + click telemetry.
  *
- * P11#16: recordClick gated behind `search-click-telemetry` flag.
- * P11#16: NL→filter pre-processing gated behind `report-llm-narration` flag.
- * C8: needle-di Container pattern; service resolved from ctx.container when available.
+ * Click telemetry and natural-language filter translation are feature-gated.
+ * Services resolve from the request container when available.
  */
 
 import { z } from "zod";
 
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   createSavedSearch,
   deleteSavedSearch,
@@ -19,9 +20,9 @@ import {
   SavedSearchOutputSchema,
   SavedSearchUpdateInputSchema,
   updateSavedSearch,
-} from "@/search/saved-searches.ts";
-import { SearchQueryService } from "@/search/query-service.ts";
-import { SnapshotService } from "@/search/snapshot-service.ts";
+} from "@knowledge-workspace/application/search/saved-searches.ts";
+import { SearchQueryService } from "@knowledge-workspace/application/search/query-service.ts";
+import { SnapshotService } from "@knowledge-workspace/application/search/snapshot-service.ts";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ const SearchFiltersSchema = z.object({
     .optional(),
 });
 
-/** T-06-09: max limit=100 enforced in schema */
+/** max limit=100 enforced in schema */
 const SearchQueryInputSchema = z.object({
   term: z.string().default(""),
   filters: SearchFiltersSchema.optional(),
@@ -66,6 +67,15 @@ const SearchQueryOutputSchema = z.object({
   total: z.number(),
   facets: z.record(z.string(), z.record(z.string(), z.number())).optional(),
 });
+
+async function mapAppError<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (error instanceof AppError) throw appErrorToTrpcError(error);
+    throw error;
+  }
+}
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
@@ -113,29 +123,29 @@ export const searchRouter = t.router({
   savedList: permissionedProcedure({ resource: "search", action: "savedList" })
     .input(z.object({}))
     .output(z.array(SavedSearchOutputSchema))
-    .query(({ ctx }) => listSavedSearches(ctx)),
+    .query(({ ctx }) => mapAppError(() => listSavedSearches(ctx))),
 
   /** savedCreate — real: persists a new saved search. */
   savedCreate: permissionedProcedure({ resource: "search", action: "savedCreate" })
     .input(SavedSearchCreateInputSchema)
     .output(SavedSearchOutputSchema)
-    .mutation(({ ctx, input }) => createSavedSearch(ctx, input)),
+    .mutation(({ ctx, input }) => mapAppError(() => createSavedSearch(ctx, input))),
 
   /** savedUpdate — real: updates an existing saved search. */
   savedUpdate: permissionedProcedure({ resource: "search", action: "savedUpdate" })
     .input(SavedSearchUpdateInputSchema)
     .output(SavedSearchOutputSchema)
-    .mutation(({ ctx, input }) => updateSavedSearch(ctx, input)),
+    .mutation(({ ctx, input }) => mapAppError(() => updateSavedSearch(ctx, input))),
 
   /** savedDelete — real: deletes a saved search by id. */
   savedDelete: permissionedProcedure({ resource: "search", action: "savedDelete" })
     .input(SavedSearchDeleteInputSchema)
     .output(z.object({ ok: z.literal(true) }))
-    .mutation(({ ctx, input }) => deleteSavedSearch(ctx, input)),
+    .mutation(({ ctx, input }) => mapAppError(() => deleteSavedSearch(ctx, input))),
 
   /**
    * snapshot — returns serialized Orama JSON snapshot for SSR hydration.
-   * T-06-15: only documents belonging to the authenticated org are included.
+   * Only documents belonging to the authenticated org are included.
    */
   snapshot: permissionedProcedure({ resource: "search", action: "query" })
     .input(z.object({}))
@@ -176,7 +186,7 @@ export const searchRouter = t.router({
         return { recorded: false };
       }
 
-      const { recordSearchClick } = await import("@/search/click-telemetry.ts");
+      const { recordSearchClick } = await import("@knowledge-workspace/application/search/click-telemetry.ts");
       if (!ctx.legacyStore || !ctx.orgId) return { recorded: false };
 
       await recordSearchClick(ctx.legacyStore, {

@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError } from "../api-errors.ts";
+import {
+  createRoutingApiCallerFromEnv,
+  type RoutingApiEnvironment,
+} from "@execution-orchestration/interface/http/routing-api-client.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -25,7 +26,6 @@ type RoutingDecision = {
   confidence: number | null;
 };
 
-// Enriched decision for draft views (D-26)
 type RoutingEnrichedDecision = {
   status: string;
   matchedRuleId: string | null;
@@ -60,7 +60,8 @@ type RoutingCaller = {
 
 export interface RoutingRunOptions {
   caller?: RoutingCaller;
-  container?: Container | null;
+  env?: RoutingApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -158,8 +159,6 @@ export async function run(
     return;
   }
 
-  // ── Drafts scope (D-25) ─────────────────────────────────────────────
-
   if (scope === "drafts") {
     const [verb = "help", ...args] = rest;
     switch (verb) {
@@ -210,8 +209,6 @@ export async function run(
     }
     return;
   }
-
-  // ── LLM gate scope (D-15, D-16) ─────────────────────────────────────
 
   if (scope === "llm-gate") {
     const [verb = "help", ...args] = rest;
@@ -454,9 +451,7 @@ async function withErrors(
   try {
     await fn();
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : (err as Error).message;
+    const msg = formatApiError(err);
     opts.printErr(`fulcrum routing ${command}: ${msg}`);
     opts.exit(1);
   }
@@ -464,8 +459,29 @@ async function withErrors(
 
 async function resolveCaller(opts: RoutingRunOptions): Promise<RoutingCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as RoutingCaller;
+  const apiCaller = createRoutingApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Routing API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.",
+    );
+  }
+  return {
+    routing: {
+      list: async (input = {}) => await apiCaller.routing.list(input) as RoutingRuleRow[],
+      create: async (input) => await apiCaller.routing.create(input) as RoutingRuleRow,
+      update: async (input) => await apiCaller.routing.update(input) as RoutingRuleRow | null,
+      delete: async (input) => await apiCaller.routing.delete(input) as { ok: true },
+      test: async (input) => await apiCaller.routing.test(input) as RoutingEnrichedDecision | null,
+      dryRun: async (input) => await apiCaller.routing.dryRun(input) as RoutingEnrichedDecision | null,
+      drafts: {
+        list: async (input = {}) => await apiCaller.routing.listDrafts(input) as RoutingEnrichedDecision[],
+        approve: async (input) => await apiCaller.routing.approveDraft(input) as { ok: boolean },
+        delete: async (input) => await apiCaller.routing.deleteDraft(input) as { ok: boolean },
+        update: async (input) => await apiCaller.routing.updateDraft(input) as { ok: boolean },
+      },
+      config: {
+        updateLlmGate: async (input) => await apiCaller.routing.updateLlmGate(input) as { ok: boolean },
+      },
+    },
+  };
 }

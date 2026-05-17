@@ -19,12 +19,12 @@
  */
 
 import { describe, expect, it, beforeEach } from "bun:test";
-import { evaluateRules } from "../../src/notifications/rule-engine.ts";
-import { notifyFanout, type NotifyFanoutRepositories, type NotificationQuietHoursLike } from "../../src/notifications/fanout-worker.ts";
-import { DEFAULT_NOTIFICATION_RULES } from "../../src/notifications/defaults.ts";
-import { DeliveryStatus } from "../../src/db/entities/notifications/index.ts";
-import type { NotificationRuleEngineRepositories } from "../../src/notifications/rule-engine.ts";
-import type { NotificationRuleLike } from "../../src/notifications/fanout-worker.ts";
+import { evaluateRules } from "@notification-center/application/delivery-runtime/rule-engine.ts";
+import { notifyFanout, type NotifyFanoutRepositories, type NotificationQuietHoursLike } from "@notification-center/application/delivery-runtime/fanout-worker.ts";
+import { DEFAULT_NOTIFICATION_RULES } from "@notification-center/application/delivery-runtime/defaults.ts";
+import { DeliveryStatus } from "@notification-center/infrastructure/database/entities/notifications/index.ts";
+import type { NotificationRuleEngineRepositories } from "@notification-center/application/delivery-runtime/rule-engine.ts";
+import type { NotificationRuleLike } from "@notification-center/application/delivery-runtime/fanout-worker.ts";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 

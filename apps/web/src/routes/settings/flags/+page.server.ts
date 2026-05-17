@@ -1,7 +1,12 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 
+import { createOrganizationApiCaller } from "@identity-access/interface/http/organization-api-client.ts";
+import { createFeatureExperimentApiCaller } from "@platform-core/interface/http/feature-experiment-api-client.ts";
+
 interface RouteLocals {
   session: unknown;
+  orgId?: string;
+  userId?: string;
 }
 
 interface LoadEvent {
@@ -27,147 +32,129 @@ export interface FlagRow {
   description: string;
 }
 
-function getBaseUrl(requestUrl: string): string {
-  const url = new URL(requestUrl);
-  return `${url.protocol}//${url.host}`;
+interface FlagApiRow {
+  flag?: unknown;
+  name?: unknown;
+  enabled?: unknown;
+  description?: unknown;
 }
 
-function extractTrpcError(body: unknown): string {
-  if (!body || typeof body !== "object") return "Request failed";
-  if (Array.isArray(body)) {
-    const first = body[0] as { error?: { json?: { message?: string } } } | undefined;
-    if (first?.error?.json?.message) return first.error.json.message;
+type ScopedApiCallers = {
+  feature: ReturnType<typeof createFeatureExperimentApiCaller>;
+  organization: ReturnType<typeof createOrganizationApiCaller>;
+};
+
+function getBaseUrl(url: URL): string {
+  return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${url.protocol}//${url.host}`;
+}
+
+function createScopedApiCallers(event: LoadEvent | ActionEvent): ScopedApiCallers | null {
+  const orgId = event.locals.orgId ?? process.env["FULCRUM_ORG_ID"] ?? "00000000-0000-0000-0000-000000000001";
+  const userId = event.locals.userId ?? process.env["FULCRUM_USER_ID"] ?? "local";
+
+  const headers = cookieHeaders(event);
+  const baseUrl = getBaseUrl(event.url);
+  return {
+    feature: createFeatureExperimentApiCaller({
+      baseUrl,
+      orgId,
+      userId,
+      fetch: event.fetch,
+      headers,
+    }),
+    organization: createOrganizationApiCaller({
+      baseUrl,
+      orgId,
+      userId,
+      fetch: event.fetch,
+      headers,
+    }),
+  };
+}
+
+function cookieHeaders(event: LoadEvent | ActionEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
+}
+
+function errorStatusFromMessage(message: string): number {
+  const lower = message.toLowerCase();
+  if (lower.includes("401") || lower.includes("unauthorized")) return 401;
+  if (lower.includes("403") || lower.includes("forbidden")) return 403;
+  return 500;
+}
+
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+async function requireOwnerOrAdmin(event: LoadEvent | ActionEvent): Promise<ScopedApiCallers> {
+  const callers = createScopedApiCallers(event);
+  if (!callers) {
+    error(503, { message: "Feature flag API caller is not configured." });
   }
 
-  const errorBody = (body as { error?: unknown }).error;
-  if (typeof errorBody === "string") return errorBody;
-  if (errorBody && typeof errorBody === "object") {
-    const errorRecord = errorBody as Record<string, unknown>;
-    if (typeof errorRecord["message"] === "string") return errorRecord["message"];
-    const json = errorRecord["json"] as Record<string, unknown> | undefined;
-    if (json && typeof json["message"] === "string") return json["message"];
-  }
-
-  return "Request failed";
-}
-
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
-}
-
-async function callTrpcQuery(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status: number }> {
   try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}?input=%7B%7D`, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        cookie: cookieHeader,
-      },
-    });
-    const body = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      return { ok: false, error: extractTrpcError(body), status: response.status };
-    }
-
-    return { ok: true, data: unwrapTrpcData(body) };
+    await callers.organization.orgs.members.list();
+    return callers;
   } catch (cause) {
-    return { ok: false, error: String(cause), status: 500 };
+    const message = errorMessage(cause);
+    const status = errorStatusFromMessage(message);
+    if (status === 401) throw redirect(302, "/auth/login");
+    if (status === 403) {
+      error(403, { message: "Only org owners and admins can access feature flags." });
+    }
+    error(500, { message });
   }
 }
 
-async function callTrpcMutation(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  input: unknown,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status: number }> {
-  try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        cookie: cookieHeader,
-      },
-      body: JSON.stringify({ json: input }),
-    });
-    const body = await response.json().catch(() => null);
+function normalizeFlagRow(row: FlagApiRow): FlagRow | null {
+  const name = typeof row.name === "string"
+    ? row.name
+    : typeof row.flag === "string"
+      ? row.flag
+      : "";
 
-    if (!response.ok) {
-      return { ok: false, error: extractTrpcError(body), status: response.status };
-    }
+  if (!name) return null;
 
-    return { ok: true, data: unwrapTrpcData(body) };
-  } catch (cause) {
-    return { ok: false, error: String(cause), status: 500 };
-  }
-}
-
-async function requireOwnerOrAdmin(
-  event: LoadEvent | ActionEvent,
-  baseUrl: string,
-  cookieHeader: string,
-): Promise<void> {
-  const result = await callTrpcQuery(event.fetch, baseUrl, "orgs.members.list", cookieHeader);
-  if (result.ok) return;
-
-  if (result.status === 403) {
-    error(403, { message: "Only org owners and admins can access feature flags." });
-  }
-  if (result.status === 401) {
-    throw redirect(302, "/auth/login");
-  }
-  error(500, { message: result.error });
+  return {
+    name,
+    enabled: row.enabled === true,
+    description: typeof row.description === "string" ? row.description : "",
+  };
 }
 
 export async function load(event: LoadEvent) {
-  const { locals, fetch: fetchFn, request, url } = event;
-
-  if (!locals.session) {
+  if (!event.locals.session) {
     throw redirect(302, "/auth/login");
   }
 
-  const baseUrl = getBaseUrl(url.href);
-  const cookieHeader = request.headers.get("cookie") ?? "";
+  const callers = await requireOwnerOrAdmin(event);
 
-  await requireOwnerOrAdmin(event, baseUrl, cookieHeader);
-
-  const result = await callTrpcQuery(fetchFn, baseUrl, "flags.list", cookieHeader);
-  if (!result.ok) {
-    if (result.status === 403) {
+  try {
+    const rows = await callers.feature.flags.list();
+    const flags = Array.isArray(rows)
+      ? rows.map((row) => normalizeFlagRow(row as FlagApiRow)).filter((row): row is FlagRow => row !== null)
+      : [];
+    return { flags };
+  } catch (cause) {
+    const message = errorMessage(cause);
+    const status = errorStatusFromMessage(message);
+    if (status === 401) throw redirect(302, "/auth/login");
+    if (status === 403) {
       error(403, { message: "Only org owners and admins can access feature flags." });
     }
-    if (result.status === 401) {
-      throw redirect(302, "/auth/login");
-    }
-    error(500, { message: result.error });
+    error(500, { message });
   }
-
-  const flags = Array.isArray(result.data) ? (result.data as FlagRow[]) : [];
-  return { flags };
 }
 
 export const actions = {
   toggle: async (event: ActionEvent) => {
-    const { locals, fetch: fetchFn, request, url } = event;
-
-    if (!locals.session) {
+    if (!event.locals.session) {
       throw redirect(302, "/auth/login");
     }
 
-    const form = await request.formData();
+    const form = await event.request.formData();
     const flag = String(form.get("flag") ?? "").trim();
     const enabledValue = String(form.get("enabled") ?? "").trim();
 
@@ -175,23 +162,15 @@ export const actions = {
       return fail(400, { toggleError: "Flag and enabled state are required." });
     }
 
-    const baseUrl = getBaseUrl(url.href);
-    const cookieHeader = request.headers.get("cookie") ?? "";
+    const callers = await requireOwnerOrAdmin(event);
 
-    await requireOwnerOrAdmin(event, baseUrl, cookieHeader);
-
-    const result = await callTrpcMutation(
-      fetchFn,
-      baseUrl,
-      "flags.set",
-      { flag, enabled: enabledValue === "true" },
-      cookieHeader,
-    );
-
-    if (!result.ok) {
-      return fail(result.status === 403 ? 403 : 400, { toggleError: result.error, flag });
+    try {
+      await callers.feature.flags.set({ flag, enabled: enabledValue === "true" });
+      return { ok: true, flag };
+    } catch (cause) {
+      const message = errorMessage(cause);
+      const status = errorStatusFromMessage(message);
+      return fail(status === 403 ? 403 : 400, { toggleError: message, flag });
     }
-
-    return { ok: true, flag };
   },
 };

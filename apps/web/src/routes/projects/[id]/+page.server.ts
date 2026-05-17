@@ -7,9 +7,8 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { deleteProject, updateProject } from "@/application/projects/commands.ts";
-import { loadProjectOverview } from "@/application/projects/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { deleteProject, loadProjectOverview, updateProject } from "@work-management/interface/project-lifecycle.ts";
+import { requestProjectScope } from "../project-request-scope";
 
 // Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
 // is immutable post-create (it's the URL-stable identifier baked into events
@@ -43,7 +42,7 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
     typeof parent === "function"
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
-  const { em, ctx } = await requestAppScope(locals, params.id);
+  const { em, ctx } = await requestProjectScope(locals, params.id);
   const data = await loadProjectOverview(em, ctx, params.id);
   if (!data) throw error(404, "Project not found");
   const form = await superValidate(
@@ -61,7 +60,7 @@ export const actions: Actions = {
   rename: async ({ params, request, locals }) => {
     const form = await superValidate(request, valibot(RenameSchema));
     if (!form.valid) return fail(400, { form });
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     await updateProject(em, ctx, {
         id: params.id!,
         name: form.data.name,
@@ -70,7 +69,7 @@ export const actions: Actions = {
     return { form };
   },
   delete: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     await deleteProject(em, ctx, params.id!);
     throw redirect(303, "/projects");
   },

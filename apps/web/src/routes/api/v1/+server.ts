@@ -1,9 +1,9 @@
 /**
- * /api/v1 — Public REST API gateway (Hono mount).
+ * /api/v1 — Public REST API gateway.
  *
  * Gated by FULCRUM_FEATURES=public-api (C1, default OFF).
  * OFF → 404 for all requests under /api/v1.
- * ON  → delegates to Hono app; /api/v1/openapi.json returns valid OpenAPI 3.1.
+ * ON  → /api/v1/openapi.json returns valid OpenAPI 3.1.
  */
 
 import type { RequestHandler } from "@sveltejs/kit";
@@ -84,7 +84,7 @@ const gate: RequestHandler = ({ url }) => {
     return json(_buildOpenApiSpec(baseUrl));
   }
 
-  // Placeholder — real Hono integration would delegate here
+  // Placeholder until this SvelteKit compatibility route delegates to the Nest server.
   return json({ message: "Fulcrum API v1", status: "ok" });
 };
 

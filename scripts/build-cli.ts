@@ -10,7 +10,19 @@ const MAX_BYTES = 150 * 1024 * 1024;
 await mkdir(dirname(OUTFILE), { recursive: true });
 
 const proc = Bun.spawn(
-  ["bun", "build", "--compile", "--minify", "apps/cli/src/main.ts", "--outfile", OUTFILE],
+  [
+    "bun", "build", "--compile", "--minify",
+    "--external", "@grpc/proto-loader",
+    "--external", "@grpc/grpc-js",
+    "--external", "amqplib",
+    "--external", "amqp-connection-manager",
+    "--external", "kafkajs",
+    "--external", "mqtt",
+    "--external", "nats",
+    "--external", "@nestjs/websockets",
+    "--external", "ioredis",
+    "apps/cli/src/main.ts", "--outfile", OUTFILE,
+  ],
   {
     cwd: process.cwd(),
     stdout: "pipe",

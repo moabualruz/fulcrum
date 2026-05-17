@@ -1,8 +1,8 @@
 /**
- * yjs-server.ts — Yjs WebSocket server with auth + persistence (Plan 05-13).
+ * yjs-server.ts — Yjs WebSocket server with auth + persistence (workflow milestone).
  *
  * Dual-mode:
- *   - In-process: import { createYjsServer } and mount alongside Hono
+ *   - In-process: import { createYjsServer } and mount alongside the server runtime
  *   - Standalone: FULCRUM_YJS_STANDALONE=true -> runs own WS server on FULCRUM_YJS_PORT
  *
  * Auth: validates Authorization header or cookie on WebSocket upgrade.
@@ -11,13 +11,13 @@
  * Persistence: debounced save of Y.Doc state to YjsSnapshot entity in PostgreSQL.
  *
  * MEDIUM-08 fix: client URL is always read from FULCRUM_YJS_URL env var (never hardcoded).
- * LOW-04 fix: startYjsServer exported for Hono startup integration.
+ * LOW-04 fix: startYjsServer exported for startup integration.
  */
 
 import * as Y from "yjs";
 import { WebSocketServer, WebSocket } from "ws";
-import type { EntityManager } from "@mikro-orm/postgresql";
-import { YjsSnapshot } from "@/db/entities/tasks/YjsSnapshot.ts";
+import type { EntityManager } from "typeorm";
+import { YjsSnapshot } from "@work-management/infrastructure/database/entities/tasks/YjsSnapshot.ts";
 
 // ── URL helper (MEDIUM-08) ─────────────────────────────────────────────────
 
@@ -120,24 +120,20 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
   // ── persistDoc ────────────────────────────────────────────────────────
 
   async function persistDoc(docName: string, state: Buffer): Promise<void> {
-    // Fork em to avoid concurrent mutation conflicts
-    const forkedEm: EntityManager = (em as any).fork ? (em as any).fork() : em;
-    let snapshot = await forkedEm.findOne(YjsSnapshot, { docName });
+    let snapshot = await em.findOne(YjsSnapshot, { where: { docName } });
     if (!snapshot) {
       snapshot = new YjsSnapshot();
       snapshot.docName = docName;
     }
     snapshot.state = state;
     snapshot.updatedAt = new Date();
-    forkedEm.persist(snapshot);
-    await forkedEm.flush();
+    await em.save(snapshot);
   }
 
   // ── loadDoc ───────────────────────────────────────────────────────────
 
   async function loadDoc(docName: string): Promise<Buffer | null> {
-    const forkedEm: EntityManager = (em as any).fork ? (em as any).fork() : em;
-    const snapshot = await forkedEm.findOne(YjsSnapshot, { docName });
+    const snapshot = await em.findOne(YjsSnapshot, { where: { docName } });
     return snapshot ? snapshot.state : null;
   }
 
@@ -232,7 +228,7 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
 
 /**
  * Start Yjs server in standalone mode.
- * LOW-04: exported for Hono startup integration.
+ * LOW-04: exported for startup integration.
  *
  * Usage:
  *   import { startYjsServer } from './yjs-server.ts';

@@ -2,7 +2,7 @@ import {
   resolveKeybindings,
   type KeybindingPlatform,
   type TenantSettingsReader,
-} from "@/keybindings/index.ts";
+} from "@platform-core/interface/input-bindings.ts";
 
 export async function createTuiKeybindingMap(options: {
   platform?: KeybindingPlatform;

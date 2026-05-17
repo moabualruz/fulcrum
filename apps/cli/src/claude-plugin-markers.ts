@@ -160,7 +160,7 @@ export async function safeClaudePluginInstall(
       reason: "confirmation required; pass --allow-claude-cli to opt in",
     };
   }
-  const { run } = await import("@/utils/proc.ts");
+  const { run } = await import("@platform-core/application/runtime-support/process-runner.ts");
   const result = await run(["claude", "plugin", "install", plugin]);
   if (result.exit === 0) {
     await writeMarker({
@@ -195,7 +195,7 @@ export async function safeClaudePluginUninstall(
       reason: "no-marker; manual command required",
     };
   }
-  const { run } = await import("@/utils/proc.ts");
+  const { run } = await import("@platform-core/application/runtime-support/process-runner.ts");
   const result = await run(["claude", "plugin", "uninstall", plugin]);
   if (result.exit === 0) {
     await removeMarker(plugin);

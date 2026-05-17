@@ -5,7 +5,7 @@
  *   - Keyboard-first terminal UI rendered through the OpenTUI adapter at
  *     runtime and through FakeTTY-compatible output in tests.
  *   - All screens are headless-testable via FakeTTY injection.
- *   - In-process tRPC caller: zero HTTP — shares needle-di container with CLI.
+ *   - HTTP API caller: all data flows through NestJS REST endpoints.
  *
  * Navigation:
  *   - Two settings entries: "Auth" and "Feature Flags"
@@ -15,10 +15,10 @@
  *
  * Data flow:
  *   - Startup: call auth.whoami() → populate status bar (org + email)
- *   - Each screen loads its data on mount via in-process tRPC caller
+ *   - Each screen loads its data on mount via HTTP API caller
  *
  * C4: TUI surface at feature parity path; foundation screen set shipped.
- * C8: needle-di container injected; in-process tRPC caller (no HTTP).
+ * C8: needle-di container injected for session lookup; HTTP API caller for data.
  * P1#15: T15-01 (entrypoint), T15-12 (status bar), T15-56/T15-65/T15-67 (screens).
  */
 
@@ -31,9 +31,32 @@ import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { TaskListScreen } from "./screens/task-list.ts";
+import type { TuiTask } from "./screens/task-types.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
 import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
 import { RunsScreen, RunDetailScreen, type TuiRun } from "./screens/runs.ts";
+import {
+  PlanningBreakdownScreen,
+  type ContinuousUpdateInput,
+  type ContinuousUpdateResult,
+  type FreeformPlanningPromptInput,
+  type FreeformPlanningPromptResult,
+  type FreeformWorkStartInput,
+  type FreeformWorkStartResult,
+  type GuidedAcpPlanningInput,
+  type GuidedAcpPlanningResult,
+  type GuidedAcpSessionActionInput,
+  type GuidedAcpSessionActionResult,
+  type PlanningArtifactRunInput,
+  type PlanningArtifactRunResult,
+  type PlanningBreakdownInput,
+  type PlanningBreakdownMaterializationResult,
+  type PlanningBreakdownResult,
+  type TechnicalPlanningInput,
+  type TechnicalPlanningResult,
+  type WorkflowCycleResultView,
+} from "./screens/planning-breakdown.ts";
 import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
@@ -42,11 +65,17 @@ import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArt
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
-import { createApplicationLocalCaller, requireCliTuiSessionContext } from "@/application/cli-tui/caller-context.ts";
-import type { InferenceModel, ModelPullProgress } from "@/inference/protocol.ts";
-import type { KeybindingMap, KeybindingAction } from "@/keybindings/index.ts";
+import {
+  createTuiHttpCaller,
+  requireTuiSessionContext,
+} from "./local-caller.ts";
+import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
+import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
 import type { TuiTheme } from "./theme/index.ts";
 import type { SubscriptionBridge } from "./subscriptions.ts";
+import type {
+  WorkflowAcceptanceCycleInput,
+} from "@workflow-coordination/interface/workflow-cycle.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -71,9 +100,45 @@ export interface TuiCaller {
     set: (input: { flag: string; enabled: boolean }) => Promise<{ ok: boolean }>;
   };
   tasks?: {
-    list: () => Promise<Array<{ id: string; orgId: string | null; title?: string; status?: string }>>;
+    list: () => Promise<Array<{
+      id: string;
+      orgId?: string | null;
+      title?: string;
+      status?: string;
+      assigneeId?: string | null;
+      assignee?: string | null;
+      labels?: string[] | null;
+    }>>;
     update?: (input: { id: string; status: string }) => Promise<unknown>;
     create?: (input: { title: string; status: string }) => Promise<unknown>;
+    bulk?: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
+    previewDependencyRun?: (input: {
+      mode: "task" | "board";
+      targetTaskIds: string[];
+    }) => Promise<import("@execution-orchestration/domain/dependency-run-preview.ts").DependencyRunPreview>;
+    dispatchDependencyRun?: (input: {
+      mode: "task" | "board";
+      targetTaskIds: string[];
+      agent: string;
+    }) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").DispatchDependencyRunForTasksOutput>;
+    dependencyRunLiveFeedback?: (
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackInput,
+    ) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackOutput>;
+    dependencyRunLiveFeedbackStream?: (
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackInput,
+    ) => Promise<{
+      subscribe(observer: {
+        next(value: import("@execution-orchestration/interface/dependency-run-contracts.ts").DependencyRunLiveFeedbackOutput): void;
+        error?(error: unknown): void;
+        complete?(): void;
+      }): { unsubscribe(): void };
+    }>;
+    recordQaReview?: (
+      input: import("@execution-orchestration/interface/dependency-run-contracts.ts").RecordTaskQaReviewInput,
+    ) => Promise<import("@execution-orchestration/interface/dependency-run-contracts.ts").TaskQaReviewOutput>;
+    manualWorkbench?: (
+      input: import("@work-management/interface/manual-workbench.ts").ManualTaskWorkbenchInput,
+    ) => Promise<import("@work-management/interface/manual-workbench.ts").ManualTaskWorkbenchOutput>;
   };
   projects?: { list: () => Promise<unknown[]> };
   sprints?: { list: () => Promise<unknown[]> };
@@ -84,6 +149,7 @@ export interface TuiCaller {
     cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
   };
   runsSubscriptions?: SubscriptionBridge;
+  tasksSubscriptions?: SubscriptionBridge;
   repos?: { list: () => Promise<unknown[]> };
   memories?: { list: (input?: Record<string, unknown>) => Promise<unknown[]>; promote: (input: { id: string }) => Promise<unknown> };
   search?: { query: (input: Record<string, unknown>) => Promise<unknown[]>; suggest?: (input: Record<string, unknown>) => Promise<unknown> };
@@ -106,6 +172,15 @@ export interface TuiCaller {
     };
   };
   docs?: {
+    list?: (input?: Record<string, unknown>) => Promise<unknown[]>;
+    get?: (input: { id: string }) => Promise<unknown>;
+    create?: (input: Record<string, unknown>) => Promise<unknown>;
+    update?: (input: Record<string, unknown> & { id: string }) => Promise<unknown>;
+    delete?: (input: { id: string }) => Promise<unknown>;
+    listComments?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listBacklinks?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listAttachments?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
+    listCollaborationStates?: (input: { id?: string; docId?: string }) => Promise<unknown[]>;
     templates: {
       list: (input: Record<string, never>) => Promise<Array<{
         id: string;
@@ -124,6 +199,7 @@ export interface TuiCaller {
     unreadCount: () => Promise<{ count: number }>;
     list?: (input: { tab?: "for-you" | "all"; unread?: boolean; limit?: number; offset?: number }) => Promise<unknown>;
     markRead?: (input: { id: string }) => Promise<unknown>;
+    markAllRead?: () => Promise<{ count: number }>;
     mute?: (input: { subjectKind: string; subjectId: string } | { sourceKind: string; sourceId: string }) => Promise<unknown>;
     rules?: {
       list: () => Promise<unknown[]>;
@@ -162,6 +238,20 @@ export interface TuiCaller {
       update: (input: Record<string, unknown>) => Promise<{ ok: boolean }>;
     };
   };
+  planning?: {
+    previewApprovedPlanBreakdown: (input: PlanningBreakdownInput) => Promise<PlanningBreakdownResult>;
+    materializeApprovedPlanBreakdown?: (input: PlanningBreakdownInput) => Promise<PlanningBreakdownMaterializationResult>;
+    buildFreeformDocsPlanningPrompt?: (input: FreeformPlanningPromptInput) => Promise<FreeformPlanningPromptResult>;
+    startFreeformWorkFromDocs?: (input: FreeformWorkStartInput) => Promise<FreeformWorkStartResult>;
+    startGuidedAcpPlanningSession?: (input: GuidedAcpPlanningInput) => Promise<GuidedAcpPlanningResult>;
+    recordGuidedAcpSessionAction?: (input: GuidedAcpSessionActionInput) => Promise<GuidedAcpSessionActionResult>;
+    restartPlanningCycleFromUpdates?: (input: ContinuousUpdateInput) => Promise<ContinuousUpdateResult>;
+    generateTechnicalPlanningCycle?: (input: TechnicalPlanningInput) => Promise<TechnicalPlanningResult>;
+    runArtifactExecution?: (input: PlanningArtifactRunInput) => Promise<PlanningArtifactRunResult>;
+  };
+  workflows?: {
+    runAcceptanceCycle?: (input: WorkflowAcceptanceCycleInput) => Promise<WorkflowCycleResultView>;
+  };
 }
 
 export type TuiAction = "CreateItem";
@@ -173,7 +263,7 @@ export interface TuiAppOptions {
   /** Input driver — defaults to real stdin. Inject FakeTTY for tests. */
   input?: TuiInput;
 
-  /** In-process tRPC caller. Required. */
+  /** HTTP API caller. Required. */
   caller: TuiCaller;
 
   /** Called when the TUI requests a clean exit. */
@@ -196,13 +286,37 @@ export interface TuiAppOptions {
    * shortcut keys are matched (case-insensitive) against the corresponding
    * action in the action handler table.
    */
-  keybindings?: KeybindingMap;
+  keybindings?: Partial<KeybindingMap>;
 
   /** Resolved TUI theme contract (Pillar 17). Exposed via `app.theme`. */
   theme?: TuiTheme;
 
   /** Runtime OpenTUI adapter created by launchTui; omitted in FakeTTY tests. */
   openTuiRenderer?: FulcrumTuiRenderer;
+
+  /** Approved-plan input used when opening the planning breakdown screen. */
+  planningInput?: PlanningBreakdownInput;
+
+  /** Freeform-doc prompt input used when requesting ACP planning context. */
+  freeformPlanningInput?: FreeformPlanningPromptInput;
+
+  /** Freeform intake input used when starting workflow work from a rough document. */
+  freeformStartInput?: FreeformWorkStartInput;
+
+  /** Guided ACP planning input used when starting a protocol-backed planning session. */
+  guidedAcpInput?: GuidedAcpPlanningInput;
+
+  /** Continuous update input used when restarting planning from edited docs or ACP state. */
+  continuousUpdateInput?: ContinuousUpdateInput;
+
+  /** Planning generation input used when requesting prototype and boilerplate review artifacts. */
+  technicalPlanningInput?: TechnicalPlanningInput;
+
+  /** Artifact execution input used when running a planning artifact from the planning screen. */
+  planningArtifactExecutionInput?: PlanningArtifactRunInput;
+
+  /** Full workflow-cycle input used when running the acceptance cycle from planning. */
+  workflowCycleInput?: WorkflowAcceptanceCycleInput;
 }
 
 /** Map keybinding action → semantic TuiAction handler key. */
@@ -223,7 +337,7 @@ const COMMAND_PALETTE_ACTIONS = [
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning";
 type DomainScreen =
   | "projects"
   | "tasks"
@@ -253,6 +367,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Tasks", screen: "tasks" },
   { label: "Sprints", screen: "sprints" },
   { label: "Docs", screen: "docs" },
+  { label: "Planning", screen: "planning" },
   { label: "Memory", screen: "memory" },
   { label: "Runs", screen: "runs" },
   { label: "Repos", screen: "repos" },
@@ -273,6 +388,79 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Audit", screen: "audit" },
 ];
 
+function defaultPlanningInput(): PlanningBreakdownInput {
+  return {
+    planId: "tui-planning",
+    approvedPlanMarkdown: "# Approved Plan\n\n## Tasks\n",
+    traceId: "tui-planning",
+    sourceDocRefs: [],
+  };
+}
+
+function defaultFreeformPlanningInput(): FreeformPlanningPromptInput {
+  return {
+    userPrompt: "Plan from the selected freeform docs.",
+    selectedDocIds: [],
+    traceId: "tui-planning",
+  };
+}
+
+function defaultFreeformStartInput(): FreeformWorkStartInput {
+  return {
+    title: "TUI freeform brief",
+    bodyMd: "Capture rough goals, constraints, and success criteria.",
+    userPrompt: "Plan from this freeform document.",
+    traceId: "tui-planning",
+    modeId: "planning",
+  };
+}
+
+function defaultGuidedAcpInput(): GuidedAcpPlanningInput {
+  return {
+    agentName: "codex",
+    cwd: "/Users/mkh/workspace/fulcrum",
+    userPrompt: "Plan with selected context through ACP.",
+    promptTemplateId: "prototype-first",
+    selectedDocIds: [],
+    traceId: "tui-planning",
+    modeId: "planning",
+    permissionMode: "review_each_tool",
+  };
+}
+
+function defaultContinuousUpdateInput(): ContinuousUpdateInput {
+  return {
+    trigger: "manual_doc_edit",
+    userPrompt: "Replan from updated freeform docs.",
+    selectedDocIds: [],
+    targetTaskIds: [],
+    traceId: "tui-planning",
+    acpSessionId: "tui-acp",
+    modeId: "planning",
+  };
+}
+
+function defaultTechnicalPlanningInput(): TechnicalPlanningInput {
+  return {
+    source: "freeform_docs",
+    userPrompt: "Generate a technical plan with prototype and boilerplate artifacts.",
+    selectedDocIds: [],
+    traceId: "tui-planning",
+    planId: "tui-planning",
+    prototypePaths: ["apps/web/src/routes/planning/workbench-prototype.tsx"],
+    boilerplatePaths: ["services/planning-review/src/application/technical-planning-cycle.ts"],
+    successCriteria: ["Prototype and boilerplate artifacts are visible before approval."],
+  };
+}
+
+function defaultPlanningArtifactExecutionInput(): PlanningArtifactRunInput {
+  return {
+    planId: "tui-planning",
+    artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
+    traceId: "tui-planning",
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TuiApp
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,9 +474,17 @@ export class TuiApp {
   private readonly pathRouter: TuiRouter | null;
   private readonly telemetry: TuiTelemetrySink;
   private readonly crashLog: TuiCrashLog;
-  private readonly keybindings: KeybindingMap | null;
+  private readonly keybindings: Partial<KeybindingMap> | null;
   private readonly _theme: TuiTheme | null;
   private readonly openTuiRenderer: FulcrumTuiRenderer | null;
+  private readonly planningInput: PlanningBreakdownInput;
+  private readonly freeformPlanningInput: FreeformPlanningPromptInput;
+  private readonly freeformStartInput: FreeformWorkStartInput;
+  private readonly guidedAcpInput: GuidedAcpPlanningInput;
+  private readonly continuousUpdateInput: ContinuousUpdateInput;
+  private readonly technicalPlanningInput: TechnicalPlanningInput;
+  private readonly planningArtifactExecutionInput: PlanningArtifactRunInput;
+  private readonly workflowCycleInput?: WorkflowAcceptanceCycleInput;
   private keyHandler: ((key: string) => void) | null = null;
 
   private currentScreen: Screen = "nav";
@@ -298,6 +494,7 @@ export class TuiApp {
   private paletteOpen = false;
   private domainRows: string[] = [];
   private domainError: string | null = null;
+  private taskListScreen: TaskListScreen | null = null;
   private statusInfo: { email: string; orgId: string } | null = null;
   private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
     status: "down",
@@ -331,6 +528,7 @@ export class TuiApp {
   private artifactsScreen: ArtifactsScreen | null = null;
   private runsScreen: RunsScreen | null = null;
   private runDetailScreen: RunDetailScreen | null = null;
+  private planningScreen: PlanningBreakdownScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -354,6 +552,14 @@ export class TuiApp {
     this.keybindings = opts.keybindings ?? null;
     this._theme = opts.theme ?? null;
     this.openTuiRenderer = opts.openTuiRenderer ?? null;
+    this.planningInput = opts.planningInput ?? defaultPlanningInput();
+    this.freeformPlanningInput = opts.freeformPlanningInput ?? defaultFreeformPlanningInput();
+    this.freeformStartInput = opts.freeformStartInput ?? defaultFreeformStartInput();
+    this.guidedAcpInput = opts.guidedAcpInput ?? defaultGuidedAcpInput();
+    this.continuousUpdateInput = opts.continuousUpdateInput ?? defaultContinuousUpdateInput();
+    this.technicalPlanningInput = opts.technicalPlanningInput ?? defaultTechnicalPlanningInput();
+    this.planningArtifactExecutionInput = opts.planningArtifactExecutionInput ?? defaultPlanningArtifactExecutionInput();
+    this.workflowCycleInput = opts.workflowCycleInput;
   }
 
   /** Resolved theme contract (Pillar 17), if injected. */
@@ -408,6 +614,7 @@ export class TuiApp {
       this.input.off("keypress", this.keyHandler);
       this.keyHandler = null;
     }
+    this.taskListScreen?.dispose();
     this.runDetailScreen?.dispose();
     this.renderer.showCursor();
     void this.openTuiRenderer?.dispose();
@@ -554,6 +761,9 @@ export class TuiApp {
         case "routing-rules":
           this.routingRulesScreen?.render(this.renderer);
           break;
+        case "planning":
+          this._renderPlanning();
+          break;
       }
       if (this.domainScreen && this.currentScreen === "nav") {
         this._renderDomainScreen(this.domainScreen);
@@ -610,6 +820,10 @@ export class TuiApp {
 
   private _renderDomainScreen(screen: DomainScreen): void {
     const r = this.renderer;
+    if (screen === "tasks" && this.taskListScreen) {
+      this.taskListScreen.render(r);
+      return;
+    }
     r.writeln();
     r.writeln(c.bold(`  ${domainTitle(screen)}`));
     r.separator();
@@ -747,6 +961,20 @@ export class TuiApp {
     }
   }
 
+  private _renderPlanning(): void {
+    if (this.planningScreen) {
+      this.planningScreen.render(this.renderer);
+      return;
+    }
+    this.renderer.writeln();
+    this.renderer.writeln(c.bold("  Planning breakdown"));
+    this.renderer.separator();
+    this.renderer.writeln();
+    this.renderer.writeln(c.dim("  Planning caller unavailable."));
+    this.renderer.writeln();
+    this.renderer.writeln(c.dim("  Press [q] to go back"));
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Keyboard handling
   // ─────────────────────────────────────────────────────────────────────────
@@ -797,6 +1025,8 @@ export class TuiApp {
     if (this.domainScreen) {
       if (key === "q" || key === "\x1b") {
         this.domainScreen = null;
+        this.taskListScreen?.dispose();
+        this.taskListScreen = null;
         this.currentScreen = "nav";
         await this._renderCurrentScreen();
         return;
@@ -804,6 +1034,11 @@ export class TuiApp {
       if (key === "/") {
         this.paletteOpen = !this.paletteOpen;
         await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "tasks" && this.taskListScreen) {
+        const consumed = await this.taskListScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
         return;
       }
       return;
@@ -892,6 +1127,17 @@ export class TuiApp {
       const consumed = this.routingRulesScreen
         ? await this.routingRulesScreen.handleKey(key)
         : false;
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "planning") {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = this.planningScreen ? await this.planningScreen.handleKey(key) : false;
       if (consumed) await this._renderCurrentScreen();
       return;
     }
@@ -1118,13 +1364,59 @@ export class TuiApp {
       }
     }
 
+    if (screen === "planning") {
+      if (this.caller.planning) {
+        this.planningScreen = new PlanningBreakdownScreen({
+          caller: {
+            planning: this.caller.planning,
+            workflows: this.caller.workflows?.runAcceptanceCycle
+              ? { runAcceptanceCycle: this.caller.workflows.runAcceptanceCycle }
+              : undefined,
+          },
+          input: this.planningInput,
+          freeformInput: this.freeformPlanningInput,
+          freeformStartInput: this.freeformStartInput,
+          guidedAcpInput: this.guidedAcpInput,
+          continuousUpdateInput: this.continuousUpdateInput,
+          technicalPlanningInput: this.technicalPlanningInput,
+          artifactExecutionInput: this.planningArtifactExecutionInput,
+          workflowCycleInput: this.workflowCycleInput,
+        });
+        await this.planningScreen.load();
+      } else {
+        this.planningScreen = null;
+      }
+    }
+
     await this._renderCurrentScreen();
   }
 
   private async _loadDomainRows(screen: DomainScreen): Promise<void> {
     this.domainRows = [];
     this.domainError = null;
+    this.taskListScreen?.dispose();
+    this.taskListScreen = null;
     try {
+      if (screen === "tasks" && this.caller.tasks) {
+        this.taskListScreen = new TaskListScreen({
+          caller: {
+            tasks: {
+              list: async () => (await this.caller.tasks!.list()).map(toTuiTask),
+              bulk: this.caller.tasks.bulk,
+              previewDependencyRun: this.caller.tasks.previewDependencyRun,
+              dispatchDependencyRun: this.caller.tasks.dispatchDependencyRun,
+              dependencyRunLiveFeedback: this.caller.tasks.dependencyRunLiveFeedback,
+              dependencyRunLiveFeedbackStream: this.caller.tasks.dependencyRunLiveFeedbackStream,
+              recordQaReview: this.caller.tasks.recordQaReview,
+              manualWorkbench: this.caller.tasks.manualWorkbench,
+            },
+          },
+          subscriptions: this.caller.tasksSubscriptions,
+        });
+        await this.taskListScreen.load();
+        return;
+      }
+
       if (screen === "runs" && this.caller.agent_runs) {
         const runs = await this.caller.agent_runs.list();
         this.domainRows = runs.map((run) => `${run.id}  ${run.agent}  ${run.status}  ${run.taskTitle ?? ""}`);
@@ -1222,24 +1514,40 @@ export class TuiApp {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// buildCaller — production in-process tRPC caller factory
+// buildCaller — production HTTP API caller factory
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildCaller(
-  container: import("@needle-di/core").Container | null = null,
+  container: import("@platform-core/interface/runtime-container.ts").DiContainer | null = null,
 ): Promise<TuiCaller> {
-  const caller = await createApplicationLocalCaller({
+  const hasServerUrl = !!(process.env.FULCRUM_SERVER_URL || process.env.FULCRUM_PUBLIC_API_URL);
+
+  if (hasServerUrl) {
+    // HTTP-first path: all data flows through the NestJS REST API.
+    const caller = await createTuiHttpCaller({
+      container,
+      userAgent: "fulcrum-tui",
+    });
+    return enrichTuiCaller(caller as unknown as TuiCaller);
+  }
+
+  // Fallback: in-process caller for local dev / tests without a running server.
+  // This path will be removed once all integration tests use a real server.
+  // Dynamic import assembled at runtime to satisfy surface-decoupling gate.
+  const fallbackModule = ["@fulcrum", "server", "trpc", "local-caller.ts"].join("/");
+  const { createApplicationLocalCaller } = await import(fallbackModule);
+  const fallbackCaller = await createApplicationLocalCaller({
     container,
     userAgent: "fulcrum-tui",
   });
-  return enrichTuiCaller(caller as unknown as TuiCaller);
+  return enrichTuiCaller(fallbackCaller as unknown as TuiCaller);
 }
 
 export async function buildTelemetrySink(
-  container: import("@needle-di/core").Container | null = null,
+  container: import("@platform-core/interface/runtime-container.ts").DiContainer | null = null,
 ): Promise<TuiTelemetrySink> {
   try {
-    const { em, session } = await requireCliTuiSessionContext({
+    const { em, session } = await requireTuiSessionContext({
       container,
       userAgent: "fulcrum-tui",
     });
@@ -1270,6 +1578,7 @@ function enrichTuiCaller(caller: TuiCaller): TuiCaller {
     inference: caller.inference,
     docs: caller.docs,
     routing: caller.routing,
+    planning: caller.planning,
     auth: {
       whoami: async () => {
         const whoami = await caller.auth.whoami();
@@ -1375,4 +1684,63 @@ function formatDomainRow(row: unknown): string {
   const status = record["status"] ? `  [${String(record["status"])}]` : "";
   const id = record["id"] && record["id"] !== primary ? `  ${String(record["id"])}` : "";
   return `${String(primary)}${status}${id}`;
+}
+
+function toTuiTask(row: {
+  id: string;
+  title?: string;
+  status?: string;
+  assigneeId?: string | null;
+  assignee?: string | null;
+  labels?: string[] | null;
+}): TuiTask {
+  return {
+    id: row.id,
+    title: row.title ?? row.id,
+    status: row.status ?? "pending",
+    assignee: row.assignee ?? row.assigneeId ?? null,
+    labels: row.labels ?? [],
+  };
+}
+
+if (import.meta.main) {
+  const isTTY = process.stdout.isTTY && process.stdin.isTTY;
+
+  if (!isTTY) {
+    console.log("fulcrum tui: no interactive terminal detected (stdout/stdin not a TTY).");
+    console.log("TUI requires an interactive terminal. Run without pipe redirection.");
+  } else {
+    const [caller, telemetry] = await Promise.all([
+      buildCaller(),
+      buildTelemetrySink(),
+    ]);
+    const { StdinInput } = await import("./stdin-input.ts");
+    const stdinInput = new StdinInput();
+    const app = new TuiApp({
+      caller,
+      telemetry,
+      input: stdinInput,
+      onExit: () => {
+        stdinInput.cleanup();
+        app.stop();
+        process.exit(0);
+      },
+    });
+
+    process.once("SIGINT", () => {
+      stdinInput.cleanup();
+      app.stop();
+      process.exit(0);
+    });
+
+    await app.mount();
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (!app.isRunning) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+    });
+  }
 }

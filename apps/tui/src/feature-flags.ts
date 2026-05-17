@@ -4,7 +4,7 @@ import {
   isRegisteredFeatureFlag,
   parseEnvFeatureFlags,
   type FeatureFlagName,
-} from "@/flags/registry.ts";
+} from "@platform-core/interface/feature-flags.ts";
 
 export type FeatureFlag = FeatureFlagName;
 

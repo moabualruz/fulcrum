@@ -115,7 +115,6 @@ Every recipe is a subcommand of the `fulcrum` binary: `fulcrum hook <name>`. Ena
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|
-| `index-check` | SessionStart-equivalent | Warn if `tags` / `graphify-out/` are stale or missing. | no |
 | `format` | PostToolUse `Write\|Edit` | Run language-appropriate formatter on the just-edited file (ruff / biome / prettier / gofmt / rustfmt / google-java-format / ktlint / dart format). Fail-open. | no |
 | `lint-gate` | PostToolUse `Write\|Edit` | Block the next turn if `ruff check` / `biome check` / `golangci-lint run` reports violations on the edited file. Stderr feeds back. | yes (exit 2) |
 | `pm-policy` | PreToolUse `Bash` | Refuse `npm`/`yarn` when the repo declares pnpm; refuse `npm` when bun is declared. Detects `pnpm-lock.yaml` / `bun.lock(b)` / `yarn.lock`. | yes (exit 2) |
@@ -124,7 +123,6 @@ Every recipe is a subcommand of the `fulcrum` binary: `fulcrum hook <name>`. Ena
 | `tool-output-router` | PostToolUse (any) | Per-tool output-handling. Reads `~/.fulcrum/tool-output-policy.toml` and applies a tier (raw / status-only / summary+head / summary+file / file-only / leave-as-is). Default: leave-as-is. See [tool-output-policy.md](tool-output-policy.md). | no |
 
 ### 5.1 Index maintenance — `index-check` + `index-rebuild`
-
 
 ### 5.2 Editor productivity — `format` + `lint-gate`
 

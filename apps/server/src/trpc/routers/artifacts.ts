@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import type { TRPCContext } from "../context.ts";
 import { t } from "../trpc.ts";
@@ -8,12 +8,12 @@ import {
   createArtifact as createApplicationArtifact,
   deleteArtifactForWeb,
   transitionArtifactLifecycle,
-} from "@/application/artifacts/commands.ts";
+} from "@workflow-coordination/application/artifacts/commands.ts";
 import {
   getArtifact as getApplicationArtifact,
   listArtifacts as listApplicationArtifacts,
-} from "@/application/artifacts/queries.ts";
-import type { AppContext as ArtifactAppContext, ArtifactDto } from "@/application/artifacts/types.ts";
+} from "@workflow-coordination/application/artifacts/queries.ts";
+import type { AppContext as ArtifactAppContext, ArtifactDto } from "@workflow-coordination/domain/artifact.ts";
 import {
   ArchiveArtifactOutputSchema,
   ArtifactIdInputSchema,

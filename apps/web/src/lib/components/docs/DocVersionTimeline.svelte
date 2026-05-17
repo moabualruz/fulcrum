@@ -192,7 +192,6 @@
                       <div
                         data-diff-html
                         class={cn("text-xs rounded border border-border bg-muted/30 p-2 overflow-auto max-h-48 font-mono leading-relaxed [&_del]:bg-red-100 [&_del]:text-red-700 [&_del]:line-through [&_ins]:bg-green-100 [&_ins]:text-green-700 [&_ins]:no-underline")}
-                        <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                       >{@html diffHtml[version.id]}</div>
                     {:else}
                       <p class={cn("text-xs text-muted-foreground")}>No diff available for this version.</p>

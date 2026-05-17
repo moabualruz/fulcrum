@@ -7,7 +7,10 @@ import {
   parseArgs,
   printJson,
 } from "./arg-parser.ts";
-import { callProcedure } from "./trpc-client.ts";
+import {
+  createAuditApiClientFromEnv,
+  type AuditApiEnvironment,
+} from "@workflow-coordination/interface/http/audit-api-client.ts";
 
 export interface AuditFilters {
   project?: string;
@@ -36,6 +39,8 @@ export interface AuditClient {
 
 interface RunOptions {
   client?: AuditClient;
+  env?: AuditApiEnvironment;
+  fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -45,13 +50,13 @@ Usage:
   fulcrum audit query [--project <id>] [--user <id>] [--kind <kind>]
                       [--verb <verb>] [--since <ISO>] [--until <ISO>]
                       [--limit <n>] [--json]
-    Query audit events. Returns filtered event array from audit.query.
+    Query audit events through the configured public API.
     --since and --until accept ISO-8601 date strings (e.g. 2026-01-01).
 
   fulcrum audit export --format csv|json [same filters] [--output <file>]
-    Export audit events via audit.export. Streams to --output file or stdout.
+    Export audit events through the configured public API. Streams to --output file or stdout.
     For large exports (>100k events), the server returns a jobId; the CLI
-    polls audit.exportStatus until the job completes, then writes the result.
+    polls the export status endpoint until the job completes, then writes the result.
     Output includes all event payload fields (compliance export per A4).
 
 Examples:
@@ -62,11 +67,15 @@ Examples:
 
 const BOOLEAN_FLAGS = new Set(["--json"]);
 
-function defaultClient(): AuditClient {
+function defaultClient(options: Pick<RunOptions, "env" | "fetch"> = {}): AuditClient {
+  const publicApiClient = createAuditApiClientFromEnv(options.env, options.fetch);
+  if (!publicApiClient) {
+    throw new Error("Audit API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.");
+  }
   return {
-    query: (input) => callProcedure("audit.query", input),
-    export: (input) => callProcedure("audit.export", input),
-    exportStatus: (jobId) => callProcedure("audit.exportStatus", { jobId }),
+    query: (input) => publicApiClient.query(input),
+    export: (input) => publicApiClient.export(input),
+    exportStatus: (jobId) => publicApiClient.exportStatus(jobId),
   };
 }
 
@@ -76,7 +85,7 @@ export async function run(argv: readonly string[], options: RunOptions = {}): Pr
     console.log(HELP);
     return;
   }
-  const client = options.client ?? defaultClient();
+  const client = options.client ?? defaultClient(options);
   switch (verb) {
     case "query":
       return runQuery(rest, client);

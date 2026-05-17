@@ -3,10 +3,12 @@
  * Contains runImport, formatImportResult, NullCredentialRepository, FetchHttpClient.
  */
 
-import { importFromLinear } from "@/data/importers/linear.ts";
-import { importFromJira } from "@/data/importers/jira.ts";
-import { importFromPlane } from "@/data/importers/plane.ts";
-import type { CredentialRepository, HttpClient, ImportResult } from "@/data/importers/types.ts";
+import {
+  importProjectSource,
+  type CredentialRepository,
+  type HttpClient,
+  type SourceImportResult as ImportResult,
+} from "@integration-hub/interface/project-importers.ts";
 
 export type { CredentialRepository, HttpClient, ImportResult };
 
@@ -23,22 +25,7 @@ export interface ImportRunOptions {
 
 export async function runImport(opts: ImportRunOptions): Promise<ImportResult> {
   const { format, project, dryRun, credentials, http, workspace } = opts;
-
-  switch (format) {
-    case "linear":
-      return importFromLinear(project, credentials, http, { dryRun });
-
-    case "jira":
-      return importFromJira(project, credentials, http, { dryRun });
-
-    case "plane": {
-      const ws = workspace ?? project;
-      return importFromPlane(ws, project, credentials, http, { dryRun });
-    }
-
-    default:
-      throw new Error(`Unknown import format: ${format}. Supported: linear, jira, plane`);
-  }
+  return importProjectSource({ format, project, dryRun, credentials, http, workspace });
 }
 
 export function formatImportResult(result: ImportResult, json: boolean): string {

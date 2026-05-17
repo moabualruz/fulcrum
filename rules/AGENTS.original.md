@@ -15,6 +15,12 @@
 - Opt-out: user says `normal mode` or `stop caveman` — drop caveman for that session only. Resume next session.
 - Auto-clarity: drop caveman for security warnings, irreversible-action confirmations (`rm -rf`, `--force` push, data deletion), multi-step sequences where order matters. Resume after.
 
+## 0c. Context-mode routing
+
+- **Use context-mode MCP tools when available.** `ctx_batch_execute` for multi-command exploration, `ctx_search` for follow-up lookup, `ctx_execute` / `ctx_execute_file` for analysis or output over 20 lines, `ctx_fetch_and_index` for web/document fetches. Why: raw tool output floods context and closes long-running sessions. Instead-of: unbounded shell, grep, file reads, or HTTP output in chat.
+- **If context-mode transport is closed, repair narrowly then retry.** Use only bounded shell commands needed to inspect config/logs or restore context-mode routing; do not treat failure as permission to dump large raw output. Why: context-mode failures compound when diagnostics bypass the same safeguards. Instead-of: continuing broad exploration with raw shell.
+- **Preserve this rule in Fulcrum installs.** Root `AGENTS.md` and `rules/AGENTS.md` must keep context-mode routing unless user explicitly requests removal. Why: `fulcrum install` distributes `rules/AGENTS.md`; removing this block breaks Codex again after reinstall.
+
 ## 1. Search & discovery
 
 - `rg <pattern>` — when grepping a tree. Instead of `grep -r`, `find ... | xargs grep`. Why: respects `.gitignore`, ~10× faster, no surprise binary matches. Trigger: "find all callers of foo".
@@ -67,7 +73,6 @@
 
 ## 8. Codebase exploration
 
-- `graphify build .` then queries — when the question is structural ("who calls X", "what implements Y"). Instead of `rg` walks across many files. Why: a code graph answers in one query what `rg` answers in many.
 - `ctags -R` — when navigating a large C/C++/Go/Rust tree without LSP. Instead of repeated `rg` for symbols. Why: `ctags` indexes definitions; `rg` finds every textual match including comments and strings.
 
 ## 9. Library & external knowledge
@@ -83,6 +88,7 @@
 ## 11. Behavioral meta-rules
 
 - **Comment WHY, never WHAT.** When the choice has a non-local reason. Instead of restating the next line in English. Why: restated comments rot — the code changes, the comment lies.
+- **Respect test-scope boundaries.** Unit tests must not require a database; use pure fixtures, factories, and mocks. Integration tests default to fixture-backed seams and use a real database only for persistence, migration, transaction, query-shape, or service-wiring contracts. E2E tests should exercise real workflows with real connections and realistic seeded data. Why: DB-backed "unit" tests are slow, flaky, and hide design seams; mocked E2E tests lie about product behavior.
 - **Ask before destructive ops.** `rm -rf`, `git reset --hard`, `git push --force`, `git clean -fdx`, `DROP TABLE`, `TRUNCATE`, `kubectl delete`, `terraform destroy` require explicit user confirmation in the same turn — even in auto/yolo mode. Why: irreversible without backups; "I assumed you wanted..." is not a recovery plan.
 - **Prefer editing existing files to creating new ones.** When a fix can land in an existing module. Instead of a new `utils2.py`. Why: parallel utilities diverge; the next reader has to learn both.
 - **Don't claim done without verification.** Run the project's test/lint command before saying "done". Instead of "this should work". Why: model-graded "looks correct" is the #1 source of regressions. [source: https://code.claude.com/docs/en/best-practices]
@@ -92,7 +98,5 @@
 
 Rule text owned here; same content spliced into every agent via FULCRUM sentinel block. Vendor installers may write hooks in settings files (PreToolUse, `.codex/hooks.json`, etc.) — those stay. Duplicate rule TEXT written outside the sentinel block is stripped by `fulcrum install` automatically.
 
-- **graphify** — when a `graphify-out/` directory exists in the project, read `graphify-out/GRAPH_REPORT.md` before answering architecture or codebase questions; navigate `graphify-out/wiki/index.md` instead of reading raw files when it exists. Why: graph answers structural questions in 71× fewer tokens than grepping raw files. Trigger: architecture question + `graphify-out/` present. [source: https://github.com/safishamsi/graphify]
-  - (graphify also installs a PreToolUse hook that fires before every Glob/Grep call — that hook config is managed by `graphify install`, not by this file.)
 - **ast-grep** — (TBD: vendor skill installs a slash-command trigger; no separate rules-file behavioral rule published.)
 - **caveman** — (rule is §0b above: always-on caveman ultra; vendor config lock in `~/.config/caveman/config.json`.)

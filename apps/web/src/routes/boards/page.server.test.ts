@@ -1,231 +1,153 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createProject } from "@/application/projects/commands.ts";
-import { createTask } from "@/application/tasks/commands.ts";
-import { initDatabase, closeDatabase } from "$lib/server/db";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-interface EventRow {
-  id: string;
-  org_id: string;
-  project_id: string | null;
-  actor: string;
-  subject_kind: string;
-  subject_id: string;
-  verb: string;
-  payload: Record<string, unknown>;
-  created_at: string;
+const calls: string[] = [];
+const boardTasks = [
+  {
+    id: "task-1",
+    title: "Plan",
+    status: "pending",
+    priority: 0,
+    project_id: "project-1",
+    updated_at: "2026-05-15T00:00:00.000Z",
+  },
+];
+
+function form(data: Record<string, string>): Request {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return new Request("http://localhost/boards", { method: "POST", body: fd });
 }
 
-// `+page.server.ts` opens `${productDbDir()}/main`, which honours
-// `FULCRUM_HOME`. Seed three tasks across two projects so the project
-// filter and event emissions can be asserted.
+mock.module("$lib/server/application-scope", () => ({
+  requestAppScope: async (_locals: unknown, projectId: string | null) => ({
+    em: { kind: "mock-em" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId },
+  }),
+}));
 
-let scratch: string;
+mock.module("@work-management/interface/work-item-detail.ts", () => ({
+  listBoardWorkItems: async (_em: unknown, ctx: { projectId?: string | null }) => {
+    calls.push(`list:${ctx.projectId ?? ""}`);
+    return boardTasks;
+  },
+}));
 
-interface BoardPayload {
-  tasks: Array<{
-    id: string;
-    title: string;
-    status: string;
-    priority: number;
-    project_id: string | null;
-    updated_at: string;
-  }>;
-}
-
-function streamedData<T>(result: unknown): Promise<T> {
-  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
-  expect(stream).toBeInstanceOf(Promise);
-  return stream as Promise<T>;
-}
+mock.module("@work-management/interface/work-item-actions.ts", () => ({
+  TASK_STATUSES: ["pending", "in_progress", "blocked", "completed", "cancelled"],
+  createTaskAction: async () => ({ id: "task-new" }),
+  updateTaskAction: async () => ({ ok: true }),
+  deleteTaskAction: async () => ({ ok: true }),
+  moveTaskStatusAction: async () => ({ ok: true }),
+  createWorkItem: async (_em: unknown, _ctx: unknown, input: { title: string; status?: string | null }) => {
+    calls.push(`create:${input.title}:${input.status ?? ""}`);
+    return { id: "task-new" };
+  },
+  updateWorkItem: async (
+    _em: unknown,
+    _ctx: unknown,
+    id: string,
+    input: { status?: string | null; expectedStatus?: string | null },
+  ) => {
+    calls.push(`update:${id}:${input.expectedStatus ?? ""}:${input.status ?? ""}`);
+    if (input.expectedStatus === "blocked") throw new Error("status conflict: expected blocked, got pending");
+    return { id };
+  },
+  deleteWorkItem: async (_em: unknown, _ctx: unknown, id: string) => {
+    calls.push(`delete:${id}`);
+    return { id };
+  },
+  bulkUpdateWorkItems: async (_em: unknown, _ctx: unknown, ids: string[], patch: { status?: string | null }) => {
+    calls.push(`bulk-update:${ids.join("|")}:${patch.status ?? ""}`);
+    return { updated: ids.length };
+  },
+  bulkDeleteWorkItems: async (_em: unknown, _ctx: unknown, ids: string[]) => {
+    calls.push(`bulk-delete:${ids.join("|")}`);
+    return { deleted: ids.length };
+  },
+}));
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-boards-"));
-  process.env["FULCRUM_HOME"] = scratch;
+  calls.splice(0, calls.length);
 });
 
-afterEach(async () => {
-  await closeDatabase();
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-interface SeededIds {
-  orgId: string;
-  alphaProjectId: string;
-  betaProjectId: string;
-  taskAlphaPendingId: string;
-  taskAlphaInProgressId: string;
-  taskBetaPendingId: string;
-}
-
-async function seedTasks(): Promise<SeededIds> {
-  const db = await initDatabase();
-  const org = (await db.query<{ id: string }>("SELECT id FROM orgs ORDER BY created_at ASC LIMIT 1"))[0]!;
-  const ctx = { orgId: org.id, userId: "test-user", projectId: null };
-  const em = db.em.fork();
-  const alpha = await createProject(em, ctx, { slug: "alpha", name: "Alpha" });
-  const beta = await createProject(em, ctx, { slug: "beta", name: "Beta" });
-  const taskAlphaPending = await createTask(em, {
-    ...ctx,
-    projectId: alpha.id,
-  }, {
-    title: "Alpha pending",
-    status: "pending",
+describe("/boards +page.server.ts", () => {
+  test("server route uses work-management interfaces instead of direct application imports", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("@work-management/interface/work-item-actions");
+    expect(source).toContain("@work-management/interface/work-item-detail");
+    expect(source).toContain("$lib/server/request-service-scope");
+    expect(source).not.toContain("@work-management/application/tasks");
+    expect(source).not.toContain("$lib/server/application-scope");
   });
-  const taskAlphaInProgress = await createTask(em, {
-    ...ctx,
-    projectId: alpha.id,
-  }, {
-    title: "Alpha in_progress",
-    status: "in_progress",
-  });
-  const taskBetaPending = await createTask(em, {
-    ...ctx,
-    projectId: beta.id,
-  }, {
-    title: "Beta pending",
-    status: "pending",
-  });
-  return {
-    orgId: org.id,
-    alphaProjectId: alpha.id,
-    betaProjectId: beta.id,
-    taskAlphaPendingId: taskAlphaPending.id,
-    taskAlphaInProgressId: taskAlphaInProgress.id,
-    taskBetaPendingId: taskBetaPending.id,
-  };
-}
 
-function fakeLoadEvent(searchParams: Record<string, string>): Parameters<
-  typeof import("./+page.server.ts").load
->[0] {
-  const url = new URL("http://localhost/boards");
-  for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v);
-  return {
-    url,
-    locals: { activeProjectId: null },
-  } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
-}
-
-interface FailResult {
-  status?: number;
-  data?: Record<string, unknown>;
-}
-
-describe("/boards +page.server.ts load()", () => {
-  test("default load returns all seeded tasks across both projects, project=''", async () => {
-    const ids = await seedTasks();
+  test("load returns board rows through the service boundary", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load(fakeLoadEvent({}));
-    expect(result.project).toBe("");
-    expect(result.activeProjectId).toBeNull();
-    const payload = await streamedData<BoardPayload>(result);
-    expect(Array.isArray(payload.tasks)).toBe(true);
-    expect(payload.tasks).toHaveLength(3);
-    const seen = new Set(payload.tasks.map((t) => t.id));
-    expect(seen.has(ids.taskAlphaPendingId)).toBe(true);
-    expect(seen.has(ids.taskAlphaInProgressId)).toBe(true);
-    expect(seen.has(ids.taskBetaPendingId)).toBe(true);
+    const result = await mod.load({
+      url: new URL("http://localhost/boards?project=project-1"),
+      locals: {},
+      parent: async () => ({ activeProjectId: null }),
+    } as Parameters<typeof mod.load>[0]);
+
+    expect(result.project).toBe("project-1");
+    const payload = await result.streamed.data;
+    expect(payload.tasks).toEqual(boardTasks);
+    expect(calls).toEqual(["list:project-1"]);
   });
 
-  test("project search-param narrows tasks to that project", async () => {
-    const ids = await seedTasks();
+  test("create, update, delete, and bulk actions call the service boundary", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load(
-      fakeLoadEvent({ project: ids.alphaProjectId }),
-    );
-    expect(result.project).toBe(ids.alphaProjectId);
-    const payload = await streamedData<BoardPayload>(result);
-    expect(payload.tasks).toHaveLength(2);
-    for (const t of payload.tasks) {
-      expect(t.project_id).toBe(ids.alphaProjectId);
-    }
-  });
-});
+    const locals = { activeProjectId: "project-1" };
 
-describe("/boards +page.server.ts actions", () => {
-  test("create action inserts the row and emits task.created", async () => {
-    await seedTasks();
+    await mod.actions.create({
+      request: form({ title: "New task", status: "pending" }),
+      locals,
+    } as Parameters<typeof mod.actions.create>[0]);
+    await mod.actions.update({
+      request: form({ id: "task-1", title: "Renamed", status: "in_progress", priority: "2" }),
+      locals,
+    } as Parameters<typeof mod.actions.update>[0]);
+    await mod.actions.delete({
+      request: form({ id: "task-1" }),
+      locals,
+    } as Parameters<typeof mod.actions.delete>[0]);
+    const bulkStatus = await mod.actions.bulkStatus({
+      request: form({ ids: "task-1,task-2", status: "blocked" }),
+      locals,
+    } as Parameters<typeof mod.actions.bulkStatus>[0]);
+    const bulkDelete = await mod.actions.bulkDelete({
+      request: form({ ids: "task-1,task-2" }),
+      locals,
+    } as Parameters<typeof mod.actions.bulkDelete>[0]);
+
+    expect(bulkStatus).toEqual({ ok: true, message: "2 task(s) updated" });
+    expect(bulkDelete).toEqual({ ok: true, message: "2 task(s) deleted" });
+    expect(calls).toEqual([
+      "create:New task:pending",
+      "update:task-1::in_progress",
+      "delete:task-1",
+      "bulk-update:task-1|task-2:blocked",
+      "bulk-delete:task-1|task-2",
+    ]);
+  });
+
+  test("move preserves optimistic status conflict handling", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const fd = new FormData();
-    fd.set("title", "Brand new task");
-    fd.set("status", "pending");
-    const request = new Request("http://localhost/boards?/create", {
-      method: "POST",
-      body: fd,
-    });
-    const result = await mod.actions.create({ request } as Parameters<
-      typeof mod.actions.create
-    >[0]);
-    // happy-path returns success (no `fail`); shape may include `{ok:true}`.
-    expect(result).toBeDefined();
-    expect((result as { status?: number }).status ?? 200).toBeLessThan(400);
+    const ok = await mod.actions.move({
+      request: form({ id: "task-1", from: "pending", to: "in_progress" }),
+      locals: { activeProjectId: "project-1" },
+    } as Parameters<typeof mod.actions.move>[0]);
+    const conflict = await mod.actions.move({
+      request: form({ id: "task-1", from: "blocked", to: "completed" }),
+      locals: { activeProjectId: "project-1" },
+    } as Parameters<typeof mod.actions.move>[0]);
 
-    const db = await initDatabase();
-    const rows = await db.query<{ id: string; title: string }>(
-      `SELECT id, title FROM tasks WHERE title = $1`,
-      ["Brand new task"],
-    );
-    expect(rows).toHaveLength(1);
-    const events = await db.query<EventRow>(
-      `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1`,
-      [rows[0]!.id],
-    );
-    expect(events.find((e) => e.verb === "created")).toBeDefined();
-  });
-
-  test("move action updates status and emits task.status_changed", async () => {
-    const ids = await seedTasks();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const fd = new FormData();
-    fd.set("id", ids.taskAlphaPendingId);
-    fd.set("from", "pending");
-    fd.set("to", "in_progress");
-    const request = new Request("http://localhost/boards?/move", {
-      method: "POST",
-      body: fd,
-    });
-    const result = await mod.actions.move({ request } as Parameters<
-      typeof mod.actions.move
-    >[0]);
-    expect((result as { status?: number }).status ?? 200).toBeLessThan(400);
-
-    const db = await initDatabase();
-    const rows = await db.query<{ status: string }>(
-      `SELECT status FROM tasks WHERE id = $1`,
-      [ids.taskAlphaPendingId],
-    );
-    expect(rows[0]?.status).toBe("in_progress");
-    const events = await db.query<EventRow>(
-      `SELECT * FROM events WHERE subject_kind = 'task' AND subject_id = $1 AND verb = 'status_changed'`,
-      [ids.taskAlphaPendingId],
-    );
-    expect(events).toHaveLength(1);
-    expect(events[0]?.payload).toEqual({
-      from: "pending",
-      to: "in_progress",
-      task: ids.taskAlphaPendingId,
-    });
-  });
-
-  test("move action with stale `from` returns fail(409, …)", async () => {
-    const ids = await seedTasks();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    const fd = new FormData();
-    // Real status is `pending`; supply `blocked` to simulate a race.
-    fd.set("id", ids.taskAlphaPendingId);
-    fd.set("from", "blocked");
-    fd.set("to", "completed");
-    const request = new Request("http://localhost/boards?/move", {
-      method: "POST",
-      body: fd,
-    });
-    const result = (await mod.actions.move({ request } as Parameters<
-      typeof mod.actions.move
-    >[0])) as FailResult;
-    expect(result.status).toBe(409);
+    expect(ok).toEqual({ ok: true, message: "Task moved" });
+    expect((conflict as { status?: number }).status).toBe(409);
+    expect(calls).toEqual([
+      "update:task-1:pending:in_progress",
+      "update:task-1:blocked:completed",
+    ]);
   });
 });

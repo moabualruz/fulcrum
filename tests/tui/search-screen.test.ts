@@ -19,7 +19,7 @@ import {
   executeSearch,
 } from "@fulcrum/tui/screens/search-screen.ts";
 import type { SearchOptions, SearchResult } from "@fulcrum/tui/types.ts";
-import { resetFeaturesCache } from "../../src/flags/index.ts";
+import { resetFeaturesCache } from "@platform-core/application/feature-flags/index.ts";
 
 beforeEach(() => {
   resetFeaturesCache();

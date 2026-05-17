@@ -1,7 +1,7 @@
 import type { Actions, PageServerLoad } from "./$types";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import { loadOrchestrationDashboard, listOrchestrationProjectOptions } from "$lib/server/orchestration";
-import { cancelRun, dispatchTaskRun, retryRun } from "@/application/runs/commands.ts";
+import { cancelRun, dispatchTaskRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
 import { actionOk } from "$lib/feedback/action-result";
 
 export const load: PageServerLoad = ({ url, locals }) => {
@@ -12,7 +12,7 @@ export const load: PageServerLoad = ({ url, locals }) => {
     projectFilter,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, projectFilter || null);
+        const { em, ctx } = await requestServiceScope(locals, projectFilter || null);
         const [dashboard, projects] = await Promise.all([
           loadOrchestrationDashboard(em, ctx, projectFilter || undefined),
           listOrchestrationProjectOptions(em, ctx),
@@ -30,7 +30,7 @@ export const actions: Actions = {
     if (!taskId) return { success: false, message: "task_id required" };
     const agent = (form.get("agent") as string | null) ?? "codex";
     try {
-      const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
       const result = await dispatchTaskRun(em, ctx, { taskId, agent });
       return actionOk(`Dispatched run ${result.id} (${result.status})`);
     } catch (err) {
@@ -43,7 +43,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const id = (form.get("run_id") as string | null) ?? "";
     if (!id) return { success: false, message: "run_id required" };
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     await cancelRun(em, ctx, id);
     return actionOk("Run cancelled");
   },
@@ -52,7 +52,7 @@ export const actions: Actions = {
     const form = await request.formData();
     const id = (form.get("run_id") as string | null) ?? "";
     if (!id) return { success: false, message: "run_id required" };
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     await retryRun(em, ctx, id);
     return actionOk("Run queued for retry");
   },

@@ -8,7 +8,10 @@
 
 import { writeFileSync } from "node:fs";
 
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
@@ -22,6 +25,8 @@ export interface ExportRunOptions {
       exportCsv?: AnyFn;
     };
   };
+  env?: TaskApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -108,5 +113,9 @@ export async function run(argv: readonly string[], opts: ExportRunOptions = {}):
 
 async function resolveCaller(opts: ExportRunOptions): Promise<Required<ExportRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ requireSession: true }) as Required<ExportRunOptions>["caller"];
+  const apiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
+  }
+  return apiCaller as unknown as Required<ExportRunOptions>["caller"];
 }

@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { THEME_DEFAULTS, PRESETS } from "./theme";
 
-// ── Unit tests for theme defaults and presets ────────────────────────────────
-// The load() and actions() call tRPC internally; we test the exported constants
-// and verify their shape so the page renders correctly when the tRPC server is
-// absent (falls back to defaults).
+const forbiddenTransportPath = "/api/" + "tr" + "pc";
 
 describe("/settings/theme +page.server.ts constants", () => {
   test("THEME_DEFAULTS has all required keys", () => {
@@ -69,9 +66,8 @@ describe("/settings/theme +page.server.ts constants", () => {
 });
 
 describe("/settings/theme load() fallback", () => {
-  test("load falls back to THEME_DEFAULTS when fetch throws", async () => {
+  test("load redirects anonymous users", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    // Simulate redirect since session is null
     let threw = false;
     try {
       await mod.load({
@@ -81,7 +77,6 @@ describe("/settings/theme load() fallback", () => {
         url: new URL("http://localhost/settings/theme"),
       });
     } catch (e) {
-      // Expected: redirect(302, "/auth/login")
       threw = true;
       const err = e as { status?: number; location?: string };
       expect(err.status).toBe(302);
@@ -89,30 +84,128 @@ describe("/settings/theme load() fallback", () => {
     expect(threw).toBe(true);
   });
 
-  test("load returns settings when session present but tRPC returns null", async () => {
+  test("load returns defaults when no scoped API caller is configured", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 1}`);
     const result = await mod.load({
       locals: { session: { userId: "u1" } },
-      fetch: async () => new Response(JSON.stringify({ result: { data: { json: null } } }), { status: 200 }),
+      fetch: async () => {
+        throw new Error("unexpected API call");
+      },
       request: { headers: { get: () => null } },
       url: new URL("http://localhost/settings/theme"),
     });
     expect(result.settings).toEqual(THEME_DEFAULTS);
   });
 
-  test("load merges remote overrides onto defaults", async () => {
+  test("load merges Nest public API settings onto defaults", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 2}`);
     const remote = { accentHue: 30, preset: "sunset" };
+    const calls: Array<{ url: string; init: RequestInit }> = [];
     const result = await mod.load({
-      locals: { session: { userId: "u1" } },
-      fetch: async () =>
-        new Response(JSON.stringify({ result: { data: { json: remote } } }), { status: 200 }),
-      request: { headers: { get: () => null } },
+      locals: { session: { userId: "u1" }, orgId: "org-1", userId: "user-1" },
+      fetch: async (url: string | URL | Request, init?: RequestInit) => {
+        const target = String(url);
+        if (target.includes(forbiddenTransportPath)) throw new Error("unexpected transport call");
+        calls.push({ url: target, init: init ?? {} });
+        return Response.json(remote);
+      },
+      request: { headers: { get: () => "sid=session-1" } },
       url: new URL("http://localhost/settings/theme"),
     });
     expect(result.settings.accentHue).toBe(30);
     expect(result.settings.preset).toBe("sunset");
-    // Other defaults preserved
     expect(result.settings.compactMode).toBe(THEME_DEFAULTS.compactMode);
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/settings/theme?orgId=org-1&userId=user-1",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            cookie: "sid=session-1",
+          },
+          body: undefined,
+        },
+      },
+    ]);
+  });
+});
+
+describe("/settings/theme actions", () => {
+  test("save sends settings through the Nest public API", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 3}`);
+    const form = new FormData();
+    form.set("accentHue", "42");
+    form.set("accentSaturation", "70");
+    form.set("accentLightness", "46");
+    form.set("radius", "0.75");
+    form.set("fontFamily", "mono");
+    form.set("colorScheme", "dark");
+    form.set("compactMode", "true");
+    form.set("animationSpeed", "reduced");
+    form.set("preset", "ocean");
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+
+    const result = await mod.actions.save({
+      locals: { session: { userId: "u1" }, orgId: "org-1", userId: "user-1" },
+      fetch: async (url: string | URL | Request, init?: RequestInit) => {
+        const target = String(url);
+        if (target.includes(forbiddenTransportPath)) throw new Error("unexpected transport call");
+        calls.push({ url: target, init: init ?? {} });
+        return Response.json({ ok: true });
+      },
+      request: {
+        headers: { get: () => "sid=session-1" },
+        formData: async () => form,
+      },
+      url: new URL("http://localhost/settings/theme"),
+    });
+
+    expect(result).toMatchObject({
+      saved: true,
+      settings: {
+        accentHue: 42,
+        fontFamily: "mono",
+        colorScheme: "dark",
+        compactMode: true,
+      },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe("http://localhost/api/v1/settings/theme");
+    expect(calls[0]?.init.method).toBe("PATCH");
+    expect(calls[0]?.init.headers).toEqual({
+      "content-type": "application/json",
+      cookie: "sid=session-1",
+    });
+    expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({
+      orgId: "org-1",
+      userId: "user-1",
+      accentHue: 42,
+      compactMode: true,
+      preset: "ocean",
+    });
+  });
+
+  test("save fails without a scoped API caller", async () => {
+    const mod = await import(`./+page.server.ts?t=${Date.now() + 4}`);
+    const result = await mod.actions.save({
+      locals: { session: { userId: "u1" } },
+      fetch: async () => {
+        throw new Error("unexpected API call");
+      },
+      request: {
+        headers: { get: () => null },
+        formData: async () => new FormData(),
+      },
+      url: new URL("http://localhost/settings/theme"),
+    });
+
+    expect(result).toMatchObject({
+      status: 503,
+      data: {
+        saveError: "Theme settings API caller is not configured.",
+      },
+    });
   });
 });

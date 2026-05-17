@@ -1,52 +1,26 @@
 <script lang="ts">
   /**
-   * RecurrenceConfig — popover for configuring task recurrence rules (D-116).
-   *
-   * Three modes: on_schedule (cron), after_completion (days), on_close (days).
-   * Shows next scheduled date, occurrence count, and bounds.
-   * Actions: create / delete / update rule via trpc.recurrence.
+   * RecurrenceConfig — popover for configuring task recurrence rules.
    */
+  import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
+  import {
+    deleteTaskRecurrenceRule,
+    listTaskRecurrenceRules,
+    saveTaskRecurrenceRule,
+    type RecurrenceMode,
+    type RecurrenceRule,
+  } from "./recurrence-api";
 
   // ── Types ────────────────────────────────────────────────────────────────────
 
-  type RecurrenceMode = "on_schedule" | "after_completion" | "on_close";
-
-  interface RecurrenceRule {
-    id: string;
-    mode: RecurrenceMode;
-    intervalDays?: number | null;
-    cronExpression?: string | null;
-    daysOfWeek?: number[] | null;
-    timeOfDay?: string | null;
-    nextOccurrence?: string | null;
-    occurrenceCount?: number;
-    endDate?: string | null;
-    maxOccurrences?: number | null;
-  }
-
-  // ── Props ────────────────────────────────────────────────────────────────────
-
   interface Props {
     taskId: string;
+    orgId?: string;
     existingRule?: RecurrenceRule | null;
-    trpc?: {
-    recurrence: {
-      create: { mutate: (input: {
-        taskId: string;
-        mode: RecurrenceMode;
-        intervalDays?: number;
-        daysOfWeek?: number[];
-        timeOfDay?: string;
-        endDate?: string;
-        maxOccurrences?: number;
-      }) => Promise<RecurrenceRule> };
-      delete: { mutate: (input: { ruleId: string }) => Promise<void> };
-    };
-    } | null;
   }
 
-  let { taskId, existingRule = null, trpc = null }: Props = $props();
+  let { taskId, orgId = "", existingRule = null }: Props = $props();
 
   // ── State ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +41,30 @@
     on_close: "On close",
   };
 
+  onMount(async () => {
+    await loadExistingRule();
+  });
+
+  async function loadExistingRule() {
+    if (existingRule) return;
+    try {
+      const rules = await listTaskRecurrenceRules(fetch, { orgId, taskId });
+      existingRule = rules[0] ?? null;
+      if (existingRule) syncForm(existingRule);
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : "Failed to load recurrence";
+    }
+  }
+
+  function syncForm(rule: RecurrenceRule) {
+    mode = rule.mode;
+    intervalDays = rule.intervalDays ?? 7;
+    selectedDays = rule.daysOfWeek ?? [1];
+    timeOfDay = rule.timeOfDay ?? "09:00";
+    endDate = rule.endDate ?? "";
+    maxOccurrences = rule.maxOccurrences ?? null;
+  }
+
   function toggleDay(d: number) {
     if (selectedDays.includes(d)) {
       selectedDays = selectedDays.filter((x) => x !== d);
@@ -76,17 +74,16 @@
   }
 
   async function save() {
-    if (!trpc) return;
     submitting = true;
     error = "";
     try {
-      const rule = await trpc.recurrence.create.mutate({
+      const rule = await saveTaskRecurrenceRule(fetch, {
+        orgId,
         taskId,
         mode,
         intervalDays: mode !== "on_schedule" ? intervalDays : undefined,
         daysOfWeek: mode === "on_schedule" ? selectedDays : undefined,
         timeOfDay: mode === "on_schedule" ? timeOfDay : undefined,
-        endDate: endDate || undefined,
         maxOccurrences: maxOccurrences ?? undefined,
       });
       existingRule = rule;
@@ -99,11 +96,11 @@
   }
 
   async function deleteRule() {
-    if (!trpc || !existingRule) return;
+    if (!existingRule) return;
     submitting = true;
     error = "";
     try {
-      await trpc.recurrence.delete.mutate({ ruleId: existingRule.id });
+      await deleteTaskRecurrenceRule(fetch, { orgId, ruleId: existingRule.id });
       existingRule = null;
       open = false;
     } catch (e: unknown) {

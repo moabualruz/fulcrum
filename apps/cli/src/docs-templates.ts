@@ -1,20 +1,13 @@
-/**
- * CLI handler for `fulcrum docs template <subcommand>`.
- *
- * Follows the same testable run(argv, opts) pattern as apps/cli/src/inference.ts:
- *   - opts.caller  — in-process tRPC caller (injected by test or CLI bootstrap)
- *   - opts.print   — stdout sink (defaults to console.log)
- *   - opts.printErr — stderr sink (defaults to console.error)
- *   - opts.exit    — process exit (defaults to process.exit)
- *
- * C4: CLI parity — every tRPC procedure has a CLI binding.
- */
+import {
+  createDocumentApiCallerFromEnv,
+  type DocumentApiEnvironment,
+} from "@knowledge-workspace/interface/http/document-api-client.ts";
 
-import type { AppRouter } from "@fulcrum/server/trpc/router.ts";
-import type { inferRouterOutputs } from "@trpc/server";
-import { createLocalCaller } from "./local-caller.ts";
-
-type DocTemplateRow = inferRouterOutputs<AppRouter>["docs"]["templates"]["list"][number];
+type DocTemplateRow = {
+  id: string;
+  docType: string;
+  name: string;
+};
 
 type DocsTemplateCaller = {
   docs: {
@@ -41,7 +34,8 @@ Commands:
 
 export interface DocsTemplateRunOptions {
   caller?: DocsTemplateCaller;
-  container?: import("@needle-di/core").Container | null;
+  env?: DocumentApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -116,9 +110,15 @@ export async function run(
 
 async function resolveCaller(opts: DocsTemplateRunOptions): Promise<DocsTemplateCaller> {
   if (opts.caller) return opts.caller;
-
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as DocsTemplateCaller;
+  const apiCaller = createDocumentApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Document API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
+  }
+  return {
+    docs: {
+      templates: {
+        list: async (input) => await apiCaller.docs.listTemplates(input) as DocTemplateRow[],
+      },
+    },
+  };
 }

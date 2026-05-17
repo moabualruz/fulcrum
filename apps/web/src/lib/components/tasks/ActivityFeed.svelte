@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fetchTaskActivity, type TaskActivityApiRow } from "./activity-api";
 
   interface Props {
     taskId: string;
+    orgId?: string;
   }
 
-  const { taskId }: Props = $props();
+  const { taskId, orgId = "" }: Props = $props();
 
   interface AuditEvent {
     id: string;
@@ -71,10 +73,7 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(`/api/trpc/audit.list?input=${encodeURIComponent(JSON.stringify({ subjectId: taskId, subjectKind: "task", limit: 50 }))}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as { result?: { data?: { items?: AuditEvent[] } } };
-      events = json.result?.data?.items ?? [];
+      events = (await fetchTaskActivity(fetch, { orgId, taskId })).map(normalizeAuditEvent);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load activity";
     } finally {
@@ -85,6 +84,18 @@
   onMount(() => {
     void loadEvents();
   });
+
+  function normalizeAuditEvent(row: TaskActivityApiRow): AuditEvent {
+    return {
+      id: row.id,
+      userId: row.userId,
+      verb: row.verb,
+      subjectKind: row.subjectKind,
+      subjectId: row.subjectId,
+      payload: row.payload,
+      createdAt: new Date(row.createdAt),
+    };
+  }
 </script>
 
 <div class="activity-feed" data-testid="activity-feed">

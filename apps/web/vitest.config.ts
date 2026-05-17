@@ -12,11 +12,30 @@ export default defineConfig({
       "$app/navigation": new URL("./tests/mocks/app-navigation.ts", import.meta.url).pathname,
       "$app/state": new URL("./tests/mocks/app-state.ts", import.meta.url).pathname,
       $lib: new URL("./src/lib", import.meta.url).pathname,
-      "@": new URL("../../src", import.meta.url).pathname,
       "@fulcrum/cli": new URL("../cli/src", import.meta.url).pathname,
       "@fulcrum/server": new URL("../server/src", import.meta.url).pathname,
       "@fulcrum/tui": new URL("../tui/src", import.meta.url).pathname,
       "@fulcrum/web": new URL("./src", import.meta.url).pathname,
+      "@agent-client-protocol": new URL("../../services/agent-client-protocol/src", import.meta.url)
+        .pathname,
+      "@execution-orchestration": new URL(
+        "../../services/execution-orchestration/src",
+        import.meta.url,
+      ).pathname,
+      "@identity-access": new URL("../../services/identity-access/src", import.meta.url).pathname,
+      "@integration-hub": new URL("../../services/integration-hub/src", import.meta.url).pathname,
+      "@knowledge-workspace": new URL("../../services/knowledge-workspace/src", import.meta.url)
+        .pathname,
+      "@notification-center": new URL("../../services/notification-center/src", import.meta.url)
+        .pathname,
+      "@planning-review": new URL("../../services/planning-review/src", import.meta.url)
+        .pathname,
+      "@platform-core": new URL("../../services/platform-core/src", import.meta.url).pathname,
+      "@workflow-coordination": new URL(
+        "../../services/workflow-coordination/src",
+        import.meta.url,
+      ).pathname,
+      "@work-management": new URL("../../services/work-management/src", import.meta.url).pathname,
     },
   },
   test: {

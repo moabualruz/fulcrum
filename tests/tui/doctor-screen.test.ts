@@ -13,7 +13,7 @@ import {
   OPENTUI_GATE_THRESHOLD,
   TuiDoctorCheckSchema,
 } from "@fulcrum/tui/screens/doctor.ts";
-import type { DoctorCheckResult } from "../../src/doctor/types.ts";
+import type { DoctorCheckResult } from "@platform-core/interface/doctor-results.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

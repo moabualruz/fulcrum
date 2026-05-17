@@ -59,7 +59,6 @@
 
 | Tool | Status | Source / Plan | Notes |
 |---|---|---|---|
-| `graphify` | ✅ | [safishamsi/graphify — skill.md](https://github.com/safishamsi/graphify/blob/v5/graphify/skill.md) | Per-agent variants. Knowledge-graph extraction + BFS/DFS. |
 | `semgrep` | ✅ | [semgrep/skills](https://github.com/semgrep/skills) | Three SKILL.md: `semgrep`, `code-security`, `llm-security`. |
 | `lizard` | ✍️ shipped | [`skills/lizard/SKILL.md`](lizard/SKILL.md) + [`evals/lizard.json`](../evals/lizard.json) | Authored 2026-04-28. 7 patterns + 7 anti-patterns; CCN, length, params, baseline diff. 20-entry eval (12/8). |
 

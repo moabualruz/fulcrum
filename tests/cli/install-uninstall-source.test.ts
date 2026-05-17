@@ -104,25 +104,28 @@ describe("install source helpers", () => {
   });
 
   it("strips known vendor rule blocks only outside the Fulcrum sentinel", async () => {
+    // VENDOR_RULE_HEADINGS is currently empty (graphify removed); verify that
+    // the sentinel-split logic is sound: content inside the managed block is
+    // preserved and user content outside is untouched.
     const target = join(scratch, "agent.md");
-    await writeFile(target, [
-      "# graphify",
-      "outside duplicate",
+    const originalContent = [
+      "outside user content",
       "",
       `${BEGIN}`,
-      "# graphify",
       "inside managed block",
       `${END}`,
       "",
       "# user heading",
       "keep me",
       "",
-    ].join("\n"));
+    ].join("\n");
+    await writeFile(target, originalContent);
 
     await stripVendorRuleBlocks(target, false);
     const result = await text(target);
 
-    expect(result).not.toContain("outside duplicate");
+    // No vendor headings registered → nothing stripped, file unchanged.
+    expect(result).toContain("outside user content");
     expect(result).toContain("inside managed block");
     expect(result).toContain("# user heading");
   });
@@ -136,11 +139,11 @@ describe("install source helpers", () => {
     await stripVendorRuleBlocks(noVendor, false);
     expect(await text(noVendor)).toBe("# user heading\nkeep me\n");
 
+    // Dry-run on a missing file is a no-op — the function returns early and
+    // logs nothing (no vendor headings registered to detect changes).
     const dryRunTarget = join(scratch, "dry-run-vendor.md");
-    await writeFile(dryRunTarget, "# graphify\nmanaged duplicate\n");
     const logs = await captureLogs(() => stripVendorRuleBlocks(dryRunTarget, true));
-    expect(logs.join("\n")).toContain("would strip vendor rule blocks");
-    expect(await text(dryRunTarget)).toBe("# graphify\nmanaged duplicate\n");
+    expect(logs.join("\n")).toBe("");
   });
 
   it("guards the shared ~/.agents path and seeds tool-output policy idempotently", async () => {

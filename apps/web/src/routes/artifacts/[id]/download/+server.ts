@@ -2,15 +2,15 @@ import { error } from "@sveltejs/kit";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { RequestHandler } from "./$types";
-import { requestAppScope } from "$lib/server/application-scope";
-import { getArtifactDetail } from "@/application/artifacts/queries.ts";
-import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@/artifacts/storage.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { getArtifactDetail } from "@workflow-coordination/interface/artifact-records.ts";
+import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
 
 const require = createRequire(import.meta.url);
 const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };
 
 export const GET: RequestHandler = async ({ params, locals }) => {
-  const { em, ctx } = await requestAppScope(locals);
+  const { em, ctx } = await requestServiceScope(locals);
   try {
     const artifact = await getArtifactDetail(em, ctx, params.id);
     if (!artifact.body_path) throw error(404, "Artifact not found");

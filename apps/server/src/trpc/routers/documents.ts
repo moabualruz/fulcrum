@@ -2,22 +2,22 @@
  * Documents tRPC router — legacy mount-compatible adapter over application docs service.
  */
 
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   createDoc,
   deleteDoc,
   updateDoc,
-} from "@/application/docs/commands.ts";
+} from "@knowledge-workspace/application/docs/commands.ts";
 import {
   getDoc,
   listDocs,
-} from "@/application/docs/queries.ts";
-import type { AppContext, DocDto } from "@/application/docs/types.ts";
+} from "@knowledge-workspace/application/docs/queries.ts";
+import type { AppContext, DocDto } from "@knowledge-workspace/application/docs/types.ts";
 import type { TRPCContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import { t } from "../trpc.ts";

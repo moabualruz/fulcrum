@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { TRPCError } from "@trpc/server";
-
 import { run as runTasks } from "../commands/tasks.ts";
 import { run as runSettings } from "../settings.ts";
 
@@ -20,7 +18,7 @@ describe("CLI E2E error handling", () => {
       caller: {
         tasks: {
           list: async () => {
-            throw new TRPCError({ code: "FORBIDDEN", message: "denied" });
+            throw { code: "FORBIDDEN", message: "denied" };
           },
         },
       },

@@ -236,4 +236,26 @@ describe("P12 TUI inbox and audit screens", () => {
       expect.objectContaining({ id: "e1", subjectKind: "task", verb: "created" }),
     ]);
   });
+
+  test("audit panel writes JSON content returned by the public API caller", async () => {
+    const screen = new AuditLogScreen({
+      cwd: scratch,
+      now: () => new Date("2026-05-03T12:34:56Z"),
+      caller: {
+        audit: {
+          query: async () => [],
+          export: async () => ({
+            format: "json",
+            content: '[{"id":"public-audit","subjectKind":"task"}]',
+          }),
+        },
+      },
+    });
+
+    await screen.handleKey("E");
+
+    expect(await Bun.file(join(scratch, "audit-2026-05-03T12-34-56-000Z.json")).json()).toEqual([
+      { id: "public-audit", subjectKind: "task" },
+    ]);
+  });
 });

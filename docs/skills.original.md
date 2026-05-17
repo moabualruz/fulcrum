@@ -25,11 +25,8 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 | `package.superpowers` | Native packages where available; full package mirrors where needed. |
 | `package.cloudflare` | Claude plugin plus full non-Claude package mirrors, loadable skill mirrors, and package MCP config from `.mcp.json`. |
 | `package.caveman` | Native Claude/Gemini installs plus full Codex/OpenCode/Pi package mirrors. |
-| `package.graphify` | Vendor `graphify install --platform <agent>` where supported; Pi skill fallback. |
 | `package.ast-grep` | Vendor `npx skills add ast-grep/agent-skill` integration. |
 | `package.tavily` | Vendor `npx skills add https://github.com/tavily-ai/skills` integration. |
-| `skills.upstream` | Pinned Playwright, Semgrep, Graphify, Superpowers, and Cloudflare skills with subtree SHA-256 verification. |
-
 
 ## 3. Adoption strategy — install one, cherry-pick the rest
 

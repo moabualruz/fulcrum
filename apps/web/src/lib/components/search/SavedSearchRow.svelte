@@ -1,11 +1,9 @@
 <script lang="ts">
+  import { searchPublicApiHeaders, searchPublicApiPath } from "./in-context-search";
+
   /**
-   * SavedSearchRow — Plan 06-09 (SRC-06, D-18)
-   *
    * Row for a single saved search with load and delete actions.
-   * Delete: inline undo toast (5s) per UI-SPEC.
-   *
-   * T-06-20: savedSearches.delete validated server-side (Zod + session user_id).
+   * Delete: inline undo toast (5s).
    */
 
   interface SavedSearch {
@@ -16,11 +14,14 @@
 
   interface Props {
     search: SavedSearch;
+    orgId?: string | null;
+    userId?: string | null;
+    apiToken?: string | null;
     onLoad?: (search: SavedSearch) => void;
     onDeleted?: (id: string) => void;
   }
 
-  let { search, onLoad, onDeleted }: Props = $props();
+  let { search, orgId = null, userId = null, apiToken = null, onLoad, onDeleted }: Props = $props();
 
   let pendingDelete = $state(false);
   let undoTimer = $state<ReturnType<typeof setTimeout> | null>(null);
@@ -45,10 +46,12 @@
     deleting = true;
     error = "";
     try {
-      const res = await fetch("/api/trpc/savedSearches.delete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: search.id }),
+      if (!orgId || !userId) throw new Error("Saved search scope is required.");
+      const path = `/api/v1/search/saved/${encodeURIComponent(search.id)}`;
+      const res = await fetch(searchPublicApiPath(path, { org_id: orgId, user_id: userId }), {
+        method: "DELETE",
+        credentials: "include",
+        headers: searchPublicApiHeaders(apiToken),
       });
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
       onDeleted?.(search.id);

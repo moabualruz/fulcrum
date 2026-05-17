@@ -1,6 +1,6 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
-import type { SearchHit } from "@/test-support/product-fixtures.ts";
+import type { SearchHit } from "@test-support/product-workspace-fixtures.ts";
 import type { SavedSearch } from "./+page.server.ts";
 
 mock.module("$app/state", () => ({

@@ -8,9 +8,10 @@
  *   fulcrum comment resolve <commentId>      — resolve comment
  */
 
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createTaskCommentApiCallerFromEnv,
+  type TaskCommentApiEnvironment,
+} from "@work-management/interface/http/task-comment-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
@@ -23,7 +24,8 @@ export interface CommentRunOptions {
       resolve: AnyFn;
     };
   };
-  container?: Container | null;
+  env?: TaskCommentApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -165,9 +167,11 @@ function formatRelativeTime(date: Date | string): string {
 
 async function resolveCaller(opts: CommentRunOptions): Promise<Required<CommentRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
-
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as Required<CommentRunOptions>["caller"];
+  const apiCaller = createTaskCommentApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Comment API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller as unknown as Required<CommentRunOptions>["caller"];
 }

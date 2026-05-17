@@ -1,1 +1,1 @@
-export * from "@/application/dashboard/product-queries.ts";
+export * from "@work-management/interface/product-dashboard.ts";

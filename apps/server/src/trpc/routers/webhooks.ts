@@ -5,21 +5,21 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError, AppNotFoundError } from "@/application/errors.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError, AppNotFoundError } from "@platform-core/domain/errors.ts";
 import {
   createWebhook,
   deleteWebhook,
   updateWebhook,
-} from "@/application/webhooks/commands.ts";
+} from "@integration-hub/application/webhooks/commands.ts";
 import {
   getWebhook,
   getWebhookDelivery,
   listWebhookDeliveries,
   listWebhooks,
-} from "@/application/webhooks/queries.ts";
-import type { WebhookAppContext } from "@/application/webhooks/types.ts";
-import { FlagRegistry } from "@/flags/registry.ts";
+} from "@integration-hub/application/webhooks/queries.ts";
+import type { WebhookAppContext } from "@integration-hub/domain/webhook.ts";
+import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import { optionalTrpcEntityManager, requireTrpcEntityManager, type TrpcContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {
@@ -32,7 +32,7 @@ import {
 import { t } from "../trpc.ts";
 
 async function assertOutboundWebhooksEnabled(ctx: {
-  container: import("@needle-di/core").Container | null;
+  container: import("@platform-core/application/runtime/di-container.ts").DiContainer | null;
   orgId: string | null;
   userId: string | null;
 }): Promise<void> {

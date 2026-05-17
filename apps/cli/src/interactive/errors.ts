@@ -1,1 +1,1 @@
-export { InteractiveRequiredError } from "@/application/init/errors.ts";
+export { InteractiveRequiredError } from "@platform-core/application/init/errors.ts";

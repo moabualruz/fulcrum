@@ -2,12 +2,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { EntityManager } from "@mikro-orm/postgresql";
 import {
   createIsolatedOrmFixture,
   type TestOrmFixture,
-} from "@/test-support/product-fixtures.ts";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+} from "@test-support/product-workspace-fixtures.ts";
 
 const scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-page-server-"));
 
@@ -17,24 +15,24 @@ afterAll(() => {
 
 async function freshDb(name: string): Promise<{
   db: TestStore;
-  em: EntityManager;
+  em: TestOrmFixture["em"];
   orgId: string;
   projectId: string;
   close: () => Promise<void>;
 }> {
   const fixture = await createIsolatedOrmFixture();
-  const db = fixture.pglite as unknown as TestStore;
+  const em = fixture.em;
   const orgId = fixture.seed.orgId;
   const projectId = crypto.randomUUID();
-  await db.query(
+  await em.query(
     `INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)`,
     [projectId, orgId, `Alpha ${name}`],
   );
-  return { db, em: fixture.em.fork(), orgId, projectId, close: fixture.close };
+  return { db: em as unknown as TestStore, em, orgId, projectId, close: fixture.close };
 }
 
 async function seedRun(
-  db: TestStore,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   startedAt: string,
@@ -43,7 +41,7 @@ async function seedRun(
 ): Promise<string> {
   const id = crypto.randomUUID();
   void projectId;
-  await db.query(
+  await em.query(
     `INSERT INTO agent_runs (id, org_id, agent_name, status, started_at)
        VALUES ($1,$2,$3,$4,$5)`,
     [id, orgId, agent, status, startedAt],
@@ -52,7 +50,7 @@ async function seedRun(
 }
 
 async function seedDoc(
-  db: TestStore,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   title: string,
@@ -60,7 +58,7 @@ async function seedDoc(
   kind = "note",
 ): Promise<string> {
   const id = crypto.randomUUID();
-  await db.query(
+  await em.query(
     `INSERT INTO documents (id, org_id, project_id, doc_type, title, body_md, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [id, orgId, projectId, kind, title, "body", updatedAt],
@@ -69,7 +67,7 @@ async function seedDoc(
 }
 
 async function seedTask(
-  db: TestStore,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   status: string,
@@ -77,7 +75,7 @@ async function seedTask(
   title = "task",
 ): Promise<string> {
   const id = crypto.randomUUID();
-  await db.query(
+  await em.query(
     `INSERT INTO tasks (id, org_id, project_id, title, status, priority) VALUES ($1,$2,$3,$4,$5,$6)`,
     [id, orgId, projectId, title, status, priority],
   );
@@ -92,18 +90,17 @@ async function seedTask(
 // exposes.
 
 describe("+page.server load contract", () => {
-  let db: TestStore;
-  let em: EntityManager;
+  let em: TestOrmFixture["em"];
   let orgId: string;
   let projectId: string;
   let fixtureClose: TestOrmFixture["close"];
 
   beforeAll(async () => {
-    ({ db, em, orgId, projectId, close: fixtureClose } = await freshDb("page-server-main"));
+    ({ em, orgId, projectId, close: fixtureClose } = await freshDb("page-server-main"));
     const now = new Date().toISOString();
-    await seedRun(db, orgId, projectId, now);
-    await seedDoc(db, orgId, projectId, "First doc", now);
-    await seedTask(db, orgId, projectId, "pending", 3, "Important task");
+    await seedRun(em, orgId, projectId, now);
+    await seedDoc(em, orgId, projectId, "First doc", now);
+    await seedTask(em, orgId, projectId, "pending", 3, "Important task");
   });
 
   afterAll(async () => {

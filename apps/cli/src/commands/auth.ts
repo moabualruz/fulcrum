@@ -1,56 +1,22 @@
-/**
- * fulcrum auth — authentication CLI subcommands.
- *
- * Commands:
- *   fulcrum auth whoami [--json]
- *   fulcrum auth invite <email> [--role owner|admin|member|guest] [--json]
- *   fulcrum auth login [--passkey | --password] [--non-interactive]
- *   fulcrum auth logout
- *
- * All commands accept a `--json` flag: outputs machine-readable JSON to stdout.
- * Non-JSON outputs human-readable text. Exit 0 on success; non-zero on error.
- *
- * The `run` function accepts an optional `opts` parameter for dependency injection
- * in tests (fake caller, print/printErr/exit callbacks). Production wiring
- * builds the caller from the shared needle-di Container.
- *
- * C4: CLI surface at feature parity with Web surface.
- * C8: needle-di Container resolves services; tRPC caller is in-process (no HTTP).
- */
-
-import { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-import { createLocalCaller } from "../local-caller.ts";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+import { formatCommandError } from "../api-errors.ts";
+import {
+  createAuthApiCallerFromEnv,
+  type AuthApiEnvironment,
+} from "@identity-access/interface/http/auth-api-client.ts";
 
 type InviteRole = "owner" | "admin" | "member" | "guest";
 
 export interface AuthRunOptions {
-  /**
-   * In-process tRPC caller. Accepts any object with an `auth` namespace
-   * that exposes the required procedures (duck-typed for testability).
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   caller?: {
     auth: {
       whoami: () => Promise<any>;
       invite?: (input: { email: string; role: InviteRole }) => Promise<any>;
     };
   };
-
-  /** needle-di Container — used to build caller when `caller` not provided. */
-  container?: Container | null;
-
-  /** stdout writer (default: console.log). */
+  env?: AuthApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
-
-  /** stderr writer (default: console.error). */
   printErr?: (line: string) => void;
-
-  /** process.exit shim (default: process.exit). */
   exit?: (code: number) => void;
 }
 
@@ -69,17 +35,6 @@ Options:
   --non-interactive Skip interactive prompts (CI/scripting).
   -h, --help        Show this help.
 `;
-
-class MissingCliSessionError extends Error {
-  constructor() {
-    super("No active CLI session found. Run fulcrum init or fulcrum auth login before protected auth commands.");
-    this.name = "MissingCliSessionError";
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// run — entry-point for `fulcrum auth <subcommand> [args]`
-// ─────────────────────────────────────────────────────────────────────────────
 
 export async function run(
   argv: readonly string[],
@@ -140,7 +95,7 @@ async function runInvite(
   try {
     const caller = await resolveCaller(opts);
     if (!caller.auth.invite) {
-      printErr("fulcrum auth invite: auth.invite procedure unavailable.");
+      printErr("fulcrum auth invite: auth invite operation is not available.");
       exit(1);
       return;
     }
@@ -153,9 +108,7 @@ async function runInvite(
       print(`Token:      ${result.token}`);
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum auth invite: ${msg}`);
     exit(1);
   }
@@ -164,10 +117,6 @@ async function runInvite(
 function isInviteRole(value: string): value is InviteRole {
   return value === "owner" || value === "admin" || value === "member" || value === "guest";
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// whoami
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function runWhoami(
   argv: readonly string[],
@@ -188,17 +137,11 @@ async function runWhoami(
       print(`Role:  ${result.role ?? "(unknown)"}`);
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum auth whoami: ${msg}`);
     exit(1);
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// login (stub — interactive auth wired in later pillar)
-// ─────────────────────────────────────────────────────────────────────────────
 
 async function runLogin(
   argv: readonly string[],
@@ -215,10 +158,6 @@ async function runLogin(
   exit(1);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// logout (stub — session invalidation wired in later pillar)
-// ─────────────────────────────────────────────────────────────────────────────
-
 async function runLogout(
   _argv: readonly string[],
   opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
@@ -228,11 +167,6 @@ async function runLogout(
   exit(1);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: resolve in-process tRPC caller
-// ─────────────────────────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function resolveCaller(opts: AuthRunOptions): Promise<{
   auth: {
     whoami: () => Promise<any>;
@@ -240,11 +174,9 @@ async function resolveCaller(opts: AuthRunOptions): Promise<{
   };
 }> {
   if (opts.caller) return opts.caller;
-
-  try {
-    return await createLocalCaller({ container: opts.container, requireSession: true }) as never;
-  } catch (error) {
-    if (error instanceof TRPCError && error.code === "UNAUTHORIZED") throw new MissingCliSessionError();
-    throw error;
+  const apiCaller = createAuthApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Auth API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
   }
+  return apiCaller;
 }

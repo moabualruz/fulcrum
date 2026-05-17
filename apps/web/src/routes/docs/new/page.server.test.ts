@@ -1,32 +1,6 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-
-let scratch: string;
-
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-docs-new-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function seedDb(): Promise<{ orgId: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  await db.close();
-  return { orgId: org.id };
-}
+import { describe, expect, test } from "bun:test";
 
 interface RedirectError {
   status: number;
@@ -43,37 +17,58 @@ function isRedirect(e: unknown): e is RedirectError {
   );
 }
 
+function makeEvent(fetchImpl: typeof fetch, request?: Request) {
+  return {
+    params: {},
+    locals: { activeProjectId: "project-1", orgId: "org-1", userId: "user-1" },
+    fetch: fetchImpl,
+    request: request ?? new Request("http://localhost/docs/new", {
+      headers: { cookie: "sid=test-session" },
+    }),
+    url: new URL("http://localhost/docs/new"),
+  };
+}
+
 describe("/docs/new +page.server.ts", () => {
-  test("load returns an empty SuperValidated form", async () => {
-    await seedDb();
+  test("server route uses the document public API instead of direct application scope", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("createDocumentApiForEvent");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("createDocumentAction");
+  });
+
+  test("load returns an empty SuperValidated form and template map", async () => {
+    const fetchImpl = (async () => Response.json([])) as typeof fetch;
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load();
+    const result = await mod.load(makeEvent(fetchImpl) as Parameters<typeof mod.load>[0]);
     expect(result.form).toBeDefined();
     expect(result.form?.data?.title).toBe("");
     expect(result.form?.data?.kind).toBe("");
     expect(result.form?.data?.body).toBe("");
     expect(result.form?.data?.labels).toBe("");
-  });
 
-  test("load returns templates map with all 9 doc_types pre-populated", async () => {
-    await seedDb();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
-    const result = await mod.load();
-    expect(result.templates).toBeDefined();
-    const docTypes = ["spec","adr","wiki","runbook","meeting","postmortem","rfc","note","scratch"];
-    for (const dt of docTypes) {
-      expect(result.templates).toHaveProperty(dt);
-      expect(typeof result.templates[dt]).toBe("string");
+    const docTypes = ["spec", "adr", "wiki", "runbook", "meeting", "postmortem", "rfc", "note", "scratch"];
+    for (const docType of docTypes) {
+      expect(result.templates).toHaveProperty(docType);
+      expect(typeof result.templates[docType]).toBe("string");
     }
-    // ADR body has the required sections
     expect(result.templates["adr"]).toContain("## Context");
     expect(result.templates["adr"]).toContain("## Decision");
     expect(result.templates["adr"]).toContain("## Consequences");
   });
 
-  test("default action with valid input creates a document and throws redirect 303", async () => {
-    const { orgId } = await seedDb();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+  test("default action creates a document through the public API and redirects to the document", async () => {
+    const calls: Array<{ url: string; method: string; cookie: string | null; body: unknown }> = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        cookie: new Headers(init?.headers).get("cookie"),
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+      });
+      return Response.json({ id: "doc-created", title: "My Doc", type: "spec" }, { status: 201 });
+    }) as typeof fetch;
+
     const fd = new FormData();
     fd.set("title", "My Doc");
     fd.set("kind", "spec");
@@ -82,50 +77,44 @@ describe("/docs/new +page.server.ts", () => {
     const request = new Request("http://localhost/docs/new", {
       method: "POST",
       body: fd,
+      headers: { cookie: "sid=test-session" },
     });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+
     let caught: unknown;
     try {
-      await mod.actions.default({ request } as Parameters<
+      await mod.actions.default(makeEvent(fetchImpl, request) as Parameters<
         typeof mod.actions.default
       >[0]);
-    } catch (e) {
-      caught = e;
+    } catch (error) {
+      caught = error;
     }
-    expect(caught).toBeDefined();
+
+    expect(calls).toEqual([{
+      url: "http://localhost/api/v1/docs",
+      method: "POST",
+      cookie: "sid=test-session",
+      body: {
+        projectId: "project-1",
+        title: "My Doc",
+        type: "spec",
+        bodyMd: "# Hello\nbody\n",
+        frontmatter: {
+          title: "My Doc",
+          kind: "spec",
+          labels: ["alpha", "beta"],
+        },
+      },
+    }]);
     expect(isRedirect(caught)).toBe(true);
     if (isRedirect(caught)) {
       expect(caught.status).toBe(303);
-      expect(caught.location.startsWith("/docs/")).toBe(true);
-    }
-    // Verify a document row was actually created.
-    const dbDir = join(scratch, "state", "product", "db");
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{
-        id: string;
-        org_id: string;
-        title: string;
-        kind: string;
-        body: string;
-        frontmatter: Record<string, unknown>;
-      }>(`SELECT id, org_id, title, kind, body, frontmatter FROM documents`);
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.title).toBe("My Doc");
-      expect(rows[0]?.kind).toBe("spec");
-      expect(rows[0]?.org_id).toBe(orgId);
-      expect(rows[0]?.frontmatter).toEqual({
-        title: "My Doc",
-        kind: "spec",
-        labels: ["alpha", "beta"],
-      });
-    } finally {
-      await db.close();
+      expect(caught.location).toBe("/docs/doc-created");
     }
   });
 
-  test("default action with empty title returns fail(400, {form})", async () => {
-    await seedDb();
+  test("default action with empty title returns fail(400, { form })", async () => {
+    const fetchImpl = (async () => Response.json({ message: "should not be called" }, { status: 500 })) as typeof fetch;
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const fd = new FormData();
     fd.set("title", "");
@@ -135,7 +124,7 @@ describe("/docs/new +page.server.ts", () => {
       method: "POST",
       body: fd,
     });
-    const result = (await mod.actions.default({ request } as Parameters<
+    const result = (await mod.actions.default(makeEvent(fetchImpl, request) as Parameters<
       typeof mod.actions.default
     >[0])) as {
       status?: number;

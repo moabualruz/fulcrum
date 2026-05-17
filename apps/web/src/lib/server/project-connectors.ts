@@ -1,1 +1,1 @@
-export * from "@/application/project-connectors/commands.ts";
+export * from "@integration-hub/interface/project-connectors.ts";

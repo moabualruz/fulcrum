@@ -1,1 +1,1 @@
-export * from "@/application/reports/web-queries.ts";
+export * from "@work-management/interface/report-dashboard.ts";

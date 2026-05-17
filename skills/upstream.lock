@@ -143,22 +143,6 @@ review_due = "2026-07-27"
 subpath_sha256 = "9675265687e1bedc9924bb57687cf409c6de76ac4e1ae98caf353ef730b07325"
 subpath_size = 226075
 
-[skills.graphify]
-source = "https://github.com/safishamsi/graphify"
-subpath = "graphify/skill.md"
-ref = "main"
-tree_sha = "494f519bf43ea8243fba8c40a4e72a1071a74395"
-license = "MIT"
-author_class = "individual"
-pinned_on = "2026-04-30"
-review_due = "2026-07-29"
-subpath_sha256 = "fa70622248c4348fdcec559772e64c812e1375a7ddd7de31cd4fffa7e8ed703a"
-subpath_size = 46699
-# vendor publishes `graphify install --platform <agent>` for these four;
-# their canonical write into <agent>/skills/graphify/ is the source of truth.
-# Pi has no vendor support → fulcrum-upstream mirror is the fallback there.
-vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
-
 # [skills.ctx7] archived 2026-04-28 — superseded by official upstash/context7 MCP (W3.4).
 # See skills/_archive/upstream-removed.lock for the full entry.
 

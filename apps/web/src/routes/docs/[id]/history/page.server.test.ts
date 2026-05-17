@@ -1,10 +1,8 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createDocumentAction, updateDocumentAction } from "../../../../lib/server/documents.ts";
 import {
   createDocumentVersion,
@@ -26,30 +24,29 @@ afterEach(() => {
 });
 
 async function openDb() {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  return db;
+  return createTestOrm();
+}
+
+function em(db: TestOrm) {
+  return db.em;
 }
 
 describe("/docs/[id]/history server logic", () => {
   test("version timeline shows DESC order with author + timestamps", async () => {
     const db = await openDb();
     try {
-      const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-      const doc = await createDocumentAction(db, {
-        orgId: org.id, projectId: null, kind: "note", title: "T v1", body: "b v1",
+      const doc = await createDocumentAction(em(db), {
+        orgId: db.seed.orgId, projectId: null, kind: "note", title: "T v1", body: "b v1",
       });
-      await createDocumentVersion(db, {
-        docId: doc.id, orgId: org.id, version: 1, title: "T v1", body: "b v1",
+      await createDocumentVersion(em(db), {
+        docId: doc.id, orgId: db.seed.orgId, version: 1, title: "T v1", body: "b v1",
         frontmatter: {}, author: "user",
       });
-      await createDocumentVersion(db, {
-        docId: doc.id, orgId: org.id, version: 2, title: "T v2", body: "b v2",
+      await createDocumentVersion(em(db), {
+        docId: doc.id, orgId: db.seed.orgId, version: 2, title: "T v2", body: "b v2",
         frontmatter: {}, author: "agent",
       });
-      const versions = await listDocumentVersions(db, doc.id);
+      const versions = await listDocumentVersions(em(db), doc.id);
       expect(versions).toHaveLength(2);
       expect(versions[0]!.version).toBe(2);
       expect(versions[0]!.author).toBe("agent");
@@ -64,26 +61,25 @@ describe("/docs/[id]/history server logic", () => {
   test("restore rolls back document content and getNextVersionNumber increments", async () => {
     const db = await openDb();
     try {
-      const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-      const doc = await createDocumentAction(db, {
-        orgId: org.id, projectId: null, kind: "note", title: "Original", body: "original",
+      const doc = await createDocumentAction(em(db), {
+        orgId: db.seed.orgId, projectId: null, kind: "note", title: "Original", body: "original",
       });
-      await createDocumentVersion(db, {
-        docId: doc.id, orgId: org.id, version: 1, title: "Original", body: "original",
+      await createDocumentVersion(em(db), {
+        docId: doc.id, orgId: db.seed.orgId, version: 1, title: "Original", body: "original",
         frontmatter: {}, author: "user",
       });
-      await updateDocumentAction(db, {
-        id: doc.id, orgId: org.id, title: "Changed", body: "changed",
+      await updateDocumentAction(em(db), {
+        id: doc.id, orgId: db.seed.orgId, title: "Changed", body: "changed",
       });
-      await createDocumentVersion(db, {
-        docId: doc.id, orgId: org.id, version: 2, title: "Changed", body: "changed",
+      await createDocumentVersion(em(db), {
+        docId: doc.id, orgId: db.seed.orgId, version: 2, title: "Changed", body: "changed",
         frontmatter: {}, author: "user",
       });
-      const nextVer = await getNextVersionNumber(db, doc.id);
+      const nextVer = await getNextVersionNumber(em(db), doc.id);
       expect(nextVer).toBe(3);
-      await restoreDocumentVersion(db, doc.id, org.id, 1);
-      const rows = await db.query<{ title: string; body: string }>(
-        `SELECT title, body FROM documents WHERE id = $1`, [doc.id],
+      await restoreDocumentVersion(em(db), doc.id, db.seed.orgId, 1);
+      const rows = await em(db).getConnection().execute<{ title: string; body: string }[]>(
+        `SELECT title, body_md AS body FROM documents WHERE id = ?`, [doc.id],
       );
       expect(rows[0]!.title).toBe("Original");
       expect(rows[0]!.body).toBe("original");
@@ -95,17 +91,16 @@ describe("/docs/[id]/history server logic", () => {
   test("5 versions visible in listing", async () => {
     const db = await openDb();
     try {
-      const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-      const doc = await createDocumentAction(db, {
-        orgId: org.id, projectId: null, kind: "note", title: "T", body: "b",
+      const doc = await createDocumentAction(em(db), {
+        orgId: db.seed.orgId, projectId: null, kind: "note", title: "T", body: "b",
       });
       for (let i = 1; i <= 5; i++) {
-        await createDocumentVersion(db, {
-          docId: doc.id, orgId: org.id, version: i, title: `T v${i}`, body: `b v${i}`,
+        await createDocumentVersion(em(db), {
+          docId: doc.id, orgId: db.seed.orgId, version: i, title: `T v${i}`, body: `b v${i}`,
           frontmatter: {}, author: "user",
         });
       }
-      const versions = await listDocumentVersions(db, doc.id);
+      const versions = await listDocumentVersions(em(db), doc.id);
       expect(versions).toHaveLength(5);
     } finally {
       await db.close();

@@ -1,1 +1,1 @@
-export * from "@/application/docs/version-queries.ts";
+export * from "@knowledge-workspace/interface/document-versions.ts";

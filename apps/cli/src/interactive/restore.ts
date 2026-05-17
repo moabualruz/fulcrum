@@ -5,7 +5,7 @@ import { join } from "node:path";
 import {
   restoreCliBackupTables,
   type CliBackupStore,
-} from "@/application/backup/cli-backup.ts";
+} from "@platform-core/application/backup/cli-backup.ts";
 import { InteractiveRequiredError } from "./errors.ts";
 
 async function exists(p: string): Promise<boolean> {

@@ -1,7 +1,8 @@
-import type { Container } from "@needle-di/core";
-import { TRPCError } from "@trpc/server";
-
-import { createLocalCaller } from "./local-caller.ts";
+import {
+  createNotificationApiCallerFromEnv,
+  type NotificationApiEnvironment,
+} from "@notification-center/interface/http/notification-api-client.ts";
+import { formatApiError } from "./api-errors.ts";
 
 type NotifyCaller = {
   notify: {
@@ -27,7 +28,8 @@ type NotifyCaller = {
 
 export interface NotifyRunOptions {
   caller?: NotifyCaller;
-  container?: Container | null;
+  env?: NotificationApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -213,7 +215,11 @@ async function runChannels(
 
 async function resolveCaller(opts: NotifyRunOptions): Promise<NotifyCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as NotifyCaller;
+  const publicApiCaller = createNotificationApiCallerFromEnv(opts.env, opts.fetch);
+  if (publicApiCaller) return publicApiCaller as NotifyCaller;
+  throw new Error(
+    "Notification API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.",
+  );
 }
 
 function printValue(value: unknown, argv: readonly string[], print: (line: string) => void): void {
@@ -282,6 +288,5 @@ function ioFor(opts: NotifyRunOptions): Required<Pick<NotifyRunOptions, "print" 
 }
 
 function errorMessage(error: unknown): string {
-  if (error instanceof TRPCError) return `${error.code}: ${error.message}`;
-  return (error as Error).message;
+  return formatApiError(error);
 }

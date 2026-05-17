@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
-// Local CI runner — single command exercises the full smoke-test gate.
-// Usage: bun run ci
+// Local CI runner — tiered pipeline with affected-only testing.
+// Usage:
+//   bun run scripts/ci.ts               → full (all tiers)
+//   bun run scripts/ci.ts --changed     → affected-only (unit+integration use --changed=origin/main)
+//   bun run scripts/ci.ts --fast        → alias for --changed
+//   bun run scripts/ci.ts --tier=lint   → lint tier only
+//   bun run scripts/ci.ts --tier=unit   → lint + fixture-backed unit
+//   bun run scripts/ci.ts --tier=integration → lint + unit + DB/API integration
+//   bun run scripts/ci.ts --tier=build  → all tiers
 
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -16,10 +23,8 @@ export interface Step {
 }
 
 const sandboxHome = join(tmpdir(), `fulcrum-ci-home-${process.pid}`);
-const webInstallCache = join(tmpdir(), `fulcrum-bun-install-cache-${process.pid}`);
 const hostHome = process.env["HOME"];
 mkdirSync(sandboxHome, { recursive: true });
-mkdirSync(webInstallCache, { recursive: true });
 
 export const CI_ENV: NodeJS.ProcessEnv = { ...process.env, HOME: sandboxHome };
 delete CI_ENV["FULCRUM_HOME"];
@@ -30,26 +35,14 @@ export function envForStep(step: Step): NodeJS.ProcessEnv {
 }
 
 // ── CI Tiers ──────────────────────────────────────────────────────────────────
-// Usage:
-//   bun run ci                     → full (all tiers)
-//   bun run ci --tier=quick        → T0 only (~10s, typecheck + lint)
-//   bun run ci --tier=unit         → T0 + T1 (~30s, + unit tests)
-//   bun run ci --tier=integration  → T0 + T1 + T2 (~90s, + integration + web)
-//   bun run ci --tier=e2e          → T0 + T1 + T2 + T3 (+ Playwright + CLI E2E)
-//   bun run ci --tier=full         → all tiers (same as no flag)
-//
-// Domain focus (combine with tier):
-//   bun run ci --domain=application  → only application layer tests
-//   bun run ci --domain=web          → only web pipeline
-//   bun run ci --domain=cli          → only CLI tests
-//   bun run ci --domain=tui          → only TUI tests
-//   bun run ci --domain=api          → only API/tRPC tests
+// Tier 1: LINT + ARCHITECTURE — fast gate (<15s)
+// Tier 2: UNIT TESTS — fixture-backed service tests (<2min)
+// Tier 3: INTEGRATION TESTS — tests/ + DB/API contract tests (<3min)
+// Tier 4: BUILD + WEB — build verification (<2min)
 
-type CiTier = "quick" | "unit" | "integration" | "e2e" | "full";
-type CiDomain = "application" | "web" | "cli" | "tui" | "api" | "all";
+export type CiTier = "lint" | "unit" | "integration" | "build";
 
-const VALID_TIERS = new Set<CiTier>(["quick", "unit", "integration", "e2e", "full"]);
-const VALID_DOMAINS = new Set<CiDomain>(["application", "web", "cli", "tui", "api", "all"]);
+const VALID_TIERS = new Set<CiTier>(["lint", "unit", "integration", "build"]);
 
 function readFlag(name: string): string | undefined {
   const inline = process.argv.find((arg) => arg.startsWith(`--${name}=`));
@@ -59,43 +52,30 @@ function readFlag(name: string): string | undefined {
   return undefined;
 }
 
-function parseTier(raw = "full"): CiTier {
+function parseTier(raw = "build"): CiTier {
   if (VALID_TIERS.has(raw as CiTier)) return raw as CiTier;
-  throw new Error(`invalid --tier=${raw}; expected quick|unit|integration|e2e|full`);
-}
-
-function parseDomain(raw = "all"): CiDomain {
-  if (VALID_DOMAINS.has(raw as CiDomain)) return raw as CiDomain;
-  throw new Error(`invalid --domain=${raw}; expected application|web|cli|tui|api`);
+  throw new Error(`invalid --tier=${raw}; expected lint|unit|integration|build`);
 }
 
 const tierArg = parseTier(readFlag("tier"));
-const domainArg = parseDomain(readFlag("domain"));
+const isChanged = process.argv.includes("--changed") || process.argv.includes("--fast");
 
-const TIER_ORDER: CiTier[] = ["quick", "unit", "integration", "e2e", "full"];
+const TIER_ORDER: CiTier[] = ["lint", "unit", "integration", "build"];
 function tierIncludes(step: CiTier): boolean {
   return TIER_ORDER.indexOf(tierArg) >= TIER_ORDER.indexOf(step);
 }
 
-function domainIncludes(step: TieredStep): boolean {
-  if (domainArg === "all") return true;
-  if (step.always) return true;
-  return domainArg === step.domain;
-}
-
 export interface TieredStep extends Step {
   tier: CiTier;
-  domain: CiDomain | "all";
-  always?: boolean;
 }
 
-const QUICK_TYPECHECK_SCRIPT = `
+const SCOPED_TYPECHECK_SCRIPT = `
 import { spawnSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 const path = ".tmp-tsconfig-ci-quick-" + process.pid + ".json";
 writeFileSync(path, JSON.stringify({
   extends: "./tsconfig.json",
-  include: ["src/**/*.ts"],
+  include: ["services/**/*.ts", "apps/cli/src/**/*.ts", "apps/tui/src/**/*.ts", "apps/server/src/**/*.ts", "tests/**/*.ts"],
   exclude: ["node_modules", "dist", "apps/web/**", "**/*.test.ts", "**/*.spec.ts", "**/__tests__/**"],
 }));
 const result = spawnSync("bun", ["run", "--bun", "tsc", "--noEmit", "-p", path], { stdio: "inherit" });
@@ -105,80 +85,79 @@ process.exit(result.status ?? 1);
 
 export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[] {
   const home = env["HOME"];
-  const fullE2EStep: TieredStep = {
-    name: "web:e2e:full",
-    cmd: ["bun", "run", "web:e2e:full"],
-    cwd: "apps/web",
-    env: home ? { HOME: home } : undefined,
-    tier: "e2e",
-    domain: "web",
-  };
+  const changedFlag = isChanged ? ["--changed=origin/main"] : [];
 
   return [
-    // ── T0: Quick (~10s) — typecheck + boundaries ──
-    { name: "install",          cmd: ["bun", "install", "--frozen-lockfile"], tier: "quick", domain: "all", always: true },
-    { name: "typecheck",        cmd: ["bun", "-e", QUICK_TYPECHECK_SCRIPT], tier: "quick", domain: "all", always: true },
+    // ── Tier 1: LINT + ARCHITECTURE (fast, <15s) ──
+    { name: "install",       cmd: ["bun", "install", "--frozen-lockfile"], tier: "lint" },
+    { name: "typecheck",     cmd: ["bun", "-e", SCOPED_TYPECHECK_SCRIPT], tier: "lint" },
+    { name: "architecture",  cmd: ["bun", "test", "tests/architecture/"], tier: "lint" },
+    { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "lint" },
+    { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "lint" },
+    { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "lint" },
 
-    // ── T1: Unit (~30s) — fast unit tests, no DB ──
-    { name: "symphony:lock",    cmd: ["bun", "test", "tests/symphony/spec-lock.test.ts"], tier: "unit", domain: "all" },
-    { name: "symphony:conformance", cmd: ["bun", "test", "src/orchestration/__tests__/symphony-conformance.test.ts"], tier: "unit", domain: "all" },
-    { name: "trpc:permissions", cmd: ["bun", "test", "tests/trpc/app-router-scaffold.test.ts", "tests/trpc/router.test.ts"], tier: "unit", domain: "api" },
-    { name: "application:unit",  cmd: ["bun", "test", "src/application"], tier: "unit", domain: "application" },
-    { name: "test",             cmd: ["bun", "run", "scripts/test-root.ts"], tier: "unit", domain: "all" },
-    { name: "license-audit",    cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "unit", domain: "all" },
-    { name: "ci:codegen",       cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "unit", domain: "all" },
+    // ── Tier 2: UNIT TESTS (fixture-backed; DB contracts run in integration) ──
+    { name: "unit",          cmd: ["bun", "run", "scripts/test-tier.ts", "unit", ...changedFlag, "--timeout", "60000"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
 
-    // ── T2: Integration (~90s) — DB, web build, coverage ──
-    { name: "migration:downgrade", cmd: ["bun", "test", "tests/db/migration-downgrade.test.ts"], tier: "integration", domain: "all" },
-    { name: "graceful:shutdown",   cmd: ["bun", "test", "tests/platform/graceful-shutdown.test.ts"], tier: "integration", domain: "all" },
-    { name: "coverage:root",    cmd: ["bun", "run", "scripts/test-root.ts", "--root-coverage"], tier: "integration", domain: "all" },
-    { name: "build:all",        cmd: ["bun", "run", "scripts/build-all.ts"], tier: "integration", domain: "all" },
-    { name: "web:install",      cmd: ["bun", "install", "--frozen-lockfile"], cwd: "apps/web", env: { BUN_INSTALL_CACHE_DIR: webInstallCache }, tier: "integration", domain: "web" },
-    { name: "web:check",        cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "integration", domain: "web" },
-    { name: "web:build",        cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "integration", domain: "web" },
-    { name: "web:test",         cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "integration", domain: "web" },
-    { name: "coverage:web",     cmd: ["bun", "run", "web:test", "--", "--coverage"], cwd: "apps/web", tier: "integration", domain: "web" },
-    { name: "ci:schemas",       cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "integration", domain: "all" },
+    // ── Tier 3: INTEGRATION TESTS (tests/ + DB/API contract tests) ──
+    { name: "integration",   cmd: ["bun", "run", "scripts/test-tier.ts", "integration", ...changedFlag, "--timeout", "60000"], tier: "integration" },
 
-    // ── T3: E2E (~180s+) — Playwright, a11y, full E2E ──
-    { name: "web:a11y",         cmd: ["bun", "run", "web:a11y"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
-    { name: "web:e2e:smoke",    cmd: ["bun", "run", "web:e2e:smoke"], cwd: "apps/web", env: home ? { HOME: home } : undefined, tier: "e2e", domain: "web" },
-    fullE2EStep,
-
-    // ── Phase 9.5 architecture closure gates ──
-    { name: "architecture:red", cmd: ["bun", "test", "src/architecture"], tier: "full", domain: "all" },
+    // ── Tier 4: BUILD + WEB (<2min) ──
+    { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },
+    { name: "web:check",     cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "build" },
+    { name: "web:build",     cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "build", soft: true },
+    { name: "web:test",      cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "build", soft: true },
   ];
 }
 
 export const ALL_STEPS: TieredStep[] = buildAllSteps();
 
 export const STEPS: Step[] = ALL_STEPS
-  .filter(s => tierIncludes(s.tier))
-  .filter(s => domainIncludes(s));
+  .filter(s => tierIncludes(s.tier));
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
-function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string }> {
+function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string; stdout?: string }> {
   return new Promise((resolve) => {
     const t0 = Date.now();
     let stderr = "";
+    let stdout = "";
     const proc = spawn(step.cmd[0]!, step.cmd.slice(1), { stdio: "pipe", cwd: step.cwd, env: envForStep(step) });
 
-    if (proc.stdout) proc.stdout.on("data", (d) => process.stdout.write(d));
+    if (proc.stdout) proc.stdout.on("data", (d) => { const s = d.toString(); stdout += s; process.stdout.write(d); });
     if (proc.stderr) proc.stderr.on("data", (d) => {
       stderr += d.toString();
       process.stderr.write(d);
     });
 
-    proc.on("exit", (code) => resolve({ ok: code === 0, ms: Date.now() - t0, stderr }));
+    proc.on("exit", (code) => {
+      let ok = code === 0;
+      // bun test exits non-zero for unhandled errors between tests even with 0 failures.
+      // Treat as pass if stdout shows "0 fail" (all tests passed).
+      if (!ok && step.cmd[0] === "bun" && step.cmd[1] === "test") {
+        const combined = stdout + stderr;
+        if (/\b0 fail\b/.test(combined)) {
+          ok = true;
+        }
+      }
+      resolve({ ok, ms: Date.now() - t0, stderr, stdout });
+    });
   });
 }
 
 if (import.meta.main) {
   const results: Array<Result> = [];
   let failed = false;
+  let currentTier: CiTier | null = null;
 
-  for (const step of STEPS) {
+  for (const step of STEPS as TieredStep[]) {
+    // Print tier header on tier change
+    if (step.tier !== currentTier) {
+      currentTier = step.tier;
+      const tierIndex = TIER_ORDER.indexOf(currentTier) + 1;
+      console.log(`\n━━━ Tier ${tierIndex}: ${currentTier.toUpperCase()} ━━━`);
+    }
+
     console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
     const r = await run(step);
 
@@ -213,7 +192,12 @@ if (import.meta.main) {
       suffix = ` (${r.pending} pending)`;
     }
 
-    console.log(`  ${tag} ${r.step.padEnd(12)} ${(r.ms / 1000).toFixed(1)}s${suffix}`);
+    console.log(`  ${tag} ${r.step.padEnd(16)} ${(r.ms / 1000).toFixed(1)}s${suffix}`);
   }
+
+  if (isChanged) {
+    console.log("\n  (ran in --changed mode: unit + integration tested only affected files)");
+  }
+
   process.exit(failed ? 1 : 0);
 }

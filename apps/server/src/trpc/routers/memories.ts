@@ -1,11 +1,11 @@
 /**
- * Memories sub-router — Plan 06-06 (Pillar 10)
+ * Memories sub-router.
  *
  * Real CRUD + promote + search procedures delegating to MemoryService.
- * C8: needle-di Container pattern; service resolved from ctx.container.
+ * Service resolved from the request container.
  *
- * T-06-13: org_id filter enforced in MemoryService on all queries.
- * T-06-14: promote guarded by permissionedProcedure write permission + orgId ownership.
+ * org_id filtering is enforced in MemoryService on all queries. Promote is
+ * guarded by permissionedProcedure write permission and orgId ownership.
  */
 
 import { z } from "zod";
@@ -13,7 +13,7 @@ import { TRPCError } from "@trpc/server";
 
 import { t } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
-import { MemoryService } from "@/memory/memory-service.ts";
+import { MemoryService } from "@knowledge-workspace/application/memory/memory-service.ts";
 import type { TRPCContext } from "../context.ts";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ const DeleteMemoryInputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Service resolver (C8 needle-di container pattern)
+// Service resolver using the request container.
 // ---------------------------------------------------------------------------
 
 function memoryService(ctx: TRPCContext): MemoryService {
@@ -100,7 +100,7 @@ export const memoriesRouter = t.router({
       return memory;
     }),
 
-  /** search — FTS with project>global ranking (D-24) */
+  /** search — FTS with project>global ranking */
   search: permissionedProcedure({ resource: "memories", action: "search" })
     .input(SearchMemoriesInputSchema)
     .query(async ({ ctx, input }) => {
@@ -123,7 +123,7 @@ export const memoriesRouter = t.router({
       });
     }),
 
-  /** promote — set global=true, preserve projectId per D-27 */
+  /** promote — set global=true and preserve projectId */
   promote: permissionedProcedure({ resource: "memories", action: "promote" })
     .input(PromoteMemoryInputSchema)
     .mutation(async ({ ctx, input }) => {

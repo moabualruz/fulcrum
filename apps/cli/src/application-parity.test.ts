@@ -32,16 +32,7 @@ const RUNTIME_BOUNDARY_PATTERNS = [
   /em\.getConnection\(\)\.execute/,
 ] as const;
 
-const CLI_BOUNDARY_ALLOWLIST = [
-  {
-    file: "apps/cli/src/db.ts",
-    reason: "fulcrum db migrate/bootstrap compatibility owns direct database lifecycle.",
-  },
-  {
-    file: "src/db/product-migrations.ts",
-    reason: "legacy product migration compatibility is infrastructure, not CLI runtime data access.",
-  },
-] as const;
+const CLI_BOUNDARY_ALLOWLIST = [] as const;
 
 describe("CLI application caller parity", () => {
   test.each(MIGRATED_COMMANDS)("%s does not import product-kernel or PGlite paths", (file) => {
@@ -60,11 +51,7 @@ describe("CLI application caller parity", () => {
   });
 
   test("runtime boundary allowlist is limited to named migration/bootstrap infrastructure", () => {
-    expect(CLI_BOUNDARY_ALLOWLIST.map((entry) => entry.file)).toEqual([
-      "apps/cli/src/db.ts",
-      "src/db/product-migrations.ts",
-    ]);
-    expect(CLI_BOUNDARY_ALLOWLIST.every((entry) => /migrate|migration|bootstrap/i.test(entry.reason))).toBe(true);
+    expect(CLI_BOUNDARY_ALLOWLIST).toHaveLength(0);
   });
 
   test.each([...CLI_RUNTIME_BOUNDARY_SURFACES])(

@@ -1,6 +1,7 @@
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createRepositoryApiCallerFromEnv,
+  type RepositoryApiEnvironment,
+} from "@integration-hub/interface/http/repository-api-client.ts";
 
 interface RepoItem {
   id: string;
@@ -50,6 +51,7 @@ interface ReposCaller {
     get: (input: { id: string }) => Promise<RepoItem | null>;
     sync?: (input: { id: string }) => Promise<RepoItem | null>;
     syncRepo?: (input: { repoId: string }) => Promise<RepoSyncQueued | null>;
+    statusRepo?: (input: { id: string }) => Promise<unknown>;
     unregister: (input: { id: string }) => Promise<RepoItem | null>;
     branches?: (input: { id: string }) => Promise<unknown[]>;
     commits?: (input: { id: string }) => Promise<unknown[]>;
@@ -59,7 +61,8 @@ interface ReposCaller {
 
 export interface ReposRunOptions {
   caller?: ReposCaller;
-  container?: Container | null;
+  env?: RepositoryApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -207,7 +210,9 @@ async function runStatus(
   }
 
   await callAndPrint("status", argv.includes("--json"), opts, async (caller) => {
-    const repo = await caller.repos.get({ id });
+    const repo = caller.repos.statusRepo
+      ? await caller.repos.statusRepo({ id })
+      : await caller.repos.get({ id });
     if (!repo) throw new Error(`repo not found: ${id}`);
     return repo;
   });
@@ -346,10 +351,41 @@ function normalizeStamp(value: Date | string | null | undefined): string | null 
 async function resolveCaller(opts: ReposRunOptions): Promise<ReposCaller> {
   if (opts.caller) return opts.caller;
 
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as ReposCaller;
+  const apiCaller = createRepositoryApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Repository API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.");
+  }
+
+  return {
+    repos: {
+      register: (input) => apiCaller.repos.register(repositoryRegistrationInput(input)) as Promise<RepoItem>,
+      list: (input) => apiCaller.repos.list(input ?? {}) as Promise<RepoItem[]>,
+      get: (input) => apiCaller.repos.get(input) as Promise<RepoItem | null>,
+      sync: async (_input) => null,
+      syncRepo: (input) => apiCaller.repos.syncRepo({ id: input.repoId }) as Promise<RepoSyncQueued | null>,
+      statusRepo: (input) => apiCaller.repos.statusRepo(input),
+      unregister: async (input) => {
+        await apiCaller.repos.unregister(input);
+        return { id: input.id, slug: input.id, archived: true } as RepoItem;
+      },
+      branches: (input) => apiCaller.repoBranches.list({ repoId: input.id }) as Promise<unknown[]>,
+      commits: (input) => apiCaller.repoCommits.list({ repoId: input.id }) as Promise<unknown[]>,
+    },
+  };
+}
+
+function repositoryRegistrationInput(
+  input:
+    | { kind: "local"; path: string; name?: string; slug?: string }
+    | { kind: "remote"; url: string; name?: string; slug?: string },
+): Record<string, unknown> {
+  return input.kind === "local"
+    ? { kind: input.kind, localPath: input.path, name: input.name ?? defaultRepositoryName(input.path), slug: input.slug }
+    : { kind: input.kind, remoteUrl: input.url, name: input.name ?? defaultRepositoryName(input.url), slug: input.slug };
+}
+
+function defaultRepositoryName(value: string): string {
+  return value.replace(/\/+$/, "").split("/").at(-1)?.replace(/\.git$/, "") || "repository";
 }
 
 function formatCliError(err: unknown): string {

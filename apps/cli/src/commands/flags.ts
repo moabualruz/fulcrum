@@ -1,3 +1,9 @@
+import { formatCommandError } from "../api-errors.ts";
+import {
+  createFeatureExperimentApiCallerFromEnv,
+  type FeatureExperimentApiEnvironment,
+} from "@platform-core/interface/http/feature-experiment-api-client.ts";
+
 /**
  * fulcrum flags — feature-flag CLI subcommands.
  *
@@ -8,16 +14,9 @@
  * All commands accept a `--json` flag: outputs machine-readable JSON to stdout.
  * Non-JSON outputs human-readable text. Exit 0 on success; non-zero on error.
  *
- * The `run` function accepts an optional `opts` parameter for dependency injection
- * in tests (fake caller, print/printErr/exit callbacks). Production wiring
- * builds the caller from the shared needle-di Container.
- *
- * C4: CLI surface at feature parity with Web surface.
- * C8: needle-di Container resolves services; tRPC caller is in-process (no HTTP).
+ * The `run` function accepts an optional `opts` parameter for dependency injection in tests.
+ * Production wiring uses the configured public API client.
  */
-
-import { TRPCError } from "@trpc/server";
-import { createLocalCaller } from "../local-caller.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -26,23 +25,30 @@ import { createLocalCaller } from "../local-caller.ts";
 interface FlagItem {
   name: string;
   enabled: boolean;
-  description: string;
+  description?: string;
 }
 
-export interface FlagsRunOptions {
-  /**
-   * In-process tRPC caller. Accepts any object with a `flags` namespace
-   * that exposes list() and set() procedures (duck-typed for testability).
-   */
-  caller?: {
-    flags: {
-      list: () => Promise<FlagItem[]>;
-      set: (input: { flag: string; enabled: boolean; rolloutPercent?: number }) => Promise<unknown>;
-    };
-  };
+interface RawFlagItem {
+  name?: string;
+  flag?: string;
+  enabled: boolean;
+  description?: string;
+  source?: string;
+}
 
-  /** needle-di Container — used to build caller when `caller` not provided. */
-  container?: import("@needle-di/core").Container | null;
+type FlagsCaller = {
+  flags: {
+    list: () => Promise<RawFlagItem[]>;
+    set: (input: { flag: string; enabled: boolean; rolloutPercent?: number }) => Promise<unknown>;
+  };
+};
+
+export interface FlagsRunOptions {
+  caller?: FlagsCaller;
+
+  env?: FeatureExperimentApiEnvironment;
+
+  fetch?: typeof fetch;
 
   /** stdout writer (default: console.log). */
   print?: (line: string) => void;
@@ -114,7 +120,7 @@ async function runList(
   const caller = await resolveCaller(opts);
 
   try {
-    const flags = await caller.flags.list();
+    const flags = (await caller.flags.list()).map(normalizeFlagItem);
 
     if (jsonMode) {
       print(JSON.stringify(flags));
@@ -129,9 +135,7 @@ async function runList(
       }
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum flags list: ${msg}`);
     exit(1);
   }
@@ -215,31 +219,30 @@ async function runSet(
       print(`Flag '${flagName}' set to ${enabled ? "on" : "off"}.`);
     }
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : `Error: ${(err as Error).message}`;
+    const msg = formatCommandError(err);
     printErr(`fulcrum flags set: ${msg}`);
     exit(1);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper: resolve in-process tRPC caller
+// Helper: resolve public API caller
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function resolveCaller(opts: FlagsRunOptions): Promise<{
-  flags: {
-    list: () => Promise<FlagItem[]>;
-    set: (input: { flag: string; enabled: boolean; rolloutPercent?: number }) => Promise<unknown>;
-  };
-}> {
+function resolveCaller(opts: FlagsRunOptions): FlagsCaller {
   if (opts.caller) return opts.caller;
 
-  // Cast: caller's flags.set input is narrowed to FeatureFlagName union by tRPC; our
-  // interface uses string for duck-typed testability. Runtime validation is unchanged.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as any;
+  const apiCaller = createFeatureExperimentApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Feature flag API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
+  }
+  return apiCaller as unknown as FlagsCaller;
+}
+
+function normalizeFlagItem(flag: RawFlagItem): FlagItem {
+  return {
+    name: flag.name ?? flag.flag ?? "unknown",
+    enabled: flag.enabled,
+    description: flag.description ?? flag.source ?? "",
+  };
 }

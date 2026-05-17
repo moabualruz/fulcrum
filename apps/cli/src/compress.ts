@@ -1,7 +1,7 @@
 // Compress markdown files using caveman CLI.
 // Wraps scripts/compress-with-caveman.sh logic in TypeScript.
 
-import { exists } from "@/utils/proc.ts";
+import { exists } from "@platform-core/application/runtime-support/process-runner.ts";
 import { spawnSync } from "bun";
 
 const HELP = `fulcrum compress — compress markdown files with caveman

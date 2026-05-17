@@ -13,7 +13,10 @@
 
 import { readFileSync } from "node:fs";
 
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
@@ -21,9 +24,12 @@ type AnyFn = (...args: any[]) => Promise<any>;
 export interface ImportRunOptions {
   caller?: {
     tasks: {
-      bulkCreate: AnyFn;
+      bulkCreate?: AnyFn;
+      importCsv?: AnyFn;
     };
   };
+  env?: TaskApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -97,7 +103,8 @@ export async function run(argv: readonly string[], opts: ImportRunOptions = {}):
         exit(2);
         return;
       }
-      tasks = parseCsv(filePath);
+      const csv = readFileSync(filePath, "utf-8");
+      tasks = parseCsvContent(csv);
     } else {
       // API-based sources — prompt user or read from env
       const tokenEnvKey = `FULCRUM_${source.toUpperCase()}_TOKEN`;
@@ -137,7 +144,12 @@ export async function run(argv: readonly string[], opts: ImportRunOptions = {}):
 
     for (let i = 0; i < tasks.length; i += batchSize) {
       const batch = tasks.slice(i, i + batchSize);
-      await caller.tasks.bulkCreate({ projectId, tasks: batch });
+      if (caller.tasks.bulkCreate) await caller.tasks.bulkCreate({ projectId, tasks: batch });
+      else {
+        const csv = tasksToCsv(batch);
+        if (!caller.tasks.importCsv) throw new Error("task import operation is not available.");
+        await caller.tasks.importCsv({ projectId, csv });
+      }
       imported += batch.length;
       if (!jsonMode) {
         print(`Imported ${imported}/${tasks.length} tasks...`);
@@ -155,8 +167,7 @@ export async function run(argv: readonly string[], opts: ImportRunOptions = {}):
   }
 }
 
-function parseCsv(filePath: string): ImportedTask[] {
-  const content = readFileSync(filePath, "utf-8");
+function parseCsvContent(content: string): ImportedTask[] {
   const lines = content.split("\n").filter((l) => l.trim());
   if (lines.length < 2) return [];
 
@@ -217,5 +228,23 @@ function splitCsvRow(line: string): string[] {
 
 async function resolveCaller(opts: ImportRunOptions): Promise<Required<ImportRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ requireSession: true }) as unknown as Required<ImportRunOptions>["caller"];
+  const apiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
+  }
+  return apiCaller as unknown as Required<ImportRunOptions>["caller"];
+}
+
+function tasksToCsv(tasks: ImportedTask[]): string {
+  const columns: Array<keyof ImportedTask> = ["title", "status", "priority", "assignee", "description", "dueDate", "externalId"];
+  const lines = [columns.join(",")];
+  for (const task of tasks) {
+    lines.push(columns.map((column) => csvCell(task[column])).join(","));
+  }
+  return lines.join("\n");
+}
+
+function csvCell(value: unknown): string {
+  const text = value === undefined || value === null ? "" : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll("\"", "\"\"")}"` : text;
 }

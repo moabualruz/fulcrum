@@ -1,1 +1,1 @@
-export * from "@/application/project-statuses/commands.ts";
+export * from "@work-management/interface/project-statuses.ts";

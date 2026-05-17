@@ -36,7 +36,7 @@ COPY . .
 # re-download the world inside the time budget.
 RUN --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/root/.cargo/git \
-    cd inference && cargo fetch 2>/dev/null; true
+    cd services/inference-runtime && cargo fetch 2>/dev/null; true
 
 # Default entrypoint: run the static build proof.
 CMD ["bun", "run", "scripts/static-build-proof.ts"]

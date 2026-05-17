@@ -21,8 +21,8 @@ import {
   preflightImporter,
   runImporter,
   type ImporterName,
-} from "@/application/importers/web-actions.ts";
-import { AppInvariantError, AppValidationError } from "@/application/errors.ts";
+} from "@integration-hub/interface/project-importers.ts";
+import { AppInvariantError, AppValidationError } from "@platform-core/domain/errors.ts";
 
 export { isImporterEnabled as _isImporterEnabled, listImportHistory as _listImportHistory };
 

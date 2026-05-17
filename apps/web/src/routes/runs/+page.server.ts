@@ -1,12 +1,12 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { dispatchRun } from "@/application/runs/commands.ts";
-import { loadRunsPageData } from "@/application/runs/queries.ts";
+import { dispatchRun } from "@execution-orchestration/interface/run-actions.ts";
+import { loadRunsPageData } from "@execution-orchestration/interface/run-pages.ts";
 import {
   type RunRange,
 } from "$lib/components/runs/runs-filters";
 import type { RunStatus } from "$lib/server/runs";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 const VALID_STATUS = new Set<RunStatus>([
   "queued",
@@ -42,11 +42,13 @@ export const load: PageServerLoad = ({ url, locals }) => {
 
   return {
     activeProjectId: locals?.activeProjectId ?? null,
+    orgId: locals?.orgId ?? null,
+    userId: locals?.userId ?? null,
     filter,
     streamed: {
       data: (async () => {
         const projectId = projectRaw !== undefined ? projectRaw || null : locals?.activeProjectId ?? null;
-        const { em, ctx } = await requestAppScope(locals, projectId);
+        const { em, ctx } = await requestServiceScope(locals, projectId);
         const data = await loadRunsPageData(em, ctx, {
           range,
           ...(agent ? { agent } : {}),
@@ -67,7 +69,7 @@ export const actions: Actions = {
     const agent = String(form.get("agent") ?? "codex");
     if (!taskId) throw redirect(303, "/runs");
 
-    const { em, ctx } = await requestAppScope(locals, projectId);
+    const { em, ctx } = await requestServiceScope(locals, projectId);
     const result = await dispatchRun(em, ctx, { agentName: agent, prompt: taskId });
     const id = result.id;
     throw redirect(303, `/runs/${id}`);

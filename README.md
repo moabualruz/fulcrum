@@ -1,6 +1,6 @@
 # Fulcrum
 
-> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Runs entirely on your machine with PGlite. SaaS-ready schema from day one.
+> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Defaults to embedded PGlite and switches to PostgreSQL with `FULCRUM_DATABASE_URL` or `DATABASE_URL`. SaaS-ready schema from day one.
 
 Fulcrum is a full-stack Agent OS that combines Jira-style task management, Confluence-style docs, agent orchestration (Symphony), inference sidecar, memory/context engine, search, notifications, and developer tooling (CLI + TUI + Web) into a single local-first platform.
 
@@ -68,7 +68,10 @@ Runtime surfaces are first-class local apps:
 | `apps/cli` | Bun CLI app and `fulcrum` binary entrypoint. |
 | `apps/tui` | OpenTUI client. Runs in-process against local application callers. |
 | `apps/server` | Local server adapters: Hono REST API, tRPC router, routing engine, Yjs/runtime adapters. |
-| `src/application` | Business workflows, DTOs, validation, command/query services. Interfaces call here. |
+| `services/*/src/application` | Bounded-service application workflows, DTOs, validation, command/query services. Interfaces call here. |
+| `services/*/src/domain` | Bounded-service domain models, value types, and pure rules. |
+| `services/*/src/infrastructure` | Bounded-service adapters for persistence, messaging, external tools, and runtime integrations. |
+| `services/*/src/interface` | Bounded-service API/presentation adapters when a service owns an interface contract. |
 | `src/db` | ORM entities, repositories, migrations, DB composition. |
 | `src/domain` | Domain enums/value types and pure domain helpers. |
 | `tests` | Cross-interface, e2e, integration, migration, and parity tests. |

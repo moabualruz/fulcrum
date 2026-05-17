@@ -2,6 +2,7 @@
   import { cn } from "$lib/utils.js";
   import { dndzone, type DndEvent } from "svelte-dnd-action";
   import type { TaskCardTask } from "./TaskCard.svelte";
+  import { fetchSprintPlanningState } from "./sprint-planning-api";
 
   interface SprintCapacity {
     totalPoints: number;
@@ -11,13 +12,14 @@
 
   interface Props {
     projectId: string;
+    orgId?: string;
     sprintId: string;
     /** All tasks — tray shows ones with no sprint assigned */
     allTasks: TaskCardTask[];
     onAssign: (taskId: string) => Promise<void>;
   }
 
-  const { projectId, sprintId, allTasks, onAssign }: Props = $props();
+  const { projectId, orgId = "", sprintId, allTasks, onAssign }: Props = $props();
 
   let capacity = $state<SprintCapacity | null>(null);
   let trayItems = $state<TaskCardTask[]>([]);
@@ -37,21 +39,9 @@
   async function loadCapacity() {
     loading = true;
     try {
-      const res = await fetch(
-        `/api/trpc/sprints.get?input=${encodeURIComponent(JSON.stringify({ id: sprintId }))}`
-      );
-      if (!res.ok) return;
-      const json = (await res.json()) as {
-        result?: {
-          data?: {
-            sprint?: { capacityPoints?: number | null };
-            assignedPoints?: number;
-          };
-        };
-      };
-      const data = json.result?.data;
+      const data = await fetchSprintPlanningState(fetch, { orgId, sprintId });
       if (data) {
-        const total = data.sprint?.capacityPoints ?? 0;
+        const total = data.capacityPoints ?? 0;
         const assigned = data.assignedPoints ?? 0;
         capacity = {
           totalPoints: total,
@@ -103,7 +93,7 @@
     <p class="text-xs text-muted-foreground">Drag tasks into the board to assign to sprint</p>
   </header>
 
-  <!-- Capacity bar (D-27) -->
+  <!-- Capacity bar -->
   {#if capacity && capacity.totalPoints > 0}
     <div data-capacity-bar class="flex flex-col gap-1">
       <div class="flex items-center justify-between text-xs">

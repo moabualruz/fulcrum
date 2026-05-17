@@ -1,14 +1,14 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg, createProject } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
 
-// `+page.server.ts` reads `productDbDir() + "/main"` (which honours
-// `FULCRUM_HOME`). We seed two projects there with controlled `created_at`
-// timestamps so the deterministic ordering assertion is meaningful.
+// The route uses the configured default PGlite data directory. We seed two
+// projects there with controlled `created_at` timestamps so ordering stays
+// deterministic.
 
 let scratch: string;
 
@@ -38,12 +38,8 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedTwoProjects(): Promise<{ first: string; second: string }> {
-  // `productDbDir()` returns `${FULCRUM_HOME}/state/product/db`. The route
-  // opens `${productDbDir()}/main` so seed exactly there.
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
+async function seedTwoProjects(): Promise<{ orgId: string; first: string; second: string }> {
+  const db = await openIsolatedStore(join(scratch, "pglite.data"));
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const first = await createProject(db, {
@@ -70,15 +66,15 @@ async function seedTwoProjects(): Promise<{ first: string; second: string }> {
     "2026-04-02T00:00:00.000Z",
   ]);
   await db.close();
-  return { first: first.id, second: second.id };
+  return { orgId: org.id, first: first.id, second: second.id };
 }
 
 describe("/projects +page.server.ts load()", () => {
   test("returns seeded projects in deterministic created_at-ASC order", async () => {
-    const { first, second } = await seedTwoProjects();
+    const { orgId, first, second } = await seedTwoProjects();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      locals: { activeProjectId: "first" },
+      locals: { activeProjectId: "first", orgId },
     } as Parameters<typeof mod.load>[0]);
     expect(result.activeProjectId).toBe("first");
     const payload = await streamedData<ProjectPayload>(result);
@@ -92,9 +88,7 @@ describe("/projects +page.server.ts load()", () => {
 
   test("returns empty array when the product DB has no projects", async () => {
     // Initialise an empty DB at the expected path so the route does not crash.
-    const dbDir = join(scratch, "state", "product", "db");
-    mkdirSync(dbDir, { recursive: true });
-    const db = await openIsolatedStore(join(dbDir, "main"));
+    const db = await openIsolatedStore(join(scratch, "pglite.data"));
     await migrateIsolatedStore(db);
     await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);

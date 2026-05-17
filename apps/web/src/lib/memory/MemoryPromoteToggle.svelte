@@ -1,22 +1,14 @@
 <script lang="ts">
-  /**
-   * MemoryPromoteToggle — Plan 06-09 (MEM-07)
-   *
-   * Inline toggle to promote a project-scoped memory to global scope.
-   * T-06-14: promote guarded by permissionedProcedure on server side.
-   *
-   * States:
-   *   - already global: disabled badge showing "Global"
-   *   - not global: button "Make Global" → confirm dialog → calls memories.promote
-   */
+  import { memoryPromoteApiPath, memoryPublicApiHeaders } from "./memory-browser.ts";
 
   interface Props {
     memoryId: string;
     isGlobal: boolean;
+    authorization?: string;
     onPromoted?: (id: string) => void;
   }
 
-  let { memoryId, isGlobal, onPromoted }: Props = $props();
+  let { memoryId, isGlobal, authorization, onPromoted }: Props = $props();
 
   let confirming = $state(false);
   let loading = $state(false);
@@ -26,12 +18,12 @@
     loading = true;
     error = "";
     try {
-      const res = await fetch("/api/trpc/memories.promote", {
+      const res = await fetch(memoryPromoteApiPath(memoryId), {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id: memoryId }),
+        credentials: "include",
+        headers: memoryPublicApiHeaders({ authorization }),
       });
-      if (!res.ok) throw new Error(`memories.promote failed: ${res.status}`);
+      if (!res.ok) throw new Error(`Memory promote failed: ${res.status}`);
       confirming = false;
       onPromoted?.(memoryId);
     } catch (cause) {

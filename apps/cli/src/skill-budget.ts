@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { AGENTS } from "@/agents/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 
 export const SKILL_DESCRIPTION_WARNING_THRESHOLD = 8_000;
 

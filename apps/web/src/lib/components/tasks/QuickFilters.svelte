@@ -1,12 +1,11 @@
 <script lang="ts">
   /**
-   * QuickFilters — sidebar preset filter buttons (D-71).
+   * QuickFilters — sidebar preset filter buttons.
    * Presets: My Work, Due Today, Overdue, Unassigned, Blocked.
-   * D-119: "My Work" is cross-project, grouped by due date urgency.
    */
   import { createEventDispatcher } from "svelte";
-  import type { SavedViewQuery } from "../../../../../filters/ast.ts";
-  import { SavedViewQuerySchema } from "../../../../../filters/ast.ts";
+  import type { SavedViewQuery } from "@work-management/interface/saved-view-filters.ts";
+  import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
   import { Button } from "$lib/components/ui/button/index.js";
 
   interface Props {

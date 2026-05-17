@@ -1,26 +1,42 @@
-import { error, fail } from "@sveltejs/kit";
+import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import {
-  createSavedView,
-  updateSavedView,
-  deleteSavedView,
-  listSavedViews,
-  VIEW_SCOPES,
-  type ViewScope,
-} from "@/application/saved-views/queries.ts";
-import { getProjectOrNull } from "@/application/projects/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { createSavedViewApiForEvent } from "$lib/server/saved-view-api";
+import { ensureProjectExists } from "$lib/server/project-api";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const { em, ctx } = await requestAppScope(locals, params.id);
-  const project = await getProjectOrNull(em, ctx, params.id);
-  if (!project) throw error(404, "Project not found");
-  const views = await listSavedViews(em, params.id);
+type ViewScope = "org" | "project" | "private";
+
+const VIEW_SCOPES: readonly ViewScope[] = ["org", "project", "private"] as const;
+
+interface PublicSavedView {
+  id: string;
+  orgId?: string | null;
+  org_id?: string | null;
+  projectId?: string;
+  project_id?: string;
+  name: string;
+  scope?: string;
+  filters?: Record<string, unknown>;
+  sortBy?: string | null;
+  sort_by?: string | null;
+  isDefault?: boolean;
+  is_default?: boolean;
+  createdAt?: string | null;
+  created_at?: string | null;
+  updatedAt?: string | null;
+  updated_at?: string | null;
+}
+
+export const load: PageServerLoad = async (event) => {
+  const { params } = event;
+  await ensureProjectExists(event, params.id);
+  const views = (await createSavedViewApiForEvent(event).savedViews.list({ projectId: params.id }) as PublicSavedView[])
+    .map((view) => toSavedViewRow(view));
   return { views, projectId: params.id };
 };
 
 export const actions: Actions = {
-  create: async ({ params, request, locals }) => {
+  create: async (event) => {
+    const { params, request } = event;
     const fd = await request.formData();
     const name = (fd.get("name") as string | null)?.trim();
     const scope = (fd.get("scope") as string | null) || "project";
@@ -38,10 +54,8 @@ export const actions: Actions = {
         return fail(400, { error: "Invalid filters JSON" });
       }
     }
-    const { em, ctx } = await requestAppScope(locals, params.id);
-    await createSavedView(em, {
-        orgId: ctx.orgId,
-        projectId: params.id!,
+    await createSavedViewApiForEvent(event).savedViews.create({
+        projectId: params.id,
         name,
         scope: scope as ViewScope,
         filters,
@@ -49,26 +63,46 @@ export const actions: Actions = {
       });
     return { success: true };
   },
-  update: async ({ request, locals }) => {
+  update: async (event) => {
+    const { request } = event;
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
     const name = fd.get("name") as string | null;
     const isDefaultRaw = fd.get("isDefault");
-    const { em } = await requestAppScope(locals);
-    await updateSavedView(em, {
+    await createSavedViewApiForEvent(event).savedViews.update({
         id,
         ...(name ? { name: name.trim() } : {}),
         ...(isDefaultRaw != null ? { isDefault: isDefaultRaw === "on" } : {}),
       });
     return { success: true };
   },
-  delete: async ({ request, locals }) => {
+  delete: async (event) => {
+    const { request } = event;
     const fd = await request.formData();
     const id = fd.get("id") as string | null;
     if (!id) return fail(400, { error: "id required" });
-    const { em } = await requestAppScope(locals);
-    await deleteSavedView(em, id);
+    await createSavedViewApiForEvent(event).savedViews.delete({ id });
     return { success: true };
   },
 };
+
+function toSavedViewRow(view: PublicSavedView) {
+  return {
+    id: view.id,
+    org_id: view.orgId ?? view.org_id ?? "",
+    project_id: view.projectId ?? view.project_id ?? "",
+    name: view.name,
+    scope: normalizeScope(view.scope),
+    owner_id: null,
+    filters: view.filters ?? {},
+    sort_by: view.sortBy ?? view.sort_by ?? null,
+    is_default: view.isDefault ?? view.is_default ?? false,
+    created_at: view.createdAt ?? view.created_at ?? "",
+    updated_at: view.updatedAt ?? view.updated_at ?? "",
+  };
+}
+
+function normalizeScope(scope: string | undefined): ViewScope {
+  return VIEW_SCOPES.includes(scope as ViewScope) ? scope as ViewScope : "project";
+}

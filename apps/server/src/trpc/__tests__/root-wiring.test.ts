@@ -41,24 +41,18 @@ describe("root wiring — canonical router mounts", () => {
 
 describe("doctor inference check names", () => {
   test("inference-sidecar check is registered", async () => {
-    const src = await readFile(
-      new URL("../../doctor/checks/inference.ts", import.meta.url),
-      "utf-8",
-    );
+    const src = await readFile(join(process.cwd(), "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
     expect(src).toContain("inference-sidecar");
   });
 
   test("inference-backends check is registered", async () => {
-    const src = await readFile(
-      new URL("../../doctor/checks/inference.ts", import.meta.url),
-      "utf-8",
-    );
+    const src = await readFile(join(process.cwd(), "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
     expect(src).toContain("inference-backends");
   });
 });
 
 describe("LangGraph/LangChain boundary — no leaks to agent, orchestration, or CLI", () => {
-  const BOUNDARY_DIRS = ["src/agents", "src/orchestration", "apps/cli/src"];
+  const BOUNDARY_DIRS = ["services/execution-orchestration/src/application/agent-catalog", "services/execution-orchestration/src/infrastructure/agent-runtime", "apps/cli/src"];
   const FORBIDDEN_PATTERNS = ["@langchain/langgraph", "@langchain/core"];
 
   /** Walk directory recursively and find any files containing the forbidden pattern. */
@@ -84,7 +78,7 @@ describe("LangGraph/LangChain boundary — no leaks to agent, orchestration, or 
   for (const dir of BOUNDARY_DIRS) {
     FORBIDDEN_PATTERNS.forEach((pattern) => {
       test(`no '${pattern}' in ${dir}`, async () => {
-        const absDir = new URL(`../../../${dir}`, import.meta.url).pathname;
+        const absDir = join(process.cwd(), dir);
         const foundIn = await findPatternInDir(absDir, pattern);
         expect(foundIn).toBeNull();
       });

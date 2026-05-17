@@ -8,10 +8,10 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseToml } from "smol-toml";
-import { AGENTS } from "@/agents/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 import { ALL_AGENT_IDS } from "./mcp-registry.ts";
-import { run as runProc, which } from "@/utils/proc.ts";
+import { run as runProc, which } from "@platform-core/application/runtime-support/process-runner.ts";
 
 const AUTHOR_CLASSES = new Set(["tool-vendor", "foundation", "individual"] as const);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,7 +40,6 @@ export interface UpstreamSkillLockEntry {
   claude_plugin?: ClaudePluginDescriptor;
   /**
    * Agents whose vendor publishes a per-agent canonical installer (e.g.
-   * `graphify install --platform <agent>`). For those agents the upstream
    * sync stays out of the way — vendor's own write into the agent's
    * top-level skills directory is the source of truth. Empty/absent means
    * the file-copy mirror runs for every detected agent into the same
@@ -550,7 +549,6 @@ async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolea
  *
  * For Claude / Codex / OpenCode / Pi: `<agent>/skills/<name>/SKILL.md`.
  * For Gemini: `~/.gemini/skills/<name>/SKILL.md` — the same path
- * `graphify install --platform gemini` uses (Gemini auto-discovers SKILL.md
  * trees from this dir, no extension wrapper needed).
  *
  * Note: this is NOT the same as `agent.skillsDir(home)` for Gemini —
@@ -605,7 +603,7 @@ export async function syncUpstreamSkills(
   }
   console.log();
 
-  // Phase 1: verify (or compute) subpath integrity for each skill.
+  // setup step: verify (or compute) subpath integrity for each skill.
   // We do this before any file copies so a tampered skill fails fast.
   let integrityFailed = false;
   const newPins = new Map<string, { sha256: string; size: number }>();
@@ -656,13 +654,13 @@ export async function syncUpstreamSkills(
     process.exit(1);
   }
 
-  // Phase 2: write updated pins back to lockfile if requested.
+  // setup step: write updated pins back to lockfile if requested.
   if (!dryRun && newPins.size > 0) {
     await writeLockfileWithPins(lockPath, skills, newPins);
     console.log(`  Wrote ${newPins.size} new subpath pin(s) to ${lockPath}\n`);
   }
 
-  // Phase 3: copy skills to each agent target.
+  // runtime workflow: copy skills to each agent target.
   // W1.6: for Claude Code, skills with `claude_plugin` set use
   // `claude plugin marketplace add` + `claude plugin install` instead of copy.
   const claudeAvailable = !dryRun ? !!(await which("claude")) : false;
@@ -682,7 +680,6 @@ export async function syncUpstreamSkills(
       if (!repoDir) continue;
 
       // Vendor-canonical gate: when the upstream skill ships a per-agent
-      // installer (e.g. `graphify install --platform <agent>`), the vendor's
       // canonical placement under <agent>/skills/<name>/ is the source of
       // truth. Stay out for those agents — fulcrum-upstream/<name>/ here
       // would create a duplicate that triggers "Skill conflict detected"

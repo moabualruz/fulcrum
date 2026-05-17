@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MikroORM } from "@mikro-orm/postgresql";
+import { DataSource } from "typeorm";
 import { resolveClientAssetPath, run, buildDbContainer } from "../../apps/cli/src/index.ts";
 
 const originalExit = process.exit;
@@ -154,22 +154,25 @@ describe("root CLI source dispatch", () => {
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-db-container-"));
 
     const { container, cleanup } = await buildDbContainer();
-    const orm = container.get(MikroORM);
+    const ds = container.get(DataSource);
 
-    expect(await orm.em.getConnection().execute("SELECT 1 AS ok")).toEqual([{ ok: 1 }]);
+    const rows = await ds.query("SELECT 1 AS ok") as Array<{ ok: number }>;
+    expect(rows).toEqual([{ ok: 1 }]);
 
     await cleanup();
-    expect(await orm.isConnected()).toBe(false);
+    expect(ds.isInitialized).toBe(false);
   });
 
   test("web command validates the real build artifact before serving", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-cli-web-missing-build-"));
     previousFulcrumHome = process.env.FULCRUM_HOME;
-    process.env.FULCRUM_HOME = join(scratch, "fulcrum-home");
+    const fulcrumHome = join(scratch, "fulcrum-home");
+    await mkdir(fulcrumHome, { recursive: true });
+    process.env.FULCRUM_HOME = fulcrumHome;
 
     const { container, cleanup } = await buildDbContainer();
     try {
-      await container.get(MikroORM).migrator.up();
+      await container.get(DataSource).runMigrations();
     } finally {
       await cleanup();
     }
@@ -180,13 +183,18 @@ describe("root CLI source dispatch", () => {
     );
   });
 
-  test("web command rejects pending migrations before serving assets", async () => {
+  test("web command rejects missing build before serving assets even on fresh DB", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "fulcrum-cli-web-pending-migrations-"));
     previousFulcrumHome = process.env.FULCRUM_HOME;
-    process.env.FULCRUM_HOME = join(scratch, "fulcrum-home");
+    const fulcrumHome = join(scratch, "fulcrum-home");
+    await mkdir(fulcrumHome, { recursive: true });
+    process.env.FULCRUM_HOME = fulcrumHome;
+    process.chdir(scratch);
 
+    // buildLocalApplicationContainer auto-runs migrations, so pending state
+    // is never reached. The next gate — missing build artifacts — fires instead.
     await expect(run(["web"])).rejects.toThrow(
-      "migrations pending:",
+      "web build missing",
     );
   });
 
@@ -198,7 +206,7 @@ describe("root CLI source dispatch", () => {
     expect(result.stderr).toContain("fulcrum: unknown command 'wat'");
   });
 
-  test("data command exits 2 for unknown subcommands after real container setup", async () => {
+  test("data command exits 2 for unknown subcommands at the command boundary", async () => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-data-unknown-"));
 
@@ -215,7 +223,7 @@ describe("root CLI source dispatch", () => {
     ["backup", ["backup", "bogus"], "fulcrum backup: missing required option --output"],
     ["errors", ["errors", "bogus"], "fulcrum errors: unknown command 'bogus'"],
     ["secrets", ["secrets", "bogus", "api-token"], "fulcrum secrets: unknown command 'bogus'"],
-  ])("%s invalid subcommand validates through a real local caller", async (_name, args, message) => {
+  ])("%s invalid subcommand validates at the command boundary", async (_name, args, message) => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-cross-cutting-"));
 
@@ -243,7 +251,7 @@ describe("root CLI source dispatch", () => {
     ["notify", ["notify", "list", "--json"]],
     ["webhooks", ["webhooks", "list", "--json"]],
     ["settings", ["settings", "list", "--json"]],
-  ])("%s non-help path builds a real DB container before command auth", async (_name, args) => {
+  ])("%s non-help path reaches the command auth/config boundary", async (_name, args) => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
     process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-non-help-"));
 
@@ -251,7 +259,7 @@ describe("root CLI source dispatch", () => {
 
     expect(result.exitCode).toBe(1);
     expect(`${result.stdout}\n${result.stderr}`).toMatch(
-      /UNAUTHORIZED|Authentication required|No active CLI session|No procedure found on path|relation "tasks" does not exist/i,
+      /UNAUTHORIZED|Authentication required|No active CLI session|API callers? (?:is|are) not configured|No procedure found on path|relation "tasks" does not exist/i,
     );
   });
 

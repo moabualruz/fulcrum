@@ -100,7 +100,7 @@ describe("decision-schema.ts", () => {
 describe("RoutingDraft entity", () => {
   it("exports RoutingDraft class and DraftStatus enum", async () => {
     const { RoutingDraft, DraftStatus } = await import(
-      "@/db/entities/router/RoutingDraft.ts"
+      "@execution-orchestration/infrastructure/database/entities/router/RoutingDraft.ts"
     );
     // Class should exist and be constructable via em.create (test structural)
     expect(RoutingDraft).toBeDefined();
@@ -116,7 +116,7 @@ describe("RoutingDraft entity", () => {
 describe("RoutingAudit entity", () => {
   it("exports RoutingAudit class", async () => {
     const { RoutingAudit } = await import(
-      "@/db/entities/router/RoutingAudit.ts"
+      "@execution-orchestration/infrastructure/database/entities/router/RoutingAudit.ts"
     );
     expect(RoutingAudit).toBeDefined();
     expect(typeof RoutingAudit).toBe("function");
@@ -125,7 +125,7 @@ describe("RoutingAudit entity", () => {
 
 describe("router entity barrel", () => {
   it("exports RoutingDraft and RoutingAudit from index", async () => {
-    const barrel = await import("@/db/entities/router/index.ts");
+    const barrel = await import("@execution-orchestration/infrastructure/database/entities/router/index.ts");
     expect(barrel.RoutingDraft).toBeDefined();
     expect(barrel.RoutingAudit).toBeDefined();
     expect(barrel.DraftStatus).toBeDefined();

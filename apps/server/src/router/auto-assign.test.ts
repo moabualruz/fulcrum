@@ -1,18 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { PGlite } from "@electric-sql/pglite";
-import { MikroORM, type Options } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
-import { Event } from "@/db/entities/core/Event.ts";
-import { Org } from "@/db/entities/auth/Org.ts";
+import { Event } from "@platform-core/infrastructure/application-database/entities/core/Event.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import {
   RoutingRule,
   RoutingRuleSource,
   type RoutingConditions,
-} from "@/db/entities/router/RoutingRule.ts";
-import { createOrmConfig } from "@/db/mikro-orm.config.ts";
-import type { EventRepository } from "@/db/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@/db/repositories/router/RoutingRuleRepository.ts";
-import { DEFAULT_ORG_ID, SeedService } from "@/db/seed.ts";
+} from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
+import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
+import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
+import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
+import { createTestOrm } from "@test-support/application-database.ts";
 import { autoAssign, configureAutoAssign } from "./auto-assign.ts";
 import { configureLlmFallback } from "./llm-fallback.ts";
 import { configureNoMatchPrompt, learnRule } from "./no-match-prompt.ts";
@@ -287,11 +286,10 @@ describe("autoAssign", () => {
   it("writes exactly one routed events row for a real rule dispatch", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
-      const org = em.getReference(Org, DEFAULT_ORG_ID);
-      const repo = em.getRepository(RoutingRule) as RoutingRuleRepository;
-      const rule = repo.create({
-        org,
+      const em = db.em;
+      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+      const rule = await em.save(RoutingRule, {
+        org: { id: DEFAULT_ORG_ID } as Org,
         name: "bugs",
         actionAgent: "codex",
         conditionsJson: BUG_CONDITIONS,
@@ -299,13 +297,12 @@ describe("autoAssign", () => {
         priority: 100,
         enabled: true,
         source: RoutingRuleSource.Manual,
-      } as never);
-      await em.flush();
+      });
 
       configureRulesEngine({ routingRuleRepository: repo });
       configureAutoAssign({ recordDecision: null });
       configureRoutingTelemetry({
-        eventRepository: em.getRepository(Event) as EventRepository,
+        eventRepository: em.getRepository(Event) as unknown as EventRepository,
       });
 
       await autoAssign({ taskId: TASK_ID, taskFacts: TASK_FACTS, orgId: DEFAULT_ORG_ID });
@@ -329,11 +326,10 @@ describe("autoAssign", () => {
   it("writes zero routed events rows for dry-run dispatch", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
-      const org = em.getReference(Org, DEFAULT_ORG_ID);
-      const repo = em.getRepository(RoutingRule) as RoutingRuleRepository;
-      repo.create({
-        org,
+      const em = db.em;
+      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+      await em.save(RoutingRule, {
+        org: { id: DEFAULT_ORG_ID } as Org,
         name: "bugs",
         actionAgent: "codex",
         conditionsJson: BUG_CONDITIONS,
@@ -341,13 +337,12 @@ describe("autoAssign", () => {
         priority: 100,
         enabled: true,
         source: RoutingRuleSource.Manual,
-      } as never);
-      await em.flush();
+      });
 
       configureRulesEngine({ routingRuleRepository: repo });
       configureAutoAssign({ recordDecision: null });
       configureRoutingTelemetry({
-        eventRepository: em.getRepository(Event) as EventRepository,
+        eventRepository: em.getRepository(Event) as unknown as EventRepository,
       });
 
       await autoAssign({
@@ -366,10 +361,10 @@ describe("autoAssign", () => {
   it("writes explicit routing events with null rule_id", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
+      const em = db.em;
       configureAutoAssign({ recordDecision: null });
       configureRoutingTelemetry({
-        eventRepository: em.getRepository(Event) as EventRepository,
+        eventRepository: em.getRepository(Event) as unknown as EventRepository,
       });
 
       await autoAssign({
@@ -411,9 +406,9 @@ describe("autoAssign", () => {
   it("stores learned and llm-fallback routing event sources", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
+      const em = db.em;
       configureRoutingTelemetry({
-        eventRepository: em.getRepository(Event) as EventRepository,
+        eventRepository: em.getRepository(Event) as unknown as EventRepository,
       });
       const { recordRoutingEvent } = await import("./telemetry.ts");
 
@@ -465,13 +460,13 @@ describe("autoAssign", () => {
   it("learnRule persists a learned routing rule derived from task kind", async () => {
     const db = await buildMigratedOrm();
     try {
-      const em = db.orm.em.fork();
-      const repo = em.getRepository(RoutingRule) as RoutingRuleRepository;
+      const em = db.em;
+      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
       configureNoMatchPrompt({ routingRuleRepository: repo });
 
       const rule = await learnRule(TASK_FACTS, "codex", DEFAULT_ORG_ID);
 
-      const persisted = await repo.findOneOrFail({ id: rule.id } as never);
+      const persisted = await em.findOneOrFail(RoutingRule, { where: { id: rule.id } });
       expect(persisted.source).toBe(RoutingRuleSource.Learned);
       expect(persisted.enabled).toBe(true);
       expect(persisted.actionAgent).toBe("codex");
@@ -537,33 +532,10 @@ describe("autoAssign", () => {
   }
 });
 
-async function buildMigratedOrm(): Promise<{
-  orm: MikroORM;
-  close: () => Promise<void>;
-}> {
-  const pglite = new PGlite();
-  const config = createOrmConfig({ pglite });
-  config.migrations = {
-    ...((config.migrations ?? {}) as NonNullable<Options["migrations"]>),
-    transactional: false,
-    allOrNothing: false,
-    snapshot: false,
-  };
-  const orm = await MikroORM.init(config);
-  await orm.migrator.up();
-  await new SeedService(orm.em).run();
-
-  return {
-    orm,
-    close: async () => {
-      await orm.close(true);
-      await (pglite as { close?: () => Promise<void> }).close?.();
-    },
-  };
+async function buildMigratedOrm() {
+  return createTestOrm();
 }
 
-async function readRoutedEvents(em: MikroORM["em"]): Promise<Event[]> {
-  return em.find(Event, { verb: "routed" } as never, {
-    orderBy: { createdAt: "ASC" },
-  });
+async function readRoutedEvents(em: EntityManager): Promise<Event[]> {
+  return em.find(Event, { where: { verb: "routed" }, order: { createdAt: "ASC" } });
 }

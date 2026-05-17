@@ -1,13 +1,13 @@
 import { error, redirect, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { getMemory, updateMemoryAction, deleteMemoryAction, MEMORY_SCOPES, type MemoryScope } from "@/application/memory/web-queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { getMemory, updateMemoryAction, deleteMemoryAction, MEMORY_SCOPES, type MemoryScope } from "@knowledge-workspace/interface/memory-records.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 export const load: PageServerLoad = ({ params, locals }) => ({
   activeProjectId: locals?.activeProjectId ?? null,
   streamed: {
     data: (async () => {
-      const { em, ctx } = await requestAppScope(locals);
+      const { em, ctx } = await requestServiceScope(locals);
       const mem = await getMemory(em, params.id, ctx.orgId);
       if (!mem) throw error(404, "Memory not found");
       return { memory: mem };
@@ -16,14 +16,14 @@ export const load: PageServerLoad = ({ params, locals }) => ({
 });
 
 export const actions: Actions = {
-  update: async ({ params, request }) => {
+  update: async ({ params, request, locals }) => {
     const formData = await request.formData();
     const scope = formData.get("scope") as string | null;
     const body = formData.get("body") as string | null;
     const key = formData.get("key") as string | null;
     const kind = formData.get("kind") as string | null;
 
-    const { em, ctx } = await requestAppScope(locals);
+    const { em, ctx } = await requestServiceScope(locals);
     const updates: Record<string, string> = {};
     if (scope && MEMORY_SCOPES.includes(scope as MemoryScope)) updates.scope = scope;
     if (body !== null && body !== undefined) updates.body = body;
@@ -34,7 +34,7 @@ export const actions: Actions = {
     return { success: true };
   },
   delete: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals);
+    const { em, ctx } = await requestServiceScope(locals);
     await deleteMemoryAction(em, params.id!, ctx.orgId);
     throw redirect(303, "/memory");
   },

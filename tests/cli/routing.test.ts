@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { RoutingRunOptions } from "@fulcrum/cli/commands/routing.ts";
 
 type RoutingRule = {
   id: string;
@@ -69,19 +70,19 @@ function rule(overrides: Partial<RoutingRule> = {}): RoutingRule {
   };
 }
 
-function fakeCaller(): RoutingCaller & { calls: Array<{ procedure: string; input: unknown }> } {
-  const calls: Array<{ procedure: string; input: unknown }> = [];
+function fakeCaller(): RoutingCaller & { calls: Array<{ operation: string; input: unknown }> } {
+  const calls: Array<{ operation: string; input: unknown }> = [];
   const rows = [rule()];
 
   return {
     calls,
     routing: {
       list: async (input = {}) => {
-        calls.push({ procedure: "routing.list", input });
+        calls.push({ operation: "routing.list", input });
         return rows;
       },
       create: async (input) => {
-        calls.push({ procedure: "routing.create", input });
+        calls.push({ operation: "routing.create", input });
         return rule({
           id: "00000000-0000-4000-8000-000000000002",
           ...(input as Partial<RoutingRule>),
@@ -91,42 +92,52 @@ function fakeCaller(): RoutingCaller & { calls: Array<{ procedure: string; input
         });
       },
       update: async (input) => {
-        calls.push({ procedure: "routing.update", input });
+        calls.push({ operation: "routing.update", input });
         return rule(input as Partial<RoutingRule>);
       },
       delete: async (input) => {
-        calls.push({ procedure: "routing.delete", input });
+        calls.push({ operation: "routing.delete", input });
         return { ok: true };
       },
       test: async (input) => {
-        calls.push({ procedure: "routing.test", input });
+        calls.push({ operation: "routing.test", input });
         return { status: "matched", matchedRuleId: RULE_ID, draftId: null, factsUsed: {}, confidence: 1, backend: null, model: null, whyUnmatched: null, evidence: ["matched"] };
       },
       dryRun: async (input) => {
-        calls.push({ procedure: "routing.dryRun", input });
+        calls.push({ operation: "routing.dryRun", input });
         return { status: "matched", matchedRuleId: RULE_ID, draftId: null, factsUsed: {}, confidence: 1, backend: null, model: null, whyUnmatched: null, evidence: ["matched"] };
       },
       drafts: {
-        list: async (input) => { calls.push({ procedure: "routing.drafts.list", input }); return []; },
-        approve: async (input) => { calls.push({ procedure: "routing.drafts.approve", input }); return { ok: true }; },
-        delete: async (input) => { calls.push({ procedure: "routing.drafts.delete", input }); return { ok: true }; },
-        update: async (input) => { calls.push({ procedure: "routing.drafts.update", input }); return { ok: true }; },
+        list: async (input) => { calls.push({ operation: "routing.drafts.list", input }); return []; },
+        approve: async (input) => { calls.push({ operation: "routing.drafts.approve", input }); return { ok: true }; },
+        delete: async (input) => { calls.push({ operation: "routing.drafts.delete", input }); return { ok: true }; },
+        update: async (input) => { calls.push({ operation: "routing.drafts.update", input }); return { ok: true }; },
       },
       config: {
-        updateLlmGate: async (input) => { calls.push({ procedure: "routing.config.updateLlmGate", input }); return { ok: true }; },
+        updateLlmGate: async (input) => { calls.push({ operation: "routing.config.updateLlmGate", input }); return { ok: true }; },
       },
     },
   };
 }
 
 async function runRouting(argv: readonly string[], caller = fakeCaller()) {
+  return {
+    caller,
+    ...await runRoutingWithOptions(argv, { caller }),
+  };
+}
+
+async function runRoutingWithOptions(
+  argv: readonly string[],
+  options: RoutingRunOptions = {},
+) {
   const { run } = await import("@fulcrum/cli/commands/routing.ts");
   const stdout: string[] = [];
   const stderr: string[] = [];
   let exitCode: number | undefined;
 
   await run(argv, {
-    caller,
+    ...options,
     print: (line: string) => stdout.push(line),
     printErr: (line: string) => stderr.push(line),
     exit: (code: number) => {
@@ -134,7 +145,7 @@ async function runRouting(argv: readonly string[], caller = fakeCaller()) {
     },
   });
 
-  return { caller, stdout, stderr, exitCode };
+  return { stdout, stderr, exitCode };
 }
 
 describe("routing rules CLI", () => {
@@ -149,7 +160,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.list",
+      operation: "routing.list",
       input: { projectId: PROJECT_ID },
     });
     const parsed = JSON.parse(stdout[0]!) as RoutingRule[];
@@ -183,7 +194,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.create",
+      operation: "routing.create",
       input: {
         name: "High priority",
         actionAgent: "claude-code",
@@ -212,7 +223,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.update",
+      operation: "routing.update",
       input: { id: RULE_ID, name: "Renamed", actionAgent: "codex", enabled: false },
     });
     expect(JSON.parse(stdout[0]!).name).toBe("Renamed");
@@ -223,7 +234,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.delete",
+      operation: "routing.delete",
       input: { id: RULE_ID },
     });
     expect(stdout.join("\n")).toContain(`Deleted routing rule ${RULE_ID}.`);
@@ -234,7 +245,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.test",
+      operation: "routing.test",
       input: { taskId: TASK_ID },
     });
     expect(stdout.join("\n")).toContain("status: matched");
@@ -252,7 +263,7 @@ describe("routing rules CLI", () => {
 
     expect(exitCode).toBeUndefined();
     expect(caller.calls[0]).toEqual({
-      procedure: "routing.dryRun",
+      operation: "routing.dryRun",
       input: { taskJson: { title: "Fix auth", kind: "bug", priority: "high", tags: ["auth"] } },
     });
     const parsed = JSON.parse(stdout[0]!);
@@ -260,7 +271,7 @@ describe("routing rules CLI", () => {
     expect(parsed.matchedRuleId).toBe(RULE_ID);
   });
 
-  test("invalid conditions JSON exits before tRPC call", async () => {
+  test("invalid conditions JSON exits before API call", async () => {
     const caller = fakeCaller();
     const { stderr, exitCode } = await runRouting([
       "rules",
@@ -276,5 +287,63 @@ describe("routing rules CLI", () => {
     expect(exitCode).toBe(1);
     expect(caller.calls).toHaveLength(0);
     expect(stderr.join("\n")).toContain("invalid --conditions JSON");
+  });
+
+  test("routes through the routing public API when no caller is injected", async () => {
+    const decision = {
+      status: "matched",
+      matchedRuleId: RULE_ID,
+      draftId: null,
+      factsUsed: {},
+      confidence: 1,
+      backend: null,
+      model: null,
+      whyUnmatched: null,
+      evidence: ["matched"],
+    };
+    const requests: Array<[string, string, unknown?]> = [];
+    const fetchFn = (async (input, init) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+      requests.push([method, url, body]);
+
+      if (url.includes("/api/v1/routing/rules?")) return Response.json([rule()]);
+      if (url.includes("/api/v1/routing/test")) return Response.json(decision);
+      return Response.json({ ok: true });
+    }) as typeof fetch;
+    const options: RoutingRunOptions = {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: fetchFn,
+    };
+
+    const list = await runRoutingWithOptions(["rules", "list", "--project", PROJECT_ID, "--json"], options);
+    const assign = await runRoutingWithOptions(["assign", TASK_ID, "--json"], options);
+    const approve = await runRoutingWithOptions(["drafts", "approve", "draft-1", "--json"], options);
+    const gate = await runRoutingWithOptions(["llm-gate", "set", "--input-mode", "task_facts", "--enabled", "true", "--json"], options);
+
+    expect([list, assign, approve, gate].every((result) => result.exitCode === undefined)).toBe(true);
+    expect(JSON.parse(list.stdout[0] as string)[0].id).toBe(RULE_ID);
+    expect(JSON.parse(assign.stdout[0] as string)).toMatchObject({ status: "matched", matchedRuleId: RULE_ID });
+    expect(JSON.parse(approve.stdout[0] as string)).toEqual({ ok: true });
+    expect(JSON.parse(gate.stdout[0] as string)).toEqual({ ok: true });
+    expect(requests).toEqual([
+      ["GET", `http://127.0.0.1:3210/api/v1/routing/rules?orgId=org-1&userId=user-1&projectId=${PROJECT_ID}`, undefined],
+      ["POST", "http://127.0.0.1:3210/api/v1/routing/test", { orgId: "org-1", userId: "user-1", taskId: TASK_ID }],
+      ["POST", "http://127.0.0.1:3210/api/v1/routing/drafts/draft-1/approve", { orgId: "org-1", userId: "user-1" }],
+      ["POST", "http://127.0.0.1:3210/api/v1/routing/config/llm-gate", { orgId: "org-1", userId: "user-1", inputMode: "task_facts", enabled: true }],
+    ]);
+  });
+
+  test("requires the routing public API when no caller is injected", async () => {
+    const result = await runRoutingWithOptions(["rules", "list", "--json"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toEqual([]);
+    expect(result.stderr.join("\n")).toContain("Routing API caller is not configured");
   });
 });

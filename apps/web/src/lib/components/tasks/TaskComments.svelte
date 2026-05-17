@@ -19,15 +19,27 @@
   import type { JSONContent } from "@tiptap/core";
   import type { Editor } from "svelte-tiptap";
   import type { Unsubscriber } from "svelte/store";
+  import {
+    addTaskCommentReaction,
+    createTaskComment,
+    fetchOrganizationMembers,
+    fetchTaskThreadedComments,
+    removeTaskCommentReaction,
+    resolveTaskComment,
+    unresolveTaskComment,
+    type TaskCommentApiRow,
+    type TaskCommentReactionApiRow,
+  } from "./comment-api";
   import type { MentionItem } from "./MentionSuggestion.svelte";
 
   interface Props {
     taskId: string;
+    orgId?: string;
     currentUserId?: string;
     currentUserName?: string;
   }
 
-  const { taskId, currentUserId = "", currentUserName = "You" }: Props = $props();
+  const { taskId, orgId = "", currentUserId = "", currentUserName = "You" }: Props = $props();
 
   interface Reaction {
     emoji: string;
@@ -101,20 +113,13 @@
 
   async function fetchMentionItems(query: string): Promise<MentionItem[]> {
     try {
-      const [membersRes] = await Promise.all([
-        fetch(`/api/trpc/orgs.members.list?input=${encodeURIComponent(JSON.stringify({}))}`)
-      ]);
-
+      const members = await fetchOrganizationMembers(fetch, { orgId, userId: currentUserId });
       const items: MentionItem[] = [];
 
-      if (membersRes.ok) {
-        const membersJson = await membersRes.json() as { result?: { data?: Array<{ id: string; userId: string; name?: string; email?: string; avatarUrl?: string }> } };
-        const members = membersJson.result?.data ?? [];
-        for (const m of members) {
-          const label = m.name ?? m.email ?? m.userId;
-          if (!query || label.toLowerCase().includes(query.toLowerCase())) {
-            items.push({ id: m.userId, type: "user", label, email: m.email, avatarUrl: m.avatarUrl });
-          }
+      for (const m of members) {
+        const label = m.name ?? m.email ?? m.userId;
+        if (!query || label.toLowerCase().includes(query.toLowerCase())) {
+          items.push({ id: m.userId, type: "user", label, email: m.email, avatarUrl: m.avatarUrl });
         }
       }
 
@@ -180,10 +185,8 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(`/api/trpc/comments.threaded?input=${encodeURIComponent(JSON.stringify({ taskId }))}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as { result?: { data?: Comment[] } };
-      comments = json.result?.data ?? [];
+      const rows = await fetchTaskThreadedComments(fetch, { orgId, userId: currentUserId, taskId });
+      comments = rows.map(normalizeComment);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load comments";
     } finally {
@@ -195,12 +198,13 @@
     if (isEmptyDoc(body)) return;
     submitting = true;
     try {
-      const res = await fetch("/api/trpc/comments.create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId, body, parentCommentId }),
+      await createTaskComment(fetch, {
+        orgId,
+        userId: currentUserId,
+        taskId,
+        body,
+        parentCommentId,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await loadComments();
       // Reset editors
       if (parentCommentId) {
@@ -218,34 +222,22 @@
 
   async function resolveComment(commentId: string): Promise<void> {
     try {
-      await fetch("/api/trpc/comments.resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId }),
-      });
+      await resolveTaskComment(fetch, { orgId, userId: currentUserId, commentId });
       await loadComments();
     } catch {}
   }
 
   async function unresolveComment(commentId: string): Promise<void> {
     try {
-      await fetch("/api/trpc/comments.unresolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId }),
-      });
+      await unresolveTaskComment(fetch, { orgId, userId: currentUserId, commentId });
       await loadComments();
     } catch {}
   }
 
   async function toggleReaction(commentId: string, emoji: string, hasReacted: boolean): Promise<void> {
-    const procedure = hasReacted ? "comments.removeReaction" : "comments.addReaction";
     try {
-      await fetch("/api/trpc/" + procedure, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId, emoji }),
-      });
+      if (hasReacted) await removeTaskCommentReaction(fetch, { orgId, userId: currentUserId, commentId, emoji });
+      else await addTaskCommentReaction(fetch, { orgId, userId: currentUserId, commentId, emoji });
       await loadComments();
     } catch {}
   }
@@ -303,6 +295,38 @@
 
   function escapeHtml(str: string): string {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function normalizeComment(row: TaskCommentApiRow): Comment {
+    return {
+      id: row.id,
+      taskId: row.taskId,
+      authorId: row.authorId,
+      authorName: row.authorId,
+      body: row.body ?? { type: "doc", content: [{ type: "paragraph" }] },
+      parentCommentId: row.parentCommentId,
+      resolvedAt: row.resolvedAt ? new Date(row.resolvedAt) : null,
+      resolvedById: row.resolvedBy,
+      resolvedByName: row.resolvedBy,
+      createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(0),
+      reactions: summarizeReactions(row.reactions),
+      replies: row.replies?.map(normalizeComment),
+    };
+  }
+
+  function summarizeReactions(rows: TaskCommentReactionApiRow[]): Reaction[] {
+    const byEmoji = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const users = byEmoji.get(row.emoji) ?? new Set<string>();
+      users.add(row.userId);
+      byEmoji.set(row.emoji, users);
+    }
+    return [...byEmoji.entries()].map(([emoji, users]) => ({
+      emoji,
+      count: users.size,
+      userIds: [...users],
+    }));
   }
 </script>
 

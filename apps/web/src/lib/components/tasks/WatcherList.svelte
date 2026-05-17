@@ -1,17 +1,24 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import {
+    fetchTaskWatchers,
+    subscribeToTaskComments,
+    unsubscribeFromTaskComments,
+    type TaskWatcherApiRow,
+  } from "./comment-api";
 
   interface Props {
     taskId: string;
+    orgId?: string;
     currentUserId?: string;
   }
 
-  const { taskId, currentUserId = "" }: Props = $props();
+  const { taskId, orgId = "", currentUserId = "" }: Props = $props();
 
   interface Watcher {
     id: string;
     userId: string;
-    source: "manual" | "mention" | "assign" | "create";
+    source: string;
     user?: {
       id: string;
       name: string;
@@ -46,10 +53,7 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(`/api/trpc/comments.watchers?input=${encodeURIComponent(JSON.stringify({ taskId }))}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as { result?: { data?: Watcher[] } };
-      watchers = json.result?.data ?? [];
+      watchers = (await fetchTaskWatchers(fetch, { orgId, userId: currentUserId, taskId })).map(normalizeWatcher);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load watchers";
     } finally {
@@ -60,13 +64,8 @@
   async function toggleSubscribe(): Promise<void> {
     subscribing = true;
     try {
-      const procedure = isSubscribed ? "comments.unsubscribe" : "comments.subscribe";
-      const res = await fetch("/api/trpc/" + procedure, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (isSubscribed) await unsubscribeFromTaskComments(fetch, { orgId, userId: currentUserId, taskId });
+      else await subscribeToTaskComments(fetch, { orgId, userId: currentUserId, taskId });
       await loadWatchers();
     } catch (e) {
       error = e instanceof Error ? e.message : "Action failed";
@@ -78,6 +77,14 @@
   onMount(() => {
     void loadWatchers();
   });
+
+  function normalizeWatcher(row: TaskWatcherApiRow): Watcher {
+    return {
+      id: row.id,
+      userId: row.userId,
+      source: row.source,
+    };
+  }
 </script>
 
 <div class="watcher-list" data-testid="watcher-list">

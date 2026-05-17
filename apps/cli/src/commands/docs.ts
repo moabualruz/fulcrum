@@ -1,12 +1,14 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError } from "../api-errors.ts";
+import {
+  createDocumentApiCallerFromEnv,
+  type DocumentApiEnvironment,
+} from "@knowledge-workspace/interface/http/document-api-client.ts";
 
 type DocRow = Record<string, unknown>;
+type DocumentApiCaller = NonNullable<ReturnType<typeof createDocumentApiCallerFromEnv>>;
 
 type DocsCaller = {
   docs: {
@@ -25,7 +27,8 @@ type DocsCaller = {
 
 export interface DocsRunOptions {
   caller?: DocsCaller;
-  container?: Container | null;
+  env?: DocumentApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -114,7 +117,7 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
     case "list":
       return withErrors("template list", opts, async () => {
         const caller = await resolveCaller(opts);
-        if (!caller.docs.templates?.list) throw new Error("docs.templates.list procedure is not available");
+        if (!caller.docs.templates?.list) throw new Error("docs template list operation is not available");
         const result = await caller.docs.templates.list({});
         printOutput(result, rest, opts.print, formatRows);
       });
@@ -318,7 +321,7 @@ async function withErrors(
   try {
     await fn();
   } catch (err) {
-    const message = err instanceof TRPCError ? `${err.code}: ${err.message}` : (err as Error).message;
+    const message = formatApiError(err);
     if (opts.printErr) opts.printErr(`fulcrum docs ${command}: ${message}`);
     opts.exit(1);
   }
@@ -326,8 +329,46 @@ async function withErrors(
 
 async function resolveCaller(opts: DocsRunOptions): Promise<DocsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as DocsCaller;
+  const apiCaller = createDocumentApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Document API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
+  }
+  return {
+    docs: {
+      list: async (input = {}) => await apiCaller.docs.list(input) as DocRow[],
+      get: async (input) => await getDocument(apiCaller, input),
+      create: async (input) => await apiCaller.docs.create(input) as DocRow,
+      update: async (input) => await apiCaller.docs.update(requireDocumentId(input)) as DocRow | null,
+      delete: async (input) => await apiCaller.docs.delete(requireDocumentId(input)) as DocRow | { deleted: true } | null,
+      versionsList: async (input) => await apiCaller.docs.listVersions({
+        id: String(input.docId ?? input.id ?? ""),
+      }) as DocRow[],
+      templates: {
+        list: async (input) => await apiCaller.docs.listTemplates(input) as DocRow[],
+      },
+    },
+  };
+}
+
+async function getDocument(
+  apiCaller: DocumentApiCaller,
+  input: Record<string, unknown>,
+): Promise<DocRow | null> {
+  const id = input.id;
+  if (typeof id === "string" && id.length > 0) {
+    return await apiCaller.docs.get({ id }) as DocRow | null;
+  }
+
+  const slug = input.slug;
+  if (typeof slug !== "string" || slug.length === 0) return null;
+  const docs = await apiCaller.docs.list({}) as DocRow[];
+  return docs.find((doc) => doc.slug === slug || doc.id === slug) ?? null;
+}
+
+function requireDocumentId(input: Record<string, unknown>): Record<string, unknown> & { id: string } {
+  const id = input.id;
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("Document id is required.");
+  }
+  return { ...input, id };
 }

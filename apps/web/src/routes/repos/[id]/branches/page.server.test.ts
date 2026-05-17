@@ -1,14 +1,19 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
+let branchPage: {
+  repo: { id: string; name: string; slug: string; currentBranch: string | null };
+  writeOpsEnabled: boolean;
+  gate: { code: "FEATURE_GATED"; message: string };
+  branches: Array<{ name: string; headSha: string | null; isCurrent: boolean; isDefault: boolean }>;
+};
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -19,6 +24,8 @@ function streamedData<T>(result: unknown): Promise<T> {
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repo-branches-"));
   process.env["FULCRUM_HOME"] = scratch;
+  branchPage = branchFixture(makeId(), false);
+  repoPagesMock["branchPage"] = branchPage;
 });
 
 afterEach(() => {
@@ -27,40 +34,61 @@ afterEach(() => {
 });
 
 async function seedBranches(writeOps = false): Promise<string> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS name text not null default ''`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind text not null default 'local'`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS current_branch text null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS default_branch text null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS last_touched_at timestamptz null`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS archived boolean not null default false`);
-  await db.query(`CREATE TABLE IF NOT EXISTS repo_branches (id uuid primary key, org_id text not null, repo_id text not null, name text not null, sha text null, is_default boolean not null default false)`);
-  await db.query(`CREATE TABLE IF NOT EXISTS feature_flags (id uuid primary key, org_id text null, user_id text null, flag text not null, enabled boolean not null default false)`);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const repoId = makeId();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, name, kind, current_branch, default_branch, archived)
-     VALUES ($1, $2, 'fulcrum', '/workspace/fulcrum', 'Fulcrum', 'local', 'feature/repos', 'main', false)`,
-    [repoId, org.id],
-  );
-  await db.query(
-    `INSERT INTO repo_branches (id, org_id, repo_id, name, sha, is_default)
-     VALUES ($1, $2, $3, 'main', '1234567890abcdef', true),
-            ($4, $2, $3, 'feature/repos', 'abcdef1234567890', false)`,
-    [randomUUID(), org.id, repoId, randomUUID()],
-  );
-  if (writeOps) {
-    await db.query(
-      `INSERT INTO feature_flags (id, org_id, user_id, flag, enabled) VALUES ($1, $2, null, 'repo-write-ops', true)`,
-      [randomUUID(), org.id],
-    );
-  }
-  await db.close();
+  branchPage = branchFixture(repoId, writeOps);
+  repoPagesMock["branchPage"] = branchPage;
   return repoId;
 }
+
+function branchFixture(repoId: string, writeOpsEnabled: boolean): typeof branchPage {
+  return {
+    repo: { id: repoId, name: "Fulcrum", slug: "fulcrum", currentBranch: "feature/repos" },
+    writeOpsEnabled,
+    gate: {
+      code: "FEATURE_GATED",
+      message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+    },
+    branches: [
+      { name: "feature/repos", headSha: "abcdef1234567890", isCurrent: true, isDefault: false },
+      { name: "main", headSha: "1234567890abcdef", isCurrent: false, isDefault: true },
+    ],
+  };
+}
+
+mock.module("@integration-hub/interface/repository-pages.ts", () => ({
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [],
+  listRepositoryDashboard: async () => [],
+  loadRepositoryDetail: async () => ({ branches: [], commits: [], files: [], syncLog: [] }),
+  loadRepositoryBranchesPage: async () => repoPagesMock["branchPage"] ?? branchPage,
+  createRepositoryBranch: async () => {
+    const page = (repoPagesMock["branchPage"] as typeof branchPage | undefined) ?? branchPage;
+    if (!page.writeOpsEnabled) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    return { ok: true };
+  },
+  checkoutRepositoryBranch: async (_context: unknown, input: { name: string }) => {
+    const page = (repoPagesMock["branchPage"] as typeof branchPage | undefined) ?? branchPage;
+    if (!page.writeOpsEnabled) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    page.repo.currentBranch = input.name;
+    page.branches = page.branches.map((branch) => ({
+      ...branch,
+      isCurrent: branch.name === input.name,
+    }));
+    return { ok: true };
+  },
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async () => ({ repo: null, commits: [], page: 1, totalPages: 1, total: 0 }),
+  loadRepositoryCommitDetail: async () => ({ repo: null, commit: null, diff: null }),
+}));
 
 describe("/repos/[id]/branches +page.server.ts", () => {
   test("load lists branches and reports write gate disabled by default", async () => {

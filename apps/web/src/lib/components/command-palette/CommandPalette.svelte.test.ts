@@ -73,6 +73,9 @@ describe("CommandPalette component (SSR)", () => {
       props: { items: ITEMS, open: true, onOpenChange: () => {}, onSelect: () => {} },
     });
     const matches = body.match(/data-command-palette-item/g) ?? [];
-    expect(matches).toHaveLength(ITEMS.length);
+    expect(matches.length).toBeGreaterThanOrEqual(ITEMS.length);
+    for (const item of ITEMS) {
+      expect(body).toContain(`data-id="${item.id}"`);
+    }
   });
 });

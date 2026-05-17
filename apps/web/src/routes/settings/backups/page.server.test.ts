@@ -1,19 +1,47 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockDb = {
-  query: vi.fn(),
-  close: vi.fn(),
+const scope = {
+  em: { marker: "em" },
+  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
 };
-vi.mock("$lib/server/db", () => ({
-  openIsolatedStore: vi.fn(() => Promise.resolve(mockDb)),
+const mocks = {
+  scope,
+  requestServiceScope: vi.fn(async () => scope),
+  createSettingsBackup: vi.fn(async () => ({ success: true, id: "backup-1" })),
+  preflightSettingsBackup: vi.fn((input: unknown) => ({
+    preflight: true,
+    entityCounts: Object.fromEntries(
+      Object.entries(input && typeof input === "object" ? input as Record<string, unknown> : {})
+        .filter(([, value]) => Array.isArray(value))
+        .map(([key, value]) => [key, (value as unknown[]).length]),
+    ),
+  })),
+  restoreSettingsBackup: vi.fn(async () => ({ restored: true, message: "Restore complete" })),
+  listBackupSummaries: vi.fn(async () => ({ backups: [] })),
+  summarizeImportManifest: vi.fn((input: unknown) => ({
+    manifest: input && typeof input === "object" && (input as { format?: string }).format === "fulcrum.json-export.v1"
+      ? input
+      : null,
+    summary: {},
+  })),
+};
+
+vi.mock("$lib/server/request-service-scope", () => ({
+  requestServiceScope: mocks.requestServiceScope,
+}));
+
+vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
+  createSettingsBackup: mocks.createSettingsBackup,
+  preflightSettingsBackup: mocks.preflightSettingsBackup,
+  restoreSettingsBackup: mocks.restoreSettingsBackup,
+  listBackupSummaries: mocks.listBackupSummaries,
+  summarizeImportManifest: mocks.summarizeImportManifest,
 }));
 
 import { actions } from "./+page.server.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDb.query.mockResolvedValue([]);
-  mockDb.close.mockResolvedValue(undefined);
 });
 
 function makeRequest(body: Record<string, string | File>) {
@@ -27,10 +55,7 @@ describe("/settings/backups actions", () => {
     const result = await actions.create({ request: { formData: async () => new FormData() } } as Parameters<typeof actions.create>[0]);
     expect(result).toMatchObject({ success: true });
     expect(result).toHaveProperty("id");
-    expect(mockDb.query).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO backups"),
-      expect.any(Array),
-    );
+    expect(mocks.createSettingsBackup).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx);
   });
 
   it("restore: fails with no file", async () => {

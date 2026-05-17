@@ -12,7 +12,6 @@
 
 ## Scope
 
-
 ```text
 Agents:
   claude-code
@@ -27,7 +26,6 @@ Managed package/component families:
   package.superpowers
   skills.authored
   skills.upstream
-  graphify project integration
   ast-grep agent skill
   tavily agent skills
   context7 MCP
@@ -96,7 +94,6 @@ These official references define the native package model. Workers must re-check
 | Official-first, then mirror everything | Current code has package-specific helpers, but each helper decides independently what "everything" means. | Need shared `PackageSurfaceManifest` plus target map so omission is testable. |
 | Disabled setup for required MCPs | Registry-owned disabled configs are written for Codex/Gemini/OpenCode. Claude/Pi are skipped because no safe disabled bit is documented. Component adapter disable currently removes config in some paths. | Need explicit install-vs-enable semantics, component disable preserving disabled config where possible, and doctor output for unsupported disabled config. |
 | All shipped surfaces: skills, rules, tools, commands, agents, hooks | Current tests mostly count skills and a few MCP/config files. | Need tests that assert `S/R/M/C/A/H/T/P` per package and per agent, with unsupported reasons. |
-| Graphify/ast-grep/Tavily lifecycle | `fulcrum init` runs vendor commands, but component lifecycle cannot inspect/remove/verify those installed package surfaces. | Add component/audit entries for project integrations and upstream skill installers so setup is not fire-and-forget. |
 
 ### Current package matrix
 
@@ -107,7 +104,6 @@ Legend: `ok` means verified or intentionally native; `partial` means some surfac
 | Caveman | ok native plugin `S/H/R/P` | partial `S/H/P` mirror | ok native extension | partial `S` mirror | partial `S` mirror | OpenCode/Pi lack full commands/hooks/rules/package config if upstream ships them. Codex mirror must be manifest-audited, not assumed. |
 | Cloudflare | ok native Claude plugin `S/M/C/P` | partial `S/M` | partial `S/M` | partial `S/M` | partial `S/M` | Non-Claude agents lack plugin metadata, commands, rules/context, assets, and any runtime package config if shipped. |
 | Superpowers | ok native Claude plugin `S/C/A/H/P` | partial `S` | ok native Gemini extension | ok native OpenCode plugin | ok native Pi package, fallback partial `S` | Codex lacks commands/agents/hooks/package metadata. Pi fallback lacks commands/agents/hooks/package metadata. |
-| Graphify | ok vendor CLI for Claude/Codex/Gemini/OpenCode | ok vendor CLI | ok vendor CLI | ok vendor CLI | partial skill fallback | Pi lacks official installer; component lifecycle cannot inspect/remove/verify graphify surfaces. |
 | ast-grep | fire-and-forget `npx skills add` | fire-and-forget | fire-and-forget | fire-and-forget | fire-and-forget | Not component-managed or removable; no parity/status audit. |
 | Tavily | fire-and-forget `npx skills add` + MCP registry | fire-and-forget | fire-and-forget | fire-and-forget | fire-and-forget | Skills and MCP availability are split; not package-audited. |
 | context7 | MCP only | MCP only | MCP only | MCP only | MCP only | Good as MCP-only package if no official skill exists, but disabled/native config support must be explicit. |
@@ -551,8 +547,6 @@ Parent resolves conflicts between C2/C3 because both touch `apps/cli/src/vendor-
     bun test apps/cli/src/component.test.ts apps/cli/src/doctor.test.ts
     ```
 
-### Wave E - graphify, ast-grep, tavily lifecycle audit
-
 - [x] Worker E1: Add component/audit coverage for vendor project integrations.
   - Worktree: `~/.config/superpowers/worktrees/fulcrum/project-integrations`
   - Owns:
@@ -564,7 +558,6 @@ Parent resolves conflicts between C2/C3 because both touch `apps/cli/src/vendor-
     src/components/adapters/vendor.ts
     src/components/adapters/vendor.test.ts
     ```
-  - Must make graphify, ast-grep, and tavily visible to component status/doctor as managed vendor integrations, even if install remains vendor-command-first.
   - Must add remove/status behavior or explicit non-removable/manual reason for vendor commands that do not publish uninstall.
   - Verify:
     ```bash

@@ -1,8 +1,3 @@
-/**
- * Re-export from canonical service layer.
- * Web consumers use $lib/server/tasks — this file preserves that alias.
- * Actual logic lives in src/services/tasks.ts.
- */
 export {
   type TaskStatus,
   TASK_STATUSES,
@@ -12,4 +7,4 @@ export {
   updateTaskAction,
   deleteTaskAction,
   moveTaskStatusAction,
-} from "@/services/tasks.ts";
+} from "@work-management/interface/work-item-actions.ts";

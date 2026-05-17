@@ -1,14 +1,14 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
+let commitDetail: unknown;
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -19,6 +19,8 @@ function streamedData<T>(result: unknown): Promise<T> {
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repo-commit-diff-"));
   process.env["FULCRUM_HOME"] = scratch;
+  commitDetail = null;
+  repoPagesMock["commitDetail"] = commitDetail;
 });
 
 afterEach(() => {
@@ -27,36 +29,39 @@ afterEach(() => {
 });
 
 async function seedCommitDiff(): Promise<{ repoId: string; sha: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS name text not null default ''`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS kind text not null default 'local'`);
-  await db.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS archived boolean not null default false`);
-  await db.query(`CREATE TABLE IF NOT EXISTS repo_commits (id uuid primary key, org_id text not null, repo_id text not null, sha text not null, message text null, author text null, committed_at timestamptz null, diff text null)`);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const repoId = makeId();
   const sha = "abcdef1234567890abcdef1234567890abcdef12";
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, name, kind, archived) VALUES ($1, $2, 'fulcrum', '/workspace/fulcrum', 'Fulcrum', 'local', false)`,
-    [repoId, org.id],
-  );
-  await db.query(
-    `INSERT INTO repo_commits (id, org_id, repo_id, sha, message, author, committed_at, diff)
-     VALUES ($1, $2, $3, $4, 'feat: diff view', 'M <m@example.test>', $5, $6)`,
-    [
-      randomUUID(),
-      org.id,
-      repoId,
-      sha,
-      "2026-05-03T10:00:00.000Z",
-      "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1,2 @@\n-old\n+new\n+line\n",
-    ],
-  );
-  await db.close();
+  const raw = "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1,2 @@\n-old\n+new\n+line\n";
+  commitDetail = {
+    repo: { id: repoId, name: "Fulcrum", slug: "fulcrum" },
+    commit: { sha, subject: "feat: diff view", author: "M <m@example.test>", committedAt: "2026-05-03T10:00:00.000Z" },
+    diff: {
+      raw,
+      html: `<div data-diff2html><div data-shiki-line>src/a.ts</div></div>`,
+      filesChanged: 1,
+      insertions: 2,
+      deletions: 1,
+    },
+  };
+  repoPagesMock["commitDetail"] = commitDetail;
   return { repoId, sha };
 }
+
+mock.module("@integration-hub/interface/repository-pages.ts", () => ({
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [],
+  listRepositoryDashboard: async () => [],
+  loadRepositoryDetail: async () => ({ branches: [], commits: [], files: [], syncLog: [] }),
+  loadRepositoryBranchesPage: async () => ({ repo: null, branches: [], writeOpsEnabled: false }),
+  createRepositoryBranch: async () => ({ ok: true }),
+  checkoutRepositoryBranch: async () => ({ ok: true }),
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async () => ({ repo: null, commits: [], page: 1, totalPages: 1, total: 0 }),
+  loadRepositoryCommitDetail: async () => repoPagesMock["commitDetail"] ?? commitDetail,
+}));
 
 describe("/repos/[id]/commits/[sha] +page.server.ts", () => {
   test("load returns commit diff, rendered diff html, and stat summary", async () => {

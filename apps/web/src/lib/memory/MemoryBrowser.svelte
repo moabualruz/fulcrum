@@ -1,23 +1,22 @@
 <script lang="ts">
-  /**
-   * MemoryBrowser — Plan 06-09 (MEM-07, D-27, D-28)
-   *
-   * Table view for browsing, searching, and managing memories.
-   * Columns: Body, Importance, Project, Global, Actions
-   *
-   * T-06-13: org_id filter enforced server-side in MemoryService.
-   * Uses MemoryPromoteToggle for promote-to-global action.
-   */
   import { onMount } from "svelte";
   import MemoryPromoteToggle from "./MemoryPromoteToggle.svelte";
   import type { MemoryRow } from "./memory-browser.ts";
-  import { previewMemory, createDebouncedMemorySearch } from "./memory-browser.ts";
+  import {
+    createDebouncedMemorySearch,
+    memoryDeleteApiPath,
+    memoryListApiPath,
+    memoryPublicApiHeaders,
+    memorySearchApiPath,
+    previewMemory,
+  } from "./memory-browser.ts";
 
   interface Props {
     projectId?: string;
+    authorization?: string;
   }
 
-  const { projectId }: Props = $props();
+  const { projectId, authorization }: Props = $props();
 
   let memories = $state<MemoryRow[]>([]);
   let loading = $state(true);
@@ -37,13 +36,17 @@
     loading = true;
     error = "";
     try {
-      const procedure = term
-        ? `memories.search?input=${encodeURIComponent(JSON.stringify({ term: term, projectId: projectId ?? "" }))}`
-        : `memories.list?input=${encodeURIComponent(JSON.stringify({ projectId }))}`;
-      const res = await fetch(`/api/trpc/${procedure}`);
+      const res = await fetch(
+        term ? memorySearchApiPath(term, { projectId }) : memoryListApiPath({ projectId }),
+        {
+          method: "GET",
+          credentials: "include",
+          headers: memoryPublicApiHeaders({ authorization }),
+        },
+      );
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       const payload = await res.json();
-      const data = payload?.result?.data?.json ?? payload?.result?.data ?? payload;
+      const data = Array.isArray(payload) ? payload : payload?.data ?? payload?.items ?? [];
       memories = Array.isArray(data) ? data : [];
     } catch (cause) {
       error = cause instanceof Error ? cause.message : "Failed to load memories";
@@ -66,10 +69,10 @@
     deleting = true;
     deleteError = "";
     try {
-      const res = await fetch("/api/trpc/memories.delete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id }),
+      const res = await fetch(memoryDeleteApiPath(id), {
+        method: "DELETE",
+        credentials: "include",
+        headers: memoryPublicApiHeaders({ authorization }),
       });
       if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
       memories = memories.filter((m) => m.id !== id);
@@ -162,6 +165,7 @@
                 <MemoryPromoteToggle
                   memoryId={memory.id}
                   isGlobal={memory.global}
+                  authorization={authorization}
                   onPromoted={handlePromoted}
                 />
               </td>

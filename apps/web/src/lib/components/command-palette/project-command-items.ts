@@ -44,6 +44,9 @@ export function buildProjectCommandItems(input: BuildProjectCommandItemsInput): 
     nav("projects", "Projects", "/projects", projectScope, projectTarget),
     nav("docs", "Documents", activeProjectId ? `${projectPrefix}/docs` : "/docs", projectScope, projectTarget),
     nav("boards", "Boards", activeProjectId ? `${projectPrefix}/board` : "/boards", projectScope, projectTarget),
+    nav("project-modules", "Project modules", activeProjectId ? `${projectPrefix}/modules` : "/projects", projectScope, projectTarget),
+    nav("project-intake", "Project intake", activeProjectId ? `${projectPrefix}/intake` : "/projects", projectScope, projectTarget),
+    nav("saved-views", "Saved views", activeProjectId ? `${projectPrefix}/settings/views` : "/projects", projectScope, projectTarget),
     nav("agents", "Agents", "/agents", SYSTEM_SCOPE, SYSTEM_TARGET),
     nav("runs", "Agent runs", activeProjectId ? `/runs?project=${activeProjectId}` : "/runs", projectScope, projectTarget),
     nav("artifacts", "Artifacts", activeProjectId ? `/artifacts?project=${activeProjectId}` : "/artifacts", projectScope, projectTarget),
@@ -61,6 +64,9 @@ export function buildProjectCommandItems(input: BuildProjectCommandItemsInput): 
     nav("data-settings", "Data Settings", "/settings/data", SYSTEM_SCOPE, SYSTEM_TARGET),
     mutate("create-task", "New task", activeProjectId ? `${projectPrefix}/board?new=task` : "/boards?new=task", projectScope, projectTarget),
     mutate("create-doc", "New doc", activeProjectId ? `${projectPrefix}/docs/new` : "/docs/new", projectScope, projectTarget),
+    mutate("create-module", "New module", activeProjectId ? `${projectPrefix}/modules?new=module` : "/projects", projectScope, projectTarget),
+    mutate("create-intake-request", "New intake request", activeProjectId ? `${projectPrefix}/intake?new=request` : "/projects", projectScope, projectTarget),
+    mutate("create-saved-view", "New saved view", activeProjectId ? `${projectPrefix}/settings/views?new=view` : "/projects", projectScope, projectTarget),
   ];
 }
 

@@ -35,6 +35,9 @@
 	const quickNav = $derived([
 		{ label: "Board", href: `/projects/${data.project.id}/board` },
 		{ label: "Backlog", href: `/projects/${data.project.id}/backlog` },
+		{ label: "Modules", href: `/projects/${data.project.id}/modules` },
+		{ label: "Intake", href: `/projects/${data.project.id}/intake` },
+		{ label: "Views", href: `/projects/${data.project.id}/settings/views` },
 		{ label: "Sprints", href: `/projects/${data.project.id}/sprints` },
 		{ label: "Reports", href: `/projects/${data.project.id}/reports` },
 		{ label: "Repos", href: `/projects/${data.project.id}/repos` },

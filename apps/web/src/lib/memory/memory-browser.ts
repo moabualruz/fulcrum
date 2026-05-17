@@ -59,6 +59,11 @@ export interface MemoryConfig {
   token_budget: number;
 }
 
+export interface MemoryPublicApiScope {
+  projectId?: string | null;
+  authorization?: string | null;
+}
+
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   bm25_weight: 1,
   recency_weight: 1,
@@ -133,6 +138,36 @@ export function previewMemory(body: string, limit = 180): string {
   return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
 
+export function memoryListApiPath(scope: Pick<MemoryPublicApiScope, "projectId"> = {}): string {
+  return memoryApiPath("/api/v1/memory", { projectId: scope.projectId ?? undefined });
+}
+
+export function memorySearchApiPath(
+  term: string,
+  scope: Pick<MemoryPublicApiScope, "projectId"> = {},
+): string {
+  return memoryApiPath("/api/v1/memory/search", {
+    query: term,
+    projectId: scope.projectId ?? undefined,
+  });
+}
+
+export function memoryDeleteApiPath(id: string): string {
+  return memoryApiPath(`/api/v1/memory/${encodeURIComponent(id)}`, { confirm: "true" });
+}
+
+export function memoryPromoteApiPath(id: string): string {
+  return `/api/v1/memory/${encodeURIComponent(id)}/promote`;
+}
+
+export function memoryPublicApiHeaders(
+  scope: Pick<MemoryPublicApiScope, "authorization"> = {},
+): Record<string, string> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (scope.authorization?.trim()) headers.authorization = scope.authorization;
+  return headers;
+}
+
 export function normalizeMemoryConfig(value: Partial<MemoryConfig> | null | undefined): MemoryConfig {
   return {
     bm25_weight: numberOrDefault(value?.bm25_weight, DEFAULT_MEMORY_CONFIG.bm25_weight),
@@ -144,6 +179,15 @@ export function normalizeMemoryConfig(value: Partial<MemoryConfig> | null | unde
 
 function parseTags(input: string): string[] {
   return input.split(",").map((tag) => tag.trim()).filter(Boolean);
+}
+
+function memoryApiPath(path: string, query: Record<string, string | null | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value) params.set(key, value);
+  }
+  const queryString = params.toString();
+  return queryString ? `${path}?${queryString}` : path;
 }
 
 function isMemoryKind(value: unknown): value is MemoryKind {

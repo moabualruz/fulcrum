@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { CreateTaskBody } from "@/test-support/product-fixtures.ts";
+import { CreateTaskBody } from "@test-support/product-workspace-fixtures.ts";
 import {
   ListDocumentsInputSchema,
 } from "../schemas/documents.ts";
 import {
   ArtifactIdInputSchema,
   UploadArtifactInputSchema,
-} from "@/test-support/product-fixtures.ts";
+} from "@test-support/product-workspace-fixtures.ts";
 import { ListRunsInputSchema } from "../schemas/runs.ts";
 import { ListMemoriesInputSchema } from "../schemas/memories.ts";
 import {
@@ -20,7 +20,7 @@ import {
   ListNotificationsInputSchema,
 } from "../schemas/notifications.ts";
 
-describe("Phase 08 tRPC schema validation", () => {
+describe("Surface tRPC schema validation", () => {
   test("rejects malformed task payloads", () => {
     expect(() => CreateTaskBody.parse({ title: "" })).toThrow();
   });

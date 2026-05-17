@@ -11,8 +11,68 @@
     data: {
       streamed: { data: Promise<TaskDetailPayload> | TaskDetailPayload };
     };
+    form?: TaskRunForm;
   }
-  const { data }: Props = $props();
+  type DependencyRunPreview = {
+    traceId?: string;
+    mode: string;
+    targetTaskIds: string[];
+    orderedTaskIds: string[];
+    requiresDisclosure: boolean;
+    blocked: boolean;
+    warnings: string[];
+    tasks: Array<{
+      id: string;
+      title: string;
+      column: string;
+      dependencyIds: string[];
+      blockedBy?: string | null;
+    }>;
+  };
+  type DependencyRunDispatch = {
+    runGroupId: string;
+    preview: DependencyRunPreview;
+    scheduledRuns: Array<{ id: string; taskId: string; agent: string; status: string; queuePosition: number }>;
+    skippedTasks: Array<{ id: string; title: string; reason: string }>;
+    warnings: string[];
+  };
+  type DependencyRunFeedback = {
+    traceId: string;
+    runGroupId: string;
+    executorStatus: {
+      queuedTaskCount: number;
+      runningTaskCount: number;
+      succeededTaskCount: number;
+      failedTaskCount: number;
+      blockedTaskCount: number;
+      inReviewCount: number;
+      active: boolean;
+    };
+    runs: Array<{
+      id: string;
+      taskId: string | null;
+      status: string;
+      queuePosition: number;
+      dependencyIds: string[];
+      latestEventSummary: string | null;
+    }>;
+    events: Array<{
+      id: string;
+      mutationType: string;
+      summary: string;
+      output: string | null;
+      createdAt: string;
+    }>;
+  };
+  type TaskRunForm = {
+    ok?: boolean;
+    mode?: "runPreview" | "run" | "runFeedback";
+    message?: string;
+    preview?: DependencyRunPreview;
+    dispatch?: DependencyRunDispatch;
+    feedback?: DependencyRunFeedback;
+  };
+  const { data, form }: Props = $props();
 
   const isStatus = (s: string): s is TaskStatus => (TASK_STATUSES as readonly string[]).includes(s);
   const fieldCls = "mt-1 w-full rounded border border-border bg-background p-2";
@@ -21,6 +81,9 @@
   let editingTitle = $state(false);
   let activeOverlay = $state<string | null>(null);
   let autosaveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
+  let liveRunFeedback = $state<DependencyRunFeedback | null>(null);
+  let liveRunFeedbackSource: EventSource | null = null;
+  let displayedRunFeedback = $derived(liveRunFeedback ?? (form?.mode === "runFeedback" && form.ok ? form.feedback ?? null : null));
   const normalizePayload = (p: TaskDetailPayload): TaskDetailPayload => ({
     ...p,
     subtasks: p.subtasks ?? [],
@@ -110,6 +173,40 @@
       await nav.goto("/boards");
     }
   }
+
+  function stopRunFeedbackStream(): void {
+    liveRunFeedbackSource?.close();
+    liveRunFeedbackSource = null;
+  }
+
+  function startRunFeedbackStream(feedback: DependencyRunFeedback): void {
+    liveRunFeedback = feedback;
+    if (typeof EventSource === "undefined" || !feedback.executorStatus.active) return;
+    stopRunFeedbackStream();
+    const params = new URLSearchParams({
+      traceId: feedback.traceId,
+      runGroupId: feedback.runGroupId,
+    });
+    const source = new EventSource(`run-feedback?${params.toString()}`);
+    source.addEventListener("feedback", (event) => {
+      const next = JSON.parse((event as MessageEvent).data) as DependencyRunFeedback;
+      liveRunFeedback = next;
+      if (!next.executorStatus.active) stopRunFeedbackStream();
+    });
+    source.onerror = () => stopRunFeedbackStream();
+    liveRunFeedbackSource = source;
+  }
+
+  $effect(() => {
+    const feedback = form?.mode === "runFeedback" && form.ok ? form.feedback ?? null : null;
+    if (!feedback) {
+      liveRunFeedback = null;
+      stopRunFeedbackStream();
+      return;
+    }
+    startRunFeedbackStream(feedback);
+    return stopRunFeedbackStream;
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -195,6 +292,125 @@
         </section>
       {/if}
 
+      <section data-task-run-controls class="mb-6 border-t border-border pt-4">
+        <div class="mb-3 flex items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold text-muted-foreground">Dependency Run</h2>
+          <span class="font-mono text-xs text-muted-foreground">{payload.task.id}</span>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <form method="POST" action="?/runPreview" data-task-run-preview-form class="flex items-end gap-2">
+            <label class="block flex-1 text-xs text-muted-foreground">
+              Trace
+              <input name="traceId" value={`trace-${payload.task.id}`} class={cn(fieldCls, "text-xs")} />
+            </label>
+            <button type="submit" data-task-run-preview class={cn(buttonVariants({ variant: "secondary" }))}>Preview</button>
+          </form>
+          <form method="POST" action="?/run" data-task-run-form class="grid gap-2">
+            <input type="hidden" name="traceId" value={`trace-${payload.task.id}`} />
+            <div class="flex items-end gap-2">
+              <label class="block flex-1 text-xs text-muted-foreground">
+                Agent
+                <input name="agent" value="codex" class={cn(fieldCls, "text-xs")} />
+              </label>
+              <label class="block flex-1 text-xs text-muted-foreground">
+                Model
+                <input name="model" value="" class={cn(fieldCls, "text-xs")} />
+              </label>
+              <button type="submit" data-task-run-submit class={cn(buttonVariants({ variant: "default" }))}>Run</button>
+            </div>
+            <input name="prompt" value={`Run dependency tree for ${payload.task.id}`} class={cn(fieldCls, "text-xs")} />
+          </form>
+          <form method="POST" action="?/runFeedback" data-task-run-feedback-form class="flex items-end gap-2">
+            <label class="block flex-1 text-xs text-muted-foreground">
+              Trace
+              <input name="traceId" value={form?.dispatch?.runGroupId ?? `trace-${payload.task.id}`} class={cn(fieldCls, "text-xs")} />
+            </label>
+            <button type="submit" data-task-run-feedback-submit class={cn(buttonVariants({ variant: "secondary" }))}>Feedback</button>
+          </form>
+        </div>
+
+        {#if form?.ok === false}
+          <p data-task-run-error class="mt-3 text-sm text-destructive">{form.message}</p>
+        {/if}
+
+        {#if form?.mode === "runPreview" && form.ok && form.preview}
+          <div data-task-dependency-graph class="mt-4 space-y-3">
+            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span>Trace: {form.preview.traceId ?? "none"}</span>
+              <span>Targets: {form.preview.targetTaskIds.length}</span>
+              <span>Disclosure: {form.preview.requiresDisclosure ? "required" : "none"}</span>
+            </div>
+            <ol class="space-y-2">
+              {#each form.preview.orderedTaskIds as orderedId, index (orderedId)}
+                {@const node = form.preview.tasks.find((task) => task.id === orderedId)}
+                <li
+                  data-task-dependency-node
+                  data-task-id={orderedId}
+                  data-column={node?.column ?? "unknown"}
+                  class="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  <span class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-muted-foreground">{index + 1}</span>
+                    <span>{node?.title ?? orderedId}</span>
+                  </span>
+                  <span class="text-xs text-muted-foreground">{node?.column ?? "unknown"}</span>
+                </li>
+              {/each}
+            </ol>
+          </div>
+        {/if}
+
+        {#if form?.mode === "run" && form.ok && form.dispatch}
+          <div data-task-run-dispatch class="mt-4 space-y-2 text-sm">
+            <div class="font-mono text-xs text-muted-foreground">Trace: {form.dispatch.runGroupId}</div>
+            <div class="flex flex-wrap gap-2">
+              {#each form.dispatch.scheduledRuns as run (run.id)}
+                <span data-task-run-scheduled class="rounded-md border border-border px-2 py-1 text-xs">
+                  queued {run.taskId} by {run.agent}
+                </span>
+              {/each}
+              {#each form.dispatch.skippedTasks as task (task.id)}
+                <span data-task-run-skipped class="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+                  skipped {task.id}: {task.reason}
+                </span>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if displayedRunFeedback}
+          <div data-task-run-feedback data-task-run-feedback-live class="mt-4 space-y-3 text-sm" aria-live="polite">
+            <div class="font-mono text-xs text-muted-foreground">Trace: {displayedRunFeedback.runGroupId}</div>
+            <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span>Queued: {displayedRunFeedback.executorStatus.queuedTaskCount}</span>
+              <span>Running: {displayedRunFeedback.executorStatus.runningTaskCount}</span>
+              <span>Succeeded: {displayedRunFeedback.executorStatus.succeededTaskCount}</span>
+              <span>Failed: {displayedRunFeedback.executorStatus.failedTaskCount}</span>
+            </div>
+            <div class="space-y-2">
+              {#each displayedRunFeedback.runs as run (run.id)}
+                <div data-task-run-feedback-run class="rounded-md border border-border px-3 py-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-mono text-xs">{run.queuePosition}. {run.id}</span>
+                    <span class="text-xs text-muted-foreground">{run.status}</span>
+                  </div>
+                  {#if run.latestEventSummary}
+                    <p class="mt-1 text-xs text-muted-foreground">{run.latestEventSummary}</p>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+            <ul class="space-y-1">
+              {#each displayedRunFeedback.events as event (event.id)}
+                <li data-task-run-feedback-event class="text-xs text-muted-foreground">
+                  <span class="text-foreground">{event.summary}</span>{event.output ? ` - ${event.output}` : ""}
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+      </section>
+
       <!-- Activity feed -->
       {#if payload.events.length > 0}
         <section data-task-activity class="mb-6">
@@ -241,6 +457,26 @@
           </div>
         </div>
       {/if}
+
+      <!-- Time Tracking -->
+      <section data-time-tracking class="border-t border-border pt-4 mt-4">
+        <h3 class="text-sm font-semibold mb-2">Time Tracking</h3>
+        <form method="POST" action="?/logTime" class="flex flex-wrap items-end gap-2 mb-3">
+          <label class="grid gap-1 text-xs">
+            <span class="text-muted-foreground">Minutes</span>
+            <input name="durationMinutes" type="number" min="1" max="1440" required class="h-8 w-20 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <label class="grid gap-1 text-xs">
+            <span class="text-muted-foreground">Date</span>
+            <input name="loggedDate" type="date" required value={new Date().toISOString().slice(0, 10)} class="h-8 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <label class="grid gap-1 text-xs flex-1">
+            <span class="text-muted-foreground">Note</span>
+            <input name="description" type="text" placeholder="Optional" class="h-8 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <button type="submit" class="h-8 rounded bg-primary px-3 text-xs font-medium text-primary-foreground">Log</button>
+        </form>
+      </section>
 
       <!-- Actions -->
       <footer class="flex items-center gap-2 border-t border-border pt-4">

@@ -55,7 +55,12 @@
 	</header>
 
 	<div class={cn("mb-3")}>
-		<InContextSearchBar kind="doc" projectId={data.activeProjectId} placeholder="Search documents" />
+		<InContextSearchBar
+			kind="doc"
+			projectId={data.activeProjectId}
+			orgId={data.orgId}
+			placeholder="Search documents"
+		/>
 	</div>
 
 	<div

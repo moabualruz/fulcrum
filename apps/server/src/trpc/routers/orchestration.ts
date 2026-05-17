@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 import { router, publicProcedure } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {
@@ -15,35 +15,35 @@ import {
   retryRun,
   upsertWorkflowDef,
   type LegacySymphonyStore,
-} from "@/application/legacy/symphony.ts";
+} from "@platform-core/application/legacy/symphony.ts";
 import {
   dispatchTaskRun,
-} from "@/application/runs/commands.ts";
-import { buildDispatchTrace } from "@/application/orchestration/dispatch-trace.ts";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
-import { AppError } from "@/application/errors.ts";
+} from "@execution-orchestration/application/runs/commands.ts";
+import { buildDispatchTrace } from "@execution-orchestration/application/orchestration/dispatch-trace.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
 import {
   getRunDetail,
-} from "@/application/runs/queries.ts";
-import type { AppContext as RunsAppContext } from "@/application/runs/types.ts";
+} from "@execution-orchestration/application/runs/queries.ts";
+import type { AppContext as RunsAppContext } from "@execution-orchestration/application/runs/types.ts";
 import {
   claimRun as claimSymphonyRun,
   ClaimConflictError,
-} from "@/orchestration/symphony/orchestrator.ts";
+} from "@execution-orchestration/infrastructure/agent-runtime/symphony/orchestrator.ts";
 import {
   fetchCandidateIssues,
   fetchIssuesByStates,
   fetchIssueStatesByIds,
-} from "@/orchestration/symphony/tracker.ts";
+} from "@execution-orchestration/infrastructure/agent-runtime/symphony/tracker.ts";
 import {
   AGENT_RUN_ORCHESTRATION_STATES,
   type AgentRunOrchestrationState,
-} from "@/orchestration/states.ts";
-import { getWorkspacePath } from "@/orchestration/symphony/workspace.ts";
+} from "@execution-orchestration/infrastructure/agent-runtime/states.ts";
+import { getWorkspacePath } from "@execution-orchestration/infrastructure/agent-runtime/symphony/workspace.ts";
 import {
   parseWorkflowConfig,
   renderPrompt,
-} from "@/orchestration/symphony/prompt.ts";
+} from "@execution-orchestration/infrastructure/agent-runtime/symphony/prompt.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — PGlite returns Date objects for timestamptz; coerce to ISO string
@@ -387,7 +387,7 @@ export const orchestrationRouter = router({
   // ---------------------------------------------------------------------------
   // dispatchRun — SND-06, SYM-25
   // Creates or updates an agent_runs row and queues the run for dispatch.
-  // Uses MikroORM EM path (ARCH-12), not legacy SQL.
+  // Uses TypeORM EntityManager path (ARCH-12), not legacy SQL.
   // Protected by permissionedProcedure with explicit resource/action metadata.
   // ---------------------------------------------------------------------------
   dispatchRun: permissionedProcedure({ resource: "orchestration", action: "dispatchRun" })

@@ -2,7 +2,10 @@
   import { cn } from "$lib/utils.js";
   import {
     appendFacetToken,
+    buildSearchFacetCounts,
     buildSearchQueryInput,
+    searchPublicApiHeaders,
+    searchPublicApiPath,
     type InContextSearchKind,
     type SearchFacetCounts,
   } from "./in-context-search";
@@ -10,6 +13,8 @@
   interface Props {
     kind: InContextSearchKind;
     projectId?: string | null;
+    orgId?: string | null;
+    apiToken?: string | null;
     placeholder?: string;
     initialValue?: string;
     facetCounts?: SearchFacetCounts;
@@ -18,6 +23,8 @@
   let {
     kind,
     projectId = null,
+    orgId = null,
+    apiToken = null,
     placeholder = "Search",
     initialValue = "",
     facetCounts = {},
@@ -36,6 +43,17 @@
 
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
+  function searchPath(): string {
+    if (!orgId) throw new Error("Search scope is required.");
+    return searchPublicApiPath("/api/v1/search", {
+      q: queryInput.q,
+      org_id: orgId,
+      kind: queryInput.kind,
+      limit: queryInput.limit,
+      project_id: projectId,
+    });
+  }
+
   async function runSearch(): Promise<void> {
     const trimmed = value.trim();
     if (trimmed === "") {
@@ -47,16 +65,16 @@
     pending = true;
     error = "";
     try {
-      const response = await fetch("/api/trpc/search.query", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(queryInput),
+      const response = await fetch(searchPath(), {
+        method: "GET",
+        credentials: "include",
+        headers: searchPublicApiHeaders(apiToken),
       });
-      if (!response.ok) throw new Error(`search.query failed: ${response.status}`);
-      const payload = await response.json();
-      const result = payload?.result?.data?.json ?? payload?.result?.data ?? payload;
-      activeFacetCounts = result?.facetCounts ?? result?.facets ?? {};
-      dispatchEvent(new CustomEvent("fulcrum:in-context-search", { detail: { input: queryInput, result } }));
+      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+      const result = await response.json();
+      const rows = Array.isArray(result) ? result : [];
+      activeFacetCounts = buildSearchFacetCounts(rows);
+      dispatchEvent(new CustomEvent("fulcrum:in-context-search", { detail: { input: queryInput, result: rows } }));
     } catch (cause) {
       error = cause instanceof Error ? cause.message : "Search failed";
     } finally {

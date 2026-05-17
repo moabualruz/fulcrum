@@ -1,13 +1,4 @@
 <script lang="ts">
-  /**
-   * Import settings page (D-121).
-   *
-   * Step 1: Select source (CSV / Jira / Linear / GitHub / Trello)
-   * Step 2: Upload file (CSV) or authenticate (external sources)
-   * Step 3: Field mapping preview
-   * Step 4: Dry-run results
-   * Step 5: Confirm + import with progress bar
-   */
   import type { PageData } from "./$types";
   import { cn } from "$lib/utils.js";
 
@@ -17,7 +8,7 @@
 
   let { data }: Props = $props();
 
-  type Source = "csv" | "jira" | "linear" | "github" | "trello";
+  type Source = "csv" | "jira" | "linear" | "plane";
   type Step = 1 | 2 | 3 | 4 | 5;
 
   interface FieldMapping {
@@ -25,19 +16,24 @@
     targetField: string;
   }
 
-  const SOURCES: Array<{ id: Source; label: string; icon: string; description: string }> = [
-    { id: "csv", label: "CSV", icon: "📄", description: "Import tasks from a CSV file" },
-    { id: "jira", label: "Jira", icon: "🔵", description: "Import from Atlassian Jira project" },
-    { id: "linear", label: "Linear", icon: "⚡", description: "Import from Linear workspace" },
-    { id: "github", label: "GitHub Issues", icon: "⬛", description: "Import GitHub Issues as tasks" },
-    { id: "trello", label: "Trello", icon: "🟦", description: "Import from Trello board" },
-  ];
+  const SOURCE_DETAILS: Record<Source, { label: string; icon: string; description: string }> = {
+    csv: { label: "CSV", icon: "📄", description: "Import tasks from a CSV file" },
+    jira: { label: "Jira", icon: "🔵", description: "Import from Atlassian Jira project" },
+    linear: { label: "Linear", icon: "⚡", description: "Import from Linear workspace" },
+    plane: { label: "Plane", icon: "▦", description: "Import from a Plane workspace export" },
+  };
 
   const TARGET_FIELDS = ["title", "description", "status", "priority", "assignee", "labels", "due_date", "story_points"];
+  const sources = data.importers.map((importer) => ({
+    id: importer.name as Source,
+    enabled: importer.enabled,
+    ...SOURCE_DETAILS[importer.name as Source],
+  })).filter((source) => source.label);
 
   let step: Step = 1;
   let selectedSource: Source | null = null;
   let uploadedFile: File | null = null;
+  let csvRowCount = 0;
   let csvPreviewRows: string[][] = [];
   let csvHeaders: string[] = [];
   let fieldMappings: FieldMapping[] = [];
@@ -63,10 +59,10 @@
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       const lines = text.split("\n").filter(Boolean);
+      csvRowCount = Math.max(0, lines.length - 1);
       if (lines.length > 0) {
         csvHeaders = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
         csvPreviewRows = lines.slice(1, 6).map((l) => l.split(",").map((c) => c.trim().replace(/^"|"$/g, "")));
-        // Default mappings
         fieldMappings = csvHeaders.slice(0, TARGET_FIELDS.length).map((src, i) => ({
           sourceField: src,
           targetField: TARGET_FIELDS[i] ?? "",
@@ -86,11 +82,13 @@
 
   async function runDryRun() {
     error = "";
-    // Simulated dry-run (real impl calls trpc.import.dryRun)
-    await new Promise((r) => setTimeout(r, 600));
+    if (selectedSource !== "csv") {
+      error = "This importer is not configured for project import preview yet.";
+      return;
+    }
     dryRunResults = {
-      importable: csvPreviewRows.length > 0 ? 42 : 0,
-      skipped: 3,
+      importable: csvRowCount,
+      skipped: 0,
       errors: [],
     };
     nextStep();
@@ -100,15 +98,8 @@
     importing = true;
     importProgress = 0;
     error = "";
-    // Simulated import progress (real impl calls trpc.import.run with SSE or polling)
-    const interval = setInterval(() => {
-      importProgress += 10;
-      if (importProgress >= 100) {
-        clearInterval(interval);
-        importing = false;
-        importDone = true;
-      }
-    }, 200);
+    importing = false;
+    error = "Importer execution requires the application import service.";
   }
 </script>
 
@@ -140,17 +131,22 @@
   <div class={cn("flex flex-col gap-4")}>
     <h2 class={cn("text-base font-semibold")}>Select import source</h2>
     <div class={cn("grid grid-cols-2 gap-3 sm:grid-cols-3")}>
-      {#each SOURCES as src}
+      {#each sources as src}
         <button
           onclick={() => selectSource(src.id)}
+          disabled={!src.enabled}
           class={cn(
             "flex flex-col items-start gap-1.5 p-4 rounded-lg border-2 text-left transition-all",
-            selectedSource === src.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/40"
+            selectedSource === src.id ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-muted/40",
+            !src.enabled && "opacity-50"
           )}
         >
           <span class={cn("text-2xl")}>{src.icon}</span>
           <span class={cn("text-sm font-medium")}>{src.label}</span>
           <span class={cn("text-xs text-muted-foreground")}>{src.description}</span>
+          {#if !src.enabled}
+            <span class={cn("text-[11px] text-muted-foreground")}>Feature flag off</span>
+          {/if}
         </button>
       {/each}
     </div>
@@ -169,7 +165,7 @@
 {:else if step === 2}
   <div class={cn("flex flex-col gap-4")}>
     <h2 class={cn("text-base font-semibold")}>
-      {selectedSource === "csv" ? "Upload CSV file" : `Connect to ${SOURCES.find((s) => s.id === selectedSource)?.label}`}
+      {selectedSource === "csv" ? "Upload CSV file" : `Connect to ${sources.find((s) => s.id === selectedSource)?.label}`}
     </h2>
 
     {#if selectedSource === "csv"}
@@ -187,10 +183,10 @@
     {:else}
       <div class={cn("bg-muted/30 rounded-lg p-6 text-center")}>
         <p class={cn("text-sm text-muted-foreground mb-3")}>
-          Connect your {SOURCES.find((s) => s.id === selectedSource)?.label} account to import.
+          Connect your {sources.find((s) => s.id === selectedSource)?.label} account to import.
         </p>
         <button class={cn("text-sm px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90")}>
-          Authenticate with {SOURCES.find((s) => s.id === selectedSource)?.label}
+          Authenticate with {sources.find((s) => s.id === selectedSource)?.label}
         </button>
       </div>
     {/if}
@@ -327,16 +323,18 @@
       </div>
     {:else}
       <div class={cn("flex flex-col gap-3")}>
-        <p class={cn("text-sm text-muted-foreground")}>
-          Importing {dryRunResults?.importable ?? 0} tasks…
-        </p>
-        <div class={cn("h-3 rounded-full bg-muted overflow-hidden")}>
-          <div
-            class={cn("h-full bg-primary rounded-full transition-all duration-200")}
-            style="width: {importProgress}%"
-          />
-        </div>
-        <p class={cn("text-xs text-muted-foreground text-right")}>{importProgress}%</p>
+        {#if importing}
+          <p class={cn("text-sm text-muted-foreground")}>
+            Importing {dryRunResults?.importable ?? 0} tasks…
+          </p>
+          <div class={cn("h-3 rounded-full bg-muted overflow-hidden")}>
+            <div
+              class={cn("h-full bg-primary rounded-full transition-all duration-200")}
+              style="width: {importProgress}%"
+            />
+          </div>
+          <p class={cn("text-xs text-muted-foreground text-right")}>{importProgress}%</p>
+        {/if}
         {#if !importing}
           <button
             onclick={confirmImport}

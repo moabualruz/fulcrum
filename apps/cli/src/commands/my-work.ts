@@ -9,9 +9,10 @@
  * Each row: task ID (FUL-42), title, project name, due date, priority icon
  */
 
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
@@ -22,7 +23,8 @@ export interface MyWorkRunOptions {
       myWork: AnyFn;
     };
   };
-  container?: Container | null;
+  env?: TaskApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -34,7 +36,7 @@ interface WorkTask {
   title: string;
   projectName?: string;
   dueDate?: string | null;
-  priority?: string;
+  priority?: string | number | null;
   status?: string;
 }
 
@@ -121,7 +123,7 @@ export async function run(argv: readonly string[], opts: MyWorkRunOptions = {}):
       print(`\n  ${group} (${groupTasks.length})`);
       for (const task of groupTasks) {
         const id = (task.identifier ?? task.id).padEnd(10);
-        const priority = PRIORITY_ICONS[task.priority ?? "none"] ?? "⚪";
+        const priority = PRIORITY_ICONS[String(task.priority ?? "none")] ?? "⚪";
         const project = task.projectName ? ` [${task.projectName}]` : "";
         const due = task.dueDate ? ` ${task.dueDate}` : "";
         print(`    ${priority} ${id} ${task.title}${project}${due}`);
@@ -136,8 +138,27 @@ export async function run(argv: readonly string[], opts: MyWorkRunOptions = {}):
 async function resolveCaller(opts: MyWorkRunOptions): Promise<Required<MyWorkRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
 
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as Required<MyWorkRunOptions>["caller"];
+  const apiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  const userId = opts.env?.FULCRUM_USER_ID ?? process.env["FULCRUM_USER_ID"];
+  if (!apiCaller || !userId) {
+    throw new Error(
+      "Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return {
+    tasks: {
+      myWork: async () => {
+        const tasks = await apiCaller.tasks.list({});
+        return Array.isArray(tasks) ? tasks.filter((task) => isAssignedToUser(task, userId)) : [];
+      },
+    },
+  };
+}
+
+function isAssignedToUser(task: unknown, userId: string): boolean {
+  if (!task || typeof task !== "object") return false;
+  const record = task as Record<string, unknown>;
+  if (record.assigneeId === userId || record.assignee === userId) return true;
+  const assignee = record.assignee;
+  return !!assignee && typeof assignee === "object" && (assignee as Record<string, unknown>).id === userId;
 }

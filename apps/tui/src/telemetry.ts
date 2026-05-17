@@ -1,4 +1,7 @@
-import { recordTuiRenderTelemetry, type RecordTuiRenderTelemetryInput } from "@/application/telemetry/commands.ts";
+import {
+  recordTuiRenderTelemetry,
+  type RecordTuiRenderTelemetryInput,
+} from "@platform-core/interface/telemetry.ts";
 
 export interface TuiRenderTelemetryRow {
   kind: "local_telemetry";

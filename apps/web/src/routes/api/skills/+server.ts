@@ -1,5 +1,5 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 import {
   installSkill,
   upgradeSkill,
@@ -34,7 +34,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const action = payload.action as string | undefined;
   if (!action) return jsonError("action is required");
 
-  const scope = await requestAppScope(locals);
+  const scope = await requestServiceScope(locals);
 
   switch (action) {
     case "install": {

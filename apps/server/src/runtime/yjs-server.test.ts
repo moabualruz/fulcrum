@@ -1,5 +1,5 @@
 /**
- * yjs-server.test.ts — TDD tests for Yjs WebSocket server (Plan 05-13).
+ * yjs-server.test.ts — TDD tests for Yjs WebSocket server (workflow milestone).
  *
  * Tests:
  * - Auth rejection: WebSocket without valid session -> close 4401
@@ -8,19 +8,22 @@
  * - Standalone boot: FULCRUM_YJS_STANDALONE=true -> binds to FULCRUM_YJS_PORT
  */
 import { describe, it, expect, beforeEach, vi } from "bun:test";
+import * as Y from "yjs";
 
 // Mock YjsSnapshot entity lookups
 const mockFindOne = vi.fn();
 const mockPersist = vi.fn();
 const mockFlush = vi.fn();
+const mockSave = vi.fn();
 const mockEm = {
   findOne: mockFindOne,
   persist: mockPersist,
   flush: mockFlush,
+  save: mockSave,
   fork: vi.fn().mockReturnThis(),
 };
 
-vi.mock("../db/entities/tasks/YjsSnapshot.ts", () => ({
+vi.mock("@work-management/infrastructure/database/entities/tasks/YjsSnapshot.ts", () => ({
   YjsSnapshot: class YjsSnapshot {
     docName!: string;
     state!: Buffer;
@@ -123,9 +126,56 @@ describe("persistence", () => {
     // Trigger persistence directly via persistDoc
     await handler.persistDoc("task-test", Buffer.from([1, 2, 3]));
 
-    expect(mockPersist).toHaveBeenCalled();
-    expect(mockFlush).toHaveBeenCalled();
+    expect(mockSave).toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it("applies one client Yjs update to the next authenticated document client", async () => {
+    const mod = await import("./yjs-server.ts");
+    const handler = mod.createYjsServer({
+      em: mockEm as any,
+      validateSession: async () => ({ id: "sess-1", userId: "user-1" }),
+      debounceMs: 100,
+    });
+    mockFindOne.mockResolvedValue(null);
+
+    let firstMessageHandler: ((data: Buffer) => void) | undefined;
+    const firstWs = {
+      close: vi.fn(),
+      send: vi.fn(),
+      readyState: 1,
+      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
+        if (event === "message") firstMessageHandler = handler;
+      }),
+    };
+
+    await handler.handleConnection(firstWs as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-alpha",
+    });
+
+    const clientDoc = new Y.Doc();
+    clientDoc.getMap("body").set("text", "collaborative doc body");
+    const update = Buffer.from(Y.encodeStateAsUpdate(clientDoc));
+    firstMessageHandler?.(Buffer.concat([Buffer.from([0]), update]));
+
+    const sentUpdates: Buffer[] = [];
+    const secondWs = {
+      close: vi.fn(),
+      send: vi.fn((data: Buffer) => sentUpdates.push(Buffer.from(data))),
+      readyState: 1,
+      on: vi.fn(),
+    };
+    await handler.handleConnection(secondWs as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-alpha",
+    });
+
+    const receivedDoc = new Y.Doc();
+    const latest = sentUpdates.at(-1);
+    expect(latest).toBeDefined();
+    Y.applyUpdate(receivedDoc, latest!.subarray(1));
+    expect(receivedDoc.getMap("body").get("text")).toBe("collaborative doc body");
   });
 
   it("loads existing snapshot on doc init", async () => {

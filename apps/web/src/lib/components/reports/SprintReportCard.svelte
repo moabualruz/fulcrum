@@ -1,81 +1,35 @@
 <script lang="ts">
-  /**
-   * SprintReportCard — sprint summary card (D-38, D-29, D-30).
-   *
-   * Renders frozen summary for closed sprints, live stats for open sprints.
-   * Velocity comparison vs prior sprints. Retrospective notes (read-only).
-   * Task table with status timeline.
-   */
   import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
-
-  // ── Types ────────────────────────────────────────────────────────────────────
-
-  interface SprintSummary {
-    completedCount: number;
-    completedPoints: number;
-    carriedOver: number;
-    addedMidSprint: number;
-    removed: number;
-    scopeChangePct: number;
-  }
-
-  interface SprintTask {
-    id: string;
-    title: string;
-    status: string;
-    storyPoints?: number | null;
-    statusHistory?: Array<{ status: string; enteredAt: string }>;
-  }
+  import { fetchSprintReport, type SprintReportData } from "./sprint-report-api.js";
 
   interface VelocityEntry {
     sprintName: string;
     completedPoints: number;
   }
 
-  interface SprintData {
-    id: string;
-    name: string;
-    startDate?: string | null;
-    endDate?: string | null;
-    status: "active" | "completed" | "planned";
-    closedSummary?: SprintSummary | null;
-    retrospectiveNotes?: Record<string, unknown> | null;
-    tasks?: SprintTask[];
-    velocityHistory?: VelocityEntry[];
-  }
-
-  // ── Props ────────────────────────────────────────────────────────────────────
+  type SprintData = SprintReportData;
 
   interface Props {
     sprintId: string;
-    trpc?: {
-    sprints: {
-      get: { query: (input: { id: string }) => Promise<SprintData | null> };
-    };
-    } | null;
+    orgId: string;
   }
 
-  let { sprintId, trpc = null }: Props = $props();
-
-  // ── State ────────────────────────────────────────────────────────────────────
+  let { sprintId, orgId }: Props = $props();
 
   let sprint: SprintData | null = null;
   let loading = true;
   let error = "";
-
-  // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   onMount(async () => {
     await load();
   });
 
   async function load() {
-    if (!trpc) return;
     loading = true;
     error = "";
     try {
-      sprint = await trpc.sprints.get.query({ id: sprintId });
+      sprint = await fetchSprintReport(fetch, { orgId, sprintId });
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : "Failed to load sprint";
     } finally {
@@ -95,7 +49,6 @@
 
   function notesText(notes: Record<string, unknown> | null | undefined): string {
     if (!notes) return "";
-    // TipTap JSON → plain text extraction
     function extractText(node: unknown): string {
       if (!node || typeof node !== "object") return "";
       const n = node as Record<string, unknown>;
@@ -170,7 +123,6 @@
       <div class={cn("text-sm text-muted-foreground italic")}>No summary data yet.</div>
     {/if}
 
-    <!-- Velocity comparison (D-30) -->
     {#if sprint.velocityHistory && sprint.velocityHistory.length > 0}
       <div class={cn("border border-border rounded-lg p-4")}>
         <h3 class={cn("text-sm font-semibold mb-3")}>Velocity</h3>
@@ -194,7 +146,6 @@
       </div>
     {/if}
 
-    <!-- Retrospective (D-29) -->
     {#if sprint.retrospectiveNotes}
       {@const retroText = notesText(sprint.retrospectiveNotes)}
       {#if retroText}

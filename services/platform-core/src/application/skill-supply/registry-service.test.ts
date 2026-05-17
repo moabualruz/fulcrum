@@ -1,0 +1,97 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { createTestOrm, type TestOrm } from "@test-support/index.ts";
+import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+import {
+  FulcrumSkill,
+  SkillSource,
+} from "@platform-core/infrastructure/application-database/entities/skills/index.ts";
+import {
+  __setRegistryServiceOrmForTest,
+  SkillRegistryService,
+} from "@platform-core/application/skill-supply/registry-service.ts";
+
+let testDb: TestOrm;
+
+beforeEach(async () => {
+  testDb = await createTestOrm();
+  __setRegistryServiceOrmForTest(testDb.ds);
+});
+
+afterEach(async () => {
+  __setRegistryServiceOrmForTest(undefined);
+  await testDb.close();
+});
+
+describe("SkillRegistryService", () => {
+  it("lists skills from the real registry table ordered by slug and scoped to one org", async () => {
+    const em = testDb.em;
+    const defaultOrg = await em.findOneOrFail(Org, { where: { id: testDb.seed.orgId } });
+    const otherOrg = em.create(Org, {
+      id: "11111111-1111-4111-8111-111111111111",
+      name: "Other org",
+      slug: "other-org",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await em.save(otherOrg);
+
+    await em.save([
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Zulu Local",
+        slug: "zulu",
+        source: SkillSource.Local,
+        enabledAgents: ["codex", "claude"],
+      }),
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Alpha Upstream",
+        slug: "alpha",
+        source: SkillSource.Upstream,
+        upstreamRepo: "owner/repo",
+        upstreamRef: "main",
+        enabledAgents: ["opencode"],
+      }),
+      em.create(FulcrumSkill, {
+        org: defaultOrg,
+        name: "Package Skill",
+        slug: "package-skill",
+        source: SkillSource.Package,
+        enabledAgents: ["gemini"],
+      }),
+      em.create(FulcrumSkill, {
+        org: otherOrg,
+        name: "Hidden Other Org",
+        slug: "hidden",
+        source: SkillSource.Upstream,
+        enabledAgents: ["codex"],
+      }),
+    ]);
+
+    const entries = await SkillRegistryService.list(testDb.seed.orgId);
+
+    expect(entries).toEqual([
+      {
+        slug: "alpha",
+        name: "Alpha Upstream",
+        source: "upstream",
+        version: null,
+        enabledAgents: ["opencode"],
+      },
+      {
+        slug: "package-skill",
+        name: "Package Skill",
+        source: "local",
+        version: null,
+        enabledAgents: ["gemini"],
+      },
+      {
+        slug: "zulu",
+        name: "Zulu Local",
+        source: "local",
+        version: null,
+        enabledAgents: ["codex", "claude"],
+      },
+    ]);
+  });
+});

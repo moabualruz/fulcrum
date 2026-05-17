@@ -2,11 +2,12 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg, createProject } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
+import { closeDatabase } from "$lib/server/db";
 
 let scratch: string;
 
@@ -40,15 +41,16 @@ beforeEach(() => {
   process.env["FULCRUM_HOME"] = scratch;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await closeDatabase();
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
 
 async function freshDb(): Promise<{ db: TestStore; orgId: string; projectId: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
+  const dbDir = join(scratch, "pglite.data");
   mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
+  const db = await openIsolatedStore(dbDir);
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const project = await createProject(db, {
@@ -186,8 +188,8 @@ describe("/runs/[id] +page.server.ts", () => {
     }
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     await mod.actions.cancel({ params: { id } } as Parameters<typeof mod.actions.cancel>[0]);
-    const dbDir = join(scratch, "state", "product", "db");
-    const db2 = await openIsolatedStore(join(dbDir, "main"));
+    const dbDir = join(scratch, "pglite.data");
+    const db2 = await openIsolatedStore(dbDir);
     await migrateIsolatedStore(db2);
     try {
       const rows = await db2.query<{ status: string }>(

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * ShortcutHelpOverlay — Phase 05 Plan 12 (D-68).
+   * ShortcutHelpOverlay — task workflow (D-68).
    *
    * Opened with the `?` key. Shows all keyboard shortcuts in a
    * two-column grouped layout. Closes on Esc or backdrop click.

@@ -1,78 +1,75 @@
 import { error, fail, redirect } from "@sveltejs/kit";
-import { getDoc } from "@/application/docs/queries.ts";
-import {
-  listDocumentVersions,
-  restoreDocumentVersion,
-  createDocumentVersion,
-  getNextVersionNumber,
-} from "@/application/docs/version-queries.ts";
-import { requestAppScope } from "../../../../lib/server/application-scope.ts";
+import { createDocumentApiForEvent } from "$lib/server/document-api";
 
 interface LoadEvent {
   params: { id: string };
+  locals: App.Locals;
+  fetch: typeof fetch;
+  request: Request;
   url: URL;
-  locals: Parameters<typeof requestAppScope>[0];
 }
 
 interface ActionEvent {
   params: { id: string };
+  locals: App.Locals;
+  fetch: typeof fetch;
   request: Request;
-  locals: Parameters<typeof requestAppScope>[0];
+  url: URL;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+interface Version {
+  id: string;
+  versionNum: number;
+  createdAt: string;
+  authorId: string | null;
+  authorName: string | null;
+  isRestoreOf: string | null;
 }
 
-function diffHtml(fromBody: string, toBody: string): string {
-  return `<del>${escapeHtml(fromBody)}</del><ins>${escapeHtml(toBody)}</ins>`;
-}
-
-export const load = async ({ params, url, locals }: LoadEvent) => {
-  const { em, ctx } = await requestAppScope(locals);
-  const doc = await getDoc(em, ctx, params.id);
-  if (!doc) throw error(404, "Document not found");
-  const versions = await listDocumentVersions(em, params.id);
-  const from = Number(url?.searchParams.get("from") ?? 0);
-  const to = Number(url?.searchParams.get("to") ?? 0);
-  const fromVersion = versions.find((version) => version.version === from);
-  const toVersion = versions.find((version) => version.version === to);
+export const load = async (event: LoadEvent) => {
+  const api = createDocumentApiForEvent(event);
+  const [doc, versions] = await Promise.all([
+    api.docs.get({ id: event.params.id }).catch(mapNotFound) as Promise<{ id: string; title: string }>,
+    api.docs.listVersions({ id: event.params.id }).catch(() => []) as Promise<Version[]>,
+  ]);
   return {
-    doc: { id: doc.id, title: doc.title },
-    versions: versions.map((version) => ({
-      ...version,
-      versionNum: version.version,
-      createdAt: version.created_at,
-      isSnapshot: true,
-    })),
-    diffHtml: fromVersion && toVersion ? diffHtml(fromVersion.body, toVersion.body) : "",
+    documentId: doc.id,
+    title: doc.title,
+    versions,
   };
 };
 
 export const actions = {
-  restore: async ({ params, request, locals }: ActionEvent) => {
-    const fd = await request.formData();
-    const versionStr = fd.get("version") ?? fd.get("version_num");
-    const version = Number(versionStr);
-    if (!version || version < 1) return fail(400, { error: "Invalid version" });
-    const { em, ctx } = await requestAppScope(locals);
-    const current = await getDoc(em, ctx, params.id);
-    if (current) {
-      const nextVer = await getNextVersionNumber(em, params.id);
-      await createDocumentVersion(em, {
-        docId: params.id,
-        orgId: ctx.orgId,
-        version: nextVer,
-        title: current.title,
-        body: current.bodyMd,
-        frontmatter: current.frontmatter ?? {},
-        author: "system",
-      });
+  diff: async (event: ActionEvent) => {
+    const formData = await event.request.formData();
+    const versionId = formData.get("versionId");
+    if (!versionId || typeof versionId !== "string") {
+      return fail(400, { error: "versionId is required" });
     }
-    await restoreDocumentVersion(em, params.id, ctx.orgId, version);
-    throw redirect(303, `/docs/${params.id}`);
+    const api = createDocumentApiForEvent(event);
+    const result = await api.docs.diffVersionById({
+      id: event.params.id,
+      versionId,
+    }).catch(mapNotFound) as { html: string; hasDiff: boolean };
+    return result;
+  },
+  restore: async (event: ActionEvent) => {
+    const formData = await event.request.formData();
+    const versionId = formData.get("versionId");
+    if (!versionId || typeof versionId !== "string") {
+      return fail(400, { error: "versionId is required" });
+    }
+    const api = createDocumentApiForEvent(event);
+    await api.docs.restoreVersionById({
+      id: event.params.id,
+      versionId,
+    }).catch(mapNotFound);
+    redirect(303, `/docs/${event.params.id}/history`);
   },
 };
+
+function mapNotFound(errorValue: unknown): never {
+  const message = errorValue instanceof Error ? errorValue.message : String(errorValue);
+  if (/not found/i.test(message)) throw error(404, "Document not found");
+  throw errorValue;
+}

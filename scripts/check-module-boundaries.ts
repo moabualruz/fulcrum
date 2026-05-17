@@ -3,9 +3,9 @@
  * Module-boundary lint: enforces layering rules.
  *
  * Rules:
- *   1. product-kernel never imports from web app
+ *   1. product-store infrastructure never imports from web app
  *   2. CLI app never imports from web app
- *   3. services never imports from web app
+ *   3. services never import from web app
  *
  * Usage: bun run scripts/check-module-boundaries.ts
  * Exit code 0 = clean, 1 = violations found.
@@ -14,7 +14,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
-const SOURCE_ROOTS = ["src", "apps"];
+const SOURCE_ROOTS = ["apps", "services"];
 
 interface Violation {
   file: string;
@@ -26,24 +26,29 @@ interface Violation {
 const RULES: Array<{
   /** Glob-like prefix of source files to check */
   sourcePrefix: string;
-  /** Forbidden import path substring */
-  forbiddenImport: string;
+  /** Forbidden import path substrings */
+  forbiddenImports: string[];
   /** Human-readable rule name */
   rule: string;
 }> = [
   {
-    sourcePrefix: "src/product-kernel/",
-    forbiddenImport: "/apps/web/",
-    rule: "product-kernel must not import from web layer",
+    sourcePrefix: "services/platform-core/src/infrastructure/product-store/",
+    forbiddenImports: ["/apps/web/", "@fulcrum/web/"],
+    rule: "product store infrastructure must not import from web layer",
   },
   {
     sourcePrefix: "apps/cli/src/",
-    forbiddenImport: "/apps/web/",
+    forbiddenImports: ["/apps/web/", "@fulcrum/web/"],
     rule: "CLI must not import from web layer",
   },
   {
-    sourcePrefix: "src/services/",
-    forbiddenImport: "/apps/web/",
+    sourcePrefix: "apps/tui/src/",
+    forbiddenImports: ["/apps/web/", "@fulcrum/web/"],
+    rule: "TUI must not import from web layer",
+  },
+  {
+    sourcePrefix: "services/",
+    forbiddenImports: ["/apps/web/", "@fulcrum/web/"],
     rule: "services must not import from web layer",
   },
 ];
@@ -54,7 +59,6 @@ function walk(dir: string): string[] {
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
-      if (entry === "node_modules" || entry === ".svelte-kit" || entry === "dist" || entry === "graphify-out") continue;
       files.push(...walk(full));
     } else if (entry.endsWith(".ts") || entry.endsWith(".tsx")) {
       files.push(full);
@@ -80,7 +84,7 @@ for (const file of allFiles) {
       if (
         (line.includes("import ") || line.includes("export ")) &&
         line.includes("from ") &&
-        line.includes(rule.forbiddenImport)
+        rule.forbiddenImports.some((forbiddenImport) => line.includes(forbiddenImport))
       ) {
         violations.push({
           file: rel,

@@ -1,37 +1,32 @@
 <script lang="ts">
   /**
-   * BulkActionBar — multi-select bulk action toolbar (D-73, D-74, D-75, D-78).
-   * Renders when selectedTaskIds.length > 0.
-   * Max 200 tasks enforcement (D-75).
-   * Calls trpc.tasks.bulkUpdate / bulkDelete mutations.
+   * BulkActionBar — multi-select bulk action toolbar.
    */
   import { createEventDispatcher } from "svelte";
   import * as Popover from "$lib/components/ui/popover/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import BulkCustomFieldEdit from "./BulkCustomFieldEdit.svelte";
+  import {
+    submitBulkTaskCustomFieldPatch,
+    submitBulkTaskMutation,
+  } from "./task-table";
 
   // ── Props ──────────────────────────────────────────────────────────
   interface Props {
     selectedTaskIds?: string[];
     projectId?: string;
+    orgId?: string;
+    currentUserId?: string;
     customFieldDefs?: Array<{
       id: string;
       name: string;
       fieldType: string;
       config?: Record<string, unknown>;
     }>;
-    /** Injected tRPC client — caller provides typed client */
-    trpc?: {
-    tasks: {
-      bulkUpdate: { mutate: (input: { taskIds: string[]; patch: Record<string, unknown> }) => Promise<unknown> };
-      bulkDelete: { mutate: (input: { taskIds: string[] }) => Promise<unknown> };
-      archive: { mutate: (input: { taskIds: string[] }) => Promise<unknown> };
-    };
-    } | null;
   }
 
-  let { selectedTaskIds = [], projectId = "", customFieldDefs = [], trpc = null }: Props = $props();
+  let { selectedTaskIds = [], projectId = "", orgId = "", currentUserId = "", customFieldDefs = [] }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     done: { action: string; taskIds: string[] };
@@ -39,7 +34,7 @@
   }>();
 
   // ── Constants ──────────────────────────────────────────────────────
-  const MAX_BULK = 200; // D-75
+  const MAX_BULK = 200;
 
   const isOverLimit = $derived(selectedTaskIds.length > MAX_BULK);
   const count = $derived(selectedTaskIds.length);
@@ -75,10 +70,13 @@
 
   // ── Helpers ────────────────────────────────────────────────────────
   async function mutate(patch: Record<string, unknown>) {
-    if (!trpc || isOverLimit) return;
+    if (isOverLimit) return;
     loading = true;
     try {
-      await trpc.tasks.bulkUpdate.mutate({ taskIds: selectedTaskIds, patch });
+      await submitBulkTaskMutation(fetch, {
+        kind: "update",
+        input: { ids: selectedTaskIds, patch },
+      }, { orgId, userId: currentUserId, projectId });
       dispatch("done", { action: "bulkUpdate", taskIds: selectedTaskIds });
     } catch (err) {
       dispatch("error", { action: "bulkUpdate", error: String(err) });
@@ -102,39 +100,55 @@
 
   async function handleSetAssignee() {
     if (!assigneeValue) return;
-    await mutate({ assignee: assigneeValue || null });
+    await mutate({ assigneeId: assigneeValue });
     assigneeValue = "";
   }
 
   async function handleAddLabel() {
     if (!labelValue) return;
-    await mutate({ addLabel: labelValue });
+    dispatchUnsupported("addLabel");
     labelValue = "";
   }
 
   async function handleRemoveLabel() {
     if (!labelValue) return;
-    await mutate({ removeLabel: labelValue });
+    dispatchUnsupported("removeLabel");
     labelValue = "";
   }
 
   async function handleSetDueDate() {
     if (!dueDateValue) return;
-    await mutate({ dueDate: dueDateValue });
+    dispatchUnsupported("dueDate");
     dueDateValue = "";
   }
 
   async function handleMoveToSprint() {
     if (!sprintValue) return;
-    await mutate({ sprintId: sprintValue });
+    if (isOverLimit) return;
+    loading = true;
+    try {
+      await submitBulkTaskMutation(fetch, {
+        kind: "assignSprint",
+        input: { ids: selectedTaskIds, sprintId: sprintValue },
+      }, { orgId, userId: currentUserId, projectId });
+      dispatch("done", { action: "assignSprint", taskIds: selectedTaskIds });
+    } catch (err) {
+      dispatch("error", { action: "assignSprint", error: String(err) });
+    } finally {
+      loading = false;
+      activeAction = null;
+    }
     sprintValue = "";
   }
 
   async function handleArchive() {
-    if (!trpc || isOverLimit) return;
+    if (isOverLimit) return;
     loading = true;
     try {
-      await trpc.tasks.archive.mutate({ taskIds: selectedTaskIds });
+      await submitBulkTaskMutation(fetch, {
+        kind: "delete",
+        input: { ids: selectedTaskIds },
+      }, { orgId, userId: currentUserId, projectId });
       dispatch("done", { action: "archive", taskIds: selectedTaskIds });
     } catch (err) {
       dispatch("error", { action: "archive", error: String(err) });
@@ -144,11 +158,14 @@
   }
 
   async function handleDelete() {
-    if (!trpc || isOverLimit) return;
+    if (isOverLimit) return;
     if (!confirm(`Delete ${count} task${count === 1 ? "" : "s"}? This cannot be undone.`)) return;
     loading = true;
     try {
-      await trpc.tasks.bulkDelete.mutate({ taskIds: selectedTaskIds });
+      await submitBulkTaskMutation(fetch, {
+        kind: "delete",
+        input: { ids: selectedTaskIds },
+      }, { orgId, userId: currentUserId, projectId });
       dispatch("done", { action: "bulkDelete", taskIds: selectedTaskIds });
     } catch (err) {
       dispatch("error", { action: "bulkDelete", error: String(err) });
@@ -157,9 +174,26 @@
     }
   }
 
-  function handleCustomFieldPatch(e: CustomEvent<Record<string, unknown>>) {
-    mutate({ customFields: e.detail });
-    showCustomFieldEdit = false;
+  async function handleCustomFieldPatch(e: CustomEvent<Record<string, unknown>>) {
+    if (isOverLimit) return;
+    loading = true;
+    try {
+      await submitBulkTaskCustomFieldPatch(fetch, selectedTaskIds, e.detail, { orgId, userId: currentUserId, projectId });
+      dispatch("done", { action: "customFields", taskIds: selectedTaskIds });
+    } catch (err) {
+      dispatch("error", { action: "customFields", error: String(err) });
+    } finally {
+      loading = false;
+      showCustomFieldEdit = false;
+      activeAction = null;
+    }
+  }
+
+  function dispatchUnsupported(action: string) {
+    dispatch("error", {
+      action,
+      error: "This bulk action needs a public API endpoint before it can mutate tasks.",
+    });
   }
 </script>
 
@@ -296,7 +330,7 @@
       </Popover.Content>
     </Popover.Root>
 
-    <!-- Edit Custom Fields (D-78, MEDIUM-05) -->
+    <!-- Edit Custom Fields -->
     <Popover.Root bind:open={showCustomFieldEdit}>
       <Popover.Trigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
@@ -314,7 +348,7 @@
 
     <div class="h-4 w-px bg-border mx-1" />
 
-    <!-- Archive (D-114) -->
+    <!-- Archive -->
     <Button
       variant="outline"
       size="sm"

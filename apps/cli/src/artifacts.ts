@@ -1,18 +1,40 @@
 /**
- * CLI: `fulcrum artifacts <verb>` — hand-wired thin wrappers over tRPC client.
- * Pillar 10, issue 10-cli-commands. Until Pillar 14 codegen lands, these are
- * hand-written; the ArtifactsClient interface matches tRPC procedure shapes.
- *
+ * CLI: `fulcrum artifacts <verb>` — thin wrappers over the artifact caller.
  * All verbs support --json for machine-parseable output.
  */
 
 import { writeFile } from "node:fs/promises";
-import type { z } from "zod";
-import type { ArtifactSchema } from "@fulcrum/server/trpc/schemas/artifacts.ts";
 
-// --- Client interface (mirrors tRPC procedures) ---
+export interface Artifact {
+  id: string;
+  orgId?: string;
+  projectId?: string | null;
+  runId?: string | null;
+  taskId?: string | null;
+  filename: string;
+  mime?: string | null;
+  sizeBytes: string;
+  path?: string;
+  checksumSha256?: string | null;
+  digest?: string | null;
+  metadataJson?: Record<string, unknown>;
+  lifecycleState?: string;
+  archived: boolean;
+  pruned?: boolean;
+  retentionStatus: string;
+  retentionUntil?: Date | string | null;
+  previewKind: string;
+  sourcePath?: string | null;
+  sourceGlob?: string | null;
+  harvestedAt?: string | null;
+  producerKind?: string | null;
+  producerId?: string | null;
+  edgeId?: string | null;
+  attestation?: unknown;
+  createdAt?: Date | string;
+}
 
-type Artifact = z.infer<typeof ArtifactSchema>;
+// --- Client interface ---
 
 export interface ArtifactsClient {
   list(input: {

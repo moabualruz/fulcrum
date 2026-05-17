@@ -20,15 +20,10 @@ Fulcrum-authored skills install under `fulcrum/` (we own that namespace). Curate
 
 ### 1.1 Vendor-canonical install vs file-copy mirror
 
-When an upstream skill ships its own per-agent installer (e.g. `graphify install --platform <agent>`), the vendor's write into the agent's top-level skills directory is the source of truth. To prevent dupe-load conflicts ("Skill conflict detected" warnings), the lockfile entry declares which agents the vendor handles:
-
 ```toml
-[skills.graphify]
 …
 vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 ```
-
-`fulcrum skills upstream` then **skips** that skill on any agent in the list — vendor's own `graphify install --platform <agent>` already ran during `fulcrum init` and placed the skill at `<agent>/skills/graphify/`. For agents NOT in the list (here: pi — graphify CLI doesn't support pi), the file-copy mirror still runs into the same top-level location (`~/.pi/agent/skills/graphify/`) so the skill is available everywhere.
 
 ## 2. Managed vendor skill/package catalogue
 
@@ -37,11 +32,8 @@ vendor_canonical_agents = ["claude-code", "codex", "gemini", "opencode"]
 | `package.superpowers` | Native packages where available; full package mirrors where needed. |
 | `package.cloudflare` | Claude plugin plus full non-Claude package mirrors, loadable skill mirrors, and package MCP config from `.mcp.json`. |
 | `package.caveman` | Native Claude/Gemini installs plus full Codex/OpenCode/Pi package mirrors. |
-| `package.graphify` | Vendor `graphify install --platform <agent>` where supported; Pi skill fallback. |
 | `package.ast-grep` | Vendor `npx skills add ast-grep/agent-skill` integration. |
 | `package.tavily` | Vendor `npx skills add https://github.com/tavily-ai/skills` integration. |
-| `skills.upstream` | Pinned Playwright, Semgrep, Graphify, Superpowers, and Cloudflare skills with subtree SHA-256 verification. |
-
 
 ## 3. Adoption strategy — install one, cherry-pick the rest
 
@@ -130,8 +122,6 @@ subpath_size   = <int>            # total byte-size (sanity check only)
 # Update tree_sha in upstream.lock manually, then:
 fulcrum skills upstream --update-pins
 ```
-
-As of 2026-04-30 audit: 19 active upstream entries. Archived ast-grep, tavily, and context7 entries live under `skills/_archive/` because their vendor package/MCP paths now own those surfaces. Active entries include six Superpowers skills, Playwright, three Semgrep skills, Graphify, and eight Cloudflare skills; all carry `subpath_sha256`. Component/full-profile install excludes package-owned Cloudflare upstream copies because `package.cloudflare` owns the loadable Cloudflare skills in that flow; direct `fulcrum skills upstream` remains the standalone upstream-skill path.
 
 ## 7. Verification
 

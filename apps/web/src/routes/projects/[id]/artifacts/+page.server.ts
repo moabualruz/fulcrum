@@ -1,8 +1,13 @@
 import type { PageServerLoad } from "./$types";
-import { getArtifactStats, listArtifactRows } from "@/application/artifacts/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import {
+  artifactStatsFromRows,
+  createArtifactApiForEvent,
+  type PublicArtifact,
+  toArtifactRow,
+} from "$lib/server/artifact-api";
 
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { params, locals } = event;
   const projectId = params.id;
 
   return {
@@ -10,12 +15,15 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, projectId);
-        const [artifacts, stats] = await Promise.all([
-          listArtifactRows(em, ctx, { projectId }),
-          getArtifactStats(em, ctx, projectId),
+        const artifactApi = createArtifactApiForEvent(event).artifacts;
+        const [visibleArtifacts, statsArtifacts] = await Promise.all([
+          artifactApi.list({ projectId, archived: false }),
+          artifactApi.list({ projectId }),
         ]);
-        return { artifacts, stats };
+        return {
+          artifacts: (visibleArtifacts as PublicArtifact[]).map(toArtifactRow),
+          stats: artifactStatsFromRows(statsArtifacts as PublicArtifact[]),
+        };
       })(),
     },
   };

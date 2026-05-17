@@ -3,14 +3,18 @@ import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import { actionFail, actionOk } from "$lib/feedback/action-result";
 import { BoardMoveSchema } from "$lib/server/boards.schema";
-import { createProjectTask, updateProjectTask } from "@/application/projects/commands.ts";
-import { completeProjectSprint, updateSprintGoal } from "@/application/sprints/commands.ts";
-import { loadProjectSprintDetail } from "@/application/sprints/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import {
+  completeProjectSprint,
+  createProjectTask,
+  loadProjectSprintDetail,
+  updateProjectTask,
+  updateSprintGoal,
+} from "@work-management/interface/project-sprints.ts";
+import { requestProjectScope } from "../../../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   try {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     return await loadProjectSprintDetail(em, ctx, params.sprintId);
   } catch (err) {
     const message = (err as Error).message;
@@ -32,7 +36,7 @@ export const actions: Actions = {
     if (!title) return fail(400, actionFail("Title required"));
 
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
+      const { em, ctx } = await requestProjectScope(locals, params.id);
       await createProjectTask(em, ctx, {
         title,
         status: status as never,
@@ -49,8 +53,8 @@ export const actions: Actions = {
     if (!parsed.success) return fail(400, actionFail("invalid input"));
 
     try {
-      const { em, ctx } = await requestAppScope(locals, params.id);
-      await updateProjectTask(em, ctx, parsed.output.id, { status: parsed.output.status });
+      const { em, ctx } = await requestProjectScope(locals, params.id);
+      await updateProjectTask(em, ctx, parsed.output.id, { status: parsed.output.to });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
@@ -62,13 +66,13 @@ export const actions: Actions = {
     const fd = await request.formData();
     const goal = String(fd.get("goal") ?? "");
 
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     await updateSprintGoal(em, ctx, params.sprintId, goal);
     return actionOk("Goal updated");
   },
 
   closeSprint: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, params.id);
+    const { em, ctx } = await requestProjectScope(locals, params.id);
     await completeProjectSprint(em, ctx, params.sprintId);
     return actionOk("Sprint closed");
   },

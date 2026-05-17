@@ -6,7 +6,7 @@ describe("NAV_ITEMS surface", () => {
   test("declares grouped primary surface", () => {
     expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Current Scope", "Portfolio", "System"]);
     expect(NAV_GROUPS.map((group) => group.items.map((item) => item.href))).toEqual([
-      ["/", "/boards", "/docs", "/runs", "/artifacts"],
+      ["/", "/boards", "/docs", "/planning", "/runs", "/artifacts"],
       ["/projects", "/search", "/memory", "/context/preview"],
       ["/agents", "/orchestration", "/audit", "/doctor", "/settings/inference"],
     ]);
@@ -17,6 +17,7 @@ describe("NAV_ITEMS surface", () => {
       "/",
       "/boards",
       "/docs",
+      "/planning",
       "/runs",
       "/artifacts",
       "/projects",
@@ -36,6 +37,7 @@ describe("NAV_ITEMS surface", () => {
       "Dashboard",
       "Board",
       "Docs",
+      "Planning",
       "Runs",
       "Artifacts",
       "All projects",
@@ -66,6 +68,7 @@ describe("NAV_ITEMS surface", () => {
       ["/", "LayoutDashboard"],
       ["/boards", "Kanban"],
       ["/docs", "FileText"],
+      ["/planning", "FileText"],
       ["/runs", "Activity"],
       ["/artifacts", "FileText"],
       ["/projects", "Folder"],

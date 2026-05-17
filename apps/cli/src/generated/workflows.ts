@@ -76,6 +76,23 @@ export function createWorkflowsCommand(): Command {
     }
   });
 
+  const runAcceptanceCycleCommand = command.command("run-acceptance-cycle");
+  runAcceptanceCycleCommand.description("workflows runAcceptanceCycle");
+  runAcceptanceCycleCommand.option("--json", "Emit JSON output");
+  runAcceptanceCycleCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for workflows.runAcceptanceCycle requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const updateEnabledTaskTypesCommand = command.command("update-enabled-task-types");
   updateEnabledTaskTypesCommand.description("workflows updateEnabledTaskTypes");
   updateEnabledTaskTypesCommand.option("--json", "Emit JSON output");

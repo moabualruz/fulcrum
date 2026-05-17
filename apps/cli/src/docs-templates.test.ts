@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { run } from "./docs-templates.ts";
 
 let scratch: string;
 
@@ -38,24 +39,28 @@ async function runFulcrum(args: readonly string[]): Promise<{
 }
 
 describe("fulcrum docs template CLI", () => {
-  test("fulcrum docs template list --json emits all seeded templates", async () => {
-    const init = await runFulcrum(["init"]);
-    expect(init.exitCode).toBe(0);
+  test("direct docs template command uses the configured public API", async () => {
+    const lines: string[] = [];
+    const calls: string[] = [];
+    await run(["list", "--json"], {
+      print: (line) => lines.push(line),
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request) => {
+        calls.push(String(url));
+        return Response.json([{ id: "tpl-1", docType: "adr", name: "ADR" }]);
+      }) as unknown as typeof globalThis.fetch,
+    });
 
+    expect(JSON.parse(lines[0] as string)).toEqual([{ id: "tpl-1", docType: "adr", name: "ADR" }]);
+    expect(calls).toEqual(["http://127.0.0.1:3210/api/v1/docs/templates"]);
+  });
+
+  test("main docs template path requires the configured document public API", async () => {
     const result = await runFulcrum(["docs", "template", "list", "--json"]);
-    expect(result.exitCode).toBe(0);
-
-    const rows = JSON.parse(result.stdout) as Array<{
-      docType: string;
-      projectId: string | null;
-      bodyTemplate: string;
-      frontmatterTemplate: Record<string, unknown>;
-      isDefault: boolean;
-    }>;
-    expect(rows).toHaveLength(9);
-    expect(rows.every((row) => row.projectId === null)).toBe(true);
-    expect(rows.every((row) => row.isDefault)).toBe(true);
-    expect(rows.every((row) => typeof row.bodyTemplate === "string")).toBe(true);
-    expect(rows.every((row) => typeof row.frontmatterTemplate === "object")).toBe(true);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("Document API caller is not configured");
   });
 });

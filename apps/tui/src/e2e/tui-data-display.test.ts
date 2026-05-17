@@ -6,10 +6,10 @@ import { FakeTTY } from "../testing/fake-tty.ts";
 describe("TUI E2E data display", () => {
   test("projects screen renders caller data", async () => {
     const text = await renderDomain("projects", makeCaller({
-      projects: { list: async () => [{ id: "project-1", name: "Phase 9.5 Project" }] },
+      projects: { list: async () => [{ id: "project-1", name: "interface Project" }] },
     }));
     expect(text).toContain("Projects");
-    expect(text).toContain("Phase 9.5 Project");
+    expect(text).toContain("interface Project");
   });
 
   test("runs screen renders run list data", async () => {
@@ -100,6 +100,9 @@ describe("TUI E2E data display", () => {
           },
           rules: {
             list: async () => [{ id: "rule-1", name: "Assignments", enabled: true, channels: ["in-app"] }],
+            create: async (input) => ({ id: "rule-2", name: input.name, enabled: input.enabled, channels: input.channels }),
+            update: async (input) => ({ id: input.id, name: input.name ?? "Assignments", enabled: input.enabled ?? true, channels: ["in-app"] }),
+            delete: async () => ({ ok: true }),
           },
         },
       }),

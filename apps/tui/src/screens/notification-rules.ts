@@ -1,6 +1,7 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import type { NotificationChannel } from "@fulcrum/server/trpc/schemas/notifications.ts";
+
+export type NotificationChannel = "in-app" | "email" | "slack" | "discord" | "webhook" | "push";
 
 export interface TuiNotificationRule {
   id: string;

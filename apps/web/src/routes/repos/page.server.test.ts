@@ -1,13 +1,47 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-let scratch: string;
+interface RepoListRow {
+  id: string;
+  slug: string;
+  path: string | null;
+  remoteUrl: string | null;
+  branch: string | null;
+  dirty: boolean;
+  lastSyncAt: string | null;
+  recentCommit: string | null;
+  openTaskCount: number;
+  health: string;
+  watcherStatus: string;
+  syncLatencyMs: number | null;
+  lastSyncError: string | null;
+}
+
+const repos: RepoListRow[] = [];
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
+repoPagesMock["listRows"] = repos;
+
+function row(overrides: Partial<RepoListRow> = {}): RepoListRow {
+  return {
+    id: "repo-1",
+    slug: "fulcrum",
+    path: "/workspace/fulcrum",
+    remoteUrl: null,
+    branch: "main",
+    dirty: false,
+    lastSyncAt: "2026-01-04T00:00:00.000Z",
+    recentCommit: null,
+    openTaskCount: 0,
+    health: "healthy",
+    watcherStatus: "unknown",
+    syncLatencyMs: null,
+    lastSyncError: null,
+    ...overrides,
+  };
+}
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -15,122 +49,117 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-async function seedDb(scratch: string) {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-
-  const r1 = makeId();
-  const r2 = makeId();
-  const r3 = makeId();
-
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [r1, org.id, "alpha", "/tmp/alpha", "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
-  );
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [r2, org.id, "beta", "/tmp/beta", "main", null, "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"],
-  );
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [r3, org.id, "gamma", "/tmp/gamma", null, null, "2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z"],
-  );
-
-  await db.close();
-  return { orgId: org.id, r1, r2, r3 };
-}
+mock.module("@integration-hub/interface/repository-pages.ts", () => ({
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [...((repoPagesMock["listRows"] as RepoListRow[] | undefined) ?? [])],
+  listRepositoryDashboard: async () => [...((repoPagesMock["dashboardRows"] as unknown[] | undefined) ?? [])],
+  loadRepositoryDetail: async () => repoPagesMock["dashboardDetail"] ?? { branches: [], commits: [], files: [], syncLog: [] },
+  loadRepositoryBranchesPage: async () => repoPagesMock["branchPage"] ?? { repo: null, branches: [], writeOpsEnabled: false },
+  createRepositoryBranch: async () => {
+    if ((repoPagesMock["branchPage"] as { writeOpsEnabled?: boolean } | undefined)?.writeOpsEnabled === false) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    return { ok: true };
+  },
+  checkoutRepositoryBranch: async (_context: unknown, input: { name: string }) => {
+    const branchPage = repoPagesMock["branchPage"] as {
+      repo?: { currentBranch?: string | null };
+      branches?: Array<{ name: string; isCurrent: boolean }>;
+      writeOpsEnabled?: boolean;
+    } | undefined;
+    if (branchPage?.writeOpsEnabled === false) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    if (branchPage?.repo) branchPage.repo.currentBranch = input.name;
+    if (branchPage?.branches) {
+      branchPage.branches = branchPage.branches.map((branch) => ({ ...branch, isCurrent: branch.name === input.name }));
+    }
+    return { ok: true };
+  },
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async (_context: unknown, input: { repoId: string; page: number; pageSize: number }) => {
+    if (repoPagesMock["knownRepoId"] && input.repoId !== repoPagesMock["knownRepoId"]) {
+      const { AppNotFoundError } = await import("@platform-core/domain/errors.ts");
+      throw new AppNotFoundError("Repo not found");
+    }
+    const rows = (repoPagesMock["commitRows"] as unknown[] | undefined) ?? [];
+    const start = (input.page - 1) * input.pageSize;
+    return { repo: null, commits: rows.slice(start, start + input.pageSize), page: input.page, totalPages: Math.max(1, Math.ceil(rows.length / input.pageSize)), total: rows.length };
+  },
+  loadRepositoryCommitDetail: async () => repoPagesMock["commitDetail"] ?? { repo: null, commit: null, diff: null },
+}));
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-list-"));
-  process.env["FULCRUM_HOME"] = scratch;
+  repos.splice(0, repos.length);
 });
 
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
+describe("/repos +page.server.ts", () => {
+  test("server route uses the repository interface instead of direct application imports", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("@integration-hub/interface/repository-pages");
+    expect(source).not.toContain("@integration-hub/application/repos");
+  });
 
-interface ReposPayload {
-  repos: Array<{
-    id: string;
-    slug: string;
-    root_path: string;
-    default_branch: string | null;
-    remote_url: string | null;
-    registered_at: string;
-    last_seen_at: string;
-    project_id: string | null;
-  }>;
-}
-
-describe("/repos +page.server.ts load()", () => {
-  test("returns 3 seeded repos in registered_at ASC order", async () => {
-    const { r1, r2, r3 } = await seedDb(scratch);
+  test("load returns repository rows from the service boundary", async () => {
+    repos.push(row({ id: "repo-1", slug: "alpha" }), row({ id: "repo-2", slug: "beta" }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      locals: { activeProjectId: null },
+      locals: { activeProjectId: "project-1", orgId: "org-1" },
     } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<ReposPayload>(result);
-    expect(payload.repos).toHaveLength(3);
-    expect(payload.repos[0]?.id).toBe(r1);
-    expect(payload.repos[1]?.id).toBe(r2);
-    expect(payload.repos[2]?.id).toBe(r3);
-    expect(payload.repos[0]?.slug).toBe("alpha");
+    const payload = await streamedData<{ repos: RepoListRow[] }>(result);
+    expect(payload.repos.map((candidate) => candidate.slug)).toEqual(["alpha", "beta"]);
   });
 
-  test("returns empty array when no repos registered", async () => {
-    const dbDir = join(scratch, "state", "product", "db");
-    mkdirSync(dbDir, { recursive: true });
-    const db = await openIsolatedStore(join(dbDir, "main"));
-    await migrateIsolatedStore(db);
-    await createLocalOrg(db, { slug: "default", name: "Default" });
-    await db.close();
-
+  test("sync action queues through the repository public API", async () => {
+    const repoId = "repo-sync";
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load({
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<ReposPayload>(result);
-    expect(payload.repos).toEqual([]);
-  });
-
-  test("repo row includes last_seen_at as ISO string", async () => {
-    await seedDb(scratch);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load({
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
-    const payload = await streamedData<ReposPayload>(result);
-    expect(typeof payload.repos[0]?.last_seen_at).toBe("string");
-    expect(payload.repos[0]?.last_seen_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-});
-
-describe("/repos +page.server.ts sync action()", () => {
-  test("updates last_seen_at for the target repo", async () => {
-    const { r1 } = await seedDb(scratch);
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-
     const form = new FormData();
-    form.set("repo_id", r1);
-    const before = new Date("2026-01-02T00:00:00Z").getTime();
+    form.set("repo_id", repoId);
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
 
-    await mod.actions.sync({ request: { formData: async () => form } } as Parameters<typeof mod.actions.sync>[0]);
+    const result = await mod.actions.sync({
+      request: {
+        headers: new Headers({ cookie: "sid=repo-list" }),
+        formData: async () => form,
+      },
+      locals: { activeProjectId: null, orgId: "org-repos", session: {}, em: null, container: null },
+      url: new URL("http://localhost/repos"),
+      fetch: async (url, init) => {
+        const target = url.toString();
+        if (target.includes("/api/trpc")) throw new Error("unexpected runtime route call");
+        calls.push({ url: target, init });
+        return Response.json({ id: repoId }, { status: 202 });
+      },
+    } as Parameters<typeof mod.actions.sync>[0]);
 
-    // Verify update by re-loading
-    const result2 = await mod.load({
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
-    const payload2 = await streamedData<ReposPayload>(result2);
-    const updated = payload2.repos.find((r) => r.id === r1);
-    expect(updated).toBeDefined();
-    const updatedMs = new Date(updated!.last_seen_at).getTime();
-    expect(updatedMs).toBeGreaterThan(before);
+    expect(result).toEqual({ ok: true, message: "Repo sync queued" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(`http://localhost/api/v1/repos/${repoId}/sync?orgId=org-repos`);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.init?.credentials).toBe("include");
+    expect((calls[0]?.init?.headers as Record<string, string>)?.cookie).toBe("sid=repo-list");
+  });
+
+  test("sync action ignores an empty repository id", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const form = new FormData();
+    const result = await mod.actions.sync({
+      request: {
+        headers: new Headers(),
+        formData: async () => form,
+      },
+      locals: { activeProjectId: null, orgId: "org-repos", session: {}, em: null, container: null },
+      url: new URL("http://localhost/repos"),
+      fetch: async () => {
+        throw new Error("sync should not call fetch without repo id");
+      },
+    } as Parameters<typeof mod.actions.sync>[0]);
+
+    expect(result).toEqual({ ok: true, message: "No repo id" });
   });
 });

@@ -18,16 +18,26 @@
   import TaskComments from "./TaskComments.svelte";
   import ActivityFeed from "./ActivityFeed.svelte";
   import WatcherList from "./WatcherList.svelte";
+  import {
+    archiveTaskDetail,
+    fetchTaskChildren,
+    fetchTaskDetail,
+    fetchTaskRelationships,
+    updateTaskTitle,
+    type TaskDetailApiRow,
+    type TaskRelationshipApiRow,
+  } from "./task-detail-api";
 
   interface Props {
     taskId: string;
+    orgId?: string;
     onClose: () => void;
     onNavigate: (direction: "prev" | "next") => void;
     currentUserId?: string;
     taskPrefix?: string;
   }
 
-  const { taskId, onClose, onNavigate, currentUserId = "", taskPrefix = "FUL" }: Props = $props();
+  const { taskId, orgId = "", onClose, onNavigate, currentUserId = "", taskPrefix = "FUL" }: Props = $props();
 
   type TabType = "comments" | "activity";
 
@@ -111,10 +121,7 @@
     loading = true;
     error = null;
     try {
-      const res = await fetch(`/api/trpc/tasks.get?input=${encodeURIComponent(JSON.stringify({ id: taskId }))}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json() as { result?: { data?: Task } };
-      task = json.result?.data ?? null;
+      task = normalizeTask(await fetchTaskDetail(fetch, { orgId, userId: currentUserId, taskId }));
       if (task) {
         titleDraft = task.title;
       }
@@ -127,31 +134,25 @@
 
   async function loadRelationships(): Promise<void> {
     try {
-      const res = await fetch(`/api/trpc/relationships.listForTask?input=${encodeURIComponent(JSON.stringify({ taskId }))}`);
-      if (!res.ok) return;
-      const json = await res.json() as { result?: { data?: Relationship[] } };
-      relationships = json.result?.data ?? [];
+      relationships = (await fetchTaskRelationships(fetch, { orgId, taskId })).map(normalizeRelationship);
     } catch {}
   }
 
   async function loadSubtasks(): Promise<void> {
     try {
-      const res = await fetch(`/api/trpc/tasks.list?input=${encodeURIComponent(JSON.stringify({}))}`);
-      if (!res.ok) return;
-      const json = await res.json() as { result?: { data?: SubTask[] } };
-      const all = json.result?.data ?? [];
-      // Filter subtasks — tasks with parentId = taskId
-      subtasks = (all as Array<SubTask & { parentId?: string }>).filter((t) => t.parentId === taskId);
+      subtasks = (await fetchTaskChildren(fetch, { orgId, userId: currentUserId, taskId })).map(normalizeSubtask);
     } catch {}
   }
 
   async function saveTitle(): Promise<void> {
     if (!task || titleDraft === task.title) { editingTitle = false; return; }
     try {
-      await fetch("/api/trpc/tasks.update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: taskId, title: titleDraft }),
+      await updateTaskTitle(fetch, {
+        orgId,
+        userId: currentUserId,
+        taskId,
+        projectId: task.projectId,
+        title: titleDraft,
       });
       task = { ...task, title: titleDraft };
     } catch {}
@@ -162,12 +163,13 @@
     archiving = true;
     showKebabMenu = false;
     try {
-      await fetch("/api/trpc/tasks.archive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: taskId }),
+      await archiveTaskDetail(fetch, {
+        orgId,
+        userId: currentUserId,
+        taskId,
+        projectId: task?.projectId ?? null,
       });
-      await loadTask();
+      if (task) task = { ...task, deletedAt: new Date() };
     } catch {}
     archiving = false;
   }
@@ -202,6 +204,45 @@
       void Promise.all([loadTask(), loadRelationships(), loadSubtasks()]);
     }
   });
+
+  function normalizeTask(row: TaskDetailApiRow): Task {
+    return {
+      id: row.id,
+      orgId,
+      title: row.title,
+      description: row.description,
+      descriptionText: row.descriptionText ?? "",
+      tiptapContent: row.tiptapContent,
+      status: row.status,
+      priority: row.priority,
+      points: row.points,
+      parentId: row.parentId,
+      dependencies: [],
+      createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : new Date(0),
+      deletedAt: row.deletedAt ? new Date(row.deletedAt) : null,
+      archivedAt: row.deletedAt ? new Date(row.deletedAt) : null,
+      assigneeId: row.assigneeId,
+      taskType: "task",
+    };
+  }
+
+  function normalizeSubtask(row: TaskDetailApiRow): SubTask {
+    return {
+      id: row.id,
+      title: row.title,
+      status: row.status,
+    };
+  }
+
+  function normalizeRelationship(row: TaskRelationshipApiRow): Relationship {
+    return {
+      id: row.id,
+      sourceTaskId: row.sourceTaskId,
+      targetTaskId: row.targetTaskId,
+      type: row.type,
+    };
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -402,7 +443,7 @@
               </button>
               {#if showRecurrencePopover}
                 <div class="task-detail-panel__recurrence-popover" role="dialog" aria-label="Recurrence settings">
-                  <p class="task-detail-panel__popover-note">Recurrence configuration (Plan 12 integration point)</p>
+                  <p class="task-detail-panel__popover-note">Recurrence configuration (workflow milestone integration point)</p>
                   <button type="button" onclick={() => { showRecurrencePopover = false; }}>Close</button>
                 </div>
               {/if}
@@ -411,14 +452,14 @@
         {/if}
       </section>
 
-      <!-- SECTION 3: Description (TipTap placeholder — full collab wiring in Plan 13) -->
+      <!-- SECTION 3: Description (TipTap placeholder — full collab wiring in workflow milestone) -->
       <section class="task-detail-panel__section">
         <h2 class="task-detail-panel__section-title">Description</h2>
         <div class="task-detail-panel__description" data-testid="task-detail-description">
           {#if task.descriptionText}
             <p>{task.descriptionText}</p>
           {:else}
-            <p class="task-detail-panel__placeholder">Add a description... (rich text editor available in Plan 13)</p>
+            <p class="task-detail-panel__placeholder">Add a description... (rich text editor available in workflow milestone)</p>
           {/if}
         </div>
       </section>
@@ -552,16 +593,16 @@
 
         <div class="task-detail-panel__tab-content">
           {#if activeTab === "comments"}
-            <TaskComments {taskId} {currentUserId} />
+            <TaskComments {taskId} orgId={task.orgId} {currentUserId} />
           {:else}
-            <ActivityFeed {taskId} />
+            <ActivityFeed {taskId} orgId={task.orgId} />
           {/if}
         </div>
       </section>
 
       <!-- SECTION 9: Watchers -->
       <section class="task-detail-panel__section">
-        <WatcherList {taskId} {currentUserId} />
+        <WatcherList {taskId} orgId={task.orgId} {currentUserId} />
       </section>
 
     </div>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { appErrorToTrpcError } from "@/application/error-mapping.ts";
+import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
 
 export const DomainContextSchema = z.object({
   orgId: z.string().min(1),

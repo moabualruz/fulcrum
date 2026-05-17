@@ -1,1 +1,1 @@
-export * from "@/application/agents/queries.ts";
+export * from "@execution-orchestration/interface/agent-profiles.ts";

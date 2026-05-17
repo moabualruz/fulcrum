@@ -1,1 +1,1 @@
-export * from "@/application/repo-files/queries.ts";
+export * from "@integration-hub/interface/repository-files.ts";

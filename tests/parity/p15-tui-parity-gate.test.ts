@@ -377,13 +377,13 @@ describe("P15 Live-update latency — EventEmitter mock", () => {
 
 describe("P15 KeybindingAction — registry has no duplicate bindings on same screen", () => {
   it("KeybindingAction enum values are importable from shared keybindings module", async () => {
-    const kb = await import("../../src/keybindings/index.ts");
+    const kb = await import("@platform-core/application/input-bindings/index.ts");
     expect(kb).toBeDefined();
     expect(typeof kb.KeybindingAction).toBe("object"); // TS enum compiles to object
   });
 
   it("KEYBINDING_ACTIONS array has no duplicate entries (conflict detector passes)", async () => {
-    const { KEYBINDING_ACTIONS } = await import("../../src/keybindings/index.ts");
+    const { KEYBINDING_ACTIONS } = await import("@platform-core/application/input-bindings/index.ts");
     const seen = new Set<string>();
     const duplicates: string[] = [];
 
@@ -398,7 +398,7 @@ describe("P15 KeybindingAction — registry has no duplicate bindings on same sc
   });
 
   it("getDefaultKeybindings: no key bound to two different actions (conflict-free)", async () => {
-    const { getDefaultKeybindings, detectConflicts } = await import("../../src/keybindings/index.ts");
+    const { getDefaultKeybindings, detectConflicts } = await import("@platform-core/application/input-bindings/index.ts");
     const defaults = getDefaultKeybindings({ platform: "macos" });
     const conflicts = detectConflicts(defaults);
     expect(conflicts).toHaveLength(0);

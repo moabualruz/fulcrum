@@ -36,6 +36,7 @@ function fakeArtifact(overrides: Partial<z.infer<typeof ArtifactSchema>> = {}): 
     checksumSha256: "abc123",
     digest: null,
     metadataJson: {},
+    lifecycleState: "created",
     archived: false,
     pruned: false,
     retentionStatus: "active",

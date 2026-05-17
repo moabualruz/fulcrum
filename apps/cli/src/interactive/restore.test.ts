@@ -4,13 +4,13 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 
 async function freshDb(): Promise<{ db: TestStore; dir: string }> {
   const dir = await mkdtemp(join(tmpdir(), "fulcrum-restore-"));
-  const { openIsolatedStore } = await import("@/test-support/product-fixtures.ts");
+  const { openIsolatedStore } = await import("@test-support/product-workspace-fixtures.ts");
   const db = await openIsolatedStore(join(dir, "db"));
-  const { migrateIsolatedStore } = await import("@/test-support/product-fixtures.ts");
+  const { migrateIsolatedStore } = await import("@test-support/product-workspace-fixtures.ts");
   await migrateIsolatedStore(db);
   return { db, dir };
 }

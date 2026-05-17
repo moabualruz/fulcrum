@@ -41,4 +41,37 @@ describe("project command item generation", () => {
       mutation: false,
     });
   });
+
+  test("adds project management shortcuts for modules, intake, and saved views", () => {
+    const items = buildProjectCommandItems({ activeProjectId: "project-alpha" });
+
+    expect(items.find((item) => item.id === "project-modules")).toMatchObject({
+      href: "/projects/project-alpha/modules",
+      scope: { projectId: "project-alpha", mode: "current" },
+      traceTarget: { kind: "project", id: "project-alpha" },
+      mutation: false,
+    });
+    expect(items.find((item) => item.id === "project-intake")).toMatchObject({
+      href: "/projects/project-alpha/intake",
+      scope: { projectId: "project-alpha", mode: "current" },
+      mutation: false,
+    });
+    expect(items.find((item) => item.id === "saved-views")).toMatchObject({
+      href: "/projects/project-alpha/settings/views",
+      scope: { projectId: "project-alpha", mode: "current" },
+      mutation: false,
+    });
+    expect(items.find((item) => item.id === "create-module")).toMatchObject({
+      href: "/projects/project-alpha/modules?new=module",
+      mutation: true,
+    });
+    expect(items.find((item) => item.id === "create-intake-request")).toMatchObject({
+      href: "/projects/project-alpha/intake?new=request",
+      mutation: true,
+    });
+    expect(items.find((item) => item.id === "create-saved-view")).toMatchObject({
+      href: "/projects/project-alpha/settings/views?new=view",
+      mutation: true,
+    });
+  });
 });

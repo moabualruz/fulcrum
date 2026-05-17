@@ -1,1 +1,1 @@
-export * from "@/application/custom-fields/commands.ts";
+export * from "@work-management/interface/custom-field-actions.ts";

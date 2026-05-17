@@ -1,13 +1,18 @@
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "../local-caller.ts";
+import { formatApiError, formatCommandError } from "../api-errors.ts";
+import {
+  createSearchApiCallerFromEnv,
+  type SearchApiEnvironment,
+} from "@knowledge-workspace/interface/http/search-api-client.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 const SEARCH_KINDS = ["task", "doc", "memory", "artifact", "repo", "agent_run"] as const;
 type SearchKind = typeof SEARCH_KINDS[number];
 
 interface SearchCaller {
-  search: {
+  search?: {
     query: (input: SearchQueryInput) => Promise<unknown>;
     suggest: (input: { partial: string; kind?: SearchKind }) => Promise<unknown>;
     savedList: (input?: { project?: string }) => Promise<unknown>;
@@ -35,7 +40,8 @@ interface SearchQueryInput {
 
 export interface SearchRunOptions {
   caller?: SearchCaller;
-  container?: Container | null;
+  env?: SearchApiEnvironment & TaskApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -112,7 +118,7 @@ export async function runCmdk(
   }
 
   try {
-    const caller = await resolveCaller(resolved);
+    const caller = resolveCmdkCaller(resolved);
     if (!caller.tasks?.create) throw new Error("tasks.create procedure is not available");
     const args = parseJsonFlag(rest, "args") ?? {};
     const result = await caller.tasks.create(asRecord(args));
@@ -165,7 +171,7 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
 
   if (nlEnabled && !kind && !flags.get("status") && !flags.get("assignee")) {
     try {
-      const { translateNlToFilter, HttpNlFilterSidecar } = await import("@/search/nl-filter.ts");
+      const { translateNlToFilter, HttpNlFilterSidecar } = await import("@knowledge-workspace/application/search/nl-filter.ts");
       const sidecar = new HttpNlFilterSidecar();
       const result = await translateNlToFilter(query, sidecar);
       if (result.translated && result.ast) {
@@ -180,19 +186,24 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
     }
   }
 
-  const input: SearchQueryInput = compact({
+  const scope: SearchQueryInput["scope"] = argv.includes("--global")
+    ? "global"
+    : argv.includes("--all-projects")
+      ? "all"
+      : undefined;
+  const input: SearchQueryInput = {
     q: resolvedQuery,
-    kind: resolvedKind,
-    project: flags.get("project"),
-    scope: argv.includes("--global") ? "global" : argv.includes("--all-projects") ? "all" : undefined,
-    status: resolvedStatus,
-    assignee: resolvedAssignee,
-    tag: resolvedTag,
-    dateRange: flags.get("date-range"),
-    author: flags.get("author"),
-    limit,
-    offset,
-  });
+    ...(resolvedKind ? { kind: resolvedKind } : {}),
+    ...(flags.get("project") ? { project: flags.get("project") } : {}),
+    ...(scope ? { scope } : {}),
+    ...(resolvedStatus ? { status: resolvedStatus } : {}),
+    ...(resolvedAssignee ? { assignee: resolvedAssignee } : {}),
+    ...(resolvedTag ? { tag: resolvedTag } : {}),
+    ...(flags.get("date-range") ? { dateRange: flags.get("date-range") } : {}),
+    ...(flags.get("author") ? { author: flags.get("author") } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+    ...(offset !== undefined ? { offset } : {}),
+  };
 
   await callAndPrint("fulcrum search", argv.includes("--json"), opts, async (caller) => caller.search.query(input));
 }
@@ -281,10 +292,10 @@ async function callAndPrint(
   label: string,
   jsonMode: boolean,
   opts: ResolvedOptions,
-  fn: (caller: SearchCaller) => Promise<unknown>,
+  fn: (caller: SearchCaller & { search: NonNullable<SearchCaller["search"]> }) => Promise<unknown>,
 ): Promise<void> {
   try {
-    const caller = await resolveCaller(opts);
+    const caller = resolveSearchCaller(opts);
     const result = await fn(caller);
     printResult(result, jsonMode, opts.print);
   } catch (err) {
@@ -382,9 +393,9 @@ function fail(label: string, message: string, opts: ResolvedOptions): void {
 }
 
 function errorMessage(err: unknown): string {
-  if (err instanceof TRPCError) return `${err.code}: ${err.message}`;
   if (err instanceof SyntaxError) return `invalid JSON: ${err.message}`;
-  return `Error: ${(err as Error).message}`;
+  const message = formatApiError(err);
+  return message.includes(": ") ? message : formatCommandError(err);
 }
 
 function isFeatureEnabled(flag: string): boolean {
@@ -395,10 +406,26 @@ function isFeatureEnabled(flag: string): boolean {
     .includes(flag);
 }
 
-async function resolveCaller(opts: SearchRunOptions): Promise<SearchCaller> {
-  if (opts.caller) return opts.caller;
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as SearchCaller;
+function resolveSearchCaller(opts: SearchRunOptions): SearchCaller & { search: NonNullable<SearchCaller["search"]> } {
+  if (opts.caller?.search) {
+    return opts.caller as SearchCaller & { search: NonNullable<SearchCaller["search"]> };
+  }
+  const apiCaller = createSearchApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Search API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, FULCRUM_USER_ID, and FULCRUM_API_TOKEN or FULCRUM_PUBLIC_API_TOKEN.",
+    );
+  }
+  return apiCaller as unknown as SearchCaller & { search: NonNullable<SearchCaller["search"]> };
+}
+
+function resolveCmdkCaller(opts: SearchRunOptions): SearchCaller {
+  if (opts.caller?.tasks) return opts.caller;
+  const apiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller as unknown as SearchCaller;
 }

@@ -1,1 +1,1 @@
-export * from "@/application/doc-links/queries.ts";
+export * from "@knowledge-workspace/interface/document-links.ts";

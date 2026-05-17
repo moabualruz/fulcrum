@@ -8,7 +8,7 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
-import type { AgentRunOrchestrationState } from "@/orchestration/states.ts";
+import type { AgentRunOrchestrationState } from "@execution-orchestration/infrastructure/agent-runtime/states.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

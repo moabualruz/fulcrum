@@ -1,35 +1,12 @@
 <script lang="ts">
-  /**
-   * CommandPalette — Phase 05 Plan 12 (D-66, D-112, D-117, D-118).
-   *
-   * Cmd+K command palette with fuzzy search across tasks, projects,
-   * sprints, and navigation actions. Task ID search (e.g. "FUL-42").
-   * Results filtered by org membership (T-05-27 mitigation).
-   *
-   * Uses the existing shadcn-svelte Command primitives via the
-   * lower-level command-palette infrastructure.
-   */
   import { cn } from "$lib/utils.js";
   import { goto } from "$app/navigation";
-  import { page } from "$app/state";
-
-  interface TaskResult {
-    id: string;
-    title: string;
-    identifier?: string;
-    projectId: string;
-  }
-
-  interface ProjectResult {
-    id: string;
-    name: string;
-  }
-
-  interface SprintResult {
-    id: string;
-    name: string;
-    projectId: string;
-  }
+  import {
+    fetchCommandPaletteEntities,
+    type ProjectResult,
+    type SprintResult,
+    type TaskResult,
+  } from "./command-palette/entity-api.ts";
 
   interface ActionItem {
     id: string;
@@ -47,9 +24,12 @@
   interface Props {
     open: boolean;
     onOpenChange: (next: boolean) => void;
+    orgId?: string | null;
+    userId?: string | null;
+    projectId?: string | null;
   }
 
-  let { open, onOpenChange }: Props = $props();
+  let { open, onOpenChange, orgId = null, userId = null, projectId = null }: Props = $props();
 
   let query = $state("");
   let loading = $state(false);
@@ -58,7 +38,6 @@
   let sprints = $state<SprintResult[]>([]);
   let selectedIndex = $state(0);
 
-  // Built-in navigation actions (always visible)
   const ACTIONS: ActionItem[] = [
     { id: "nav-dashboard",  label: "Go to Dashboard",  action: () => void goto("/") },
     { id: "nav-projects",   label: "Go to Projects",   action: () => void goto("/projects") },
@@ -67,7 +46,6 @@
     { id: "nav-search",     label: "Search",           action: () => void goto("/search") },
   ];
 
-  // Task ID pattern: 3-6 uppercase letters, dash, digits e.g. "FUL-42"
   const TASK_ID_RE = /^[A-Z]{2,6}-\d+$/i;
 
   function fuzzyMatch(text: string, q: string): boolean {
@@ -84,10 +62,8 @@
     return true;
   }
 
-  // Derived results from loaded data
   const results = $derived<ResultGroup[]>(() => {
     if (!query.trim()) {
-      // Recent: show actions only
       return ACTIONS.slice(0, 5).map((item) => ({ type: "action" as const, item }));
     }
 
@@ -166,42 +142,25 @@
     if (event.target === event.currentTarget) close();
   }
 
-  // Keep selectedIndex in bounds when results change
   $effect(() => {
     if (selectedIndex >= results.length) selectedIndex = Math.max(0, results.length - 1);
   });
 
-  // Load data when opened for the first time
   $effect(() => {
     if (!open) return;
-    if (tasks.length > 0 || loading) return; // already loaded
+    if (tasks.length > 0 || projects.length > 0 || loading) return;
 
     loading = true;
-    // Fetch data via tRPC — best-effort; palette still works as nav launcher if fetch fails
-    Promise.allSettled([
-      fetch("/api/trpc/tasks.list?input=" + encodeURIComponent(JSON.stringify({ limit: 200 }))),
-      fetch("/api/trpc/projects.list"),
-      fetch("/api/trpc/sprints.list"),
-    ])
-      .then(async ([taskRes, projRes, sprintRes]) => {
-        if (taskRes.status === "fulfilled" && taskRes.value.ok) {
-          try {
-            const json = await taskRes.value.json() as { result?: { data?: { items?: TaskResult[] } } };
-            tasks = json.result?.data?.items ?? [];
-          } catch { /* ignore */ }
-        }
-        if (projRes.status === "fulfilled" && projRes.value.ok) {
-          try {
-            const json = await projRes.value.json() as { result?: { data?: ProjectResult[] } };
-            projects = json.result?.data ?? [];
-          } catch { /* ignore */ }
-        }
-        if (sprintRes.status === "fulfilled" && sprintRes.value.ok) {
-          try {
-            const json = await sprintRes.value.json() as { result?: { data?: SprintResult[] } };
-            sprints = json.result?.data ?? [];
-          } catch { /* ignore */ }
-        }
+    fetchCommandPaletteEntities(fetch, { orgId, userId, projectId })
+      .then((entities) => {
+        tasks = entities.tasks;
+        projects = entities.projects;
+        sprints = entities.sprints;
+      })
+      .catch(() => {
+        tasks = [];
+        projects = [];
+        sprints = [];
       })
       .finally(() => {
         loading = false;
@@ -233,7 +192,6 @@
     return result.item.label;
   }
 
-  // Group results for display
   const groupedResults = $derived<Array<{ type: ResultGroup["type"]; items: ResultGroup[] }>>(() => {
     const groups = new Map<ResultGroup["type"], ResultGroup[]>();
     for (const r of results) {
@@ -244,7 +202,6 @@
     return Array.from(groups.entries()).map(([type, items]) => ({ type, items }));
   });
 
-  // Flat index for keyboard nav
   let flatIndex = $derived(
     results.findIndex((_r, i) => i === selectedIndex)
   );

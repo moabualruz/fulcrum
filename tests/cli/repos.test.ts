@@ -136,7 +136,63 @@ describe("repos.run", () => {
     expect(parsed[0]?.slug).toBe("alpha");
   });
 
-  it("sync, unregister, and status call matching tRPC procedures", async () => {
+  it("lists repos through the configured public API", async () => {
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
+    const lines: string[] = [];
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await run(["list", "--include-archived", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json([{ id: "repo-public", slug: "public", currentBranch: "main" }]);
+      }) as typeof fetch,
+      print: (line) => lines.push(line),
+      printErr: () => {},
+      exit: () => {},
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/repos?orgId=org-1&includeArchived=true",
+        method: "GET",
+        body: null,
+      },
+    ]);
+    expect(JSON.parse(lines[0] as string)[0]).toMatchObject({
+      id: "repo-public",
+      slug: "public",
+      branch: "main",
+    });
+  });
+
+  it("requires a configured public API without injected caller", async () => {
+    const { run } = await import("@fulcrum/cli/commands/repos.ts");
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await run(["list", "--json"], {
+      env: {},
+      fetch: (async () => {
+        throw new Error("fetch should not run without API configuration");
+      }) as unknown as typeof fetch,
+      print: () => {},
+      printErr: (line) => errors.push(line),
+      exit: (code) => exits.push(code),
+    });
+
+    expect(errors.join("\n")).toContain("Repository API caller is not configured");
+    expect(exits).toEqual([1]);
+  });
+
+  it("sync, unregister, and status call matching application procedures", async () => {
     const { run } = await import("@fulcrum/cli/commands/repos.ts");
     const caller = fakeReposCaller();
     const lines: string[] = [];

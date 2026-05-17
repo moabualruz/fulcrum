@@ -17,4 +17,4 @@
   </div>
 </header>
 
-<AutomationRuleList projectId={data.projectId} />
+<AutomationRuleList projectId={data.projectId} orgId={data.orgId} currentUserId={data.currentUserId} />

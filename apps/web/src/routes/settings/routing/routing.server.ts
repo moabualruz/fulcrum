@@ -1,10 +1,19 @@
-import { fail, redirect } from "@sveltejs/kit";
+import { error, fail, redirect } from "@sveltejs/kit";
 import { z } from "zod";
 
-import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
+import { createRoutingApiCaller } from "@execution-orchestration/interface/http/routing-api-client.ts";
+import type {
+  DraftRow,
+  EnrichedDecisionRow,
+  LlmGateConfig,
+  RoutingDecisionRow,
+  RoutingRuleRow,
+} from "./routing.types";
 
 function getLlmGateConfig(): LlmGateConfig {
-  const features = (process.env["FULCRUM_FEATURES"] ?? "").split(",").map((f) => f.trim());
+  const features = (process.env["FULCRUM_FEATURES"] ?? "")
+    .split(",")
+    .map((f) => f.trim());
   const enabled = features.includes("router-llm");
   const rawMode = process.env["FULCRUM_LLM_INPUT_MODE"];
   const inputMode = rawMode === "task_facts" || rawMode === "task_plus_history" || rawMode === "full_context"
@@ -15,6 +24,8 @@ function getLlmGateConfig(): LlmGateConfig {
 
 interface RouteLocals {
   session: unknown;
+  orgId?: string | null;
+  userId?: string | null;
 }
 
 export interface RoutingLoadEvent {
@@ -29,68 +40,40 @@ export interface RoutingActionEvent extends RoutingLoadEvent {
   request: RoutingLoadEvent["request"] & { formData(): Promise<FormData> };
 }
 
+type RoutingCaller = ReturnType<typeof createRoutingApiCaller>["routing"];
+
 const ConditionsSchema = z.record(z.string(), z.unknown()).refine(
   (value) => "all" in value || "any" in value,
   "conditions_json must contain an all or any group.",
 );
 
 function baseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
+  return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${url.protocol}//${url.host}`;
 }
 
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
+function cookieHeaders(event: RoutingLoadEvent | RoutingActionEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
 }
 
-function extractTrpcError(body: unknown): string {
-  const errorBody = (body as { error?: unknown })?.error;
-  if (errorBody && typeof errorBody === "object") {
-    const message = (errorBody as { message?: unknown; json?: { message?: unknown } }).message;
-    const jsonMessage = (errorBody as { json?: { message?: unknown } }).json?.message;
-    if (typeof message === "string") return message;
-    if (typeof jsonMessage === "string") return jsonMessage;
-  }
-  return "Request failed";
+function createRoutingCaller(event: RoutingLoadEvent | RoutingActionEvent): RoutingCaller | null {
+  const orgId = event.locals.orgId ?? process.env["FULCRUM_ORG_ID"] ?? "00000000-0000-0000-0000-000000000001";
+  const userId = event.locals.userId ?? process.env["FULCRUM_USER_ID"] ?? "local";
+  if (!orgId || !userId) return null;
+
+  return createRoutingApiCaller({
+    baseUrl: baseUrl(event.url),
+    orgId,
+    userId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event),
+  }).routing;
 }
 
-async function trpcGet(
-  fetchFn: typeof fetch,
-  origin: string,
-  procedure: string,
-  input: unknown,
-  cookie: string,
-) {
-  const encodedInput = encodeURIComponent(JSON.stringify(input ?? {}));
-  const response = await fetchFn(`${origin}/api/trpc/${procedure}?input=${encodedInput}`, {
-    method: "GET",
-    credentials: "include",
-    headers: { "content-type": "application/json", cookie },
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
-}
-
-async function trpcPost(
-  fetchFn: typeof fetch,
-  origin: string,
-  procedure: string,
-  input: unknown,
-  cookie: string,
-) {
-  const response = await fetchFn(`${origin}/api/trpc/${procedure}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json", cookie },
-    body: JSON.stringify(input ?? {}),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
+function requireRoutingCaller(event: RoutingLoadEvent | RoutingActionEvent): RoutingCaller {
+  const caller = createRoutingCaller(event);
+  if (!caller) error(503, { message: "Routing API caller is not configured." });
+  return caller;
 }
 
 function requireSession(event: RoutingLoadEvent): void {
@@ -105,44 +88,152 @@ function parseConditions(value: FormDataEntryValue | null) {
       return { ok: false as const, error: `Invalid conditions_json: ${result.error.issues[0]?.message ?? "invalid JSON"}` };
     }
     return { ok: true as const, value: result.data };
-  } catch (error) {
-    return { ok: false as const, error: `Invalid conditions_json: ${String((error as Error).message ?? error)}` };
+  } catch (parseError) {
+    return { ok: false as const, error: `Invalid conditions_json: ${String((parseError as Error).message ?? parseError)}` };
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function stringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function numberValue(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function booleanValue(value: unknown, fallback = false): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeRule(row: unknown): RoutingRuleRow | null {
+  if (!isRecord(row) || typeof row.id !== "string" || typeof row.orgId !== "string") return null;
+  return {
+    id: row.id,
+    orgId: row.orgId,
+    projectId: typeof row.projectId === "string" ? row.projectId : null,
+    name: stringValue(row.name, "Untitled rule"),
+    conditionsJson: isRecord(row.conditionsJson) ? row.conditionsJson : {},
+    actionAgent: stringValue(row.actionAgent, ""),
+    actionSkillSet: stringArray(row.actionSkillSet),
+    priority: numberValue(row.priority, 100),
+    enabled: booleanValue(row.enabled, true),
+    source: row.source === "learned" || row.source === "imported" ? row.source : "manual",
+    createdAt: stringValue(row.createdAt),
+    updatedAt: stringValue(row.updatedAt),
+  };
+}
+
+function proposedRuleText(row: Record<string, unknown>): string {
+  const actions = isRecord(row.proposedActionsJson) ? row.proposedActionsJson : {};
+  const actionAgent = stringValue(actions.actionAgent, "agent");
+  const conditions = isRecord(row.proposedConditionsJson) ? row.proposedConditionsJson : {};
+  return `Route matching work to ${actionAgent}: ${JSON.stringify(conditions)}`;
+}
+
+function normalizeDraft(row: unknown): DraftRow | null {
+  if (!isRecord(row)) return null;
+  const id = stringValue(row.id || row.draftId);
+  const orgId = stringValue(row.orgId);
+  if (!id || !orgId) return null;
+  const status = stringValue(row.status, "review_needed");
+  const matchedRuleIds = [
+    ...stringArray(row.matchingActiveRuleIds),
+    ...(typeof row.matchedRuleId === "string" ? [row.matchedRuleId] : []),
+  ];
+  return {
+    id,
+    orgId,
+    proposedRule: stringValue(row.proposedRule, proposedRuleText(row)),
+    source: stringValue(row.source, "learned"),
+    confidence: typeof row.confidence === "number" ? row.confidence : null,
+    conflictState: status === "conflict" || status === "abstained" ? status : "review_needed",
+    matchingActiveRuleIds: matchedRuleIds,
+    createdAt: stringValue(row.createdAt),
+  };
+}
+
+function normalizeRules(rows: unknown): RoutingRuleRow[] {
+  return Array.isArray(rows)
+    ? rows.map(normalizeRule).filter((row): row is RoutingRuleRow => row !== null)
+    : [];
+}
+
+function normalizeDrafts(rows: unknown): DraftRow[] {
+  return Array.isArray(rows)
+    ? rows.map(normalizeDraft).filter((row): row is DraftRow => row !== null)
+    : [];
+}
+
+function normalizeDecision(row: unknown): RoutingDecisionRow | null {
+  if (!isRecord(row)) return null;
+  return {
+    ruleId: typeof row.ruleId === "string"
+      ? row.ruleId
+      : typeof row.matchedRuleId === "string" ? row.matchedRuleId : null,
+    source: stringValue(row.source, stringValue(row.status, "api")),
+    agent: stringValue(row.agent),
+    confidence: typeof row.confidence === "number" ? row.confidence : null,
+  };
+}
+
+function normalizeEnrichedDecision(row: unknown): EnrichedDecisionRow {
+  const record = isRecord(row) ? row : {};
+  return {
+    status: record.status === "matched" || record.status === "recommended" || record.status === "draft_created" || record.status === "conflict" || record.status === "abstained"
+      ? record.status
+      : "no_match",
+    matchedRuleId: typeof record.matchedRuleId === "string" ? record.matchedRuleId : null,
+    draftId: typeof record.draftId === "string" ? record.draftId : null,
+    factsUsed: isRecord(record.factsUsed) ? record.factsUsed : {},
+    confidence: typeof record.confidence === "number" ? record.confidence : null,
+    backend: typeof record.backend === "string" ? record.backend : null,
+    model: typeof record.model === "string" ? record.model : null,
+    whyUnmatched: typeof record.whyUnmatched === "string" ? record.whyUnmatched : null,
+    evidence: stringArray(record.evidence),
+  };
+}
+
+function messageFromError(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 export async function loadRoutingPage(event: RoutingLoadEvent, projectId: string | null) {
   requireSession(event);
-  const origin = baseUrl(event.url);
-  const cookie = event.request.headers.get("cookie") ?? "";
-
+  const caller = requireRoutingCaller(event);
   const llmGateConfig = getLlmGateConfig();
 
   if (projectId) {
     const [projectRules, allRules, drafts] = await Promise.all([
-      trpcGet(event.fetch, origin, "routing.list", { projectId }, cookie),
-      trpcGet(event.fetch, origin, "routing.list", {}, cookie),
-      trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie).catch(() => []),
+      caller.list({ projectId }),
+      caller.list({}),
+      caller.listDrafts({}).catch(() => []),
     ]);
     return {
       projectId,
-      rules: Array.isArray(projectRules) ? (projectRules as RoutingRuleRow[]) : [],
-      inheritedRules: Array.isArray(allRules)
-        ? (allRules as RoutingRuleRow[]).filter((rule) => rule.projectId === null)
-        : [],
-      drafts: Array.isArray(drafts) ? (drafts as DraftRow[]) : [],
+      rules: normalizeRules(projectRules),
+      inheritedRules: normalizeRules(allRules).filter((rule) => rule.projectId === null),
+      drafts: normalizeDrafts(drafts),
       llmGateConfig,
     };
   }
 
   const [rules, drafts] = await Promise.all([
-    trpcGet(event.fetch, origin, "routing.list", {}, cookie),
-    trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie).catch(() => []),
+    caller.list({}),
+    caller.listDrafts({}).catch(() => []),
   ]);
   return {
     projectId: null,
-    rules: Array.isArray(rules) ? (rules as RoutingRuleRow[]).filter((rule) => rule.projectId === null) : [],
+    rules: normalizeRules(rules).filter((rule) => rule.projectId === null),
     inheritedRules: [],
-    drafts: Array.isArray(drafts) ? (drafts as DraftRow[]) : [],
+    drafts: normalizeDrafts(drafts),
     llmGateConfig,
   };
 }
@@ -162,7 +253,7 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       if (!name || !actionAgent) return fail(400, { createError: "Rule name and agent are required." });
 
       try {
-        await trpcPost(event.fetch, baseUrl(event.url), "routing.create", {
+        await requireRoutingCaller(event).create({
           projectId: scopedProjectId(event),
           name,
           actionAgent,
@@ -174,10 +265,10 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
           priority: Number(form.get("priority") ?? "100"),
           enabled: form.get("enabled") !== "false",
           source: "manual",
-        }, event.request.headers.get("cookie") ?? "");
+        });
         return { ok: true };
-      } catch (error) {
-        return fail(400, { createError: String((error as Error).message ?? error) });
+      } catch (createError) {
+        return fail(400, { createError: messageFromError(createError) });
       }
     },
 
@@ -199,33 +290,34 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       }
 
       try {
-        await trpcPost(event.fetch, baseUrl(event.url), "routing.update", input, event.request.headers.get("cookie") ?? "");
+        await requireRoutingCaller(event).update(input);
         return { ok: true };
-      } catch (error) {
-        return fail(400, { updateError: String((error as Error).message ?? error), id });
+      } catch (updateError) {
+        return fail(400, { updateError: messageFromError(updateError), id });
       }
     },
 
     toggle: async (event: RoutingActionEvent) => {
       requireSession(event);
       const form = await event.request.formData();
-      await trpcPost(event.fetch, baseUrl(event.url), "routing.update", {
+      await requireRoutingCaller(event).update({
         id: String(form.get("id") ?? ""),
         enabled: String(form.get("enabled")) === "true",
-      }, event.request.headers.get("cookie") ?? "");
+      });
       return { ok: true };
     },
 
     reorder: async (event: RoutingActionEvent) => {
       requireSession(event);
       const form = await event.request.formData();
-      const ids = String(form.get("orderedIds") ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+      const ids = String(form.get("orderedIds") ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
       const start = 10;
+      const caller = requireRoutingCaller(event);
       for (const [index, id] of ids.entries()) {
-        await trpcPost(event.fetch, baseUrl(event.url), "routing.update", {
-          id,
-          priority: start + index * 10,
-        }, event.request.headers.get("cookie") ?? "");
+        await caller.update({ id, priority: start + index * 10 });
       }
       return { ok: true };
     },
@@ -236,58 +328,40 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       try {
         const taskJson = JSON.parse(String(form.get("taskJson") ?? ""));
         if (scopedProjectId(event) && !taskJson.projectId) taskJson.projectId = scopedProjectId(event);
-        const result = await trpcGet(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.dryRun",
-          { taskJson },
-          event.request.headers.get("cookie") ?? "",
-        );
-        return { ok: true, dryRunResult: result as RoutingDecisionRow | null };
-      } catch (error) {
-        return fail(400, { dryRunError: String((error as Error).message ?? error) });
+        const result = await requireRoutingCaller(event).dryRun({ taskJson });
+        return { ok: true, dryRunResult: normalizeDecision(result) };
+      } catch (dryRunError) {
+        return fail(400, { dryRunError: messageFromError(dryRunError) });
       }
     },
 
     delete: async (event: RoutingActionEvent) => {
       requireSession(event);
       const form = await event.request.formData();
-      await trpcPost(event.fetch, baseUrl(event.url), "routing.delete", {
-        id: String(form.get("id") ?? ""),
-      }, event.request.headers.get("cookie") ?? "");
+      await requireRoutingCaller(event).delete({ id: String(form.get("id") ?? "") });
       return { ok: true };
     },
-
-    // ── New enriched test action (calls routing.test) ────────────────────
 
     test: async (event: RoutingActionEvent) => {
       requireSession(event);
       const form = await event.request.formData();
       try {
-        const result = await trpcPost(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.test",
-          { taskId: String(form.get("taskId") ?? "") },
-          event.request.headers.get("cookie") ?? "",
-        );
-        return { ok: true, testResult: result as EnrichedDecisionRow };
-      } catch (error) {
-        return fail(400, { testError: String((error as Error).message ?? error) });
+        const result = await requireRoutingCaller(event).test({
+          taskId: String(form.get("taskId") ?? ""),
+        });
+        return { ok: true, testResult: normalizeEnrichedDecision(result) };
+      } catch (testError) {
+        return fail(400, { testError: messageFromError(testError) });
       }
     },
 
-    // ── Draft actions (proxy to routing.drafts.* tRPC procedures) ────────
-
     draftList: async (event: RoutingActionEvent) => {
       requireSession(event);
-      const origin = baseUrl(event.url);
-      const cookie = event.request.headers.get("cookie") ?? "";
       try {
-        const drafts = await trpcGet(event.fetch, origin, "routing.drafts.list", {}, cookie);
-        return { ok: true, drafts: (drafts ?? []) as DraftRow[] };
-      } catch (error) {
-        return fail(400, { draftError: String((error as Error).message ?? error) });
+        const drafts = await requireRoutingCaller(event).listDrafts({});
+        return { ok: true, drafts: normalizeDrafts(drafts) };
+      } catch (draftError) {
+        return fail(400, { draftError: messageFromError(draftError) });
       }
     },
 
@@ -295,16 +369,12 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       requireSession(event);
       const form = await event.request.formData();
       try {
-        await trpcPost(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.drafts.approve",
-          { draftId: String(form.get("draftId") ?? "") },
-          event.request.headers.get("cookie") ?? "",
-        );
+        await requireRoutingCaller(event).approveDraft({
+          draftId: String(form.get("draftId") ?? ""),
+        });
         return { ok: true };
-      } catch (error) {
-        return fail(400, { draftError: String((error as Error).message ?? error) });
+      } catch (draftError) {
+        return fail(400, { draftError: messageFromError(draftError) });
       }
     },
 
@@ -312,16 +382,12 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       requireSession(event);
       const form = await event.request.formData();
       try {
-        await trpcPost(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.drafts.delete",
-          { draftId: String(form.get("draftId") ?? "") },
-          event.request.headers.get("cookie") ?? "",
-        );
+        await requireRoutingCaller(event).deleteDraft({
+          draftId: String(form.get("draftId") ?? ""),
+        });
         return { ok: true };
-      } catch (error) {
-        return fail(400, { draftError: String((error as Error).message ?? error) });
+      } catch (draftError) {
+        return fail(400, { draftError: messageFromError(draftError) });
       }
     },
 
@@ -338,20 +404,12 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       const actionAgent = String(form.get("actionAgent") ?? "").trim();
       if (actionAgent) input["actionAgent"] = actionAgent;
       try {
-        await trpcPost(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.drafts.update",
-          input,
-          event.request.headers.get("cookie") ?? "",
-        );
+        await requireRoutingCaller(event).updateDraft(input);
         return { ok: true };
-      } catch (error) {
-        return fail(400, { draftError: String((error as Error).message ?? error) });
+      } catch (draftError) {
+        return fail(400, { draftError: messageFromError(draftError) });
       }
     },
-
-    // ── LLM gate config action (proxies to routing.config.updateLlmGate) ──
 
     updateLlmGate: async (event: RoutingActionEvent) => {
       requireSession(event);
@@ -364,16 +422,10 @@ export function routingActions(projectIdFromParams?: (event: RoutingActionEvent)
       const inputMode = String(form.get("inputMode") ?? "").trim();
       if (inputMode) input["inputMode"] = inputMode;
       try {
-        await trpcPost(
-          event.fetch,
-          baseUrl(event.url),
-          "routing.config.updateLlmGate",
-          input,
-          event.request.headers.get("cookie") ?? "",
-        );
+        await requireRoutingCaller(event).updateLlmGate(input);
         return { ok: true };
-      } catch (error) {
-        return fail(400, { llmGateError: String((error as Error).message ?? error) });
+      } catch (llmGateError) {
+        return fail(400, { llmGateError: messageFromError(llmGateError) });
       }
     },
   };

@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
-import { ALL_COMPONENTS, getComponent } from "@/components/catalog.ts";
-import { planComponentOperation } from "@/components/planner.ts";
-import type { Operation } from "@/components/types.ts";
+import { ALL_COMPONENTS, getComponent } from "@platform-core/application/component-lifecycle/catalog.ts";
+import { planComponentOperation } from "@platform-core/application/component-lifecycle/planner.ts";
+import type { Operation } from "@platform-core/application/component-lifecycle/types.ts";
 import { ALL_AGENT_IDS, type AgentId } from "./mcp-registry.ts";
 
 type ComponentOperation = Exclude<Operation, "status">;
@@ -43,7 +43,7 @@ export async function run(argv: string[]): Promise<void> {
 
 async function runStatus(argv: string[]): Promise<void> {
   const options = parseStatusOptions(argv);
-  const { ComponentLedger } = await import("@/components/ledger.ts");
+  const { ComponentLedger } = await import("@platform-core/application/component-lifecycle/ledger.ts");
   const ledger = ComponentLedger.open();
   try {
     if (options.target !== undefined) {
@@ -254,7 +254,7 @@ async function runApply(operation: ComponentOperation, argv: string[]): Promise<
     printJson(plan);
   }
 
-  const { executeComponentPlan } = await import("@/components/executor.ts");
+  const { executeComponentPlan } = await import("@platform-core/application/component-lifecycle/executor.ts");
   await executeComponentPlan(plan, { dryRun: options.dryRun, purge: options.purge });
 }
 

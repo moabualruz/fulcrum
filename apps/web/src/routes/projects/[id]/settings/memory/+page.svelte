@@ -13,6 +13,11 @@
   }
 
   const { data }: Props = $props();
+  type ScopedProjectData = PageData & {
+    orgId?: string | null;
+    project: PageData["project"] & { orgId?: string | null; workspaceId?: string | null };
+  };
+  const scopedData = data as ScopedProjectData;
   let memory_config = $state<MemoryConfig>(normalizeMemoryConfig(data.memory_config));
   let saved = $state(false);
 
@@ -28,14 +33,12 @@
   }
 
   async function save(): Promise<void> {
-    await fetch(`/api/trpc/projects.update`, {
-      method: "POST",
+    await fetch(`/api/v1/projects/${encodeURIComponent(data.project.id)}`, {
+      method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        json: {
-          id: data.project.id,
-          memory_config,
-        },
+        orgId: scopedData.project.orgId ?? scopedData.project.workspaceId ?? scopedData.orgId ?? data.project.id,
+        memory_config,
       }),
     });
     saved = true;

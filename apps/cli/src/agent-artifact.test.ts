@@ -56,6 +56,63 @@ describe("fulcrum agent/artifact CLI", () => {
     expect(payload.status).toBe("queued");
   });
 
+  test("agent run routes through the configured public API", async () => {
+    const output: string[] = [];
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runAgent(["run", "--task", "task-agent-cli", "--agent", "codex", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json({ id: "run-public", status: "queued", agent: "codex" });
+      }) as typeof fetch,
+      print: (line) => output.push(line),
+      printErr: () => {},
+      exit: () => {},
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/runs?orgId=org-1",
+        method: "POST",
+        body: { taskId: "task-agent-cli", agent: "codex" },
+      },
+    ]);
+    expect(JSON.parse(output.join("\n"))).toEqual({
+      id: "run-public",
+      task_id: "task-agent-cli",
+      agent: "codex",
+      status: "queued",
+    });
+  });
+
+  test("agent run requires a configured public API when no test caller is injected", async () => {
+    const errors: string[] = [];
+    const exits: number[] = [];
+
+    await runAgent(["run", "--task", "task-agent-cli", "--json"], {
+      env: {},
+      fetch: (async () => {
+        throw new Error("fetch should not run without API configuration");
+      }) as unknown as typeof fetch,
+      print: () => {},
+      printErr: (line) => errors.push(line),
+      exit: (code) => {
+        exits.push(code);
+      },
+    });
+
+    expect(errors.join("\n")).toContain("Agent-run API caller is not configured");
+    expect(exits).toEqual([1]);
+  });
+
   test("artifact list --json returns caller-backed artifact rows", async () => {
     const output: string[] = [];
     await runArtifact(["list", "--json"], {

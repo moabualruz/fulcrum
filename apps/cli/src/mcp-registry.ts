@@ -11,7 +11,7 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parse as parseToml } from "smol-toml";
-import { which, run as runProc } from "@/utils/proc.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
 
 // ── types ──────────────────────────────────────────────────────────────────
 

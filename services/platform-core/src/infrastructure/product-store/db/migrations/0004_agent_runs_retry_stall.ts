@@ -1,0 +1,6 @@
+import type { ProductStoreMigration } from "./types.ts";
+
+export const migration: ProductStoreMigration = {
+  name: "0004_agent_runs_retry_stall.sql",
+  sql: "-- Retry/backoff and stall-scan columns for product-kernel run views.\n\nALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS orchestration_state text;\nALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0;\nALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS next_retry_at timestamptz;\nALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS last_error_kind text;\n\nALTER TABLE agent_runs DROP CONSTRAINT IF EXISTS agent_runs_orchestration_state_check;\nALTER TABLE agent_runs ADD CONSTRAINT agent_runs_orchestration_state_check\n  CHECK (orchestration_state IN (\n    'unclaimed',\n    'claimed',\n    'running',\n    'retry_queued',\n    'released',\n    'succeeded',\n    'failed',\n    'timed_out',\n    'stalled',\n    'cancelled'\n  ));\n\nCREATE INDEX IF NOT EXISTS agent_runs_dispatch_poll\n  ON agent_runs (org_id, orchestration_state, next_retry_at)\n  WHERE orchestration_state IN ('unclaimed', 'retry_queued');\n\nCREATE INDEX IF NOT EXISTS agent_runs_stall_scan\n  ON agent_runs (org_id, orchestration_state, started_at)\n  WHERE orchestration_state = 'running';\n",
+};

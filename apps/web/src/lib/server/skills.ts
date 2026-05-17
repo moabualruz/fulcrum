@@ -11,7 +11,7 @@ import {
   type SkillRow,
   type SkillsWebScope,
   type UpstreamConflict,
-} from "@/application/skills/web-actions.ts";
+} from "@platform-core/application/skills/web-actions.ts";
 
 export type {
   InstallSkillInput,

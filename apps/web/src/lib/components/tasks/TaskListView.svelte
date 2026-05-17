@@ -14,13 +14,22 @@
   } from "@tanstack/svelte-table";
   import { createVirtualizer } from "@tanstack/svelte-virtual";
   import type { TaskCardTask } from "./TaskCard.svelte";
+  import {
+    fetchSavedTaskView,
+    fetchTaskList,
+    savedTaskViewColumns,
+    updateTaskListFields,
+    type TaskListRow,
+  } from "./task-list-api";
 
   interface Props {
     projectId: string;
+    orgId?: string;
+    currentUserId?: string;
     savedViewId?: string;
   }
 
-  const { projectId, savedViewId }: Props = $props();
+  const { projectId, orgId = "", currentUserId = "", savedViewId }: Props = $props();
 
   // ── State ──
   let tasks = $state<TaskCardTask[]>([]);
@@ -44,59 +53,13 @@
     "due_date",
   ]);
 
-  // ── tRPC helpers ──
-  async function trpcQuery<T>(procedure: string, input?: unknown): Promise<T> {
-    const params =
-      input !== undefined
-        ? `?input=${encodeURIComponent(JSON.stringify(input))}`
-        : "";
-    const res = await fetch(`/api/trpc/${procedure}${params}`);
-    if (!res.ok) throw new Error(`tRPC ${procedure}: ${res.status}`);
-    const json = (await res.json()) as { result?: { data?: T } };
-    return json.result?.data as T;
-  }
-
-  async function trpcMutation<T>(procedure: string, input: unknown): Promise<T> {
-    const res = await fetch(`/api/trpc/${procedure}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`tRPC ${procedure}: ${res.status}`);
-    const json = (await res.json()) as { result?: { data?: T } };
-    return json.result?.data as T;
-  }
-
-  interface RawTask {
-    id: string;
-    title: string;
-    status: string | null;
-    priority: number | null;
-    points: number | null;
-    parentId: string | null;
-    dependencies: { blocks: string[]; blocked_by: string[] };
-    descriptionText?: string;
-  }
-
   // ── Load ──
   async function loadTasks() {
     loading = true;
     error = null;
     try {
-      const raw = await trpcQuery<RawTask[]>("tasks.list");
-      tasks = (raw ?? []).map(
-        (t): TaskCardTask => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          priority: t.priority,
-          points: t.points,
-          parentId: t.parentId,
-          dependencies: t.dependencies ?? { blocks: [], blocked_by: [] },
-          descriptionText: t.descriptionText,
-          taskType: t.parentId ? "subtask" : "task",
-        })
-      );
+      const raw = await fetchTaskList(fetch, { orgId, userId: currentUserId, projectId });
+      tasks = (raw ?? []).map(normalizeTask);
     } catch (e) {
       error = e instanceof Error ? e.message : "Failed to load tasks";
     } finally {
@@ -107,12 +70,9 @@
   async function loadSavedView() {
     if (!savedViewId) return;
     try {
-      const view = await trpcQuery<{ columns?: string[] }>(
-        "saved_views.get",
-        { id: savedViewId }
-      );
-      if (view?.columns && view.columns.length > 0) {
-        visibleColIds = view.columns;
+      const columns = savedTaskViewColumns(await fetchSavedTaskView(fetch, { savedViewId }));
+      if (columns.length > 0) {
+        visibleColIds = columns;
       }
     } catch {
       // non-fatal — use default columns
@@ -138,7 +98,7 @@
     else if (field === "title") patch.title = editValue;
     else if (field === "priority") patch.priority = Number(editValue);
     else if (field === "points") patch.points = Number(editValue);
-    else if (field === "assignee") patch.assignee = editValue;
+    else if (field === "assignee") patch.assigneeId = editValue;
     else return;
 
     // Optimistic update
@@ -146,7 +106,13 @@
       t.id === taskId ? { ...t, ...patch } : t
     );
     try {
-      await trpcMutation("tasks.update", { id: taskId, ...patch });
+      await updateTaskListFields(fetch, {
+        orgId,
+        userId: currentUserId,
+        projectId,
+        taskId,
+        patch,
+      });
     } catch {
       // revert by reloading
       void loadTasks();
@@ -291,6 +257,21 @@
     if (colId === "assignee") return task.assignee ?? "";
     if (colId === "points") return String(task.points ?? "");
     return "";
+  }
+
+  function normalizeTask(row: TaskListRow): TaskCardTask {
+    return {
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      priority: row.priority,
+      points: row.points,
+      parentId: row.parentId,
+      dependencies: { blocks: [], blocked_by: [] },
+      descriptionText: row.descriptionText ?? undefined,
+      assignee: row.assigneeId,
+      taskType: row.parentId ? "subtask" : "task",
+    };
   }
 </script>
 

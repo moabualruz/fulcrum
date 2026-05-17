@@ -1,29 +1,12 @@
-/**
- * Settings → Users page server — admin user-management UI.
- *
- * Pillar 12: user management (list members, invite, change role, remove).
- *
- * Guard: only owner/admin roles may access this page.
- * Accessible at /settings/users.
- *
- * Procedures used (via /api/trpc):
- *   - orgs.members.list()           (GET query)
- *   - auth.invite(email, role)       (POST mutation — invite action)
- *   - orgs.members.updateRole(...)   (POST mutation — updateRole action)
- *   - orgs.members.remove(...)       (POST mutation — remove action)
- *
- * C4: tRPC is the shared core — all mutations route through /api/trpc.
- * C6: No raw SQL.
- */
-
 import { error, fail, redirect } from "@sveltejs/kit";
 
-// ── Type helpers ──────────────────────────────────────────────────────────────
+import { createInvitationApiCaller } from "@identity-access/interface/http/invitation-api-client.ts";
+import { createOrganizationApiCaller } from "@identity-access/interface/http/organization-api-client.ts";
 
 interface RouteLocals {
   session: unknown;
-  orgId: string | null;
-  activeProjectId: string | null;
+  orgId?: string | null;
+  userId?: string | null;
 }
 
 interface LoadEvent {
@@ -43,104 +26,6 @@ interface ActionEvent {
   url: URL;
 }
 
-// ── tRPC fetch helpers ─────────────────────────────────────────────────────────
-
-function extractTrpcError(body: unknown): string {
-  if (!body || typeof body !== "object") return "Request failed";
-  if (Array.isArray(body)) {
-    const first = (body as Array<{ error?: { json?: { message?: string } } }>)[0];
-    if (first?.error?.json?.message) return first.error.json.message;
-  }
-  const b = body as Record<string, unknown>;
-  const err = b["error"];
-  if (typeof err === "string") return err;
-  if (err && typeof err === "object") {
-    const e = err as Record<string, unknown>;
-    if (typeof e["message"] === "string") return e["message"];
-    const json = e["json"] as Record<string, unknown> | undefined;
-    if (json && typeof json["message"] === "string") return json["message"];
-  }
-  return "Request failed";
-}
-
-/** Call a tRPC query via GET. */
-async function callTrpcQuery(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string; status: number }> {
-  try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}?input=%7B%7D`, {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        cookie: cookieHeader,
-      },
-    });
-
-    const body = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      const msg = extractTrpcError(body);
-      return { ok: false, error: msg, status: response.status };
-    }
-
-    const data =
-      (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-      (body as { result?: { data?: unknown } })?.result?.data ??
-      body;
-
-    return { ok: true, data };
-  } catch (e) {
-    return { ok: false, error: String(e), status: 500 };
-  }
-}
-
-async function callTrpcMutation(
-  fetchFn: typeof fetch,
-  baseUrl: string,
-  procedure: string,
-  input: unknown,
-  cookieHeader: string,
-): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
-  try {
-    const response = await fetchFn(`${baseUrl}/api/trpc/${procedure}`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "content-type": "application/json",
-        cookie: cookieHeader,
-      },
-      body: JSON.stringify({ json: input }),
-    });
-
-    const body = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      return { ok: false, error: extractTrpcError(body) };
-    }
-
-    const data =
-      (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-      (body as { result?: { data?: unknown } })?.result?.data ??
-      body;
-
-    return { ok: true, data };
-  } catch (e) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-function getBaseUrl(requestUrl: string): string {
-  const u = new URL(requestUrl);
-  return `${u.protocol}//${u.host}`;
-}
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-/** OrgMember row as returned by orgs.members.list. */
 export interface MemberRow {
   id: string;
   userId: string;
@@ -149,46 +34,120 @@ export interface MemberRow {
   joinedAt: string;
 }
 
-// ── Load ──────────────────────────────────────────────────────────────────────
+interface MemberApiRow {
+  id?: unknown;
+  userId?: unknown;
+  orgId?: unknown;
+  role?: unknown;
+  joinedAt?: unknown;
+}
+
+type ScopedApiCallers = {
+  invitations: ReturnType<typeof createInvitationApiCaller>["invitations"];
+  organizations: ReturnType<typeof createOrganizationApiCaller>["orgs"];
+};
+
+function getBaseUrl(url: URL): string {
+  return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${url.protocol}//${url.host}`;
+}
+
+function scopedIdentity(locals: RouteLocals): { orgId: string; userId: string } | null {
+  const orgId = locals.orgId;
+  const userId = locals.userId ?? (locals.session as { userId?: string } | null)?.userId;
+  if (!orgId || !userId) return null;
+  return { orgId, userId };
+}
+
+function createScopedApiCallers(event: LoadEvent | ActionEvent): ScopedApiCallers | null {
+  const identity = scopedIdentity(event.locals);
+  if (!identity) return null;
+
+  const options = {
+    baseUrl: getBaseUrl(event.url),
+    orgId: identity.orgId,
+    userId: identity.userId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event),
+  };
+
+  return {
+    invitations: createInvitationApiCaller(options).invitations,
+    organizations: createOrganizationApiCaller(options).orgs,
+  };
+}
+
+function cookieHeaders(event: LoadEvent | ActionEvent): Record<string, string> {
+  const cookie = event.request.headers.get("cookie");
+  return cookie ? { cookie } : {};
+}
+
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+function statusFromMessage(message: string): number {
+  const lower = message.toLowerCase();
+  if (lower.includes("401") || lower.includes("unauthorized")) return 401;
+  if (lower.includes("403") || lower.includes("forbidden")) return 403;
+  return 500;
+}
+
+function requireApiCallers(event: LoadEvent | ActionEvent): ScopedApiCallers {
+  const callers = createScopedApiCallers(event);
+  if (!callers) {
+    error(503, { message: "User management API caller is not configured." });
+  }
+  return callers;
+}
+
+function actionFailure(cause: unknown, key: "inviteError" | "roleError" | "removeError") {
+  const message = errorMessage(cause);
+  const status = statusFromMessage(message);
+  return fail(status === 403 ? 403 : 400, { [key]: message });
+}
+
+function normalizeMember(row: MemberApiRow): MemberRow | null {
+  if (typeof row.userId !== "string" || typeof row.orgId !== "string") return null;
+  return {
+    id: typeof row.id === "string" ? row.id : `${row.orgId}:${row.userId}`,
+    userId: row.userId,
+    orgId: row.orgId,
+    role: typeof row.role === "string" ? row.role : "member",
+    joinedAt: typeof row.joinedAt === "string" ? row.joinedAt : "",
+  };
+}
 
 export async function load(event: LoadEvent) {
-  const { locals, fetch: fetchFn, request, url } = event;
-
-  // Auth guard — must be signed in.
-  if (!locals.session) {
+  if (!event.locals.session) {
     throw redirect(302, "/auth/login");
   }
 
-  const baseUrl = getBaseUrl(url.href);
-  const cookieHeader = request.headers.get("cookie") ?? "";
+  const callers = requireApiCallers(event);
 
-  const result = await callTrpcQuery(fetchFn, baseUrl, "orgs.members.list", cookieHeader);
-
-  if (!result.ok) {
-    // 403 from tRPC → SvelteKit error(403)
-    if (result.status === 403) {
+  try {
+    const rows = await callers.organizations.members.list();
+    const members = Array.isArray(rows)
+      ? rows.map((row) => normalizeMember(row as MemberApiRow)).filter((row): row is MemberRow => row !== null)
+      : [];
+    return { members };
+  } catch (cause) {
+    const message = errorMessage(cause);
+    const status = statusFromMessage(message);
+    if (status === 401) throw redirect(302, "/auth/login");
+    if (status === 403) {
       error(403, { message: "Only org owners and admins can access user management." });
     }
-    error(500, { message: result.error });
+    error(500, { message });
   }
-
-  const members = Array.isArray(result.data) ? (result.data as MemberRow[]) : [];
-
-  return { members };
 }
 
-// ── Actions ───────────────────────────────────────────────────────────────────
-
 export const actions = {
-  /**
-   * invite — generate an invitation token.
-   * POST body: email (required), role (optional, default "member").
-   */
   invite: async (event: ActionEvent) => {
-    const { fetch: fetchFn, request, url } = event;
-    const baseUrl = getBaseUrl(url.href);
-    const cookieHeader = request.headers.get("cookie") ?? "";
-    const form = await request.formData();
+    if (!event.locals.session) {
+      throw redirect(302, "/auth/login");
+    }
+
+    const form = await event.request.formData();
     const email = String(form.get("email") ?? "").trim();
     const role = String(form.get("role") ?? "member").trim();
 
@@ -196,25 +155,22 @@ export const actions = {
       return fail(400, { inviteError: "Email is required." });
     }
 
-    const result = await callTrpcMutation(fetchFn, baseUrl, "auth.invite", { email, role }, cookieHeader);
-
-    if (!result.ok) {
-      return fail(400, { inviteError: result.error });
+    try {
+      const callers = requireApiCallers(event);
+      const invitation = await callers.invitations.create({ email, role });
+      const data = invitation as { token?: string } | null;
+      return { inviteToken: data?.token ?? null, inviteEmail: email };
+    } catch (cause) {
+      return actionFailure(cause, "inviteError");
     }
-
-    const data = result.data as { token?: string; invitationId?: string } | null;
-    return { inviteToken: data?.token ?? null, inviteEmail: email };
   },
 
-  /**
-   * updateRole — change a member's role.
-   * POST body: userId (required), role (required).
-   */
   updateRole: async (event: ActionEvent) => {
-    const { fetch: fetchFn, request, url } = event;
-    const baseUrl = getBaseUrl(url.href);
-    const cookieHeader = request.headers.get("cookie") ?? "";
-    const form = await request.formData();
+    if (!event.locals.session) {
+      throw redirect(302, "/auth/login");
+    }
+
+    const form = await event.request.formData();
     const userId = String(form.get("userId") ?? "").trim();
     const role = String(form.get("role") ?? "").trim();
 
@@ -222,48 +178,33 @@ export const actions = {
       return fail(400, { roleError: "userId and role are required." });
     }
 
-    const result = await callTrpcMutation(
-      fetchFn,
-      baseUrl,
-      "orgs.members.updateRole",
-      { userId, role },
-      cookieHeader,
-    );
-
-    if (!result.ok) {
-      return fail(400, { roleError: result.error });
+    try {
+      const callers = requireApiCallers(event);
+      await callers.organizations.members.updateRole({ userId, role });
+      return { ok: true };
+    } catch (cause) {
+      return actionFailure(cause, "roleError");
     }
-
-    return { ok: true };
   },
 
-  /**
-   * remove — remove a member from the org.
-   * POST body: userId (required).
-   */
   remove: async (event: ActionEvent) => {
-    const { fetch: fetchFn, request, url } = event;
-    const baseUrl = getBaseUrl(url.href);
-    const cookieHeader = request.headers.get("cookie") ?? "";
-    const form = await request.formData();
+    if (!event.locals.session) {
+      throw redirect(302, "/auth/login");
+    }
+
+    const form = await event.request.formData();
     const userId = String(form.get("userId") ?? "").trim();
 
     if (!userId) {
       return fail(400, { removeError: "userId is required." });
     }
 
-    const result = await callTrpcMutation(
-      fetchFn,
-      baseUrl,
-      "orgs.members.remove",
-      { userId },
-      cookieHeader,
-    );
-
-    if (!result.ok) {
-      return fail(400, { removeError: result.error });
+    try {
+      const callers = requireApiCallers(event);
+      await callers.organizations.members.remove({ userId });
+      return { ok: true };
+    } catch (cause) {
+      return actionFailure(cause, "removeError");
     }
-
-    return { ok: true };
   },
 };

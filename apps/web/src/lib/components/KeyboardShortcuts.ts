@@ -1,5 +1,5 @@
 /**
- * KeyboardShortcuts — Phase 05 Plan 12 (D-67).
+ * KeyboardShortcuts — task workflow (D-67).
  *
  * Registers all global keyboard shortcuts using tinykeys.
  * Returns a cleanup function for use in onMount/onDestroy.

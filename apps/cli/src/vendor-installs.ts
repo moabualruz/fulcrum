@@ -2,9 +2,7 @@
 // each detected agent during `fulcrum init <dir>`.
 //
 // Scope: per-agent skill / plugin / extension / hook installs whose vendor
-// publishes a CLI installer (`graphify install --platform <agent>`,
 // `npx skills add <pkg>`, `pi-mcp-adapter init`). Project-INDEX builds
-// (`graphify update .`) live in `project-index.ts` —
 // different concern.
 //
 // Rules:
@@ -16,11 +14,11 @@
 //   - Fail-soft per tool: log warning and continue on any error.
 
 import { stat } from "node:fs/promises";
-import { AGENTS } from "@/agents/registry.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
-import { which, run as runProc } from "@/utils/proc.ts";
-import { getComponent } from "@/components/catalog.ts";
-import { ComponentLedger } from "@/components/ledger.ts";
+import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
+import { getComponent } from "@platform-core/application/component-lifecycle/catalog.ts";
+import { ComponentLedger } from "@platform-core/application/component-lifecycle/ledger.ts";
 import { stripVendorRuleBlocks } from "./install.ts";
 
 async function isDir(p: string): Promise<boolean> {
@@ -101,51 +99,6 @@ function recordVendorComponent(componentId: string, agentIds: readonly AgentId[]
   }
 }
 
-export async function runGraphifyIntegration(
-  dir: string,
-  home: string,
-  dryRun: boolean,
-): Promise<boolean> {
-  const detected = await detectedAgentIds(home);
-  const hasGraphify = !!(await which("graphify"));
-  const installedAgents: AgentId[] = [];
-
-  if (hasGraphify) {
-    if (detected.has("claude-code")) {
-      if (await vendorRun("graphify: Claude Code", ["graphify", "claude", "install"], dir, dryRun)) {
-        installedAgents.push("claude-code");
-      }
-    }
-    if (detected.has("codex")) {
-      if (await vendorRun("graphify: Codex CLI", ["graphify", "install", "--platform", "codex"], dir, dryRun)) {
-        installedAgents.push("codex");
-      }
-    }
-    if (detected.has("opencode")) {
-      if (await vendorRun("graphify: OpenCode", ["graphify", "install", "--platform", "opencode"], dir, dryRun)) {
-        installedAgents.push("opencode");
-      }
-    }
-    if (detected.has("gemini")) {
-      if (await vendorRun("graphify: Gemini CLI", ["graphify", "install", "--platform", "gemini"], dir, dryRun)) {
-        installedAgents.push("gemini");
-      }
-    }
-    if (detected.has("pi")) {
-      // Pi is not supported by the graphify CLI; upstream vendor does not list it.
-      // Upstream skill copy (via upstream-skills.ts) covers the fallback.
-      console.log("  · graphify: Pi not supported by graphify CLI; skipping (file copy via upstream skills covers fallback)");
-    }
-    if (!dryRun && installedAgents.length > 0) {
-      recordVendorComponent("package.graphify", installedAgents);
-    }
-    return installedAgents.length > 0;
-  }
-
-  console.log("  · graphify not on PATH — skipping graphify integrations");
-  return false;
-}
-
 export async function runAstGrepIntegration(dir: string, dryRun: boolean): Promise<boolean> {
   const hasNpx = !!(await which("npx"));
   if (!hasNpx) return false;
@@ -223,10 +176,7 @@ export async function runVendorIntegrations(
 
   console.log("\nVendor integrations:");
 
-  // ── graphify ──────────────────────────────────────────────────────────────
   // Run per-agent. NEVER pass --output or any path override.
-  await runGraphifyIntegration(dir, home, dryRun);
-  // NOTE: project-index BUILD (`graphify update .`) runs in project-index.ts,
   // not here. This module only handles per-agent integration installers.
 
   // Caveman is installed by `fulcrum install`, not `fulcrum init`: Codex,
@@ -251,7 +201,6 @@ export async function runVendorIntegrations(
   await runPiMcpAdapterIntegration(dir, home, dryRun);
 
   // ── Strip duplicate vendor rule blocks ────────────────────────────────────
-  // Vendor CLIs (e.g. `graphify install`) write rule text directly into each
   // agent's primary rules file. The same text lives in rules/AGENTS.md and is
   // spliced into the FULCRUM sentinel block by `fulcrum install`. Strip the
   // duplicates that live outside the sentinel so agents don't load the rule

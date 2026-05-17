@@ -1,15 +1,15 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg } from "@/test-support/product-fixtures.ts";
-import { insertRepoFile, upsertFileContent, insertBlameLine } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
+let repoId = "";
+const fileDetails = new Map<string, FileDetailPayload>();
+const repoFilesMock = ((globalThis as typeof globalThis & {
+  __repoFilesMock?: Record<string, unknown>;
+}).__repoFilesMock ??= {});
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -20,27 +20,15 @@ function streamedData<T>(result: unknown): Promise<T> {
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-file-detail-"));
   process.env["FULCRUM_HOME"] = scratch;
+  repoId = makeId();
+  fileDetails.clear();
+  repoFilesMock["fileDetails"] = fileDetails;
 });
 
 afterEach(() => {
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
-
-async function freshDb(): Promise<{ db: TestStore; orgId: string; repoId: string }> {
-  const dbDir = join(scratch, "state", "product", "db");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(join(dbDir, "main"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const repoId = makeId();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [repoId, org.id, "my-repo", "/tmp/my-repo", "main"],
-  );
-  return { db, orgId: org.id, repoId };
-}
 
 interface FileDetailPayload {
   repo: { id: string; slug: string };
@@ -53,21 +41,45 @@ interface FileDetailPayload {
   blame: Array<{ line_number: number; commit_sha: string; author: string }>;
 }
 
+function putFile(path: string, overrides: Partial<FileDetailPayload> = {}) {
+  fileDetails.set(path, {
+    repo: { id: repoId, slug: "my-repo" },
+    branch: "main",
+    filePath: path,
+    mimeCategory: "text",
+    content: null,
+    isBinary: false,
+    showBlame: false,
+    blame: [],
+    ...overrides,
+  });
+}
+
+mock.module("@integration-hub/interface/repository-files.ts", () => ({
+  loadRepositoryFilesPage: async () => ({ tree: [], filePath: "", fileContent: null, isBinary: false }),
+  loadRepositoryFileDetail: async (
+    _context: unknown,
+    input: { branch?: string; filePath: string; showBlame: boolean },
+  ) => {
+    const sharedDetails = (repoFilesMock["fileDetails"] as Map<string, FileDetailPayload> | undefined) ?? fileDetails;
+    const detail = sharedDetails.get(input.filePath);
+    if (!detail) {
+      const { AppNotFoundError } = await import("@platform-core/domain/errors.ts");
+      throw new AppNotFoundError("File not found");
+    }
+    return {
+      ...detail,
+      branch: input.branch ?? detail.branch,
+      showBlame: input.showBlame,
+      blame: input.showBlame ? detail.blame : [],
+    };
+  },
+  listRepositoryTreeChildren: async () => [],
+}));
+
 describe("/repos/[id]/files/[...path] +page.server.ts", () => {
   test("load returns file content for a text file", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts", kind: "file",
-        parentPath: "src", mime: "text/typescript",
-      });
-      await upsertFileContent(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts",
-        content: "const x = 1;", isBinary: false,
-      });
-    } finally {
-      await db.close();
-    }
+    putFile("apps/cli/src/main.ts", { content: "const x = 1;" });
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
@@ -85,29 +97,13 @@ describe("/repos/[id]/files/[...path] +page.server.ts", () => {
   });
 
   test("load returns blame when ?blame=1", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts", kind: "file",
-        parentPath: "src", mime: "text/typescript",
-      });
-      await upsertFileContent(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts",
-        content: "line1\nline2", isBinary: false,
-      });
-      await insertBlameLine(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts",
-        lineNumber: 1, commitSha: "abc1234", author: "alice",
-        authorDate: "2025-01-01T00:00:00Z", lineContent: "line1",
-      });
-      await insertBlameLine(db, {
-        repoId, branch: "main", path: "apps/cli/src/main.ts",
-        lineNumber: 2, commitSha: "def5678", author: "bob",
-        authorDate: "2025-01-02T00:00:00Z", lineContent: "line2",
-      });
-    } finally {
-      await db.close();
-    }
+    putFile("apps/cli/src/main.ts", {
+      content: "line1\nline2",
+      blame: [
+        { line_number: 1, commit_sha: "abc1234", author: "alice" },
+        { line_number: 2, commit_sha: "def5678", author: "bob" },
+      ],
+    });
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
@@ -123,15 +119,7 @@ describe("/repos/[id]/files/[...path] +page.server.ts", () => {
   });
 
   test("load returns binary flag for binary file", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, {
-        repoId, branch: "main", path: "data.bin", kind: "file",
-        parentPath: null, mime: "application/octet-stream",
-      });
-    } finally {
-      await db.close();
-    }
+    putFile("data.bin", { mimeCategory: "binary", isBinary: true });
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const result = await mod.load({
@@ -146,9 +134,6 @@ describe("/repos/[id]/files/[...path] +page.server.ts", () => {
   });
 
   test("load throws 404 for nonexistent file", async () => {
-    const { db, repoId } = await freshDb();
-    await db.close();
-
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     let caught: unknown;
     try {
@@ -168,24 +153,11 @@ describe("/repos/[id]/files/[...path] +page.server.ts", () => {
   });
 
   test("load supports branch param for blame", async () => {
-    const { db, repoId } = await freshDb();
-    try {
-      await insertRepoFile(db, {
-        repoId, branch: "dev", path: "dev.ts", kind: "file",
-        parentPath: null, mime: "text/typescript",
-      });
-      await upsertFileContent(db, {
-        repoId, branch: "dev", path: "dev.ts",
-        content: "dev line", isBinary: false,
-      });
-      await insertBlameLine(db, {
-        repoId, branch: "dev", path: "dev.ts",
-        lineNumber: 1, commitSha: "devsha1", author: "carol",
-        authorDate: "2025-03-01T00:00:00Z", lineContent: "dev line",
-      });
-    } finally {
-      await db.close();
-    }
+    putFile("dev.ts", {
+      branch: "dev",
+      content: "dev line",
+      blame: [{ line_number: 1, commit_sha: "devsha1", author: "carol" }],
+    });
 
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
     const result = await mod.load({

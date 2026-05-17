@@ -1,10 +1,17 @@
 import type { Component } from "svelte";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
   applyAction: async () => {},
   deserialize: (s: string) => JSON.parse(s),
+}));
+
+mock.module("svelte-tiptap", () => ({
+  createEditor: () => ({ subscribe: () => () => {} }),
+  EditorContent: "div",
 }));
 
 interface EditDoc {
@@ -69,5 +76,16 @@ describe("/docs/[id]/edit +page.svelte", () => {
     expect(body).toContain("data-frontmatter-toggle-yaml");
     expect(body).toContain("name=\"frontmatter[consequences]\"");
     expect(body).toContain("data-required-field=\"consequences\"");
+  });
+
+  test("wires real-time collaboration presence and cursor surfaces around the editor", () => {
+    const source = readFileSync(join(import.meta.dir, "+page.svelte"), "utf8");
+
+    expect(source).toContain("createCollabProvider");
+    expect(source).toContain("<PresenceAvatars users={presenceUsers} />");
+    expect(source).toContain("<CursorOverlay cursors={remoteCursors} />");
+    expect(source).toContain("FeatureGate flag=\"real-time-collab-server\"");
+    expect(source).toContain("provider.onPresenceChange");
+    expect(source).toContain("provider.onCursorChange");
   });
 });

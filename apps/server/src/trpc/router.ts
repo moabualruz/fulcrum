@@ -9,45 +9,46 @@ import { z } from "zod";
 
 import { t, publicProcedure } from "./trpc.ts";
 
-import { authRouter } from "../runtime/trpc/routers/auth.ts";
-import { flagsRouter } from "../runtime/trpc/routers/flags.ts";
-import { inferenceRouter } from "../runtime/trpc/routers/inference.ts";
-import { orgsRouter } from "../runtime/trpc/routers/orgs.ts";
-import { tasksRouter } from "../runtime/trpc/routers/tasks.ts";
-import { sprintsRouter } from "../runtime/trpc/routers/sprints.ts";
-import { memoryRouter } from "../runtime/trpc/routers/memory.ts";
-import { docsRouter } from "../runtime/trpc/routers/docs.ts";
-import { customFieldDefsRouter, taskCustomFieldsRouter } from "../runtime/trpc/routers/custom-fields.ts";
-import { auditRouter } from "../runtime/trpc/routers/audit.ts";
-import { backupRouter } from "../runtime/trpc/routers/backup.ts";
-import { dataExportRouter, dataImportRouter } from "../runtime/trpc/routers/json-import-export.ts";
-import { errorLogsRouter } from "../runtime/trpc/routers/error-logs.ts";
-import { telemetryRouter } from "../runtime/trpc/routers/telemetry.ts";
-import { themeRouter } from "../runtime/trpc/routers/theme.ts";
-import { routingRouter } from "../runtime/trpc/routers/routing.ts";
-import { skillsRouter } from "../runtime/trpc/routers/skills.ts";
+import { authRouter } from "./routers/auth.ts";
+import { flagsRouter } from "./routers/flags.ts";
+import { inferenceRouter } from "./routers/inference.ts";
+import { orgsRouter } from "./routers/orgs.ts";
+import { tasksRouter } from "./routers/tasks.ts";
+import { sprintsRouter } from "./routers/sprints.ts";
+import { memoryRouter } from "./routers/memory.ts";
+import { docsRouter } from "./routers/docs.ts";
+import { customFieldDefsRouter, taskCustomFieldsRouter } from "./routers/custom-fields.ts";
+import { auditRouter } from "./routers/audit.ts";
+import { backupRouter } from "./routers/backup.ts";
+import { dataExportRouter, dataImportRouter } from "./routers/json-import-export.ts";
+import { errorLogsRouter } from "./routers/error-logs.ts";
+import { telemetryRouter } from "./routers/telemetry.ts";
+import { themeRouter } from "./routers/theme.ts";
+import { routingRouter } from "./routers/routing.ts";
+import { skillsRouter } from "./routers/skills.ts";
 import { orchestrationRouter } from "./routers/orchestration.ts";
 import { notificationsRouter } from "./routers/notifications.ts";
 import { artifactsRouter } from "./routers/artifacts.ts";
 import { reposRouter } from "./routers/repos.ts";
-import { credentialsRouter } from "@/secrets/credentials-router.ts";
+import { credentialsRouter } from "./routers/credentials.ts";
 import { reportsRouter } from "./routers/reports.ts";
 import { webhooksRouter } from "./routers/webhooks.ts";
-import { commentsRouter } from "../runtime/trpc/routers/comments.ts";
-import { workflowsRouter } from "../runtime/trpc/routers/workflows.ts";
-import { relationshipsRouter } from "../runtime/trpc/routers/relationships.ts";
-import { templatesRouter } from "../runtime/trpc/routers/templates.ts";
-import { recurrenceRouter } from "../runtime/trpc/routers/recurrence.ts";
-import { automationsRouter } from "../runtime/trpc/routers/automations.ts";
+import { commentsRouter } from "./routers/comments.ts";
+import { workflowsRouter } from "./routers/workflows.ts";
+import { relationshipsRouter } from "./routers/relationships.ts";
+import { templatesRouter } from "./routers/templates.ts";
+import { recurrenceRouter } from "./routers/recurrence.ts";
+import { automationsRouter } from "./routers/automations.ts";
+import { planningRouter } from "./routers/planning.ts";
+import { reviewRouter } from "./routers/review.ts";
 import {
   runsSubscriptionRouter,
   notifySubscriptionRouter,
   orchestrationSubscriptionRouter,
-} from "@/subscriptions/procedures.ts";
+} from "./routers/subscriptions.ts";
 
-// Extracted stub routers (formerly inline)
+// Stub routers (pending pillar replacement)
 import { projectsRouter } from "./routers/projects.ts";
-import { customFieldsRouter } from "./routers/custom-fields.ts";
 import { savedViewsRouter } from "./routers/saved-views.ts";
 import { docVersionsRouter } from "./routers/doc-versions.ts";
 import { docCommentsRouter } from "./routers/doc-comments.ts";
@@ -83,7 +84,6 @@ export const appRouter = t.router({
   customFieldDefs: customFieldDefsRouter,
   taskCustomFields: taskCustomFieldsRouter,
   sprints: sprintsRouter,
-  custom_fields: customFieldsRouter,
   saved_views: savedViewsRouter,
   docs: docsRouter,
   doc_versions: docVersionsRouter,
@@ -121,12 +121,14 @@ export const appRouter = t.router({
   templates: templatesRouter,
   recurrence: recurrenceRouter,
   automations: automationsRouter,
+  planning: planningRouter,
+  review: reviewRouter,
   credentials: credentialsRouter,
 
   db: dbRouter,
   health: healthRouter,
 
-  // P13#02: WebSocket subscription routers.
+  // WebSocket subscription routers.
   runsSubscriptions: runsSubscriptionRouter,
   notifySubscriptions: notifySubscriptionRouter,
   orchestrationSubscriptions: orchestrationSubscriptionRouter,

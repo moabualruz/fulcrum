@@ -1,7 +1,5 @@
 ### `index-check` registration
 
-Runs at session start; warns if `tags` / `graphify-out/` are stale or missing.
-
 **Claude Code** — `~/.claude/settings.json`
 ```json
 { "hooks": { "SessionStart": [

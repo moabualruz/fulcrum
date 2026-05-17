@@ -7,7 +7,7 @@
  *
  * Fallback adapter note: if paraglide-js breaks on a Svelte rune update,
  * swap the catalog loader here. The t() signature and CI gate remain the same.
- * See src/i18n/README.md for migration guide.
+ * See services/platform-core/src/application/localization/README.md for migration guide.
  */
 
 import enCatalog from "./locales/en.json";

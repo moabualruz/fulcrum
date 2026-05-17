@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { FakeTTY } from "../testing/fake-tty.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
-import type { InferenceModel, ModelPullProgress } from "@/inference/protocol.ts";
+import type { InferenceModel, ModelPullProgress } from "@platform-core/application/inference/protocol.ts";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

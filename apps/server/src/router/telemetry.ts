@@ -1,7 +1,7 @@
 import {
   routingApplication,
   type RoutingApplication,
-} from "@/application/routing.ts";
+} from "@execution-orchestration/application/routing.ts";
 import type { RoutingDecision } from "./types.ts";
 
 type RoutingEventRepository = Parameters<

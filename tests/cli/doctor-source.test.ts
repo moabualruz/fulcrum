@@ -200,7 +200,7 @@ describe("doctor CLI source command", () => {
       "# END FULCRUM MCP private-http",
       "",
     ].join("\n"));
-    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
       expect(String(url)).toBe("https://mcp.example.test/rpc");
       expect(init?.method === "HEAD" || init?.method === "POST").toBe(true);
       return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }), { status: 200 });

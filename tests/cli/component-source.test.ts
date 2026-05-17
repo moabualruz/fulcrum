@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { run } from "../../apps/cli/src/component.ts";
-import { ComponentLedger } from "@/components/ledger.ts";
+import { ComponentLedger } from "@platform-core/application/component-lifecycle/ledger.ts";
 
 let scratch: string;
 let previousHome: string | undefined;

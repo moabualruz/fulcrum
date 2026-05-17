@@ -1,7 +1,9 @@
-import type { Container } from "@needle-di/core";
 import { writeFileSync } from "node:fs";
 
-import { createLocalCaller } from "./local-caller.ts";
+import {
+  createTaskApiCallerFromEnv,
+  type TaskApiEnvironment,
+} from "@work-management/interface/http/task-api-client.ts";
 
 type ExportCaller = {
   tasks: {
@@ -11,7 +13,8 @@ type ExportCaller = {
 
 export interface ExportRunOptions {
   caller?: ExportCaller;
-  container?: Container | null;
+  env?: TaskApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -86,7 +89,11 @@ function toCsv(tasks: Array<Record<string, unknown>>): string {
 
 async function resolveCaller(opts: ExportRunOptions): Promise<ExportCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as ExportCaller;
+  const apiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Task API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.");
+  }
+  return apiCaller as unknown as ExportCaller;
 }
 
 function flagValue(argv: readonly string[], flag: string): string | undefined {

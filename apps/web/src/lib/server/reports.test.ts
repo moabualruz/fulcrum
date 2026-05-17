@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, test } from "bun:test";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import {
   listSprints,
   loadBurndown,
@@ -94,7 +94,7 @@ describe("listSprints", () => {
     try {
       await seedSprint(db, orgId, projectId, { name: "S1", startDate: "2025-01-01", endDate: "2025-01-14" });
       await seedSprint(db, orgId, projectId, { name: "S2", startDate: "2025-01-15", endDate: "2025-01-28" });
-      const sprints = await listSprints(db.em.fork(), projectId);
+      const sprints = await listSprints(db.em, projectId);
       expect(sprints).toHaveLength(2);
       expect(sprints[0]!.name).toBe("S2");
       expect(sprints[1]!.name).toBe("S1");
@@ -119,7 +119,7 @@ describe("loadBurndown", () => {
       await seedMetric(db, orgId, projectId, {
         sprintId: sid, date: "2025-01-02", kind: "burndown", payload: { remaining: 5 },
       });
-      const points = await loadBurndown(db.em.fork(), projectId, sid);
+      const points = await loadBurndown(db.em, projectId, sid);
       expect(points.length).toBeGreaterThanOrEqual(3); // day 0, 1, 2
       expect(points[0]!.date).toBe("2025-01-01");
       expect(points[0]!.actual).toBe(10);
@@ -132,7 +132,7 @@ describe("loadBurndown", () => {
   test("returns empty for missing sprint", async () => {
     const { db, projectId } = await freshDb("burndown-missing");
     try {
-      const result = await loadBurndown(db.em.fork(), projectId, randomUUID());
+      const result = await loadBurndown(db.em, projectId, randomUUID());
       expect(result).toEqual([]);
     } finally { await db.close(); }
   });
@@ -155,7 +155,7 @@ describe("loadVelocity", () => {
       await seedTask(db, orgId, projectId, { status: "pending", sprintId: s1, storyPoints: 2 }); // not completed
       await seedTask(db, orgId, projectId, { status: "completed", sprintId: s2, storyPoints: 7 });
 
-      const bars = await loadVelocity(db.em.fork(), projectId);
+      const bars = await loadVelocity(db.em, projectId);
       expect(bars).toHaveLength(2);
       // newest first
       expect(bars[0]!.sprint_name).toBe("S2");
@@ -197,7 +197,7 @@ describe("loadCycleTime", () => {
         createdAt: "2025-01-06T00:00:00Z",
       });
 
-      const stats = await loadCycleTime(db.em.fork(), projectId);
+      const stats = await loadCycleTime(db.em, projectId);
       expect(stats.bins.length).toBeGreaterThan(0);
       expect(stats.p50).toBeGreaterThanOrEqual(2);
       expect(stats.p90).toBeGreaterThanOrEqual(2);
@@ -207,7 +207,7 @@ describe("loadCycleTime", () => {
   test("returns empty stats for no events", async () => {
     const { db, projectId } = await freshDb("cycle-time-empty");
     try {
-      const stats = await loadCycleTime(db.em.fork(), projectId);
+      const stats = await loadCycleTime(db.em, projectId);
       expect(stats.bins).toEqual([]);
       expect(stats.p50).toBe(0);
     } finally { await db.close(); }
@@ -233,7 +233,7 @@ describe("loadThroughput", () => {
         createdAt: "2025-01-07T00:00:00Z",
       });
 
-      const points = await loadThroughput(db.em.fork(), projectId);
+      const points = await loadThroughput(db.em, projectId);
       expect(points.length).toBeGreaterThan(0);
       // Both in same week
       expect(points[0]!.count).toBe(2);
@@ -255,7 +255,7 @@ describe("loadWip", () => {
         date: "2025-01-02", kind: "wip",
         payload: { pending: 4, in_progress: 4, blocked: 0 },
       });
-      const points = await loadWip(db.em.fork(), projectId);
+      const points = await loadWip(db.em, projectId);
       expect(points).toHaveLength(2);
       expect(points[0]!.pending).toBe(5);
       expect(points[1]!.in_progress).toBe(4);
@@ -273,7 +273,7 @@ describe("loadCfd", () => {
         date: "2025-01-01", kind: "cfd",
         payload: { pending: 10, in_progress: 2, blocked: 0, completed: 1, cancelled: 0 },
       });
-      const points = await loadCfd(db.em.fork(), projectId);
+      const points = await loadCfd(db.em, projectId);
       expect(points).toHaveLength(1);
       expect(points[0]!.completed).toBe(1);
     } finally { await db.close(); }
@@ -290,7 +290,7 @@ describe("loadReports", () => {
         name: "S1", startDate: "2025-01-01", endDate: "2025-01-14",
       });
       await seedTask(db, orgId, projectId, { status: "completed", sprintId: sid, storyPoints: 5 });
-      const data = await loadReports(db.em.fork(), projectId, sid);
+      const data = await loadReports(db.em, projectId, sid);
       expect(data.sprints).toHaveLength(1);
       expect(data).toHaveProperty("burndown");
       expect(data).toHaveProperty("velocity");
@@ -304,7 +304,7 @@ describe("loadReports", () => {
   test("returns empty-safe data when no sprints", async () => {
     const { db, projectId } = await freshDb("reports-empty");
     try {
-      const data = await loadReports(db.em.fork(), projectId);
+      const data = await loadReports(db.em, projectId);
       expect(data.sprints).toEqual([]);
       expect(data.burndown).toEqual([]);
       expect(data.cycleTime.bins).toEqual([]);

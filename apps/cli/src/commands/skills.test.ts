@@ -1,7 +1,7 @@
 /**
- * Tests for fulcrum skills CLI commands (P5#17).
+ * Tests for fulcrum skills CLI commands.
  *
- * Uses fake tRPC caller for unit-level validation of:
+ * Uses a fake skill caller for unit-level validation of:
  * - `--json` output for list, sync, conflicts list
  * - cron entry idempotency (write twice → one entry)
  * - `--install-cron` rejected when FULCRUM_FEATURES lacks skills-daily-sync
@@ -13,6 +13,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { SkillsRunOptions, SkillsCaller } from "./skills.ts";
+
+type FetchInput = Parameters<typeof fetch>[0];
+type FetchInit = Parameters<typeof fetch>[1];
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -105,6 +108,82 @@ describe("fulcrum skills list", () => {
     expect(exitCode).toBe(0);
     expect(captured.some((l) => l.includes("jq"))).toBe(true);
   });
+
+  test("requires configured public API when no caller is injected", async () => {
+    const { run } = await import("./skills.ts");
+    const captured: string[] = [];
+    let exitCode = 0;
+    const fetchFn = (async () => {
+      throw new Error("fetch should not be called without a base URL");
+    }) as unknown as typeof fetch;
+
+    await run(["list", "--json"], {
+      env: {},
+      fetch: fetchFn,
+      print: (line: string) => captured.push(line),
+      printErr: (line: string) => captured.push(line),
+      exit: (code: number) => {
+        exitCode = code;
+      },
+    });
+
+    expect(exitCode).toBe(1);
+    expect(captured.join("\n")).toContain("Skill supply API caller is not configured");
+  });
+
+  test("uses configured skill public API with org scope", async () => {
+    const { run } = await import("./skills.ts");
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const captured: string[] = [];
+    const fetchFn = (async (url: FetchInput, init?: FetchInit) => {
+      requests.push({ url: String(url), init });
+      return Response.json([
+        {
+          id: "api-skill",
+          name: "api-skill",
+          slug: "api-skill",
+          source: "local",
+          upstreamRepo: null,
+          upstreamRef: null,
+          enabledAgents: ["codex"],
+        },
+      ]);
+    }) as unknown as typeof fetch;
+
+    await run(["list", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210",
+        FULCRUM_ORG_ID: "org-1",
+      },
+      fetch: fetchFn,
+      print: (line: string) => captured.push(line),
+      printErr: (line: string) => captured.push(line),
+      exit: () => undefined,
+    });
+
+    expect(requests).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/skills?orgId=org-1",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+    expect(JSON.parse(captured.join(""))).toEqual([
+      {
+        id: "api-skill",
+        name: "api-skill",
+        slug: "api-skill",
+        source: "local",
+        upstreamRepo: null,
+        upstreamRef: null,
+        enabledAgents: ["codex"],
+      },
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -189,6 +268,37 @@ describe("fulcrum skills sync", () => {
     expect(exitCode).toBe(0);
     expect(receivedInput?.fetchUpstream).toBe(true);
   });
+
+  test("uses the configured skill public API for sync", async () => {
+    const { run } = await import("./skills.ts");
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const captured: string[] = [];
+    const fetchFn = (async (url: FetchInput, init?: FetchInit) => {
+      requests.push({ url: String(url), init });
+      return Response.json({ merged: ["api-skill"], conflicts: [], errors: [] });
+    }) as unknown as typeof fetch;
+
+    await run(["sync", "--fetch-upstream", "--json"], {
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210" },
+      fetch: fetchFn,
+      print: (line: string) => captured.push(line),
+      printErr: (line: string) => captured.push(line),
+      exit: () => undefined,
+    });
+
+    expect(requests).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/skills/sync",
+        init: {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ fetchUpstream: true }),
+        },
+      },
+    ]);
+    expect(JSON.parse(captured.join(""))).toEqual({ merged: ["api-skill"], conflicts: [], errors: [] });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +313,38 @@ describe("fulcrum skills conflicts list", () => {
       } as Partial<SkillsCaller> as SkillsCaller,
     });
     expect(exitCode).toBe(0);
-    // conflicts list uses lock file, not tRPC list — but CLI --json wraps it
+    expect(JSON.parse(captured.join(""))).toEqual([]);
+  });
+
+  test("uses the configured skill public API for conflict listing", async () => {
+    const { run } = await import("./skills.ts");
+    const requests: Array<{ url: string; init: RequestInit | undefined }> = [];
+    const captured: string[] = [];
+    const fetchFn = (async (url: FetchInput, init?: FetchInit) => {
+      requests.push({ url: String(url), init });
+      return Response.json([{ id: "skill:api-skill", slug: "api-skill" }]);
+    }) as unknown as typeof fetch;
+
+    await run(["conflicts", "list", "--json"], {
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210" },
+      fetch: fetchFn,
+      print: (line: string) => captured.push(line),
+      printErr: (line: string) => captured.push(line),
+      exit: () => undefined,
+    });
+
+    expect(requests).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/skills/conflicts",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: undefined,
+        },
+      },
+    ]);
+    expect(JSON.parse(captured.join(""))).toEqual(["api-skill"]);
   });
 });
 
@@ -270,10 +411,22 @@ describe("fulcrum skills sync --install-cron", () => {
 
   test("accepted when FULCRUM_FEATURES=skills-daily-sync", async () => {
     process.env["FULCRUM_FEATURES"] = "skills-daily-sync";
-    const { exitCode } = await runSkills(["sync", "--install-cron", "--json"], {
+    const { run } = await import("./skills.ts");
+    const captured: string[] = [];
+    let exitCode = 0;
+
+    await run(["sync", "--install-cron", "--json"], {
       cronHome: tmpHome,
+      env: {},
+      print: (line: string) => captured.push(line),
+      printErr: (line: string) => captured.push(line),
+      exit: (code: number) => {
+        exitCode = code;
+      },
     });
+
     expect(exitCode).toBe(0);
+    expect(JSON.parse(captured.join(""))).toEqual({ cronInstalled: true });
   });
 
   test("idempotent — write twice → one entry (macOS plist)", async () => {

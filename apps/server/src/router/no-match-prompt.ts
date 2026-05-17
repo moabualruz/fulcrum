@@ -4,7 +4,7 @@ import { stdin as input, stdout as output } from "node:process";
 import {
   routingApplication,
   type RoutingApplication,
-} from "@/application/routing.ts";
+} from "@execution-orchestration/application/routing.ts";
 import type { TaskFacts } from "./types.ts";
 
 type LearnedRoutingRule = Awaited<ReturnType<RoutingApplication["learnRoutingRule"]>>;

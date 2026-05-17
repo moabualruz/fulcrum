@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { builtinTemplateRows } from "@/docs/template-seeds.ts";
+import { builtinTemplateRows } from "@knowledge-workspace/interface/document-templates.ts";
 
 export const load: PageServerLoad = async (event) => {
   const locals = (event as unknown as { locals?: Record<string, unknown> }).locals ?? {};

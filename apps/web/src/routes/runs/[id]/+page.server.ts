@@ -2,10 +2,10 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
-import { requestAppScope } from "$lib/server/application-scope";
-import { cancelRun, retryRun } from "@/application/runs/commands.ts";
-import { getProjectRunPageData } from "@/application/runs/queries.ts";
-import type { RunStatus } from "@/services/runs.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
+import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
+import type { RunStatus } from "$lib/server/runs";
 
 interface AgentRunDetail {
   id: string;
@@ -70,7 +70,7 @@ export const load: PageServerLoad = ({ params, locals }) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
         let data;
         try {
           data = await getProjectRunPageData(em, ctx, params.id);
@@ -120,12 +120,12 @@ export const load: PageServerLoad = ({ params, locals }) => {
 
 export const actions: Actions = {
   cancel: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
     await cancelRun(em, ctx, params.id!);
     return actionOk("Run cancelled");
   },
   retry: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
     const result = await retryRun(em, ctx, params.id!);
     const newId = result.id;
     throw redirect(303, `/runs/${newId}`);

@@ -1,9 +1,9 @@
 import {
   resolveKeybindings,
+  type KeybindingAction,
   type KeybindingPlatform,
   type TenantSettingsReader,
-} from "@/keybindings/index.ts";
-import type { KeybindingAction } from "@/keybindings/schema.ts";
+} from "@platform-core/interface/input-bindings.ts";
 
 export function createKeybind(action: KeybindingAction) {
   return { action };

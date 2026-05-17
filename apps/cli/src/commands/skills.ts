@@ -1,5 +1,5 @@
 /**
- * fulcrum skills — CLI subcommands backed by tRPC skills.* procedures.
+ * fulcrum skills — CLI subcommands backed by the skill-supply public API.
  *
  * Commands:
  *   fulcrum skills list [--json]
@@ -10,19 +10,19 @@
  *   fulcrum skills conflicts list [--json]
  *   fulcrum skills conflicts resolve <slug> --keep <local|upstream|editor> [--json]
  *
- * All commands accept `--json`: machine-readable JSON to stdout matching tRPC
- * schema identically to Web API responses.
- *
- * P5#17 — CLI fulcrum skills * commands + daily cron install (gated).
+ * All commands accept `--json`: machine-readable JSON to stdout matching API
+ * responses.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { platform } from "node:os";
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
+import { formatCommandError } from "../api-errors.ts";
 
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createSkillSupplyApiCallerFromEnv,
+  type SkillSupplyApiEnvironment,
+} from "@platform-core/interface/http/skill-supply-api-client.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +44,11 @@ interface SyncResult {
   errors: string[];
 }
 
+interface SkillConflictOutput {
+  id?: string;
+  slug?: string;
+}
+
 export interface SkillsCaller {
   list: () => Promise<SkillOutput[]>;
   install: (input: { path: string }) => Promise<SkillOutput>;
@@ -51,11 +56,13 @@ export interface SkillsCaller {
   uninstall: (input: { slug: string }) => Promise<void>;
   sync: (input: { fetchUpstream: boolean }) => Promise<SyncResult>;
   resolveConflict: (input: { slug: string; resolution: "local" | "upstream" | "editor" }) => Promise<SkillOutput>;
+  listConflicts?: () => Promise<Array<string | SkillConflictOutput>>;
 }
 
 export interface SkillsRunOptions {
   caller?: SkillsCaller;
-  container?: Container | null;
+  env?: SkillSupplyApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -110,7 +117,7 @@ export async function run(
 
 const HELP = `fulcrum skills
 
-Skill management commands (tRPC-backed).
+Skill management commands.
 
 Usage:
   fulcrum skills list [--json]
@@ -138,9 +145,9 @@ async function runList(
 ): Promise<void> {
   const { print, printErr, exit } = opts;
   const jsonMode = argv.includes("--json");
-  const caller = await resolveCaller(opts);
 
   try {
+    const caller = await resolveCaller(opts);
     const skills = await caller.list();
     if (jsonMode) {
       print(JSON.stringify(skills));
@@ -181,8 +188,8 @@ async function runInstall(
     return;
   }
 
-  const caller = await resolveCaller(opts);
   try {
+    const caller = await resolveCaller(opts);
     const skill = await caller.install({ path });
     if (jsonMode) {
       print(JSON.stringify(skill));
@@ -214,8 +221,8 @@ async function runUpgrade(
     return;
   }
 
-  const caller = await resolveCaller(opts);
   try {
+    const caller = await resolveCaller(opts);
     const skills = await caller.upgrade({ slug });
     if (jsonMode) {
       print(JSON.stringify(skills));
@@ -246,8 +253,8 @@ async function runUninstall(
     return;
   }
 
-  const caller = await resolveCaller(opts);
   try {
+    const caller = await resolveCaller(opts);
     await caller.uninstall({ slug });
     if (argv.includes("--json")) {
       print(JSON.stringify({ ok: true, slug }));
@@ -288,8 +295,8 @@ async function runSync(
     return;
   }
 
-  const caller = await resolveCaller(opts);
   try {
+    const caller = await resolveCaller(opts);
     const result = await caller.sync({ fetchUpstream });
     if (jsonMode) {
       print(JSON.stringify(result));
@@ -333,25 +340,26 @@ async function runConflictsList(
   argv: readonly string[],
   opts: Required<Pick<SkillsRunOptions, "print" | "printErr" | "exit">> & SkillsRunOptions,
 ): Promise<void> {
-  const { print } = opts;
+  const { print, printErr, exit } = opts;
   const jsonMode = argv.includes("--json");
 
-  // Read conflicts from lock file (same source as existing cmdConflicts)
-  const { readSkillsLockFile } = await import("@/skills/lock.ts");
-  const lock = await readSkillsLockFile();
-  const conflicts = Object.entries(lock)
-    .filter(([, entry]) => entry.upstream_conflict)
-    .map(([slug]) => slug)
-    .sort();
+  try {
+    const caller = await resolveCaller(opts);
+    const conflicts = caller.listConflicts
+      ? (await caller.listConflicts()).map(conflictSlug).sort()
+      : [];
 
-  if (jsonMode) {
-    print(JSON.stringify(conflicts));
-  } else {
-    if (conflicts.length === 0) {
-      print("No pending conflicts.");
+    if (jsonMode) {
+      print(JSON.stringify(conflicts));
     } else {
-      for (const slug of conflicts) print(slug);
+      if (conflicts.length === 0) {
+        print("No pending conflicts.");
+      } else {
+        for (const slug of conflicts) print(slug);
+      }
     }
+  } catch (err) {
+    handleError("fulcrum skills conflicts list", err, printErr, exit);
   }
 }
 
@@ -380,8 +388,8 @@ async function runConflictsResolve(
     return;
   }
 
-  const caller = await resolveCaller(opts);
   try {
+    const caller = await resolveCaller(opts);
     const skill = await caller.resolveConflict({
       slug,
       resolution: keepValue as "local" | "upstream" | "editor",
@@ -464,23 +472,35 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: resolve in-process tRPC caller
+// Helper: resolve API or compatibility caller
 // ---------------------------------------------------------------------------
 
 async function resolveCaller(opts: SkillsRunOptions): Promise<SkillsCaller> {
   if (opts.caller) return opts.caller;
-  const caller = await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  });
-  return {
-    list: () => caller.fulcrum_skills.list(),
-    install: (input) => caller.fulcrum_skills.install(input),
-    upgrade: (input) => caller.fulcrum_skills.upgrade(input),
-    uninstall: (input) => caller.fulcrum_skills.uninstall(input),
-    sync: (input) => caller.fulcrum_skills.sync(input),
-    resolveConflict: (input) => caller.fulcrum_skills.resolveConflict(input),
-  };
+  const apiCaller = createSkillSupplyApiCallerFromEnv(opts.env, opts.fetch);
+  if (apiCaller) {
+    return {
+      list: async () => await apiCaller.fulcrumSkills.list() as SkillOutput[],
+      install: async (input) => await apiCaller.fulcrumSkills.install(input) as SkillOutput,
+      upgrade: async (input) => await apiCaller.fulcrumSkills.upgrade(input) as SkillOutput[],
+      uninstall: async (input) => {
+        await apiCaller.fulcrumSkills.uninstall(input);
+      },
+      sync: async (input) => await apiCaller.fulcrumSkills.sync(input) as SyncResult,
+      resolveConflict: async (input) => await apiCaller.fulcrumSkills.resolveConflict(input) as SkillOutput,
+      listConflicts: async () => await apiCaller.fulcrumSkills.conflicts.list() as Array<string | SkillConflictOutput>,
+    };
+  }
+  throw new Error(
+    "Skill supply API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.",
+  );
+}
+
+function conflictSlug(conflict: string | SkillConflictOutput): string {
+  if (typeof conflict === "string") return conflict;
+  const slug = conflict.slug ?? conflict.id;
+  if (!slug) throw new Error("Skill conflict response is missing slug.");
+  return slug.startsWith("skill:") ? slug.slice("skill:".length) : slug;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,9 +513,7 @@ function handleError(
   printErr: (line: string) => void,
   exit: (code: number) => void,
 ): void {
-  const msg = err instanceof TRPCError
-    ? `${err.code}: ${err.message}`
-    : `Error: ${(err as Error).message}`;
+  const msg = formatCommandError(err);
   printErr(`${prefix}: ${msg}`);
   exit(1);
 }

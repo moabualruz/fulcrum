@@ -2,12 +2,12 @@ import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { migrateIsolatedStore } from "@/test-support/product-fixtures.ts";
-import { createLocalOrg, createProject } from "@/test-support/product-fixtures.ts";
-import { makeId } from "@/test-support/product-fixtures.ts";
-import { listArtifacts, getArtifactStats } from "@/test-support/product-fixtures.ts";
-import type { TestStore } from "@/test-support/product-fixtures.ts";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
+import { makeId } from "@test-support/product-workspace-fixtures.ts";
+import { listArtifacts, getArtifactStats } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
 let db: TestStore;
@@ -16,9 +16,9 @@ let projectId: string;
 
 beforeEach(async () => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-artifacts-"));
-  const dbDir = join(scratch, "state", "product", "db");
+  const dbDir = join(scratch, "pglite.data");
   mkdirSync(dbDir, { recursive: true });
-  db = await openIsolatedStore(join(dbDir, "main"));
+  db = await openIsolatedStore(dbDir);
   await migrateIsolatedStore(db);
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   orgId = org.id;

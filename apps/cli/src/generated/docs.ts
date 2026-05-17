@@ -95,6 +95,8 @@ export function createDocsCommand(): Command {
   createCommand.description("docs create");
   createCommand.option("--json", "Emit JSON output");
   createCommand.option("--body-md <string>", "body-md");
+  createCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
+  createCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   createCommand.option("--sort-position <number>", "sort-position", Number.parseFloat);
   createCommand.option("--source-id <string>", "source-id");
   createCommand.option("--source-kind <string>", "source-kind");
@@ -185,8 +187,10 @@ export function createDocsCommand(): Command {
   listCommand.description("docs list");
   listCommand.option("--json", "Emit JSON output");
   listCommand.option("--archived", "archived");
+  listCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
   listCommand.option("--limit <number>", "limit", Number.parseFloat);
   listCommand.option("--offset <number>", "offset", Number.parseFloat);
+  listCommand.addOption(new Option("--scope <choice>", "scope").choices([]));
   listCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for docs.list requires an explicit surface adapter.");
@@ -222,6 +226,7 @@ export function createDocsCommand(): Command {
   const templatesResolveCommand = command.command("templates resolve");
   templatesResolveCommand.description("docs templates resolve");
   templatesResolveCommand.option("--json", "Emit JSON output");
+  templatesResolveCommand.addOption(new Option("--doc-type <choice>", "doc-type").choices([]));
   templatesResolveCommand.option("--project-id <string>", "project-id");
   templatesResolveCommand.action(async (options) => {
     try {

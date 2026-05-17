@@ -57,6 +57,10 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
+  fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Preview approved-plan docs/tasks/dependencies through shared planning API.
+  fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Persist approved-plan docs/tasks/dependencies through shared planning API.
   fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
                                      Report bun, agent dirs, tool presence, policy health.
                                      --subsystem runs only named subsystem checks via orchestrator.
@@ -206,42 +210,42 @@ async function runHook(name: string, _args: string[]) {
   switch (name) {
     case "router":
     case "tool-output-router": {
-      const { run } = await import("@/hooks/tool-output-router.ts");
+      const { run } = await import("@platform-core/application/agent-hooks/tool-output-router.ts");
       await run();
       return;
     }
     case "format": {
-      const { runHook } = await import("@/hooks/format.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/format.ts");
       await runHook();
       return;
     }
     case "lint-gate": {
-      const { runHook } = await import("@/hooks/lint-gate.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/lint-gate.ts");
       await runHook();
       return;
     }
     case "pm-policy": {
-      const { runHook } = await import("@/hooks/pm-policy.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/pm-policy.ts");
       await runHook();
       return;
     }
     case "test-on-edit": {
-      const { runHook } = await import("@/hooks/test-on-edit.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/test-on-edit.ts");
       await runHook();
       return;
     }
     case "audit-log": {
-      const { runHook } = await import("@/hooks/audit-log.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/audit-log.ts");
       await runHook();
       return;
     }
     case "index-check": {
-      const { runHook } = await import("@/hooks/index-check.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/index-check.ts");
       await runHook();
       return;
     }
     case "index-rebuild": {
-      const { runHook } = await import("@/hooks/index-rebuild.ts");
+      const { runHook } = await import("@platform-core/application/agent-hooks/index-rebuild.ts");
       await runHook();
       return;
     }

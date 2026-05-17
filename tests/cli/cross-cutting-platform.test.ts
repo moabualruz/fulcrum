@@ -100,6 +100,55 @@ describe("cross-cutting CLI surfaces", () => {
     });
   });
 
+  it("theme list routes through the configured public API", async () => {
+    const { runTheme } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runTheme(["list", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json([{ key: "theme.accent", value: "#123456", defaultValue: "#6D28D9" }]);
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/settings/theme/tokens?orgId=org-1&userId=user-1",
+        method: "GET",
+        body: null,
+      },
+    ]);
+    expect(JSON.parse(h.lines[0] as string)).toEqual([
+      { key: "theme.accent", value: "#123456", defaultValue: "#6D28D9" },
+    ]);
+  });
+
+  it("theme list requires a configured public API without injected caller", async () => {
+    const { runTheme } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await expect(
+      runTheme(["list", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Theme settings API caller is not configured");
+  });
+
   it("secrets set reads stdin and never prints secret value", async () => {
     const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -200,6 +249,59 @@ describe("cross-cutting CLI surfaces", () => {
     });
   });
 
+  it("secrets set routes through the configured public API", async () => {
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runSecrets(["set", "--name", "API_KEY", "--value", "sk-live-secret", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json({ id: "cred-1", name: "API_KEY", status: "stored" });
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/credentials",
+        method: "POST",
+        body: {
+          orgId: "org-1",
+          userId: "user-1",
+          name: "API_KEY",
+          value: "sk-live-secret",
+        },
+      },
+    ]);
+    expect(h.lines.join("\n")).not.toContain("sk-live-secret");
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "cred-1", name: "API_KEY", status: "stored" });
+  });
+
+  it("secrets set requires a configured public API without injected caller", async () => {
+    const { runSecrets } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await expect(
+      runSecrets(["set", "--name", "API_KEY", "--value", "sk-live-secret", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Credential API caller is not configured");
+  });
+
   it("errors list --since filters through caller and emits JSON", async () => {
     const { runErrors } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -248,6 +350,53 @@ describe("cross-cutting CLI surfaces", () => {
     expect(JSON.parse(purgeHarness.lines[0] as string)).toEqual({ ok: true, deleted: 2 });
   });
 
+  it("errors list routes through the configured public API", async () => {
+    const { runErrors } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runErrors(["list", "--since", "2026-05-01", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json([{ id: "err-1", errorMessage: "boom" }]);
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/error-logs?orgId=org-1&userId=user-1&since=2026-05-01T00%3A00%3A00.000Z",
+        method: "GET",
+        body: null,
+      },
+    ]);
+    expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "err-1", errorMessage: "boom" }]);
+  });
+
+  it("errors list requires a configured public API without injected caller", async () => {
+    const { runErrors } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await expect(
+      runErrors(["list", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Error log API caller is not configured");
+  });
+
   it("backup --output writes dump, reports progress on stderr, and emits manifest JSON", async () => {
     const { runBackup } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
 
@@ -274,6 +423,64 @@ describe("cross-cutting CLI surfaces", () => {
         path: output,
       });
     });
+  });
+
+  it("backup --output routes through the configured public API", async () => {
+    const { runBackup } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+
+    await withTempDir(async (dir) => {
+      const h = harness();
+      const output = join(dir, "b.tar.gz");
+      const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+      await runBackup(["--output", output, "--json"], {
+        env: {
+          FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+          FULCRUM_ORG_ID: "org-1",
+          FULCRUM_USER_ID: "user-1",
+        },
+        fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+          calls.push({
+            url: String(url),
+            method: init?.method,
+            body: init?.body ? JSON.parse(String(init.body)) : null,
+          });
+          return Response.json({
+            dump: Buffer.from("payload").toString("base64"),
+            entityCounts: { tasks: 2 },
+          });
+        }) as typeof fetch,
+        ...h,
+      });
+
+      expect(calls).toEqual([
+        {
+          url: "http://127.0.0.1:3210/api/v1/data-portability/backup",
+          method: "POST",
+          body: { orgId: "org-1", userId: "user-1" },
+        },
+      ]);
+      expect(await readFile(output, "utf8")).toContain("payload");
+      expect(JSON.parse(h.lines[0] as string)).toEqual({
+        manifest: { entity_counts: { tasks: 2 } },
+        path: output,
+      });
+    });
+  });
+
+  it("backup create requires a configured public API without injected caller", async () => {
+    const { runBackup } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await expect(
+      runBackup(["create", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Data portability API caller is not configured");
   });
 
   it("backup create, restore --dump, and verify emit JSON parity payloads", async () => {
@@ -384,6 +591,53 @@ describe("cross-cutting CLI surfaces", () => {
     expect(JSON.parse(h.lines[0] as string)).toEqual({ opted_in: false, row_count: 7 });
   });
 
+  it("telemetry status routes through the configured public API", async () => {
+    const { runTelemetry } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runTelemetry(["status", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json({ opted_in: true, row_count: 9 });
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/telemetry/status?orgId=org-1&userId=user-1",
+        method: "GET",
+        body: null,
+      },
+    ]);
+    expect(JSON.parse(h.lines[0] as string)).toEqual({ opted_in: true, row_count: 9 });
+  });
+
+  it("telemetry status requires a configured public API without injected caller", async () => {
+    const { runTelemetry } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
+    const h = harness();
+
+    await expect(
+      runTelemetry(["status", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Telemetry API caller is not configured");
+  });
+
   it("telemetry opt-in, opt-out, and purge emit JSON", async () => {
     const { runTelemetry } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -431,6 +685,55 @@ describe("cross-cutting CLI surfaces", () => {
     });
   });
 
+  it("flags list routes through the configured public API", async () => {
+    const { runFlags } = await import("@fulcrum/cli/commands/flags.ts");
+    const h = harness();
+    const calls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+
+    await runFlags(["list", "--json"], {
+      env: {
+        FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+        FULCRUM_ORG_ID: "org-1",
+        FULCRUM_USER_ID: "user-1",
+      },
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({
+          url: String(url),
+          method: init?.method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
+        return Response.json([{ flag: "public-api", enabled: true, source: "org" }]);
+      }) as typeof fetch,
+      ...h,
+    });
+
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:3210/api/v1/feature-flags?orgId=org-1&userId=user-1",
+        method: "GET",
+        body: null,
+      },
+    ]);
+    expect(JSON.parse(h.lines[0] as string)).toEqual([
+      { name: "public-api", enabled: true, description: "org" },
+    ]);
+  });
+
+  it("flags list requires a configured public API without injected caller", async () => {
+    const { runFlags } = await import("@fulcrum/cli/commands/flags.ts");
+    const h = harness();
+
+    await expect(
+      runFlags(["list", "--json"], {
+        env: {},
+        fetch: (async () => {
+          throw new Error("fetch should not run without API configuration");
+        }) as unknown as typeof fetch,
+        ...h,
+      }),
+    ).rejects.toThrow("Feature flag API caller is not configured");
+  });
+
   it("data export blocks csv when import-csv/export-csv flag is disabled", async () => {
     const { runDataExport } = await import("@fulcrum/cli/commands/cross-cutting-platform.ts");
     const h = harness();
@@ -464,6 +767,44 @@ describe("cross-cutting CLI surfaces", () => {
       expect(JSON.parse(exportHarness.lines[0] as string)).toEqual({
         path: jsonOutput,
         entityCounts: { tasks: 2 },
+        format: "json",
+      });
+
+      const publicExportHarness = harness();
+      const publicJsonOutput = join(dir, "public-fulcrum-export.json");
+      const publicCalls: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+      await runDataExport(["--format", "json", "--output", publicJsonOutput, "--json"], {
+        env: {
+          FULCRUM_SERVER_URL: "http://127.0.0.1:3210/",
+          FULCRUM_ORG_ID: "org-1",
+          FULCRUM_USER_ID: "user-1",
+        },
+        fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+          publicCalls.push({
+            url: String(url),
+            method: init?.method,
+            body: init?.body ? JSON.parse(String(init.body)) : null,
+          });
+          return Response.json({ json: "{\"format\":\"fulcrum.json-export.v1\"}", entityCounts: { tasks: 3 } });
+        }) as typeof fetch,
+        ...publicExportHarness,
+      });
+      expect(publicCalls).toEqual([
+        {
+          url: "http://127.0.0.1:3210/api/v1/data-portability/export",
+          method: "POST",
+          body: {
+            orgId: "org-1",
+            userId: "user-1",
+            pretty: true,
+            outputPath: publicJsonOutput,
+            format: "json",
+          },
+        },
+      ]);
+      expect(JSON.parse(publicExportHarness.lines[0] as string)).toEqual({
+        path: publicJsonOutput,
+        entityCounts: { tasks: 3 },
         format: "json",
       });
 

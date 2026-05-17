@@ -8,8 +8,10 @@
  *   fulcrum task relate <taskId> --delete <relationshipId>
  */
 
-import type { Container } from "@needle-di/core";
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createRelationshipApiCallerFromEnv,
+  type RelationshipApiEnvironment,
+} from "@work-management/interface/http/relationship-api-client.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyFn = (...args: any[]) => Promise<any>;
@@ -22,7 +24,8 @@ export interface TaskRelateRunOptions {
       delete: AnyFn;
     };
   };
-  container?: Container | null;
+  env?: RelationshipApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -134,6 +137,9 @@ export async function run(argv: readonly string[], opts: TaskRelateRunOptions = 
 
 async function resolveCaller(opts: TaskRelateRunOptions): Promise<Required<TaskRelateRunOptions>["caller"]> {
   if (opts.caller) return opts.caller;
-
-  return await createLocalCaller({ container: opts.container, requireSession: false }) as never;
+  const apiCaller = createRelationshipApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error("Relationship API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_ORG_ID.");
+  }
+  return apiCaller as never;
 }

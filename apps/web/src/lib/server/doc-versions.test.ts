@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createTestOrm, type TestOrm } from "@/test-utils/db.ts";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createDocumentAction, updateDocumentAction } from "./documents";
 import {
   createDocumentVersion,
@@ -29,7 +29,7 @@ async function seedDb() {
 }
 
 function em(db: TestOrm) {
-  return db.em.fork();
+  return db.em;
 }
 
 describe("document versions", () => {

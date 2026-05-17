@@ -1,6 +1,6 @@
 import { describe, expect, test, afterEach, beforeEach } from "bun:test";
 import { parseArgs, formatOutput } from "./flags.ts";
-import { experimentStore } from "@/flags/experiments.ts";
+import { experimentStore } from "@platform-core/application/feature-flags/experiments.ts";
 
 describe("flags CLI", () => {
   afterEach(() => {

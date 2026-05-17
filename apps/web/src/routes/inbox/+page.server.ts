@@ -1,7 +1,10 @@
 import { redirect, type Actions, type ServerLoad } from "@sveltejs/kit";
+import { createNotificationApiCaller } from "@notification-center/interface/http/notification-api-client.ts";
+import { createAuditApiClient } from "@workflow-coordination/interface/http/audit-api-client.ts";
+import { cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 interface SessionEvent {
-  locals: { session?: unknown };
+  locals: { session?: unknown; orgId?: string | null; userId?: string | null };
   fetch: typeof fetch;
   request: { headers: { get(name: string): string | null } };
   url: URL;
@@ -48,51 +51,25 @@ export interface InboxData {
 
 const PAGE_SIZE = 20;
 
-function baseUrl(url: URL): string {
-  return `${url.protocol}//${url.host}`;
+function notificationApi(event: SessionEvent) {
+  if (!event.locals.orgId || !event.locals.userId) return null;
+  return createNotificationApiCaller({
+    baseUrl: publicApiBaseUrl(event.url),
+    orgId: event.locals.orgId,
+    userId: event.locals.userId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event.request as Request),
+  }).notify;
 }
 
-function unwrapTrpcData(body: unknown): unknown {
-  return (
-    (body as { result?: { data?: { json?: unknown } } })?.result?.data?.json ??
-    (body as { result?: { data?: unknown } })?.result?.data ??
-    body
-  );
-}
-
-function extractTrpcError(body: unknown): string {
-  const error = (body as { error?: { json?: { message?: string }; message?: string } })?.error;
-  return error?.json?.message ?? error?.message ?? "Request failed";
-}
-
-async function trpcQuery(event: SessionEvent, procedure: string, input: unknown): Promise<unknown> {
-  const encodedInput = encodeURIComponent(JSON.stringify(input));
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}?input=${encodedInput}`, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
+function auditApi(event: SessionEvent) {
+  if (!event.locals.orgId || !event.locals.userId) return null;
+  return createAuditApiClient({
+    baseUrl: publicApiBaseUrl(event.url),
+    orgId: event.locals.orgId,
+    fetch: event.fetch,
+    headers: cookieHeaders(event.request as Request),
   });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
-}
-
-async function trpcMutation(event: ActionEvent, procedure: string, input: unknown): Promise<unknown> {
-  const response = await event.fetch(`${baseUrl(event.url)}/api/trpc/${procedure}`, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
-    body: JSON.stringify({ json: input }),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractTrpcError(body));
-  return unwrapTrpcData(body);
 }
 
 function normalizeNotification(row: Record<string, unknown>): NotificationRow {
@@ -112,29 +89,60 @@ function normalizeNotification(row: Record<string, unknown>): NotificationRow {
   };
 }
 
+function normalizeActivity(row: Record<string, unknown>): ActivityRow {
+  return {
+    id: String(row["id"]),
+    org_id: String(row["orgId"]),
+    project_id: row["projectId"] ? String(row["projectId"]) : null,
+    actor: String(row["userId"] ?? "system"),
+    subject_kind: String(row["subjectKind"] ?? "event"),
+    subject_id: String(row["subjectId"] ?? ""),
+    verb: String(row["verb"] ?? ""),
+    payload: isRecord(row["payload"]) ? row["payload"] : {},
+    created_at: String(row["createdAt"]),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
 export const load: ServerLoad = async (event) => {
   const sessionEvent = event as SessionEvent;
   if (!sessionEvent.locals.session) throw redirect(302, "/auth/login");
 
   const activityPageRaw = parseInt(sessionEvent.url.searchParams.get("activity_page") ?? "1", 10);
   const activityPage = Number.isNaN(activityPageRaw) || activityPageRaw < 1 ? 1 : activityPageRaw;
+  const notify = notificationApi(sessionEvent);
+  const audit = auditApi(sessionEvent);
+  if (!notify) throw new Error("Notification scope is required.");
+  if (!audit) throw new Error("Audit scope is required.");
 
-  const [unreadResult, listResult] = await Promise.all([
-    trpcQuery(sessionEvent, "notify.unreadCount", {}),
-    trpcQuery(sessionEvent, "notify.list", { limit: 50, offset: 0 }),
+  const [unreadResult, listResult, activityResult] = await Promise.all([
+    notify.unreadCount(),
+    notify.list(),
+    audit.queryPage({
+      userId: sessionEvent.locals.userId ?? undefined,
+      limit: PAGE_SIZE,
+      offset: (activityPage - 1) * PAGE_SIZE,
+    }),
   ]);
 
   const count = Number((unreadResult as { count?: unknown })?.count ?? 0);
-  const items = Array.isArray((listResult as { items?: unknown })?.items)
-    ? ((listResult as { items: Record<string, unknown>[] }).items)
+  const items = Array.isArray(listResult)
+    ? (listResult as Record<string, unknown>[])
     : [];
+  const activityItems = Array.isArray(activityResult.data)
+    ? (activityResult.data as Record<string, unknown>[])
+    : [];
+  const activityTotal = Number((activityResult as { total?: unknown })?.total ?? activityItems.length);
 
   return {
     notifications: items.map(normalizeNotification),
     unreadCount: Math.max(0, count),
-    activity: [],
+    activity: activityItems.map(normalizeActivity),
     activityPage,
-    activityTotal: 0,
+    activityTotal: Math.max(0, activityTotal),
   } satisfies InboxData;
 };
 
@@ -142,7 +150,9 @@ export const actions: Actions = {
   markAllRead: async (event) => {
     const actionEvent = event as ActionEvent;
     if (!actionEvent.locals.session) throw redirect(302, "/auth/login");
-    await trpcMutation(actionEvent, "notify.markAllRead", {});
+    const notify = notificationApi(actionEvent);
+    if (!notify) throw new Error("Notification scope is required.");
+    await notify.markAllRead();
     return { markedRead: true };
   },
 };

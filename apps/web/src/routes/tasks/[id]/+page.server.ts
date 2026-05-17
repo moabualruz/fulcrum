@@ -1,19 +1,27 @@
 import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { deleteTask, updateTask } from "@/application/tasks/commands.ts";
-import { getTask, listChildren } from "@/application/tasks/queries.ts";
+import { deleteWorkItem, updateWorkItem } from "@work-management/interface/work-item-actions.ts";
+import { getWorkItem, listChildWorkItems } from "@work-management/interface/work-item-detail.ts";
+import {
+  dispatchDependencyRunForTasks,
+  previewDependencyRunForTasks,
+} from "@execution-orchestration/interface/dependency-run-actions.ts";
+import {
+  loadDependencyRunLiveFeedbackForTasks,
+} from "@execution-orchestration/interface/dependency-run-live-feedback.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
-import { requestAppScope } from "$lib/server/application-scope";
+import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
 export const load: PageServerLoad = ({ params, locals }) => {
   return {
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
         try {
-          const task = await getTask(em, ctx, params.id);
-          const children = await listChildren(em, ctx, params.id);
+          const task = await getWorkItem(em, ctx, params.id);
+          const children = await listChildWorkItems(em, ctx, params.id);
           return { task, children };
         } catch (err) {
           if ((err as Error).message.includes("not found")) throw error(404, "Task not found");
@@ -56,10 +64,10 @@ export const actions: Actions = {
     if (candidate["description"] === "") candidate["description"] = null;
     const parsed = v.safeParse(UpdateFieldSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     try {
       const { id: _id, ...input } = parsed.output;
-      await updateTask(em, ctx, params.id, input);
+      await updateWorkItem(em, ctx, params.id, input);
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
@@ -67,8 +75,8 @@ export const actions: Actions = {
   },
 
   delete: async ({ params, locals }) => {
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-    await deleteTask(em, ctx, params.id);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
+    await deleteWorkItem(em, ctx, params.id);
     return actionOk("Task deleted");
   },
 
@@ -78,9 +86,9 @@ export const actions: Actions = {
     const candidate = { id: params.id, description: raw["description"] ?? null };
     const parsed = v.safeParse(UpdateDescriptionSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
     try {
-      await updateTask(
+      await updateWorkItem(
         em,
         ctx,
         params.id,
@@ -90,5 +98,117 @@ export const actions: Actions = {
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
     }
+  },
+
+  runPreview: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const preview = await workflowApi.tasks.previewDependencyRun({
+          projectId,
+          mode: "task",
+          targetTaskIds: [params.id],
+          traceId: raw["traceId"] ?? undefined,
+        });
+        return { ok: true, mode: "runPreview", preview };
+      }
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, params.id);
+      const preview = await previewDependencyRunForTasks(em, ctx, {
+        mode: "task",
+        targetTaskIds: [params.id],
+        traceId: raw["traceId"] ?? undefined,
+      });
+      return { ok: true, mode: "runPreview", preview };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "runPreview", message: (err as Error).message });
+    }
+  },
+
+  run: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    const agent = raw["agent"]?.trim() || "codex";
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const dispatch = await workflowApi.tasks.dispatchDependencyRun({
+          ...workflowApiProjectMetadata(event, projectId),
+          mode: "task",
+          targetTaskIds: [params.id],
+          traceId: raw["traceId"] ?? undefined,
+          agent,
+          model: raw["model"] ?? undefined,
+          prompt: raw["prompt"] ?? undefined,
+        });
+        return { ok: true, mode: "run", dispatch };
+      }
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, params.id);
+      const dispatch = await dispatchDependencyRunForTasks(em, ctx, {
+        mode: "task",
+        targetTaskIds: [params.id],
+        traceId: raw["traceId"] ?? undefined,
+        agent,
+        model: raw["model"] ?? undefined,
+        prompt: raw["prompt"] ?? undefined,
+      });
+      return { ok: true, mode: "run", dispatch };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "run", message: (err as Error).message });
+    }
+  },
+
+  runFeedback: async (event) => {
+    const { request, params, locals } = event;
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    try {
+      const projectId = locals?.activeProjectId ?? null;
+      const workflowApi = projectId ? createWebWorkflowApiCaller(event) : null;
+      if (workflowApi) {
+        const feedback = await workflowApi.tasks.dependencyRunLiveFeedback({
+          projectId,
+          traceId: raw["traceId"] ?? undefined,
+          runGroupId: raw["runGroupId"] ?? undefined,
+          runId: raw["runId"] ?? undefined,
+          taskId: params.id,
+        });
+        return { ok: true, mode: "runFeedback", feedback };
+      }
+      const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, params.id);
+      const feedback = await loadDependencyRunLiveFeedbackForTasks(em, ctx, {
+        traceId: raw["traceId"] ?? undefined,
+        runGroupId: raw["runGroupId"] ?? undefined,
+        runId: raw["runId"] ?? undefined,
+        taskId: params.id,
+      });
+      return { ok: true, mode: "runFeedback", feedback };
+    } catch (err) {
+      return fail(400, { ok: false, mode: "runFeedback", message: (err as Error).message });
+    }
+  },
+
+  logTime: async (event) => {
+    const { request, params } = event;
+    const fd = await request.formData();
+    const durationMinutes = Number(fd.get("durationMinutes") ?? 0);
+    const loggedDate = String(fd.get("loggedDate") ?? "").trim();
+    const description = String(fd.get("description") ?? "").trim() || null;
+    if (!durationMinutes || durationMinutes < 1 || !loggedDate) {
+      return fail(400, actionFail("Duration and date are required"));
+    }
+    const workflowApi = createWebWorkflowApiCaller(event);
+    await workflowApi.timeEntries.log({
+      taskId: params.id,
+      durationMinutes,
+      loggedDate,
+      description: description ?? undefined,
+    });
+    return actionOk(`Logged ${durationMinutes} min`);
   },
 };

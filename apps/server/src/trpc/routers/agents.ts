@@ -2,17 +2,17 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import type { EntityManager } from "@mikro-orm/postgresql";
+import type { EntityManager } from "typeorm";
 
 import { t } from "../trpc.ts";
 import { publicProcedure } from "../trpc.ts";
 import { permissionedProcedure } from "../middleware.ts";
-import { getProfile, listProfiles } from "@/agents/registry.ts";
-import { AgentProfileSchema } from "@/agents/types.ts";
+import { getProfile, listProfiles } from "@execution-orchestration/application/agent-catalog/registry.ts";
+import { AgentProfileSchema } from "@execution-orchestration/application/agent-catalog/types.ts";
 import {
   getProfile as getStoredAgentProfile,
   testProfileAction,
-} from "@/application/agents/queries.ts";
+} from "@execution-orchestration/application/agents/queries.ts";
 
 // ─── SEC-02: CLI binary allowlist ────────────────────────────────────────────
 // Only binaries registered in the agent profile registry may be spawned.

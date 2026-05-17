@@ -1,13 +1,46 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { verifyBackupArchive } from "@/backup/runner.ts";
-import { dirForLocale, normalizeLocale } from "@/i18n/index.ts";
-import type { NativeKeyringAdapter } from "@/secrets/keyring.ts";
-import { productionAdapterFactory, type NativeAdapterLoader } from "@/secrets/keyring-platform.ts";
+import {
+  createDataPortabilityApiCallerFromEnv,
+  type DataPortabilityApiEnvironment,
+} from "@integration-hub/interface/http/data-portability-api-client.ts";
+import { verifyBackupArchive } from "@platform-core/application/backup/runner.ts";
+import { dirForLocale, normalizeLocale } from "@platform-core/application/localization/index.ts";
+import type { NativeKeyringAdapter } from "@platform-core/application/secrets/keyring.ts";
+import { productionAdapterFactory, type NativeAdapterLoader } from "@platform-core/application/secrets/keyring-platform.ts";
+import {
+  createCredentialApiCallerFromEnv,
+  type CredentialApiEnvironment,
+} from "@platform-core/interface/http/credential-api-client.ts";
+import {
+  createErrorLogApiCallerFromEnv,
+  type ErrorLogApiEnvironment,
+} from "@platform-core/interface/http/error-log-api-client.ts";
+import {
+  createFeatureExperimentApiCallerFromEnv,
+  type FeatureExperimentApiEnvironment,
+} from "@platform-core/interface/http/feature-experiment-api-client.ts";
+import {
+  createThemeSettingsApiCallerFromEnv,
+  type ThemeSettingsApiEnvironment,
+} from "@platform-core/interface/http/theme-settings-api-client.ts";
+import {
+  createTelemetryApiCallerFromEnv,
+  type TelemetryApiEnvironment,
+} from "@platform-core/interface/http/telemetry-api-client.ts";
 
 type Writer = (line: string) => void;
+type CrossCuttingApiEnvironment =
+  & CredentialApiEnvironment
+  & DataPortabilityApiEnvironment
+  & ErrorLogApiEnvironment
+  & FeatureExperimentApiEnvironment
+  & TelemetryApiEnvironment
+  & ThemeSettingsApiEnvironment;
 
 type CliOptions = {
   caller?: Record<string, any>;
+  env?: CrossCuttingApiEnvironment;
+  fetch?: typeof fetch;
   print?: Writer;
   printErr?: Writer;
   exit?: (code: number) => void;
@@ -66,7 +99,8 @@ export async function runTheme(argv: readonly string[], opts: CliOptions = {}): 
   const { print } = io(opts);
   const [sub = "help"] = argv;
   if (sub === "list") {
-    const rows = await opts.caller?.theme.listThemes();
+    const caller = resolveThemeCaller(opts);
+    const rows = await caller!.theme.listThemes();
     const compact = rows.map((row: { key: string; value: string; defaultValue: string }) => ({
       key: row.key,
       value: row.value,
@@ -81,12 +115,24 @@ export async function runTheme(argv: readonly string[], opts: CliOptions = {}): 
     const value = option(argv, "--value");
     if (!key) return fail(opts, "fulcrum theme set: missing required option --key", 2);
     if (!value) return fail(opts, "fulcrum theme set: missing required option --value", 2);
-    const result = await opts.caller?.theme.setTheme({ key, value });
+    const caller = resolveThemeCaller(opts);
+    const result = await caller!.theme.setTheme({ key, value });
     jsonOrText(print, has(argv, "--json"), result, `${result.key}=${result.value}`);
     return;
   }
 
   fail(opts, `fulcrum theme: unknown command '${sub}'`, 2);
+}
+
+function resolveThemeCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.theme) return opts.caller;
+  const apiCaller = createThemeSettingsApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Theme settings API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller;
 }
 
 export async function runI18n(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
@@ -126,7 +172,7 @@ export async function runSecrets(argv: readonly string[], opts: CliOptions = {})
   if (sub === "set") {
     const raw = option(argv, "--value") ??
       await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
-    const result = await opts.caller?.credentials.set({ name, value: raw.replace(/\r?\n$/, "") });
+    const result = await resolveCredentialCaller(opts).credentials.set({ name, value: raw.replace(/\r?\n$/, "") });
     print(JSON.stringify(result));
     return;
   }
@@ -134,14 +180,15 @@ export async function runSecrets(argv: readonly string[], opts: CliOptions = {})
   if (sub === "rotate") {
     const raw = option(argv, "--value") ??
       await (opts.stdin ?? (() => new Response(Bun.stdin.stream()).text()))();
-    const result = await opts.caller?.credentials.rotate({ name, value: raw.replace(/\r?\n$/, "") });
+    const value = raw.replace(/\r?\n$/, "");
+    const result = await resolveCredentialCaller(opts).credentials.rotate({ name, value, newValue: value });
     print(JSON.stringify(result));
     return;
   }
 
   if (sub === "get") {
     if (has(argv, "--unmask")) return fail(opts, "fulcrum secrets get: --unmask requires interactive confirmation", 1);
-    const result = await opts.caller?.credentials.get({ name });
+    const result = await resolveCredentialCaller(opts).credentials.get({ name });
     print(JSON.stringify({
       name: result.name,
       masked_value: result.masked_value ?? "***",
@@ -153,12 +200,23 @@ export async function runSecrets(argv: readonly string[], opts: CliOptions = {})
   fail(opts, `fulcrum secrets: unknown command '${sub}'`, 2);
 }
 
+function resolveCredentialCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.credentials) return opts.caller;
+  const apiCaller = createCredentialApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Credential API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller;
+}
+
 export async function runErrors(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
   if (sub === "list") {
     const sinceValue = option(argv, "--since");
-    const rows = await opts.caller?.errorLogs.list({
+    const rows = await resolveErrorLogCaller(opts).errorLogs.list({
       since: sinceValue ? new Date(`${sinceValue}T00:00:00.000Z`) : undefined,
     });
     jsonOrText(print, has(argv, "--json"), rows, rows.map((row: { id: string; errorMessage: string }) => `${row.id} ${row.errorMessage}`).join("\n"));
@@ -168,13 +226,13 @@ export async function runErrors(argv: readonly string[], opts: CliOptions = {}):
   if (sub === "get") {
     const id = positionals(argv.slice(1))[0];
     if (!id) return fail(opts, "fulcrum errors get: missing required argument <id>", 2);
-    const row = await opts.caller?.errorLogs.get({ id });
+    const row = await resolveErrorLogCaller(opts).errorLogs.get({ id });
     jsonOrText(print, has(argv, "--json"), row, `${row.id} ${row.errorMessage}`);
     return;
   }
 
   if (sub === "purge") {
-    const result = await opts.caller?.errorLogs.clear({});
+    const result = await resolveErrorLogCaller(opts).errorLogs.clear({});
     jsonOrText(print, has(argv, "--json"), result, `deleted=${result.deleted}`);
     return;
   }
@@ -182,12 +240,23 @@ export async function runErrors(argv: readonly string[], opts: CliOptions = {}):
   return fail(opts, `fulcrum errors: unknown command '${sub}'`, 2);
 }
 
+function resolveErrorLogCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.errorLogs) return opts.caller;
+  const apiCaller = createErrorLogApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Error log API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller;
+}
+
 export async function runBackup(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print, printErr } = io(opts);
   const [sub] = argv;
 
   if (sub === "create") {
-    const result = await opts.caller?.backup.create();
+    const result = await resolveDataPortabilityCaller(opts).backup.create();
     jsonOrText(print, has(argv, "--json"), result, `Backup created ${result.path ?? ""}`.trim());
     return;
   }
@@ -195,7 +264,7 @@ export async function runBackup(argv: readonly string[], opts: CliOptions = {}):
   if (sub === "restore") {
     const dump = option(argv, "--dump");
     if (!dump) return fail(opts, "fulcrum backup restore: missing required option --dump", 2);
-    const result = await opts.caller?.backup.restore({ dump, dryRun: has(argv, "--dry-run") });
+    const result = await resolveDataPortabilityCaller(opts).backup.restore({ dump, dryRun: has(argv, "--dry-run") });
     jsonOrText(print, has(argv, "--json"), result, `${result.collisions?.length ?? 0} collisions`);
     return;
   }
@@ -212,7 +281,7 @@ export async function runBackup(argv: readonly string[], opts: CliOptions = {}):
 
   const output = option(argv, "--output");
   if (!output) return fail(opts, "fulcrum backup: missing required option --output", 2);
-  const result = await opts.caller?.backup.create();
+  const result = await resolveDataPortabilityCaller(opts).backup.create();
   const body = Buffer.from(result.dump, "base64").toString("utf8");
   await writeFile(output, body);
   printErr(`${Math.ceil(Buffer.byteLength(body) / 1024)} KB written`);
@@ -227,7 +296,7 @@ export async function runRestore(argv: readonly string[], opts: CliOptions = {})
   const input = option(argv, "--input");
   if (!input) return fail(opts, "fulcrum restore: missing required option --input", 2);
   const dump = opts.readInput ? await opts.readInput(input) : await readFile(input, "utf8");
-  const result = await opts.caller?.backup.restore({ dump, dryRun: has(argv, "--dry-run") });
+  const result = await resolveDataPortabilityCaller(opts).backup.restore({ dump, dryRun: has(argv, "--dry-run") });
   const payload = {
     collisions: result.collisions ?? [],
     entity_counts: result.entity_counts ?? result.entityCounts ?? {},
@@ -235,34 +304,56 @@ export async function runRestore(argv: readonly string[], opts: CliOptions = {})
   jsonOrText(print, has(argv, "--json"), payload, `${payload.collisions.length} collisions`);
 }
 
+function resolveDataPortabilityCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.backup || opts.caller?.dataExport || opts.caller?.dataImport || opts.caller?.jsonImportExport) return opts.caller;
+  const apiCaller = createDataPortabilityApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Data portability API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller;
+}
+
 export async function runTelemetry(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
   const { print } = io(opts);
   const [sub = "help"] = argv;
   if (sub === "status") {
-    const result = await opts.caller?.telemetry.status({});
+    const result = await resolveTelemetryCaller(opts).telemetry.status({});
     jsonOrText(print, has(argv, "--json"), result, `opted_in=${result.opted_in} row_count=${result.row_count}`);
     return;
   }
 
   if (sub === "opt-in") {
-    const result = await opts.caller?.telemetry.optIn({});
+    const result = await resolveTelemetryCaller(opts).telemetry.optIn({});
     jsonOrText(print, has(argv, "--json"), result, "opted in");
     return;
   }
 
   if (sub === "opt-out") {
-    const result = await opts.caller?.telemetry.optOut({});
+    const result = await resolveTelemetryCaller(opts).telemetry.optOut({});
     jsonOrText(print, has(argv, "--json"), result, "opted out");
     return;
   }
 
   if (sub === "purge") {
-    const result = await opts.caller?.telemetry.purge({});
+    const result = await resolveTelemetryCaller(opts).telemetry.purge({});
     jsonOrText(print, has(argv, "--json"), result, `deleted=${result.deleted}`);
     return;
   }
 
   fail(opts, `fulcrum telemetry: unknown command '${sub}'`, 2);
+}
+
+function resolveTelemetryCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.telemetry) return opts.caller;
+  const apiCaller = createTelemetryApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Telemetry API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
+    );
+  }
+  return apiCaller;
 }
 
 export async function runDataExport(argv: readonly string[], opts: CliOptions = {}): Promise<void> {
@@ -271,14 +362,15 @@ export async function runDataExport(argv: readonly string[], opts: CliOptions = 
   if (!output) return fail(opts, "fulcrum export: missing required option --output", 2);
 
   if (format === "csv") {
-    const flags = await opts.caller?.flags.list();
+    const flags = await resolveFeatureFlagCaller(opts).flags.list();
     const enabled = flags.some((flag: { name: string; enabled: boolean }) =>
       flag.name === "import-csv/export-csv" && flag.enabled,
     );
     if (!enabled) return fail(opts, "Feature import-csv/export-csv not enabled", 1);
   }
 
-  const dataExport = opts.caller?.dataExport ?? opts.caller?.jsonImportExport;
+  const dataCaller = resolveDataPortabilityCaller(opts);
+  const dataExport = dataCaller.dataExport ?? dataCaller.jsonImportExport;
   const result = await dataExport.create({
     pretty: true,
     outputPath: output,
@@ -300,7 +392,7 @@ export async function runDataImport(argv: readonly string[], opts: CliOptions = 
   if (sub === "preflight") {
     const path = option(argv, "--path");
     if (!path) return fail(opts, "fulcrum data import preflight: missing required option --path", 2);
-    const result = await opts.caller?.dataImport.preflight({ path });
+    const result = await resolveDataPortabilityCaller(opts).dataImport.preflight({ path });
     jsonOrText(print, has(argv, "--json"), result, `${Object.keys(result.counts ?? {}).length} entity kinds`);
     return;
   }
@@ -308,7 +400,7 @@ export async function runDataImport(argv: readonly string[], opts: CliOptions = 
   if (sub === "run") {
     const importId = option(argv, "--import-id");
     if (!importId) return fail(opts, "fulcrum data import run: missing required option --import-id", 2);
-    const result = await opts.caller?.dataImport.run({
+    const result = await resolveDataPortabilityCaller(opts).dataImport.run({
       importId,
       dryRun: has(argv, "--dry-run"),
       onConflict: option(argv, "--on-conflict"),
@@ -318,6 +410,17 @@ export async function runDataImport(argv: readonly string[], opts: CliOptions = 
   }
 
   fail(opts, `fulcrum data import: unknown command '${sub}'`, 2);
+}
+
+function resolveFeatureFlagCaller(opts: CliOptions): Record<string, any> {
+  if (opts.caller?.flags) return opts.caller;
+  const apiCaller = createFeatureExperimentApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Feature flag API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL before exporting CSV.",
+    );
+  }
+  return apiCaller;
 }
 
 /**

@@ -1,7 +1,6 @@
 import type { PageServerLoad } from "./$types";
-import { listDocs } from "@/application/docs/queries.ts";
 import { buildDocTree, type DocScope, type DocTreeNode } from "$lib/components/docs/doc-tree";
-import { requestAppScope } from "$lib/server/application-scope";
+import { createDocumentApiForEvent } from "$lib/server/document-api";
 
 interface DocRow {
   id: string;
@@ -12,18 +11,31 @@ interface DocRow {
   body_excerpt: string;
 }
 
-function isoStamp(value: Date): string {
-  return value.toISOString();
+interface PublicDocument {
+  id: string;
+  title: string;
+  type?: string;
+  docType?: string;
+  projectId?: string | null;
+  project_id?: string | null;
+  frontmatter?: Record<string, unknown>;
+  bodyMd?: string;
+  body_md?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
-function toDocRow(doc: Awaited<ReturnType<typeof listDocs>>[number], kind: string): DocRow {
+function toDocRow(doc: PublicDocument): DocRow {
+  const frontmatter = doc.frontmatter ?? {};
+  const body = doc.bodyMd ?? doc.body_md ?? "";
+  const kind = typeof frontmatter.kind === "string" ? frontmatter.kind : doc.docType ?? doc.type;
   return {
     id: doc.id,
     title: doc.title,
     kind: kind || "document",
-    project_id: doc.projectId,
-    updated_at: isoStamp(doc.updatedAt),
-    body_excerpt: doc.bodyMd.slice(0, 200),
+    project_id: doc.projectId ?? doc.project_id ?? null,
+    updated_at: doc.updatedAt ?? doc.updated_at ?? "",
+    body_excerpt: body.slice(0, 200),
   };
 }
 
@@ -45,19 +57,20 @@ function loadDocTree(docs: DocRow[], scope: DocScope, activeProjectId: string | 
   );
 }
 
-export const load: PageServerLoad = ({ url, locals }) => {
+export const load: PageServerLoad = ({ url, locals, fetch, request }) => {
   const activeProjectId = locals?.activeProjectId ?? null;
   const kind = url.searchParams.get("kind") ?? "";
   const q = url.searchParams.get("q") ?? "";
   return {
     activeProjectId,
+    orgId: locals?.orgId ?? null,
+    userId: locals?.userId ?? null,
     kind,
     q,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, activeProjectId);
-        const allDocs = await listDocs(em, ctx);
-        let documents = allDocs.map((doc) => toDocRow(doc, kind));
+        const allDocs = await createDocumentApiForEvent({ url, locals, fetch, request }).docs.list();
+        let documents = (allDocs as PublicDocument[]).map((doc) => toDocRow(doc));
         if (kind) documents = documents.filter((doc) => doc.kind === kind);
         if (q.trim()) {
           const needle = q.trim().toLowerCase();

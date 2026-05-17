@@ -17,14 +17,17 @@ export interface I18nCheckResult {
   catalog: string[];
 }
 
-const DEFAULT_ROOTS = ["apps/web/src", "src/i18n"];
-const DEFAULT_CATALOG = "src/i18n/locales/en.json";
+const DEFAULT_ROOTS = ["apps/web/src", "services/platform-core/src/application/localization"];
+const DEFAULT_CATALOG = "services/platform-core/src/application/localization/locales/en.json";
 const SOURCE_EXTENSIONS = new Set([".ts", ".svelte"]);
 
 export async function checkI18nCatalog(input: CheckInput = {}): Promise<I18nCheckResult> {
   const roots = input.roots ?? DEFAULT_ROOTS;
   const catalogPath = input.catalogPath ?? DEFAULT_CATALOG;
-  const localeCatalogPaths = input.localeCatalogPaths ?? ["src/i18n/locales/fr.json", "src/i18n/locales/ar.json"];
+  const localeCatalogPaths = input.localeCatalogPaths ?? [
+    "services/platform-core/src/application/localization/locales/fr.json",
+    "services/platform-core/src/application/localization/locales/ar.json",
+  ];
   const referenced = new Set<string>();
 
   for (const root of roots) {

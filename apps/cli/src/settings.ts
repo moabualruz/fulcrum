@@ -1,6 +1,4 @@
-import type { Container } from "@needle-di/core";
-
-import { createLocalCaller } from "./local-caller.ts";
+import { createSettingsApiCallerFromEnv } from "@platform-core/interface/http/settings-api-client.ts";
 
 type SettingsCaller = {
   settings?: {
@@ -12,7 +10,8 @@ type SettingsCaller = {
 
 export interface SettingsRunOptions {
   caller?: SettingsCaller;
-  container?: Container | null;
+  env?: Record<string, string | undefined>;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -74,7 +73,9 @@ export async function run(argv: readonly string[], opts: SettingsRunOptions = {}
 
 async function resolveCaller(opts: SettingsRunOptions): Promise<SettingsCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({ container: opts.container, requireSession: true }) as unknown as SettingsCaller;
+  const apiCaller = createSettingsApiCallerFromEnv(opts.env, opts.fetch);
+  if (apiCaller) return apiCaller as SettingsCaller;
+  throw new Error("Settings API caller is not configured");
 }
 
 function printValue(value: unknown, argv: readonly string[], print: (line: string) => void): void {

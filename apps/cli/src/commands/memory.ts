@@ -1,8 +1,9 @@
-import { TRPCError } from "@trpc/server";
-import type { Container } from "@needle-di/core";
+import { formatApiError } from "../api-errors.ts";
 
-import { requireCliTuiSessionContext } from "@/application/cli-tui/caller-context.ts";
-import { createLocalCaller } from "../local-caller.ts";
+import {
+  createMemoryApiCallerFromEnv,
+  type MemoryApiEnvironment,
+} from "@knowledge-workspace/interface/http/memory-api-client.ts";
 
 type MemoryRow = Record<string, unknown>;
 
@@ -14,12 +15,14 @@ type MemoryCaller = {
     delete: (input: { id: string }) => Promise<unknown>;
     search: (input: Record<string, unknown>) => Promise<MemoryRow[]>;
     promote: (input: { id: string }) => Promise<MemoryRow>;
+    digest: (input: { projectId: string; since?: string }) => Promise<MemoryRow | null>;
   };
 };
 
 export interface MemoryRunOptions {
   caller?: MemoryCaller;
-  container?: Container | null;
+  env?: MemoryApiEnvironment;
+  fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
@@ -103,47 +106,12 @@ export async function run(
       });
     case "digest":
       return withErrors("digest", runOpts, async () => {
-        const { isDigestEnabled, MemoryDigestJob } = await import("@/memory/digest.ts");
-        if (!isDigestEnabled()) {
-          throw new Error("feature not enabled");
-        }
         const projectId = flagValue(rest, "--project");
         if (!projectId) {
           throw new Error("fulcrum memory digest: missing required --project <id>");
         }
-        const sinceStr = flagValue(rest, "--since");
-        const since = sinceStr ? new Date(sinceStr) : undefined;
-
-        const cliContext = await requireCliTuiSessionContext({
-          container: runOpts.container,
-          missingSessionMessage: "No active CLI session. Run `fulcrum init` or `fulcrum auth login`.",
-        });
-        if (!cliContext.em) {
-          throw new Error("Database not available. Run `fulcrum init` first.");
-        }
-        const socketPath = process.env["FULCRUM_SIDECAR_SOCKET"] ?? "/tmp/fulcrum-sidecar.sock";
-        // Adapt InferenceClient to InferenceClientLike (call method)
-        const client = {
-          async call(method: string, params: unknown) {
-            // JSON-RPC over the sidecar socket
-            const body = JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 });
-            const resp = await fetch("http://localhost/rpc", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body,
-              unix: socketPath,
-            });
-            const json = await resp.json() as { result?: unknown; error?: { message: string } };
-            if (json.error) throw new Error(json.error.message);
-            return json.result;
-          },
-        };
-        const job = new MemoryDigestJob(cliContext.em, client, printErr);
-        const result = await job.run(
-          cliContext.orgId,
-          projectId,
-          since,
-        );
+        const caller = await resolveCaller(runOpts);
+        const result = await caller.memories.digest({ projectId, since: flagValue(rest, "--since") });
         if (!result) {
           print("No memories in window to digest.");
           return;
@@ -264,9 +232,7 @@ async function withErrors(
   try {
     await fn();
   } catch (err) {
-    const msg = err instanceof TRPCError
-      ? `${err.code}: ${err.message}`
-      : (err as Error).message;
+    const msg = formatApiError(err);
     opts.printErr(`fulcrum memory ${command}: ${msg}`);
     opts.exit(1);
   }
@@ -274,8 +240,33 @@ async function withErrors(
 
 async function resolveCaller(opts: MemoryRunOptions): Promise<MemoryCaller> {
   if (opts.caller) return opts.caller;
-  return await createLocalCaller({
-    container: opts.container,
-    requireSession: true,
-  }) as unknown as MemoryCaller;
+  const apiCaller = createMemoryApiCallerFromEnv(opts.env, opts.fetch);
+  if (!apiCaller) {
+    throw new Error(
+      "Memory API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL and FULCRUM_API_TOKEN or FULCRUM_PUBLIC_API_TOKEN.",
+    );
+  }
+  return {
+    memories: {
+      list: async (input = {}) => await apiCaller.memories.list(input) as MemoryRow[],
+      get: async (input) => await apiCaller.memories.get(input) as MemoryRow,
+      create: async (input) => await apiCaller.memories.create(input) as MemoryRow,
+      delete: async (input) => await apiCaller.memories.delete(input),
+      search: async (input) => await apiCaller.memories.search(memorySearchInput(input)) as MemoryRow[],
+      promote: async (input) => await apiCaller.memories.promote(input) as MemoryRow,
+      digest: async (input) => await apiCaller.memories.digest(input) as MemoryRow | null,
+    },
+  };
+}
+
+function memorySearchInput(input: Record<string, unknown>): Record<string, unknown> & { query: string } {
+  const query = input.query ?? input.term;
+  if (typeof query !== "string" || query.length === 0) {
+    throw new Error("Memory search query is required.");
+  }
+  return {
+    ...input,
+    query,
+    limit: input.limit ?? input.topK,
+  };
 }

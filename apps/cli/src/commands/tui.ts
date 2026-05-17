@@ -12,11 +12,9 @@
  *   --no-tui     Flag respected by convention; suppresses TUI mode (no-op here,
  *                for use by other commands to detect if TUI is disabled).
  *
- * Design: thin wrapper — builds the in-process tRPC caller, wires real stdin,
- * and delegates to TuiApp. Separated from TuiApp so tests can import TuiApp
- * directly without triggering real stdin/stdout setup.
- *
- * P1#15: C4 (three surfaces), C8 (in-process tRPC, needle-di container).
+ * Design: thin wrapper — builds the TUI caller, wires real stdin, and delegates
+ * to TuiApp. Separated from TuiApp so tests can import TuiApp directly without
+ * triggering real stdin/stdout setup.
  */
 
 const HELP = `fulcrum tui
@@ -47,8 +45,6 @@ export interface TuiRunOptions {
   /** stdout writer for messages before TUI starts (default: console.log). */
   print?: (line: string) => void;
 
-  /** needle-di Container — passed to buildCaller when provided. */
-  container?: import("@needle-di/core").Container | null;
 }
 
 export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Promise<void> {
@@ -75,10 +71,9 @@ export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Pr
     return;
   }
 
-  const container = opts.container ?? null;
   const [caller, telemetry] = await Promise.all([
-    buildCaller(container),
-    buildTelemetrySink(container),
+    buildCaller(),
+    buildTelemetrySink(),
   ]);
 
   // Wire real stdin for keypress events

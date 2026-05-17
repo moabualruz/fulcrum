@@ -111,11 +111,10 @@ Rule of thumb: **PreToolUse for prevention, PostToolUse for reaction, SessionSta
 
 ## 5. Recipe library
 
-Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config **only for agents whose root dirs exist on disk** (detection-aware default), records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Pass `--all` to write configs for all 5 supported agents regardless of whether their dirs exist (useful for cross-machine dotfiles setup). Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker, also detection-aware by default (`--all` to target all). Implementation in `src/hooks/<name>.ts`; this section explains *what each does and when to use.*
+Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `fulcrum hooks enable <name>` — writes native hook config **only for agents whose root dirs exist on disk** (detection-aware default), records intent at `~/.fulcrum/hooks/enabled/<name>`, and prints the per-agent snippet for review. Pass `--all` to write configs for all 5 supported agents regardless of whether their dirs exist (useful for cross-machine dotfiles setup). Disable: `fulcrum hooks disable <name>` — removes Fulcrum-managed native registrations and the marker, also detection-aware by default (`--all` to target all). Implementation in `services/platform-core/src/application/agent-hooks/<name>.ts`; this section explains *what each does and when to use.*
 
 | Recipe | Lifecycle | Purpose | Blocks? |
 |---|---|---|---|
-| `index-check` | SessionStart-equivalent | Warn if `tags` / `graphify-out/` stale or missing. | no |
 | `format` | PostToolUse `Write\|Edit` | Run language-appropriate formatter on just-edited file (ruff / biome / prettier / gofmt / rustfmt / google-java-format / ktlint / dart format). Fail-open. | no |
 | `lint-gate` | PostToolUse `Write\|Edit` | Block next turn if `ruff check` / `biome check` / `golangci-lint run` reports violations on edited file. Stderr feeds back. | yes (exit 2) |
 | `pm-policy` | PreToolUse `Bash` | Refuse `npm`/`yarn` when repo declares pnpm; refuse `npm` when bun declared. Detects `pnpm-lock.yaml` / `bun.lock(b)` / `yarn.lock`. | yes (exit 2) |
@@ -124,7 +123,6 @@ Every recipe = subcommand of `fulcrum` binary: `fulcrum hook <name>`. Enable: `f
 | `tool-output-router` | PostToolUse (any) | Per-tool output handling. Reads `~/.fulcrum/tool-output-policy.toml`, applies tier (raw / status-only / summary+head / summary+file / file-only / leave-as-is). Default: leave-as-is. See [tool-output-policy.md](tool-output-policy.md). | no |
 
 ### 5.1 Index maintenance — `index-check` + `index-rebuild`
-
 
 ### 5.2 Editor productivity — `format` + `lint-gate`
 

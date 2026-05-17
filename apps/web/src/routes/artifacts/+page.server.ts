@@ -1,8 +1,8 @@
 import type { PageServerLoad } from "./$types";
-import { listArtifactRows } from "@/application/artifacts/queries.ts";
-import { requestAppScope } from "$lib/server/application-scope";
+import { createArtifactApiForEvent, type PublicArtifact, toArtifactRow } from "$lib/server/artifact-api";
 
-export const load: PageServerLoad = ({ url, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { url, locals } = event;
   const mime = (url.searchParams.get("mime") ?? "").trim();
   const kind = (url.searchParams.get("kind") ?? "").trim();
   const archived = url.searchParams.get("archived") ?? "";
@@ -14,14 +14,13 @@ export const load: PageServerLoad = ({ url, locals }) => {
     filter: { mime, kind, project: projectRaw ?? "", archived },
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestAppScope(locals, locals?.activeProjectId ?? null);
-        const artifacts = await listArtifactRows(em, ctx, {
+        const artifacts = await createArtifactApiForEvent(event).artifacts.list({
           mime: mime || null,
           kind: kind || null,
           projectId: projectRaw,
-          includeArchived: archived === "true",
-        });
-        return { artifacts };
+          archived: archived === "true" ? undefined : false,
+        }) as PublicArtifact[];
+        return { artifacts: artifacts.map(toArtifactRow) };
       })(),
     },
   };

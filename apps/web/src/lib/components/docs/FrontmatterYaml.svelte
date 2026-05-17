@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { DocType } from "@/domain/docs/enums.ts";
+	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import { cn } from "$lib/utils.js";
 	import {
 		dumpFrontmatterYaml,

@@ -11,8 +11,8 @@ import {
   publish,
   verify,
   install,
-} from "@/marketplace/procedures.ts";
-import { FeatureDisabledError, SignatureVerificationError } from "@/marketplace/types.ts";
+} from "@platform-core/application/skill-supply/marketplace/procedures.ts";
+import { FeatureDisabledError, SignatureVerificationError } from "@platform-core/application/skill-supply/marketplace/types.ts";
 
 function parseKV(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};

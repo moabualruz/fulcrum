@@ -3,18 +3,18 @@
 // policy file location + size, skill count, managed MCPs.
 
 import { stat, readdir } from "node:fs/promises";
-import { which, exists } from "@/utils/proc.ts";
-import { AGENTS } from "@/agents/registry.ts";
-import { ALL_COMPONENTS } from "@/components/catalog.ts";
-import { ComponentLedger, dbPath as componentLedgerPath } from "@/components/ledger.ts";
+import { which, exists } from "@platform-core/application/runtime-support/process-runner.ts";
+import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
+import { ALL_COMPONENTS } from "@platform-core/application/component-lifecycle/catalog.ts";
+import { ComponentLedger, dbPath as componentLedgerPath } from "@platform-core/application/component-lifecycle/ledger.ts";
 import { loadRegistry, ALL_AGENT_IDS, isEnabled, type AgentId } from "./mcp-registry.ts";
 import { MINIMAL_DEFAULT_MCPS } from "./mcp-builtins.ts";
 import { scanSkillBudgets, type SkillBudgetReport } from "./skill-budget.ts";
 import { auditPackageParity, type PackageParityReport } from "./package-parity.ts";
 import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
-import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@/platform/doctor-checks.ts";
-import { listProfiles } from "@/agents/registry.ts";
+import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@platform-core/application/platform-operations/readiness-checks.ts";
+import { listProfiles } from "@execution-orchestration/interface/agent-catalog.ts";
 import {
   buildMemoryEngineDoctorReport,
   buildProductKernelDoctorReport,
@@ -22,7 +22,7 @@ import {
   type MemoryDoctorReport,
   type ProductKernelDoctorReport,
   type ReposDoctorReport,
-} from "@/infrastructure/doctor/legacy-db.ts";
+} from "@platform-core/infrastructure/doctor/product-store-report.ts";
 
 interface ToolCheck {
   cmd: string;
@@ -129,7 +129,6 @@ const TOOLS: ToolCheck[] = [
   // git is treated as optional: index-rebuild fail-opens via a "no-git" SHA fallback.
   { cmd: "git",                    usedBy: "index-rebuild (HEAD diff; rebuilds every session without git)", required: false },
   { cmd: "ctags",                  usedBy: "index-rebuild + index-check",            required: false },
-  { cmd: "graphify",               usedBy: "index-rebuild + index-check",            required: false },
 
   // Format / lint hooks (per-language).
   { cmd: "biome",                  usedBy: "format/lint-gate (ts/js/json/md)",       required: false },
@@ -916,7 +915,7 @@ export async function run(args: string[]): Promise<void> {
   // When --subsystem is given, delegate entirely to the modular orchestrator.
   if (subsystem) {
     if (subsystem === "api") {
-      const { buildDefaultApiDoctorConfig, runApiDoctorChecks } = await import("@/doctor/checks/api.ts");
+      const { buildDefaultApiDoctorConfig, runApiDoctorChecks } = await import("@platform-core/application/health-checks/checks/api.ts");
       const apiReport = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
       if (isJsonOutput) {
         console.log(JSON.stringify(apiReport, null, 2));
@@ -929,7 +928,7 @@ export async function run(args: string[]): Promise<void> {
       if (apiReport.summary.fail > 0) process.exit(1);
       return;
     }
-    const { runOrchestrator } = await import("@/doctor/index.ts");
+    const { runOrchestrator } = await import("@platform-core/application/health-checks/index.ts");
     await runOrchestrator(args);
     return;
   }
@@ -938,9 +937,9 @@ export async function run(args: string[]): Promise<void> {
 
   // Default JSON gets a lightweight orchestration section; --checks runs the full modular doctor.
   const runOrchestratorChecks = args.includes("--checks");
-  let orchestratorReport: import("@/doctor/index.ts").DoctorReport | LightweightOrchestrationReport | undefined;
+  let orchestratorReport: import("@platform-core/application/health-checks/index.ts").DoctorReport | LightweightOrchestrationReport | undefined;
   if (runOrchestratorChecks) {
-    const { buildDoctorReport } = await import("@/doctor/index.ts");
+    const { buildDoctorReport } = await import("@platform-core/application/health-checks/index.ts");
     orchestratorReport = await buildDoctorReport();
     (report as unknown as Record<string, unknown>)["orchestrator"] = orchestratorReport;
     (report as unknown as Record<string, unknown>)["orchestration"] = orchestratorReport;
@@ -957,9 +956,9 @@ export async function run(args: string[]): Promise<void> {
 
     // Print orchestrator checks in interactive mode.
     if (runOrchestratorChecks && orchestratorReport && orchestratorReport.checks.length > 0) {
-      const { printInteractiveReport } = await import("@/doctor/output.ts");
+      const { printInteractiveReport } = await import("@platform-core/application/health-checks/output.ts");
       console.log();
-      printInteractiveReport(orchestratorReport as import("@/doctor/index.ts").DoctorReport);
+      printInteractiveReport(orchestratorReport as import("@platform-core/application/health-checks/index.ts").DoctorReport);
     }
   }
 

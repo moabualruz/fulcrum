@@ -6,6 +6,7 @@ import * as v from "valibot";
  * here is a valid active-project cookie value.
  */
 export const ProjectFormSchema = v.object({
+  kind: v.optional(v.picklist(["workspace", "project", "subproject"])),
   name: v.pipe(
     v.string(),
     v.trim(),
