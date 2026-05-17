@@ -1,8 +1,0 @@
-{
-  "workflow": {
-    "plan_review_convergence": false
-  },
-  "graphify": {
-    "enabled": true
-  }
-}

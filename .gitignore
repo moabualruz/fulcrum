@@ -1,5 +1,9 @@
 .claude/
 .sandcastle/
+.scratch/
+.planning/
+.tmp-pruner-test/
+vendor/
 node_modules/
 dist/
 *.tsbuildinfo

@@ -15,6 +15,18 @@
 7. **Names describe responsibility / value / behavior.** Never phase numbers, never `new flow`, never `revamped` or `improved`.
 8. **First-person plural is banned.** Never "We couldn't…". Use "Fulcrum couldn't…" or third-person.
 9. **Buttons are imperative verbs.** "Create project", "Approve plan", not "Click here" or "Get started".
+10. **Say "AI Assist", not "ACP" or "chat".** "ACP" is a transport protocol and must never leak into the chrome. The drawer is **AI Assist**; the right-most footer segment is **AI Assist**; the slash-command equivalent in CLI is `fulcrum ai`. Inside an agent picker, the per-agent client kind is shown as plain metadata (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`, `custom`) but never as the primary affordance label.
+11. **Top-right system icons get human-language tooltips.** Not "Bell" but "Notifications · 3 unread". Not "Cog" but "Display, density, mode, theme". Not "?" alone but "Keyboard shortcuts · ?". Not "mk" but "Account · sign out, switch workspace".
+
+### Top-right icon tooltips (canonical)
+
+| Trigger      | Tooltip                                  | Opens                                          |
+| ------------ | ---------------------------------------- | ---------------------------------------------- |
+| `search`     | `Command palette · ⌘K`                   | ⌘K palette overlay                             |
+| `bell`       | `Notifications · N unread`               | Notifications popover (tabbed: All / Mentions / Runs / Ship) |
+| `settings`   | `Display, density, mode, theme`          | Display popover (Theme / Density / Mode / Motion / Sidebar) |
+| `?`          | `Keyboard shortcuts · ?`                 | Keyboard cheatsheet overlay                    |
+| avatar (`mk`)| `Account · sign out, switch workspace`   | Account popover (workspaces · API keys · CLI agents · MCP · Plugins · Docs · Sign out) |
 
 ---
 
@@ -128,7 +140,7 @@ One sentence naming the next workflow action.
 >
 > [ View transcript ]   [ Retry from step ]   trace=4f3a1c9e…
 
-**Permission denied during ACP tool call:**
+**Permission denied during agent tool call:**
 > Agent `claude` asked for permission to run `rm -rf node_modules`. You denied.
 >
 > [ Allow once ]   [ Allow always ]   [ Cancel run ]
@@ -186,33 +198,48 @@ One sentence naming the next workflow action.
 
 ### ▶ Play picker popover
 
-```
-Run with agent
-[ claude     ▾]   default
-Model
-[ opus-4-7   ▾]
-Policy
-( ) review each tool   ( ) auto-approve safe   ( ) full access (danger)
-Initial prompt (optional)
-[                                                                  ]
+The picker is dynamic — it lists every CLI agent the user has configured, with the default-routed agent for this action kind marked. There is no separate "model" line because the agent registry already pairs each agent with its model.
 
-[ Cancel ]                                                  [ ▶ Run ]
 ```
+Run with                                  · default for build.run.step
+
+[CL] Claude Opus 4.7      claude-code · 142ms       ⌘1
+[CL] Claude Sonnet 4.6    claude-code · 88ms        ⌘2        ← default for this action kind
+[GP] GPT-5.4              codex · 210ms             ⌘3
+[GE] Gemini 3 Pro         gemini-cli · 124ms        ⌘4
+[OC] OpenCode · Llama-3   opencode · 305ms
+[CX] Codex · GPT-4o       codex · 540ms · degraded
++ Pick another agent…                                          ← jumps to Settings > AI agents
+
+Policy
+( ) Ask on write   ( ) Auto   ( ) Read-only
+
+[ ▶ Play ↵ ]   [ 💾 Preset ]   [ ⇄ Set default route ]
+```
+
+Copy rules:
+- Never say "model"; the agent's name carries the model. Never say "ACP"; say "AI Assist" or the client kind (`claude-code` / `codex` / `gemini-cli` / `opencode` / `pi-cli`).
+- The default-routed agent for this action kind is marked but not pre-selected; user always confirms with `↵`.
+- `+ Pick another agent…` is link-styled (accent color) and routes to `settings.html#agents`.
+- `⇄ Set default route` opens `settings.html#routes` for the current action kind.
 
 ### 💬 Discuss thread header
 
 ```
 💬 Discuss this <step type>
-agent: claude    trace 4f3a1c9e…
+agent: [CL Claude Opus 4.7 ▾]    trace tr_8f29a4c1…
 
 This thread is anchored to <step title>.
 ```
 
-### ACP drawer header
+### AI Assist drawer header (formerly "ACP drawer header")
 
 ```
-⊞ Step: <step title>     agent: [claude ▾]     trace 4f3a1c9e…
+✨ AI chat     [CL Claude Opus 4.7 ▾]     ⛶ ✕
+@ scope: <step title>                trace tr_8f29a4c1…
 ```
+
+The agent picker in the drawer header opens a full-panel agent registry inline (filter input, every configured agent with status + latency + MCP + plugin counts + ring badge, `+ Add CLI agent` shortcut, footer link to `settings.html#agents`). Switching agents mid-thread keeps history per agent — one tab per agent.
 
 ### Coachmark on first ▶ Play (one-time)
 

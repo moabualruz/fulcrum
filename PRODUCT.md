@@ -115,14 +115,64 @@ Workflow-stage primary navigation:
 
 **Prototyping lives inside Plan, not separately.** Planning produces three artifacts: a written plan, one or more prototype callouts (file paths + sketches + interactive demos), and a task breakdown. The plan review surface must show all three side-by-side; the user reviews and approves them as one unit before materializing tasks.
 
-### Cross-cutting affordance: ACP chat panel
+### Cross-cutting affordance: AI Assist drawer (formerly "ACP chat panel")
 
-A right-side drawer is pullable from any screen. Pulled out, it docks the live ACP session pane scoped to the current step (Capture: doc; Plan: planning session; Build: task or run; Review: review item; Ship: artifact; Operate: subsystem). The user types directly to an agent; the agent reads the active step's context (project + trace + scope), executes, and streams output. Closing the drawer pauses but does not abort the session. Reopening resumes. Trace ID is shared with whatever surface is open.
+A right-side drawer slides over (Cloudflare-style overlay, not push) from any screen via the **AI Assist** segment in the status footer — always the right-most footer segment on every surface — or via `⌘/`. Pulled out, it docks the live agent session scoped to the current step (Capture: doc; Plan: planning session; Build: task or run; Review: review item; Ship: artifact; Operate: subsystem). The user types directly to an agent; the agent reads the active step's context (project + trace + scope), executes, and streams output. Closing the drawer pauses but does not abort the session. Reopening resumes. Trace ID is shared with whatever surface is open.
 
-The drawer width is user-adjustable. On mobile the drawer becomes a bottom sheet. CLI/TUI equivalents:
+The drawer width is user-adjustable. On mobile the drawer becomes a bottom sheet, reachable from the bottom-tab-bar AI Assist tab. CLI/TUI equivalents:
 
-- **CLI:** `fulcrum chat --step <step-id>` opens an inline ACP session in the terminal, scoped to the same step.
-- **TUI:** `c` on any screen toggles the right-side chat pane; same scope rule.
+- **CLI:** `fulcrum ai --step <step-id>` opens an inline session in the terminal, scoped to the same step.
+- **TUI:** `⌘/` on any screen toggles the right-side AI pane; same scope rule.
+
+**Why "AI Assist" and not "ACP"**: ACP is a transport protocol (Agent Client Protocol). It is *one* way Fulcrum talks to a locally-running CLI agent; in the future Fulcrum may also speak directly to hosted APIs (a user-configured Anthropic / OpenAI key), reach out over SSH to a remote machine running an agent, or attach to a sandboxed cloud runner. All of those flow through the same UI affordance. Users should never read protocol names in the chrome — they should just see "AI Assist" everywhere and pick which configured agent runs their request.
+
+#### Multi-CLI agent model (unlimited clients)
+
+The user can configure any number of CLI agent clients — Claude Code, Codex, Gemini CLI, OpenCode, pi-cli, or any future client that speaks an agent protocol. There is **no cap**. Each configured agent has:
+
+- a stable id (e.g. `claude-opus-4.7`, `gpt-5.4`, `gemini-3-pro`, `opencode-llama-3`, `pi-cli-mistral`)
+- a client kind (`claude-code` · `codex` · `gemini-cli` · `opencode` · `pi-cli` · `custom`)
+- a runtime status (`ready` · `degraded` · `paused`)
+- a ring (`preferred` · `stable` · `experimental`)
+- its **own MCP server set** (configured per agent — see below)
+- its **own plugin set** (configured per agent)
+- its own tool-permission policy and rate-limit budget
+
+In every place a user runs an action — `▶ Play` on a step, **AI Assist** drawer, ⌘K palette `Play current step`, CLI `fulcrum run --step …` — they get an agent picker. The picker:
+
+1. Shows the **default-routed** agent for that action kind first.
+2. Lets the user override to any other configured agent in one click.
+3. Offers `Set as default route for this action kind` so the override sticks.
+4. Offers `+ Add CLI agent` to configure another client without leaving the picker.
+
+#### Default routes (per-action agent assignment)
+
+A `routes` table in Settings maps an action kind to a preferred agent. Out-of-the-box defaults:
+
+| Action kind         | Default agent              | Note                 |
+| ------------------- | -------------------------- | -------------------- |
+| `plan.draft`        | Claude Opus 4.7            | high-context planning |
+| `plan.refactor`     | Claude Opus 4.7            |                      |
+| `build.run.step`    | Claude Sonnet 4.6          | fast iteration       |
+| `build.test.write`  | GPT-5.4                    |                      |
+| `review.suggest`    | Gemini 3 Pro               | second opinion       |
+| `ship.changelog`    | Claude Sonnet 4.6          |                      |
+| `operate.probe`     | OpenCode (local-only)      | no cloud calls       |
+
+Every route is overridable per action. Each rule has an `Allow inline override` toggle (on by default); turning it off forces the route and removes the picker from that action's mode popover.
+
+#### Per-agent MCP servers and plugins
+
+MCP servers and plugins are configured **per CLI agent** — not globally. The Operate → MCP servers and Operate → Plugins surfaces show a scope chip at the top: `Claude Opus 4.7 · Sonnet 4.6 · GPT-5.4 · Gemini 3 · OpenCode · pi-cli · Codex`. Switching the scope filters the table to that agent's installed set. The user can:
+
+- install a server / plugin into a single agent
+- uninstall it
+- pin it to a specific ring
+- override its tool permissions for that agent
+
+A `Install across all agents` action is reserved for a future release; until then the design must make per-agent scoping explicit (chip selector, copy on the page, badge on rows) so users never confuse one agent's plugin set for another's.
+
+**SaaS-future-proofing**: when Fulcrum eventually offers a cloud tier, the same UI vocabulary applies — instead of (or in addition to) local CLI clients, the user can register cloud API keys (Anthropic, OpenAI, …) and SSH-attached remote runners. Each becomes another agent entry in the registry. The chrome never says "ACP" or "API key" or "SSH agent" — it says **AI Assist** and **agent**, and the agent's metadata reveals its underlying client kind.
 
 Portfolio surfaces (workspace-wide, cross-project, accessible from a separate scope switcher):
 
@@ -256,20 +306,26 @@ Six stages. Each has a primary question, default landing surface, key sub-views,
 
 ## Scope Chrome — Persistent Top Bar
 
-Every primary surface, every breakpoint, shows the scope chrome at the top. 32px desktop / 40px mobile.
+Every primary surface, every breakpoint, shows the scope chrome at the top. **48px desktop / 56px mobile** (lifted from the original 32/40 spec — small chrome read as outdated on modern displays, Linear / Vercel / GitHub now sit at ~48px).
 
 Layout left-to-right:
 
-1. **Workspace switcher chip.** Click → full-screen scope picker (recent + search + portfolio toggle).
-2. **Project path.** `workspace › project › subproject (›…› current-subproject)`. Truncated middle, never truncated head or tail.
-3. **Stage tab strip.** `Capture · Plan · Build · Review · Ship · Operate` — active stage underlined w/ accent. Keyboard: `g c / g p / g b / g r / g s / g o`.
-4. **Active scope summary.** Cycle name + status if any.
-5. **Trace ID badge.** Copyable pill, 24×16, mono font, click-to-copy + ⌘C shortcut, links to audit on click-through.
-6. **Drawer toggle.** ⊞ pull tab for ACP chat drawer. `⌘/` keyboard.
-7. **Command palette trigger.** ⌘K.
-8. **Profile / theme / notifications.** Bell + avatar.
+1. **Brand mark + name.** `Fulcrum` wordmark, click → workspace home.
+2. **Workspace switcher.** Folder icon + `mkh / fulcrum` + chevron. Click → workspace popover (current + other workspaces + `+ New workspace`). Pro-mode shows the current branch as a `path` chip after the switcher.
+3. **Stage tab strip.** `Capture · Plan · Build · Review · Ship · Operate` segmented control — active stage has accent indicator + inset shadow. Keyboard: `g c / g p / g b / g r / g s / g o`. Per-tab `key` hint pill (`g c` etc) is pro-only.
+4. **Spacer.** Pushes the right cluster to the right edge.
+5. **Trace ID badge.** Copyable pill, mono font, `git-commit` icon + 10-char prefix + ellipsis + copy icon. Click-to-copy with flash feedback. Pro-only.
+6. **Right-cluster icons** — every one is a real button with a labelled popover or destination (no decorative chrome):
+   - **Command palette** (`search` icon) → opens ⌘K palette. Pro-only.
+   - **Notifications** (`bell` icon, with red dot when unread) → opens **Notifications popover**: tabbed (All · Mentions · Runs · Ship), each row shows status icon (PR / warn / rocket / etc.), one-line summary, meta line (trace + age + scope), snooze button. Mark-all-read + settings shortcut + "View all" link.
+   - **Display settings** (`settings` icon) → opens **Display popover**: segmented controls for Theme (Auto · Light · Dark), Density (Compact · Cozy · Comfortable), Mode (Simple · Pro), Motion (Full · Reduced), Sidebar (Expanded · Icons only). "Open all settings →" link to the full Settings page.
+   - **Keyboard help** (`?` icon) → opens the keyboard cheatsheet overlay. Pro-only.
+   - **Account avatar** → opens **Account popover**: current workspace + other workspaces + `+ New workspace`, then `Account & profile`, `API keys & tokens`, `CLI agents` (with count), `MCP servers`, `Plugins`, `Docs`, `Send feedback`, `Sign out` (danger color).
+7. **AI Assist is NOT in the scope chrome.** It lives in the status footer as the right-most segment (so it stays one click away from anywhere, in line with the other status indicators rather than competing with system icons for visual weight). Keyboard `⌘/` opens the drawer from anywhere.
 
-Mobile: collapses to project chip + active-stage chip + drawer pull-handle on the right edge. Trace ID accessible via swipe-down quick panel.
+Each right-cluster button has a tooltip on hover; tooltips state what the button does in human language (not just the icon name). Popovers position below their trigger, slide-in animation, click-outside or `Esc` to close. Triggers expose `aria-expanded="true"` while their popover is open.
+
+Mobile: collapses to brand + workspace + active-stage chip + notifications + account on the right edge. AI Assist becomes the right-most **tab** in the bottom tab bar. Trace ID accessible via swipe-down quick panel.
 
 ---
 
@@ -302,16 +358,17 @@ Keyboard parity:
 
 ## Agent Identity Model
 
-Agents are first-class workspace members. Five default agent identities ship with Fulcrum: **codex**, **claude**, **gemini**, **opencode**, **pi**. Operators can register custom agents with their own identity + model + policy.
+Agents are first-class workspace members. Fulcrum ships with seven default agent identities — `claude-opus-4.7`, `claude-sonnet-4.6`, `gpt-5.4`, `gemini-3-pro`, `opencode-llama-3`, `pi-cli-mistral`, `codex-gpt-4o` — covering five default CLI client kinds (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`). Operators can register any number of additional agents — there is **no cap** — with their own id, name, client kind, model, policy, MCP set, and plugin set.
 
 - An agent appears in every assignee picker, every mention picker, every approval-gate selector — identical UI affordance as a human user.
-- Mentions: `@claude` resolves to the agent identity in the workspace. Mentioning triggers an agent reply via ACP.
-- Agent runs are persisted with `(agent_id, model, policy, trace_id, run_id, started_at, finished_at, cost_tokens, status)`.
+- Mentions: `@claude-opus-4.7` resolves to that specific agent identity in the workspace. Mentioning triggers an agent reply via its configured client (ACP, hosted API, SSH-attached runner, …).
+- Agent runs are persisted with `(agent_id, client_kind, model, policy, trace_id, run_id, started_at, finished_at, cost_tokens, status)`.
 - Assignment: when a step is assigned to an agent, the human stays primary owner; the agent is added as contributor. ([Linear Agents model, adopted.](https://linear.app/agents))
 - Audit log records every agent action with the same trace ID as a human action; no separate audit feed.
 - Policy: each agent has a policy (`auto_approve_safe`, `review_each_tool`, `danger_zone`). Policy is set at workspace, overridable at project, overridable per run.
+- **MCP servers and plugins are configured per agent**, not globally. Switching the scope on Operate → MCP / Plugins shows that agent's installed set. (See `### Cross-cutting affordance: AI Assist drawer` for the full multi-CLI model.)
 
-The right-side ACP chat drawer auto-resolves which agent to talk to based on the active step's assignment. Operator can switch agent via the drawer header dropdown without losing thread history (each agent gets its own tab in the drawer).
+The right-side **AI Assist** drawer auto-resolves which agent to talk to based on the active step's assigned agent or the default-route rule for the current action kind. The drawer's header picker lists every configured agent (with status dot, client kind, latency, MCP count, plugin count, ring badge) and offers `+ Add CLI agent` inline. Switching agents mid-thread does not lose history — each agent gets its own tab in the drawer.
 
 ---
 

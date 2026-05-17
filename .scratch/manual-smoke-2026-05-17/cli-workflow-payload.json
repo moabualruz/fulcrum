@@ -1,9 +1,0 @@
-{
-  "workspace": { "id": "00000000-0000-0000-0000-000000000001", "slug": "local", "name": "Local" },
-  "project": { "id": "project-cli-smoke-mp9mwwsq", "slug": "cli-smoke-mp9mwwsq", "name": "CLI Smoke Workflow", "traceId": "trace-cli-smoke-mp9mwwsq" },
-  "freeform": { "documentId": "doc-cli-smoke-mp9mwwsq", "title": "CLI smoke workflow", "bodyMd": "CLI freeform docs feed ACP planning, prototype review, dependency execution, QA, UAT/code review, and generated E2E coverage.", "userPrompt": "Turn this into a technical plan with prototype and task success criteria." },
-  "guidedPlanning": { "acpSessionId": "acp-cli-smoke-mp9mwwsq", "agentName": "codex", "cwd": "/Users/mkh/workspace/fulcrum", "modeId": "planning", "modelId": "gpt-5.4", "permissionMode": "review_each_tool" },
-  "approvedPlan": { "planId": "plan-cli-smoke-mp9mwwsq", "reviewId": "review-cli-smoke-mp9mwwsq", "markdown": "# CLI Smoke Workflow\n\n## Tasks\n- [context] Preserve CLI freeform context\n  Depends on: none\n- [planning] Build CLI planning handoff\n  Depends on: context\n- [execution] Execute CLI dependency-aware task run\n  Depends on: planning\n- [verify-end-to-end] Prove CLI final UI/API path\n  Depends on: execution\n\n## Prototype / Boilerplate\n- [prototype] apps/web/src/routes/planning/+page.svelte\n\n## Success Criteria\n- CLI request persists freeform docs.\n- CLI request creates ACP planning traffic.\n- CLI request generates real-data E2E coverage." },
-  "execution": { "agent": "codex", "model": "gpt-5.4", "prompt": "Run CLI dependency tree and report success criteria.", "lifecycleSummary": "CLI workflow completed with accepted evidence.", "qaReviewText": "## QA Review\n### Verdict: APPROVE\nSuccess criteria satisfied and no feedback remains." },
-  "uat": { "decision": "approve_without_manual_review", "reviewType": "uat", "e2eRunner": "bun" }
-}

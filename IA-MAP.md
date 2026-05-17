@@ -145,7 +145,7 @@ URL invariants:
 
 | Surface | Route | Default view | Per-step mode |
 |---|---|---|---|
-| Freeform editor | `/.../capture/<docId>` | Blank canvas, slash menu | manual / Play / Discuss / ACP |
+| Freeform editor | `/.../capture/<docId>` | Blank canvas, slash menu | manual / Play / Discuss / AI Assist |
 | Docs tree | `/.../capture` (left rail) | Lazy expansion, drag reorder (Docmost shape) | n/a |
 | Intake queue | `/.../capture/inbox` | Single column, snooze/accept/decline | Plane intake (modified) |
 | Templates | inline | Note, Doc, Decision, Bug, Question, Intake | n/a |
@@ -220,8 +220,8 @@ Plan-share zero-knowledge URL hash sharing (AES-256-GCM, 7-day TTL) from Plannot
 ## 3. Sidebar IA (exact)
 
 ```
-SCOPE BAR (32px)
-  [workspace ▾]  /  project/subpath ›  [stage tabs]  [trace 4f3a1c9e]  ⊞  ⌘K  🔔  avatar
+SCOPE BAR (48px)
+  Fulcrum · [mkh / fulcrum ▾]  branch  [stage tabs]  spacer  [trace tr_8f29…]  search  bell·  ⚙  ?  avatar
 
 STAGE NAV (left rail)
   • Capture
@@ -231,24 +231,21 @@ STAGE NAV (left rail)
   • Ship
   • Operate
   ─────
-  ◆ Dashboard      (workspace portfolio)
-  ◆ Projects
-  ◆ Search
-  ◆ Memory
-  ◆ Inbox
-  ─────
   ▼ System
-    Doctor
-    Settings
-    Skills
-    MCP
-    Credentials
-    Audit
+    Settings              → settings.html (sections: General · Appearance · Keyboard · AI agents · Default routes · Privacy · Integrations · Account · Danger)
+    Knowledge
+    MCP servers           → operate-mcp.html (per-agent scope)
+    Plugins               → operate-plugins.html (per-agent scope)
+
+STATUS FOOTER (44px)
+  [MODE pill] profile · branch · run x/y · agent · mcp · — spacer —
+  trace · time · ? · ⌘K · ✨ AI Assist ⌘/   ← right-most segment is the AI Assist trigger
 ```
 
 - Stage nav 220 px expanded / 56 px collapsed (icons + tooltip).
 - Portfolio surfaces always visible (Plane two-tier sidebar adapted — research-07 §1.1).
 - System section collapsed by default; opens on hover.
+- **Settings page sub-IA** (anchors on `settings.html`): `#general · #appearance · #keyboard · #privacy · #agents · #routes · #integrations · #account · #danger`. The `#agents` panel hosts the multi-CLI agent registry; `#routes` hosts the action-kind → default-agent routing table. Both are linked from the agent picker in every AI Assist drawer.
 
 ---
 
@@ -267,7 +264,7 @@ STAGE NAV (left rail)
 | `g d` | Go to Dashboard | |
 | `g i` | Go to Inbox | |
 | `⌘K` | Command palette | Linear/Plane/VS Code |
-| `⌘/` | Toggle ACP drawer | Fulcrum |
+| `⌘/` | Toggle AI Assist drawer | Fulcrum |
 | `⌘,` | Open settings | macOS convention |
 | `?` | Keyboard cheatsheet | k9s/Linear |
 | `g g` | First item in list | vim |
@@ -327,37 +324,40 @@ STAGE NAV (left rail)
 
 ---
 
-## 5. Right drawer — ACP chat panel
+## 5. Right drawer — AI Assist (formerly "ACP chat panel")
 
-Per DESIGN.md §3.1 + research-01 §11.
+Per DESIGN.md §3.1 + research-01 §11. Slides over content as an overlay with a dimmed/blurred backdrop (Cloudflare AI Assistant pattern), not push-style.
 
 ```
-┌────────────────────────────────┐
-│ ⊞ Pin │ Step: <step-title>  ⋮ │  ← header: pin/unpin, scope, more
-│ Agent: [claude ▾]  trace 4f3a… │
-├────────────────────────────────┤
-│ Tab: Step thread  · All steps  │  ← per-step thread + history
-├────────────────────────────────┤
-│                                │
-│   transcript (scrollable)      │
-│   - user message               │
-│   - agent_message_chunk        │
-│   - tool_call card             │
-│                                │
-├────────────────────────────────┤
-│ Composer                       │
-│  [type or paste...           ] │
-│  ▶ Run with current input      │
-│  💾 Save thread to docs        │
-└────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│ ✨ AI chat │ [CL Claude Opus 4.7 ▾] │ ⛶ ✕│  ← header: title, agent picker, expand, close
+├──────────────────────────────────────────┤
+│ @ scope: live planning session  · tr_8f… │  ← scope chip + trace pill (copyable)
+├──────────────────────────────────────────┤
+│ Suggestions for this screen              │  ← 4 context-aware suggestion buttons
+│  · Summarize what's on this screen        │
+│  · What should I do next?                 │
+│  · Explain the controls and shortcuts     │
+│  · Find similar past work                 │
+├──────────────────────────────────────────┤
+│   transcript (scrollable)                │
+│   - user message                         │
+│   - agent_message_chunk                  │
+│   - tool_call card                       │
+├──────────────────────────────────────────┤
+│ Composer                                  │
+│  [type or paste; @ to mention scope...]   │
+│  @ scope · 📎 attach · 💾 Save · ▶ Send ⌘↵│
+└──────────────────────────────────────────┘
 ```
 
-- Width 360–560 px user-adjustable. Persists per workspace.
-- `⌘/` toggle from anywhere. `Esc` collapses.
-- Survives stage nav; threads tabbed by step.
+- Width **420 px desktop / 92 vw mobile** (overlay, not push — no longer user-resizable).
+- `⌘/` toggle from anywhere. Backdrop click or `Esc` closes.
+- Survives stage nav; threads tabbed per agent — switching the agent picker keeps history per agent.
 - Auto-scopes to current step + project + trace ID.
-- Agent picker in header dropdown (codex / claude / gemini / opencode / pi + custom).
-- Mobile: bottom sheet 60vh, draggable.
+- **Agent picker header opens a full panel** listing every configured CLI agent (claude-code · codex · gemini-cli · opencode · pi-cli · custom), with status dot · client kind · latency · MCP count · plugin count · ring badge. Includes a filter input and `+ Add CLI agent (claude-code, codex, gemini-cli, opencode, pi-cli …)` shortcut. Footer link: `Manage agents, MCP & plugins in Settings →`.
+- Entry point: the **right-most segment of the status footer** on web (`✨ AI Assist  ⌘/`), the **right-most tab** of the bottom tab bar on mobile (accent-tinted), or the **right-most segment of the terminal footer** in TUI. Never decorative; always accent-tinted left-border.
+- Mobile: bottom sheet 92vw × full-height-minus-tabs.
 
 ---
 
@@ -373,7 +373,7 @@ Per research-07 §1.6 Plane Power-K + research-01 §12.
 4. **Step actions** (only when invoked on a step):
    - ▶ Play this step
    - 💬 Discuss this step
-   - ⊞ Open in ACP drawer
+   - ⊞ Open in AI Assist drawer
    - Copy trace ID
    - Open in audit
 5. **Federated search:** docs / tasks / runs / artifacts / memory / audit rows.
@@ -455,7 +455,9 @@ fulcrum compress [--check]
 fulcrum config   <get|set|edit|path>
 fulcrum audit    <list|export|--trace <id>>
 fulcrum trace    <show <id>>
-fulcrum chat     [--step <id>]             # opens inline ACP session
+fulcrum ai       [--step <id>] [--agent <id>]   # opens inline AI Assist session;
+                                                # --agent overrides the default route
+                                                # for the step's action kind
 
 # Cross-cutting
 fulcrum web                                 # opens web shell
@@ -479,7 +481,7 @@ Per research-05 §3.5. OpenTUI host shell, screens implemented as components.
 | Capture | `:docs` | tree nav, `Enter`, `n` new |
 | Capture | `:doc/<id>` | doc reader/editor |
 | Plan | `:plans` | sessions list |
-| Plan | `:plan/<id>` | live ACP session |
+| Plan | `:plan/<id>` | live planning session |
 | Plan | `:missions` | mission tree |
 | Build | `:runs` | runs feed, auto-tail |
 | Build | `:run/<id>` | live session |
@@ -493,7 +495,7 @@ Per research-05 §3.5. OpenTUI host shell, screens implemented as components.
 | Ship | `:repos` | repo status |
 | Operate | `:doctor` | subsystems |
 | Operate | `:audit` | audit log |
-| Operate | `:chat` | ACP chat pane |
+| Operate | `:ai` | AI Assist pane |
 | Operate | `:logs` | live log tail |
 
 Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g / G` first/last, `H/L` prev/next screen, `q` pop view, `Ctrl-C` graceful quit.
@@ -516,7 +518,7 @@ Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g /
 ```
 
 - Bottom tab bar 6 icons (Capture / Plan / Build / Review / Ship / Operate); first 5 always visible, Operate folds with portfolio + system under "···".
-- ACP drawer = bottom sheet 60vh draggable.
+- AI Assist drawer = bottom sheet 60vh draggable.
 - Modals = bottom sheets.
 - Tap targets ≥44×44 px under `(pointer: coarse)` (research-06 §1, WCAG 2.5.5).
 - Heavy authoring (multi-pane doc edit, complex board drag) gracefully degrades to "open desktop for full edit" banner; read + approve + comment + status-update remain fully mobile.
@@ -527,7 +529,7 @@ Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g /
 
 Same trace ID surfaces in 4 places (research-04 §15):
 
-- **Web:** scope-bar pill, ACP drawer header, every error inline mention, audit row, every transcript chip.
+- **Web:** scope-bar pill, AI Assist drawer header, every error inline mention, audit row, every transcript chip.
 - **CLI:** `--json` envelope `trace_id` field, plain-text header line, `fulcrum trace show <id>`.
 - **TUI:** status footer `[trace 4f3a1c9e]` segment, `y t` to yank.
 - **URL:** `/<ws>/trace/<traceId>` deep link, every primary route accepts `#trace=<id>`.

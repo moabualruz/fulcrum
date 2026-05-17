@@ -149,42 +149,38 @@ Body line length 65–75ch in prose surfaces (doc editor). Tables, run feed, aud
 ### 3.1 Chrome layout (web, desktop ≥ lg)
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│  SCOPE BAR  ws · project / subpath  ·  stage tabs  ·  trace-id  ·  ⊞  ⌘K  bell │  32px
-├──────────────┬──────────────────────────────────────────────┬─────────────────┤
-│              │                                              │                 │
-│  STAGE NAV   │            STAGE CONTENT                     │   ACP DRAWER    │
-│  (Capture)   │   (board / doc / runs / review / artifacts)  │   (pullable)    │
-│   Plan       │                                              │   step context  │
-│   Build      │                                              │   live thread   │
-│   Review     │                                              │   trace badge   │
-│   Ship       │                                              │   ▶ Run         │
-│   Operate    │                                              │   💾 Save       │
-│  ─────       │                                              │                 │
-│   Dashboard  │                                              │                 │
-│   Projects   │                                              │                 │
-│   Search     │                                              │                 │
-│   Memory     │                                              │                 │
-│   Inbox      │                                              │                 │
-│  ─────       │                                              │                 │
-│   Doctor     │                                              │                 │
-│   Settings   │                                              │                 │
-│              │                                              │                 │
-├──────────────┴──────────────────────────────────────────────┴─────────────────┤
-│  STATUS FOOTER   profile · scope · run x/y · agent · mcp · trace · time · ? · :│  28px
-└───────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│ SCOPE BAR  brand · ws · stage tabs · trace · ⌘K · 🔔 · ⚙ · ? · avatar              │ 48px
+├──────────────┬───────────────────────────────────────────────────┬─────────────────┤
+│              │                                                   │                 │
+│  STAGE NAV   │            STAGE CONTENT                          │  AI ASSIST      │
+│  (Capture)   │   (board / doc / runs / review / artifacts)       │  (overlay, ⌘/)  │
+│   Plan       │                                                   │  agent picker   │
+│   Build      │                                                   │  step context   │
+│   Review     │                                                   │  live thread    │
+│   Ship       │                                                   │  trace badge    │
+│   Operate    │                                                   │  ▶ Send         │
+│  ─────       │                                                   │                 │
+│   Settings   │                                                   │                 │
+│   Knowledge  │                                                   │                 │
+│   MCP        │                                                   │                 │
+│   Plugins    │                                                   │                 │
+├──────────────┴───────────────────────────────────────────────────┴─────────────────┤
+│ STATUS FOOTER  mode·profile·branch·run x/y·agent·mcp···trace·time·?·⌘K·✨ AI Assist│ 44px
+└────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Scope bar 32 px desktop / 40 px mobile.
+- **Scope bar 48 px desktop / 56 px mobile** (lifted from 32/40 — small chrome read as outdated; Linear / Vercel / GitHub sit ~48 px).
 - Stage nav rail collapsed = 56 px (icons only) / expanded = 220 px (label).
-- Status footer 28 px desktop, fixed bottom. **TUI status footer mirrors this exactly** (research-05 §3.6).
-- Drawer 360–560 px user-adjustable, sticky across nav, hidden on `<lg`.
+- **Status footer 44 px desktop** (compact 38 / comfortable 50; mobile 64 px), fixed bottom. **TUI status footer mirrors this exactly** (research-05 §3.6).
+- **AI Assist drawer (formerly "ACP chat") is overlay-style, not push**: slides over content with a dimmed/blurred backdrop (Cloudflare AI Assistant pattern). 420 px desktop, 92vw mobile; opens via `⌘/`, the right-most footer segment, or backdrop click closes it.
+- The AI Assist entry point lives in the **status footer** (right-most segment, accent left-border, ✨ icon + label + `⌘/` kbd), not the scope bar. The scope bar's right cluster is for system chrome (palette · notifications · display settings · keyboard help · avatar) — see PRODUCT.md §"Scope Chrome" for the popovers each one opens.
 
 ### 3.2 Mobile chrome (`<md`)
 
-- Scope bar collapses to workspace+project chip on left, drawer pull-handle on right.
-- Stage nav becomes a **bottom tab bar**: 6 stage icons + 5-item more menu.
-- Drawer → bottom sheet 60vh default, draggable.
+- Scope bar 56 px — workspace chip on left, active-stage chip + notifications + account on right.
+- Stage nav becomes a **bottom tab bar**: 6 stage icons + AI Assist tab (right-most, accent-tinted; tab grid `repeat(6, 1fr) auto`).
+- AI Assist drawer → bottom sheet 60vh default, draggable, opened from the AI Assist tab or `⌘/`.
 - Status footer hidden; trace ID accessible via swipe-down quick panel.
 
 ### 3.3 Stage content layouts
@@ -271,7 +267,7 @@ Per Plannotator review-editor (research-07 §4.2). Two-pane (split) or unified, 
 | Surface | Use when | Width |
 |---|---|---|
 | **Inline overlay** | < 5 fields, no nav, < 5s task | n/a |
-| **Side drawer (right)** | Persistent context (ACP chat), survives nav | 360–560 px user-resizable |
+| **Side drawer (right)** | Persistent context (AI Assist), overlay slide-in with backdrop, survives nav | 420 px desktop / 92vw mobile |
 | **Peek modal** (Plane peek-overview) | Quick read of one entity, single click to dismiss | 720 px centered |
 | **Sheet (mobile)** | Mobile equivalent of drawer / peek modal | full width × 60vh draggable |
 | **Confirm modal** | Irreversible action only | 400 px centered |
@@ -331,9 +327,9 @@ Universal — on every step header (task card, doc block, review item, artifact 
 [step title] ............... ▶ Play   💬 Discuss   ⋮ More   ⊞ Drawer
 ```
 
-- ▶ Play 24px primary action button. Click → mode picker popover (agent + model + policy + optional prompt). Run streams inline below the step.
+- ▶ Play 24px primary action button. Click → **mode picker popover**: lists every configured CLI agent (claude-code · codex · gemini-cli · opencode · pi-cli · …), with the default-routed agent for this action kind marked, plus `+ Pick another agent…` and a `workflow` icon shortcut to `Settings → Default routes` for setting the agent for that action kind. Below the agent list: policy (Ask on write / Auto / Read-only), `Play` + `Preset` buttons. Run streams inline below the step.
 - 💬 Discuss 24px secondary. Opens inline thread anchored to the step.
-- ⊞ Drawer pulls right-side ACP chat scoped to this step.
+- ⊞ Drawer pulls right-side AI Assist drawer scoped to this step. The drawer's header carries the agent picker — switching agents mid-thread keeps history per agent.
 - ⋮ More: clone / archive / change owner / lock for review.
 
 Keyboard: `p` Play / `d` Discuss / `⌘/` drawer / `c` clone (on focused row).
@@ -493,12 +489,14 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 
 1. **Trace ID** visible + copyable (web badge / CLI envelope key / TUI footer segment).
 2. **Project + stage** visible at chrome level (research-01 §5).
-3. **Four-mode affordance** per step (manual / Play / Discuss / ACP drawer).
+3. **Four-mode affordance** per step (manual / Play / Discuss / AI Assist drawer).
 4. **Command palette** parity: `⌘K` web, `:` TUI, `fulcrum <verb>` CLI (research-05 §3.5).
 5. **Status vocabulary** identical (eight states, same colour, same icon).
 6. **Empty states** identical structure (one sentence + one action).
 7. **Error copy** template: `[what failed]. [why, if non-obvious]. [exact next step]. trace=<id>`.
-8. **ACP chat** reachable in one keystroke from anywhere (`⌘/` web, `c` TUI, `fulcrum chat` CLI).
+8. **AI Assist** reachable in one keystroke from anywhere (`⌘/` web, `⌘/` TUI, `fulcrum ai` CLI). Entry point lives as the **right-most segment of the status footer** (web), the **right-most tab** of the bottom tab bar (mobile), and the **right-most segment of the terminal footer** (TUI). Never decorative; always accent-tinted left-border so it reads as the primary AI affordance.
+9. **Multi-CLI agent registry** is global to the workspace, scope-aware in the UI. Every Play / Discuss / Send invocation goes through an agent picker showing the default-routed agent first plus all other configured agents (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`, custom). Users can configure unlimited agents. MCP servers and plugins are **per agent** until cross-agent install is supported — the Operate → MCP and Operate → Plugins surfaces show a scope chip per agent, never a global list.
+10. **Top-right system icons** in the scope bar have defined behavior: `search` opens ⌘K palette · `bell` opens the Notifications popover (tabbed, with mark-all-read) · `settings` opens the Display popover (theme / density / mode / motion / sidebar) · `?` opens the keyboard cheatsheet overlay · avatar opens the Account popover (workspace switcher, account, API keys, CLI agents, MCP, plugins, sign out). Each icon has a labelled tooltip and `aria-expanded` state. They are never used as decorative chrome.
 
 ---
 
