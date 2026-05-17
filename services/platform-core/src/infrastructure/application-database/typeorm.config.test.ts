@@ -19,7 +19,7 @@ describe("application database TypeORM config", () => {
     });
 
     expect(options.migrations).toBeArray();
-    expect(options.migrations).toHaveLength(24);
+    expect(options.migrations).toHaveLength(29);
     expect(String(options.migrations?.[0])).not.toContain("*");
   });
 

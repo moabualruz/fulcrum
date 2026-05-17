@@ -37,6 +37,12 @@ export class AuthPublicApiService {
   ) {}
 
   async whoami(input: AuthScopeDto): Promise<AuthSessionPublicRow> {
+    if (!input?.orgId || !input?.userId) {
+      throw new BadRequestException({
+        error: "auth.whoami requires orgId and userId query parameters.",
+        recovery: "GET /api/v1/auth/whoami?orgId=<uuid>&userId=<user>",
+      });
+    }
     return await this.requireStore().whoami(input);
   }
 

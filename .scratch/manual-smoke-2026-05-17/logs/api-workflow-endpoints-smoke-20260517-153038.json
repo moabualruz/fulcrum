@@ -1,0 +1,139 @@
+{
+  "timestamp": "20260517-153038",
+  "baseUrl": "http://127.0.0.1:3000",
+  "results": [
+    {
+      "path": "/openapi-json",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.003206",
+      "body_preview": "{\"openapi\":\"3.0.0\",\"paths\":{\"/api/v1/credentials\":{\"get\":{\"operationId\":\"CredentialPublicApiController_listCredentials\",\"parameters\":[],\"responses\":{\"200\":{\"description\":\"List credentials\"}},\"summary\""
+    },
+    {
+      "path": "/api/v1/doctor",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.383862",
+      "body_preview": "{\"version\":\"1.0.0\",\"timestamp\":\"2026-05-17T12:30:38.617Z\",\"checks\":[{\"name\":\"binary-entrypoint\",\"subsystem\":\"cli\",\"durationMs\":23,\"status\":\"ok\",\"message\":\"fulcrum binary at /Users/mkh/.local/bin/fulcr"
+    },
+    {
+      "path": "/api/v1/doctor/subsystems",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001094",
+      "body_preview": "[\"cli\",\"inference\",\"tui\",\"web\"]"
+    },
+    {
+      "path": "/api/v1/organizations/members",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.004426",
+      "body_preview": "[{\"id\":\"00000000-0000-0000-0000-000000000001:90806f78-648c-44e7-adad-87ddec42aa8e\",\"userId\":\"90806f78-648c-44e7-adad-87ddec42aa8e\",\"orgId\":\"00000000-0000-0000-0000-000000000001\",\"role\":\"owner\",\"joined"
+    },
+    {
+      "path": "/api/v1/docs",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001515",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/artifacts",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002806",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/audit",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002582",
+      "body_preview": "{\"data\":[],\"total\":0}"
+    },
+    {
+      "path": "/api/v1/auth/whoami",
+      "status": 400,
+      "ok": false,
+      "time_total": "0.001137",
+      "body_preview": "{\"error\":\"auth.whoami requires orgId and userId query parameters.\",\"recovery\":\"GET /api/v1/auth/whoami?orgId=<uuid>&userId=<user>\"}"
+    },
+    {
+      "path": "/api/v1/settings",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002161",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/feature-flags",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001044",
+      "body_preview": "[{\"flag\":\"router-llm\",\"description\":\"Enable the LLM-based task router for agent dispatch decisions.\",\"enabled\":false,\"rolloutPercent\":0,\"source\":\"default\"},{\"flag\":\"embeddings\",\"description\":\"Enable v"
+    },
+    {
+      "path": "/api/v1/skills",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001032",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/inference/health",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001973",
+      "body_preview": "{\"status\":\"ok\",\"backends\":[],\"models\":[]}"
+    },
+    {
+      "path": "/api/v1/credentials",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.003097",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/error-logs",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.003174",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/telemetry/status",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.004456",
+      "body_preview": "{\"opted_in\":false,\"row_count\":0}"
+    },
+    {
+      "path": "/api/v1/notifications/settings",
+      "status": 500,
+      "ok": false,
+      "time_total": "0.007696",
+      "body_preview": "{\"statusCode\":500,\"message\":\"Internal server error\"}"
+    },
+    {
+      "path": "/api/v1/notifications",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002183",
+      "body_preview": "{\"data\":[]}"
+    },
+    {
+      "path": "/api/v1/projects",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002241",
+      "body_preview": "{\"data\":[]}"
+    },
+    {
+      "path": "/api/v1/tasks",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002718",
+      "body_preview": "[]"
+    }
+  ]
+}

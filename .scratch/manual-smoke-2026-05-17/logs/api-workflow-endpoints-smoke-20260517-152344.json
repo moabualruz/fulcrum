@@ -1,0 +1,118 @@
+{
+  "timestamp": "20260517-152344",
+  "baseUrl": "http://127.0.0.1:3000",
+  "results": [
+    {
+      "path": "/openapi-json",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001873",
+      "body_preview": "{\"openapi\":\"3.0.0\",\"paths\":{\"/api/v1/credentials\":{\"get\":{\"operationId\":\"CredentialPublicApiController_listCredentials\",\"parameters\":[],\"responses\":{\"200\":{\"description\":\"List credentials\"}},\"summary\""
+    },
+    {
+      "path": "/api/v1/doctor",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.391798",
+      "body_preview": "{\"version\":\"1.0.0\",\"timestamp\":\"2026-05-17T12:23:45.110Z\",\"checks\":[{\"name\":\"binary-entrypoint\",\"subsystem\":\"cli\",\"durationMs\":29,\"status\":\"ok\",\"message\":\"fulcrum binary at /Users/mkh/.local/bin/fulcr"
+    },
+    {
+      "path": "/api/v1/doctor/subsystems",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001004",
+      "body_preview": "[\"cli\",\"inference\",\"tui\",\"web\"]"
+    },
+    {
+      "path": "/api/v1/organizations/members",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.001824",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/docs",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.002857",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/artifacts",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.001441",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/audit",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.001145",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/auth/whoami",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.000974",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/settings",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.002869",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/feature-flags",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.000958",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/skills",
+      "status": 200,
+      "ok": true,
+      "time_total": "0.001127",
+      "body_preview": "[]"
+    },
+    {
+      "path": "/api/v1/inference/health",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.000701",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/credentials",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.000929",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/error-logs",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.001056",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/telemetry/status",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.000893",
+      "body_preview": "{\"error\":\"not found\"}"
+    },
+    {
+      "path": "/api/v1/notifications/preferences",
+      "status": 404,
+      "ok": false,
+      "time_total": "0.001416",
+      "body_preview": "{\"message\":\"Cannot GET /api/v1/notifications/preferences\",\"error\":\"Not Found\",\"statusCode\":404}"
+    }
+  ]
+}

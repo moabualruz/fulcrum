@@ -96,6 +96,69 @@ export class NotificationSettings1778750500000 implements MigrationInterface {
       isNullable: true,
     }));
 
+    // Align legacy notification_quiet_hours columns from Notifications1715788800005 with the entity:
+    //   timezone -> tz; days_of_week text CSV -> integer[]; add created_at/updated_at.
+    await queryRunner.query(`
+      do $$ begin
+        if exists (select 1 from information_schema.columns
+                   where table_name = 'notification_quiet_hours' and column_name = 'timezone')
+           and not exists (select 1 from information_schema.columns
+                           where table_name = 'notification_quiet_hours' and column_name = 'tz') then
+          alter table "notification_quiet_hours" rename column "timezone" to "tz";
+        end if;
+      end $$;
+    `);
+    await queryRunner.query(`
+      do $$ begin
+        if exists (select 1 from information_schema.columns
+                   where table_name = 'notification_quiet_hours' and column_name = 'days_of_week'
+                     and data_type = 'text') then
+          alter table "notification_quiet_hours"
+            alter column "days_of_week" drop default,
+            alter column "days_of_week" type integer[] using
+              case when "days_of_week" is null or "days_of_week" = '' then ARRAY[]::integer[]
+                   else string_to_array("days_of_week", ',')::integer[] end,
+            alter column "days_of_week" set default ARRAY[0,1,2,3,4,5,6];
+        end if;
+      end $$;
+    `);
+    await addColumnIfMissing(queryRunner, "notification_quiet_hours", new TableColumn({
+      name: "created_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+    await addColumnIfMissing(queryRunner, "notification_quiet_hours", new TableColumn({
+      name: "updated_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+    await addColumnIfMissing(queryRunner, "notification_mutes", new TableColumn({
+      name: "created_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+    await addColumnIfMissing(queryRunner, "notification_mutes", new TableColumn({
+      name: "updated_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+    await addColumnIfMissing(queryRunner, "push_subscriptions", new TableColumn({
+      name: "created_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+    await addColumnIfMissing(queryRunner, "push_subscriptions", new TableColumn({
+      name: "updated_at",
+      type: "timestamptz",
+      isNullable: false,
+      default: "now()",
+    }));
+
     await createIndexIfMissing(queryRunner, "notification_rules", new TableIndex({
       name: "notification_rules_org_user",
       columnNames: ["org_id", "user_id"],

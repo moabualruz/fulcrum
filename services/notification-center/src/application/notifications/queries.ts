@@ -160,11 +160,25 @@ export function serializeRule(row: NotificationRule): NotificationRuleDto {
   };
 }
 
-function notificationChannels(channels: string[] | null): NotificationChannel[] {
+function notificationChannels(channels: unknown): NotificationChannel[] {
   const allowed = new Set<NotificationChannel>(["in-app", "email", "slack", "discord", "webhook", "push"]);
-  return (channels ?? []).filter((channel): channel is NotificationChannel =>
-    allowed.has(channel as NotificationChannel)
+  const list = Array.isArray(channels)
+    ? channels
+    : typeof channels === "string"
+      ? safeParseJsonArray(channels)
+      : [];
+  return list.filter((channel): channel is NotificationChannel =>
+    typeof channel === "string" && allowed.has(channel as NotificationChannel)
   );
+}
+
+function safeParseJsonArray(raw: string): unknown[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function isMissingNotificationRuleColumns(error: unknown): boolean {

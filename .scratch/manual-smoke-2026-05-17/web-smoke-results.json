@@ -1,7 +1,8 @@
-[
-  {
-    "name": "dashboard",
-    "path": "/",
+{
+  "routes": 24,
+  "failures": []
+}
+ath": "/",
     "url": "http://127.0.0.1:5173/",
     "status": 200,
     "finalUrl": "http://127.0.0.1:5173/",
@@ -75,9 +76,9 @@
       "Global docs"
     ],
     "buttons": 6,
-    "links": 45,
+    "links": 21,
     "inputs": 3,
-    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Docs All projects Default Advanced Unreachable ⌘K ! — Documents Global tree New document Clear Project docs New No documents. Global docs New No documents. All kinds decision spec note runbook Apply Title Kind Project Updated Manual smoke workflow freeform_work_intake project-manual-smoke-mp9mm31e 2026-05-17 10:22 Manual Smoke Workflow approved_plan project-manual-smoke-mp9mm31e 2026-05-17 10:22 +page.svelte prototype_artifact project-manual-smoke-mp9mm31e 2026-05-17 10:22 Manual Smoke Workflow success criteria success_criteria project-manual-smoke-mp9mm31e 2026-05-17 10:22 Manual smoke workflow freeform_work_intake project-manual-smoke-mp9mng2r 2026-05-17 10:23 Manual Smoke Workflow approved_plan proj",
+    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Docs All projects Default Advanced Unreachable ⌘K ! — Documents Global tree New document Clear Project docs New No documents. Global docs New No documents. All kinds decision spec note runbook Apply No documents yet — create one.",
     "screenshot": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs.png",
     "console": [],
     "pageErrors": [],
@@ -267,9 +268,9 @@
       "Artifacts"
     ],
     "buttons": 5,
-    "links": 29,
-    "inputs": 10,
-    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Artifacts All projects Default Advanced Unreachable ⌘K ! — Artifacts All types All kinds prototype Show archived Apply Title Kind MIME Run Preview Retention Size Created Download +page.svelte prototype — — download active 0 2026-05-17 Download +page.svelte prototype — — download active 0 2026-05-17 Download +page.svelte prototype — — download active 0 2026-05-17 Download +page.svelte prototype — — download active 0 2026-05-17 Download +page.svelte prototype — — download active 0 2026-05-17 Download +page.svelte prototype — — download active 0 2026-05-17 Download",
+    "links": 17,
+    "inputs": 3,
+    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Artifacts All projects Default Advanced Unreachable ⌘K ! — Artifacts All types All kinds Show archived Apply No artifacts match the current filters.",
     "screenshot": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/artifacts.png",
     "console": [],
     "pageErrors": [],
@@ -430,7 +431,7 @@
     "buttons": 7,
     "links": 17,
     "inputs": 0,
-    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Doctor All projects Default Advanced Unreachable ⌘K ! — Doctor Per-subsystem health — auto-refreshes every 30 s Refresh now FAIL — 15/17 subsystems healthy last checked 2026-05-17 10:52:52Z Subsystem Status Message Checked at Recovery Foundation OK FULCRUM_HOME reachable: /Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/home 2026-05-17 10:52:51Z — Inference FAIL ANTHROPIC_API_KEY missing 2026-05-17 10:52:51Z Show recovery Orchestration OK Orchestration subsystem reachable (static check) 2026-05-17 10:52:51Z — Sandcastle OK Sandcastle subsystem reachable; sandbox provider checks passed. 2026-05-17 10:52:51Z — Router OK Router subsystem reachable (static check) 2026-05-17 10:52:51Z — Tasks O",
+    "textSample": "Skip to main content Current Scope Dashboard Board Docs Planning Runs Artifacts Portfolio All projects Search Memory Context System Agents Orchestration Audit Doctor Settings — Dashboard / Doctor All projects Default Advanced Unreachable ⌘K ! — Doctor Per-subsystem health — auto-refreshes every 30 s Refresh now FAIL — 15/17 subsystems healthy last checked 2026-05-17 12:36:40Z Subsystem Status Message Checked at Recovery Foundation OK FULCRUM_HOME reachable: /Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/home 2026-05-17 12:36:40Z — Inference FAIL ANTHROPIC_API_KEY missing 2026-05-17 12:36:40Z Show recovery Orchestration OK Orchestration subsystem reachable (static check) 2026-05-17 12:36:40Z — Sandcastle OK Sandcastle subsystem reachable; sandbox provider checks passed. 2026-05-17 12:36:40Z — Router OK Router subsystem reachable (static check) 2026-05-17 12:36:40Z — Tasks O",
     "screenshot": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/doctor.png",
     "console": [],
     "pageErrors": [],

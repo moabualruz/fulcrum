@@ -1,123 +1,180 @@
 {
-  "generatedAt": "2026-05-17T10:56:05.777Z",
-  "directory": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots",
-  "count": 29,
-  "screenshots": [
+  "total": 29,
+  "generatedAt": "2026-05-17T12:36:51.606Z",
+  "entries": [
     {
-      "file": "agents.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/agents.png"
+      "name": "agents.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/agents.png",
+      "size": 95246,
+      "mtime": "2026-05-17T12:36:33.787Z"
     },
     {
-      "file": "api-smoke-terminal.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/api-smoke-terminal.png"
+      "name": "api-smoke-terminal.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/api-smoke-terminal.png",
+      "size": 46798,
+      "mtime": "2026-05-17T10:55:47.523Z"
     },
     {
-      "file": "api-startup-terminal.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/api-startup-terminal.png"
+      "name": "api-startup-terminal.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/api-startup-terminal.png",
+      "size": 48672,
+      "mtime": "2026-05-17T10:55:47.585Z"
     },
     {
-      "file": "artifacts.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/artifacts.png"
+      "name": "artifacts.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/artifacts.png",
+      "size": 52289,
+      "mtime": "2026-05-17T12:36:36.351Z"
     },
     {
-      "file": "audit.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/audit.png"
+      "name": "audit.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/audit.png",
+      "size": 59903,
+      "mtime": "2026-05-17T12:36:36.942Z"
     },
     {
-      "file": "cli-smoke-terminal.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/cli-smoke-terminal.png"
+      "name": "cli-smoke-terminal.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/cli-smoke-terminal.png",
+      "size": 45530,
+      "mtime": "2026-05-17T10:55:47.548Z"
     },
     {
-      "file": "dashboard-mobile.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/dashboard-mobile.png"
+      "name": "dashboard-mobile.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/dashboard-mobile.png",
+      "size": 30725,
+      "mtime": "2026-05-17T12:36:41.406Z"
     },
     {
-      "file": "dashboard.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/dashboard.png"
+      "name": "dashboard.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/dashboard.png",
+      "size": 56968,
+      "mtime": "2026-05-17T12:36:28.835Z"
     },
     {
-      "file": "docs-global.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs-global.png"
+      "name": "docs-global.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs-global.png",
+      "size": 51919,
+      "mtime": "2026-05-17T12:36:31.317Z"
     },
     {
-      "file": "docs-mobile.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs-mobile.png"
+      "name": "docs-mobile.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs-mobile.png",
+      "size": 36477,
+      "mtime": "2026-05-17T12:36:42.659Z"
     },
     {
-      "file": "docs.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs.png"
+      "name": "docs.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/docs.png",
+      "size": 63036,
+      "mtime": "2026-05-17T12:36:30.718Z"
     },
     {
-      "file": "doctor.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/doctor.png"
+      "name": "doctor.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/doctor.png",
+      "size": 199981,
+      "mtime": "2026-05-17T12:36:40.651Z"
     },
     {
-      "file": "inbox.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/inbox.png"
+      "name": "inbox.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/inbox.png",
+      "size": 46552,
+      "mtime": "2026-05-17T12:36:32.567Z"
     },
     {
-      "file": "planning-sessions.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/planning-sessions.png"
+      "name": "planning-sessions.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/planning-sessions.png",
+      "size": 133684,
+      "mtime": "2026-05-17T12:36:35.139Z"
     },
     {
-      "file": "planning.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/planning.png"
+      "name": "planning.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/planning.png",
+      "size": 326045,
+      "mtime": "2026-05-17T12:36:34.497Z"
     },
     {
-      "file": "project-new.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/project-new.png"
+      "name": "project-new.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/project-new.png",
+      "size": 66588,
+      "mtime": "2026-05-17T12:36:30.126Z"
     },
     {
-      "file": "projects-mobile.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/projects-mobile.png"
+      "name": "projects-mobile.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/projects-mobile.png",
+      "size": 20973,
+      "mtime": "2026-05-17T12:36:42.032Z"
     },
     {
-      "file": "projects.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/projects.png"
+      "name": "projects.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/projects.png",
+      "size": 50777,
+      "mtime": "2026-05-17T12:36:29.460Z"
     },
     {
-      "file": "repos.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/repos.png"
+      "name": "repos.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/repos.png",
+      "size": 47483,
+      "mtime": "2026-05-17T12:36:35.760Z"
     },
     {
-      "file": "runs.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/runs.png"
+      "name": "runs.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/runs.png",
+      "size": 59663,
+      "mtime": "2026-05-17T12:36:33.177Z"
     },
     {
-      "file": "search.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/search.png"
+      "name": "search.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/search.png",
+      "size": 61733,
+      "mtime": "2026-05-17T12:36:31.943Z"
     },
     {
-      "file": "settings-api.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-api.png"
+      "name": "settings-api.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-api.png",
+      "size": 68378,
+      "mtime": "2026-05-17T12:36:40.022Z"
     },
     {
-      "file": "settings-connectors.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-connectors.png"
+      "name": "settings-connectors.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-connectors.png",
+      "size": 58719,
+      "mtime": "2026-05-17T12:36:38.792Z"
     },
     {
-      "file": "settings-flags-mobile.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-flags-mobile.png"
+      "name": "settings-flags-mobile.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-flags-mobile.png",
+      "size": 144471,
+      "mtime": "2026-05-17T12:36:43.315Z"
     },
     {
-      "file": "settings-flags.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-flags.png"
+      "name": "settings-flags.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-flags.png",
+      "size": 282666,
+      "mtime": "2026-05-17T12:36:37.593Z"
     },
     {
-      "file": "settings-routing.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-routing.png"
+      "name": "settings-routing.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-routing.png",
+      "size": 78948,
+      "mtime": "2026-05-17T12:36:38.187Z"
     },
     {
-      "file": "settings-theme.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-theme.png"
+      "name": "settings-theme.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/settings-theme.png",
+      "size": 97449,
+      "mtime": "2026-05-17T12:36:39.421Z"
     },
     {
-      "file": "tui-command-palette.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/tui-command-palette.png"
+      "name": "tui-command-palette.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/tui-command-palette.png",
+      "size": 96426,
+      "mtime": "2026-05-17T10:55:47.498Z"
     },
     {
-      "file": "tui-startup-terminal.png",
-      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/tui-startup-terminal.png"
+      "name": "tui-startup-terminal.png",
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/screenshots/tui-startup-terminal.png",
+      "size": 69590,
+      "mtime": "2026-05-17T09:23:12.287Z"
     }
   ]
 }

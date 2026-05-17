@@ -12,6 +12,11 @@ import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
 import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
 import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
 import { PlatformFeatureFlags1778753400000 } from "@platform-core/infrastructure/database/feature-flag.migration.ts";
+import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
+import { ErrorLog1778758800000 } from "@platform-core/infrastructure/database/error-log.migration.ts";
+import { Telemetry1778755200000 } from "@platform-core/infrastructure/database/telemetry.migration.ts";
+import { NotificationReadState1778750400000 } from "@notification-center/infrastructure/database/notification-read-state.migration.ts";
+import { NotificationSettings1778750500000 } from "@notification-center/infrastructure/database/notification-settings.migration.ts";
 import { IdentityAccess1778623200009 } from "@identity-access/infrastructure/database/organization.migration.ts";
 import { Invitation1778757000000 } from "@identity-access/infrastructure/database/invitation.migration.ts";
 import { WorkManagement1778623200003 } from "@work-management/infrastructure/database/work-structure.migration.ts";
@@ -269,6 +274,11 @@ export const applicationMigrations = [
   PlatformFeatureFlags1778753400000,
   Invitation1778757000000,
   TaskRecurrence1778760600000,
+  Credential1778623200010,
+  Telemetry1778755200000,
+  ErrorLog1778758800000,
+  NotificationReadState1778750400000,
+  NotificationSettings1778750500000,
 ];
 
 export function createDataSourceOptions(

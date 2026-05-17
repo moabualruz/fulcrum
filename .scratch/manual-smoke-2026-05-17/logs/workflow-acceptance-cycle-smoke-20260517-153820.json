@@ -1,0 +1,37 @@
+{"traceId":"trace-manual-smoke-20260517-153820","freeform":{"status":"ready_for_planning","document":{"id":"doc-manual-smoke-20260517-153820","projectId":"project-manual-smoke-20260517-153820","parentId":null,"title":"API smoke workflow","bodyMd":"API freeform docs drive ACP planning, prototype review, dependency execution, QA, UAT/code review, and generated E2E.","sourceType":"freeform_work_intake","traceId":"trace-manual-smoke-20260517-153820","createdAt":"2026-05-17T12:38:20.568Z","updatedAt":"2026-05-17T12:38:20.568Z"},"context":{"traceId":"trace-manual-smoke-20260517-153820","sourceRefs":[{"kind":"doc","id":"doc-manual-smoke-20260517-153820"}],"selectedDocs":[{"id":"doc-manual-smoke-20260517-153820","title":"API smoke workflow","breadcrumb":"API smoke workflow","bodyMd":"API freeform docs drive ACP planning, prototype review, dependency execution, QA, UAT/code review, and generated E2E.","truncated":false}],"contextMarkdown":"## Freeform Document: API smoke workflow
+- doc_id: doc-manual-smoke-20260517-153820
+
+API freeform docs drive ACP planning, prototype review, dependency execution, QA, UAT/code review, and generated E2E."},"prompt":"Use the following freeform documents as planning context. Preserve their constraints, goals, and success criteria when creating the technical plan, prototype/boilerplate targets, and task breakdown.
+Trace ID: trace-manual-smoke-20260517-153820
+## User Request
+Convert to technical plan with prototype + task success criteria.
+## Freeform Document Context
+## Freeform Document: API smoke workflow
+- doc_id: doc-manual-smoke-20260517-153820
+
+API freeform docs drive ACP planning, prototype review, dependency execution, QA, UAT/code review, and generated E2E.
+## Plan Review
+
+You have a plan submission tool called `submit_plan`. It opens an interactive review UI where the user can annotate, approve, or request changes.
+
+**How to use it:**
+
+- Pass your plan as markdown text - `submit_plan(plan: \"# My Plan\n...\")`.
+- Or pass an absolute file path to a .md file - `submit_plan(plan: \"/path/to/plan.md\")`.
+
+The tool auto-detects whether you passed text or a file path. Both open the same review UI.
+
+### Before you write a plan
+
+Do not jump straight to writing a plan. First:
+
+1. **Explore** - Read the relevant code, trace dependencies, and look at existing patterns. The depth should match the task.
+2. **Ask questions** - If you need information only the user can provide (requirements, preferences, tradeoffs), ask using the `question` tool. Don't guess at ambiguous requirements.
+
+Only write and submit a plan once you have sufficient context.
+
+### What NOT to do
+
+- Don't proceed with implementation until the plan is approved.
+- Don't use `plan_exit` - use `submit_plan` instead.
+- Don't end your turn without either submitting a plan or asking the user a question."},"guidedPlanning":{"status":"ready_for_acp_prompt","context":{"traceId":"trace-manual-smoke-20260517-153820","sourceRefs":[{"kind":"doc","id":"doc-manual-smoke-202

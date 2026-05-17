@@ -91,11 +91,20 @@ async function readPid(path: string): Promise<number | undefined> {
 
 function defaultServerPath(): string {
   if (process.env["FULCRUM_INFERENCE_SERVER"]) return process.env["FULCRUM_INFERENCE_SERVER"];
-  const root = process.cwd();
-  const candidates = [
-    join(root, "services", "inference-runtime", "target", "release", "inference-server"),
-    join(root, "services", "inference-runtime", "target", "debug", "inference-server"),
+  const cwd = process.cwd();
+  const roots = [cwd];
+  let current = cwd;
+  for (let i = 0; i < 4; i += 1) {
+    const parent = join(current, "..");
+    if (parent === current) break;
+    roots.push(parent);
+    current = parent;
+  }
+  const subpaths = [
+    join("services", "inference-runtime", "target", "release", "inference-server"),
+    join("services", "inference-runtime", "target", "debug", "inference-server"),
   ];
+  const candidates = roots.flatMap((root) => subpaths.map((sub) => join(root, sub)));
   return candidates.find((path) => existsSync(path)) ?? candidates[0]!;
 }
 

@@ -448,9 +448,23 @@ function toQuietHoursPublicRow(quietHours: NotificationQuietHoursSettings): Noti
   };
 }
 
-function notificationChannels(channels: string[] | null): string[] {
+function notificationChannels(channels: unknown): string[] {
   const allowed = new Set(CHANNELS.map((channel) => channel.name));
-  return (channels ?? []).filter((channel) => allowed.has(channel as never));
+  const list = Array.isArray(channels)
+    ? channels
+    : typeof channels === "string"
+      ? safeParseJsonArray(channels)
+      : [];
+  return list.filter((channel): channel is string => typeof channel === "string" && allowed.has(channel as never));
+}
+
+function safeParseJsonArray(raw: string): unknown[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function channelConfig(input: {
