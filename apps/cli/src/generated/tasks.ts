@@ -269,11 +269,13 @@ export function createTasksCommand(): Command {
   runAutomatedFeedbackLoopCommand.option("--cwd <string>", "cwd");
   runAutomatedFeedbackLoopCommand.option("--feedback-agent <string>", "feedback-agent");
   runAutomatedFeedbackLoopCommand.option("--feedback-model <string>", "feedback-model");
+  runAutomatedFeedbackLoopCommand.option("--iteration-timeout-ms <number>", "iteration-timeout-ms", Number.parseFloat);
   runAutomatedFeedbackLoopCommand.option("--max-iterations <number>", "max-iterations", Number.parseFloat);
   runAutomatedFeedbackLoopCommand.option("--project-id <string>", "project-id");
   runAutomatedFeedbackLoopCommand.addOption(new Option("--review-type <choice>", "review-type").choices(["plan","code","spec"]));
   runAutomatedFeedbackLoopCommand.option("--reviewer-agent <string>", "reviewer-agent");
   runAutomatedFeedbackLoopCommand.option("--run-group-id <string>", "run-group-id");
+  runAutomatedFeedbackLoopCommand.option("--stale-threshold-ms <number>", "stale-threshold-ms", Number.parseFloat);
   runAutomatedFeedbackLoopCommand.option("--trace-id <string>", "trace-id");
   runAutomatedFeedbackLoopCommand.option("--worker-id <string>", "worker-id");
   runAutomatedFeedbackLoopCommand.action(async (options) => {

@@ -1,9 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Component } from "svelte";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore, migrateIsolatedStore, createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore, createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
 import { createDocumentAction } from "@fulcrum/web/lib/server/documents.ts";
 import { DataSource, type DataSourceOptions } from "typeorm";
 import { EventEmitter } from "node:events";
@@ -254,83 +253,9 @@ describe("docs read/edit/history routes", () => {
     expect(result.doc.title).toBeDefined();
   });
 
-  test("history route lists versions and returns a diff for selected versions", async () => {
-    const { docId } = await seedDocs();
-    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.server.ts");
-    const result = await mod.load({
-      params: { id: docId },
-      url: new URL(`http://localhost/docs/${docId}/history?from=1&to=2`),
-    } as Parameters<typeof mod.load>[0]);
-    expect(result.doc.id).toBe(docId);
-    expect(result.versions.map((version: { versionNum: number; isSnapshot: boolean }) => [
-      version.versionNum,
-      version.isSnapshot,
-    ])).toEqual([[2, true], [1, true]]);
-    expect(result.diffHtml).toContain("First body");
-    expect(result.diffHtml).toContain("Second body");
-  });
-
-  test("history restore creates a new version and redirects to read view", async () => {
-    const { docId } = await seedDocs();
-    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.server.ts");
-    const fd = new FormData();
-    fd.set("version_num", "1");
-    let caught: unknown;
-    try {
-      await mod.actions.restore({
-        params: { id: docId },
-        request: new Request(`http://localhost/docs/${docId}/history`, { method: "POST", body: fd }),
-      } as Parameters<typeof mod.actions.restore>[0]);
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toMatchObject({ status: 303, location: `/docs/${docId}` });
-
-    const db = await openIsolatedStore(join(dbDir(), "main"));
-    await migrateIsolatedStore(db);
-    try {
-      const rows = await db.query<{ body_md: string; latest: number }>(
-        `SELECT d.body_md, max(v.version_num)::int AS latest
-           FROM documents d
-           JOIN doc_versions v ON v.doc_id = d.id AND v.org_id = d.org_id
-          WHERE d.id = $1
-          GROUP BY d.body_md`,
-        [docId],
-      );
-      expect(rows[0]).toEqual({ body_md: "First body", latest: 3 });
-    } finally {
-      await db.close();
-    }
-  });
-
-  test("history view renders timeline, snapshot badge, diff, and restore buttons", async () => {
-    const { render } = await import("svelte/server");
-    const mod = await import("@fulcrum/web/routes/docs/[id]/history/+page.svelte");
-    const Page = mod.default as Component<{
-      data: {
-        doc: { id: string; title: string };
-        versions: Array<{ id: string; versionNum: number; isSnapshot: boolean; createdAt: string }>;
-        diffHtml: string;
-      };
-    }>;
-
-    const { body } = render(Page, {
-      props: {
-        data: {
-          doc: { id: "doc-1", title: "History Doc" },
-          versions: [
-            { id: "v2", versionNum: 2, isSnapshot: true, createdAt: "2026-05-03T00:00:00.000Z" },
-            { id: "v1", versionNum: 1, isSnapshot: true, createdAt: "2026-05-02T00:00:00.000Z" },
-          ],
-          diffHtml: "<del>old</del><ins>new</ins>",
-        },
-      },
-    });
-
-    expect(body).toContain("data-doc-history-view");
-    expect(body).toContain('data-doc-version="2"');
-    expect(body).toContain("data-snapshot-badge");
-    expect(body).toContain("data-restore-version");
-    expect(body).toContain("<del>old</del><ins>new</ins>");
-  });
+  // History route coverage lives in:
+  //   apps/web/src/routes/docs/[id]/history/page.server.public-api.test.ts
+  //   apps/web/src/routes/docs/[id]/history/page.svelte.test.ts
+  // Those exercise the public-API path with mocked fetch; this orphan suite
+  // predated the public-API refactor and asserted a different return shape.
 });
