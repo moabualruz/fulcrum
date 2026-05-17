@@ -47,6 +47,10 @@
   let saving = $state(false);
   let saveError = $state<string | null>(null);
   let suppressSlashState = false;
+  let searchOpen = $state(false);
+  let searchTerm = $state("");
+  let replaceTerm = $state("");
+  let searchMatchCount = $state(0);
 
   const filteredItems = $derived(filterSlashMenuItems(ALL_ITEMS, slashQuery));
 
@@ -132,6 +136,11 @@
       if (href) editor?.chain().focus().extendMarkRange("link").setLink({ href }).run();
       return;
     }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "h") {
+      event.preventDefault();
+      searchOpen = !searchOpen;
+      return;
+    }
 
     if (!slashOpen) return;
 
@@ -149,6 +158,33 @@
       slashOpen = false;
       slashQuery = "";
     }
+  }
+
+  function findInEditor(): void {
+    if (!editor || !searchTerm) { searchMatchCount = 0; return; }
+    const text = editor.getText();
+    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const matches = text.match(regex);
+    searchMatchCount = matches?.length ?? 0;
+  }
+
+  function replaceNext(): void {
+    if (!editor || !searchTerm) return;
+    const { state } = editor;
+    const text = state.doc.textContent;
+    const idx = text.indexOf(searchTerm, state.selection.from);
+    if (idx === -1) return;
+    editor.chain().focus().setTextSelection({ from: idx, to: idx + searchTerm.length }).insertContent(replaceTerm).run();
+    findInEditor();
+  }
+
+  function replaceAll(): void {
+    if (!editor || !searchTerm) return;
+    const text = editor.getText();
+    const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const newText = text.replace(regex, replaceTerm);
+    editor.commands.setContent(newText);
+    searchMatchCount = 0;
   }
 
   function handleEditorFiles(files: File[]): boolean {
@@ -254,7 +290,18 @@
       <button type="button" aria-label="Table" title="Table" data-doc-table onclick={() => editor && insertSlashMenuItem(editor, "table")}>▦</button>
       <button type="button" aria-label="Unlink" title="Unlink" data-doc-unlink onclick={() => editor?.chain().focus().unsetLink().run()}>⨯</button>
       <button type="button" aria-label="Comment" title="Comment" data-doc-comment onclick={createCommentAnchor}>💬</button>
+      <button type="button" aria-label="Find & Replace" title="Find & Replace (Ctrl+H)" data-doc-search onclick={() => { searchOpen = !searchOpen; }}>🔍</button>
     </div>
+    {#if searchOpen}
+      <div data-doc-search-bar class="doc-editor__search-bar">
+        <input type="text" placeholder="Find..." bind:value={searchTerm} oninput={findInEditor} aria-label="Search" class="doc-editor__search-input" />
+        <span class="doc-editor__search-count">{searchMatchCount} match{searchMatchCount === 1 ? '' : 'es'}</span>
+        <input type="text" placeholder="Replace..." bind:value={replaceTerm} aria-label="Replace" class="doc-editor__search-input" />
+        <button type="button" onclick={replaceNext} class="doc-editor__search-btn">Replace</button>
+        <button type="button" onclick={replaceAll} class="doc-editor__search-btn">All</button>
+        <button type="button" onclick={() => { searchOpen = false; searchTerm = ''; replaceTerm = ''; searchMatchCount = 0; }} class="doc-editor__search-btn">✕</button>
+      </div>
+    {/if}
     <div class="doc-editor__surface">
       <EditorContent editor={editor as never} class="doc-editor__content" />
       {#if slashOpen}
@@ -407,6 +454,40 @@
 
   .doc-editor__error {
     color: hsl(var(--destructive, 0 84% 60%));
+  }
+
+  .doc-editor__search-bar {
+    align-items: center;
+    border: 1px solid hsl(var(--border, 214 32% 91%));
+    border-radius: 0.375rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding: 0.375rem;
+  }
+
+  .doc-editor__search-input {
+    border: 1px solid hsl(var(--border, 214 32% 91%));
+    border-radius: 0.25rem;
+    font-size: 0.8125rem;
+    height: 1.75rem;
+    padding: 0 0.5rem;
+    width: 10rem;
+  }
+
+  .doc-editor__search-count {
+    color: hsl(var(--muted-foreground, 215 20% 65%));
+    font-size: 0.75rem;
+    min-width: 4rem;
+  }
+
+  .doc-editor__search-btn {
+    border: 1px solid hsl(var(--border, 214 32% 91%));
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    height: 1.75rem;
+    padding: 0 0.5rem;
   }
 
   :global(.callout) {
