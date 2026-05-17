@@ -18,7 +18,7 @@ import { betterAuth } from "better-auth";
 import { organization, magicLink, emailOTP } from "better-auth/plugins";
 import type { DBAdapter } from "@better-auth/core/db/adapter";
 
-import { MikroOrmBetterAuthAdapter } from "./adapter.ts";
+import { TypeOrmBetterAuthAdapter } from "./adapter.ts";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { DEFAULT_ADMIN_EMAIL } from "@platform-core/infrastructure/application-database/seed.ts";
 
@@ -42,18 +42,18 @@ async function isFlagEnabled(em: EntityManager, flag: string): Promise<boolean> 
 }
 
 /**
- * Build the Better-Auth DBAdapterInstance from our MikroOrm adapter.
+ * Build the Better-Auth DBAdapterInstance from our TypeORM adapter.
  *
  * Better-Auth expects: database = (betterAuthOptions) => DBAdapter
  * where DBAdapter has: { id, create, findOne, findMany, update, updateMany, delete, deleteMany, count, transaction }
  */
-function buildDbAdapterInstance(mikro: MikroOrmBetterAuthAdapter): unknown {
+function buildDbAdapterInstance(typeorm: TypeOrmBetterAuthAdapter): unknown {
   // DBAdapterInstance is (options: BetterAuthOptions) => DBAdapter
   // PGlite does not support transactions; Better-Auth auto-patches when transaction is absent.
   return (_options: unknown): Omit<DBAdapter, "transaction"> => {
-    const custom = mikro.createAdapter();
+    const custom = typeorm.createAdapter();
     return {
-      id: "mikro-orm",
+      id: "typeorm",
       create: custom.create as DBAdapter["create"],
       findOne: custom.findOne as DBAdapter["findOne"],
       findMany: custom.findMany as DBAdapter["findMany"],
@@ -191,9 +191,9 @@ async function authConfigSignature(em: EntityManager): Promise<string> {
 }
 
 async function buildAuth(em: EntityManager): Promise<{ auth: AnyAuth; signature: string }> {
-  const mikro = new MikroOrmBetterAuthAdapter(em);
+  const typeorm = new TypeOrmBetterAuthAdapter(em);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = buildDbAdapterInstance(mikro) as any;
+  const db = buildDbAdapterInstance(typeorm) as any;
 
   const saasEnabled = await isFlagEnabled(em, SAAS_AUTH_FLAG);
   const socialProviders = saasEnabled ? oauthProviderConfig() : undefined;

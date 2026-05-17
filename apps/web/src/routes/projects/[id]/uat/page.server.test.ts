@@ -21,6 +21,14 @@ mock.module("$lib/server/application-scope", () => ({
 }));
 
 mock.module("@planning-review/interface/project-review-reports.ts", () => ({
+  listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
+    calls.push(`history:${input.projectId}:${input.limit ?? ""}`);
+    return [];
+  },
+  runGeneratedE2eRegressionTests: async (_em: unknown, _ctx: unknown, input: { projectId: string; runner?: string }) => {
+    calls.push(`e2e:${input.projectId}:${input.runner ?? ""}`);
+    return { projectId: input.projectId, status: "passed" };
+  },
   buildUatCodeReviewHandoff: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
     calls.push(`handoff:${input.projectId}`);
     if (loadShouldThrowNotFound) throw new AppNotFoundError("Project not found");

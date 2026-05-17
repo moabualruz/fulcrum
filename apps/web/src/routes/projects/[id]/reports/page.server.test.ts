@@ -57,6 +57,10 @@ mock.module("@planning-review/interface/project-review-reports.ts", () => ({
     calls.push(`e2e:${input.projectId}:${input.runner ?? ""}:${input.planOnly ? "plan" : "run"}`);
     return { projectId: input.projectId, status: input.planOnly ? "planned" : "passed" };
   },
+  listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
+    calls.push(`history:${input.projectId}:${input.limit ?? ""}`);
+    return [];
+  },
   buildReviewWorkbenchModel: async (input: { projectId?: string; reviewId?: string }) => {
     calls.push(`workbench:${input.projectId ?? ""}:${input.reviewId ?? ""}`);
     return { projectId: input.projectId, reviewId: input.reviewId, files: [] };

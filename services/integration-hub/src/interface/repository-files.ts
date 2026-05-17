@@ -1,12 +1,11 @@
-import type { EntityManager } from "typeorm";
-
-import type { AppContext } from "@integration-hub/domain/repository.ts";
 import type {
   FileTreeNode,
   RepoFileBlameRow,
   RepoFileContentRow,
   RepoFileRow,
 } from "@integration-hub/application/repo-files/queries.ts";
+import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import type { RepositoryRequestContextInput } from "./repository-pages.ts";
 
 export type {
   FileTreeNode,
@@ -16,31 +15,31 @@ export type {
 };
 
 export async function loadRepositoryFilesPage(
-  em: EntityManager,
-  ctx: AppContext,
+  contextInput: RepositoryRequestContextInput,
   input: { repoId: string; filePath: string },
 ) {
   const service = await import("@integration-hub/application/repo-files/queries.ts");
+  const { em, ctx } = await repositoryScope(contextInput);
   return service.getRepoFilesPage(em, ctx, input);
 }
 
 export async function loadRepositoryFileDetail(
-  em: EntityManager,
-  ctx: AppContext,
+  contextInput: RepositoryRequestContextInput,
   input: { repoId: string; branch?: string; filePath: string; showBlame: boolean },
 ) {
   const service = await import("@integration-hub/application/repo-files/queries.ts");
+  const { em, ctx } = await repositoryScope(contextInput);
   return service.getRepoFileDetailPage(em, ctx, input);
 }
 
 export async function listRepositoryTreeChildren(
-  em: EntityManager,
-  ctx: AppContext,
+  contextInput: RepositoryRequestContextInput,
   repoId: string,
   branch: string,
   parentPath: string | null,
 ): Promise<RepoFileRow[]> {
   const service = await import("@integration-hub/application/repo-files/queries.ts");
+  const { em, ctx } = await repositoryScope(contextInput);
   return service.listTreeChildren(em, ctx, repoId, branch, parentPath);
 }
 
@@ -90,4 +89,15 @@ export function shikiLangFromPath(path: string): string {
     txt: "text",
   };
   return map[ext] ?? "text";
+}
+
+async function repositoryScope(input: RepositoryRequestContextInput) {
+  return {
+    em: (await initDataSource()).manager,
+    ctx: {
+      orgId: input.orgId,
+      userId: input.userId ?? null,
+      projectId: input.projectId ?? null,
+    },
+  };
 }

@@ -1101,7 +1101,7 @@
 			{/if}
 
 			{#if form?.mode === "reviewWorkbench" && form.ok && form.reviewWorkbench}
-				<ReviewWorkbench model={form.reviewWorkbench} />
+				<ReviewWorkbench model={form.reviewWorkbench} aiStreamUrl={`/api/review/stream?projectId=${data.projectId}`} />
 				<!-- Legacy inline render preserved below for data debugging -->
 				<details class={cn("mt-2")}>
 					<summary class={cn("text-xs text-muted-foreground cursor-pointer")}>Raw review data</summary>

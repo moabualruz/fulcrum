@@ -31,8 +31,8 @@ if (isVitestCli) {
     priority: 20,
   };
 
-  const trpcResponse = (data: unknown, init?: ResponseInit) =>
-    new Response(JSON.stringify({ result: { data: { json: data } } }), {
+  const apiResponse = (data: unknown, init?: ResponseInit) =>
+    new Response(JSON.stringify(data), {
       status: 200,
       headers: { "content-type": "application/json" },
       ...init,
@@ -77,7 +77,7 @@ if (isVitestCli) {
     });
 
     test("create validates conditions_json inline before routing.create", async () => {
-      const fetchFn = vi.fn().mockResolvedValue(trpcResponse([]));
+      const fetchFn = vi.fn().mockResolvedValue(apiResponse([]));
       const formData = new FormData();
       formData.set("name", "Broken");
       formData.set("actionAgent", "codex");
@@ -98,12 +98,12 @@ if (isVitestCli) {
     test("create, update, reorder, dryRun, and delete call routing tRPC procedures", async () => {
       const fetchFn = vi
         .fn()
-        .mockResolvedValueOnce(trpcResponse(globalRule))
-        .mockResolvedValueOnce(trpcResponse({ ...globalRule, enabled: false }))
-        .mockResolvedValueOnce(trpcResponse(globalRule))
-        .mockResolvedValueOnce(trpcResponse(globalRule))
-        .mockResolvedValueOnce(trpcResponse({ ruleId: globalRule.id, source: "rule", agent: "codex", confidence: 1 }))
-        .mockResolvedValueOnce(trpcResponse({ ok: true }));
+        .mockResolvedValueOnce(apiResponse(globalRule))
+        .mockResolvedValueOnce(apiResponse({ ...globalRule, enabled: false }))
+        .mockResolvedValueOnce(apiResponse(globalRule))
+        .mockResolvedValueOnce(apiResponse(globalRule))
+        .mockResolvedValueOnce(apiResponse({ ruleId: globalRule.id, source: "rule", agent: "codex", confidence: 1 }))
+        .mockResolvedValueOnce(apiResponse({ ok: true }));
 
       const createForm = new FormData();
       createForm.set("name", "Bugs to Codex");
@@ -145,32 +145,32 @@ if (isVitestCli) {
 
       expect(fetchFn).toHaveBeenNthCalledWith(
         1,
-        "http://localhost/api/trpc/routing.create",
+        "http://localhost/api/v1/routing/rules/create",
         expect.objectContaining({ body: expect.stringContaining('"actionAgent":"codex"') }),
       );
       expect(fetchFn).toHaveBeenNthCalledWith(
         2,
-        "http://localhost/api/trpc/routing.update",
+        `http://localhost/api/v1/routing/rules/${globalRule.id}/update`,
         expect.objectContaining({ body: expect.stringContaining('"enabled":false') }),
       );
       expect(fetchFn).toHaveBeenNthCalledWith(
         3,
-        "http://localhost/api/trpc/routing.update",
+        `http://localhost/api/v1/routing/rules/${globalRule.id}/update`,
         expect.objectContaining({ body: expect.stringContaining('"priority":10') }),
       );
-      expect(String(fetchFn.mock.calls[4][0])).toContain("/api/trpc/routing.dryRun?input=");
+      expect(String(fetchFn.mock.calls[4][0])).toContain("/api/v1/routing/dry-run");
       expect(fetchFn).toHaveBeenNthCalledWith(
         6,
-        "http://localhost/api/trpc/routing.delete",
-        expect.objectContaining({ body: expect.stringContaining(globalRule.id) }),
+        `http://localhost/api/v1/routing/rules/${globalRule.id}/delete`,
+        expect.objectContaining({ method: "POST" }),
       );
     });
 
     test("project routing loads project rules plus read-only inherited globals and passes projectId", async () => {
       const fetchFn = vi
         .fn()
-        .mockResolvedValueOnce(trpcResponse([projectRule]))
-        .mockResolvedValueOnce(trpcResponse([globalRule, projectRule]));
+        .mockResolvedValueOnce(apiResponse([projectRule]))
+        .mockResolvedValueOnce(apiResponse([globalRule, projectRule]));
 
       const data = await projectRoute.load(
         event(fetchFn as unknown as typeof fetch, `/projects/${projectRule.projectId}/routing`, { id: projectRule.projectId }),
@@ -178,9 +178,8 @@ if (isVitestCli) {
 
       expect(data.rules).toEqual([projectRule]);
       expect(data.inheritedRules).toEqual([globalRule]);
-      expect(String(fetchFn.mock.calls[0][0])).toContain(
-        `routing.list?input=${encodeURIComponent(JSON.stringify({ projectId: projectRule.projectId }))}`,
-      );
+      expect(String(fetchFn.mock.calls[0][0])).toContain("/api/v1/routing/rules?");
+      expect(String(fetchFn.mock.calls[0][0])).toContain(`projectId=${projectRule.projectId}`);
 
       const { default: Page } = await import("../../src/routes/projects/[id]/routing/+page.svelte");
       const { container, getByText } = render(Page, {

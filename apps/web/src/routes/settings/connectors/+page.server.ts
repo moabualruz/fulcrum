@@ -14,8 +14,8 @@ import { error, fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { createConnectorApiForEvent } from "$lib/server/connector-api";
 
-export const CONNECTOR_NAMES = ["confluence", "notion", "github-issues"] as const;
-export type ConnectorName = (typeof CONNECTOR_NAMES)[number];
+const CONNECTOR_NAMES = ["confluence", "notion", "github-issues"] as const;
+type ConnectorName = (typeof CONNECTOR_NAMES)[number];
 
 interface ConnectorDescriptor {
   name: string;

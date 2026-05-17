@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { EntityManager } from "typeorm";
 import {
   createIsolatedOrmFixture,
   type TestOrmFixture,
@@ -16,7 +15,7 @@ afterAll(() => {
 
 async function freshDb(name: string): Promise<{
   db: TestStore;
-  em: EntityManager;
+  em: TestOrmFixture["em"];
   orgId: string;
   projectId: string;
   close: () => Promise<void>;
@@ -33,7 +32,7 @@ async function freshDb(name: string): Promise<{
 }
 
 async function seedRun(
-  em: EntityManager,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   startedAt: string,
@@ -51,7 +50,7 @@ async function seedRun(
 }
 
 async function seedDoc(
-  em: EntityManager,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   title: string,
@@ -68,7 +67,7 @@ async function seedDoc(
 }
 
 async function seedTask(
-  em: EntityManager,
+  em: TestOrmFixture["em"],
   orgId: string,
   projectId: string | null,
   status: string,
@@ -91,7 +90,7 @@ async function seedTask(
 // exposes.
 
 describe("+page.server load contract", () => {
-  let em: EntityManager;
+  let em: TestOrmFixture["em"];
   let orgId: string;
   let projectId: string;
   let fixtureClose: TestOrmFixture["close"];

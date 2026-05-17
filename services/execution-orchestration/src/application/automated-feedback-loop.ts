@@ -27,7 +27,10 @@ export type AutomatedFeedbackLoopStopReason =
   | "max_iterations_reached"
   | "manual_review_required"
   | "reviewer_unavailable"
-  | "worker_waiting";
+  | "worker_waiting"
+  | "cancelled"
+  | "iteration_timeout"
+  | "stale_run_detected";
 
 export interface AutomatedFeedbackLoopInput {
   projectId?: string | null;
@@ -39,6 +42,9 @@ export interface AutomatedFeedbackLoopInput {
   feedbackModel?: string | null;
   workerId?: string | null;
   maxIterations?: number | null;
+  iterationTimeoutMs?: number | null;
+  staleThresholdMs?: number | null;
+  signal?: AbortSignal | null;
   cwd?: string | null;
   copyToWorktree?: string[] | null;
 }
@@ -83,6 +89,18 @@ export interface AutomatedFeedbackLoopOutput {
 }
 
 const DEFAULT_MAX_ITERATIONS = 10;
+const DEFAULT_ITERATION_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise.then(
+      (result) => { clearTimeout(timer); resolve(result); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
 
 export async function runAutomatedFeedbackLoopForTasks(
   em: EntityManager,
@@ -97,6 +115,8 @@ export async function runAutomatedFeedbackLoopForTasks(
   if (!Number.isInteger(maxIterations) || maxIterations < 1) {
     throw new AppValidationError("Automated feedback maxIterations must be at least 1.");
   }
+  const iterationTimeoutMs = input.iterationTimeoutMs ?? DEFAULT_ITERATION_TIMEOUT_MS;
+  const staleThresholdMs = input.staleThresholdMs ?? DEFAULT_STALE_THRESHOLD_MS;
 
   const scopedCtx = {...ctx, projectId };
   const processedRuns: AutomatedFeedbackLoopProcessedRun[] = [];
@@ -104,17 +124,44 @@ export async function runAutomatedFeedbackLoopForTasks(
   let feedback = await loadDependencyRunLiveFeedbackForTasks(em, scopedCtx, { projectId, traceId });
   let stopReason: AutomatedFeedbackLoopStopReason = "automated_feedback_exhausted";
   let iterations = 0;
+  let lastProgressAt = Date.now();
 
   for (let index = 0; index < maxIterations; index += 1) {
+    if (input.signal?.aborted) {
+      stopReason = "cancelled";
+      break;
+    }
+
+    const sinceLastProgress = Date.now() - lastProgressAt;
+    if (sinceLastProgress > staleThresholdMs) {
+      stopReason = "stale_run_detected";
+      break;
+    }
+
     iterations = index + 1;
-    const tick = await runNextDependencyRunWorkerTickForTasks(em, scopedCtx, {
-      projectId,
-      traceId,
-      workerId: input.workerId ?? null,
-      cwd: input.cwd ?? null,
-      copyToWorktree: input.copyToWorktree ?? null,
-    }, {...(deps.runAgent ? { runAgent: deps.runAgent } : {}),
-    });
+    let tick: DependencyRunWorkerTickOutput;
+    try {
+      tick = await withTimeout(
+        runNextDependencyRunWorkerTickForTasks(em, scopedCtx, {
+          projectId,
+          traceId,
+          workerId: input.workerId ?? null,
+          cwd: input.cwd ?? null,
+          copyToWorktree: input.copyToWorktree ?? null,
+        }, { ...(deps.runAgent ? { runAgent: deps.runAgent } : {}) }),
+        iterationTimeoutMs,
+        `worker-tick-iteration-${iterations}`,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("timed out")) {
+        stopReason = "iteration_timeout";
+      } else {
+        stopReason = "agent_run_failed";
+      }
+      break;
+    }
+
+    lastProgressAt = Date.now();
     feedback = tick.feedback;
 
     if (!tick.processedRun) {
@@ -148,14 +195,32 @@ export async function runAutomatedFeedbackLoopForTasks(
       tick,
       feedback,
     };
-    const review = deps.reviewTaskRun
-      ? await deps.reviewTaskRun(reviewInput)
-      : await runDefaultReviewerForTaskRun(
-        em,
-        scopedCtx,
-        input,
-        reviewInput,
-        deps.reviewAgent ?? defaultReviewAgent,);
+    let review: AutomatedFeedbackReviewResult;
+    try {
+      review = await withTimeout(
+        deps.reviewTaskRun
+          ? deps.reviewTaskRun(reviewInput)
+          : runDefaultReviewerForTaskRun(
+              em,
+              scopedCtx,
+              input,
+              reviewInput,
+              deps.reviewAgent ?? defaultReviewAgent,
+            ),
+        iterationTimeoutMs,
+        `review-iteration-${iterations}`,
+      );
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("timed out")) {
+        stopReason = "iteration_timeout";
+      } else {
+        stopReason = "reviewer_unavailable";
+      }
+      break;
+    }
+
+    lastProgressAt = Date.now();
+
     if (!review.reviewText?.trim()) {
       stopReason = "reviewer_unavailable";
       break;

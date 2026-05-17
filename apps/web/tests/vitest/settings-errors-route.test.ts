@@ -1,42 +1,38 @@
 import { fireEvent, render, waitFor } from "@testing-library/svelte";
 import { describe, expect, test, vi } from "vitest";
 
-const { appScope, clearSettingsErrors, errors, listSettingsErrors } = vi.hoisted(() => {
-  const errors = [
-    {
-      id: "err-1",
-      occurred_at: "2026-05-03T10:00:00.000Z",
-      message: "Unhandled rejection",
-      os: "darwin",
-      version: "0.1.0",
-      stack_trace: "Error: fail\n at run (<cwd>/apps/cli/src/main.ts:1:1)",
-      context: { source: "unhandledRejection" },
-    },
-  ];
-  const appScope = {
-    em: { kind: "entity-manager" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId: null },
-  };
-  const listSettingsErrors = vi.fn(async () => ({ errors, total: 1, page: 1, pageSize: 20 }));
-  const clearSettingsErrors = vi.fn(async () => ({ success: true as const }));
-  return { appScope, clearSettingsErrors, errors, listSettingsErrors };
-});
-
-vi.mock("$lib/server/application-scope", () => ({
-  requestAppScope: async () => appScope,
-}));
-
-vi.mock("@platform-core/application/settings/queries.ts", () => ({
-  listSettingsErrors,
-}));
-
-vi.mock("@platform-core/application/settings/commands.ts", () => ({
-  clearSettingsErrors,
-}));
-
 const { actions, load } = await import("../../src/routes/settings/errors/+page.server");
 
 const session = { id: "session-1", userId: "user-1" };
+const apiRows = [
+  {
+    id: "err-1",
+    occurredAt: "2026-05-03T10:00:00.000Z",
+    errorMessage: "Unhandled rejection",
+    os: "darwin",
+    fulcrumVersion: "0.1.0",
+    stackTrace: "Error: fail\n at run (<cwd>/apps/cli/src/main.ts:1:1)",
+    context: { source: "unhandledRejection" },
+  },
+];
+const errors = [
+  {
+    id: "err-1",
+    occurred_at: "2026-05-03T10:00:00.000Z",
+    message: "Unhandled rejection",
+    os: "darwin",
+    version: "0.1.0",
+    stack_trace: "Error: fail\n at run (<cwd>/apps/cli/src/main.ts:1:1)",
+    context: { source: "unhandledRejection" },
+  },
+];
+
+const jsonResponse = (data: unknown, init?: ResponseInit) =>
+  new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+    ...init,
+  });
 
 function event(fetchFn: typeof fetch) {
   return {
@@ -49,14 +45,15 @@ function event(fetchFn: typeof fetch) {
 
 describe("/settings/errors route", () => {
   test("load fetches paginated local error rows", async () => {
-    listSettingsErrors.mockClear();
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ data: apiRows, total: 1 }));
 
-    const data = await load(event(vi.fn() as unknown as typeof fetch));
+    const data = await load(event(fetchFn as unknown as typeof fetch));
     const payload = await data.streamed.data;
 
     expect(payload.errors).toEqual(errors);
     expect(payload.total).toBe(1);
-    expect(listSettingsErrors).toHaveBeenCalledWith(appScope.em, appScope.ctx, { page: 1, pageSize: 20 });
+    expect(String(fetchFn.mock.calls[0][0])).toContain("/api/v1/error-logs?");
+    expect(String(fetchFn.mock.calls[0][0])).toContain("includeTotal=true");
   });
 
   test("renders crashlog rows with stack details", async () => {
@@ -74,12 +71,12 @@ describe("/settings/errors route", () => {
   });
 
   test("clearBefore action deletes local rows", async () => {
-    clearSettingsErrors.mockClear();
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ success: true }));
     const formData = new FormData();
     formData.set("before", "2026-05-03T00:00:00.000Z");
 
     const result = await actions.clearBefore({
-      ...event(vi.fn() as unknown as typeof fetch),
+      ...event(fetchFn as unknown as typeof fetch),
       request: {
         headers: new Headers({ cookie: "sid=abc" }),
         formData: async () => formData,
@@ -87,8 +84,10 @@ describe("/settings/errors route", () => {
     });
 
     expect(result).toEqual({ success: true });
-    expect(clearSettingsErrors).toHaveBeenCalledWith(appScope.em, appScope.ctx, {
-      before: "2026-05-03T00:00:00.000Z",
-    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/error-logs?"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(String(fetchFn.mock.calls[0][0])).toContain("before=2026-05-03T00%3A00%3A00.000Z");
   });
 });

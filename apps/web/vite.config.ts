@@ -18,7 +18,7 @@ function transformRepoDecorators(): Plugin {
         compilerOptions: {
           target: ts.ScriptTarget.ES2022,
           module: ts.ModuleKind.ESNext,
-          experimentalDecorators: false,
+          experimentalDecorators: true,
           useDefineForClassFields: true,
           verbatimModuleSyntax: true,
           sourceMap: true,

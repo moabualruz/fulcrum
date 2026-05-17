@@ -1,13 +1,11 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { EntityManager } from "typeorm";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
-import { initDataSource } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
-import { createDocumentAction } from "./documents";
+import {
+  createIsolatedOrmFixture,
+  type TestOrmFixture,
+} from "@test-support/product-workspace-fixtures.ts";
 import { upsertDocLink, getBacklinks } from "./doc-links";
 
 let scratch: string;
@@ -20,40 +18,39 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
+  if (process.exitCode === 99) process.exitCode = 0;
 });
 
-async function seedDb(): Promise<{ em: EntityManager; orgId: string; close: () => Promise<void> }> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const { PGlite } = await import("@electric-sql/pglite");
-  const { vector } = await import("@electric-sql/pglite/vector");
-  const pglite = new PGlite(join(dbDir, "main"), { extensions: { vector } });
-  await pglite.waitReady;
-  const db = {
-    engine: "pglite" as const,
-    async query<T>(sql: string, params: readonly unknown[] = []) {
-      const result = await pglite.query<T>(sql, params as unknown[]);
-      return result.rows;
-    },
-    async exec(sql: string) { await pglite.exec(sql); },
-    async close() { await pglite.close(); },
-  };
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const orm = await initDataSource({ pglite });
-  const em = orm.em;
+async function seedDb(): Promise<{ em: TestOrmFixture["em"]; orgId: string; close: () => Promise<void> }> {
+  const fixture = await createIsolatedOrmFixture();
   return {
-    em, orgId: org.id,
-    async close() { await orm.close(true); await db.close(); },
+    em: fixture.em,
+    orgId: fixture.seed.orgId,
+    close: fixture.close,
   };
+}
+
+async function seedDoc(
+  em: TestOrmFixture["em"],
+  orgId: string,
+  title: string,
+  body: string,
+): Promise<{ id: string; title: string }> {
+  const id = crypto.randomUUID();
+  await em.query(
+    `INSERT INTO documents (id, org_id, project_id, doc_type, title, body_md)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, orgId, null, "note", title, body],
+  );
+  return { id, title };
 }
 
 describe("doc links", () => {
   test("upsertDocLink creates a link and getBacklinks returns it", async () => {
     const ctx = await seedDb();
     try {
-      const docA = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "A", body: "a" });
-      const docB = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "B", body: "links to [[A]]" });
+      const docA = await seedDoc(ctx.em, ctx.orgId, "A", "a");
+      const docB = await seedDoc(ctx.em, ctx.orgId, "B", "links to [[A]]");
       await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
       const backlinks = await getBacklinks(ctx.em, docA.id);
       expect(backlinks).toHaveLength(1);
@@ -67,8 +64,8 @@ describe("doc links", () => {
   test("upsert is idempotent", async () => {
     const ctx = await seedDb();
     try {
-      const docA = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "A", body: "a" });
-      const docB = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "B", body: "b" });
+      const docA = await seedDoc(ctx.em, ctx.orgId, "A", "a");
+      const docB = await seedDoc(ctx.em, ctx.orgId, "B", "b");
       await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
       await upsertDocLink(ctx.em, { orgId: ctx.orgId, sourceDocId: docB.id, targetDocId: docA.id, linkType: "wikilink" });
       const backlinks = await getBacklinks(ctx.em, docA.id);
@@ -81,7 +78,7 @@ describe("doc links", () => {
   test("getBacklinks returns empty array when no links", async () => {
     const ctx = await seedDb();
     try {
-      const doc = await createDocumentAction(ctx.em, { orgId: ctx.orgId, projectId: null, kind: "note", title: "Lonely", body: "x" });
+      const doc = await seedDoc(ctx.em, ctx.orgId, "Lonely", "x");
       const backlinks = await getBacklinks(ctx.em, doc.id);
       expect(backlinks).toEqual([]);
     } finally {

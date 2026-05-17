@@ -6,7 +6,7 @@ import {
   generateAuthenticationOptions,
   generatePasskeyRegistrationOptions,
   generateRegistrationOptions,
-  MikroOrmPasskeyStore,
+  TypeOrmPasskeyStore,
   verifyAuthenticationResponse,
   verifyPasskeyRegistration,
   verifyRegistrationResponse,
@@ -416,11 +416,11 @@ describe("passkey WebAuthn helpers", () => {
     expect(lastAuthenticationVerifyOptions?.["requireUserVerification"]).toBe(false);
   });
 
-  test("MikroOrmPasskeyStore persists challenges and credentials across store instances", async () => {
+  test("TypeOrmPasskeyStore persists challenges and credentials across store instances", async () => {
     const db = await createTestOrm();
 
     try {
-      const store1 = new MikroOrmPasskeyStore(db.em);
+      const store1 = new TypeOrmPasskeyStore(db.em);
       const userId = "00000000-0000-0000-0000-000000000111";
       await store1.saveChallenge({
         challengeId: userId,
@@ -441,7 +441,7 @@ describe("passkey WebAuthn helpers", () => {
         userVerificationRequired: true,
       });
 
-      const store2 = new MikroOrmPasskeyStore(db.em);
+      const store2 = new TypeOrmPasskeyStore(db.em);
       expect(await store2.getChallenge({ challengeId: userId, purpose: "registration" }))
         .toMatchObject({ challenge: "persisted-challenge", userId });
       expect(await store2.getCredentialById("credential-1")).toMatchObject({
@@ -454,18 +454,18 @@ describe("passkey WebAuthn helpers", () => {
       });
 
       await store2.updateCredentialCounter("credential-1", 9);
-      const store3 = new MikroOrmPasskeyStore(db.em);
+      const store3 = new TypeOrmPasskeyStore(db.em);
       expect(await store3.getCredentialById("credential-1")).toMatchObject({ counter: 9 });
 
       await store3.deleteChallenge({ challengeId: userId, purpose: "registration" });
-      const store4 = new MikroOrmPasskeyStore(db.em);
+      const store4 = new TypeOrmPasskeyStore(db.em);
       expect(await store4.getChallenge({ challengeId: userId, purpose: "registration" })).toBeNull();
     } finally {
       await db.close();
     }
   });
 
-  test("MikroOrmPasskeyStore.saveChallenge replaces challenge inside one transaction", async () => {
+  test("TypeOrmPasskeyStore.saveChallenge replaces challenge inside one transaction", async () => {
     const calls: string[] = [];
     const txEm = {
       delete: async () => {
@@ -498,7 +498,7 @@ describe("passkey WebAuthn helpers", () => {
         return entity;
       },
     };
-    const store = new MikroOrmPasskeyStore(em as never);
+    const store = new TypeOrmPasskeyStore(em as never);
 
     await store.saveChallenge({
       challengeId: "user-1",
@@ -518,7 +518,7 @@ describe("passkey WebAuthn helpers", () => {
     ]);
   });
 
-  test("MikroOrmPasskeyStore.saveCredential upserts inside one transaction", async () => {
+  test("TypeOrmPasskeyStore.saveCredential upserts inside one transaction", async () => {
     const calls: string[] = [];
     const txEm = {
       findOne: async () => {
@@ -553,7 +553,7 @@ describe("passkey WebAuthn helpers", () => {
         return entity;
       },
     };
-    const store = new MikroOrmPasskeyStore(em as never);
+    const store = new TypeOrmPasskeyStore(em as never);
 
     await store.saveCredential({
       id: "credential-1",
@@ -571,7 +571,7 @@ describe("passkey WebAuthn helpers", () => {
     ]);
   });
 
-  test("MikroOrmPasskeyStore.updateCredentialCounter runs inside one transaction", async () => {
+  test("TypeOrmPasskeyStore.updateCredentialCounter runs inside one transaction", async () => {
     const calls: string[] = [];
     const txRow = {
       userId: "user-1",
@@ -604,7 +604,7 @@ describe("passkey WebAuthn helpers", () => {
         return entity;
       },
     };
-    const store = new MikroOrmPasskeyStore(em as never);
+    const store = new TypeOrmPasskeyStore(em as never);
 
     await store.updateCredentialCounter("credential-1", 4);
 

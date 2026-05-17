@@ -82,6 +82,15 @@ export async function runGeneratedE2eRegressionTests(
   return service.runGeneratedE2eRegressionTests(em, ctx, input);
 }
 
+export async function listGeneratedE2eRunHistory(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { projectId: string; limit?: number },
+) {
+  const service = await import("@planning-review/application/reports/generated-e2e-run-actions.ts");
+  return service.listGeneratedE2eRunHistory(em, ctx, input);
+}
+
 export async function buildReviewWorkbenchModel(input: ReviewWorkbenchInput) {
   const service = await import("@planning-review/application/reviews/review-workbench.ts");
   return service.buildReviewWorkbenchModel(input);

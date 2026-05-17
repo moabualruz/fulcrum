@@ -1,7 +1,7 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup
 
 **Date:** 2026-05-15
-**Status:** HISTORICALLY IMPLEMENTED (2026-05-17), CURRENTLY EVIDENCE-SCOPED — prior notes claim CI completion; current verification is limited to architecture stack gates passing 50 tests. Full CI/final gates must be rerun in the current tree before final closure.
+**Status:** HISTORICALLY IMPLEMENTED (2026-05-17), CURRENTLY STACK-VERIFIED — prior notes claim CI completion; current stack verification includes identity-access TypeORM adapter/passkey tests passing 12 tests, architecture stack gates passing 50 tests, `bun run --bun tsc --noEmit` passing, app-surface direct ORM scan returning 0 files, tracked `.sql` files absent, upstream scratch tracked count 0, and repository/naming/migration/PostgreSQL/PGlite/cross-surface audit cluster passing 75 tests. Full CI/final gates must wait for remaining Phase 9.6 product workflow blockers.
 **Scope:** Full ORM migration + god module split + DTO extraction + tRPC consolidation + stub removal + test co-location
 
 ## Context
@@ -17,7 +17,7 @@ Fulcrum uses MikroORM v7 as primary ORM (93 entities, 40 custom repositories, 52
 | Existing migrations | Discard, write fresh TypeORM set | Cleaner than 1:1 translation of 52 files |
 | Local DB | PGlite via `typeorm-pglite` (v0.3.4) | Default when no DATABASE_URL; full PostgreSQL when DATABASE_URL set |
 | Validation | Zod (keep as-is) | User decision; 81+ imports, dominant in codebase |
-| class-validator | Keep (60+ imports in controllers) | Already used for NestJS DTO validation at HTTP boundary |
+| Zod | Do not expand | AGENTS.md now makes Zod the validation direction; historical references are migration notes, not current architecture authority |
 
 ## Architecture
 
@@ -92,8 +92,8 @@ Entity ownership by service:
 - **workflow-coordination**: Artifact, ArtifactRetentionPolicy, WorkflowCycle, Audit (~6 entities)
 - **platform-core** (shared): Org, TenantSetting, FeatureFlag, FlagOverride, SchemaMigration, Job (~10 entities)
 
-### Phase 10: Extract DTOs from Controllers (60+ controllers)
-class-validator decorators are inline in controller handler methods across 60+ files. Extract to proper `dto/` folders per feature module. Each controller endpoint gets `CreateXDto`, `UpdateXDto`, `QueryXDto` classes with validation decorators. Controllers become thin — accept DTO, delegate to service, return response DTO. Never expose entities directly as API responses.
+### Phase 10: Extract DTOs/Schemas from Controllers (60+ controllers)
+Historical controller validation notes must be reconciled with current AGENTS.md: Zod remains the validation library. Extract request/response contracts into proper `dto/` or schema folders per feature module, keep controllers thin, validate with Zod-backed pipes/schemas, delegate to services, and return response DTOs. Never expose entities directly as API responses.
 
 ### Phase 11: Consolidate tRPC → NestJS Controllers
 33 tRPC routers split across `apps/server/src/trpc/routers/` and `apps/server/src/runtime/trpc/routers/`. Some contain business logic. Consolidate to single location first, then incrementally convert to NestJS controllers (long-term — full conversion is future work, but consolidation + removing business logic from routers is in scope).
@@ -125,6 +125,7 @@ class-validator decorators are inline in controller handler methods across 60+ f
 Checked criteria below reflect historical implementation evidence plus the current focused architecture gate evidence. They are not a current full-CI/final-gate claim; rerun full CI in the current tree before final closure.
 
 - [x] Zero `@mikro-orm/*` imports in codebase
+- [x] Current 2026-05-17 focused evidence: stale identity-access MikroORM adapter/passkey names were corrected to TypeORM; focused identity tests passed 12 tests and architecture stack tests passed 50 tests.
 - [x] Zero `kysely` imports in codebase
 - [x] All 93 entities use TypeORM decorators
 - [x] All repositories use TypeORM `Repository<T>` pattern

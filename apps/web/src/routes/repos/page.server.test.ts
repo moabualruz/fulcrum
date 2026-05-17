@@ -19,8 +19,10 @@ interface RepoListRow {
 }
 
 const repos: RepoListRow[] = [];
-const scopes: Array<{ projectId: string | null }> = [];
-const appScope = { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: null as string | null } };
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
+repoPagesMock["listRows"] = repos;
 
 function row(overrides: Partial<RepoListRow> = {}): RepoListRow {
   return {
@@ -47,22 +49,53 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId?: string | null) => {
-    scopes.push({ projectId: projectId ?? null });
-    return { ...appScope, ctx: { ...appScope.ctx, projectId: projectId ?? null } };
-  },
-}));
-
 mock.module("@integration-hub/interface/repository-pages.ts", () => ({
-  listRepositoryPageRows: async () => [...repos],
-  listRepositoryDashboard: async () => [],
-  loadRepositoryDetail: async () => ({ branches: [], commits: [], files: [], syncLog: [] }),
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [...((repoPagesMock["listRows"] as RepoListRow[] | undefined) ?? [])],
+  listRepositoryDashboard: async () => [...((repoPagesMock["dashboardRows"] as unknown[] | undefined) ?? [])],
+  loadRepositoryDetail: async () => repoPagesMock["dashboardDetail"] ?? { branches: [], commits: [], files: [], syncLog: [] },
+  loadRepositoryBranchesPage: async () => repoPagesMock["branchPage"] ?? { repo: null, branches: [], writeOpsEnabled: false },
+  createRepositoryBranch: async () => {
+    if ((repoPagesMock["branchPage"] as { writeOpsEnabled?: boolean } | undefined)?.writeOpsEnabled === false) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    return { ok: true };
+  },
+  checkoutRepositoryBranch: async (_context: unknown, input: { name: string }) => {
+    const branchPage = repoPagesMock["branchPage"] as {
+      repo?: { currentBranch?: string | null };
+      branches?: Array<{ name: string; isCurrent: boolean }>;
+      writeOpsEnabled?: boolean;
+    } | undefined;
+    if (branchPage?.writeOpsEnabled === false) {
+      const { AppForbiddenError } = await import("@platform-core/domain/errors.ts");
+      throw new AppForbiddenError("Write operations disabled.");
+    }
+    if (branchPage?.repo) branchPage.repo.currentBranch = input.name;
+    if (branchPage?.branches) {
+      branchPage.branches = branchPage.branches.map((branch) => ({ ...branch, isCurrent: branch.name === input.name }));
+    }
+    return { ok: true };
+  },
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async (_context: unknown, input: { repoId: string; page: number; pageSize: number }) => {
+    if (repoPagesMock["knownRepoId"] && input.repoId !== repoPagesMock["knownRepoId"]) {
+      const { AppNotFoundError } = await import("@platform-core/domain/errors.ts");
+      throw new AppNotFoundError("Repo not found");
+    }
+    const rows = (repoPagesMock["commitRows"] as unknown[] | undefined) ?? [];
+    const start = (input.page - 1) * input.pageSize;
+    return { repo: null, commits: rows.slice(start, start + input.pageSize), page: input.page, totalPages: Math.max(1, Math.ceil(rows.length / input.pageSize)), total: rows.length };
+  },
+  loadRepositoryCommitDetail: async () => repoPagesMock["commitDetail"] ?? { repo: null, commit: null, diff: null },
 }));
 
 beforeEach(() => {
   repos.splice(0, repos.length);
-  scopes.splice(0, scopes.length);
 });
 
 describe("/repos +page.server.ts", () => {
@@ -80,7 +113,6 @@ describe("/repos +page.server.ts", () => {
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<{ repos: RepoListRow[] }>(result);
     expect(payload.repos.map((candidate) => candidate.slug)).toEqual(["alpha", "beta"]);
-    expect(scopes).toEqual([{ projectId: "project-1" }]);
   });
 
   test("sync action queues through the repository public API", async () => {

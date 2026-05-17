@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { initializeLocalProductReadiness } from "@platform-core/application/cli-tui/product-readiness.ts";
+import { initializeLocalProductReadiness } from "@platform-core/interface/product-readiness.ts";
 import { createMemoryApiCallerFromEnv } from "@knowledge-workspace/interface/http/memory-api-client.ts";
 import { createSearchApiCallerFromEnv } from "@knowledge-workspace/interface/http/search-api-client.ts";
 import { createProjectApiCallerFromEnv } from "@work-management/interface/http/project-api-client.ts";

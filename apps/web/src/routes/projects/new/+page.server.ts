@@ -27,6 +27,7 @@ export const actions: Actions = {
         slug: form.data.slug,
         name: form.data.name,
         description: form.data.description ?? null,
+        kind: form.data.kind ?? "project",
         repoPath,
         template,
         parentId,
@@ -38,6 +39,7 @@ export const actions: Actions = {
       slug: form.data.slug,
       name: form.data.name,
       description: form.data.description ?? null,
+      kind: form.data.kind ?? "project",
     });
     setActiveProject(cookies, project.slug);
     throw redirect(303, `/projects/${project.id}`);

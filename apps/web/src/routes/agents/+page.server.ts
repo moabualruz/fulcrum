@@ -72,4 +72,72 @@ export const actions: Actions = {
     const run = await dispatchTaskRun(em, ctx, { taskId, agent });
     throw redirect(303, `/runs/${run.id}`);
   },
+
+  resolvePermission: async ({ request, locals }) => {
+    const form = await request.formData();
+    const sessionId = form.get("sessionId") as string;
+    const optionId = form.get("optionId") as string;
+    if (!sessionId || !optionId)
+      return { success: false, message: "sessionId and optionId required" };
+    const { em, ctx } = await requestServiceScope(locals);
+    const { resolveSessionPermission } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await resolveSessionPermission(em, { sessionId, optionId });
+    return actionOk("Permission resolved");
+  },
+
+  trafficControl: async ({ request, locals }) => {
+    const form = await request.formData();
+    const action = form.get("trafficAction") as string;
+    const value = form.get("value") as string;
+    if (!action)
+      return { success: false, message: "trafficAction required" };
+    const { em, ctx } = await requestServiceScope(locals);
+    const { updateTrafficControl } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await updateTrafficControl(em, { action, value });
+    return actionOk(`Traffic ${action} updated`);
+  },
+
+  connectBridge: async ({ request, locals }) => {
+    const form = await request.formData();
+    const agentName = form.get("agentName") as string;
+    const transportType = form.get("transportType") as string;
+    const command = form.get("command") as string;
+    const url = form.get("url") as string;
+    const cwd = (form.get("cwd") as string) || process.cwd();
+    if (!agentName) return { success: false, message: "agentName required" };
+    if (!transportType) return { success: false, message: "transportType required" };
+    const { AcpSessionManager, setActiveSessionManager } = await import(
+      "@agent-client-protocol/interface/session-workbench.ts"
+    );
+    const { createAcpClientBridge } = await import(
+      "@agent-client-protocol/application/client-bridge-factory.ts"
+    );
+    const { createAcpSessionState } = await import(
+      "@agent-client-protocol/application/session-store.ts"
+    );
+    const { createAcpConfigState } = await import(
+      "@agent-client-protocol/application/config-store.ts"
+    );
+    let agentConfig: Record<string, unknown>;
+    if (transportType === "stdio" && command) {
+      agentConfig = { type: "stdio", command, args: [], env: {} };
+    } else if (transportType === "websocket" && url) {
+      agentConfig = { type: "remote", transport: "websocket", url, headers: {} };
+    } else {
+      return { success: false, message: "invalid transport config" };
+    }
+    const config = createAcpConfigState({ config: { agents: { [agentName]: agentConfig } } });
+    const manager = new AcpSessionManager({
+      state: createAcpSessionState(),
+      config,
+      createBridge: async (input) => createAcpClientBridge({ config: config.getAgent(input.name)!, cwd }),
+    });
+    setActiveSessionManager(manager);
+    const session = await manager.createSession(agentName, cwd);
+    return actionOk(`Connected to ${agentName} (session: ${session.sessionId})`);
+  },
 };

@@ -1,5 +1,5 @@
 /**
- * MikroOrmBetterAuthAdapter — maps Better-Auth v1 CRUD contract to
+ * TypeOrmBetterAuthAdapter — maps Better-Auth v1 CRUD contract to
  * TypeORM repository calls.
  *
  * Better-Auth model names and how they map:
@@ -274,7 +274,7 @@ class InMemoryStore {
 }
 
 /**
- * MikroOrmBetterAuthAdapter wires Better-Auth's CustomAdapter contract to
+ * TypeOrmBetterAuthAdapter wires Better-Auth's CustomAdapter contract to
  * TypeORM repository calls.
  *
  * Usage: pass `this.createAdapter()` as the `database` option to `betterAuth()`.
@@ -283,7 +283,7 @@ class InMemoryStore {
  * In-memory fallback: any unrecognised model name Better-Auth may introduce.
  */
 @Injectable()
-export class MikroOrmBetterAuthAdapter {
+export class TypeOrmBetterAuthAdapter {
   /** In-memory fallback for any unrecognised model names Better-Auth may introduce. */
   private readonly memStore = new InMemoryStore();
 

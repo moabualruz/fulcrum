@@ -243,8 +243,14 @@ maxAttempts: 5
   test("REQUIRED: claim lock allows exactly one unclaimed run transition", async () => {
     const db = await testDb();
     const task = await seedTask(db);
-    const firstRun = await seedRun(db, { task });
-    await seedRun(db, { task });
+    const firstRun = await seedRun(db, {
+      task,
+      createdAt: new Date("2026-05-01T00:01:00.000Z"),
+    });
+    await seedRun(db, {
+      task,
+      createdAt: new Date("2026-05-01T00:02:00.000Z"),
+    });
 
     await expect(claimRun(db.em, ORG_ID, task.id, "worker-a")).resolves.toEqual({
       runId: firstRun.id,

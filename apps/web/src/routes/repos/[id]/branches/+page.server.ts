@@ -8,7 +8,7 @@ import {
   REPOSITORY_WRITE_ACTIONS_GATE,
 } from "@integration-hub/interface/repository-pages.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
-import { requestRepositoryScope } from "../../repository-request-scope";
+import { repositoryRouteContext } from "../../repository-route-context";
 
 function gated() {
   return fail(403, {
@@ -22,8 +22,10 @@ export const load: PageServerLoad = ({ params, locals }) => ({
   streamed: {
     data: (async () => {
       try {
-        const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
-        return await loadRepositoryBranchesPage(em, ctx, params.id);
+        return await loadRepositoryBranchesPage(
+          repositoryRouteContext(locals, locals?.activeProjectId ?? null),
+          params.id,
+        );
       } catch (e) {
         if (e instanceof AppError && e.kind === "not_found") throw error(404, e.message);
         throw e;
@@ -38,8 +40,10 @@ export const actions: Actions = {
     const name = String(form.get("name") ?? "").trim();
     try {
       if (!name) return fail(400, { ok: false, message: "branch name required" });
-      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
-      await createRepositoryBranch(em, ctx, { repoId: params.id, name });
+      await createRepositoryBranch(
+        repositoryRouteContext(locals, locals?.activeProjectId ?? null),
+        { repoId: params.id, name },
+      );
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();
@@ -50,8 +54,10 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
     try {
-      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
-      await checkoutRepositoryBranch(em, ctx, { repoId: params.id, name });
+      await checkoutRepositoryBranch(
+        repositoryRouteContext(locals, locals?.activeProjectId ?? null),
+        { repoId: params.id, name },
+      );
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();
@@ -62,8 +68,10 @@ export const actions: Actions = {
     const form = await request.formData();
     const name = String(form.get("name") ?? "").trim();
     try {
-      const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
-      await deleteRepositoryBranch(em, ctx, { repoId: params.id, name });
+      await deleteRepositoryBranch(
+        repositoryRouteContext(locals, locals?.activeProjectId ?? null),
+        { repoId: params.id, name },
+      );
       return { ok: true };
     } catch (e) {
       if (e instanceof AppError && e.kind === "forbidden") return gated();

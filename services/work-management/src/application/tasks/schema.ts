@@ -196,6 +196,8 @@ export const AutomatedFeedbackLoopInputSchema = z.object({
   feedbackModel: nullableString,
   workerId: nullableString,
   maxIterations: z.number().int().positive().nullable().optional(),
+  iterationTimeoutMs: z.number().int().positive().nullable().optional(),
+  staleThresholdMs: z.number().int().positive().nullable().optional(),
   cwd: nullableString,
   copyToWorktree: z.array(z.string()).nullable().optional(),
 });
@@ -220,6 +222,9 @@ export const AutomatedFeedbackLoopOutputSchema = z.object({
     "manual_review_required",
     "reviewer_unavailable",
     "worker_waiting",
+    "cancelled",
+    "iteration_timeout",
+    "stale_run_detected",
   ]),
   feedback: DependencyRunLiveFeedbackSchema,
 });

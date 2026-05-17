@@ -1,14 +1,15 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { makeId } from "@test-support/product-workspace-fixtures.ts";
-import { _PAGE_SIZE } from "./+page.server.ts";
 
 let scratch: string;
+let commitRows: Array<{ sha: string; shortSha: string; author: string; email: string; date: string; message: string }> = [];
+let knownRepoId = "";
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -17,24 +18,33 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 async function seedRepo(scratch: string, rootPath: string) {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
   const repoId = makeId();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [repoId, org.id, "commitrepo", rootPath, "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
-  );
-  await db.close();
+  knownRepoId = repoId;
+  commitRows = rootPath.includes("nonexistent")
+    ? []
+    : Array.from({ length: 75 }, (_, index) => {
+      const hex = String(index + 1).padStart(40, "a");
+      return {
+        sha: hex,
+        shortSha: hex.slice(0, 8),
+        author: "Fulcrum",
+        email: "fulcrum@example.test",
+        date: "2026-01-02T00:00:00.000Z",
+        message: `commit ${index + 1}`,
+      };
+    });
+  repoPagesMock["knownRepoId"] = knownRepoId;
+  repoPagesMock["commitRows"] = commitRows;
   return { repoId };
 }
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-commits-"));
   process.env["FULCRUM_HOME"] = scratch;
+  commitRows = [];
+  knownRepoId = "";
+  repoPagesMock["knownRepoId"] = knownRepoId;
+  repoPagesMock["commitRows"] = commitRows;
 });
 
 afterEach(() => {
@@ -42,9 +52,50 @@ afterEach(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
+mock.module("@integration-hub/interface/repository-pages.ts", () => ({
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [],
+  listRepositoryDashboard: async () => [],
+  loadRepositoryDetail: async () => ({ branches: [], commits: [], files: [], syncLog: [] }),
+  loadRepositoryBranchesPage: async () => ({ repo: null, branches: [], writeOpsEnabled: false }),
+  createRepositoryBranch: async () => ({ ok: true }),
+  checkoutRepositoryBranch: async () => ({ ok: true }),
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async (
+    _context: unknown,
+    input: { repoId: string; page: number; pageSize: number },
+  ) => {
+    if (input.repoId !== repoPagesMock["knownRepoId"]) {
+      const { AppNotFoundError } = await import("@platform-core/domain/errors.ts");
+      throw new AppNotFoundError("Repo not found");
+    }
+    const rows = (repoPagesMock["commitRows"] as typeof commitRows | undefined) ?? commitRows;
+    const start = (input.page - 1) * input.pageSize;
+    return {
+      repo: {
+        id: input.repoId,
+        slug: "commitrepo",
+        local_path: null,
+        root_path: null,
+        default_branch: "main",
+        last_seen_at: "2026-01-02T00:00:00.000Z",
+      },
+      commits: rows.slice(start, start + input.pageSize),
+      page: input.page,
+      totalPages: Math.max(1, Math.ceil(rows.length / input.pageSize)),
+      total: rows.length,
+    };
+  },
+  loadRepositoryCommitDetail: async () => null,
+}));
+
 describe("/repos/[id]/commits +page.server.ts", () => {
-  test("PAGE_SIZE constant is 50", () => {
-    expect(_PAGE_SIZE).toBe(50);
+  test("PAGE_SIZE constant is 50", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}-page-size`);
+    expect(mod._PAGE_SIZE).toBe(50);
   });
 
   test("returns empty commits when git repo does not exist", async () => {
@@ -98,7 +149,7 @@ describe("/repos/[id]/commits +page.server.ts", () => {
     }>(result);
 
     expect(payload.commits.length).toBeGreaterThan(0);
-    expect(payload.commits.length).toBeLessThanOrEqual(_PAGE_SIZE);
+    expect(payload.commits.length).toBeLessThanOrEqual(50);
     expect(payload.total).toBeGreaterThan(0);
     expect(payload.page).toBe(1);
 

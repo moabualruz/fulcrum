@@ -89,6 +89,8 @@ export function createWorkflowApiCaller(options: WorkflowApiClientOptions) {
         await request("/workflows/review/uat-code-review/decision/apply-configured", { method: "POST", body: input }),
       runGeneratedE2eRegressionTests: async (input: JsonRecord) =>
         await request("/workflows/review/generated-e2e/run", { method: "POST", body: input }),
+      listGeneratedE2eRuns: async (input: JsonRecord) =>
+        await request("/workflows/review/generated-e2e/history", { method: "POST", body: input }),
     },
     tasks: {
       previewDependencyRun: async (input: JsonRecord) =>

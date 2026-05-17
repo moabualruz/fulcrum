@@ -1,4 +1,5 @@
-import type { PageServerLoad } from "./$types";
+import { fail } from "@sveltejs/kit";
+import type { Actions, PageServerLoad } from "./$types";
 import { buildDocTree, type FlatDoc } from "$lib/server/doc-tree";
 import { createDocumentApiForEvent } from "$lib/server/document-api";
 
@@ -31,3 +32,40 @@ export const load: PageServerLoad = async (event) => {
   }));
   return { tree: buildDocTree(flat) };
 };
+
+export const actions: Actions = {
+  reorder: async (event) => {
+    const fd = await event.request.formData();
+    const docId = stringField(fd, "docId");
+    const parentId = nullableField(fd, "parentId");
+    const sortPosition = numberField(fd, "sortPosition");
+
+    if (!docId) return fail(400, { error: "docId is required" });
+    if (sortPosition === null) return fail(400, { error: "sortPosition is required" });
+
+    await createDocumentApiForEvent(event).docs.update({
+      id: docId,
+      parentId,
+      sortPosition,
+    });
+
+    return { ok: true };
+  },
+};
+
+function stringField(fd: FormData, key: string): string {
+  const value = fd.get(key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function nullableField(fd: FormData, key: string): string | null {
+  const value = stringField(fd, key);
+  return value === "" || value === "root" ? null : value;
+}
+
+function numberField(fd: FormData, key: string): number | null {
+  const value = stringField(fd, key);
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}

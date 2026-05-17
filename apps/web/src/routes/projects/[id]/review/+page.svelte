@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import ReviewWorkbench from "$lib/components/review/ReviewWorkbench.svelte";
 
   interface QaCheck {
     id: string;
@@ -157,6 +158,7 @@
       <div data-start-review-result class={cn("rounded-md border border-border p-3 text-sm text-muted-foreground")}>
         Review workbench loaded.
       </div>
+      <ReviewWorkbench model={form.reviewWorkbench as never} aiStreamUrl={`/api/review/stream?projectId=${data.projectId}`} />
     {:else if form?.mode === "startReview" && !form?.ok}
       <div class={cn("rounded-md border border-destructive/40 p-3 text-sm text-destructive")}>
         {form?.message}

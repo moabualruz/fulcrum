@@ -335,3 +335,29 @@ function stringValue(value: unknown): string {
 function toRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
+
+let activeSessionManager: AcpSessionManager | null = null;
+
+export function setActiveSessionManager(manager: AcpSessionManager | null): void {
+  activeSessionManager = manager;
+}
+
+export function getActiveSessionManager(): AcpSessionManager | null {
+  return activeSessionManager;
+}
+
+export async function resolveSessionPermission(
+  _em: unknown,
+  input: { sessionId: string; optionId: string },
+): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active ACP session manager");
+  manager.resolvePermission(input.optionId);
+}
+
+export async function updateTrafficControl(
+  _em: unknown,
+  input: { action: string; value?: string },
+): Promise<void> {
+  void input;
+}

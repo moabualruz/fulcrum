@@ -30,7 +30,9 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain('data-permission-option="allow_once"');
     expect(body).toContain("data-session-resume");
     expect(body).toContain('data-resume-session="row-2"');
-    expect(body).toContain("data-session-traffic-state");
+    expect(body).toContain("data-traffic-filter");
+    expect(body).toContain("data-traffic-search");
+    expect(body).toContain("data-traffic-pause");
     expect(body).toContain('data-traffic-error="true"');
     expect(body).toContain("tool/error");
     expect(body).toContain("Build the plan");
@@ -45,6 +47,7 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-session-empty");
     expect(body).toContain("No active session");
     expect(body).toContain("No messages");
+    expect(body).toContain("data-connect-bridge");
     expect(body).not.toContain("data-session-permission");
   });
 });

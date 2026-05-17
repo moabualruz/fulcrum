@@ -83,4 +83,41 @@ describe("/docs/global +page.server.ts", () => {
       { url: "http://localhost/api/v1/docs?orgId=org-1", method: "GET", cookie: "sid=test-session" },
     ]);
   });
+
+  test("reorder delegates document tree moves to the public API", async () => {
+    const calls: Array<{ url: string; method: string; body: unknown; cookie: string | null }> = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : null,
+        cookie: new Headers(init?.headers).get("cookie"),
+      });
+      return Response.json({ id: "global-child", parentId: null, sortOrder: 0.5 });
+    }) as typeof fetch;
+    const fd = new FormData();
+    fd.set("docId", "global-child");
+    fd.set("parentId", "");
+    fd.set("sortPosition", "0.5");
+    const event = {
+      ...makeEvent(fetchImpl),
+      request: new Request("http://localhost/docs/global", {
+        method: "POST",
+        body: fd,
+        headers: { cookie: "sid=test-session" },
+      }),
+    };
+    const mod = await import(`./+page.server.ts?reorder=${Date.now()}`);
+
+    await expect(mod.actions.reorder(event as Parameters<typeof mod.actions.reorder>[0])).resolves.toEqual({ ok: true });
+
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/docs/global-child",
+        method: "PATCH",
+        body: { parentId: null, sortPosition: 0.5 },
+        cookie: "sid=test-session",
+      },
+    ]);
+  });
 });

@@ -27,6 +27,7 @@ export interface DocumentPublicRow {
   id: string;
   projectId: string;
   parentId: string | null;
+  sortOrder: number;
   title: string;
   type: string;
   bodyMd: string;
@@ -184,6 +185,8 @@ export class DocumentPublicStore {
     docType?: string;
     bodyMd?: string;
     frontmatter?: Record<string, unknown>;
+    parentId?: string | null;
+    sortPosition?: number;
   }): Promise<DocumentPublicRow | null> {
     const document = await this.documentRepository().findOneBy({ id: input.id });
     if (!document) return null;
@@ -193,11 +196,14 @@ export class DocumentPublicStore {
     if (input.title !== undefined) document.title = input.title;
     if (input.docType !== undefined) document.sourceType = input.docType;
     if (input.bodyMd !== undefined) document.bodyMd = input.bodyMd;
+    if (input.parentId !== undefined) document.parentId = input.parentId;
     const saved = await this.documentRepository().save(document);
     if (page) {
       if (input.title !== undefined) page.title = input.title;
       if (input.bodyMd !== undefined) page.bodyMd = input.bodyMd;
       if (input.frontmatter !== undefined) page.editorJson = withFrontmatter(page.editorJson, input.frontmatter);
+      if (input.parentId !== undefined) page.parentPageId = input.parentId;
+      if (input.sortPosition !== undefined) page.position = String(input.sortPosition);
       page.traceId = document.traceId;
       await this.pageRepository().save(page);
       await this.upsertSearchEntry(saved, page);
@@ -686,7 +692,8 @@ function toPublicRow(document: FulcrumDocument, page?: KnowledgeWorkspacePage): 
   return {
     id: document.id,
     projectId: document.projectId,
-    parentId: document.parentId,
+    parentId: page?.parentPageId ?? document.parentId,
+    sortOrder: numericPosition(page?.position),
     title: document.title,
     type: document.sourceType,
     bodyMd: document.bodyMd,
@@ -695,6 +702,12 @@ function toPublicRow(document: FulcrumDocument, page?: KnowledgeWorkspacePage): 
     createdAt: document.createdAt?.toISOString() ?? null,
     updatedAt: document.updatedAt?.toISOString() ?? null,
   };
+}
+
+function numericPosition(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function frontmatterFor(document: FulcrumDocument, page?: KnowledgeWorkspacePage): Record<string, unknown> {

@@ -2,7 +2,7 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { loadRepositoryFileDetail } from "@integration-hub/interface/repository-files.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
-import { requestRepositoryScope } from "../../../repository-request-scope";
+import { repositoryRouteContext } from "../../../repository-route-context";
 
 export const load: PageServerLoad = ({ params, url, locals }) => {
   const branch = url.searchParams.get("branch") ?? undefined;
@@ -13,8 +13,10 @@ export const load: PageServerLoad = ({ params, url, locals }) => {
     streamed: {
       data: (async () => {
         try {
-          const { em, ctx } = await requestRepositoryScope(locals, locals?.activeProjectId ?? null);
-          return await loadRepositoryFileDetail(em, ctx, { repoId: params.id, branch, filePath, showBlame });
+          return await loadRepositoryFileDetail(
+            repositoryRouteContext(locals, locals?.activeProjectId ?? null),
+            { repoId: params.id, branch, filePath, showBlame },
+          );
         } catch (e) {
           if (e instanceof AppError && e.kind === "not_found") throw error(404, e.message);
           throw e;

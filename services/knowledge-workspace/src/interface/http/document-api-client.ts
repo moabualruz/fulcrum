@@ -142,7 +142,7 @@ function documentRequest(options: DocumentApiClientOptions) {
         "content-type": "application/json",
         ...options.headers,
       },
-      body: init.body ? JSON.stringify(compact(init.body)) : undefined,
+      body: init.body ? JSON.stringify(compactBody(init.body)) : undefined,
     });
     const body = await parseResponseBody(response);
     if (!response.ok) throw new Error(extractErrorMessage(body, response.status));
@@ -159,13 +159,18 @@ function documentListQuery(options: DocumentApiClientOptions, input: JsonRecord)
 }
 
 function documentBody(input: JsonRecord): JsonRecord {
-  return compact({
+  const body = compact({
     projectId: input.projectId ?? input.project_id,
     title: input.title,
     type: input.type ?? input.docType ?? input.doc_type,
     bodyMd: input.bodyMd ?? input.body_md,
     frontmatter: input.frontmatter,
+    sortPosition: input.sortPosition ?? input.sort_position,
   });
+  if ("parentId" in input || "parent_id" in input) {
+    body["parentId"] = input.parentId ?? input.parent_id ?? null;
+  }
+  return body;
 }
 
 function commentBody(input: JsonRecord): JsonRecord {
@@ -243,6 +248,14 @@ function compact(input: JsonRecord): JsonRecord {
   return Object.fromEntries(
     Object.entries(input).filter(([, value]) =>
       value !== undefined && value !== null && (!Array.isArray(value) || value.length > 0)
+    ),
+  );
+}
+
+function compactBody(input: JsonRecord): JsonRecord {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) =>
+      value !== undefined && (!Array.isArray(value) || value.length > 0)
     ),
   );
 }

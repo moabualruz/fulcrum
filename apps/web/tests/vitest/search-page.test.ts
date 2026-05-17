@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, it, expect } from "vitest";
 import {
@@ -10,9 +11,9 @@ import {
 } from "$lib/components/search/in-context-search";
 
 const searchPageSource = () =>
-  readFileSync(resolve(import.meta.dir, "../../src/lib/components/search/SearchPage.svelte"), "utf8");
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../src/lib/components/search/SearchPage.svelte"), "utf8");
 const savedSearchRowSource = () =>
-  readFileSync(resolve(import.meta.dir, "../../src/lib/components/search/SavedSearchRow.svelte"), "utf8");
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../src/lib/components/search/SavedSearchRow.svelte"), "utf8");
 
 describe("SearchPage component logic — knowledge workflow", () => {
   describe("public API invocation", () => {

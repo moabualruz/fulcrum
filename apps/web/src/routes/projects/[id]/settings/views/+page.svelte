@@ -56,7 +56,9 @@
     <tbody>
       {#each data.views as view (view.id)}
         <tr data-view-row class={cn("border-b border-border")}>
-          <td class={cn("py-2 pr-4")}>{view.name}</td>
+          <td class={cn("py-2 pr-4")}>
+            <a href={`/projects/${data.projectId}/settings/views/${view.id}`} class={cn("hover:underline")}>{view.name}</a>
+          </td>
           <td class={cn("py-2 pr-4")}>{view.scope}</td>
           <td class={cn("py-2 pr-4")}>{view.is_default ? "Yes" : "No"}</td>
           <td class={cn("py-2")}>

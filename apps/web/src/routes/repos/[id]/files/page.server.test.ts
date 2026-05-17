@@ -1,13 +1,15 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { makeId } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
+let knownRepoId = "";
+let rootPath = "";
+const repoFilesMock = ((globalThis as typeof globalThis & {
+  __repoFilesMock?: Record<string, unknown>;
+}).__repoFilesMock ??= {});
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -15,31 +17,56 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-async function seedRepo(scratch: string, rootPath: string) {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+async function seedRepo(scratch: string, repoRootPath: string) {
   const repoId = makeId();
-  await db.query(
-    `INSERT INTO repos (id, org_id, slug, root_path, default_branch, remote_url, registered_at, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [repoId, org.id, "filesrepo", rootPath, "main", null, "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"],
-  );
-  await db.close();
+  knownRepoId = repoId;
+  rootPath = repoRootPath;
+  repoFilesMock["knownRepoId"] = knownRepoId;
+  repoFilesMock["rootPath"] = rootPath;
   return { repoId };
 }
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-repos-files-"));
   process.env["FULCRUM_HOME"] = scratch;
+  knownRepoId = "";
+  rootPath = "";
+  repoFilesMock["knownRepoId"] = knownRepoId;
+  repoFilesMock["rootPath"] = rootPath;
 });
 
 afterEach(() => {
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
+
+mock.module("@integration-hub/interface/repository-files.ts", () => ({
+  loadRepositoryFilesPage: async (_context: unknown, input: { repoId: string; filePath: string }) => {
+    if (input.repoId !== repoFilesMock["knownRepoId"]) {
+      const { AppNotFoundError } = await import("@platform-core/domain/errors.ts");
+      throw new AppNotFoundError("Repo not found");
+    }
+    const activeRootPath = String(repoFilesMock["rootPath"] ?? rootPath);
+    const isBinary = input.filePath.endsWith(".png");
+    return {
+      repo: {
+        id: input.repoId,
+        slug: "filesrepo",
+        root_path: activeRootPath,
+        default_branch: "main",
+        last_seen_at: "2026-01-02T00:00:00.000Z",
+      },
+      tree: activeRootPath.includes("nonexistent")
+        ? []
+        : [{ kind: "dir", name: "src", path: "src", children: [] }],
+      filePath: input.filePath,
+      fileContent: isBinary ? null : null,
+      isBinary,
+    };
+  },
+  loadRepositoryFileDetail: async () => null,
+  listRepositoryTreeChildren: async () => [],
+}));
 
 describe("/repos/[id]/files +page.server.ts load()", () => {
   test("returns empty tree when root_path has no git repo", async () => {

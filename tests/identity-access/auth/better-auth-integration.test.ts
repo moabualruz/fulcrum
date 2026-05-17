@@ -7,7 +7,7 @@
  *      to the admin user).
  *   2. AuthService is constructable + init()-able from the DI container.
  *   3. auth.handler returns a Response (not an unhandled throw) on GET /api/auth/session.
- *   4. MikroOrmBetterAuthAdapter can be instantiated with an EntityManager.
+ *   4. TypeOrmBetterAuthAdapter can be instantiated with an EntityManager.
  *   5. Adapter CRUD: account model round-trips via DB (create → findOne → update → delete).
  *   6. Adapter CRUD: verification model round-trips via DB.
  *   7. Adapter CRUD: member model update/delete/count hit DB (not in-memory).
@@ -19,7 +19,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 
 import { DEFAULT_ADMIN_PASSWORD } from "@platform-core/infrastructure/application-database/seed.ts";
 import { AuthService } from "@identity-access/application/auth/index.ts";
-import { MikroOrmBetterAuthAdapter } from "@identity-access/application/auth/adapter.ts";
+import { TypeOrmBetterAuthAdapter } from "@identity-access/application/auth/adapter.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm;
@@ -133,19 +133,19 @@ describe("auth.handler GET /api/auth/session", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────
-// 4. MikroOrmBetterAuthAdapter construction
+// 4. TypeOrmBetterAuthAdapter construction
 // ─────────────────────────────────────────────────────────────────
 
-describe("MikroOrmBetterAuthAdapter", () => {
+describe("TypeOrmBetterAuthAdapter", () => {
   it("can be instantiated with EntityManager", () => {
-    const adapter = new MikroOrmBetterAuthAdapter(db.em);
+    const adapter = new TypeOrmBetterAuthAdapter(db.em);
     expect(adapter).toBeDefined();
     expect(typeof adapter.createAdapter).toBe("function");
   });
 
   it("round-trips user and session models with joins, token aliases, sorting, updates, and deleteMany", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter() as any;
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter() as any;
     const email = `adapter-user-${crypto.randomUUID()}@example.com`;
 
     const user = await adapter.create({
@@ -234,8 +234,8 @@ describe("MikroOrmBetterAuthAdapter", () => {
   });
 
   it("round-trips organization member and invitation models through DB-backed update/delete paths", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter() as any;
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter() as any;
     const email = `adapter-member-${crypto.randomUUID()}@example.com`;
     const user = await adapter.create({ model: "user", data: { email, name: "Member User" } });
 
@@ -301,7 +301,7 @@ describe("MikroOrmBetterAuthAdapter", () => {
   });
 
   it("uses the in-memory fallback for unknown models with real Better Auth where operators", async () => {
-    const adapter = new MikroOrmBetterAuthAdapter(db.em).createAdapter() as any;
+    const adapter = new TypeOrmBetterAuthAdapter(db.em).createAdapter() as any;
     await adapter.create({ model: "rateLimit", data: { id: "rl-1", key: "login:ada", attempts: 1, bucket: "auth" } });
     await adapter.create({ model: "rateLimit", data: { id: "rl-2", key: "login:grace", attempts: 3, bucket: "auth" } });
     await adapter.create({ model: "rateLimit", data: { id: "rl-3", key: "api:ada", attempts: 5, bucket: "api" } });
@@ -339,7 +339,7 @@ describe("MikroOrmBetterAuthAdapter", () => {
 // 5. Adapter CRUD — account model (DB-backed)
 // ─────────────────────────────────────────────────────────────────
 
-describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
+describe("TypeOrmBetterAuthAdapter - account model (DB-backed)", () => {
   it("create/findOne/update/delete round-trip via DB", async () => {
     // Seed a user first so we have a valid userId
     const { User } = await import("@identity-access/infrastructure/database/entities/auth/index.ts");
@@ -348,8 +348,8 @@ describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
     expect(adminUser).not.toBeNull();
     const userId = adminUser!.id;
 
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter();
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter();
 
     // CREATE
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -405,10 +405,10 @@ describe("MikroOrmBetterAuthAdapter — account model (DB-backed)", () => {
 // 6. Adapter CRUD — verification model (DB-backed)
 // ─────────────────────────────────────────────────────────────────
 
-describe("MikroOrmBetterAuthAdapter — verification model (DB-backed)", () => {
+describe("TypeOrmBetterAuthAdapter - verification model (DB-backed)", () => {
   it("create/findOne/delete round-trip via DB", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter();
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter();
 
     const identifier = `test@example.com`;
     const value = `otp-${crypto.randomUUID()}`;
@@ -463,10 +463,10 @@ describe("MikroOrmBetterAuthAdapter — verification model (DB-backed)", () => {
 // 7. Adapter CRUD — member model (update/delete/count completeness)
 // ─────────────────────────────────────────────────────────────────
 
-describe("MikroOrmBetterAuthAdapter — member model DB completeness", () => {
+describe("TypeOrmBetterAuthAdapter - member model DB completeness", () => {
   it("count returns a number (DB path, not in-memory)", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter();
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter();
 
     // Just verify count doesn't throw and returns a number
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -480,10 +480,10 @@ describe("MikroOrmBetterAuthAdapter — member model DB completeness", () => {
 // 8. Adapter CRUD — invitation model (update/delete/count completeness)
 // ─────────────────────────────────────────────────────────────────
 
-describe("MikroOrmBetterAuthAdapter — invitation model DB completeness", () => {
+describe("TypeOrmBetterAuthAdapter - invitation model DB completeness", () => {
   it("count returns a number (DB path, not in-memory)", async () => {
-    const mikro = new MikroOrmBetterAuthAdapter(db.em);
-    const adapter = mikro.createAdapter();
+    const typeorm = new TypeOrmBetterAuthAdapter(db.em);
+    const adapter = typeorm.createAdapter();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cnt = await (adapter as any).count({ model: "invitation" });

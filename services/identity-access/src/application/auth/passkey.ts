@@ -269,7 +269,7 @@ class InMemoryPasskeyStore implements PasskeyStore {
   }
 }
 
-export class MikroOrmPasskeyStore implements PasskeyStore {
+export class TypeOrmPasskeyStore implements PasskeyStore {
   constructor(private readonly em: EntityManager) {}
 
   async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
@@ -389,7 +389,7 @@ export class MikroOrmPasskeyStore implements PasskeyStore {
   }
 }
 
-class LazyMikroOrmPasskeyStore implements PasskeyStore {
+class LazyTypeOrmPasskeyStore implements PasskeyStore {
   private ormPromise: Promise<DataSource> | null = null;
 
   async saveChallenge(challenge: PasskeyChallengeRecord): Promise<void> {
@@ -429,7 +429,7 @@ class LazyMikroOrmPasskeyStore implements PasskeyStore {
   async runInScope<T>(callback: (store: PasskeyStore) => Promise<T>): Promise<T> {
     const dataSource = await this.dataSource();
     const em = dataSource.manager;
-    return await callback(new MikroOrmPasskeyStore(em));
+    return await callback(new TypeOrmPasskeyStore(em));
   }
 
   private async dataSource(): Promise<DataSource> {
@@ -443,7 +443,7 @@ class LazyMikroOrmPasskeyStore implements PasskeyStore {
   }
 }
 
-export const defaultPasskeyStore: PasskeyStore = new LazyMikroOrmPasskeyStore();
+export const defaultPasskeyStore: PasskeyStore = new LazyTypeOrmPasskeyStore();
 
 async function withPasskeyStore<T>(
   store: PasskeyStore | undefined,

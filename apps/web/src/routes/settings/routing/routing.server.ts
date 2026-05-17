@@ -57,8 +57,8 @@ function cookieHeaders(event: RoutingLoadEvent | RoutingActionEvent): Record<str
 }
 
 function createRoutingCaller(event: RoutingLoadEvent | RoutingActionEvent): RoutingCaller | null {
-  const orgId = event.locals.orgId ?? process.env["FULCRUM_ORG_ID"];
-  const userId = event.locals.userId ?? process.env["FULCRUM_USER_ID"];
+  const orgId = event.locals.orgId ?? process.env["FULCRUM_ORG_ID"] ?? "00000000-0000-0000-0000-000000000001";
+  const userId = event.locals.userId ?? process.env["FULCRUM_USER_ID"] ?? "local";
   if (!orgId || !userId) return null;
 
   return createRoutingApiCaller({

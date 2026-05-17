@@ -20,35 +20,29 @@ mock.module("$app/forms", () => ({
   deserialize: (s: string) => JSON.parse(s),
 }));
 
-interface VersionRow {
-  id: string;
-  doc_id: string;
-  org_id: string;
-  version: number;
-  title: string;
-  body: string;
-  frontmatter: Record<string, unknown>;
-  author: string;
-  created_at: string;
-}
-
 type PageProps = {
   data: {
-    doc: { id: string; title: string };
-    versions: VersionRow[];
+    documentId: string;
+    title: string;
+    versions: Array<{
+      id: string;
+      versionNum: number;
+      createdAt: string;
+      authorId: string | null;
+      authorName: string | null;
+      isRestoreOf: string | null;
+    }>;
   };
 };
 
-const VERSIONS: VersionRow[] = [
+const VERSIONS: PageProps["data"]["versions"] = [
   {
-    id: "v2", doc_id: "doc-1", org_id: "org-1", version: 2,
-    title: "Title v2", body: "body v2", frontmatter: {},
-    author: "agent", created_at: "2026-05-01T12:00:00.000Z",
+    id: "v2", versionNum: 2, createdAt: "2026-05-01T12:00:00.000Z",
+    authorId: "agent-1", authorName: "agent", isRestoreOf: null,
   },
   {
-    id: "v1", doc_id: "doc-1", org_id: "org-1", version: 1,
-    title: "Title v1", body: "body v1", frontmatter: {},
-    author: "user", created_at: "2026-04-30T12:00:00.000Z",
+    id: "v1", versionNum: 1, createdAt: "2026-04-30T12:00:00.000Z",
+    authorId: "user-1", authorName: "user", isRestoreOf: null,
   },
 ];
 
@@ -62,30 +56,27 @@ describe("/docs/[id]/history +page.svelte", () => {
     Page = mod.default;
   });
 
-  test("renders version list with version numbers and authors", () => {
+  test("renders history page with header and title", () => {
     const { body } = render(Page, {
-      props: { data: { doc: { id: "doc-1", title: "My Doc" }, versions: VERSIONS } },
+      props: { data: { documentId: "doc-1", title: "My Doc", versions: VERSIONS } },
     });
-    expect(body).toContain("data-version-list");
-    expect(body).toContain("data-version-item");
-    expect(body).toContain("Version 2");
-    expect(body).toContain("Version 1");
-    expect(body).toContain("agent");
-    expect(body).toContain("user");
-  });
-
-  test("renders empty state when no versions", () => {
-    const { body } = render(Page, {
-      props: { data: { doc: { id: "doc-1", title: "My Doc" }, versions: [] } },
-    });
-    expect(body).toContain("data-empty-history");
+    expect(body).toContain("data-doc-history-header");
+    expect(body).toContain("My Doc");
   });
 
   test("header links back to document", () => {
     const { body } = render(Page, {
-      props: { data: { doc: { id: "doc-1", title: "My Doc" }, versions: VERSIONS } },
+      props: { data: { documentId: "doc-1", title: "My Doc", versions: VERSIONS } },
     });
     expect(body).toContain('href="/docs/doc-1"');
+    expect(body).toContain("data-back-doc");
+  });
+
+  test("renders doc title in heading", () => {
+    const { body } = render(Page, {
+      props: { data: { documentId: "doc-1", title: "My Doc", versions: [] } },
+    });
+    expect(body).toContain("data-doc-title");
     expect(body).toContain("My Doc");
   });
 });

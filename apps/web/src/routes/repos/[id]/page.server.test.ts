@@ -24,6 +24,9 @@ const detail = {
   files: [] as Array<{ path: string; updatedAt: Date }>,
   syncLog: [] as Array<{ status: string; createdAt: Date }>,
 };
+const repoPagesMock = ((globalThis as typeof globalThis & {
+  __repoPagesMock?: Record<string, unknown>;
+}).__repoPagesMock ??= {});
 
 function row(overrides: Partial<DashboardRow> = {}): DashboardRow {
   return {
@@ -47,13 +50,24 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 mock.module("@integration-hub/interface/repository-pages.ts", () => ({
-  listRepositoryDashboard: async () => [...repos],
-  loadRepositoryDetail: async () => ({
+  REPOSITORY_WRITE_ACTIONS_GATE: {
+    code: "FEATURE_GATED",
+    message: "Write operations disabled. Enable repo-write-ops to create, checkout, or delete branches.",
+  },
+  listRepositoryPageRows: async () => [],
+  listRepositoryDashboard: async () => [...((repoPagesMock["dashboardRows"] as DashboardRow[] | undefined) ?? repos)],
+  loadRepositoryDetail: async () => repoPagesMock["dashboardDetail"] ?? ({
     branches: [...detail.branches],
     commits: [...detail.commits],
     files: [...detail.files],
     syncLog: [...detail.syncLog],
   }),
+  loadRepositoryBranchesPage: async () => repoPagesMock["branchPage"] ?? { repo: null, branches: [], writeOpsEnabled: false },
+  createRepositoryBranch: async () => ({ ok: true }),
+  checkoutRepositoryBranch: async () => ({ ok: true }),
+  deleteRepositoryBranch: async () => ({ ok: true }),
+  loadRepositoryCommitsPage: async () => ({ repo: null, commits: [], page: 1, totalPages: 1, total: 0 }),
+  loadRepositoryCommitDetail: async () => repoPagesMock["commitDetail"] ?? { repo: null, commit: null, diff: null },
 }));
 
 beforeEach(() => {
@@ -62,6 +76,8 @@ beforeEach(() => {
   detail.commits.splice(0, detail.commits.length);
   detail.files.splice(0, detail.files.length);
   detail.syncLog.splice(0, detail.syncLog.length);
+  repoPagesMock["dashboardRows"] = repos;
+  repoPagesMock["dashboardDetail"] = detail;
 });
 
 describe("/repos/[id] +page.server.ts", () => {

@@ -7,8 +7,8 @@ if (isVitestCli) {
 
   const ownerSession = { id: "session-1", userId: "user-1" };
 
-  const trpcResponse = (data: unknown, init?: ResponseInit) =>
-    new Response(JSON.stringify({ result: { data: { json: data } } }), {
+  const apiResponse = (data: unknown, init?: ResponseInit) =>
+    new Response(JSON.stringify(data), {
       status: 200,
       headers: { "content-type": "application/json" },
       ...init,
@@ -56,10 +56,10 @@ if (isVitestCli) {
     test("toggle action calls flags.set, then load re-reads flags.list", async () => {
       const fetchFn = vi
         .fn()
-        .mockResolvedValueOnce(trpcResponse([]))
-        .mockResolvedValueOnce(trpcResponse({ ok: true }))
-        .mockResolvedValueOnce(trpcResponse([]))
-        .mockResolvedValueOnce(trpcResponse([{ ...flags[0], enabled: true }]));
+        .mockResolvedValueOnce(apiResponse([]))
+        .mockResolvedValueOnce(apiResponse({ ok: true }))
+        .mockResolvedValueOnce(apiResponse([]))
+        .mockResolvedValueOnce(apiResponse([{ ...flags[0], enabled: true }]));
 
       const formData = new FormData();
       formData.set("flag", "router-llm");
@@ -76,10 +76,14 @@ if (isVitestCli) {
       expect(actionResult).toEqual({ ok: true, flag: "router-llm" });
       expect(fetchFn).toHaveBeenNthCalledWith(
         2,
-        "http://localhost/api/trpc/flags.set",
+        "http://localhost/api/v1/feature-flags",
         expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({ json: { flag: "router-llm", enabled: true } }),
+          method: "PATCH",
+          body: JSON.stringify({
+            flag: "router-llm",
+            enabled: true,
+            orgId: "00000000-0000-0000-0000-000000000001",
+          }),
         }),
       );
 
@@ -88,7 +92,7 @@ if (isVitestCli) {
       expect(data.flags).toEqual([{ ...flags[0], enabled: true }]);
       expect(fetchFn).toHaveBeenNthCalledWith(
         4,
-        "http://localhost/api/trpc/flags.list?input=%7B%7D",
+        "http://localhost/api/v1/feature-flags?orgId=00000000-0000-0000-0000-000000000001&userId=local",
         expect.objectContaining({ method: "GET" }),
       );
     });

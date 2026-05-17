@@ -4,6 +4,8 @@ import {
   createWorkflowApiCaller,
   WorkflowApiError,
 } from "@workflow-coordination/interface/http/workflow-api-client";
+import { listGeneratedE2eRunHistory } from "@planning-review/interface/project-review-reports.ts";
+import { requestServiceScope } from "$lib/server/request-service-scope";
 
 interface E2eEvent {
   params: { id: string };
@@ -31,9 +33,16 @@ function createE2eWorkflowApi(event: E2eEvent) {
   });
 }
 
-export const load: PageServerLoad = async ({ params }) => ({
-  projectId: params.id,
-});
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const projectId = params.id;
+  try {
+    const { em, ctx } = await requestServiceScope(locals, projectId);
+    const history = await listGeneratedE2eRunHistory(em, ctx, { projectId, limit: 20 });
+    return { projectId, history };
+  } catch {
+    return { projectId, history: [] };
+  }
+};
 
 function field(fd: FormData, key: string): string {
   const value = fd.get(key);
@@ -72,7 +81,7 @@ export const actions: Actions = {
         traceId,
         testFiles: testFiles.length > 0 ? testFiles : undefined,
       });
-      return { ok: true, mode: "runE2e", result };
+      return { ok: true, mode: "runE2e" as const, result };
     } catch (err) {
       const message =
         err instanceof WorkflowApiError

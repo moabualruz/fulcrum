@@ -42,6 +42,23 @@
     <p data-session-error class={cn("mt-3 text-sm text-destructive")}>{model.connection.error}</p>
   {/if}
 
+  {#if model.connection.status === "idle"}
+    <form method="POST" action="?/connectBridge" data-connect-bridge class={cn("mt-4 grid gap-3 rounded-md border border-border p-3")}>
+      <h3 class={cn("text-sm font-medium")}>Connect to agent</h3>
+      <div class={cn("grid grid-cols-2 gap-2")}>
+        <input name="agentName" placeholder="Agent name" required class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+        <select name="transportType" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")}>
+          <option value="stdio">stdio (local)</option>
+          <option value="websocket">WebSocket (remote)</option>
+        </select>
+      </div>
+      <input name="command" placeholder="Command (for stdio)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+      <input name="url" placeholder="URL (for websocket)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+      <input name="cwd" placeholder="Working directory" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+      <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }), "w-fit")}>Connect</button>
+    </form>
+  {/if}
+
   <div data-session-controls class={cn("mt-4 flex flex-wrap gap-2")}>
     <button type="button" disabled={!model.controls.canPrompt} class={cn(buttonVariants({ variant: "default", size: "sm" }))}>
       Prompt
@@ -96,14 +113,49 @@
         <div><dt class={cn("text-muted-foreground")}>Errors</dt><dd>{model.traffic.summary.errors}</dd></div>
         <div><dt class={cn("text-muted-foreground")}>Paused</dt><dd>{model.traffic.paused ? "Yes" : "No"}</dd></div>
       </dl>
-      <div data-session-traffic-state class={cn("grid grid-cols-2 gap-2 text-xs")}>
-        <div><span class={cn("text-muted-foreground")}>Filter</span> <span>{model.traffic.filter}</span></div>
-        <div><span class={cn("text-muted-foreground")}>Search</span> <span>{model.traffic.searchQuery || "none"}</span></div>
+      <div class={cn("flex flex-wrap items-center gap-2")}>
+        <form method="POST" action="?/trafficControl" class={cn("flex flex-wrap items-center gap-2")}>
+          <input type="hidden" name="trafficAction" value="filter" />
+          <select
+            data-traffic-filter
+            name="value"
+            class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")}
+          >
+            <option value="all" selected={model.traffic.filter === "all"}>All</option>
+            <option value="request" selected={model.traffic.filter === "request"}>Request</option>
+            <option value="response" selected={model.traffic.filter === "response"}>Response</option>
+            <option value="notification" selected={model.traffic.filter === "notification"}>Notification</option>
+            <option value="error" selected={model.traffic.filter === "error"}>Error</option>
+          </select>
+        </form>
+        <form method="POST" action="?/trafficControl" class={cn("flex items-center gap-2")}>
+          <input type="hidden" name="trafficAction" value="search" />
+          <input
+            data-traffic-search
+            name="value"
+            type="text"
+            placeholder="Search traffic..."
+            value={model.traffic.searchQuery}
+            class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")}
+          />
+        </form>
+        <form method="POST" action="?/trafficControl">
+          <input type="hidden" name="trafficAction" value="pause" />
+          <input type="hidden" name="value" value={model.traffic.paused ? "resume" : "pause"} />
+          <button
+            data-traffic-pause
+            type="submit"
+            class={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs")}
+          >
+            {model.traffic.paused ? "Resume" : "Pause"}
+          </button>
+        </form>
       </div>
       {#if model.traffic.filteredEntries.length > 0}
         <ol class={cn("space-y-1 text-xs")}>
-          {#each model.traffic.filteredEntries.slice(0, 5) as entry}
+          {#each model.traffic.filteredEntries.slice(0, 50) as entry}
             <li
+              data-traffic-entry
               data-session-traffic-entry={entry.id}
               data-traffic-error={entry.error === true}
               class={cn("grid grid-cols-[auto_auto_1fr] gap-2 text-muted-foreground")}
@@ -135,9 +187,13 @@
       <h3 class={cn("text-sm font-medium")}>{model.permission.toolCall.title}</h3>
       <div class={cn("mt-2 flex flex-wrap gap-2")}>
         {#each model.permission.options as option}
-          <button type="button" data-permission-option={option.optionId} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            {option.name}
-          </button>
+          <form method="POST" action="?/resolvePermission">
+            <input type="hidden" name="sessionId" value={model.permission.sessionId} />
+            <input type="hidden" name="optionId" value={option.optionId} />
+            <button type="submit" data-permission-option={option.optionId} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              {option.name}
+            </button>
+          </form>
         {/each}
       </div>
     </div>

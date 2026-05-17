@@ -1,6 +1,6 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup Plan
 
-> **Status: HISTORICALLY IMPLEMENTED (2026-05-16), CURRENTLY EVIDENCE-SCOPED (2026-05-17).** Historical tracker evidence says the migration tasks were executed: MikroORM removed, TypeORM in place, platform-core split into bounded services, tRPC consolidated as NestJS-native dual-exposure, DTOs extracted, and prior `bun run ci` tiers 1-6 passed. Current evidence is narrower: architecture stack gates were rerun with `bun test tests/architecture/boundary.test.ts tests/architecture/server-stack.test.ts tests/architecture/no-raw-sql.test.ts` and passed 50 tests; `.scratch/upstream-product-replacement` has zero tracked files and remains ignored. Full CI/final release gates must be rerun in the current tree before claiming final closure.
+> **Status: HISTORICALLY IMPLEMENTED (2026-05-16), CURRENTLY STACK-VERIFIED (2026-05-17).** Historical tracker evidence says the migration tasks were executed: MikroORM removed, TypeORM in place, platform-core split into bounded services, tRPC consolidated as NestJS-native dual-exposure, DTOs extracted, and prior `bun run ci` tiers 1-6 passed. Current stack evidence: identity-access stale MikroORM adapter names were corrected to TypeORM, `bun test tests/identity-access/auth/better-auth-integration.test.ts tests/identity-access/auth/passkey.test.ts --test-name-pattern 'TypeOrmBetterAuthAdapter|TypeOrmPasskeyStore'` passed 12 tests, architecture stack gates passed 50 tests, `bun run --bun tsc --noEmit` passed, app-surface direct ORM scan returns 0 files, tracked `.sql` files are absent, `.scratch/upstream-product-replacement` has zero tracked files and remains ignored, and the repository/naming/migration/PostgreSQL/PGlite/cross-surface audit cluster passed 75 tests. Full CI/final release gates must still wait for remaining Phase 9.6 product workflow blockers.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Checked steps below record historical implementation status from the tracker/provenance, not a current full-CI rerun.
 
@@ -711,7 +711,7 @@ git commit -m "refactor(arch): split platform-core god module — entities owned
 - Create: `services/<service>/src/interface/http/dto/` directories
 - Modify: All `*-public-api.controller.ts` files
 
-Currently class-validator decorators are inline in controller methods. Extract to proper DTO classes.
+Current AGENTS.md makes Zod the validation direction. Treat historical Zod notes below as stale migration context; extract request/response contracts to proper DTO/schema files and validate with Zod-backed schemas/pipes.
 
 - [x] **Step 1: Create dto/ directories in each service**
 
@@ -733,18 +733,15 @@ async create(@Body() body: { name: string; @IsString() description: string }) {
 
 After (separate DTO file):
 ```typescript
-// dto/create-task.dto.ts
-import { IsString, IsOptional, MinLength } from "class-validator";
+// dto/create-task.schema.ts
+import { z } from "zod";
 
-export class CreateTaskDto {
-  @IsString()
-  @MinLength(1)
-  name!: string;
+export const CreateTaskSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+});
 
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
+export type CreateTaskDto = z.infer<typeof CreateTaskSchema>;
 
 // controller
 @Post()
@@ -757,8 +754,8 @@ async create(@Body() body: CreateTaskDto) {
 
 Work through each service's controllers:
 1. Identify all `@Body()`, `@Query()`, `@Param()` inline types
-2. Extract to `dto/create-*.dto.ts`, `dto/update-*.dto.ts`, `dto/query-*.dto.ts`
-3. Use `PartialType()` from `@nestjs/mapped-types` for update DTOs
+2. Extract to `dto/create-*.schema.ts`, `dto/update-*.schema.ts`, `dto/query-*.schema.ts` or existing local DTO/schema conventions
+3. Derive update/input variants with Zod helpers or existing mapped DTO utilities when already present
 4. Add Swagger decorators (`@ApiProperty()`) to each DTO field
 
 - [x] **Step 4: Create response DTOs — never expose entities directly**
@@ -953,6 +950,8 @@ rg "@mikro-orm" services/ apps/ --type ts | grep -v "_archived"
 ```
 
 Expected: No results.
+
+Current 2026-05-17 focused evidence: scan over `services/identity-access`, `tests/identity-access`, `apps`, and package manifests returns no runtime/test `MikroOrm`, `MikroORM`, `mikro-orm`, `@mikro-orm`, `PGliteKyselyDriver`, `mikroorm.config`, `Kysely`, `kysely`, or `hono` matches except negative guardrail assertions after renaming Better Auth and passkey TypeORM adapters.
 
 - [x] **Step 3: Verify entity ownership**
 

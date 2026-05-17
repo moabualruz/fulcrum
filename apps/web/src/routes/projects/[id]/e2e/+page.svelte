@@ -12,8 +12,18 @@
     durationMs?: number;
   }
 
+  interface E2eHistoryEntry {
+    eventId: string;
+    createdAt: string;
+    runner: string;
+    status: string;
+    testFileCount: number;
+    exitCode: number | null;
+    traceId: string | null;
+  }
+
   interface Props {
-    data: { projectId: string };
+    data: { projectId: string; history: E2eHistoryEntry[] };
     form?: {
       ok: boolean;
       mode?: "runE2e";
@@ -23,6 +33,20 @@
   }
 
   let { data, form = null }: Props = $props();
+
+  function formatDate(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+    } catch {
+      return iso;
+    }
+  }
+
+  function statusColor(status: string): string {
+    if (status === "passed") return "text-green-600";
+    if (status === "failed") return "text-red-600";
+    return "text-yellow-600";
+  }
 </script>
 
 <svelte:head>
@@ -143,4 +167,50 @@
       {/if}
     </section>
   {/if}
+
+  <!-- Run History -->
+  <section data-e2e-history class={cn("space-y-3")}>
+    <h2 class={cn("text-lg font-semibold")}>Run History</h2>
+    {#if data.history.length === 0}
+      <p class={cn("text-sm text-muted-foreground")}>No runs recorded yet.</p>
+    {:else}
+      <div class={cn("overflow-hidden rounded-md border border-border")}>
+        <table class={cn("w-full text-sm")}>
+          <thead>
+            <tr class={cn("border-b border-border bg-muted/30")}>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Time</th>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Status</th>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Runner</th>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Tests</th>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Exit</th>
+              <th class={cn("px-3 py-2 text-left text-xs font-medium text-muted-foreground")}>Trace</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each data.history as entry (entry.eventId)}
+              <tr class={cn("border-b border-border last:border-0 hover:bg-muted/20")}>
+                <td class={cn("px-3 py-2 text-xs text-muted-foreground")}>{formatDate(entry.createdAt)}</td>
+                <td class={cn("px-3 py-2")}>
+                  <span class={cn("inline-flex items-center gap-1 text-xs font-medium", statusColor(entry.status))}>
+                    {#if entry.status === "passed"}
+                      <span class={cn("h-2 w-2 rounded-full bg-green-500")}></span>
+                    {:else if entry.status === "failed"}
+                      <span class={cn("h-2 w-2 rounded-full bg-red-500")}></span>
+                    {:else}
+                      <span class={cn("h-2 w-2 rounded-full bg-yellow-500")}></span>
+                    {/if}
+                    {entry.status}
+                  </span>
+                </td>
+                <td class={cn("px-3 py-2 text-xs")}>{entry.runner}</td>
+                <td class={cn("px-3 py-2 text-xs")}>{entry.testFileCount}</td>
+                <td class={cn("px-3 py-2 text-xs font-mono")}>{entry.exitCode ?? "-"}</td>
+                <td class={cn("px-3 py-2 text-xs text-muted-foreground font-mono truncate max-w-[10rem]")}>{entry.traceId ?? "-"}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+  </section>
 </div>

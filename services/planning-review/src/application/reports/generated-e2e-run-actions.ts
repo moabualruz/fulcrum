@@ -119,6 +119,47 @@ export function buildGeneratedE2eRunnerPlan(
   };
 }
 
+export interface GeneratedE2eRunHistoryEntry {
+  eventId: string;
+  createdAt: string;
+  runner: string;
+  status: string;
+  testFileCount: number;
+  exitCode: number | null;
+  traceId: string | null;
+  durationMs?: number;
+}
+
+export async function listGeneratedE2eRunHistory(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { projectId: string; limit?: number },
+): Promise<GeneratedE2eRunHistoryEntry[]> {
+  const limit = input.limit ?? 20;
+  const rows = await em.query(
+    `select id as "eventId", created_at as "createdAt", payload_json as payload
+       from audit_events
+      where org_id = ?
+        and payload_json->>'verb' = 'generated_e2e_regression_run_completed'
+        and (subject_id = ? or payload_json->>'projectId' = ?)
+      order by created_at desc
+      limit ?`,
+    [ctx.orgId, input.projectId, input.projectId, limit],
+  );
+  return rows.map((row: { eventId: string; createdAt: string; payload: string | Record<string, unknown> }) => {
+    const payload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
+    return {
+      eventId: row.eventId,
+      createdAt: row.createdAt,
+      runner: payload.runner ?? "bun",
+      status: payload.status ?? "unknown",
+      testFileCount: Array.isArray(payload.testFiles) ? payload.testFiles.length : 0,
+      exitCode: payload.exitCode ?? null,
+      traceId: payload.traceId ?? null,
+    };
+  });
+}
+
 async function loadGeneratedE2eArtifacts(
   em: EntityManager,
   ctx: AppContext,
