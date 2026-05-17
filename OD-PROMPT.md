@@ -34,6 +34,8 @@ REQUIRED READS (verbatim sources of truth — do not invent, do not skip):
        — Route tree, sidebar IA, keyboard map, ACP drawer behavior, command palette, status footer, CLI subcommand tree, TUI screen list, mobile IA, trace-spine.
   4. /Users/mkh/workspace/fulcrum/COPY.md
        — Voice rules, empty-state copy, error template, mode affordance copy, doctor copy, permission prompts, status labels.
+  4b. /Users/mkh/workspace/fulcrum/CLI-TUI-UX.md
+       — Full CLI subcommand tree (six workflow stages), JSON envelope, flag standards, completion, error codes, TUI screen list, keyboard map, status footer (mirror of web), command palette, ACP chat pane, CLI↔TUI parity table.
   5. /Users/mkh/workspace/fulcrum/.scratch/design-research/01-workflow-nav-ia.md
   6. /Users/mkh/workspace/fulcrum/.scratch/design-research/02-agent-supervision.md
   7. /Users/mkh/workspace/fulcrum/.scratch/design-research/03-knowledge-docs-memory.md
@@ -229,6 +231,7 @@ Lock decisions into DESIGN.md / IA-MAP.md / COPY.md as they stabilize so future 
 | `/Users/mkh/workspace/fulcrum/DESIGN.md` | Tokens, components, motion |
 | `/Users/mkh/workspace/fulcrum/IA-MAP.md` | Routes, IA, keyboard, drawer |
 | `/Users/mkh/workspace/fulcrum/COPY.md` | Voice + copy templates |
+| `/Users/mkh/workspace/fulcrum/CLI-TUI-UX.md` | CLI subcommand tree, JSON envelope, flags, completion, TUI screens, keymap, status footer, palette, ACP chat pane, parity table |
 | `/Users/mkh/workspace/fulcrum/.scratch/design-research/01-workflow-nav-ia.md` | Workflow-stage IA research |
 | `/Users/mkh/workspace/fulcrum/.scratch/design-research/02-agent-supervision.md` | Live session pane research |
 | `/Users/mkh/workspace/fulcrum/.scratch/design-research/03-knowledge-docs-memory.md` | Editor / memory research |
