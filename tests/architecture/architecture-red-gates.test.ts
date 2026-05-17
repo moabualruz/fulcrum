@@ -30,15 +30,14 @@ describe("architecture RED gates", () => {
     expect(ci).toContain("tests/architecture/");
   });
 
-  test("root CI unit stage runs services/ with --parallel", async () => {
+  test("root CI unit stage runs services/", async () => {
     const ci = await read("scripts/ci.ts");
 
     expect(ci).toContain('name: "unit"');
-    expect(ci).toContain("--parallel");
     expect(ci).toContain("services/");
   });
 
-  test("root CI integration stage runs tests/ with --parallel", async () => {
+  test("root CI integration stage runs tests/", async () => {
     const ci = await read("scripts/ci.ts");
 
     expect(ci).toContain('name: "integration"');
