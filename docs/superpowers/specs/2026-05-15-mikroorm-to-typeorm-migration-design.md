@@ -1,7 +1,7 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup
 
 **Date:** 2026-05-15
-**Status:** Approved
+**Status:** COMPLETED (2026-05-17) — all migration work done, verified by CI + architecture tests
 **Scope:** Full ORM migration + god module split + DTO extraction + tRPC consolidation + stub removal + test co-location
 
 ## Context
