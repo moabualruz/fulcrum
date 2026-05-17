@@ -458,6 +458,26 @@
         </div>
       {/if}
 
+      <!-- Time Tracking -->
+      <section data-time-tracking class="border-t border-border pt-4 mt-4">
+        <h3 class="text-sm font-semibold mb-2">Time Tracking</h3>
+        <form method="POST" action="?/logTime" class="flex flex-wrap items-end gap-2 mb-3">
+          <label class="grid gap-1 text-xs">
+            <span class="text-muted-foreground">Minutes</span>
+            <input name="durationMinutes" type="number" min="1" max="1440" required class="h-8 w-20 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <label class="grid gap-1 text-xs">
+            <span class="text-muted-foreground">Date</span>
+            <input name="loggedDate" type="date" required value={new Date().toISOString().slice(0, 10)} class="h-8 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <label class="grid gap-1 text-xs flex-1">
+            <span class="text-muted-foreground">Note</span>
+            <input name="description" type="text" placeholder="Optional" class="h-8 rounded border border-input bg-background px-2 text-sm" />
+          </label>
+          <button type="submit" class="h-8 rounded bg-primary px-3 text-xs font-medium text-primary-foreground">Log</button>
+        </form>
+      </section>
+
       <!-- Actions -->
       <footer class="flex items-center gap-2 border-t border-border pt-4">
         <button type="button" data-task-save onclick={onSave} class={cn(buttonVariants({ variant: "default" }))}>Save</button>

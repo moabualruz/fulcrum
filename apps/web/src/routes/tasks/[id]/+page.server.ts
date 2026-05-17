@@ -192,4 +192,28 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "runFeedback", message: (err as Error).message });
     }
   },
+
+  logTime: async ({ request, params, locals }) => {
+    const fd = await request.formData();
+    const durationMinutes = Number(fd.get("durationMinutes") ?? 0);
+    const loggedDate = String(fd.get("loggedDate") ?? "").trim();
+    const description = String(fd.get("description") ?? "").trim() || null;
+    if (!durationMinutes || durationMinutes < 1 || !loggedDate) {
+      return fail(400, actionFail("Duration and date are required"));
+    }
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
+    const { TimeEntry } = await import("@work-management/infrastructure/database/entities/tasks/TimeEntry.ts");
+    const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
+    const { Task } = await import("@work-management/infrastructure/database/entities/tasks/Task.ts");
+    const entry = em.create(TimeEntry, {
+      org: { id: ctx.orgId } as InstanceType<typeof Org>,
+      task: { id: params.id } as InstanceType<typeof Task>,
+      userId: ctx.userId,
+      durationMinutes,
+      description,
+      loggedDate,
+    });
+    await em.save(entry);
+    return actionOk(`Logged ${durationMinutes} min`);
+  },
 };
