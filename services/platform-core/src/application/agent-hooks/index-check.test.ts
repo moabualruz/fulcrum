@@ -1,6 +1,6 @@
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { mkdtemp, rm, writeFile, mkdir, utimes, unlink } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, utimes, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -17,6 +17,7 @@ afterAll(async () => {
 });
 
 async function reset() {
+  for (const p of ["tags"]) {
     const full = join(TMP, p);
     if (existsSync(full)) {
       try { await rm(full, { recursive: true, force: true }); } catch {}
@@ -49,11 +50,7 @@ describe("index-check", () => {
     expect(r.stdout).toContain("No ctags index");
   });
 
-    await reset();
-    const r = await runIdxCheck();
-    expect(r.exit).toBe(0);
-  });
-
+  test("fresh tags file → stdout stays quiet", async () => {
     await reset();
     await writeFile(join(TMP, "tags"), "");
     const r = await runIdxCheck();

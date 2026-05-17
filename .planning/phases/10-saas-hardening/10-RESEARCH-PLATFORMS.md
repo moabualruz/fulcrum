@@ -120,7 +120,7 @@ PgBouncer is deployment guidance, not a required embedded dependency. If support
 
 ## PostgreSQL Integration Tests
 
-SAS-06 requires real PostgreSQL tests. PGlite remains local-first unit/default test backend, but PostgreSQL integration must run against:
+SAS-06 requires real PostgreSQL tests. PGlite remains useful for local persistence-contract integration tests, not unit/default coverage, and PostgreSQL integration must run against:
 
 - A real PostgreSQL container through `@testcontainers/postgresql@11.6.0` when Docker is available.
 - Or `FULCRUM_TEST_DATABASE_URL` for developer/CI environments without Testcontainers.

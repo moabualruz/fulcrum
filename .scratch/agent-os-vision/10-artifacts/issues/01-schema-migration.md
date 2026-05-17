@@ -25,7 +25,7 @@ Write `Artifact` and `ArtifactLifecycle` MikroORM v7 entity classes plus generat
 - [ ] Web surface: N/A (schema-only slice).
 - [ ] CLI command: `fulcrum doctor --json` reports migration class `Migration<timestamp>` covering artifacts has applied; no crash.
 - [ ] TUI screen: N/A.
-- [ ] Tests: unit migration test asserts all columns + indexes present; integration test applies migration on fresh PGlite instance; RED→GREEN.
+- [ ] Tests: fixture-backed entity metadata test asserts all columns + indexes present; DB-backed integration test applies migration on fresh PGlite instance; RED→GREEN.
 
 ## Blocked by
 - Pillar 1 (Foundation) — base `Artifact`, `Org`, `Project`, and `Event` entities plus graphile-worker bootstrap must exist.

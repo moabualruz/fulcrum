@@ -61,7 +61,7 @@ Phase 10 is the milestone closure phase after local-first product completion. It
 - **D-32:** SAS-05 requires a two-worker PostgreSQL integration test proving one logical job is processed once under concurrent workers.
 
 ### PostgreSQL Integration Testing
-- **D-33:** PGlite unit/default tests are not sufficient for Phase 10 completion. Add a real PostgreSQL suite using `@testcontainers/postgresql@11.6.0` or `FULCRUM_TEST_DATABASE_URL`.
+- **D-33:** PGlite-backed persistence-contract tests are not sufficient for Phase 10 completion, and must not be treated as unit/default coverage. Add a real PostgreSQL suite using `@testcontainers/postgresql@11.6.0` or `FULCRUM_TEST_DATABASE_URL`.
 - **D-34:** `scripts/ci.ts` remains local CI source of truth. Add a visible PostgreSQL integration stage that can skip only with an explicit reason, but Phase 10 completion must record a green PostgreSQL run.
 - **D-35:** PostgreSQL integration suite must cover tenant isolation, auth org switch/member roles, pooling/load, EventBus cross-instance, graphile-worker coordination, and migrations up/down.
 - **D-36:** Use `postgres:17-alpine` or the current PostgreSQL stable container image selected by the planner; record exact image tag in plan and tests.

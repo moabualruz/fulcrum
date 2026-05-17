@@ -89,7 +89,7 @@ For each phase in dependency order:
 
 Worker selection:
 - **P1 infrastructure:** Use `opus` — these are critical path, need judgment
-- **P2 tRPC:** Use `sonnet` — straightforward PGlite integration tests
+- **P2 tRPC:** Use `sonnet` — fixture-backed router integration tests; use PGlite only for persistence-contract cases
 - **P3 Playwright:** Use `sonnet` — route-by-route e2e tests
 - **P4 TUI:** Use `sonnet` — FakeTTY screen tests
 - **P5 inference:** Use `sonnet` — sidecar integration

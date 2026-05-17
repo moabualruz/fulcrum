@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import type { EntityManager } from "typeorm";
 import { resolveDatabaseConfig, type ResolvedDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 import { initDataSource, __resetDataSourceForTest as __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
-import { normalizeSqlParams } from "@platform-core/application/orm-helpers.ts";
 import { sqlAccess } from "@platform-core/application/legacy/orm-web-adapter.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "@platform-core/application/tenancy/defaults.ts";
 import type { DataSource } from "typeorm";
@@ -162,8 +161,7 @@ function createOrmDb(
       sql: string,
       params: readonly OrmDbValue[] = [],
     ): Promise<T[]> {
-      const normalized = normalizeSqlParams(sql, params);
-      return await conn.execute<T[]>(normalized.sql, normalized.params as OrmDbValue[]);
+      return await conn.execute<T[]>(sql, params);
     },
     async exec(sql: string): Promise<void> {
       await conn.execute(sql);

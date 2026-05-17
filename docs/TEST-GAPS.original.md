@@ -1,4 +1,4 @@
-# Test Gaps — Integration & E2E
+# Test Gaps — Fixture, Integration & E2E
 
 Audit date: 2026-05-04. Updated after live dev-server debugging session.
 Covers all pillars (P1-P17).
@@ -42,7 +42,7 @@ Existing e2e: smoke, user-journey, auth-login, search, artifacts, routing-settin
 - [ ] `/memory` — no unit test and no e2e for memory list/detail views
 - [ ] `/memory/[id]` — no unit test and no e2e
 - [ ] `/docs/global` — no unit test and no e2e for global docs listing
-- [ ] `/docs/[id]/edit` — no e2e for Tiptap editor save/cancel round-trip with real DB
+- [ ] `/docs/[id]/edit` — no e2e for Tiptap editor save/cancel round-trip through real workflow and seeded DB
 - [ ] `/docs/[id]/history` — no e2e for version history diff viewer
 - [ ] `/docs/new` — no e2e for new-doc creation flow end-to-end
 - [ ] `/projects/new` — no unit test and no e2e for project creation wizard
@@ -71,18 +71,18 @@ Existing e2e: smoke, user-journey, auth-login, search, artifacts, routing-settin
 - [ ] `/settings/skills` — no e2e for skill browser/install UI
 - [ ] `/auth/invite/[token]` — no unit test and no e2e for invite acceptance flow
 
-## API/tRPC (Integration tests with real DB needed)
+## API/tRPC (Fixture-backed integration by default; DB-backed only for persistence contracts)
 
 Existing tRPC tests: audit, auth, backup, credentials, customFields, docs-*, errorLogs, flags, json-import-export, memory, notifications, orgs, reports-burndown, repos, router, routing, schemas, sprints-crud, stubs, tasks-crud, telemetry, theme, webhooks.
 
-- [ ] `artifacts` router — no tRPC integration test (unit test at `apps/server/src/trpc/routers/artifacts.test.ts` exists, but no `tests/trpc/artifacts.test.ts` with real DB)
+- [ ] `artifacts` router — no tRPC integration test (unit test at `apps/server/src/trpc/routers/artifacts.test.ts` exists; add fixture-backed router coverage first, DB-backed coverage only for persistence behavior)
 - [ ] `documents` router — no tRPC integration test (tRPC docs-crud covers some, but `documents` router has its own procedures)
 - [ ] `memories` router — no tRPC integration test for memory CRUD procedures
 - [ ] `orchestration` router — no tRPC integration test for workflow/queue management procedures
 - [ ] `runs` router — no tRPC integration test for run CRUD, status transitions, log streaming
 - [ ] `search` router — no tRPC integration test for search-across-entities procedure
 - [ ] REST API v1 (`/api/v1/*`) — unit test exists but no integration test against real server with auth headers
-- [ ] Product-kernel PGlite queries — `openProductDb` + `runMigrations` not tested with real PGlite in web context (only product-kernel unit tests)
+- [ ] Product-kernel PGlite queries — `openProductDb` + `runMigrations` not tested with real PGlite in web-context integration (only product-kernel component tests)
 - [ ] `sprints.close` — no integration test for `next-sprint` disposition (gate review found it was a no-op, F2 — fixed)
 - [ ] `sprints.close` event — no test verifies `metrics_snapshot.id` is non-empty in the persisted event (gate review found empty UUID, F1 — fixed)
 - [ ] Hybrid search params — no integration test with `embedQuery` provided to verify FTS WHERE clause params match (gate review found params/SQL mismatch, F1 — fixed)

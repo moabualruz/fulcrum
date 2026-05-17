@@ -14,11 +14,11 @@ passing automated test.
 | Vitest (web) | `src/web/vitest.config.ts` | `cd src/web && bun run web:test` |
 | Playwright (web e2e) | `src/web/playwright.config.ts` | `cd src/web && bun run web:e2e` |
 | Playwright (a11y) | same config, `--project=chromium` | `cd src/web && bun run web:a11y` |
-| PGlite | `src/product-kernel/db/pglite.ts` | In-process, no external DB needed |
-| Test utils | `src/test-utils/db.ts` | `createTestDb()`, `createLocalOrg()` |
+| PGlite | `src/product-kernel/db/pglite.ts` | In-process Postgres for persistence-contract tests |
+| Test utils | `src/test-utils/db.ts` | `createTestDb()`, `createLocalOrg()` for tests that explicitly need DB seams |
 
 Playwright auto-starts `vite dev` with isolated `FULCRUM_HOME` per run.
-PGlite provides an in-process Postgres for integration tests — no Docker needed.
+PGlite is not the default for all tests. Unit tests use pure fixtures/mocks. Integration tests use fixture-backed seams unless they need to prove migrations, query behavior, transactions, or API/service wiring through persistence. E2E tests use real workflows with seeded realistic data and real runtime connections.
 
 ## Phases
 
@@ -36,8 +36,9 @@ because they gate every other phase.
 
 ### Phase 2: API/tRPC Integration (P2) — 15 issues
 
-Real-DB integration tests for tRPC routers using PGlite. These verify that
-the server-side logic works end-to-end without mocks.
+Fixture-backed tRPC integration tests for routers. Use PGlite only for procedures
+whose acceptance depends on persistence, migrations, transactionality, query shape,
+or service wiring through the database boundary.
 
 - P2-01: artifacts router
 - P2-02: documents router
@@ -135,5 +136,5 @@ P8 (gate regressions) ← can run parallel with P7
 - [ ] All 108 issues `Status: completed`
 - [ ] `bun run ci` test stage: 0 new failures from test-coverage branch
 - [ ] Every Playwright test: page loads, primary interaction works, no console errors
-- [ ] Every PGlite integration test: real queries, real migrations, no mocks of DB layer
+- [ ] Every DB-backed integration test: real queries, real migrations, no mocks of DB layer; non-persistence integration tests stay fixture-backed
 - [ ] `docs/TEST-GAPS.md` updated: all `[ ]` → `[x]` with test file paths

@@ -75,6 +75,14 @@ Companion artifacts travel with rules:
 - Hook recipes — `hooks/recipes/*.snippet.md`, vendored to `~/.fulcrum/hooks/snippets/` by install. Per-agent registration in `docs/hooks.md`.
 - Skill registry — `skills/SOURCES.md`. `fulcrum skills sync` mirrors `skills/<name>/` to each agent's native namespace, excluding `.original.md` and source-only folders from generated CLI agent mirrors while keeping them in project source.
 
+## Context-mode routing for Codex
+
+Fulcrum project instructions must preserve context-mode routing wherever Codex reads project rules. `rules/AGENTS.md` is the distributed source of truth; root `AGENTS.md` keeps the project-local copy.
+
+- When context-mode MCP tools are available, use `ctx_batch_execute` for multi-command exploration, `ctx_search` for follow-up lookup, `ctx_execute` / `ctx_execute_file` for analysis or output over 20 lines, and `ctx_fetch_and_index` for web/document fetches.
+- Do not dump raw large shell, grep, file, or HTTP output into the conversation. If context-mode transport is closed, use the smallest bounded shell fallback needed to repair context-mode itself, then retry MCP tools.
+- Keep context-mode routing inside project instruction files when updating Fulcrum rules. Do not remove it from root `AGENTS.md` or `rules/AGENTS.md` during install/uninstall cleanup unless the user explicitly asks to remove context-mode.
+
 ## Conventions that apply to current work
 
 - **Competitive parity audit loop.** Product features iterate: audit competing app → identify gaps → implement additions with stated exit criteria → review → re-audit until parity + surplus. Every iteration updates all source-of-truth docs. Docs, code, and progress never drift out of sync. See tracker `## Competitive Parity Audit Framework` for process and exit criteria.
@@ -97,6 +105,7 @@ Companion artifacts travel with rules:
 - **No new docs files unless asked.** Update existing docs in place; don't generate planning, decision, or analysis markdown alongside code changes.
 - **One commit per logical change.** Bisect granularity matter — separate fixes from features.
 - **Test organization.** Unit tests (`*.test.ts`) co-located beside source in `services/<svc>/src/`. Integration tests (`*.integration.test.ts` or `*.test.ts`) in `tests/<svc>/`. Architecture/boundary guards in `tests/architecture/`. Web surface tests in `apps/web/tests/`. CLI/TUI surface tests in `tests/cli/`, `tests/tui/`. E2E in `tests/e2e/`. No test file should exist in both locations for the same behavior. No orphan test dirs — every `tests/<dir>/` must map to a service, surface, or test category.
+- **Test data boundaries.** Unit tests never require a database; use pure fixtures, factories, and repository/service mocks. Integration tests default to fixture-backed component seams; use PGlite/PostgreSQL only when the behavior under test is persistence, migrations, transactionality, query shape, or API/service wiring that cannot be proven with mocks. E2E tests exercise real workflows with real connections and seeded realistic data through the same public surfaces users/agents use. Do not upgrade a unit or narrow integration test into a database workflow just to make data setup convenient.
 - **CI pipeline is tiered.** Tier 1: lint + architecture (fast, <15s). Tier 2: unit tests (`services/`). Tier 3: integration tests (`tests/`). Tier 4: build + web. Use `just ci-fast` (affected-only via `bun test --changed`) for PR checks. Use `just ci` for full suite. No duplicate test runs.
 - **Monorepo is microservice-splittable.** Each service under `services/` must be self-contained: own entities, repositories, migrations, module definition, interface controllers. Services are directories with tsconfig path aliases today. Extraction means: add `package.json`, switch alias to `workspace:*` dep, deploy separately. Structure must make extraction mechanical, not architectural.
 - **Service internal layout is canonical.** Every service follows: `src/{domain,application,infrastructure/database/{entities,repositories,migrations},interface/http/{controllers,dto}}`. No variations. `domain/` has zero imports from infrastructure. `interface/` depends on `application/`, never on `infrastructure/` directly.

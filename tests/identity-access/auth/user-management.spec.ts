@@ -1,18 +1,18 @@
 /**
- * Unit tests for the settings/users page server functions.
- * Tests the +page.server.ts load() and actions (invite, updateRole, remove).
+ * Fixture-backed route tests for the settings/users page server functions.
+ * Tests the +page.server.ts load() and actions through mocked public API fetches.
  *
  * Acceptance criteria:
  *   1. load() redirects unauthenticated visitors to /auth/login (303).
- *   2. load() returns members array when tRPC orgs.members.list succeeds.
- *   3. load() surfaces 403 error when tRPC returns FORBIDDEN.
+ *   2. load() returns members array when organizations members list succeeds.
+ *   3. load() surfaces 403 error when the public API returns FORBIDDEN.
  *   4. actions.invite returns fail(400) when email is missing.
  *   5. actions.invite returns { inviteToken, inviteEmail } on success.
- *   6. actions.invite returns fail(400) on tRPC error.
+ *   6. actions.invite returns fail(400) on public API error.
  *   7. actions.updateRole returns fail(400) when userId or role is missing.
  *   8. actions.updateRole returns { ok: true } on success.
  *   9. actions.remove returns fail(400) when userId is missing.
- *   10. actions.remove returns fail(400) when tRPC returns BAD_REQUEST (last owner).
+ *   10. actions.remove returns fail(400) when public API returns BAD_REQUEST (last owner).
  *   11. actions.remove returns { ok: true } on success.
  */
 
@@ -99,11 +99,8 @@ describe("settings/users +page.server load()", () => {
 
   it("returns members array when orgs.members.list succeeds", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/trpc/orgs.members.list")) {
-        return new Response(
-          JSON.stringify({ result: { data: { json: MOCK_MEMBERS } } }),
-          { status: 200 },
-        );
+      if (url.toString().includes("/api/v1/organizations/members")) {
+        return new Response(JSON.stringify(MOCK_MEMBERS), { status: 200 });
       }
       return new Response(null, { status: 404 });
     };
@@ -120,10 +117,10 @@ describe("settings/users +page.server load()", () => {
     expect(result.members[1]?.role).toBe("member");
   });
 
-  it("surfaces 403 error when tRPC returns FORBIDDEN", async () => {
+  it("surfaces 403 error when public API returns FORBIDDEN", async () => {
     const mockFetch = async () =>
       new Response(
-        JSON.stringify([{ error: { json: { message: "Only org owners and admins can perform this action." } } }]),
+        JSON.stringify({ message: "Forbidden: only org owners and admins can perform this action." }),
         { status: 403 },
       );
 
@@ -146,7 +143,7 @@ describe("settings/users +page.server load()", () => {
 
   it("returns empty members array when list returns empty", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/trpc/orgs.members.list")) {
+      if (url.toString().includes("/api/v1/organizations/members")) {
         return new Response(
           JSON.stringify({ result: { data: { json: [] } } }),
           { status: 200 },
@@ -176,10 +173,10 @@ describe("settings/users +page.server actions.invite", () => {
     expect((result as { data: { inviteError: string } }).data.inviteError).toMatch(/email/i);
   });
 
-  it("returns fail(400) on tRPC error", async () => {
+  it("returns fail(400) on public API error", async () => {
     const mockFetch = async () =>
       new Response(
-        JSON.stringify([{ error: { json: { message: "Only org owners and admins can invite members." } } }]),
+        JSON.stringify({ message: "Only org owners and admins can invite members." }),
         { status: 403 },
       );
 
@@ -195,17 +192,11 @@ describe("settings/users +page.server actions.invite", () => {
 
   it("returns inviteToken and inviteEmail on success", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/trpc/auth.invite")) {
+      if (url.toString().includes("/api/v1/invitations")) {
         return new Response(
           JSON.stringify({
-            result: {
-              data: {
-                json: {
-                  invitationId: "inv-uuid-01",
-                  token: "plaintext-token-abcdef1234567890",
-                },
-              },
-            },
+            invitationId: "inv-uuid-01",
+            token: "plaintext-token-abcdef1234567890",
           }),
           { status: 200 },
         );
@@ -242,10 +233,10 @@ describe("settings/users +page.server actions.updateRole", () => {
     expect((result as { data: { roleError: string } }).data.roleError).toBeTruthy();
   });
 
-  it("returns fail(400) on tRPC FORBIDDEN error", async () => {
+  it("returns fail(400) on public API FORBIDDEN error", async () => {
     const mockFetch = async () =>
       new Response(
-        JSON.stringify([{ error: { json: { message: "Only org owners can perform this action." } } }]),
+        JSON.stringify({ message: "Only org owners can perform this action." }),
         { status: 403 },
       );
 
@@ -261,11 +252,8 @@ describe("settings/users +page.server actions.updateRole", () => {
 
   it("returns { ok: true } on success", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/trpc/orgs.members.updateRole")) {
-        return new Response(
-          JSON.stringify({ result: { data: { json: { ok: true } } } }),
-          { status: 200 },
-        );
+      if (url.toString().includes("/api/v1/organizations/members/") && url.toString().endsWith("/role")) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
       return new Response(null, { status: 404 });
     };
@@ -290,10 +278,10 @@ describe("settings/users +page.server actions.remove", () => {
     expect((result as { data: { removeError: string } }).data.removeError).toBeTruthy();
   });
 
-  it("returns fail(400) when tRPC returns BAD_REQUEST (last owner)", async () => {
+  it("returns fail(400) when public API returns BAD_REQUEST (last owner)", async () => {
     const mockFetch = async () =>
       new Response(
-        JSON.stringify([{ error: { json: { message: "Cannot remove the last owner of an org." } } }]),
+        JSON.stringify({ message: "Cannot remove the last owner of an org." }),
         { status: 400 },
       );
 
@@ -309,11 +297,8 @@ describe("settings/users +page.server actions.remove", () => {
 
   it("returns { ok: true } on success", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/trpc/orgs.members.remove")) {
-        return new Response(
-          JSON.stringify({ result: { data: { json: { ok: true } } } }),
-          { status: 200 },
-        );
+      if (url.toString().includes("/api/v1/organizations/members/")) {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }
       return new Response(null, { status: 404 });
     };

@@ -10,7 +10,7 @@ File ownership:
 - `src/web/src/lib/server/tasks.ts`
 
 TDD plan:
-- RED unit: `tasks.test.ts` server actions: `createTaskAction`, `updateTaskAction`, `deleteTaskAction`, `moveTaskStatusAction` against PGlite. Each asserts the row + the matching `task.<verb>` event.
+- RED integration: `tasks.test.ts` server actions: `createTaskAction`, `updateTaskAction`, `deleteTaskAction`, `moveTaskStatusAction` against PGlite because they verify persistence and event rows. Pure board helpers stay fixture-backed unit tests.
 - RED unit: `board-helpers.test.ts` covers `groupTasksByStatus` (already exists; tighten ordering), `keyboardMove(state, key)` for the accessibility keyboard re-order, and `optimisticMove(tasks, taskId, toStatus)`.
 - RED component: `board-card.svelte.test.ts` renders a card, clicks it, asserts the parent's open-edit-sheet handler was called.
 - RED component: `board-column.svelte.test.ts` enters text into "+ Add" input, presses Enter, asserts `enhance` action called with the correct `formData`.
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 ## Sub-tasks
 
-- [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
+- [x] **05.1 — Server actions for tasks.** Owns: `src/web/src/lib/server/tasks.ts`, `.test.ts`. RED integration: PGlite tests for create/update/delete/moveStatus + matching `task.<verb>` event rows.
 - [x] **05.2 — Board helpers (`optimisticMove`, `keyboardMove`).** Owns: `src/web/src/lib/components/board/board-helpers.ts`, `.test.ts`. RED: optimistic move keeps order stable in same column; cross-column move appends to end of target.
 - [x] **05.3 — `BoardCard` component.** Owns: `src/web/src/lib/components/board/BoardCard.svelte`, `.svelte.test.ts`. RED: click fires `onEdit` callback with task id.
 - [x] **05.4 — `BoardColumn` with `svelte-dnd-action`.** Owns: `src/web/src/lib/components/board/BoardColumn.svelte`, `.svelte.test.ts`. RED: `finalize` handler emits server-action call with `{ taskId, fromStatus, toStatus }`.

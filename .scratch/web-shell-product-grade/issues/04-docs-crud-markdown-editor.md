@@ -10,7 +10,7 @@ File ownership:
 - `src/web/src/lib/components/markdown/**`
 
 TDD plan:
-- RED unit: `src/web/src/lib/server/documents.test.ts` exercises `createDocumentAction`, `updateDocumentAction`, `deleteDocumentAction` against PGlite; asserts source row + `document.<verb>` event row + `search_documents` row update via `indexSearchDocument`.
+- RED integration: `src/web/src/lib/server/documents.test.ts` exercises `createDocumentAction`, `updateDocumentAction`, `deleteDocumentAction` against PGlite because it verifies persistence, event rows, and search indexing; pure document helpers stay fixture-backed unit tests.
 - RED unit: `markdown-preview.test.ts` for the preview helper — sanitises script tags, preserves links, renders basic Markdown to HTML.
 - RED component: `markdown-editor.svelte.test.ts` boots the CodeMirror wrapper, types into the textarea fallback, and asserts the `change` event payload matches the typed text. (Skip the real CodeMirror render in jsdom; assert wrapper props instead.)
 - RED component: `frontmatter-form.svelte.test.ts` validates required `title` + `kind`, surfaces inline errors.
@@ -29,7 +29,7 @@ Acceptance criteria:
 
 ## Sub-tasks
 
-- [x] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
+- [x] **04.1 — Server actions for documents.** Owns: `src/web/src/lib/server/documents.ts`, `.test.ts`. RED integration: PGlite tests for create/update/delete + matching `events` row + `search_documents` upsert via `indexSearchDocument`.
 - [x] **04.2 — Frontmatter form mapper.** Owns: `src/web/src/lib/markdown/frontmatter-form.ts`, `.test.ts`. RED: round-trip `{ title, kind, labels[] }` ↔ `KernelMarkdown.frontmatter` via existing `parseKernelMarkdown` / `serializeKernelMarkdown`.
 - [x] **04.3 — `MarkdownEditor` wrapper (CodeMirror 6).** Owns: `src/web/src/lib/components/markdown/MarkdownEditor.svelte`, `.svelte.test.ts`. RED: jsdom-safe wrapper test asserts the `value` prop binding and the `change` event payload.
 - [x] **04.4 — `MarkdownPreview` (marked + dompurify).** Owns: `src/web/src/lib/components/markdown/MarkdownPreview.svelte`, `.svelte.test.ts`. RED: sanitises `<script>`; preserves links + headings; renders `# h1` to `<h1>`.

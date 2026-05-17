@@ -21,11 +21,11 @@ Blocked-by: [P1-01]
 
 ## What to test
 
-tRPC integration test for the `artifacts` router using real PGlite. Unit tests exist at `src/trpc/routers/artifacts.test.ts` but no integration test exercises the router against a real DB.
+tRPC integration test for the `artifacts` router. Start fixture-backed for router contract behavior; use real PGlite only for artifact persistence, transaction, query-shape, or migration-sensitive paths.
 
 ## Setup
 
-- PGlite with all migrations via `createTestDb()`
+- Fixture-backed caller for router contract coverage; PGlite with all migrations via `createTestDb()` only for persistence-contract cases
 - Default org and project created via `createLocalOrg()`
 - tRPC caller created from the server context
 

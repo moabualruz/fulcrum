@@ -21,7 +21,7 @@ Blocked-by: [P1-02, P2-02]
 
 ## What to test
 
-Playwright e2e for the Tiptap document editor save/cancel round-trip with real DB. No e2e currently exists.
+Playwright e2e for the Tiptap document editor save/cancel round-trip through the real workflow, real runtime connection, and seeded DB. No e2e currently exists.
 
 ## Setup
 

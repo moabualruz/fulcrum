@@ -5,8 +5,8 @@
 //   bun run scripts/ci.ts --changed     → affected-only (unit+integration use --changed=origin/main)
 //   bun run scripts/ci.ts --fast        → alias for --changed
 //   bun run scripts/ci.ts --tier=lint   → lint tier only
-//   bun run scripts/ci.ts --tier=unit   → lint + unit
-//   bun run scripts/ci.ts --tier=integration → lint + unit + integration
+//   bun run scripts/ci.ts --tier=unit   → lint + fixture-backed unit
+//   bun run scripts/ci.ts --tier=integration → lint + unit + DB/API integration
 //   bun run scripts/ci.ts --tier=build  → all tiers
 
 import { spawn } from "node:child_process";
@@ -36,8 +36,8 @@ export function envForStep(step: Step): NodeJS.ProcessEnv {
 
 // ── CI Tiers ──────────────────────────────────────────────────────────────────
 // Tier 1: LINT + ARCHITECTURE — fast gate (<15s)
-// Tier 2: UNIT TESTS — services/ (<2min)
-// Tier 3: INTEGRATION TESTS — tests/ (<3min)
+// Tier 2: UNIT TESTS — fixture-backed service tests (<2min)
+// Tier 3: INTEGRATION TESTS — tests/ + DB/API contract tests (<3min)
 // Tier 4: BUILD + WEB — build verification (<2min)
 
 export type CiTier = "lint" | "unit" | "integration" | "build";
@@ -96,11 +96,11 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "lint" },
     { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "lint" },
 
-    // ── Tier 2: UNIT TESTS (services/, sequential to avoid PGlite socket drops) ──
-    { name: "unit",          cmd: ["bun", "test", ...changedFlag, "--timeout", "60000", "services/"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
+    // ── Tier 2: UNIT TESTS (fixture-backed; DB contracts run in integration) ──
+    { name: "unit",          cmd: ["bun", "run", "scripts/test-tier.ts", "unit", ...changedFlag, "--timeout", "60000"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
 
-    // ── Tier 3: INTEGRATION TESTS (tests/) ──
-    { name: "integration",   cmd: ["bun", "test", ...changedFlag, "--timeout", "60000", "tests/", "--exclude", "tests/architecture"], tier: "integration" },
+    // ── Tier 3: INTEGRATION TESTS (tests/ + DB/API contract tests) ──
+    { name: "integration",   cmd: ["bun", "run", "scripts/test-tier.ts", "integration", ...changedFlag, "--timeout", "60000"], tier: "integration" },
 
     // ── Tier 4: BUILD + WEB (<2min) ──
     { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },

@@ -128,8 +128,8 @@ describe("architecture platform gate regressions", () => {
   test("CI tiered pipeline covers unit and integration tiers", () => {
     const steps = new Map(STEPS.map((step) => [step.name, step.cmd.join(" ")]));
 
-    expect(steps.get("unit")).toContain("services/");
-    expect(steps.get("integration")).toContain("tests/");
+    expect(steps.get("unit")).toContain("scripts/test-tier.ts unit");
+    expect(steps.get("integration")).toContain("scripts/test-tier.ts integration");
     expect(steps.get("ci:schemas")).toContain("scripts/ci-schemas.ts");
   });
 

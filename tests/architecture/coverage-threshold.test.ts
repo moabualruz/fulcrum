@@ -107,14 +107,16 @@ describe("architecture coverage threshold gates", () => {
     expect(source).toContain('if (path === "apps/web") continue;');
   });
 
-  test("local CI runs unit and integration tiers that cover all service tests", () => {
+  test("local CI runs unit and integration tiers through the test-tier selector", () => {
     const unit = STEPS.find((step) => step.name === "unit");
     const integration = STEPS.find((step) => step.name === "integration");
 
     expect(unit).toBeDefined();
-    expect(unit!.cmd).toContain("services/");
+    expect(unit!.cmd).toContain("scripts/test-tier.ts");
+    expect(unit!.cmd).toContain("unit");
     expect(integration).toBeDefined();
-    expect(integration!.cmd).toContain("tests/");
+    expect(integration!.cmd).toContain("scripts/test-tier.ts");
+    expect(integration!.cmd).toContain("integration");
   });
 
   test("web Vitest coverage uses v8 provider and 80 percent lines", () => {

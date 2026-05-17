@@ -115,6 +115,7 @@ const mockEm = {
 ```
 
 **What to Mock:**
+- Unit tests never need a database. Use factories, fixtures, and mocked repositories/services for pure domain, application-service, CLI, and config behavior.
 - Mock SvelteKit virtual modules for SSR component tests: `$app/state`, `$app/navigation`, `$app/forms` in `apps/web/src/routes/boards/page.svelte.test.ts`.
 - Mock repository/EntityManager surfaces for pure service behavior: `makeMockRepo()` and `makeMockEm()` in `src/services/TaskService.test.ts`.
 - Mock process HOME/config roots with temp directories for CLI behavior: `apps/cli/src/doctor.test.ts`.
@@ -124,6 +125,7 @@ const mockEm = {
 - Do not mock PGlite for migration/schema/product DB contract tests; use in-memory PGlite and real migrations: `tests/db/migrator-service.test.ts`, `apps/web/src/routes/boards/page.server.test.ts`.
 - Do not mock public API route registration when testing OpenAPI/parity contracts: `tests/api/openapi-memory.test.ts`, `tests/api/rest-parity.test.ts`.
 - Do not mock Svelte SSR output when asserting rendered markup; use `svelte/server` `render()` with Bun preload from `bunfig.toml`.
+- Do not replace E2E workflows with mocked data paths; seed realistic data through public setup helpers and exercise the same runtime connections as users/agents.
 
 ## Fixtures and Factories
 
@@ -177,16 +179,19 @@ CI runs both coverage gates through `scripts/ci.ts`: `coverage:root` and `covera
 **Unit Tests:**
 - Pure domain/service logic with mocks: `src/services/TaskService.test.ts`, `tests/notifications/rule-engine.test.ts`, `src/router/rules-engine.test.ts`.
 - CLI and config behavior with temp HOME roots: `apps/cli/src/doctor.test.ts`, `apps/cli/src/install.test.ts`.
+- No database dependency; if a test needs migrations, SQL, transactions, or live repositories, it is not a unit test.
 
 **Integration Tests:**
-- PGlite/MikroORM migrations and DB schema contracts: `tests/db/migrator-service.test.ts`, `tests/db/migrations/*.test.ts`.
-- Web route server actions against seeded local product DB: `apps/web/src/routes/boards/page.server.test.ts`, `apps/web/src/routes/runs/page.server.test.ts`.
+- Fixture-backed service/router seams by default; use DB only when testing persistence, migrations, transactions, query shape, or API/service wiring through repositories.
+- PGlite/TypeORM migrations and DB schema contracts: `tests/db/migrator-service.test.ts`, `tests/db/migrations/*.test.ts`.
+- Web route server actions against seeded local product DB only when route behavior depends on persistence: `apps/web/src/routes/boards/page.server.test.ts`, `apps/web/src/routes/runs/page.server.test.ts`.
 - API parity/OpenAPI tests: `tests/api/rest-parity.test.ts`, `tests/api/hono-setup.test.ts`.
 
 **E2E Tests:**
 - Playwright smoke is always in CI through `web:e2e:smoke`: `apps/web/tests/e2e/_smoke.spec.ts`.
 - Full Playwright e2e runs with `FULCRUM_RUN_E2E=1`: `apps/web/playwright.config.ts`, `scripts/ci.ts`.
 - Accessibility uses Playwright + axe: `apps/web/package.json` script `web:a11y`, tests under `apps/web/tests/a11y/`.
+- E2E tests use real workflows, real runtime connections, and seeded realistic data through public surfaces.
 
 ## Common Patterns
 

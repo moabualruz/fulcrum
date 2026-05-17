@@ -57,26 +57,26 @@ describe("ci tiered pipeline — lint tier", () => {
 describe("ci tiered pipeline — unit tier", () => {
   const unitSteps = ALL_STEPS.filter((s) => s.tier === "unit");
 
-  it("has a single 'unit' step running bun test on services/", () => {
+  it("has a single 'unit' step running fixture-backed service tests", () => {
     expect(unitSteps).toHaveLength(1);
     const step = unitSteps[0]!;
     expect(step.name).toBe("unit");
-    expect(step.cmd).toContain("services/");
-    expect(step.cmd).toContain("--parallel");
+    expect(step.cmd).toContain("scripts/test-tier.ts");
+    expect(step.cmd).toContain("unit");
+    expect(step.cmd).toContain("--timeout");
   });
 });
 
 describe("ci tiered pipeline — integration tier", () => {
   const integrationSteps = ALL_STEPS.filter((s) => s.tier === "integration");
 
-  it("has a single 'integration' step running bun test on tests/", () => {
+  it("has a single 'integration' step running external and DB contract tests", () => {
     expect(integrationSteps).toHaveLength(1);
     const step = integrationSteps[0]!;
     expect(step.name).toBe("integration");
-    expect(step.cmd).toContain("tests/");
-    expect(step.cmd).toContain("--parallel");
-    expect(step.cmd).toContain("--exclude");
-    expect(step.cmd).toContain("tests/architecture");
+    expect(step.cmd).toContain("scripts/test-tier.ts");
+    expect(step.cmd).toContain("integration");
+    expect(step.cmd).toContain("--timeout");
   });
 });
 

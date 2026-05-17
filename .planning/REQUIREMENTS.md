@@ -267,8 +267,8 @@
 ### Testing (TST)
 
 - [ ] **TST-01**: Infrastructure tests: migration compat, dev server smoke, SvelteKit export validation, auth mode, default org seeding
-- [ ] **TST-02**: tRPC integration tests for all routers
-- [ ] **TST-03**: Playwright e2e for 14 user journeys (enumerated in WEB-07)
+- [ ] **TST-02**: tRPC integration tests for all routers — fixture-backed by default; DB-backed only for persistence, migration, transaction, query-shape, or service-wiring contracts
+- [ ] **TST-03**: Playwright e2e for 14 user journeys (enumerated in WEB-07) with real workflows, real runtime connections, and seeded realistic data
 - [ ] **TST-04**: TUI screen tests for all screens (count verified against actual screen registry)
 - [ ] **TST-05**: CLI command tests for all 15 domains
 - [ ] **TST-06**: Inference backend contract tests
@@ -284,7 +284,7 @@
 - [ ] **SAS-03**: EventBus injectable (pluggable for Redis/NATS in multi-instance)
 - [ ] **SAS-04**: Auth org-switching + org member management functional
 - [ ] **SAS-05**: Job queue coordination across instances (graphile-worker advisory locks)
-- [ ] **SAS-06**: Integration tests run against PostgreSQL (not just PGlite)
+- [ ] **SAS-06**: SaaS persistence/integration and E2E contracts run against PostgreSQL where pooling, org isolation, advisory locks, or production database behavior is the point (not every unit or fixture-backed integration test)
 
 ### Milestone Closure (CLOSURE)
 
