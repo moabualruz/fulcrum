@@ -448,6 +448,9 @@ fulcrum memory   <list|promote|view>
 # Operate
 fulcrum doctor   [--json] [--subsystem <name>] [--probe]
 fulcrum mcp      <list|register|unregister|enable|disable|test|reload>
+                 [--agent <id>]               # scope MCP ops to a CLI agent
+fulcrum plugin   <list|install|enable|disable|update|remove>
+                 [--agent <id>] [--all-agents]
 fulcrum hooks    <list|enable|disable|test>
 fulcrum skills   <list|sync|lint|upstream>
 fulcrum install  [--profile minimal|rules-only|full] [--dry-run]
@@ -459,6 +462,23 @@ fulcrum ai       [--step <id>] [--agent <id>]   # opens inline AI Assist session
                                                 # --agent overrides the default route
                                                 # for the step's action kind
 
+# Multi-CLI agent management (no cap on configured agents)
+fulcrum agent    <list|view|add|edit|remove|enable|disable|set-default|reload>
+                 [--client claude-code|codex|gemini-cli|opencode|pi-cli|...]
+                 [--ring preferred|stable|experimental]
+fulcrum agent invoke <id> [--step <step-id>]    # run any agent against a step
+fulcrum route    <list|show|set|reset>           # default agent per action kind
+                 <action-kind> <agent-id> [--fallback <agent-id>]
+                 # action kinds: plan.draft, plan.refine, plan.prototype,
+                 # capture.discuss, build.run.step, build.run.long,
+                 # review.suggest, review.summary, ship.changelog,
+                 # operate.probe, operate.diagnose, ai.freeform
+
+# Settings
+fulcrum settings              # opens :settings (TUI) or settings.html (web)
+fulcrum profile  <list|show|switch|new|delete>
+fulcrum workspace <list|switch|new>
+
 # Cross-cutting
 fulcrum web                                 # opens web shell
 fulcrum tui                                 # opens TUI (default if no args)
@@ -467,38 +487,73 @@ fulcrum help [topic]
 fulcrum completion <bash|zsh|fish|powershell>
 ```
 
-Default: `fulcrum` alone = `fulcrum tui`. `-h/--help` always works.
+Default: `fulcrum` alone = `fulcrum tui`. `-h/--help` always works. Every command accepts `--profile <name>` and emits `trace=<id>` in stderr envelope for cross-surface linking.
+
+### 8.1 CLI envelope format
+
+Every command writes a one-line trailer to stderr (so `--json` stdout stays parseable):
+
+```
+fulcrum: ok | err [exit=N] trace=<id> agent=<id> profile=<name> took=<ms>
+```
+
+Errors follow the COPY.md template: `[what failed]. [why]. [next step]. trace=<id>`. Use `fulcrum trace show <id>` to jump to the trace explorer (web auto-opens if `$FULCRUM_OPEN=1`).
 
 ---
 
-## 9. TUI screen list (mirrors stage nav)
+## 9. TUI screen list (mirrors stage nav · full parity with web)
 
-Per research-05 §3.5. OpenTUI host shell, screens implemented as components.
+Per research-05 §3.5. OpenTUI host shell, screens implemented as components. The TUI is **feature-complete parity** with the web shell: every web destination has a TUI screen. AI is **TUI-native** (inline `:ai` pane), never a web drawer overlay.
 
-| Stage | Screen | Default key |
-|---|---|---|
-| Capture | `:inbox` | `j/k` items, `Enter`, `c` capture |
-| Capture | `:docs` | tree nav, `Enter`, `n` new |
-| Capture | `:doc/<id>` | doc reader/editor |
-| Plan | `:plans` | sessions list |
-| Plan | `:plan/<id>` | live planning session |
-| Plan | `:missions` | mission tree |
-| Build | `:runs` | runs feed, auto-tail |
-| Build | `:run/<id>` | live session |
-| Build | `:board` | task board (j/k/h/l) |
-| Build | `:tasks` | list view |
-| Build | `:graph` | dependency graph |
-| Build | `:agents` | agent panel |
-| Review | `:review` | review queue |
-| Review | `:review/<id>` | diff viewer |
-| Ship | `:artifacts` | artifacts list |
-| Ship | `:repos` | repo status |
-| Operate | `:doctor` | subsystems |
-| Operate | `:audit` | audit log |
-| Operate | `:ai` | AI Assist pane |
-| Operate | `:logs` | live log tail |
+| Stage | Screen | Default key | Notes |
+|---|---|---|---|
+| Capture | `:capture` (alias `:inbox`) | `j/k` items, `Enter`, `c` capture | filters / drafts / promoted in side pane |
+| Capture | `:docs` | tree nav, `Enter`, `n` new | doc reader/editor |
+| Capture | `:doc/<id>` | mode keys `p / d / m / :ai` | per-block mode row |
+| Plan | `:plan` | sessions list | `Enter` enters live session |
+| Plan | `:plan/<id>` | live planning session | 3-pane: sessions · transcript · workspace |
+| Plan | `:missions` | mission tree | activate slice with `a` |
+| Plan | `:prototype` | prototype gallery | live + archived |
+| Plan | `:templates` | plan template library | 12 templates |
+| Plan | `:prompts` | prompt library | tag filter |
+| Build | `:runs` | runs feed, auto-tail | `Enter` opens `:run/<id>` |
+| Build | `:run` / `:run/<id>` | live agent session | 4 panes: steps · current tool · cost/tokens · permission |
+| Build | `:board` | task board (j/k/h/l) | five-layout switcher mirrors web |
+| Build | `:list` | task list view | dense table |
+| Build | `:timeline` | gantt | 14-day window |
+| Build | `:graph` | dependency graph | status-coloured nodes |
+| Review | `:review` | review queue | tabs: awaiting / changes / approved / merged |
+| Review | `:review/<id>` | diff viewer | inline comments anchored to lines |
+| Ship | `:ship` | releases list | cycle/channel filters |
+| Ship | `:ship/<id>` | release detail | overlay panel (top-anchored sheet) |
+| Ship | `:archive` | release archive | major/minor/patch pills |
+| Operate | `:doctor` | subsystems | probe per row |
+| Operate | `:telemetry` | charts | p50/p99 · runs-by-step · resources |
+| Operate | `:alerts` | firing alerts | severity tabs |
+| Operate | `:mcp` | per-agent MCP scope | scope chip switches CLI agent |
+| Operate | `:plugins` | per-agent plugin scope | toggle / update / install-across |
+| Operate | `:audit` | audit log | trace-linked |
+| Operate | `:logs` | live log tail | follow + filter |
+| System | `:ai` | inline AI Assist pane | TUI-native; no web drawer; auto-injected `[ :ai ]` foot seg on every screen |
+| System | `:agents` | CLI agent registry | unlimited entries · `a` add · `d` set default |
+| System | `:routes` | default agent per action | `e` edit · `o` override · `r` reset |
+| System | `:settings` | settings | 8 sections: General · Appearance · Keyboard · Privacy · Integrations · AI agents · Account · Danger |
+| System | `:K` | command palette | parity with web ⌘K |
+| System | `?` | keyboard cheatsheet | full key map |
 
-Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g / G` first/last, `H/L` prev/next screen, `q` pop view, `Ctrl-C` graceful quit.
+Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g / G` first/last, `H/L` prev/next screen, `q` pop view, `Ctrl-C` graceful quit. Stage chord: `g {c|p|b|B|r|s|o}` (`g b` runs feed, `g B` board). Run control: `:run`, `:pause`, `:cancel`, `:replay`. Profile: `:profile`, `:workspace`. Settings: `:set theme dark/light`, `:set density compact/cozy/comfortable`, `:set mode simple/pro`.
+
+### 9.1 TUI footer (status spine)
+
+Mirrors web `.foot` exactly. Left-to-right: `mode pill · profile · repo:branch · run id + step · agent · mcp health · spacer · trace · time · ? · :`. Right-most segment is `[ :ai ]` (accent-bordered), invokes `:ai` inline screen. No drawer.
+
+### 9.2 TUI ≠ web invariants
+
+- **No web chat drawer in TUI.** AI is the inline `:ai` screen.
+- **No mouse-only affordances.** Every action has a keystroke; click is a convenience.
+- **No animation.** Status changes flash one frame; no slide / fade / pulse beyond the cursor blink.
+- **Status badge vocabulary identical.** `pending · running · complete · blocked · awaiting · failed · cancelled · degraded · unknown` — color + glyph + text, never color alone.
+- **Trace ID on every footer.** Click (or `y` yank) copies; `:trace <id>` jumps.
 
 ---
 

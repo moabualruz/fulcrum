@@ -507,7 +507,7 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 - [PRODUCT.md](PRODUCT.md) — target-state platform definition.
 - [IA-MAP.md](IA-MAP.md) — full route tree, sidebar, keyboard, drawer, palette, status footer, CLI tree, TUI screen list, mobile IA, trace-spine.
 - [COPY.md](COPY.md) — voice rules, empty/error/permission templates, status label lock.
-- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, ACP chat pane, parity table.
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, **TUI-native AI Assist pane** (not a drawer), per-agent MCP/plugin scoping, action-routing CLI, full parity table.
 - [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
 
 ### 14.2 Research dossiers (`.scratch/design-research/`)

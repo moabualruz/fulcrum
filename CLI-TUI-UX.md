@@ -150,13 +150,21 @@ fulcrum memory view       <id>
 
 ```
 fulcrum doctor            [--json] [--subsystem <name>] [--checks] [--probe]
-fulcrum mcp list          [--json]
+fulcrum mcp list          [--json] [--agent <id>]
 fulcrum mcp register      <name> [--http <url>|--stdio <cmd>] [--vendor <v>]
-fulcrum mcp unregister    <name>
+                          [--agent <id>...] [--all-agents]
+fulcrum mcp unregister    <name> [--agent <id>...] [--all-agents]
 fulcrum mcp enable        <name> [--agent <id>...] [--all-agents]
 fulcrum mcp disable       <name> [--agent <id>...] [--all-agents]
-fulcrum mcp test          <name>
-fulcrum mcp reload        <name>
+fulcrum mcp test          <name> [--agent <id>]
+fulcrum mcp reload        <name> [--agent <id>...] [--all-agents]
+
+fulcrum plugin list       [--json] [--agent <id>]
+fulcrum plugin install    <name> [--agent <id>...] [--all-agents] [--version <v>]
+fulcrum plugin enable     <name> [--agent <id>...] [--all-agents]
+fulcrum plugin disable    <name> [--agent <id>...] [--all-agents]
+fulcrum plugin update     <name|--all> [--agent <id>...] [--all-agents]
+fulcrum plugin remove     <name> [--agent <id>...] [--all-agents]
 
 fulcrum hooks list
 fulcrum hooks enable      <name>
@@ -180,7 +188,63 @@ fulcrum config path
 fulcrum audit list        [--project <id>] [--actor <id>] [--action <ns>] [--target <ref>] [--trace <id>] [--since <t>] [--until <t>] [--export csv|jsonl]
 
 fulcrum trace show        <id>
-fulcrum chat              [--step <id>] [--agent <name>]      # opens inline ACP session
+fulcrum ai                [--step <id>] [--agent <name>] [--thread <id>]
+                          # opens TUI-native inline AI Assist pane (no web drawer);
+                          # --agent overrides default route for the step's action kind
+```
+
+### 1.6.1 Multi-CLI agent management (no cap)
+
+```
+fulcrum agent list        [--json] [--client <kind>] [--ring <ring>]
+fulcrum agent view        <id>
+fulcrum agent add         <id> --client <kind> [--binary <path>] [--model <m>]
+                          [--ring preferred|stable|experimental] [--default]
+                          [--policy <file>]
+fulcrum agent edit        <id> [--ring <r>] [--policy <file>] [--model <m>]
+fulcrum agent remove      <id> [--force]
+fulcrum agent enable      <id>
+fulcrum agent disable     <id>
+fulcrum agent set-default <id> [--action <kind>]
+fulcrum agent reload      <id>
+fulcrum agent invoke      <id> [--step <step-id>] [--policy <file>]
+
+# clients (extensible; --client values):
+#   claude-code · codex · gemini-cli · opencode · pi-cli · custom
+# rings:
+#   preferred · stable · experimental
+```
+
+### 1.6.2 Action routing (default agent per action kind)
+
+```
+fulcrum route list                                      [--json]
+fulcrum route show        <action-kind>
+fulcrum route set         <action-kind> <agent-id> [--fallback <agent-id>]
+fulcrum route reset       <action-kind|--all>
+
+# action kinds:
+#   plan.draft · plan.refine · plan.prototype
+#   capture.discuss
+#   build.run.step · build.run.long
+#   review.suggest · review.summary
+#   ship.changelog
+#   operate.probe · operate.diagnose
+#   ai.freeform
+```
+
+### 1.6.3 Settings · profile · workspace
+
+```
+fulcrum settings                                       # opens :settings
+fulcrum profile list
+fulcrum profile show
+fulcrum profile switch    <name>
+fulcrum profile new       <name>
+fulcrum profile delete    <name> --confirm <name>
+fulcrum workspace list
+fulcrum workspace switch  <name>
+fulcrum workspace new     <name>
 ```
 
 ### 1.7 Cross-cutting
@@ -193,6 +257,10 @@ fulcrum version
 fulcrum help [topic]
 fulcrum completion <bash|zsh|fish|powershell>
 ```
+
+### 1.8 Per-agent scoping rule
+
+Every command that mutates configuration (mcp · plugin · hooks · install · skills) accepts `--agent <id>` (repeatable) and `--all-agents`. Default scope: **active agent only** (the one set as default for the relevant action kind). Use `--all-agents` to apply across the registry once cross-agent install lands. Until then, the flag prints `note: cross-agent install is staged behind feature flag plugins.cross_agent; falling back to per-agent loop`.
 
 ---
 
@@ -371,49 +439,67 @@ Lifted from COPY.md §3 + research-05 §1.9 (clig.dev). Pattern: `[what failed].
 
 ## 6. TUI screen list
 
-Per IA-MAP.md §9 + research-05 §3.5. OpenTUI host, screens as components. Default screen on `fulcrum tui` boot = `:inbox` if any unread, else last-visited screen.
+Per IA-MAP.md §9 + research-05 §3.5 + the `tui-runs.html` prototype (16 screens shipped). OpenTUI host, screens as components. **Feature parity with web shell is mandatory** — every web destination has a TUI screen. Default screen on `fulcrum tui` boot = `:inbox` if any unread, else last-visited screen.
 
 | Stage | Screen id | Description |
 |---|---|---|
-| **Capture** | `:inbox` | Intake queue, single column, snooze/accept/decline |
+| **Capture** | `:capture` (alias `:inbox`) | Intake queue; filters · drafts · promoted in side pane; snooze/accept/decline |
 | | `:docs` | Tree view, lazy expansion, drag reorder |
-| | `:doc/<id>` | Doc reader; `e` edit; `c` capture-from-selection |
+| | `:doc/<id>` | Doc reader; per-block mode row `p / d / m / :ai`; slash menu via `/` |
 | | `:notes` | Short-form note list |
-| **Plan** | `:plans` | Planning sessions list |
-| | `:plan/<id>` | Live ACP session (3-pane Live Session Pane spec) |
-| | `:plan/<id>/review` | Plan + prototype + tasks tripane |
+| **Plan** | `:plan` (alias `:plans`) | Planning sessions list |
+| | `:plan/<id>` | Live ACP session (3-pane: sessions · transcript · workspace) |
+| | `:plan/<id>/review` | Plan + prototype + tasks tripane with inline comments |
 | | `:missions` | Mission tree |
 | | `:mission/<id>` | Mission detail with sub-waves |
+| | `:prototype` | Prototype gallery (live + archived) |
+| | `:templates` | Plan template library (12 templates) |
+| | `:prompts` | Prompt library, tag filter |
 | **Build** | `:runs` | Runs feed with auto-tail toggle |
-| | `:run/<id>` | Live session pane (same 3-column shape as web) |
-| | `:board` | Task board (j/k/h/l between cards + columns) |
-| | `:tasks` | List view |
+| | `:run` / `:run/<id>` | Live agent session detail (4 panes: steps · current tool · cost/tokens · permission) |
+| | `:board` | Task board (j/k/h/l between cards + columns; five-layout switcher) |
+| | `:list` (alias `:tasks`) | List view (dense table) |
+| | `:timeline` | Gantt, 14-day window |
 | | `:table` | Spreadsheet layout |
 | | `:graph` | Dependency graph (Sugiyama via OpenTUI canvas) |
-| | `:agents` | Agent panel (Fusion-style) |
 | | `:cycles` | Cycle list |
 | | `:cycle/<id>` | Cycle detail |
 | | `:modules` | Module list |
 | | `:module/<id>` | Module detail |
-| **Review** | `:review` | Review queue |
-| | `:review/<id>` | Diff viewer (3-pane: file tree, diff, annotation sidebar) |
+| **Review** | `:review` | Review queue (tabs: awaiting · changes · approved · merged) |
+| | `:review/<id>` | Diff viewer (file tree, diff, annotation sidebar; inline comments anchored to lines) |
 | | `:qa/<task-id>` | QA report |
 | | `:uat` | UAT handoff queue |
-| **Ship** | `:artifacts` | Artifact list |
-| | `:artifact/<id>` | Artifact detail + diff/export/download |
+| **Ship** | `:ship` (alias `:artifacts`) | Release list / artifact list; cycle/channel filters |
+| | `:ship/<id>` (alias `:artifact/<id>`) | Release detail — top-anchored sheet overlay |
+| | `:archive` | Release archive, major/minor/patch pills |
 | | `:repos` | Repo list with branch + status column |
 | | `:repo/<id>` | Repo detail |
 | | `:memory` | Memory entries |
 | **Operate** | `:doctor` | Subsystem table (research-04 verbatim) |
+| | `:telemetry` | p50/p99 charts · runs-by-step bars · resources |
+| | `:alerts` | Firing alerts with severity tabs |
 | | `:audit` | Audit log; filter via `/` |
 | | `:logs` | Live log tail with severity color |
 | | `:errors` | Error logs (Sentry-grouped) |
-| | `:mcp` | MCP server list |
+| | `:mcp` | MCP server list, **scope chip switches CLI agent** (per-agent config) |
+| | `:plugins` | Plugin list, per-agent scope, toggle/update/install-across |
 | | `:hooks` | Hook list |
 | | `:skills` | Skill list |
-| | `:settings` | Settings tabs |
 | | `:trace/<id>` | Trace explorer |
-| | `:chat` | Standalone ACP chat pane |
+| **System** | `:ai` | **TUI-native inline AI Assist pane** (NOT a web drawer); thread + composer; auto-injected `[ :ai ]` segment on every footer; reachable via `:ai` cmd, `:ai` tab, or footer-seg click |
+| | `:agents` | CLI agent registry (unlimited entries): `a` add · `e` edit · `d` set default · `D` delete · `m` mcp scope · `p` plugin scope |
+| | `:routes` | Default agent per action kind: `e` edit · `o` toggle override · `r` reset to defaults |
+| | `:settings` | 8 sections: General · Appearance · Keyboard · Privacy · Integrations · AI agents · Account · Danger |
+| | `:K` | Command palette (parity with web ⌘K) |
+| | `?` | Keyboard cheatsheet (full key map) |
+
+### 6.1 What is intentionally NOT in the TUI
+
+- **No web chat drawer.** The web slides a chat drawer from the right (Cloudflare AI Assist pattern). That overlay does not belong in a terminal. AI lives as the inline `:ai` screen, with `[ :ai ]` as the right-most footer segment of every other screen. Invoking it switches the visible screen; it does not draw an overlay panel over terminal content.
+- **No mouse-only affordances.** Every action has a keystroke; click is a convenience.
+- **No animation.** Status changes flash one frame; no slide / fade / pulse beyond the cursor blink.
+- **No modal overlays for routine actions.** Modals only for confirm-irreversible (`:agent remove`, `:profile delete --confirm`).
 
 ---
 
@@ -442,10 +528,13 @@ Per research-05 §3.5 + Helix/k9s/lazygit conventions.
 |---|---|
 | `g c` | Go to Capture |
 | `g p` | Go to Plan |
-| `g b` | Go to Build |
+| `g b` | Go to Build (runs feed) |
+| `g B` | Go to Build · board view |
 | `g r` | Go to Review |
 | `g s` | Go to Ship |
 | `g o` | Go to Operate |
+| `:run` | Open current run detail |
+| `:ai`  | Open inline AI Assist pane (any screen) |
 
 ### 7.3 List navigation
 
@@ -472,12 +561,17 @@ Per research-05 §3.5 + Helix/k9s/lazygit conventions.
 | `m` | Open mode picker without committing |
 | `Shift+P` | Replay last Play |
 
-### 7.5 Chat pane
+### 7.5 AI Assist pane (TUI-native, NOT a web drawer)
 
 | Key | Action |
 |---|---|
-| `c` | Toggle ACP chat pane (right-side overlay) |
-| Inside chat | `Enter` submit, `Shift+Enter` newline, `↑`/`↓` history, `Ctrl-l` clear, `Ctrl-d` close, `Esc` blur |
+| `:ai` | Open inline AI Assist pane (`:ai` screen) |
+| Click `[ :ai ]` | Same as `:ai` (right-most footer segment, accent-bordered) |
+| `:ai` tab | Same as `:ai` (top tab strip) |
+| Inside `:ai` | `Enter` submit, `Shift+Enter` newline, `↑`/`↓` history, `Ctrl-l` clear, `Ctrl-s` save thread, `Esc` blur |
+| `q` | Pop back to previous screen |
+
+The AI pane **does not overlay** other screens. It is an inline screen reachable via tab swap. This is intentional: the web shell overlays AI Assist on top of content (Cloudflare AI Assist pattern); the TUI keeps the terminal a terminal.
 
 ### 7.6 Trace clipboard
 
@@ -528,7 +622,7 @@ Layout (left → right):
 
 | Segment | Width | Source |
 |---|---|---|
-| `MODE` | 8 ch | Reverse-video. NORMAL / INSERT / FILTER / COMMAND / CHAT |
+| `MODE` | 8 ch | Reverse-video. CAPTURE / PLAN / RUNS / BOARD / REVIEW / SHIP / DOCTOR / :AI / :AGENTS / :MCP / :PLUGINS / :ROUTES / :SET / : K / ? |
 | `profile` | 8 ch | Active workspace profile (work / oss / home) |
 | `repo:branch` | flex | Implicit-scope (Vercel/flyctl style) |
 | `run:<id> 12/47` | 16 ch | Run ID + position-of-total (tig pattern) |
@@ -563,29 +657,56 @@ Per research-05 §3.7 + IA-MAP.md §6. Two surfaces, both indexed by `trace_id`:
 
 ---
 
-## 10. ACP chat pane (TUI)
+## 10. AI Assist pane (TUI) — TUI-native, NOT a web drawer
 
-Toggle key: `c` (single letter, no chord). Pane overlays right ~40% of screen. Mode footer flips to `CHAT` while focused.
+> **Why this is not a drawer:** the web shell slides AI Assist in from the right (Cloudflare AI Assist pattern). That overlay does not belong in a terminal — sliding a panel over terminal content fights every assumption the user has about a TTY (scroll-back, focus, copy/paste, alt-buffer). The TUI keeps AI as a **first-class inline screen** reachable in one keystroke from anywhere via three equivalent affordances.
+
+### 10.1 Invocation (three equivalent ways)
+
+1. Type `:ai` on any command bar.
+2. Press `:ai` tab in the top tab strip.
+3. Click `[ :ai ]` segment in the footer (auto-injected as the right-most segment of every other screen, accent-bordered).
+
+All three swap the visible screen to `:ai`. Mode footer flips to `:AI` while focused. `q` pops back to the previous screen.
+
+### 10.2 Screen layout
 
 ```
-┌──── ACP Chat ─────────────────────┐
-│ agent: claude  trace 4f3a1c9e…    │
-│ step: TASK-471 "auth refactor"    │
-├───────────────────────────────────┤
-│ > Help me sketch the migration    │
-│   path for OAuth providers.       │
-│                                   │
-│ claude: Here's a plan…            │
-│   [tool_call: read_file] ✓        │
-│   ┌ file diff (collapsed)         │
-│                                   │
-├───────────────────────────────────┤
-│ > _                               │
-│   [Enter] send  [Shift-Enter] nl  │
-└───────────────────────────────────┘
+┌──── fulcrum · :ai · inline AI pane (TUI-native) ──── agent: claude-opus-4-7 ──┐
+│ ─── thread · auth-rewrite ──────────────────────────────────────────────────  │
+│                                                                               │
+│ you 14:02                                                                     │
+│   Rotate sessions on every issuance, record issuance metadata,                │
+│   add a kill-switch by kid.                                                   │
+│                                                                               │
+│ claude 14:02                                                                  │
+│   ▸ read_file src/auth/session.ts · 0–240            done                     │
+│   ▸ edit_file src/auth/session.ts · 3 hunks          done                     │
+│                                                                               │
+│      @@ -42,7 +42,12 @@                                                       │
+│      - const t = signToken(req.user);                                         │
+│      + const t = signToken(req.user, { rotate: true });                       │
+│      + recordIssuance(t.kid, req.ip);                                         │
+│                                                                               │
+│   ⚠ permission shell.run  pnpm test --filter auth                             │
+│      [ Allow once ]  [ Deny ]  [ Always allow shell.run ]                     │
+│                                                                               │
+│ ─── composer ─────────────────────────────────────────────────────────────── │
+│ › _                                                                           │
+│ @scope mention · /cmd slash · ⌘↵ run · ⌘s save thread                        │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ :AI  profile:dev  auth/rewrite  thread·auth-rewrite  agent:claude  mcp:7/7   │
+│ trace:tr_8f29a4c…  14:11  ?  :  [ :ai ]                                       │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Auto-scopes to current step + project + trace ID. Survives screen nav. Reopens with state intact. Trace badge in header is yank-able (`y t`).
+### 10.3 Scope rules
+
+Auto-scopes to: current project + active step (if any) + last-visited trace ID. Survives screen nav (thread state preserved). Reopens with last thread. Trace badge in header is yank-able (`y t`). Use `--thread <id>` on `fulcrum ai` to attach to a specific thread.
+
+### 10.4 Agent selection
+
+Default agent comes from the routing table (`fulcrum route show ai.freeform`). Override per-turn with `:agent <id>` typed into the composer, or persistently with `fulcrum route set ai.freeform <agent-id>`. The `:agents` screen lists all configured CLI agents; `:ai` always uses the routed agent unless overridden.
 
 ---
 
@@ -628,15 +749,36 @@ Per research-05 §3.9. **Same data, two front-ends; both stream over the same RP
 |---|---|
 | `fulcrum runs feed --watch` | `:runs` (auto-tail on) |
 | `fulcrum runs feed --json` (JSONL) | TUI subscribes to same JSONL stream |
-| `fulcrum run view <id> --watch` | `:run/<id>` |
+| `fulcrum run view <id> --watch` | `:run` / `:run/<id>` |
 | `fulcrum runs tail <id>` | log pane inside `:run/<id>` |
-| `fulcrum task list --filter status=open` | `:tasks` with filter prefilled |
+| `fulcrum task list --filter status=open` | `:list` with filter prefilled |
+| `fulcrum task list --view board` | `:board` |
+| `fulcrum task list --view timeline` | `:timeline` |
+| `fulcrum task list --view graph` | `:graph` |
 | `fulcrum doctor --json` | `:doctor` |
 | `fulcrum audit list --trace <id>` | `:audit` with filter prefilled |
 | `fulcrum trace show <id>` | `:trace/<id>` |
-| `fulcrum chat --step <id>` | `c` toggles chat scoped to current step |
+| `fulcrum ai --step <id>` | `:ai` scoped to current step (inline pane) |
+| `fulcrum ai --thread <id>` | `:ai` re-attached to thread |
 | `fulcrum doc edit <id>` | `:doc/<id>` then `e` |
-| `fulcrum board` (new alias) | `:board` |
+| `fulcrum agent list` | `:agents` |
+| `fulcrum agent add <id> --client <kind>` | `:agents` → `a` add |
+| `fulcrum agent set-default <id> --action <kind>` | `:routes` → `e` edit |
+| `fulcrum route list` | `:routes` |
+| `fulcrum route set <kind> <agent>` | `:routes` → `e` edit |
+| `fulcrum mcp list --agent <id>` | `:mcp` with scope chip = `<id>` |
+| `fulcrum mcp enable <name> --agent <id>` | `:mcp` → toggle row |
+| `fulcrum plugin list --agent <id>` | `:plugins` with scope chip = `<id>` |
+| `fulcrum plugin update <name> --agent <id>` | `:plugins` → `u` update |
+| `fulcrum settings` | `:settings` |
+| `fulcrum profile switch <name>` | `:set profile <name>` or `:settings` → General |
+| `fulcrum workspace switch <name>` | `:set workspace <name>` |
+| `fulcrum ship list` | `:ship` |
+| `fulcrum ship view <id>` | `:ship/<id>` (top-anchored sheet) |
+| `fulcrum review list --tab awaiting` | `:review` with tab=awaiting |
+| `fulcrum doctor --probe <subsystem>` | `:doctor` → row probe |
+| `fulcrum operate telemetry --tail` | `:telemetry` |
+| `fulcrum operate alerts list` | `:alerts` |
 
 Invariants:
 - **Every CLI command is one keystroke away in the TUI palette.**
@@ -653,8 +795,14 @@ Per PRODUCT.md invariant 7. Every UI action also runs as `fulcrum <verb>` and `P
 |---|---|---|
 | Click "Create project" | `fulcrum projects new --name <n>` | `POST /api/v1/projects` |
 | Drag card to "Done" | `fulcrum task edit <id> --status done` | `PATCH /api/v1/tasks/<id>` |
-| Hit ▶ Play on a task | `fulcrum task run <id> --agent claude` | `POST /api/v1/runs` |
-| Hit 💬 Discuss on a step | `fulcrum chat --step <id>` | `POST /api/v1/chat/sessions` |
+| Hit ▶ Play on a step | `fulcrum task run <id> --agent <id>` | `POST /api/v1/runs` |
+| Hit 💬 Discuss on a step | `fulcrum ai --step <id>` (inline pane) | `POST /api/v1/ai/threads` |
+| Open AI Assist drawer (web `⌘/`) | `:ai` (TUI inline) / `fulcrum ai` | `POST /api/v1/ai/threads` |
+| Add a CLI agent | `fulcrum agent add <id> --client <kind>` | `POST /api/v1/agents` |
+| Set default agent for action | `fulcrum route set <kind> <agent>` | `PUT /api/v1/routes/<kind>` |
+| Enable MCP on an agent | `fulcrum mcp enable <name> --agent <id>` | `PUT /api/v1/agents/<id>/mcp/<name>` |
+| Install plugin on an agent | `fulcrum plugin install <name> --agent <id>` | `POST /api/v1/agents/<id>/plugins` |
+| Toggle theme | `fulcrum config set theme dark` | `PUT /api/v1/settings/theme` |
 | Approve a review | `fulcrum review approve <id>` | `POST /api/v1/reviews/<id>/approve` |
 | Open Doctor | `fulcrum doctor --json` | `GET /api/v1/doctor` |
 | Copy trace ID | env: `FULCRUM_TRACE_ID` | response header `X-Trace-Id` |
