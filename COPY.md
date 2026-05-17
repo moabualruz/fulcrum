@@ -387,8 +387,28 @@ Set later via `fulcrum config telemetry on|anon|off` or
 
 ## 14. Sources
 
-- [PRODUCT.md](PRODUCT.md) §Tone & Voice
-- [.scratch/design-research/04-observability-trace.md](.scratch/design-research/04-observability-trace.md) §Error / Audit / Telemetry
-- [.scratch/design-research/01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) §Empty states
-- [.scratch/design-research/02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) §Permission prompts
-- [.claude/skills/impeccable/reference/ux-writing.md](.claude/skills/impeccable/reference/ux-writing.md)
+### 14.1 Sibling design docs
+
+- [PRODUCT.md](PRODUCT.md) §Tone & Voice — voice rules, anti-references, hard bans.
+- [DESIGN.md](DESIGN.md) §4.9 — 8-state status label vocabulary (this file locks the strings).
+- [IA-MAP.md](IA-MAP.md) §11 — trace-spine link grammar (this file's error template echoes `trace=<id>`).
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) §5 — CLI error code namespace `FUL_<DOMAIN>_<SPECIFIC>` (this file's error samples cite those codes).
+- [OD-PROMPT.md](OD-PROMPT.md).
+
+### 14.2 Research dossiers (`.scratch/design-research/`)
+
+- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) §9 — empty-state template (one sentence + one action, no illustration).
+- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) §10–13 — permission prompt copy (inline transcript, never modal for non-destructive).
+- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) §10/§14/§16 — error template, telemetry first-run prompt, doctor row shape.
+- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) §4.1 — Plannotator `Mod+Enter` overload copy semantics.
+
+### 14.3 PRD glossary + impeccable
+
+- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 94 `error copy` mentions, 113 `empty state` mentions, 119 `error recovery` mentions in critique_focus.
+- [.claude/skills/impeccable/reference/ux-writing.md](.claude/skills/impeccable/reference/ux-writing.md).
+- [.claude/skills/impeccable/reference/clarify.md](.claude/skills/impeccable/reference/clarify.md).
+- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register copy rules.
+
+### 14.4 Transformation note
+
+The copy templates above are **additive**: every existing user-facing string in the codebase (`apps/web/src/lib/**`, `apps/cli/src/**`, `apps/tui/src/**`) is reviewed against these templates and replaced if it violates them. Strings that match are kept. No feature is removed; the words around the features are sharpened.

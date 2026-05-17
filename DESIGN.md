@@ -504,15 +504,32 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 
 ## 14. Sources
 
-Research files this DESIGN.md draws from, all in `.scratch/design-research/`:
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md)
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md)
-- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md)
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md)
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md)
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md)
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md)
+### 14.1 Sibling design docs
 
-PRD glossary: [.scratch/prd.jsonl](.scratch/prd.jsonl) (1281 entries).
-Goal loop: [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md).
-Impeccable register: [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md).
+- [PRODUCT.md](PRODUCT.md) — target-state platform definition.
+- [IA-MAP.md](IA-MAP.md) — full route tree, sidebar, keyboard, drawer, palette, status footer, CLI tree, TUI screen list, mobile IA, trace-spine.
+- [COPY.md](COPY.md) — voice rules, empty/error/permission templates, status label lock.
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, ACP chat pane, parity table.
+- [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
+
+### 14.2 Research dossiers (`.scratch/design-research/`)
+
+Each section of this DESIGN.md cites the dossier it draws from.
+
+- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §3 (chrome layout), §4.12 (palette), §4.10 (trace badge), §7 (density), §13 (invariants). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
+- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §4.5 (tool-call card), §8 (live session pane), §9 (run feed + orchestrator). Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
+- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — drives editor block set, slash menu, mentions, attachments, version history, comments, backlinks, memory tier model. Notion / Docmost / Outline / Coda / Anytype / Logseq / Obsidian / HedgeDoc / Tana / Linear docs / Slack Canvas.
+- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §4.9 (status vocabulary), §4.10 (trace-ID badge), §10 (doctor/audit/error logs). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
+- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — drives §3 (status footer), pairs with CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / doctl / heroku / clig.dev / 12-factor / k9s / lazygit / tig / htop/btop / fzf / Helix / Charm / OpenTUI / gh-dash.
+- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §1 (tokens), §1.5 (breakpoints), §1.6 (reduced motion / forced colors), §2 (typography), §13 (cross-surface). Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / GitHub Mobile / GOV.UK / Atlassian / IBM Carbon / Radix / Bits UI / Melt UI / Core Web Vitals / Workbox / Vercel Speed Insights / TanStack Virtual / OKLCH.
+- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §3.3 (multi-layout grid), §4.4 (board cards), §4.6 (inline diff), §8 (live session pane), §10 (doctor/audit). Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table + Top-30 must-copy.
+
+### 14.3 PRD glossary + impeccable + goal
+
+- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 entries, top critique_focus themes drive every component spec (`workflow parity` 178, `traceability` 148, `validation` 146, `contract completeness` 142, `service boundary` 141, `auth` 140, `error recovery` 119, `accessibility` 114, `empty state` 113, `mobile` 109, `hierarchy` 108, `workflow fit` 107).
+- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register laws (typography, color, layout, components, motion, bans, permissions).
+- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md) — Ralph-Wiggum-style /goal loop with append-only PRD discipline.
+
+### 14.4 Transformation note
+
+This DESIGN.md is **additive** over the current Fulcrum codebase. Every visual decision here is a transformation of an existing surface (current sidebar nav → workflow stages; current settings tabs → inheritance chips; current trace ID in URL → copyable badge), not a removal. The component vocabulary in §4 is meant to be applied to every existing route in `apps/web/src/routes/**` via the carry-over table in [PRODUCT.md § Transformation Discipline](PRODUCT.md).

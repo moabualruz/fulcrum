@@ -350,3 +350,86 @@ These have been observed in PRDs as the most common operator complaints. Re-stat
 - **Settings buried under "More" menu.** Settings is one keystroke from any surface (⌘,).
 - **Save without confirmation.** Saved state visible in the surface; not a toast.
 
+
+---
+
+## Transformation Discipline
+
+Fulcrum's redesign is **additive + transformative, never subtractive**. The new IA (workflow stages) replaces the current feature-bucket sidebar; it does not delete any shipped feature. Every route, command, screen, and capability already in the codebase must land somewhere in the new IA.
+
+Carry-over invariants:
+
+1. **Every existing web route** in `apps/web/src/routes/**` maps to a workflow stage in [IA-MAP.md §2](IA-MAP.md). Routes that don't have an obvious home land in **Operate** (default fallback for system / settings / power-tools) or get an explicit deferral note.
+2. **Every existing CLI command** in `apps/cli/src/commands/**` maps to a stage-organized verb in [CLI-TUI-UX.md §1](CLI-TUI-UX.md). Anything missing gets added as a stub with the same flags as today.
+3. **Every existing TUI screen** in `apps/tui/src/screens/**` maps to a `:` palette command in [CLI-TUI-UX.md §6](CLI-TUI-UX.md).
+4. **Every existing service capability** in `services/**` keeps its API endpoint shape; the UI may relocate the affordance, the API contract does not break.
+5. **Every existing setting** in `apps/web/src/routes/settings/**` lives in either `/<ws>/operate/settings/*` (project-scoped) or `/<ws>/settings/*` (workspace-scoped). No setting disappears silently.
+6. **Renames are namespaced + aliased.** If a route or command is renamed (e.g. `boards/` → `build/board`, `inference/` → `operate/inference`), the old path stays as a 301 redirect for one minor version with a deprecation banner pointing at the new path.
+
+Inventory snapshot (audited 2026-05-17) — every cluster preserved in the new IA:
+
+| Code cluster | Source path | New IA home |
+|---|---|---|
+| Dashboard | `apps/web/src/routes/+page.svelte` | Portfolio: Dashboard |
+| Agents list/detail | `apps/web/src/routes/agents/**` | Operate: agents panel |
+| API health probe | `apps/web/src/routes/api/inference/health` | Operate: doctor probe |
+| Artifacts list + download | `apps/web/src/routes/artifacts/**` | Ship: artifacts list |
+| Audit + export | `apps/web/src/routes/audit/**` | Operate: audit log |
+| Auth (login, signup, invite, passkey, logout) | `apps/web/src/routes/auth/**` | Auth root (unchanged), invite via Operate: settings/members |
+| Boards | `apps/web/src/routes/boards` | Build: board layout |
+| Context preview | `apps/web/src/routes/context/preview` | Plan: context-preview sub-view |
+| Docs (read/edit/history/planning hand-off/global/new) | `apps/web/src/routes/docs/**` | Capture: docs (project-scoped) + Portfolio: global docs |
+| Doctor | `apps/web/src/routes/doctor` | Operate: doctor |
+| Inbox | `apps/web/src/routes/inbox` | Portfolio: inbox + Operate: inbox |
+| Inference | `apps/web/src/routes/inference` | Operate: settings/inference |
+| Memory list/detail | `apps/web/src/routes/memory/**` | Portfolio: memory + Ship: memory promotion |
+| Offline page | `apps/web/src/routes/offline` | Cross-cutting fallback |
+| Orchestration | `apps/web/src/routes/orchestration` | Operate: settings/orchestration |
+| Planning sessions | `apps/web/src/routes/planning/**` | Plan: sessions list + live session |
+| Project [id] sub-routes (activity/artifacts/backlog/board/calendar/e2e/gantt/intake/list/modules/planning/reports/repos/review/routing/runs/settings/uat/sprints/updates/templates/statuses/views/fields/automations/connectors/import/memory) | `apps/web/src/routes/projects/[id]/**` | Re-bucketed by stage (board/list/table/calendar/gantt → Build; review/uat/e2e → Review; reports/artifacts → Ship; settings/automations/connectors/routing/repos → Operate) |
+| Repos list/detail/branches/commits/files | `apps/web/src/routes/repos/**` | Ship: repos + Operate: settings/integrations |
+| Runs list/detail/artifacts | `apps/web/src/routes/runs/**` | Build: runs feed |
+| Search | `apps/web/src/routes/search` | Portfolio: search |
+| Settings (api/backups/billing/connectors/data/database/errors/experiments/feature-flags/flags/i18n/importers/inference/integrations/notifications/orchestration/routing/secrets/skills/telemetry/templates/theme/users) | `apps/web/src/routes/settings/**` | Workspace `/<ws>/settings/*` for global; Project `/<ws>/operate/settings/*` for per-project |
+| Tasks | `apps/web/src/routes/tasks` | Build: tasks (board/list/table/calendar/gantt + dependency graph) |
+| Workspace | `apps/web/src/routes/workspace` | Portfolio: dashboard + scope chrome |
+
+CLI command carry-over (`apps/cli/src/commands/**`):
+
+- `agents`, `artifacts`, `auth`, `comment`, `context`, `cross-cutting-platform`, `db`, `docs`, `doctor`, `export`, `flags`, `import`, `init`, `interactive-flows`, `memory`, `my-work`, `pillar14-generated`, `project-config`, `projects`, `report`, `repos`, `routing`, `search`, `skills`, `sprints`, `symphony`, `task-hierarchy`, `task-relate`, `tasks`, `tui`, `work` — **all preserved**, regrouped under the workflow-stage subcommand tree in [CLI-TUI-UX.md §1](CLI-TUI-UX.md). Internal-only / power-user commands keep their current names with stage prefix added as alias (e.g. `fulcrum symphony` stays + `fulcrum operate symphony` aliased).
+
+TUI screen carry-over (`apps/tui/src/screens/**`):
+
+- `accessibility`, `activity`, `agents`, `artifacts`, `audit`, `auth`, `connectors`, `context-preview`, `dashboard`, `docs-reader-editor`, `docs-tree`, `doctor`, `flags`, `i18n-screen`, `inference`, `memory-browser`, `new-doc`, `notification-rules`, `notifications`, `orchestration`, `orchestrator-pane`, `planning-breakdown`, `planning-screen`, `project-detail`, `projects`, `reports`, `repos`, `review-screen`, `routing-rules`, `runs-screen`, `runs`, `search-screen`, `search`, `settings-screens`, `settings`, `skills`, `sprints`, `task-board`, `task-calendar`, `task-detail`, `task-list`, `task-timeline`, `theme`, `webhooks` — **all preserved**, mapped to `:` palette entries in [CLI-TUI-UX.md §6](CLI-TUI-UX.md).
+
+Service contracts (`services/**`) — **unchanged**:
+
+- `agent-client-protocol`, `execution-orchestration`, `identity-access`, `inference-runtime`, `integration-hub`, `knowledge-workspace`, `notification-center`, `planning-review`, `platform-core`, `work-management`, `workflow-coordination`. Every public API endpoint keeps its current path + shape. UI re-grouping is purely a SvelteKit/CLI/TUI surface change.
+
+---
+
+## Sources (cross-references — every doc grounded)
+
+Every section above is grounded in at least one of:
+
+- [DESIGN.md](DESIGN.md) — visual + interaction system.
+- [IA-MAP.md](IA-MAP.md) — routes, sidebar, keyboard, drawer, palette, footer.
+- [COPY.md](COPY.md) — voice, empty/error/permission copy templates.
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI subcommand tree, JSON envelope, TUI screens, status footer.
+- [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
+
+Research dossiers in `.scratch/design-research/`:
+
+- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — IA, project hierarchy, scope chrome, agent identity, command palette (Linear, Plane, Devin, Cursor, GitHub Projects, Notion, k9s, dense-workbench).
+- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — live sessions, tool calls, run feeds, multi-agent orchestration, ACP protocol (Devin, Cursor, Claude Code, Codex, Aider, Replit, Linear Agents, LangSmith, Temporal, Argo, Dagster, Airflow, ACP).
+- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — editor, page tree, attachments, version history, memory tiers, provenance (Notion, Docmost, Outline, Coda, Anytype, Logseq, Obsidian, HedgeDoc, Tana, Roam, Linear docs, Slack Canvas).
+- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — doctor, audit, runs feed, trace-spine, telemetry (Datadog, Honeycomb, Sentry, LangSmith, Grafana, OpenTelemetry, GitHub Actions, Vercel, Healthchecks, k9s, CloudTrail/Stripe/Okta/Auth0, npm doctor).
+- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — CLI envelope, TUI screens, status footer, palette (gh, stripe, vercel, wrangler, flyctl, cargo, bun, kubectl, doctl, heroku, clig.dev, 12-factor; k9s, lazygit, tig, htop/btop, fzf, Helix, Charm, OpenTUI, gh-dash).
+- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — mobile, WCAG 2.2 AA, performance budgets, PWA, OKLCH tokens (Tailwind, Apple HIG, Material 3, shadcn-svelte, GitHub Mobile, Notion mobile, GOV.UK, Atlassian, IBM Carbon, Radix, Bits UI, Melt UI, Core Web Vitals, Workbox, Vercel Speed Insights, TanStack Virtual, OKLCH).
+- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — full parity audit of plane / docmost / fusion / plannotator / acp-ui with master adoption table + Top-30 must-copy.
+
+PRD glossary: [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 entries, 22 seed-agent categories, 178 critique_focus mentions of `workflow parity`, 148 `traceability`, 142 `contract completeness`.
+
+Impeccable register reference: [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md).
+
+Goal loop: [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md) — Ralph-Wiggum-discipline-adapted-to-/goal.

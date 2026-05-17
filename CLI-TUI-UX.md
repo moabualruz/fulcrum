@@ -690,16 +690,41 @@ If first frame takes >200 ms, the boot is broken.
 
 ## 17. Sources
 
-- [.scratch/design-research/05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — 4725 words, 29 citations
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 142 cli + 149 tui PRD entries
-- [IA-MAP.md](IA-MAP.md) §8, §9
-- [DESIGN.md](DESIGN.md) §13
-- [PRODUCT.md](PRODUCT.md) invariants 7, 11
-- [COPY.md](COPY.md) §3 error template
-- [clig.dev](https://clig.dev/) — Command Line Interface Guidelines
-- [12-Factor CLI Apps](https://jdxcode.medium.com/12-factor-cli-apps-dd3c227a0e46)
-- [gh manual](https://cli.github.com/manual/)
-- [k9s commands](https://k9scli.io/topics/commands/)
-- [Helix keymap](https://docs.helix-editor.com/keymap.html)
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea)
-- [OpenTUI](https://github.com/sst/opentui)
+### 17.1 Sibling design docs
+
+- [PRODUCT.md](PRODUCT.md) — target state, four-mode-per-step, hard invariants 7+11, Transformation Discipline carry-over of every CLI command + TUI screen.
+- [DESIGN.md](DESIGN.md) §13 — cross-surface invariants, status badge vocabulary (this file's §11 mirrors it).
+- [IA-MAP.md](IA-MAP.md) §8 (CLI tree shape), §9 (TUI screen list).
+- [COPY.md](COPY.md) §3 (error template), §10 (permission prompts), §13 (telemetry first-run prompt).
+- [OD-PROMPT.md](OD-PROMPT.md) — Open Design context block.
+
+### 17.2 Research dossiers (`.scratch/design-research/`)
+
+- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — 4725 words, 29 sources; drives every section of this file.
+- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §3 (JSON envelope), §6 (live session TUI screen), §10 (ACP chat pane), §14 (agent-native parity). ACP `session/*` methods, tool-call lifecycle.
+- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §3 (trace_id key), §5 (error codes), §8 (status footer trace segment), §11 (status badges).
+- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §1 (workflow-stage subcommand grouping), §7.2 (chord nav `g c/p/b/r/s/o`), §9 (palette grammar).
+- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §7.8 (drag-and-drop a11y alternative — WCAG 2.5.7), §15/§16 (performance budgets).
+- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §7.7 (Plannotator Review shortcuts verbatim: `Mod+Enter`, `Alt Alt`, `V`, `Mod+B`, `Mod+.`).
+
+### 17.3 External references
+
+- [clig.dev](https://clig.dev/) — every CLI rule.
+- [12-Factor CLI Apps](https://jdxcode.medium.com/12-factor-cli-apps-dd3c227a0e46).
+- [gh manual](https://cli.github.com/manual/) — `--json` / `--jq` / `--template` / `--web` triad.
+- [vercel logs](https://vercel.com/docs/cli/logs) — log-filter flag shape.
+- [k9s commands](https://k9scli.io/topics/commands/) — `:` palette grammar.
+- [Helix keymap](https://docs.helix-editor.com/keymap.html) — `Space` modeless menu.
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) / [Lipgloss](https://github.com/charmbracelet/lipgloss) / [Ink](https://github.com/vadimdemedes/ink).
+- [OpenTUI](https://github.com/sst/opentui).
+- [ACP](https://agentclientprotocol.com/protocol/overview).
+
+### 17.4 PRD glossary + impeccable
+
+- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 142 CLI + 149 TUI PRD entries; top critique themes for these surfaces: `exit codes` 96, `machine output` 96, `error copy` 94, `keyboard ux` 82, `selected state` 82, `status clarity` 80, `terminal density` 80.
+- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register laws.
+- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md).
+
+### 17.5 Transformation note
+
+The 30 commands in `apps/cli/src/commands/**` and 50+ screens in `apps/tui/src/screens/**` are all preserved. The workflow-stage grouping in §1 + §6 is a regrouping with stage aliases, not a removal. Existing entrypoints stay valid; new stage-prefixed verbs are added as additional aliases. See [PRODUCT.md § Transformation Discipline](PRODUCT.md) for the per-command carry-over inventory.

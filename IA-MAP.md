@@ -538,13 +538,30 @@ Click any of them → same trace explorer view (span tree + linked artifacts + a
 
 ## 12. Sources
 
-- [PRODUCT.md](PRODUCT.md)
-- [DESIGN.md](DESIGN.md)
-- [.scratch/design-research/01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md)
-- [.scratch/design-research/02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md)
-- [.scratch/design-research/03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md)
-- [.scratch/design-research/04-observability-trace.md](.scratch/design-research/04-observability-trace.md)
-- [.scratch/design-research/05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md)
-- [.scratch/design-research/06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md)
-- [.scratch/design-research/07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md)
-- [.scratch/prd.jsonl](.scratch/prd.jsonl)
+### 12.1 Sibling design docs
+
+- [PRODUCT.md](PRODUCT.md) — target state, workflow stages, four-mode contract, scope chrome, agent identity, hard invariants, Transformation Discipline (carry-over inventory of every existing route, CLI command, TUI screen).
+- [DESIGN.md](DESIGN.md) — tokens, typography, components, motion, trace badge spec, status vocabulary, live session pane, cross-surface invariants.
+- [COPY.md](COPY.md) — voice rules, empty-state per-surface samples, error template, status label lock.
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) — extends §8 (CLI tree) and §9 (TUI screen list) with JSON envelope, flag standards, completion install, error codes, keyboard map, parity table.
+- [OD-PROMPT.md](OD-PROMPT.md) — paste block for Open Design with all required reads.
+
+### 12.2 Research dossiers (`.scratch/design-research/`)
+
+- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §3 (sidebar IA), §5 (right drawer), §6 (palette), §7 (status footer). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
+- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §2.3 (Build runs feed), §5 (ACP drawer), live session shape inside Plan/Build. Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
+- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — drives §2.1 (Capture editor + tree), Plan doc surface, memory promotion in §2.5 (Ship). Notion / Docmost / Outline / Anytype / Logseq / Obsidian / Tana / Linear docs / Slack Canvas.
+- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §2.6 (Operate doctor/audit/error logs/telemetry), §11 (trace-spine link grammar). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
+- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — drives §8 (CLI tree) and §9 (TUI screens), expanded in CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / clig.dev / 12-factor / k9s / lazygit / tig / btop / fzf / Helix / Charm / OpenTUI / gh-dash.
+- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §10 (mobile IA), breakpoint inheritance from DESIGN.md §1.5. Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / WCAG 2.2 AA / Bits UI / Radix.
+- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §2.3 (Plane five-layout views verbatim), §2.4 (Plannotator review-editor 40-component suite verbatim), §2.6 (Plane settings two-level split), trace-spine cross-cuts. Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table.
+
+### 12.3 PRD glossary + impeccable + goal
+
+- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 PRD entries; 142 CLI + 149 TUI items inform §8 + §9, 178 `workflow parity` mentions force workflow-stage IA, 148 `traceability` force §11.
+- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md).
+- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md).
+
+### 12.4 Transformation note
+
+Every web route, CLI command, and TUI screen currently shipped in `apps/web/src/routes/**`, `apps/cli/src/commands/**`, `apps/tui/src/screens/**` is preserved under the new IA. See [PRODUCT.md § Transformation Discipline](PRODUCT.md) for the per-cluster carry-over table. Renames are 301-redirected for one minor version with deprecation banner.
