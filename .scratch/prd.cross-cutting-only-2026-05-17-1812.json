@@ -1,0 +1,826 @@
+[
+  {
+    "id": "prd-xc-trace-propagation-web-to-api",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Trace ID propagation: web \u2192 API \u2192 service \u2192 audit",
+    "intent": "Every user action in web creates a trace ID and echoes it in API response headers and JSON body, enabling link-following from UI through logs to artifacts.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-57",
+      "apps/web/src/routes/(app)/*",
+      "apps/server/src/trpc/router.ts"
+    ],
+    "acceptance": {
+      "201": {
+        "description": "API response includes X-Trace-ID header and trace_id in JSON"
+      }
+    },
+    "anti_patterns": [
+      "trace_id generated server-side only",
+      "no X-Trace-ID in response headers",
+      "trace_id lost at service boundaries"
+    ],
+    "critique_focus": [
+      "trace_id format (UUID v7 or v4)",
+      "propagation through middleware"
+    ],
+    "manual_simulation": "curl -H 'X-Trace-ID: $(uuidgen)' http://localhost:3000/api/trpc/tasks.create",
+    "passes": false,
+    "priority": "P0",
+    "incentive": "Enable root cause analysis and observability linkage",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:00Z"
+  },
+  {
+    "id": "prd-xc-trace-web-footer-display",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Trace ID echo in web footer, clickable copy",
+    "intent": "Display current trace_id in web footer as [copy] button so user can paste it into support requests and logs.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:67-73"
+    ],
+    "acceptance": {
+      "ui": {
+        "description": "Footer shows trace_id and [copy] button"
+      }
+    },
+    "anti_patterns": [
+      "trace_id not visible anywhere in UI",
+      "copy button not working"
+    ],
+    "critique_focus": [
+      "footer space constraints",
+      "text truncation"
+    ],
+    "manual_simulation": "Open browser DevTools > Application > SessionStorage, find trace_id, verify footer shows it",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Support debugging and issue correlation",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:01Z"
+  },
+  {
+    "id": "prd-xc-trace-cli-json-output",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Trace ID echo in CLI JSON output and status bar",
+    "intent": "CLI JSON output includes trace_id and links fields, TUI status bar displays current trace_id.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:75-81"
+    ],
+    "acceptance": {
+      "cli": {
+        "description": "JSON response includes 'trace_id' and 'links' object"
+      },
+      "tui": {
+        "description": "Status bar shows trace_id"
+      }
+    },
+    "anti_patterns": [
+      "CLI JSON without trace_id field",
+      "TUI status bar missing trace context"
+    ],
+    "critique_focus": [
+      "JSON schema consistency",
+      "status bar readability"
+    ],
+    "manual_simulation": "fulcrum tasks list --json | jq '.trace_id'",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Consistent observability across all surfaces",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:02Z"
+  },
+  {
+    "id": "prd-xc-audit-log-state-transition",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Audit log entry per state transition with causation linkage",
+    "intent": "Every task/run/doc/artifact state change creates audit row with actor, action, before/after, causation_id, and timestamp.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-63",
+      "services/workflow-coordination/src/application/audit/"
+    ],
+    "acceptance": {
+      "audit": {
+        "description": "Row has id, timestamp, actor, action, subject_kind, subject_id, causation_id fields"
+      }
+    },
+    "anti_patterns": [
+      "audit rows without causation_id",
+      "state changes without audit trail",
+      "orphan audit rows"
+    ],
+    "critique_focus": [
+      "audit row schema completeness",
+      "causation linkage clarity"
+    ],
+    "manual_simulation": "Update task status, check database audit table, verify links back to task",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Compliance, debugging, and accountability",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:03Z"
+  },
+  {
+    "id": "prd-xc-audit-retention-policy",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Audit retention policy: 90 days or org-configurable TTL",
+    "intent": "Audit rows older than 90 days are soft-deleted (marked with deleted_at). Org settings allow TTL override.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-63",
+      "services/notification-center/src/application/delivery-runtime/audit-retention.ts"
+    ],
+    "acceptance": {
+      "retention": {
+        "description": "Audit rows with deleted_at are not returned by audit query"
+      }
+    },
+    "anti_patterns": [
+      "hard deletion of audit rows",
+      "no org-level TTL override"
+    ],
+    "critique_focus": [
+      "soft-delete vs hard-delete tradeoff",
+      "org setting UX"
+    ],
+    "manual_simulation": "Set TTL to 1 day, wait or mock clock, verify rows are soft-deleted",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Compliance and storage management",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:04Z"
+  },
+  {
+    "id": "prd-xc-runs-feed-ordering-filters",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Runs feed: event ordering, filtering by status/project/actor/time",
+    "intent": "Runs list supports sorting by created_at DESC, filtering by status (running|succeeded|failed), project, actor, date range.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-57",
+      "services/execution-orchestration/src/application/runs/queries.ts"
+    ],
+    "acceptance": {
+      "api": {
+        "description": "GET /runs supports ?status=running&project=<id>&actor=<id>"
+      }
+    },
+    "anti_patterns": [
+      "runs list unsorted or reversed",
+      "no filter UI",
+      "filters not exposed in API"
+    ],
+    "critique_focus": [
+      "filter UX clarity",
+      "pagination handling"
+    ],
+    "manual_simulation": "Create 5 runs with different statuses, filter by status=running, verify order",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Observability of agent activity",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:05Z"
+  },
+  {
+    "id": "prd-xc-run-worker-reassignment-audit",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Run worker reassignment: audit trail and coordination",
+    "intent": "When a run is reassigned from one worker to another, create audit row with old_worker_id, new_worker_id, reason, causation_id.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-63",
+      "services/execution-orchestration/src/application/runs/commands.ts"
+    ],
+    "acceptance": {
+      "audit": {
+        "description": "Run reassignment visible as audit event with actor and reason"
+      }
+    },
+    "anti_patterns": [
+      "worker change without audit row",
+      "reassignment not visible in run detail"
+    ],
+    "critique_focus": [
+      "worker claim protocol",
+      "lock recovery"
+    ],
+    "manual_simulation": "Claim run as worker1, release it, claim as worker2, verify audit trail",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Coordination and debugging of agent handoff",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:06Z"
+  },
+  {
+    "id": "prd-xc-generated-e2e-spec-generation-execution",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "orchestration",
+    "title": "Generated E2E spec: generation, execution, result linking",
+    "intent": "When a run completes, generate E2E spec from artifacts/transcript. Store spec with run_id and project_id. Spec is queryable from run detail.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-57",
+      "services/execution-orchestration/src/application/runs/queries.ts"
+    ],
+    "acceptance": {
+      "artifact": {
+        "description": "E2E spec created and stored with clear run_id linkage"
+      },
+      "run.detail": {
+        "description": "Links to generated E2E spec visible and clickable"
+      }
+    },
+    "anti_patterns": [
+      "spec generated but not linked to run",
+      "spec stored without run_id in path"
+    ],
+    "critique_focus": [
+      "spec generation correctness",
+      "linkage bidirectionality"
+    ],
+    "manual_simulation": "Complete a run, check artifacts for E2E spec, verify filename contains run_id",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Enable automated testing of agent output",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:07Z"
+  },
+  {
+    "id": "prd-xc-generated-e2e-retry-flake",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "orchestration",
+    "title": "Generated E2E retry on flake: automatic rerun and result deduplication",
+    "intent": "E2E spec execution failures marked as 'flake' (intermittent) trigger automatic rerun (up to 3x). Results deduplicated by spec_id.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:47-57",
+      "services/execution-orchestration/src/application/runs/commands.ts"
+    ],
+    "acceptance": {
+      "e2e.result": {
+        "description": "Flaky tests rerun automatically, result shows attempt count"
+      }
+    },
+    "anti_patterns": [
+      "single E2E failure blocks run",
+      "no distinction between flake and true failure"
+    ],
+    "critique_focus": [
+      "flake detection heuristic",
+      "rerun limit and backoff"
+    ],
+    "manual_simulation": "Run E2E that randomly fails, observe retries and final verdict in run detail",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Reduce false negatives from E2E flakiness",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:08Z"
+  },
+  {
+    "id": "prd-xc-doctor-subsystem-registration",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Doctor subsystem registration and probe action discovery",
+    "intent": "Doctor service discovers registered subsystems (api, db, pglite, orchest, audit, memory). Each subsystem exposes probe() function.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:124-131",
+      "apps/server/src/trpc/routers/doctor.ts"
+    ],
+    "acceptance": {
+      "doctor.subsystems": {
+        "description": "Returns array of subsystem names"
+      },
+      "doctor.run": {
+        "description": "Returns status for all subsystems"
+      }
+    },
+    "anti_patterns": [
+      "hardcoded subsystem list",
+      "no probe() interface",
+      "no recovery_action field"
+    ],
+    "critique_focus": [
+      "subsystem discovery mechanism",
+      "probe timeout and parallelization"
+    ],
+    "manual_simulation": "Call doctor.subsystems, then doctor.run, verify each subsystem checked",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Enable rapid health checks and triage",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:09Z"
+  },
+  {
+    "id": "prd-xc-doctor-failure-actionable",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Doctor failure result: actionable recovery, not just red status",
+    "intent": "When doctor.run() finds a subsystem down, return {ok: false, message, recovery_action, runnable_command}.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:124-131"
+    ],
+    "acceptance": {
+      "doctor.result": {
+        "description": "Failed subsystem includes recovery_action and runnable_command"
+      }
+    },
+    "anti_patterns": [
+      "doctor returns {ok: false} with no guidance",
+      "no CLIable recovery command"
+    ],
+    "critique_focus": [
+      "recovery action UX",
+      "safety of automated fixes"
+    ],
+    "manual_simulation": "Simulate PGlite lock, call doctor, verify recovery_action, run suggested command",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Self-healing developer experience",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:10Z"
+  },
+  {
+    "id": "prd-xc-telemetry-opt-in-default-prompt",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Telemetry: opt-in default, first-run prompt, FULCRUM_TELEMETRY env var",
+    "intent": "First run after install/upgrade, prompt user about telemetry. Default is opt-out. Users can set FULCRUM_TELEMETRY=on/off.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "services/platform-core/src/application/init/seed.ts"
+    ],
+    "acceptance": {
+      "firstrun": {
+        "description": "User sees telemetry prompt and can opt in/out"
+      },
+      "env": {
+        "description": "FULCRUM_TELEMETRY=on enables telemetry without prompt"
+      }
+    },
+    "anti_patterns": [
+      "telemetry always on without consent",
+      "no skip option"
+    ],
+    "critique_focus": [
+      "prompt UX and timing",
+      "default consent level"
+    ],
+    "manual_simulation": "First run after clean install, see telemetry prompt, set FULCRUM_TELEMETRY=off",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Privacy and transparency",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:11Z"
+  },
+  {
+    "id": "prd-xc-error-log-capture-breadcrumbs",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Error log capture: stack, breadcrumbs, context, source run/task linkage",
+    "intent": "When an error occurs, capture stack trace, 10 most recent breadcrumbs, execution context (run_id, task_id, project_id), timestamp.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "services/platform-core/src/application/agent-hooks/audit-log.ts"
+    ],
+    "acceptance": {
+      "error.log": {
+        "description": "Contains stack, breadcrumbs, run_id, task_id, error_id, timestamp"
+      }
+    },
+    "anti_patterns": [
+      "errors logged without stack",
+      "no breadcrumbs or context"
+    ],
+    "critique_focus": [
+      "breadcrumb granularity",
+      "performance of logging"
+    ],
+    "manual_simulation": "Trigger error in run, check ~/.fulcrum/logs/errors.log, verify stack and breadcrumbs present",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Debugging and error analysis",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:12Z"
+  },
+  {
+    "id": "prd-xc-error-log-link-to-run",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "Error log link to source run and task from run detail",
+    "intent": "Run detail error section links to error log entry via error_id. Error log entry includes run_id and task_id.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:67-73"
+    ],
+    "acceptance": {
+      "run.detail": {
+        "description": "Error section includes [view log] link"
+      },
+      "error.log": {
+        "description": "Entry includes run_id and task_id for bidirectional linkage"
+      }
+    },
+    "anti_patterns": [
+      "error log not discoverable from run detail",
+      "error_id not linkable to run"
+    ],
+    "critique_focus": [
+      "link clarity and discoverability",
+      "log entry readability"
+    ],
+    "manual_simulation": "Complete run with error, view error section, click [view log], verify full context",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Debugging efficiency",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:13Z"
+  },
+  {
+    "id": "prd-xc-local-pglite-cold-start",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Local-first PGlite cold start: schema init, seed, ready in <5s",
+    "intent": "First run creates ~/.fulcrum/db/main (or FULCRUM_HOME/db/main). Schema is idempotent. Default seed creates org, user, session.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "services/platform-core/src/infrastructure/application-database/seed.ts"
+    ],
+    "acceptance": {
+      "startup": {
+        "description": "Cold start from empty ~/.fulcrum/db completes in <5s"
+      }
+    },
+    "anti_patterns": [
+      "startup takes >5s",
+      "schema not idempotent",
+      "seed missing org/user/session"
+    ],
+    "critique_focus": [
+      "schema idempotency",
+      "seed completeness",
+      "startup performance"
+    ],
+    "manual_simulation": "rm -rf ~/.fulcrum && fulcrum doctor && time curl http://localhost:3000/api/health",
+    "passes": false,
+    "priority": "P0",
+    "incentive": "Local-first developer and user experience",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:14Z"
+  },
+  {
+    "id": "prd-xc-local-pglite-warm-start",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Local-first PGlite warm start: existing schema and data, ready in <2s",
+    "intent": "When ~/.fulcrum/db/main exists with valid schema, start time is <2s. Migrations (if any) are applied idempotently.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23"
+    ],
+    "acceptance": {
+      "startup": {
+        "description": "Warm start with existing db completes in <2s"
+      }
+    },
+    "anti_patterns": [
+      "warm start slower than cold start (regression)",
+      "migrations not idempotent"
+    ],
+    "critique_focus": [
+      "migration idempotency",
+      "warm boot performance"
+    ],
+    "manual_simulation": "Start app, note time, restart, time should be <2s",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "User experience and iteration velocity",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:15Z"
+  },
+  {
+    "id": "prd-xc-local-pglite-lock-recovery",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Local-first PGlite lock recovery: auto-detect stale lock, retry with backoff",
+    "intent": "If PGlite startup finds exclusive lock held by dead process, detect and recover (rm lock file + retry).",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:124-131"
+    ],
+    "acceptance": {
+      "pglite.lock": {
+        "description": "Stale lock detected and recovered automatically or via doctor"
+      }
+    },
+    "anti_patterns": [
+      "lock file not detected",
+      "no recovery mechanism",
+      "indefinite wait on live lock"
+    ],
+    "critique_focus": [
+      "lock staleness detection",
+      "safe recovery",
+      "pid detection"
+    ],
+    "manual_simulation": "Simulate stale lock: create .lock file, start app, verify recovery or doctor fix",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Reliability of local development",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:16Z"
+  },
+  {
+    "id": "prd-xc-local-pglite-corruption-recovery",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Local-first PGlite corruption detection and recovery",
+    "intent": "On schema or data corruption, expose as doctor subsystem failure with recovery action 'fulcrum doctor --run-fix=pglite-rebuild'.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:124-131"
+    ],
+    "acceptance": {
+      "corruption.detect": {
+        "description": "Detected during startup, reported by doctor"
+      },
+      "corruption.recovery": {
+        "description": "Rebuild succeeds and verified"
+      }
+    },
+    "anti_patterns": [
+      "corruption silently causes data loss",
+      "no detection or recovery"
+    ],
+    "critique_focus": [
+      "corruption detection heuristic",
+      "safe rebuild process"
+    ],
+    "manual_simulation": "Corrupt a table manually, start app, doctor should report, fix should work",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Data integrity and reliability",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:17Z"
+  },
+  {
+    "id": "prd-xc-postgresql-switch-database-url",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "PostgreSQL switch via FULCRUM_DATABASE_URL environment variable",
+    "intent": "If FULCRUM_DATABASE_URL is set (postgres://...), use PostgreSQL instead of PGlite. Schema migrations run idempotently.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23"
+    ],
+    "acceptance": {
+      "env.FULCRUM_DATABASE_URL": {
+        "description": "When set to postgres://, PostgreSQL is used"
+      },
+      "migration": {
+        "description": "Schema applied idempotently to PostgreSQL"
+      }
+    },
+    "anti_patterns": [
+      "FULCRUM_DATABASE_URL ignored",
+      "schema not idempotent on PostgreSQL"
+    ],
+    "critique_focus": [
+      "connection handling",
+      "SQL compatibility (PGlite vs PostgreSQL)"
+    ],
+    "manual_simulation": "Set FULCRUM_DATABASE_URL=postgres://localhost/fulcrum and start app, verify it connects",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Production deployment and scale",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:18Z"
+  },
+  {
+    "id": "prd-xc-migrations-idempotent-rerun",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Migrations: idempotent on re-run, no rollback required",
+    "intent": "Every migration is idempotent. Running migrations twice has same result as running once (e.g., CREATE TABLE IF NOT EXISTS).",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:124-131",
+      "services/platform-core/src/infrastructure/application-database/product-migrations.ts"
+    ],
+    "acceptance": {
+      "migration.rerun": {
+        "description": "Applying same migration twice succeeds"
+      }
+    },
+    "anti_patterns": [
+      "migrations fail on rerun",
+      "no IF NOT EXISTS guards"
+    ],
+    "critique_focus": [
+      "idempotency pattern",
+      "error handling and retry logic"
+    ],
+    "manual_simulation": "Run migrations, run again, verify no errors and same state",
+    "passes": false,
+    "priority": "P1",
+    "incentive": "Deployment safety and operator confidence",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:19Z"
+  },
+  {
+    "id": "prd-xc-seeded-local-identity-visible",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "Seeded local identity: org, user, token visible on first login",
+    "intent": "After first start, default org 'Local' with user 'admin@local' is visible in UI. Auth session token displayed in CLI and settings.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "services/platform-core/src/infrastructure/application-database/seed.ts"
+    ],
+    "acceptance": {
+      "firstrun": {
+        "description": "UI shows 'Local' org and 'admin@local' user"
+      },
+      "cli.auth": {
+        "description": "'fulcrum auth show-token' displays session token"
+      },
+      "settings.api": {
+        "description": "Settings page shows org_id and user_id for API calls"
+      }
+    },
+    "anti_patterns": [
+      "seed user not visible after first start",
+      "no token visible for API use"
+    ],
+    "critique_focus": [
+      "seeded identity visibility UX",
+      "token display safety"
+    ],
+    "manual_simulation": "Clean start, login, verify 'Local' org visible, run 'fulcrum auth show-token'",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Developer onboarding and API usability",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:20Z"
+  },
+  {
+    "id": "prd-xc-fulcrum-home-path-discipline",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "persistence",
+    "title": "FULCRUM_HOME path discipline: all local state under one dir",
+    "intent": "All local state (db, logs, cache, hooks, temp) lives under FULCRUM_HOME (default ~/.fulcrum).",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "services/platform-core/src/application/runtime-support/hook-event-io.ts"
+    ],
+    "acceptance": {
+      "FULCRUM_HOME": {
+        "description": "All state stored under FULCRUM_HOME"
+      }
+    },
+    "anti_patterns": [
+      "state scattered across multiple dirs",
+      "FULCRUM_HOME not honored"
+    ],
+    "critique_focus": [
+      "path safety and validation",
+      "directory creation permissions"
+    ],
+    "manual_simulation": "Set FULCRUM_HOME=/tmp/test_fulcrum and verify all state stored there",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Installation simplicity and system integration",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:21Z"
+  },
+  {
+    "id": "prd-xc-fulcrum-features-flag-list",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "observability",
+    "title": "FULCRUM_FEATURES flag list: guidance and discovery",
+    "intent": "FULCRUM_FEATURES env var accepts comma-separated feature flags (e.g., 'embeddings'). Unrecognized flags warn but don't block.",
+    "sources": [
+      "09.6-RESEARCH-TRACE-LINKAGE-MODEL.md:6-23",
+      "tests/tui/smoke.test.ts"
+    ],
+    "acceptance": {
+      "env.FULCRUM_FEATURES": {
+        "description": "Comma-separated flags enable features"
+      },
+      "cli.features": {
+        "description": "'fulcrum features list' shows available flags and descriptions"
+      }
+    },
+    "anti_patterns": [
+      "FULCRUM_FEATURES not documented",
+      "unrecognized flags silently ignored"
+    ],
+    "critique_focus": [
+      "flag naming consistency",
+      "UX of flag discovery"
+    ],
+    "manual_simulation": "Set FULCRUM_FEATURES=invalid,embeddings and verify warning, run 'fulcrum features list'",
+    "passes": false,
+    "priority": "P2",
+    "incentive": "Developer experience and feature control",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:22Z"
+  },
+  {
+    "id": "prd-xc-agent-native-parity-invariant",
+    "type": "feature",
+    "surface": "cross-cutting",
+    "area": "interface",
+    "title": "Agent-native parity: every UI action reachable via API + CLI + TUI",
+    "intent": "No capability exposed only in Web. Every action (create, read, update, delete, workflow) is reachable via API endpoint, CLI command, and TUI screen.",
+    "sources": [
+      "09.6-RESEARCH-CODE-TARGETS.md:268-271",
+      "09.6-PATTERNS.md:72-85",
+      "src/application/interface-parity.test.ts"
+    ],
+    "acceptance": {
+      "parity.test": {
+        "description": "Interface parity test covers Web, CLI, TUI for key workflows"
+      }
+    },
+    "anti_patterns": [
+      "feature only on Web (no CLI/TUI/API)",
+      "feature only on API (not exposed in UI)"
+    ],
+    "critique_focus": [
+      "parity test coverage",
+      "workflow completeness on all surfaces"
+    ],
+    "manual_simulation": "Create task on Web, verify same action works on CLI (fulcrum tasks create) and TUI (keybinding)",
+    "passes": false,
+    "priority": "P0",
+    "incentive": "Agent usability and automation",
+    "status": "proposed",
+    "op": "create",
+    "agent": "seed-cross-cutting",
+    "ts": "2026-05-17T18:15:23Z"
+  }
+]

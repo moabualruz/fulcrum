@@ -35,32 +35,52 @@
     {
       "path": "/Users/mkh/workspace/fulcrum/.scratch/prd-plane-seeds.jsonl",
       "entries": 26
+    },
+    {
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/prd.cross-cutting.ndjson",
+      "entries": 24
+    },
+    {
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/prd.cross-cutting-only-2026-05-17-1812.json",
+      "entries": 24
+    },
+    {
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/prd.json.corrupted",
+      "entries": 69
+    },
+    {
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/prd.ndjson-malformed-backup-2026-05-17.jsonl",
+      "entries": 907
+    },
+    {
+      "path": "/Users/mkh/workspace/fulcrum/.scratch/prd.object-backup-2026-05-17.json",
+      "entries": 30
     }
   ],
-  "total_seen": 1994,
+  "total_seen": 3048,
   "parse_errors": 0,
   "dedup_by_id": 0,
-  "dedup_by_title": 778,
-  "kept": 1216,
+  "dedup_by_title": 1767,
+  "kept": 1281,
   "unclear": 12,
   "by_surface": {
-    "web": 494,
-    "cross-cutting": 90,
-    "cli": 142,
-    "tui": 125,
-    "api": 217,
+    "web": 522,
+    "cross-cutting": 99,
+    "cli": 144,
+    "tui": 149,
+    "api": 219,
     "canvas": 27,
     "service": 96,
     "desktop": 25
   },
   "by_priority": {
-    "P1": 442,
-    "P0": 175,
-    "P2": 580,
+    "P1": 469,
+    "P0": 193,
+    "P2": 600,
     "P3": 19
   },
   "by_status": {
-    "proposed": 1204,
+    "proposed": 1269,
     "unclear": 12
   },
   "by_agent": {
@@ -68,9 +88,12 @@
     "codex": 228,
     "seed-internal-api": 67,
     "seed-services": 48,
+    "seed-internal-tui": 47,
     "seed-plane-settings": 35,
+    "seed-docmost-search": 32,
     "seed-docmost-editor": 31,
     "seed-converted-object": 30,
+    "unknown": 30,
     "seed-internal-cli": 27,
     "seed-mobile-perf": 27,
     "seed-internal-web": 26,
@@ -80,16 +103,14 @@
     "seed-docmost-auth": 25,
     "seed-fusion-obs": 25,
     "seed-plannotator": 25,
-    "seed-internal-tui": 25,
     "seed-acp-ui": 25,
     "seed-cross-cutting": 24,
     "seed-plane-tasks": 20,
-    "seed-docmost-search": 19,
     "seed-plane-automations": 4,
     "seed-plane-importers": 4,
     "seed-plane-custom-fields": 3,
     "seed-plane-templates": 3,
     "codex,local-inventory-expander": 1
   },
-  "deduped_count": 778
+  "deduped_count": 1767
 }

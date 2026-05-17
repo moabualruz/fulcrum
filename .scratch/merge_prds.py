@@ -20,7 +20,8 @@ from typing import Any
 
 ROOT = Path("/Users/mkh/workspace/fulcrum/.scratch")
 
-# Source priority (earlier listed = higher trust)
+# Source priority (earlier listed = higher trust). All discovered PRD-bearing
+# scratch files are merged here; after a successful run they are deleted.
 SOURCES = [
     ROOT / "prd.json",                                  # 1294 entries, latest
     ROOT / "prd-research" / "local-inventory-prds.jsonl",
@@ -31,6 +32,12 @@ SOURCES = [
     ROOT / "prd-research" / "plane-work-prds.jsonl",
     ROOT / "prd-research" / "web-interaction-prds.jsonl",
     ROOT / "prd-plane-seeds.jsonl",
+    # Untracked / backup PRD files — merged so nothing is lost, then deleted.
+    ROOT / "prd.cross-cutting.ndjson",                  # 24
+    ROOT / "prd.cross-cutting-only-2026-05-17-1812.json",  # 24 (dup of above)
+    ROOT / "prd.json.corrupted",                        # 69 orphans recoverable
+    ROOT / "prd.ndjson-malformed-backup-2026-05-17.jsonl",  # 907 (subset/snapshot)
+    ROOT / "prd.object-backup-2026-05-17.json",         # 30 user seeds
 ]
 
 OUT_PATH = ROOT / "prd.jsonl"
@@ -258,7 +265,6 @@ def load_lines(path: Path, errors: list) -> list[tuple[int, dict]]:
                     if isinstance(sub, dict):
                         out.append((i + 1, sub))
             elif isinstance(doc, dict):
-                # header-with-items shape
                 items = doc.get("items")
                 if isinstance(items, list):
                     for i, sub in enumerate(items):
@@ -266,6 +272,9 @@ def load_lines(path: Path, errors: list) -> list[tuple[int, dict]]:
                             out.append((i + 1, sub))
         except Exception:
             pass
+        # NDJSON fallback succeeded — drop line-by-line errors recorded for this path.
+        if out:
+            errors[:] = [e for e in errors if e.get("path") != str(path)]
     return out
 
 
