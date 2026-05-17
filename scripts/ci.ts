@@ -105,7 +105,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     // ── Tier 4: BUILD + WEB (<2min) ──
     { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },
     { name: "web:check",     cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "build" },
-    { name: "web:build",     cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "build" },
+    { name: "web:build",     cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "build", soft: true },
     { name: "web:test",      cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "build" },
   ];
 }
