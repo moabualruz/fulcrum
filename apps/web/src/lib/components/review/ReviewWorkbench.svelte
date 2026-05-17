@@ -106,6 +106,26 @@
 
   let searchQuery = $state(model.search.query ?? "");
   let sidebarTab = $state<"files" | "annotations" | "search" | "ai">("files");
+  let annotationDraft = $state<{ lineStart: number; lineEnd: number; text: string } | null>(null);
+
+  function handleLineClick(lineIndex: number): void {
+    if (!model.selectedFile) return;
+    annotationDraft = { lineStart: lineIndex + 1, lineEnd: lineIndex + 1, text: "" };
+    sidebarTab = "annotations";
+  }
+
+  function submitAnnotation(): void {
+    if (!annotationDraft || !model.selectedFile) return;
+    onAnnotate?.({
+      filePath: model.selectedFile.path,
+      lineStart: annotationDraft.lineStart,
+      lineEnd: annotationDraft.lineEnd,
+      text: annotationDraft.text,
+      type: "comment",
+      scope: "line",
+    });
+    annotationDraft = null;
+  }
 </script>
 
 <div data-review-workbench class={cn("grid h-[calc(100vh-12rem)] grid-cols-[16rem_1fr_18rem] gap-0 rounded-lg border border-border overflow-hidden")}>
@@ -139,15 +159,21 @@
         {#each model.selectedFile.patch.split("\n") as line, i (i)}
           <div
             data-diff-line={i}
-            class={cn("px-3 py-0 flex gap-2", {
-              "bg-green-50 text-green-800": line.startsWith("+") && !line.startsWith("+++"),
-              "bg-red-50 text-red-800": line.startsWith("-") && !line.startsWith("---"),
+            class={cn("px-3 py-0 flex gap-2 cursor-pointer hover:bg-primary/5 group", {
+              "bg-green-50 text-green-800 hover:bg-green-100": line.startsWith("+") && !line.startsWith("+++"),
+              "bg-red-50 text-red-800 hover:bg-red-100": line.startsWith("-") && !line.startsWith("---"),
               "bg-blue-50/50 text-blue-700": line.startsWith("@@"),
               "text-muted-foreground": !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@"),
+              "ring-1 ring-primary/30": annotationDraft?.lineStart === i + 1,
             })}
+            role="button"
+            tabindex="0"
+            onclick={() => handleLineClick(i)}
+            onkeydown={(e) => e.key === "Enter" && handleLineClick(i)}
           >
             <span class={cn("w-8 shrink-0 text-right text-muted-foreground select-none")}>{i + 1}</span>
             <pre class={cn("flex-1 whitespace-pre-wrap break-all")}>{line}</pre>
+            <span class={cn("opacity-0 group-hover:opacity-100 text-xs text-primary shrink-0")}>+</span>
           </div>
         {/each}
       </div>
@@ -182,6 +208,21 @@
 
     <div class={cn("flex-1 overflow-y-auto p-2")}>
       {#if sidebarTab === "annotations"}
+        {#if annotationDraft}
+          <div data-annotation-draft class={cn("mb-3 rounded border border-primary/30 bg-primary/5 p-2")}>
+            <p class={cn("text-xs font-medium mb-1")}>New annotation — Line {annotationDraft.lineStart}</p>
+            <textarea
+              bind:value={annotationDraft.text}
+              placeholder="Write your comment..."
+              rows="3"
+              class={cn("w-full rounded border border-input bg-background px-2 py-1.5 text-xs resize-none")}
+            ></textarea>
+            <div class={cn("mt-1 flex gap-1")}>
+              <button type="button" onclick={submitAnnotation} class={cn("rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground")}>Add</button>
+              <button type="button" onclick={() => { annotationDraft = null; }} class={cn("rounded border border-border px-2 py-1 text-xs")}>Cancel</button>
+            </div>
+          </div>
+        {/if}
         {#each model.annotationGroups as group (group.filePath)}
           <div class={cn("mb-3")}>
             <button
