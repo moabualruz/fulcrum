@@ -96,11 +96,11 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "lint" },
     { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "lint" },
 
-    // ── Tier 2: UNIT TESTS (services/, <2min) ──
-    { name: "unit",          cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "60000", "services/"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
+    // ── Tier 2: UNIT TESTS (services/, sequential to avoid PGlite socket drops) ──
+    { name: "unit",          cmd: ["bun", "test", ...changedFlag, "--timeout", "60000", "services/"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
 
-    // ── Tier 3: INTEGRATION TESTS (tests/, <3min) ──
-    { name: "integration",   cmd: ["bun", "test", ...changedFlag, "--parallel", "--timeout", "30000", "tests/", "--exclude", "tests/architecture"], tier: "integration" },
+    // ── Tier 3: INTEGRATION TESTS (tests/) ──
+    { name: "integration",   cmd: ["bun", "test", ...changedFlag, "--timeout", "60000", "tests/", "--exclude", "tests/architecture"], tier: "integration" },
 
     // ── Tier 4: BUILD + WEB (<2min) ──
     { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },
