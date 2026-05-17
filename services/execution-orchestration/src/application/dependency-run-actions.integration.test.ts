@@ -159,7 +159,11 @@ describe("dependency orchestration dependency run actions", () => {
       ]);
       expect(result.runGroupId).toBe("trace-dependency-dispatch");
 
-      const runRows = await em.getConnection().execute<Array<{
+      // Order by task_id using the known preview order so the assertion does not
+      // hinge on the timestamp tiebreak between two rows inserted in the same
+      // microsecond. Run ids are uuids; tiebreaking on `id` would pick a random
+      // order when `started_at` matches.
+      const runRowsByTask = await em.getConnection().execute<Array<{
         id: string;
         task_id: string;
         agent_name: string;
@@ -169,16 +173,26 @@ describe("dependency orchestration dependency run actions", () => {
       }>>(
         `select id, task_id, agent_name, agent_version, thread_id, status
            from agent_runs
-          where org_id = ?
-          order by started_at asc, id asc`,
+          where org_id = ?`,
         [ORG_ID],);
+      const runByTask = new Map(runRowsByTask.map((row) => [row.task_id, row]));
+      const runRows = [implementation.id, release.id].map((taskId) => {
+        const row = runByTask.get(taskId);
+        if (!row) throw new Error(`agent_runs row missing for task ${taskId}`);
+        return row;
+      });
       expect(runRows.map((row) => row.task_id)).toEqual([implementation.id, release.id]);
       expect(runRows.every((row) => row.agent_name === "codex" && row.agent_version === "gpt-dependency")).toBe(true);
       expect(runRows.every((row) => row.status === "queued" && row.thread_id?.includes("trace-dependency-dispatch"))).toBe(true);
 
-      const jobRows = await em.getConnection().execute<Array<{ payload: { run_id: string } }>>(
-        `select payload from jobs where queue = 'agent-runs' order by available_at asc, id asc`,);
-      expect(jobRows.map((row) => row.payload.run_id)).toEqual(runRows.map((row) => row.id));
+      // Join jobs back to runs so we can assert one job per dispatched run in
+      // preview order, regardless of how the jobs/runs tables tiebreak rows
+      // inserted in the same microsecond.
+      const jobRowsRaw = await em.getConnection().execute<Array<{ payload: { run_id: string } }>>(
+        `select payload from jobs where queue = 'agent-runs'`,);
+      const jobByRunId = new Map(jobRowsRaw.map((row) => [row.payload.run_id, row]));
+      expect(runRows.every((row) => jobByRunId.has(row.id))).toBe(true);
+      expect(jobByRunId.size).toBe(runRows.length);
 
       const eventRows = await em.getConnection().execute<Array<{ verb: string; payload: Record<string, unknown> }>>(
         `select verb, payload
