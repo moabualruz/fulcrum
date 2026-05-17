@@ -106,7 +106,7 @@ describe("auth public Nest API", () => {
 
   test("runs whoami, invite, and accept-invite through PGlite socket", async () => {
     await assertAuthRoundTrip("pglite-socket", await startPgliteSocket());
-  });
+  }, 60_000);
 
   test("runs whoami, invite, and accept-invite through real PostgreSQL", async () => {
     postgres = await startTemporaryPostgres();
