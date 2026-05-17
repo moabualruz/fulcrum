@@ -180,99 +180,46 @@ Use harsh UI/UX criticism at every level:
 
 Feel free to recommend or implement full overhauls when the evidence shows a surface is structurally wrong. Do not patch around a bad screen if the right fix is to replace its information architecture, workflow ordering, component layout, empty-state model, or navigation placement. Record overhaul recommendations as PRD items with clear incentives and acceptance criteria.
 
-## PRD Backlog File
+## PRD Backlog File — Single Source Of Truth
 
-Use `/Users/mkh/workspace/fulcrum/.scratch/prd.json` as the machine-readable backlog for this loop.
+`/Users/mkh/workspace/fulcrum/.scratch/prd.jsonl` is the only PRD glossary. NDJSON, one PRD per line, 1281 entries seeded from upstream clones (plane, docmost, fusion, plannotator, acp-ui), `.planning/phases/09.6-*`, and the internal repo. Seed history lives in commit `df7852157`; do not reseed.
 
-Rules:
+Open the file at the start of every loop iteration. Resolve current state by reading the line for each PRD id; if multiple lines share an id, the newest `ts` wins. The `passes` field is the live progress signal — flip it to `true` only when current smoke evidence, screenshots, logs, focused tests, and the loop's own critique all prove the PRD's acceptance.
 
-- Read it at the start of every loop.
-- Append new PRD items when a critique discovers missing value, broken UX, weak logic, or an overhaul opportunity.
-- Do not delete or rewrite existing PRD items during the loop; duplicates can be cleaned later after parallel agents finish.
-- Keep each item small enough to own and verify, but broad enough to represent a useful product slice.
-- Every item starts with `"passes": false` and becomes true only when current smoke evidence, screenshots, logs, and focused tests prove it.
-- Use exact evidence paths, commands, screenshots, and trace IDs in `evidence`.
-- Prefer 20-30 deep targeted analysis/implementation subagents or work packages over vague large buckets when planning a full pass. Partition by non-overlapping files/surfaces.
-
-Minimum PRD item shape:
-
-```json
-{
-  "id": "prd-web-dashboard-001",
-  "surface": "web",
-  "area": "dashboard",
-  "passes": false,
-  "priority": "P1",
-  "intent": "What user value this area must deliver.",
-  "critique_focus": ["hierarchy", "workflow fit", "empty state", "mobile"],
-  "manual_simulation": ["Every concrete action to click/type/submit/verify."],
-  "acceptance": ["Observable pass conditions."],
-  "evidence": []
-}
-```
-
-## Ralph-Style Goal Discipline
-
-Use the linked AI Hero / Ralph Wiggum-style loop as operating discipline, adapted to `/goal`:
-
-- Keep explicit progress in files, not conversation memory.
-- Keep every PRD item independently checkable with `passes: false` until proven.
-- Work in small loops, but preserve end-to-end context.
-- Update the goal evidence after every run.
-- Run risky or blocking checks first.
-- Let critique create the next batch of focused items.
-- Never assume "looks loaded" means "works."
-- Never end while a failing PRD item is hidden by a broad summary.
-
-## Append-Only PRD JSON Convention
-
-`/Users/mkh/workspace/fulcrum/.scratch/prd.json` is **NDJSON** (newline-delimited JSON). One PRD item per line. Multiple CLI agents append in parallel; never edit existing lines.
-
-Rules:
-
-- Each agent writes by appending a single JSON line atomically (`>>` redirect; no `jq -i`, no full-file rewrites).
-- Dedup, supersede, and `passes: true` flips happen by appending **new** lines that reference the prior id via `supersedes: ["<old-id>"]` or `parents: ["<old-id>"]`. The newest matching line wins on read.
-- Dedup passes write entries with `op: "dedup"` and an array of superseded ids. Never delete.
-- Status transitions: `proposed → in-progress → landed → verified`. Each transition is a new appended line.
-- Agents tag every line with `agent` (e.g. `seed-plane-tasks`, `dedup-pass-001`, `loop-implementer`) and `ts` (ISO-8601 UTC).
-- A `read` of `prd.json` always resolves by `id`: newest line per id wins (compare `ts`).
-
-Schema (superset of the minimum item shape already in this file):
+Schema (use only fields that apply; never write `null`):
 
 ```json
 {
   "id": "prd-<area>-<short-slug>",
   "type": "feature|workflow|value|component|interaction|recovery|empty-state|copy|overhaul",
-  "surface": "web|cli|tui|api|service|cross-cutting",
-  "area": "<one of the area buckets>",
+  "surface": "web|cli|tui|api|service|cross-cutting|desktop|canvas",
+  "area": "<area bucket>",
   "title": "Concise title",
   "intent": "What user value this delivers, 1–3 sentences.",
-  "sources": ["upstream:plane:<path-or-url>", "upstream:docmost:<...>", "phase:09.6:<doc>", "internal:<service>", "competitor:<name>"],
+  "sources": ["upstream:plane:<path>", "phase:09.6:<doc>", "internal:<service>", "competitor:<name>"],
   "acceptance": ["Observable pass conditions."],
   "anti_patterns": ["Explicit failures to avoid."],
-  "interactions": [{"selector": "button[data-test=...] or /route or fulcrum <cmd>", "action": "click|type|submit|hover|focus|key|run", "expected": "Observable outcome."}],
+  "interactions": [{"selector": "/route or fulcrum <cmd> or button[data-test=...]", "action": "click|type|submit|hover|focus|key|run", "expected": "Observable outcome."}],
   "critique_focus": ["hierarchy", "workflow fit", "empty state", "mobile"],
   "manual_simulation": ["Step 1 …", "Step 2 …"],
   "passes": false,
   "priority": "P0|P1|P2|P3",
   "incentive": "Why the loop should pick this up; what unblocks if landed.",
-  "status": "proposed|in-progress|landed|verified|deferred|deduped|superseded",
-  "supersedes": ["<old-id>"] ,
-  "parents": ["<other-id>"] ,
-  "competitor_refs": ["linear:cycles", "shortcut:cfd", "plane:modules"],
+  "status": "proposed|in-progress|landed|verified|deferred|unclear|superseded",
+  "supersedes": ["<old-id>"],
+  "parents": ["<other-id>"],
+  "competitor_refs": ["linear:cycles", "plane:modules"],
   "screens": ["<path>"],
-  "evidence": [],
+  "evidence": ["<path or trace ID>"],
   "tests": ["<test path>"],
   "risk": "Free-form. Especially for overhauls.",
-  "op": "create|update|dedup",
+  "merged_from": [{"id": "<contributor-id>", "source_path": "<path>", "agent": "<id>", "ts": "<ts>"}],
   "agent": "<id>",
   "ts": "<ISO-8601 UTC>"
 }
 ```
 
-Omit fields that don't apply. Don't write `null`.
-
-`.scratch/manual-smoke-2026-05-17/findings.ndjson` follows the same append-only rule, schema:
+Findings sidecar `.scratch/manual-smoke-2026-05-17/findings.ndjson` (append-only) keeps a parallel log of every observed failure during simulation:
 
 ```json
 {
@@ -292,45 +239,115 @@ Omit fields that don't apply. Don't write `null`.
 }
 ```
 
-## Parallel Subagent Fan-Out (20–30 agents)
+## Ralph-Wiggum Discipline Adapted To `/goal`
 
-To seed `prd.json` deeply, dispatch focused subagents in batches of 6 concurrent calls. Each subagent is assigned **one (area × source)** pair. Areas: dashboard, projects, project-creation, board, docs, doc-editor, planning, acp, review, qa, uat, runs, artifacts, audit, repos, search, settings-routing, settings-connectors, settings-flags, settings-secrets, settings-theme, settings-api, settings-experiments, settings-importers, doctor, inbox, notifications-settings, agents, auth, workflow-cycle, identity, inference, skills, credentials, telemetry, error-logs, dependency-runs, qa-feedback-gate. Sources: `plane`, `docmost`, `plannotator`, `fusion`, `acp-ui`, `phase-09.6` planning docs, internal `services/<svc>`.
+Reference: https://www.aihero.dev/tips-for-ai-coding-with-ralph-wiggum — adopt the 11-tip discipline, but drive it through `/goal` (this file is the durable loop instruction; `/goal` reads it every turn) instead of `ralph.sh`. The mapping below is binding.
 
-Each subagent **must**:
+### 1. The loop is `/goal`, not a shell script
 
-1. Read its assigned upstream clone under `.scratch/upstream-product-replacement/repos/<source>/` for the assigned area — every UI element, route, copy string, settings panel, empty state, error, keyboard shortcut, mobile pattern, accessibility cue.
-2. Cross-reference against `.planning/phases/09.6-product-workflow-completeness-human-agent-journeys/*` for intended value/workflow/feature from the copy-first parts of the phase.
-3. Append PRD entries to `.scratch/prd.json` — one per line, schema above, `status: "proposed"`, `op: "create"`, `agent: "seed-<source>-<area>"`, `passes: false`, with `sources` citing exact files.
-4. Cap append at ~30 entries per agent. If the area is empty in the assigned source, append one `type: "value"` PRD describing the gap and what we should add.
-5. Append observations to `findings.ndjson` if the research surfaces a feature in copy that we don't yet implement.
+This goal file replaces `ralph.sh`. Every turn the agent runs reads this file plus `.scratch/prd.jsonl` plus `findings.ndjson` and decides the next single PRD to work on. `/goal` re-enters the loop until the closing gates hold. **No second shell loop needed.** The Stop hook is the iteration boundary.
 
-Dispatch policy:
+### 2. HITL first, AFK later
 
-- Run subagents in concurrent batches of **6**.
-- Run **at least 24 batches** until coverage is broad. Stop when every (area × source) pair has at least one agent or one explicit "empty source" PRD entry.
-- After all batches complete, run a **dedup pass agent** that reads `prd.json`, groups by `(surface, area, title)` similarity, appends `op: "dedup"` entries marking obsolete ids `status: "superseded"`, and keeps the strongest entry.
+Start every new operating mode in human-in-the-loop. Watch the first iteration, verify the PRD that was picked is actually the highest-leverage P0/P1, verify the acceptance criteria are honest, only then trust the loop to run unattended. Match Ralph: "HITL Ralph resembles pair programming … AFK Ralph unlocks real leverage" — but flip the trust gate only after one good HITL pass.
+
+### 3. Scope is `.scratch/prd.jsonl`
+
+Anthropic-style PRD items with a `passes` field are the canonical scope. The agent must not invent new scope mid-loop unless a critique discovers genuinely missing value — and then the new PRD line must be appended (not inserted) with `parents: [...]` pointing back to whatever prompted it. Vague scope kills loops; the file IS the stop condition.
+
+### 4. Track progress in files, not chat
+
+Two progress files:
+
+- **`.scratch/prd.jsonl`** — flip `passes: true` plus append `evidence`, `screens`, `tests`, and `agent`/`ts` on the existing line. Allowed in-place edit; this is the operational truth.
+- **`.scratch/manual-smoke-2026-05-17/2026-05-17-manual-smoke-critique.md`** — append a dated remediation pass each loop iteration with: PRD ids touched, fixed blockers, fresh blockers, evidence paths, exact verification commands. **Never rewrite past passes; only append new ones.** This is the human-readable equivalent of Ralph's `progress.txt`, but committed.
+
+Commit after every meaningful iteration. Future iterations read the commit log to skip exploration.
+
+### 5. Feedback loops are the speed limit
+
+Before flipping any PRD to `passes: true`:
+
+- Run the focused tests it names (`tests` array).
+- Run the manual simulation it names (`manual_simulation` array).
+- Hit the API endpoint, the CLI command, the web route, the TUI key — exactly as `interactions` describe.
+- Capture screenshot + log + trace ID in `evidence`.
+- Run `bun run ci` at the close of each batch of related PRDs.
+
+A PRD cannot be `verified` without those artifacts on disk. "Looks loaded" is not evidence.
+
+### 6. Take small steps
+
+One PRD per iteration. Avoid multi-PRD batches except when an overhaul (see below) genuinely spans them. If a PRD feels too large, split it before starting — append child PRD lines with `parents: ["<this-id>"]`. Bias toward many tight commits over one giant commit. Quality > speed, especially when an iteration runs unattended.
+
+### 7. Prioritize risky work first
+
+Selection order each iteration:
+
+1. P0 boot/runtime blockers.
+2. Architectural decisions and cross-cutting trace/audit/agent-native-parity issues.
+3. Integration points between modules (web ↔ API ↔ service ↔ CLI ↔ TUI parity).
+4. Unknown unknowns and spikes surfaced by the current critique.
+5. P1 standard workflow value.
+6. P2 harsh UX/UI/design remediation including overhauls.
+7. P3 polish + quick wins.
+
+When two PRDs tie on priority, pick the one whose acceptance is hardest to fake. Save easy wins for last.
+
+### 8. Quality bar is production
+
+This repo is a **local-first Agent OS**, not a prototype. Production rules apply: TypeORM only, NestJS-native server, Zod for validation, no `.sql` migrations, no `class-validator`, responsibility-named modules, agent-native parity (every UI action also reachable via API + CLI + TUI). Repeat these inside the loop's reasoning every iteration; the codebase wins over the prompt, so verify the actual code matches the rules and fix drift you discover.
+
+### 9. Sandbox + safety
+
+`/goal` runs against a real working tree, not a Docker sandbox. The safety equivalent here:
+
+- Never run `git push --force`, `git reset --hard`, `rm -rf`, `DROP TABLE`, or destructive migrations without explicit user confirmation in the same turn.
+- Preserve `.scratch/upstream-product-replacement/` ignored upstream clones — never delete.
+- Move corrupted PGlite data dirs aside (`pglite.data.<reason>-<ts>`) instead of deleting.
+- Append-only for `prd.jsonl` history and `findings.ndjson`. In-place flips to `passes` are allowed; deletions of past entries are not.
+
+### 10. Cost discipline
+
+Each iteration should pay for itself in PRDs verified, blockers fixed, or evidence captured. Aim for visible movement on at least one P0/P1/P2 PRD per loop turn. If a turn produces no verifiable progress, treat it as a smell and surface why before the next turn.
+
+### 11. Make the loop your own (alternative loop types)
+
+Beyond the headline manual-simulation loop, these specialized loops are first-class — each picks a different selection rule on top of the same PRD file. Use `/goal` to run any of them as long as the closing gates still hold for the headline goal.
+
+- **Coverage loop** — pick PRDs whose `tests` array is empty or whose `passes` is false because of missing test evidence. Goal: every PRD has at least one focused test path before it can verify.
+- **Linting / typecheck loop** — pick PRDs blocked by lint, typecheck, or `bun run lint:boundaries`. One fix per iteration; rerun the gate after.
+- **Duplication / entropy loop** — pick PRDs flagged as duplicated logic or stale code (`type: "overhaul"` candidates that surfaced via `findings.ndjson` `category: "logic"`).
+- **Trace-spine loop** — pick PRDs in `surface: "cross-cutting"` `area: "observability"` and prove trace IDs propagate across every surface end-to-end.
+- **Mobile loop** — pick PRDs with `critique_focus` including `"mobile"`; run desktop + mobile screenshots side-by-side.
+
+Switch between loops by re-running `/goal` after telling the agent which selection rule to use this turn; the goal file and PRD file stay constant.
 
 ## Total Overhaul Protocol
 
-When a critique surfaces structural failure (navigation, hierarchy, density, copy, mobile, a11y, workflow fit, value), do not patch. Open a `type: "overhaul"` PRD with:
+When a critique surfaces structural failure (navigation, hierarchy, density, copy, mobile, a11y, workflow fit, value), **propose an overhaul, do not patch**. Append a new PRD line with `type: "overhaul"`, `priority: "P1"` or higher, and:
 
 - Current screen problem stated harshly.
 - Proposed replacement information architecture.
 - New navigation grouping (workflow stages, not feature buckets).
 - New empty/error/loading state pattern.
 - New copy that names user value, not implementation.
-- Acceptance proof: screenshots before/after, focused tests, interaction matrix.
-- Risk: explicit named risk + mitigation.
+- Acceptance proof requirement: screenshots before/after, focused tests, interaction matrix.
+- `risk`: explicit named risk + mitigation.
+- `parents`: ids of the patched PRDs being superseded.
 
-Implement the overhaul as the next loop iteration's primary slice, even if it crosses multiple files. Cite the PRD id in the commit message.
+Implement the overhaul as the next loop iteration's primary slice, even if it crosses multiple files. Cite the PRD id in the commit message and on the patched PRDs flip `status: "superseded"`.
 
 ## Closing The Loop
 
-The loop closes only when:
+The loop closes only when **all** of these hold:
 
-- Every PRD line with newest status `proposed` or `in-progress` for priorities P0/P1/P2 has either landed (`status: "verified"`) or been explicitly deferred with a written reason.
-- `findings.ndjson` newest per id has no `severity: blocker` and no `severity: major`.
-- `prd.json` line count > 200 with broad coverage across surfaces/areas, and a dedup pass has been recorded.
-- Full `bun run ci` green.
-- Critique report's latest section enumerates running dev server URLs, screenshot index, PRD totals, findings totals, blockers, polish, exact verification commands.
+- Every PRD with `passes: false` and `priority: "P0"` has either flipped to `passes: true` with evidence or been explicitly deferred with a written reason on the line.
+- No PRD with `priority: "P1"` carries an unresolved blocker — either `passes: true` or recorded as polish in the critique.
+- `findings.ndjson` has no open `severity: "blocker"` and no `severity: "major"`.
+- `bun run ci` is green.
+- Critique report's latest section enumerates running dev server URLs, screenshot index, PRD totals (passes/failed/unclear), findings totals, blockers, polish, exact verification commands, and trace IDs for the canonical workflow proof.
+- The dev servers are left running for human review.
+
+`promise>COMPLETE</promise>` is signalled in the critique report's most recent "Status" line: `Status: COMPLETE — closing gates all met.` The Stop hook clears once that line is present and every closing gate above resolves true on re-read.
 
