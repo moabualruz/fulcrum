@@ -136,8 +136,12 @@ export function buildApprovedPlanBreakdown(input: BuildApprovedPlanBreakdownInpu
     }
   }
 
-  const verificationTask = buildVerificationTask(parsedTasks);
-  const allParsedTasks = [...parsedTasks, verificationTask];
+  const explicitVerificationTask = parsedTasks.find((task) => task.clientKey === "verify-end-to-end");
+  const allParsedTasks = explicitVerificationTask
+    ? parsedTasks.map((task) => task.clientKey === "verify-end-to-end" && task.successCriteria.length === 0
+      ? { ...task, successCriteria: verificationSuccessCriteria() }
+      : task)
+    : [...parsedTasks, buildVerificationTask(parsedTasks)];
   const successCriteria = buildSuccessCriteria({
     planId: input.planId,
     traceId: input.traceId,
@@ -416,8 +420,12 @@ function buildVerificationTask(tasks: ParsedPlanTask[]): ParsedPlanTask {
     clientKey: "verify-end-to-end",
     title: "Verify end-to-end",
     blockedByClientKeys: lastTask ? [lastTask.clientKey] : [],
-    successCriteria: ["Verify the full plan end-to-end against all success criteria and approved artifacts."],
+    successCriteria: verificationSuccessCriteria(),
   };
+}
+
+function verificationSuccessCriteria(): string[] {
+  return ["Verify the full plan end-to-end against all success criteria and approved artifacts."];
 }
 
 function buildSuccessCriteria(input: {

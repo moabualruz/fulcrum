@@ -5,6 +5,7 @@ import { resolveDatabaseConfig, type ResolvedDatabaseConfig } from "@platform-co
 import { initDataSource, __resetDataSourceForTest as __resetDefaultOrmForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { sqlAccess } from "@platform-core/application/legacy/orm-web-adapter.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DEFAULT_ORG_SLUG } from "@platform-core/application/tenancy/defaults.ts";
+import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import type { DataSource } from "typeorm";
 
 export type OrmDbValue = string | number | boolean | null | Date | Uint8Array;
@@ -44,13 +45,13 @@ export async function initDatabase(): Promise<WebDatabaseHandle> {
     const dataSource = await initDataSource();
 
     if (!(await hasExistingSchema(dataSource.manager))) {
-      await dataSource.runMigrations();
+      await dataSource.runMigrations({ transaction: "each" });
     }
 
     const db = createOrmDb(dataSource, dataSource.manager, async () => {
       await dataSource.destroy();
     });
-    await ensureDefaultOrg(db);
+    await new SeedService(dataSource.manager).run();
     _instance = db;
     _instanceKey = key;
     return db;

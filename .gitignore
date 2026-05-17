@@ -24,3 +24,7 @@ tests/.tmp-*/
 # Phase 9.6 copy-first workflow/value mapping. Do not track archive folders;
 # track only copied/adapted files after they land in Fulcrum's real source tree.
 /.scratch/upstream-product-replacement/
+
+# Manual smoke session runtime homes (PGlite data, logs, etc.) — track only
+# the curated critique/screenshot/logs evidence, not the live PGlite snapshot.
+/.scratch/manual-smoke-*/home/

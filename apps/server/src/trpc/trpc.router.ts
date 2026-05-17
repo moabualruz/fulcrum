@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { Injectable, type INestApplication, type OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, type INestApplication, type OnModuleInit } from "@nestjs/common";
 import * as trpcExpress from "@trpc/server/adapters/express";
 
 import { TrpcService } from "./trpc.service.ts";
@@ -65,7 +65,7 @@ import { z } from "zod";
 export class TrpcRouter implements OnModuleInit {
   private _appRouter!: ReturnType<typeof this.buildRouter>;
 
-  constructor(private readonly trpcService: TrpcService) {}
+  constructor(@Inject(TrpcService) private readonly trpcService: TrpcService) {}
 
   onModuleInit() {
     this._appRouter = this.buildRouter();

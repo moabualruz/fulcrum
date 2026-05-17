@@ -1,0 +1,31 @@
+$ fetch http://127.0.0.1:3000/
+error TypeError: fetch failed
+
+$ fetch http://127.0.0.1:3000/openapi
+error TypeError: fetch failed
+
+$ fetch http://127.0.0.1:3000/api/v1/docs
+error TypeError: fetch failed
+
+$ fetch http://127.0.0.1:3000/api/v1/audit
+error TypeError: fetch failed
+
+$ fetch http://127.0.0.1:5173/api/v1/docs
+status 404
+<!doctype html> <html lang="en"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <meta name="text-scale" content="scale" /> <script> window.onerror = function (message, source, lineno, colno, error) { try { var telemetry = window.telemetry; if (telemetry && typeof telemetry.recordError === "function") { Promise.resolve( telemetry.recordError(error || { message, source, lineno, colno }), ).catch(function () {}); } } catch (_) {} return false; }; </script> <!--12qhfyh--><link rel="icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20width='107'%20height='128'%20viewBox='0%200%20107%20128'%3e%3ctitle%3esvelte-logo%3c/title%3e%3cpath%20d='M94.157%2022.
+
+$ fetch http://127.0.0.1:5173/api/v1/artifacts
+status 404
+<!doctype html> <html lang="en"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <meta name="text-scale" content="scale" /> <script> window.onerror = function (message, source, lineno, colno, error) { try { var telemetry = window.telemetry; if (telemetry && typeof telemetry.recordError === "function") { Promise.resolve( telemetry.recordError(error || { message, source, lineno, colno }), ).catch(function () {}); } } catch (_) {} return false; }; </script> <!--12qhfyh--><link rel="icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20width='107'%20height='128'%20viewBox='0%200%20107%20128'%3e%3ctitle%3esvelte-logo%3c/title%3e%3cpath%20d='M94.157%2022.
+
+$ fetch http://127.0.0.1:5173/api/v1/audit
+status 404
+<!doctype html> <html lang="en"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <meta name="text-scale" content="scale" /> <script> window.onerror = function (message, source, lineno, colno, error) { try { var telemetry = window.telemetry; if (telemetry && typeof telemetry.recordError === "function") { Promise.resolve( telemetry.recordError(error || { message, source, lineno, colno }), ).catch(function () {}); } } catch (_) {} return false; }; </script> <!--12qhfyh--><link rel="icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20width='107'%20height='128'%20viewBox='0%200%20107%20128'%3e%3ctitle%3esvelte-logo%3c/title%3e%3cpath%20d='M94.157%2022.
+
+$ fetch http://127.0.0.1:5173/api/v1/connectors
+status 404
+<!doctype html> <html lang="en"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <meta name="text-scale" content="scale" /> <script> window.onerror = function (message, source, lineno, colno, error) { try { var telemetry = window.telemetry; if (telemetry && typeof telemetry.recordError === "function") { Promise.resolve( telemetry.recordError(error || { message, source, lineno, colno }), ).catch(function () {}); } } catch (_) {} return false; }; </script> <!--12qhfyh--><link rel="icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20width='107'%20height='128'%20viewBox='0%200%20107%20128'%3e%3ctitle%3esvelte-logo%3c/title%3e%3cpath%20d='M94.157%2022.
+
+$ fetch http://127.0.0.1:5173/api/v1/routing/rules
+status 404
+<!doctype html> <html lang="en"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <meta name="text-scale" content="scale" /> <script> window.onerror = function (message, source, lineno, colno, error) { try { var telemetry = window.telemetry; if (telemetry && typeof telemetry.recordError === "function") { Promise.resolve( telemetry.recordError(error || { message, source, lineno, colno }), ).catch(function () {}); } } catch (_) {} return false; }; </script> <!--12qhfyh--><link rel="icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20width='107'%20height='128'%20viewBox='0%200%20107%20128'%3e%3ctitle%3esvelte-logo%3c/title%3e%3cpath%20d='M94.157%2022.

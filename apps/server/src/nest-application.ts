@@ -3,9 +3,11 @@ import "reflect-metadata";
 import { ValidationPipe, type INestApplication, type LogLevel } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { DataSource } from "typeorm";
 
 import { AppModule } from "./app.module.ts";
 import { TrpcRouter } from "./trpc/trpc.router.ts";
+import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 
 export interface FulcrumNestApplicationOptions {
   logger?: false | LogLevel[];
@@ -59,6 +61,21 @@ export async function startFulcrumNestServer(
   options: FulcrumNestServerOptions = {},
 ): Promise<INestApplication> {
   const app = await createFulcrumNestApplication(options);
+  await seedLocalDevelopmentRuntime(app);
   await app.listen(options.port ?? resolveFulcrumServerPort());
   return app;
+}
+
+async function seedLocalDevelopmentRuntime(app: INestApplication): Promise<void> {
+  if (process.env["FULCRUM_REQUIRE_AUTH"]) return;
+
+  const appWithGet = app as INestApplication & {
+    get?: <TInput = unknown, TResult = TInput>(typeOrToken: TInput) => TResult;
+  };
+  if (typeof appWithGet.get !== "function") return;
+
+  const dataSource = appWithGet.get(DataSource, { strict: false });
+  if (!dataSource?.isInitialized) return;
+
+  await new SeedService(dataSource.manager).run();
 }

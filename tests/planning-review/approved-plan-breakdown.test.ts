@@ -264,4 +264,42 @@ describe("approved plan breakdown ported behavior", () => {
       },
     ]);
   });
+
+  test("preserves explicit verification tasks without adding a self dependency", () => {
+    const breakdown = buildApprovedPlanBreakdown({
+      planId: "plan-explicit-verify",
+      traceId: "trace-explicit-verify",
+      approvedPlanMarkdown: [
+        "# Manual Smoke Workflow",
+        "",
+        "## Tasks",
+        "- [context] Preserve freeform context",
+        "  Depends on: none",
+        "- [planning] Build prototype-first planning flow",
+        "  Depends on: context",
+        "- [execution] Execute dependency-aware task run",
+        "  Depends on: planning",
+        "- [verify-end-to-end] Prove final UI/API path",
+        "  Depends on: execution",
+      ].join("\n"),
+    });
+
+    expect(breakdown.taskDrafts.map((task) => task.clientKey)).toEqual([
+      "context",
+      "planning",
+      "execution",
+      "verify-end-to-end",
+    ]);
+    expect(breakdown.dependencyUpdates).toContainEqual({
+      taskClientKey: "verify-end-to-end",
+      blockedByClientKeys: ["execution"],
+    });
+    expect(breakdown.dependencyUpdates).not.toContainEqual({
+      taskClientKey: "verify-end-to-end",
+      blockedByClientKeys: ["verify-end-to-end"],
+    });
+    expect(breakdown.taskDrafts.find((task) => task.clientKey === "verify-end-to-end")?.successCriteria.map((criterion) => criterion.text)).toEqual([
+      "Verify the full plan end-to-end against all success criteria and approved artifacts.",
+    ]);
+  });
 });

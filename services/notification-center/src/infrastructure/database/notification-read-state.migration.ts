@@ -1,35 +1,29 @@
 import type { MigrationInterface, QueryRunner } from "typeorm";
-import { Table, TableColumn, TableIndex } from "typeorm";
 
 export class NotificationReadState1778750400000 implements MigrationInterface {
   name = "NotificationReadState1778750400000";
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.createTable(
-      new Table({
-        name: "user_notifications",
-        columns: [
-          {
-            name: "id",
-            type: "uuid",
-            isPrimary: true,
-            default: "gen_random_uuid()",
-          },
-          { name: "org_id", type: "uuid", isNullable: false },
-          { name: "user_id", type: "uuid", isNullable: false },
-          { name: "rule_id", type: "uuid", isNullable: true },
-          { name: "event_id", type: "uuid", isNullable: false },
-          { name: "title", type: "varchar", length: "255", isNullable: false },
-          { name: "body", type: "text", isNullable: false, default: "''" },
-          { name: "entity_kind", type: "varchar", length: "255", isNullable: false },
-          { name: "entity_id", type: "uuid", isNullable: false },
-          { name: "read_at", type: "timestamptz", isNullable: true },
-          { name: "trace_id", type: "varchar", length: "160", isNullable: true },
-          { name: "created_at", type: "timestamptz", isNullable: false, default: "now()" },
-        ],
-      }),
-      true,
-    );
+    try {
+      await queryRunner.query(`
+        CREATE TABLE IF NOT EXISTS "user_notifications" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "org_id" uuid NOT NULL,
+          "user_id" uuid NOT NULL,
+          "rule_id" uuid,
+          "event_id" uuid NOT NULL,
+          "title" varchar(255) NOT NULL,
+          "body" text NOT NULL DEFAULT '',
+          "entity_kind" varchar(255) NOT NULL,
+          "entity_id" uuid NOT NULL,
+          "read_at" timestamptz,
+          "trace_id" varchar(160),
+          "created_at" timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+    } catch (error) {
+      if (!isExistingRelationError(error)) throw error;
+    }
 
     await addTraceColumnIfMissing(queryRunner);
 
@@ -38,18 +32,18 @@ export class NotificationReadState1778750400000 implements MigrationInterface {
         on "user_notifications" ("user_id", "event_id", "rule_id") nulls not distinct
     `);
 
-    await createIndexIfMissing(queryRunner, new TableIndex({
-      name: "idx_user_notifications_org_user_read",
-      columnNames: ["org_id", "user_id", "read_at"],
-    }));
-    await createIndexIfMissing(queryRunner, new TableIndex({
-      name: "idx_user_notifications_org_user_created",
-      columnNames: ["org_id", "user_id", "created_at"],
-    }));
-    await createIndexIfMissing(queryRunner, new TableIndex({
-      name: "idx_user_notifications_trace",
-      columnNames: ["trace_id"],
-    }));
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS "idx_user_notifications_org_user_read"
+        ON "user_notifications" ("org_id", "user_id", "read_at")
+    `);
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS "idx_user_notifications_org_user_created"
+        ON "user_notifications" ("org_id", "user_id", "created_at")
+    `);
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS "idx_user_notifications_trace"
+        ON "user_notifications" ("trace_id")
+    `);
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
@@ -58,18 +52,34 @@ export class NotificationReadState1778750400000 implements MigrationInterface {
 }
 
 async function addTraceColumnIfMissing(queryRunner: QueryRunner): Promise<void> {
-  const table = await queryRunner.getTable("user_notifications");
-  if (table?.columns.some((candidate) => candidate.name === "trace_id")) return;
-  await queryRunner.addColumn("user_notifications", new TableColumn({
-    name: "trace_id",
-    type: "varchar",
-    length: "160",
-    isNullable: true,
-  }));
+  const rows = await queryRunner.query(`
+    SELECT 1
+      FROM pg_attribute a
+      JOIN pg_class c ON c.oid = a.attrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'public'
+       AND c.relname = 'user_notifications'
+       AND a.attname = 'trace_id'
+       AND NOT attisdropped
+     LIMIT 1
+  `) as unknown[];
+  if (rows.length > 0) return;
+  try {
+    await queryRunner.query(`ALTER TABLE "user_notifications" ADD COLUMN "trace_id" varchar(160)`);
+  } catch (error) {
+    if (isDuplicateColumnError(error)) return;
+    throw error;
+  }
 }
 
-async function createIndexIfMissing(queryRunner: QueryRunner, index: TableIndex): Promise<void> {
-  const table = await queryRunner.getTable("user_notifications");
-  if (table?.indices.some((candidate) => candidate.name === index.name)) return;
-  await queryRunner.createIndex("user_notifications", index);
+function isDuplicateColumnError(error: unknown): boolean {
+  const candidate = error as { code?: string; driverError?: { code?: string; constraint?: string } };
+  return candidate.code === "23505"
+    || candidate.driverError?.code === "23505"
+    || candidate.driverError?.constraint === "pg_attribute_relid_attnam_index";
+}
+
+function isExistingRelationError(error: unknown): boolean {
+  const candidate = error as { code?: string; driverError?: { code?: string } };
+  return candidate.code === "42P07" || candidate.driverError?.code === "42P07";
 }

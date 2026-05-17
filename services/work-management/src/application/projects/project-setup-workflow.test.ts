@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
@@ -38,6 +38,13 @@ import { evaluateTemplateTrustPolicy } from "@work-management/application/projec
 const ctx = { orgId: DEFAULT_ORG_ID, userId: "user-workflow", projectId: null };
 
 describe("Workflow project hierarchy and setup", () => {
+  test("project read model SQL uses TypeORM-compatible bind placeholders", async () => {
+    const source = await readFile(new URL("./queries.ts", import.meta.url), "utf8");
+
+    expect(source).not.toContain("WHERE org_id = ?");
+    expect(source).not.toContain("WHERE id = ? AND org_id = ?");
+  });
+
   test("supports workspace/project/subproject/deep child hierarchy and aggregate dashboard scope", async () => {
     const db = await createTestOrm();
     try {

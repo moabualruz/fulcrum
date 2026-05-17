@@ -270,31 +270,30 @@ export async function listRunRows(
   const sandboxExpr = columns.has("sandbox_mode") ? "ar.sandbox_mode" : "NULL::text";
   const iterationExpr = columns.has("iteration_count") ? "ar.iteration_count" : "NULL::int";
   const joins = hasProjectId ? "" : "LEFT JOIN tasks t ON t.id = ar.task_id";
-  const conditions = ["ar.org_id = ?"];
-  const params: unknown[] = [ctx.orgId];
+  const params: unknown[] = [];
+  const bind = (value: unknown): string => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  const conditions = [`ar.org_id = ${bind(ctx.orgId)}`];
 
   if (ctx.projectId !== undefined && ctx.projectId !== null) {
-    params.push(ctx.projectId);
-    conditions.push(`${projectExpr} = ?`);
+    conditions.push(`${projectExpr} = ${bind(ctx.projectId)}`);
   } else if (filter.projectId !== undefined && filter.projectId !== null) {
-    params.push(filter.projectId);
-    conditions.push(`${projectExpr} = ?`);
+    conditions.push(`${projectExpr} = ${bind(filter.projectId)}`);
   }
   if (filter.projectId === null) {
     conditions.push(`${projectExpr} IS NULL`);
   }
   if (filter.agent) {
-    params.push(filter.agent);
-    conditions.push(`${agentExpr} = ?`);
+    conditions.push(`${agentExpr} = ${bind(filter.agent)}`);
   }
   if (filter.status) {
-    params.push(filter.status);
-    conditions.push(`${statusExpr} = ?`);
+    conditions.push(`${statusExpr} = ${bind(filter.status)}`);
   }
   if (filter.range && filter.range !== "all") {
     const hours = filter.range === "24h" ? 24 : filter.range === "7d" ? 24 * 7 : 24 * 30;
-    params.push(new Date(Date.now() - hours * 60 * 60 * 1000));
-    conditions.push("ar.started_at >= ?");
+    conditions.push(`ar.started_at >= ${bind(new Date(Date.now() - hours * 60 * 60 * 1000))}`);
   }
 
   const rows = await ormSqlConnection(em).execute<Array<{

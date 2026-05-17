@@ -1,0 +1,16 @@
+$ bun run src/index.ts
+40 |         }
+41 |         // explicitly set a primary and generated to column options
+42 |         options.primary = true;
+43 |         // register column metadata args
+44 |         (0, globals_1.getMetadataArgsStorage)().columns.push({
+45 |             target: object.constructor,
+                         ^
+TypeError: undefined is not an object (evaluating 'object.constructor')
+      at <anonymous> (/Users/mkh/workspace/fulcrum/node_modules/.bun/typeorm@0.3.29+52bd52a0bccfa6a2/node_modules/typeorm/decorator/columns/PrimaryGeneratedColumn.js:45:21)
+      at /Users/mkh/workspace/fulcrum/services/identity-access/src/infrastructure/database/entities/auth/Org.ts:16:8
+
+Bun v1.3.13 (macOS arm64)
+error: script "dev" exited with code 1
+
+[exit 1]

@@ -34,6 +34,14 @@ function ctx(orgId = DEFAULT_ORG_ID): AppContext {
   return { orgId, userId: "user-runs", projectId: null };
 }
 
+test("run listing SQL uses TypeORM-compatible bind placeholders", async () => {
+  const source = await Bun.file(new URL("./queries.ts", import.meta.url)).text();
+
+  expect(source).not.toContain("ar.org_id = ?");
+  expect(source).not.toContain("ar.started_at >= ?");
+  expect(source).not.toContain("conditions.push(`${projectExpr} = ?`)");
+});
+
 async function createProjectAndTask(em: TestOrm["em"]) {
   const projectId = crypto.randomUUID();
   const taskId = crypto.randomUUID();

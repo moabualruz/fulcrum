@@ -1,0 +1,16 @@
+{
+  "command": [
+    "bun",
+    "run",
+    "scripts/ci-generated-e2e.ts"
+  ],
+  "traceId": "trace-manual-smoke-mp9npf55",
+  "projectId": "project-manual-smoke-mp9npf55",
+  "env": {
+    "FULCRUM_GENERATED_E2E_RUNNER": "bun",
+    "FULCRUM_GENERATED_E2E_FILES": "/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-preserve-freeform-context.spec.ts:/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-execute-dependency-aware-task-run.spec.ts:/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-build-prototype-first-planning-flow.spec.ts:/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-prove-final-ui-api-path.spec.ts"
+  },
+  "status": 0,
+  "stdout": "bun test v1.3.13 (bf2e2cec)\n",
+  "stderr": "\n../../../../private/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-preserve-freeform-context.spec.ts:\n(pass) Generated UAT regression: trace-manual-smoke-mp9npf55 > preserves approved UAT evidence for Preserve freeform context [0.07ms]\n\n../../../../private/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-execute-dependency-aware-task-run.spec.ts:\n(pass) Generated UAT regression: trace-manual-smoke-mp9npf55 > preserves approved UAT evidence for Execute dependency-aware task run\n\n../../../../private/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-build-prototype-first-planning-flow.spec.ts:\n(pass) Generated UAT regression: trace-manual-smoke-mp9npf55 > preserves approved UAT evidence for Build prototype-first planning flow [0.02ms]\n\n../../../../private/var/folders/m0/h9317g_x73s05cpkmvrcbgtc0000gn/T/fulcrum-generated-e2e/project-manual-smoke-mp9npf55/trace-manual-smoke-mp9npf55/uat-trace-manual-smoke-mp9npf55-prove-final-ui-api-path.spec.ts:\n(pass) Generated UAT regression: trace-manual-smoke-mp9npf55 > preserves approved UAT evidence for Prove final UI/API path\n\n 4 pass\n 0 fail\n 12 expect() calls\nRan 4 tests across 4 files. [117.00ms]\n"
+}

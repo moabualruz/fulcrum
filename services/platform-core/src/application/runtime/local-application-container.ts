@@ -19,7 +19,7 @@ export async function buildLocalApplicationContainer(): Promise<LocalApplication
   const database = resolveDatabaseConfig();
   const dataSource = await initDataSource();
 
-  await dataSource.runMigrations();
+  await dataSource.runMigrations({ transaction: "each" });
 
   const container: DiContainer = {
     get: (token: unknown) => {

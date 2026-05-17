@@ -1,0 +1,2593 @@
+
+$ bun run apps/cli/src/main.ts --help
+fulcrum — multi-agent foundation CLI
+
+Usage:
+  fulcrum init [DIR]                 Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
+  fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
+                                     Recipes: format, lint-gate, pm-policy, test-on-edit,
+                                              audit-log, index-check, index-rebuild, router
+  fulcrum hooks list                 List available hook recipes.
+  fulcrum hooks enable <name>        Register a hook in each detected agent config.
+  fulcrum skills sync                Mirror authored skills; Codex global scope is opt-in.
+  fulcrum skills upstream [--update-pins]
+                                     Mirror curated third-party skills to agents; --update-pins
+                                     computes and writes subpath_sha256 for unpinned entries.
+  fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
+  fulcrum skills list [--installed]  Enumerate authored skills, or installed skill budgets.
+  fulcrum install [--profile minimal|rules-only|full] [--with-project DIR]
+                  [--no-skills] [--no-upstream-skills]
+                  [--no-default-mcps] [--enable-all-mcps]
+                                     Splice rules, vendor hooks, sync skills, install caveman.
+                                     Default profile is minimal; full keeps historical bootstrap.
+                                     --enable-all-mcps: enable every builtin MCP across all agents.
+  fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
+                                     Remove Fulcrum-managed install artifacts.
+  fulcrum compress [--check] [FILES...]
+                                     Compress markdown with caveman; default targets shown in help.
+  fulcrum mcp list [--json]          List registered MCP servers.
+  fulcrum mcp register <name> [--http URL | --stdio CMD] [--vendor V] ...
+                                     Register an MCP server in the registry.
+  fulcrum mcp unregister <name>      Unregister and remove from all agents.
+  fulcrum mcp enable <name> [--agent <id> ...] [--all-agents]
+                                     Enable server and push to agents.
+  fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
+                                     Disable server and remove from agents.
+  fulcrum component list [--json]    List Fulcrum components.
+  fulcrum components status [--json] Show component lifecycle status.
+  fulcrum component info <id> [--json]
+                                     Show component details and surfaces.
+  fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
+                                     Plan component changes without applying them.
+  fulcrum auth <whoami|invite|login|logout>
+  fulcrum flags <list|set> [options]
+  fulcrum routing rules <list|add|edit|delete> [options]
+  fulcrum db <migrate|status|history> [options]
+  fulcrum web
+  fulcrum tui
+  fulcrum inference <start|status|embed|generate|stop> [--json]
+  fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum settings <list|get|set> [--json]
+  fulcrum completion --shell <bash|zsh|fish|powershell>
+  fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
+  fulcrum product projects list [--json]
+                                     List product-kernel projects.
+  fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
+                                     Run an FTS query over the product kernel search index.
+  fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
+                                     Render the assembled Markdown context for a task.
+  fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Preview approved-plan docs/tasks/dependencies through shared planning API.
+  fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Persist approved-plan docs/tasks/dependencies through shared planning API.
+  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
+                                     Report bun, agent dirs, tool presence, policy health.
+                                     --subsystem runs only named subsystem checks via orchestrator.
+                                     --checks includes modular orchestrator checks in legacy report.
+  fulcrum version                    Print version.
+  fulcrum help                       This message.
+
+Environment:
+  FULCRUM_HOME           override ~/.fulcrum
+  FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
+  FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
+
+[exit 0]
+
+$ bun run apps/cli/src/main.ts version
+0.1.0
+[exit 0]
+
+$ bun run apps/cli/src/main.ts doctor --json
+{
+  "bun": "1.3.13",
+  "platform": "darwin-arm64",
+  "agents": [
+    {
+      "label": "Claude Code",
+      "detected": true,
+      "rulesSpliced": true
+    },
+    {
+      "label": "Codex CLI",
+      "detected": true,
+      "rulesSpliced": true
+    },
+    {
+      "label": "Gemini CLI",
+      "detected": true,
+      "rulesSpliced": true
+    },
+    {
+      "label": "OpenCode",
+      "detected": true,
+      "rulesSpliced": true
+    },
+    {
+      "label": "Pi CLI",
+      "detected": true,
+      "rulesSpliced": true
+    }
+  ],
+  "caveman": {
+    "agents": [
+      {
+        "label": "Claude Code",
+        "installed": true,
+        "activationHookPresent": false
+      },
+      {
+        "label": "Codex CLI",
+        "installed": true,
+        "activationHookPresent": false
+      },
+      {
+        "label": "Gemini CLI",
+        "installed": true,
+        "activationHookPresent": false
+      },
+      {
+        "label": "OpenCode",
+        "installed": true,
+        "activationHookPresent": false
+      },
+      {
+        "label": "Pi CLI",
+        "installed": true,
+        "activationHookPresent": false
+      }
+    ],
+    "defaultMode": "ultra",
+    "defaultModeSource": "file",
+    "configPath": "/Users/mkh/.config/caveman/config.json"
+  },
+  "tools": [
+    {
+      "cmd": "git",
+      "path": "/usr/bin/git",
+      "present": true,
+      "usedBy": "index-rebuild (HEAD diff; rebuilds every session without git)"
+    },
+    {
+      "cmd": "ctags",
+      "path": "/usr/bin/ctags",
+      "present": true,
+      "usedBy": "index-rebuild + index-check"
+    },
+    {
+      "cmd": "biome",
+      "path": "/opt/homebrew/bin/biome",
+      "present": true,
+      "usedBy": "format/lint-gate (ts/js/json/md)"
+    },
+    {
+      "cmd": "prettier",
+      "path": "/opt/homebrew/bin/prettier",
+      "present": true,
+      "usedBy": "format fallback (ts/js/json/md)"
+    },
+    {
+      "cmd": "ruff",
+      "path": "/opt/homebrew/bin/ruff",
+      "present": true,
+      "usedBy": "format/lint-gate (.py)"
+    },
+    {
+      "cmd": "gofmt",
+      "path": "/opt/homebrew/bin/gofmt",
+      "present": true,
+      "usedBy": "format (.go)"
+    },
+    {
+      "cmd": "golangci-lint",
+      "path": "/opt/homebrew/bin/golangci-lint",
+      "present": true,
+      "usedBy": "lint-gate (.go)"
+    },
+    {
+      "cmd": "rustfmt",
+      "path": "/opt/homebrew/opt/rustup/bin/rustfmt",
+      "present": true,
+      "usedBy": "format (.rs)"
+    },
+    {
+      "cmd": "ktlint",
+      "path": "/opt/homebrew/bin/ktlint",
+      "present": true,
+      "usedBy": "format (.kt/.kts)"
+    },
+    {
+      "cmd": "google-java-format",
+      "path": "/opt/homebrew/bin/google-java-format",
+      "present": true,
+      "usedBy": "format (.java)"
+    },
+    {
+      "cmd": "dart",
+      "path": "/opt/homebrew/bin/dart",
+      "present": true,
+      "usedBy": "format (.dart)"
+    },
+    {
+      "cmd": "php-cs-fixer",
+      "path": "/opt/homebrew/bin/php-cs-fixer",
+      "present": true,
+      "usedBy": "format (.php)"
+    },
+    {
+      "cmd": "jq",
+      "path": "/usr/bin/jq",
+      "present": true,
+      "usedBy": "skills/jq"
+    },
+    {
+      "cmd": "yq",
+      "path": "/opt/homebrew/bin/yq",
+      "present": true,
+      "usedBy": "skills/yq"
+    },
+    {
+      "cmd": "fd",
+      "path": "/opt/homebrew/bin/fd",
+      "present": true,
+      "usedBy": "tool-output policy (raw tier)"
+    },
+    {
+      "cmd": "rg",
+      "path": "/opt/homebrew/bin/rg",
+      "present": true,
+      "usedBy": "tool-output policy (raw_then_head)"
+    },
+    {
+      "cmd": "gh",
+      "path": "/opt/homebrew/bin/gh",
+      "present": true,
+      "usedBy": "skills/gh"
+    },
+    {
+      "cmd": "just",
+      "path": "/opt/homebrew/bin/just",
+      "present": true,
+      "usedBy": "skills/just"
+    },
+    {
+      "cmd": "fzf",
+      "path": "/opt/homebrew/bin/fzf",
+      "present": true,
+      "usedBy": "skills/fzf (non-interactive `--filter`)"
+    },
+    {
+      "cmd": "xh",
+      "path": "/opt/homebrew/bin/xh",
+      "present": true,
+      "usedBy": "skills/xh"
+    },
+    {
+      "cmd": "bat",
+      "path": "/opt/homebrew/bin/bat",
+      "present": true,
+      "usedBy": "skills/bat"
+    },
+    {
+      "cmd": "eza",
+      "path": "/opt/homebrew/bin/eza",
+      "present": true,
+      "usedBy": "skills/eza"
+    },
+    {
+      "cmd": "sd",
+      "path": "/opt/homebrew/bin/sd",
+      "present": true,
+      "usedBy": "skills/sd"
+    },
+    {
+      "cmd": "zoxide",
+      "path": "/opt/homebrew/bin/zoxide",
+      "present": true,
+      "usedBy": "skills/zoxide"
+    },
+    {
+      "cmd": "difft",
+      "path": "/opt/homebrew/bin/difft",
+      "present": true,
+      "usedBy": "skills/difftastic (binary is `difft`)"
+    },
+    {
+      "cmd": "direnv",
+      "path": "/opt/homebrew/bin/direnv",
+      "present": true,
+      "usedBy": "skills/direnv"
+    },
+    {
+      "cmd": "mise",
+      "path": "/opt/homebrew/bin/mise",
+      "present": true,
+      "usedBy": "skills/mise"
+    },
+    {
+      "cmd": "watchexec",
+      "path": "/opt/homebrew/bin/watchexec",
+      "present": true,
+      "usedBy": "skills/watchexec"
+    },
+    {
+      "cmd": "hyperfine",
+      "path": "/opt/homebrew/bin/hyperfine",
+      "present": true,
+      "usedBy": "skills/hyperfine"
+    },
+    {
+      "cmd": "lizard",
+      "path": "/Users/mkh/.local/bin/lizard",
+      "present": true,
+      "usedBy": "skills/lizard"
+    },
+    {
+      "cmd": "gitleaks",
+      "path": "/opt/homebrew/bin/gitleaks",
+      "present": true,
+      "usedBy": "skills/gitleaks"
+    },
+    {
+      "cmd": "osv-scanner",
+      "path": "/opt/homebrew/bin/osv-scanner",
+      "present": true,
+      "usedBy": "skills/osv-scanner"
+    },
+    {
+      "cmd": "pmd",
+      "path": "/opt/homebrew/bin/pmd",
+      "present": true,
+      "usedBy": "skills/pmd"
+    },
+    {
+      "cmd": "spotbugs",
+      "path": "/opt/homebrew/bin/spotbugs",
+      "present": true,
+      "usedBy": "skills/spotbugs"
+    },
+    {
+      "cmd": "flarectl",
+      "path": "/opt/homebrew/bin/flarectl",
+      "present": true,
+      "usedBy": "skills/flarectl"
+    },
+    {
+      "cmd": "usql",
+      "path": "/opt/homebrew/bin/usql",
+      "present": true,
+      "usedBy": "skills/usql"
+    },
+    {
+      "cmd": "tmux",
+      "path": "/opt/homebrew/bin/tmux",
+      "present": true,
+      "usedBy": "multi-agent parallel sessions (capabilities.md §1)"
+    },
+    {
+      "cmd": "ast-grep",
+      "path": "/opt/homebrew/bin/ast-grep",
+      "present": true,
+      "usedBy": "skills/ast-grep + tool-output-policy"
+    },
+    {
+      "cmd": "semgrep",
+      "path": "/opt/homebrew/bin/semgrep",
+      "present": true,
+      "usedBy": "capabilities.md §2 SAST (tool-output-policy)"
+    },
+    {
+      "cmd": "knip",
+      "path": "/Users/mkh/.nvm/versions/node/v24.15.0/bin/knip",
+      "present": true,
+      "usedBy": "capabilities.md §5 JS/TS (tool-output-policy)"
+    },
+    {
+      "cmd": "pip-audit",
+      "path": "/Users/mkh/.local/bin/pip-audit",
+      "present": true,
+      "usedBy": "capabilities.md §5 Python supply-chain audit"
+    },
+    {
+      "cmd": "cargo-deny",
+      "path": "/Users/mkh/.cargo/bin/cargo-deny",
+      "present": true,
+      "usedBy": "capabilities.md §5 Rust supply-chain audit"
+    },
+    {
+      "cmd": "phpstan",
+      "path": "/opt/homebrew/bin/phpstan",
+      "present": true,
+      "usedBy": "capabilities.md §5 PHP static analysis (tool-output-policy)"
+    },
+    {
+      "cmd": "git-cliff",
+      "path": "/opt/homebrew/bin/git-cliff",
+      "present": true,
+      "usedBy": "`bun run changelog` and `bun run release`"
+    },
+    {
+      "cmd": "python3.12",
+      "path": "/opt/homebrew/bin/python3.12",
+      "present": true,
+      "usedBy": "scripts/eval-skill-claude.sh (skill-creator's run_loop.py)"
+    }
+  ],
+  "policy": {
+    "path": "/Users/mkh/.fulcrum/tool-output-policy.toml",
+    "exists": true,
+    "size": 4892,
+    "mtime": "2026-05-11T07:48:47.528Z"
+  },
+  "piMcpAdapter": {
+    "adapterPresent": true,
+    "deepwikiPresent": true
+  },
+  "mcp": {
+    "servers": []
+  },
+  "components": {
+    "total": 39,
+    "installed": 0,
+    "database": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/home/state/global/components.db",
+    "packageParity": [
+      {
+        "packageId": "package.caveman",
+        "agentId": "claude-code",
+        "sourceCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "installedCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.caveman",
+        "agentId": "codex",
+        "sourceCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "installedCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.caveman",
+        "agentId": "gemini",
+        "sourceCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "installedCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.caveman",
+        "agentId": "opencode",
+        "sourceCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "installedCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.caveman",
+        "agentId": "pi",
+        "sourceCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "installedCounts": {
+          "skill": 5,
+          "rule": 1,
+          "mcp": 0,
+          "command": 1,
+          "agent": 0,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.cloudflare",
+        "agentId": "claude-code",
+        "sourceCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.cloudflare",
+        "agentId": "codex",
+        "sourceCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 0,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "asset",
+              "name": "icon",
+              "sourcePath": "package.cloudflare:assets/icon.png",
+              "relativePath": "assets/icon.png",
+              "sha256": "6644d2b85f04b4f58c27ae257d158e666bc8c895727ef4b392e1c7e0502b8898",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/assets/icon.png",
+            "support": "mirror"
+          },
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "deploy",
+              "sourcePath": "package.cloudflare:commands/deploy.md",
+              "relativePath": "commands/deploy.md",
+              "sha256": "86cf2e1d60522a09cd422b64ab15ad8856e2470bcf61e0cc36fd1c8c9a29feca",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/commands/deploy.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "wrangler",
+              "sourcePath": "package.cloudflare:commands/wrangler.md",
+              "relativePath": "commands/wrangler.md",
+              "sha256": "eb20e35effc3ad867d831fbab9cad1544d3b3ed094667e678ff9ce00d0f61295",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/commands/wrangler.md",
+            "support": "mirror"
+          }
+        ],
+        "missingReasons": [
+          {
+            "agentId": "codex",
+            "kind": "asset",
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/assets/icon.png",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "codex",
+            "kind": "command",
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/commands/deploy.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "codex",
+            "kind": "command",
+            "targetPath": "~/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/commands/wrangler.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          }
+        ],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": false
+      },
+      {
+        "packageId": "package.cloudflare",
+        "agentId": "gemini",
+        "sourceCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 0,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [
+          {
+            "agentId": "gemini",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "asset",
+              "name": "icon",
+              "sourcePath": "package.cloudflare:assets/icon.png",
+              "relativePath": "assets/icon.png",
+              "sha256": "6644d2b85f04b4f58c27ae257d158e666bc8c895727ef4b392e1c7e0502b8898",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.gemini/extensions/cloudflare/assets/icon.png",
+            "support": "mirror"
+          },
+          {
+            "agentId": "gemini",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "deploy",
+              "sourcePath": "package.cloudflare:commands/deploy.md",
+              "relativePath": "commands/deploy.md",
+              "sha256": "86cf2e1d60522a09cd422b64ab15ad8856e2470bcf61e0cc36fd1c8c9a29feca",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.gemini/extensions/cloudflare/commands/deploy.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "gemini",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "wrangler",
+              "sourcePath": "package.cloudflare:commands/wrangler.md",
+              "relativePath": "commands/wrangler.md",
+              "sha256": "eb20e35effc3ad867d831fbab9cad1544d3b3ed094667e678ff9ce00d0f61295",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.gemini/extensions/cloudflare/commands/wrangler.md",
+            "support": "mirror"
+          }
+        ],
+        "missingReasons": [
+          {
+            "agentId": "gemini",
+            "kind": "asset",
+            "targetPath": "~/.gemini/extensions/cloudflare/assets/icon.png",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "gemini",
+            "kind": "command",
+            "targetPath": "~/.gemini/extensions/cloudflare/commands/deploy.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "gemini",
+            "kind": "command",
+            "targetPath": "~/.gemini/extensions/cloudflare/commands/wrangler.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          }
+        ],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": false
+      },
+      {
+        "packageId": "package.cloudflare",
+        "agentId": "opencode",
+        "sourceCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 0,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [
+          {
+            "agentId": "opencode",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "asset",
+              "name": "icon",
+              "sourcePath": "package.cloudflare:assets/icon.png",
+              "relativePath": "assets/icon.png",
+              "sha256": "6644d2b85f04b4f58c27ae257d158e666bc8c895727ef4b392e1c7e0502b8898",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.config/opencode/packages/cloudflare/assets/icon.png",
+            "support": "mirror"
+          },
+          {
+            "agentId": "opencode",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "deploy",
+              "sourcePath": "package.cloudflare:commands/deploy.md",
+              "relativePath": "commands/deploy.md",
+              "sha256": "86cf2e1d60522a09cd422b64ab15ad8856e2470bcf61e0cc36fd1c8c9a29feca",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.config/opencode/packages/cloudflare/commands/deploy.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "opencode",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "wrangler",
+              "sourcePath": "package.cloudflare:commands/wrangler.md",
+              "relativePath": "commands/wrangler.md",
+              "sha256": "eb20e35effc3ad867d831fbab9cad1544d3b3ed094667e678ff9ce00d0f61295",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.config/opencode/packages/cloudflare/commands/wrangler.md",
+            "support": "mirror"
+          }
+        ],
+        "missingReasons": [
+          {
+            "agentId": "opencode",
+            "kind": "asset",
+            "targetPath": "~/.config/opencode/packages/cloudflare/assets/icon.png",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "opencode",
+            "kind": "command",
+            "targetPath": "~/.config/opencode/packages/cloudflare/commands/deploy.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "opencode",
+            "kind": "command",
+            "targetPath": "~/.config/opencode/packages/cloudflare/commands/wrangler.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          }
+        ],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": false
+      },
+      {
+        "packageId": "package.cloudflare",
+        "agentId": "pi",
+        "sourceCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 2,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 8,
+          "rule": 0,
+          "mcp": 1,
+          "command": 0,
+          "agent": 0,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 0
+        },
+        "missing": [
+          {
+            "agentId": "pi",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "asset",
+              "name": "icon",
+              "sourcePath": "package.cloudflare:assets/icon.png",
+              "relativePath": "assets/icon.png",
+              "sha256": "6644d2b85f04b4f58c27ae257d158e666bc8c895727ef4b392e1c7e0502b8898",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.pi/agent/packages/cloudflare/assets/icon.png",
+            "support": "mirror"
+          },
+          {
+            "agentId": "pi",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "deploy",
+              "sourcePath": "package.cloudflare:commands/deploy.md",
+              "relativePath": "commands/deploy.md",
+              "sha256": "86cf2e1d60522a09cd422b64ab15ad8856e2470bcf61e0cc36fd1c8c9a29feca",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.pi/agent/packages/cloudflare/commands/deploy.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "pi",
+            "surface": {
+              "packageId": "package.cloudflare",
+              "kind": "command",
+              "name": "wrangler",
+              "sourcePath": "package.cloudflare:commands/wrangler.md",
+              "relativePath": "commands/wrangler.md",
+              "sha256": "eb20e35effc3ad867d831fbab9cad1544d3b3ed094667e678ff9ce00d0f61295",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.pi/agent/packages/cloudflare/commands/wrangler.md",
+            "support": "mirror"
+          }
+        ],
+        "missingReasons": [
+          {
+            "agentId": "pi",
+            "kind": "asset",
+            "targetPath": "~/.pi/agent/packages/cloudflare/assets/icon.png",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "pi",
+            "kind": "command",
+            "targetPath": "~/.pi/agent/packages/cloudflare/commands/deploy.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "pi",
+            "kind": "command",
+            "targetPath": "~/.pi/agent/packages/cloudflare/commands/wrangler.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          }
+        ],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": false
+      },
+      {
+        "packageId": "package.superpowers",
+        "agentId": "claude-code",
+        "sourceCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.superpowers",
+        "agentId": "codex",
+        "sourceCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 0,
+          "agent": 1,
+          "hook": 0,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.superpowers",
+              "kind": "command",
+              "name": "review",
+              "sourcePath": "package.superpowers:commands/review.md",
+              "relativePath": "commands/review.md",
+              "sha256": "3a6f812ad4fcdfa0aa0337de88e049dce44039e6e240a3a52cd2bfcffae3c510",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/commands/review.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.superpowers",
+              "kind": "command",
+              "name": "use-superpowers",
+              "sourcePath": "package.superpowers:commands/use-superpowers.md",
+              "relativePath": "commands/use-superpowers.md",
+              "sha256": "d0d1c2cba7f5d1ea83afede4ea2f1b2f6b77af0ce6a47e43dfed50d03615fe5f",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/commands/use-superpowers.md",
+            "support": "mirror"
+          },
+          {
+            "agentId": "codex",
+            "surface": {
+              "packageId": "package.superpowers",
+              "kind": "hook",
+              "name": "hooks",
+              "sourcePath": "package.superpowers:hooks.json",
+              "relativePath": "hooks.json",
+              "sha256": "585f129cb31ef0cbb336ce27663787cfa4ecbbaadb284ef4d594c2ec5fe2d538",
+              "runtimeRequired": true,
+              "packageOwned": true
+            },
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/hooks.json",
+            "configMutation": "codex:hooks",
+            "support": "mirror"
+          }
+        ],
+        "missingReasons": [
+          {
+            "agentId": "codex",
+            "kind": "command",
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/commands/review.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "codex",
+            "kind": "command",
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/commands/use-superpowers.md",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          },
+          {
+            "agentId": "codex",
+            "kind": "hook",
+            "targetPath": "~/.codex/plugins/cache/superpowers/superpowers/1.0.0/hooks.json",
+            "owned": false,
+            "nativeExists": false,
+            "ledgerExists": false,
+            "status": "missing-target",
+            "reason": "missing-target"
+          }
+        ],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": false
+      },
+      {
+        "packageId": "package.superpowers",
+        "agentId": "gemini",
+        "sourceCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.superpowers",
+        "agentId": "opencode",
+        "sourceCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      },
+      {
+        "packageId": "package.superpowers",
+        "agentId": "pi",
+        "sourceCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "installedCounts": {
+          "skill": 4,
+          "rule": 0,
+          "mcp": 0,
+          "command": 2,
+          "agent": 1,
+          "hook": 1,
+          "tool": 0,
+          "metadata": 1,
+          "asset": 1
+        },
+        "missing": [],
+        "missingReasons": [],
+        "unsupported": [],
+        "leakedSourceOnlyFiles": [],
+        "ok": true
+      }
+    ]
+  },
+  "productKernel": {
+    "engine": "absent",
+    "dbPath": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/home/pglite.data",
+    "schemaApplied": 0,
+    "rows": {
+      "orgs": 0,
+      "projects": 0,
+      "documents": 0,
+      "tasks": 0,
+      "agentRuns": 0
+    },
+    "latestEventAt": null
+  },
+  "repos": {
+    "totalRepos": 0,
+    "syncErrors": 0,
+    "activeWatchers": 0,
+    "lruQueueDepth": 0,
+    "mirrorDiskGb": 0
+  },
+  "memoryEngine": {
+    "checks": [
+      {
+        "name": "memories_schema",
+        "status": "ok",
+        "message": "memories table: 10 columns, 2 indexes"
+      },
+      {
+        "name": "embeddings_schema",
+        "status": "disabled",
+        "message": "embeddings feature flag is off"
+      },
+      {
+        "name": "heuristic_extractor",
+        "status": "ok",
+        "message": "extractor produces 5 kinds: blocker, decision, file_ref, link, section_anchor"
+      },
+      {
+        "name": "retriever",
+        "status": "ok",
+        "message": "retriever functional; 0 indexed documents"
+      },
+      {
+        "name": "context_assembly",
+        "status": "ok",
+        "message": "assembler tables present: artifacts, documents, edges, memories, tasks"
+      },
+      {
+        "name": "embeddings",
+        "status": "disabled",
+        "message": "embeddings feature flag is off"
+      },
+      {
+        "name": "llm_extraction",
+        "status": "disabled",
+        "message": "llm-extraction feature flag is off"
+      },
+      {
+        "name": "report_narration",
+        "status": "disabled",
+        "message": "report-narration feature flag is off"
+      }
+    ]
+  },
+  "platformChecks": [
+    {
+      "name": "platform.theme",
+      "status": "pass",
+      "message": "Tenant theme accent #4f46e5 is valid HEX.",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.706Z"
+    },
+    {
+      "name": "platform.keyring",
+      "status": "pass",
+      "message": "Fallback keyring file exists with mode 0600.",
+      "recovery": "Configure OS keyring for stronger local secret storage.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.keyring_mode",
+      "status": "warn",
+      "message": "Keyring is using fallback file mode.",
+      "recovery": "Configure OS keyring to leave fallback mode.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.credentials",
+      "status": "pass",
+      "message": "Credential metadata registered and encryption round-trip succeeded.",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.crashlog_dir",
+      "status": "pass",
+      "message": "/Users/mkh/workspace/fulcrum/.scratch/manual-smoke-2026-05-17/home/state/errors exists and is writable.",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.backup_last_run",
+      "status": "pass",
+      "message": "No backup policy or no prior backup recorded.",
+      "recovery": "Configure backup policy when scheduled backups are required.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.telemetry",
+      "status": "pass",
+      "message": "Telemetry opted_in=false.",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.flags_registry",
+      "status": "pass",
+      "message": "Feature-flag registry loaded 29 flag(s).",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.experiment_entity",
+      "status": "pass",
+      "message": "ExperimentAssignment metadata registered.",
+      "recovery": "No action needed.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.i18n",
+      "status": "skip",
+      "message": "i18n flag is off.",
+      "recovery": "Enable i18n flag to run locale checks.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.remote_backup",
+      "status": "skip",
+      "message": "scheduled-backups flag is off.",
+      "recovery": "Enable scheduled-backups flag to test remote backup.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.remote_telemetry",
+      "status": "skip",
+      "message": "telemetry-remote flag is off.",
+      "recovery": "Enable telemetry-remote flag and set FULCRUM_TELEMETRY_ENDPOINT + FULCRUM_TELEMETRY_SECRET to activate.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    },
+    {
+      "name": "platform.error_reporting",
+      "status": "skip",
+      "message": "error-reporting-remote flag is off.",
+      "recovery": "Enable error-reporting-remote flag and set FULCRUM_ERROR_REPORT_ENDPOINT to activate.",
+      "checked_at": "2026-05-17T09:20:08.709Z"
+    }
+  ],
+  "memoriesSchema": {
+    "subsystem": "memories_schema",
+    "ok": true
+  },
+  "worktrees": {
+    "projectLocalIgnoredRoots": [
+      {
+        "path": "/Users/mkh/workspace/fulcrum/.claude/worktrees",
+        "entries": [
+          "agent-a8f8e1e5198f2d0b0",
+          "component-ledger",
+          "festive-margulis-b150d7",
+          "romantic-wescoff-97e071"
+        ]
+      }
+    ]
+  },
+  "skillBudget": {
+    "warningThresholdChars": 8000,
+    "agents": [
+      {
+        "id": "claude-code",
+        "label": "Claude Code",
+        "activeSkillCount": 123,
+        "totalDescriptionChars": 27718,
+        "warningThresholdChars": 8000,
+        "overThreshold": true,
+        "sourceRoots": [
+          {
+            "path": "/Users/mkh/.claude/skills",
+            "skills": 4,
+            "descriptionChars": 1801
+          },
+          {
+            "path": "/Users/mkh/.claude/plugins/cache",
+            "skills": 119,
+            "descriptionChars": 25917
+          }
+        ],
+        "topDescriptions": [
+          {
+            "name": "ce-compound-refresh",
+            "path": "/Users/mkh/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.4.1/skills/ce-compound-refresh/SKILL.md",
+            "descriptionChars": 972,
+            "sourceRoot": "/Users/mkh/.claude/plugins/cache"
+          },
+          {
+            "name": "ce-proof",
+            "path": "/Users/mkh/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.4.1/skills/ce-proof/SKILL.md",
+            "descriptionChars": 926,
+            "sourceRoot": "/Users/mkh/.claude/plugins/cache"
+          },
+          {
+            "name": "ce-plan",
+            "path": "/Users/mkh/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.4.1/skills/ce-plan/SKILL.md",
+            "descriptionChars": 770,
+            "sourceRoot": "/Users/mkh/.claude/plugins/cache"
+          },
+          {
+            "name": "ce-commit-push-pr",
+            "path": "/Users/mkh/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.4.1/skills/ce-commit-push-pr/SKILL.md",
+            "descriptionChars": 690,
+            "sourceRoot": "/Users/mkh/.claude/plugins/cache"
+          },
+          {
+            "name": "ce-slack-research",
+            "path": "/Users/mkh/.claude/plugins/cache/compound-engineering-plugin/compound-engineering/3.4.1/skills/ce-slack-research/SKILL.md",
+            "descriptionChars": 634,
+            "sourceRoot": "/Users/mkh/.claude/plugins/cache"
+          }
+        ],
+        "duplicateNames": [
+          {
+            "name": "caveman",
+            "count": 5,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/.cursor/skills/caveman/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/.windsurf/skills/caveman/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/caveman/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/plugins/caveman/skills/caveman/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/skills/caveman/SKILL.md"
+            ]
+          },
+          {
+            "name": "compress",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/plugins/caveman/skills/compress/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/caveman/caveman/84cc3c14fa1e/skills/compress/SKILL.md"
+            ]
+          },
+          {
+            "name": "context-mode",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/context-mode/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/context-mode/SKILL.md"
+            ]
+          },
+          {
+            "name": "context-mode-ops",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/context-mode-ops/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/.claude/skills/context-mode-ops/SKILL.md"
+            ]
+          },
+          {
+            "name": "ctx-doctor",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/ctx-doctor/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/ctx-doctor/SKILL.md"
+            ]
+          },
+          {
+            "name": "ctx-insight",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/ctx-insight/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/ctx-insight/SKILL.md"
+            ]
+          },
+          {
+            "name": "ctx-purge",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/ctx-purge/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/ctx-purge/SKILL.md"
+            ]
+          },
+          {
+            "name": "ctx-stats",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/ctx-stats/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/ctx-stats/SKILL.md"
+            ]
+          },
+          {
+            "name": "ctx-upgrade",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.103/skills/ctx-upgrade/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/context-mode/context-mode/1.0.135/skills/ctx-upgrade/SKILL.md"
+            ]
+          },
+          {
+            "name": "skill-creator",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.claude/plugins/cache/claude-plugins-official/skill-creator/1a2f18b05cf5/skills/skill-creator/SKILL.md",
+              "/Users/mkh/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/SKILL.md"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "codex",
+        "label": "Codex CLI",
+        "activeSkillCount": 193,
+        "totalDescriptionChars": 40996,
+        "warningThresholdChars": 8000,
+        "overThreshold": true,
+        "sourceRoots": [
+          {
+            "path": "/Users/mkh/.codex/skills",
+            "skills": 65,
+            "descriptionChars": 15525
+          },
+          {
+            "path": "/Users/mkh/.codex/plugins/cache",
+            "skills": 128,
+            "descriptionChars": 25471
+          }
+        ],
+        "topDescriptions": [
+          {
+            "name": "code-security",
+            "path": "/Users/mkh/.codex/skills/semgrep-code-security/SKILL.md",
+            "descriptionChars": 599,
+            "sourceRoot": "/Users/mkh/.codex/skills"
+          },
+          {
+            "name": "llm-security",
+            "path": "/Users/mkh/.codex/skills/semgrep-llm-security/SKILL.md",
+            "descriptionChars": 593,
+            "sourceRoot": "/Users/mkh/.codex/skills"
+          },
+          {
+            "name": "imagegen",
+            "path": "/Users/mkh/.codex/skills/.system/imagegen/SKILL.md",
+            "descriptionChars": 570,
+            "sourceRoot": "/Users/mkh/.codex/skills"
+          },
+          {
+            "name": "semgrep",
+            "path": "/Users/mkh/.codex/skills/semgrep/SKILL.md",
+            "descriptionChars": 532,
+            "sourceRoot": "/Users/mkh/.codex/skills"
+          },
+          {
+            "name": "cloudflare-email-service",
+            "path": "/Users/mkh/.codex/skills/cloudflare/cloudflare-email-service/SKILL.md",
+            "descriptionChars": 508,
+            "sourceRoot": "/Users/mkh/.codex/skills"
+          }
+        ],
+        "duplicateNames": [
+          {
+            "name": "caveman",
+            "count": 7,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/.cursor/skills/caveman/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/.windsurf/skills/caveman/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/caveman/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/plugins/caveman/skills/caveman/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/skills/caveman/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/skills/caveman/SKILL.md",
+              "/Users/mkh/.codex/skills/caveman/SKILL.md"
+            ]
+          },
+          {
+            "name": "compress",
+            "count": 4,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/plugins/caveman/skills/compress/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/skills/compress/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/skills/compress/SKILL.md",
+              "/Users/mkh/.codex/skills/compress/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-adversarial-review",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-adversarial-review/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-adversarial-review/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-adversarial-review/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-cancel",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-cancel/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-cancel/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-cancel/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-rescue",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-rescue/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-rescue/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-rescue/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-result",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-result/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-result/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-result/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-review",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-review/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-review/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-review/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-setup",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-setup/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-setup/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-setup/SKILL.md"
+            ]
+          },
+          {
+            "name": "claude-status",
+            "count": 3,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.4/skills/claude-status/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.5/skills/claude-status/SKILL.md",
+              "/Users/mkh/.codex/plugins/cache/claude-code/claude/1.0.6/skills/claude-status/SKILL.md"
+            ]
+          },
+          {
+            "name": "agents-sdk",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/agents-sdk/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/agents-sdk/SKILL.md"
+            ]
+          },
+          {
+            "name": "bat",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/bat/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/bat/SKILL.md"
+            ]
+          },
+          {
+            "name": "biome",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/biome/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/biome/SKILL.md"
+            ]
+          },
+          {
+            "name": "brainstorming",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/brainstorming/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/brainstorming/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman-commit",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/skills/caveman-commit/SKILL.md",
+              "/Users/mkh/.codex/skills/caveman-commit/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman-help",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/skills/caveman-help/SKILL.md",
+              "/Users/mkh/.codex/skills/caveman-help/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman-review",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/caveman/caveman/0.1.0/package/skills/caveman-review/SKILL.md",
+              "/Users/mkh/.codex/skills/caveman-review/SKILL.md"
+            ]
+          },
+          {
+            "name": "cloudflare",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/cloudflare/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/cloudflare/SKILL.md"
+            ]
+          },
+          {
+            "name": "cloudflare-email-service",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/cloudflare-email-service/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/cloudflare-email-service/SKILL.md"
+            ]
+          },
+          {
+            "name": "dart-toolchain",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/dart-toolchain/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/dart-toolchain/SKILL.md"
+            ]
+          },
+          {
+            "name": "difftastic",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/difftastic/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/difftastic/SKILL.md"
+            ]
+          },
+          {
+            "name": "direnv",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/direnv/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/direnv/SKILL.md"
+            ]
+          },
+          {
+            "name": "dispatching-parallel-agents",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/dispatching-parallel-agents/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/dispatching-parallel-agents/SKILL.md"
+            ]
+          },
+          {
+            "name": "durable-objects",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/durable-objects/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/durable-objects/SKILL.md"
+            ]
+          },
+          {
+            "name": "executing-plans",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/executing-plans/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/executing-plans/SKILL.md"
+            ]
+          },
+          {
+            "name": "eza",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/eza/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/eza/SKILL.md"
+            ]
+          },
+          {
+            "name": "finishing-a-development-branch",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/finishing-a-development-branch/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/finishing-a-development-branch/SKILL.md"
+            ]
+          },
+          {
+            "name": "flarectl",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/flarectl/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/flarectl/SKILL.md"
+            ]
+          },
+          {
+            "name": "fzf",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/fzf/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/fzf/SKILL.md"
+            ]
+          },
+          {
+            "name": "gh",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/gh/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/gh/SKILL.md"
+            ]
+          },
+          {
+            "name": "git-cliff",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/git-cliff/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/git-cliff/SKILL.md"
+            ]
+          },
+          {
+            "name": "gitleaks",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/gitleaks/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/gitleaks/SKILL.md"
+            ]
+          },
+          {
+            "name": "google-java-format",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/google-java-format/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/google-java-format/SKILL.md"
+            ]
+          },
+          {
+            "name": "hyperfine",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/hyperfine/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/hyperfine/SKILL.md"
+            ]
+          },
+          {
+            "name": "jq",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/jq/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/jq/SKILL.md"
+            ]
+          },
+          {
+            "name": "just",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/just/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/just/SKILL.md"
+            ]
+          },
+          {
+            "name": "ktlint",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/ktlint/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/ktlint/SKILL.md"
+            ]
+          },
+          {
+            "name": "lizard",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/lizard/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/lizard/SKILL.md"
+            ]
+          },
+          {
+            "name": "mise",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/mise/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/mise/SKILL.md"
+            ]
+          },
+          {
+            "name": "osv-scanner",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/osv-scanner/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/osv-scanner/SKILL.md"
+            ]
+          },
+          {
+            "name": "pmd",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/pmd/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/pmd/SKILL.md"
+            ]
+          },
+          {
+            "name": "receiving-code-review",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/receiving-code-review/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/receiving-code-review/SKILL.md"
+            ]
+          },
+          {
+            "name": "requesting-code-review",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/requesting-code-review/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/requesting-code-review/SKILL.md"
+            ]
+          },
+          {
+            "name": "ruff",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/ruff/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/ruff/SKILL.md"
+            ]
+          },
+          {
+            "name": "sandbox-sdk",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/sandbox-sdk/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/sandbox-sdk/SKILL.md"
+            ]
+          },
+          {
+            "name": "sd",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/sd/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/sd/SKILL.md"
+            ]
+          },
+          {
+            "name": "spotbugs",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/spotbugs/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/spotbugs/SKILL.md"
+            ]
+          },
+          {
+            "name": "subagent-driven-development",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/subagent-driven-development/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/subagent-driven-development/SKILL.md"
+            ]
+          },
+          {
+            "name": "subagent-orchestration",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/subagent-orchestration/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/subagent-orchestration/SKILL.md"
+            ]
+          },
+          {
+            "name": "systematic-debugging",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/systematic-debugging/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/systematic-debugging/SKILL.md"
+            ]
+          },
+          {
+            "name": "test-driven-development",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/test-driven-development/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/test-driven-development/SKILL.md"
+            ]
+          },
+          {
+            "name": "using-git-worktrees",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/using-git-worktrees/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/using-git-worktrees/SKILL.md"
+            ]
+          },
+          {
+            "name": "using-superpowers",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/using-superpowers/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/using-superpowers/SKILL.md"
+            ]
+          },
+          {
+            "name": "usql",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/usql/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/usql/SKILL.md"
+            ]
+          },
+          {
+            "name": "verification-before-completion",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/verification-before-completion/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/verification-before-completion/SKILL.md"
+            ]
+          },
+          {
+            "name": "watchexec",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/watchexec/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/watchexec/SKILL.md"
+            ]
+          },
+          {
+            "name": "web-perf",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/web-perf/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/web-perf/SKILL.md"
+            ]
+          },
+          {
+            "name": "workers-best-practices",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/workers-best-practices/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/workers-best-practices/SKILL.md"
+            ]
+          },
+          {
+            "name": "wrangler",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/cloudflare/cloudflare/1.0.0/skills/wrangler/SKILL.md",
+              "/Users/mkh/.codex/skills/cloudflare/wrangler/SKILL.md"
+            ]
+          },
+          {
+            "name": "writing-plans",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/writing-plans/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/writing-plans/SKILL.md"
+            ]
+          },
+          {
+            "name": "writing-skills",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/superpowers/superpowers/1.0.0/skills/writing-skills/SKILL.md",
+              "/Users/mkh/.codex/skills/superpowers/writing-skills/SKILL.md"
+            ]
+          },
+          {
+            "name": "xh",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/xh/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/xh/SKILL.md"
+            ]
+          },
+          {
+            "name": "yq",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/yq/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/yq/SKILL.md"
+            ]
+          },
+          {
+            "name": "zoxide",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.codex/plugins/cache/fulcrum/fulcrum/0.1.0/skills/zoxide/SKILL.md",
+              "/Users/mkh/.codex/skills/fulcrum/zoxide/SKILL.md"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "gemini",
+        "label": "Gemini CLI",
+        "activeSkillCount": 66,
+        "totalDescriptionChars": 11949,
+        "warningThresholdChars": 8000,
+        "overThreshold": true,
+        "sourceRoots": [
+          {
+            "path": "/Users/mkh/.gemini/extensions",
+            "skills": 66,
+            "descriptionChars": 11949
+          }
+        ],
+        "topDescriptions": [
+          {
+            "name": "cloudflare-email-service",
+            "path": "/Users/mkh/.gemini/extensions/cloudflare/skills/cloudflare-email-service/SKILL.md",
+            "descriptionChars": 508,
+            "sourceRoot": "/Users/mkh/.gemini/extensions"
+          },
+          {
+            "name": "web-perf",
+            "path": "/Users/mkh/.gemini/extensions/cloudflare/skills/web-perf/SKILL.md",
+            "descriptionChars": 453,
+            "sourceRoot": "/Users/mkh/.gemini/extensions"
+          },
+          {
+            "name": "agents-sdk",
+            "path": "/Users/mkh/.gemini/extensions/cloudflare/skills/agents-sdk/SKILL.md",
+            "descriptionChars": 431,
+            "sourceRoot": "/Users/mkh/.gemini/extensions"
+          },
+          {
+            "name": "durable-objects",
+            "path": "/Users/mkh/.gemini/extensions/cloudflare/skills/durable-objects/SKILL.md",
+            "descriptionChars": 382,
+            "sourceRoot": "/Users/mkh/.gemini/extensions"
+          },
+          {
+            "name": "cloudflare",
+            "path": "/Users/mkh/.gemini/extensions/cloudflare/skills/cloudflare/SKILL.md",
+            "descriptionChars": 368,
+            "sourceRoot": "/Users/mkh/.gemini/extensions"
+          }
+        ],
+        "duplicateNames": [
+          {
+            "name": "cavecrew",
+            "count": 6,
+            "paths": [
+              "/Users/mkh/.gemini/extensions/caveman/.agents/skills/cavecrew/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/.junie/skills/cavecrew/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/.kiro/skills/cavecrew/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/.roo/skills/cavecrew/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/plugins/caveman/skills/cavecrew/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/skills/cavecrew/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.gemini/extensions/caveman/plugins/caveman/skills/caveman/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/skills/caveman/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman-compress",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.gemini/extensions/caveman/plugins/caveman/skills/caveman-compress/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/skills/caveman-compress/SKILL.md"
+            ]
+          },
+          {
+            "name": "caveman-stats",
+            "count": 2,
+            "paths": [
+              "/Users/mkh/.gemini/extensions/caveman/plugins/caveman/skills/caveman-stats/SKILL.md",
+              "/Users/mkh/.gemini/extensions/caveman/skills/caveman-stats/SKILL.md"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "opencode",
+        "label": "OpenCode",
+        "activeSkillCount": 83,
+        "totalDescriptionChars": 24127,
+        "warningThresholdChars": 8000,
+        "overThreshold": true,
+        "sourceRoots": [
+          {
+            "path": "/Users/mkh/.config/opencode/skills",
+            "skills": 83,
+            "descriptionChars": 24127
+          }
+        ],
+        "topDescriptions": [
+          {
+            "name": "ce-compound-refresh",
+            "path": "/Users/mkh/.config/opencode/skills/ce-compound-refresh/SKILL.md",
+            "descriptionChars": 972,
+            "sourceRoot": "/Users/mkh/.config/opencode/skills"
+          },
+          {
+            "name": "ce-proof",
+            "path": "/Users/mkh/.config/opencode/skills/ce-proof/SKILL.md",
+            "descriptionChars": 926,
+            "sourceRoot": "/Users/mkh/.config/opencode/skills"
+          },
+          {
+            "name": "ce-plan",
+            "path": "/Users/mkh/.config/opencode/skills/ce-plan/SKILL.md",
+            "descriptionChars": 770,
+            "sourceRoot": "/Users/mkh/.config/opencode/skills"
+          },
+          {
+            "name": "ce-commit-push-pr",
+            "path": "/Users/mkh/.config/opencode/skills/ce-commit-push-pr/SKILL.md",
+            "descriptionChars": 690,
+            "sourceRoot": "/Users/mkh/.config/opencode/skills"
+          },
+          {
+            "name": "ce-slack-research",
+            "path": "/Users/mkh/.config/opencode/skills/ce-slack-research/SKILL.md",
+            "descriptionChars": 634,
+            "sourceRoot": "/Users/mkh/.config/opencode/skills"
+          }
+        ],
+        "duplicateNames": []
+      },
+      {
+        "id": "pi",
+        "label": "Pi CLI",
+        "activeSkillCount": 94,
+        "totalDescriptionChars": 26710,
+        "warningThresholdChars": 8000,
+        "overThreshold": true,
+        "sourceRoots": [
+          {
+            "path": "/Users/mkh/.pi/agent/skills",
+            "skills": 94,
+            "descriptionChars": 26710
+          }
+        ],
+        "topDescriptions": [
+          {
+            "name": "ce-compound-refresh",
+            "path": "/Users/mkh/.pi/agent/skills/ce-compound-refresh/SKILL.md",
+            "descriptionChars": 972,
+            "sourceRoot": "/Users/mkh/.pi/agent/skills"
+          },
+          {
+            "name": "ce-proof",
+            "path": "/Users/mkh/.pi/agent/skills/ce-proof/SKILL.md",
+            "descriptionChars": 926,
+            "sourceRoot": "/Users/mkh/.pi/agent/skills"
+          },
+          {
+            "name": "ce-plan",
+            "path": "/Users/mkh/.pi/agent/skills/ce-plan/SKILL.md",
+            "descriptionChars": 770,
+            "sourceRoot": "/Users/mkh/.pi/agent/skills"
+          },
+          {
+            "name": "ce-commit-push-pr",
+            "path": "/Users/mkh/.pi/agent/skills/ce-commit-push-pr/SKILL.md",
+            "descriptionChars": 690,
+            "sourceRoot": "/Users/mkh/.pi/agent/skills"
+          },
+          {
+            "name": "ce-slack-research",
+            "path": "/Users/mkh/.pi/agent/skills/ce-slack-research/SKILL.md",
+            "descriptionChars": 634,
+            "sourceRoot": "/Users/mkh/.pi/agent/skills"
+          }
+        ],
+        "duplicateNames": []
+      }
+    ]
+  },
+  "skillsCount": 29,
+  "warnings": 7,
+  "warningsList": [],
+  "errors": 0,
+  "verdict": "warning",
+  "orchestration": {
+    "checks": [
+      {
+        "name": "agent-binary:claude-code",
+        "level": "ok",
+        "message": "claude found"
+      },
+      {
+        "name": "auth-vars:claude-code",
+        "level": "warn",
+        "message": "missing ANTHROPIC_API_KEY"
+      },
+      {
+        "name": "agent-binary:codex",
+        "level": "ok",
+        "message": "codex found"
+      },
+      {
+        "name": "auth-vars:codex",
+        "level": "warn",
+        "message": "missing OPENAI_API_KEY"
+      },
+      {
+        "name": "agent-binary:copilot",
+        "level": "ok",
+        "message": "copilot found"
+      },
+      {
+        "name": "auth-vars:copilot",
+        "level": "ok",
+        "message": "auth env vars present"
+      },
+      {
+        "name": "agent-binary:gemini-cli",
+        "level": "ok",
+        "message": "gemini found"
+      },
+      {
+        "name": "auth-vars:gemini-cli",
+        "level": "warn",
+        "message": "missing GEMINI_API_KEY"
+      },
+      {
+        "name": "agent-binary:opencode",
+        "level": "ok",
+        "message": "opencode found"
+      },
+      {
+        "name": "auth-vars:opencode",
+        "level": "warn",
+        "message": "missing ANTHROPIC_API_KEY"
+      },
+      {
+        "name": "agent-binary:pi",
+        "level": "ok",
+        "message": "pi found"
+      },
+      {
+        "name": "auth-vars:pi",
+        "level": "warn",
+        "message": "missing ANTHROPIC_API_KEY"
+      },
+      {
+        "name": "workspace-writable",
+        "level": "ok",
+        "message": "workspace is writable"
+      },
+      {
+        "name": "effect-singleton",
+        "level": "ok",
+        "message": "Effect runtime loaded once"
+      }
+    ]
+  }
+}
+[exit 0]
+
+$ bun run apps/cli/src/main.ts projects --help
+fulcrum projects
+
+Usage:
+  fulcrum projects list [--json]
+  fulcrum projects get <id> [--json]
+  fulcrum projects create --name <name> [--repo-path <path>] [--template <id>] [--parent <id>] [--json]
+  fulcrum projects update <id> [--name <name>] [--json]
+  fulcrum projects delete <id> [--json]
+  fulcrum projects stats <id> [--json]
+
+[exit 0]
+
+$ bun run apps/cli/src/main.ts projects list --json
+fulcrum projects list: Project API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID.
+[exit 1]
+
+$ bun run apps/cli/src/main.ts docs --help
+fulcrum docs
+
+Docs commands.
+
+Usage:
+  fulcrum docs list [--type <type>] [--scope <scope>] [--archived] [--limit <n>] [--offset <n>] [--json]
+  fulcrum docs get <slug|id> [--json]
+  fulcrum docs create --title <title> [--type <type>] [--scope <scope>] [--project <id>] [--parent <id>] [--body <markdown>] [--json]
+  fulcrum docs edit <slug|id> [--editor <cmd>] [--json]
+  fulcrum docs delete <id> [--hard --yes] [--json]
+  fulcrum docs search <query> [--type <type>] [--scope <scope>] [--limit <n>] [--json]
+  fulcrum docs versions list <doc-id> [--json]
+  fulcrum docs template list [--json]
+
+[exit 0]
+
+$ bun run apps/cli/src/main.ts docs list --json
+fulcrum docs list: Document API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.
+[exit 1]
+
+$ bun run apps/cli/src/main.ts search --help
+fulcrum search
+
+Search commands.
+
+Usage:
+  fulcrum search <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
+  fulcrum search query <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
+  fulcrum search suggest <partial> [--kind <kind>] [--json]
+  fulcrum search saved list [--project <id>] [--json]
+  fulcrum search saved create --name <name> --query-json <json> [--json]
+  fulcrum search saved delete <id> [--json]
+
+Options:
+  --json      Output as machine-readable JSON.
+  -h, --help  Show this help.
+
+[exit 0]
+
+$ bun run apps/cli/src/main.ts search smoke --json
+fulcrum search: Error: Search API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, FULCRUM_USER_ID, and FULCRUM_API_TOKEN or FULCRUM_PUBLIC_API_TOKEN.
+[exit 1]
+
+$ bun run apps/cli/src/main.ts work --help
+fulcrum: unknown command 'work'
+fulcrum — multi-agent foundation CLI
+
+Usage:
+  fulcrum init [DIR]                 Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
+  fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
+                                     Recipes: format, lint-gate, pm-policy, test-on-edit,
+                                              audit-log, index-check, index-rebuild, router
+  fulcrum hooks list                 List available hook recipes.
+  fulcrum hooks enable <name>        Register a hook in each detected agent config.
+  fulcrum skills sync                Mirror authored skills; Codex global scope is opt-in.
+  fulcrum skills upstream [--update-pins]
+                                     Mirror curated third-party skills to agents; --update-pins
+                                     computes and writes subpath_sha256 for unpinned entries.
+  fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
+  fulcrum skills list [--installed]  Enumerate authored skills, or installed skill budgets.
+  fulcrum install [--profile minimal|rules-only|full] [--with-project DIR]
+                  [--no-skills] [--no-upstream-skills]
+                  [--no-default-mcps] [--enable-all-mcps]
+                                     Splice rules, vendor hooks, sync skills, install caveman.
+                                     Default profile is minimal; full keeps historical bootstrap.
+                                     --enable-all-mcps: enable every builtin MCP across all agents.
+  fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
+                                     Remove Fulcrum-managed install artifacts.
+  fulcrum compress [--check] [FILES...]
+                                     Compress markdown with caveman; default targets shown in help.
+  fulcrum mcp list [--json]          List registered MCP servers.
+  fulcrum mcp register <name> [--http URL | --stdio CMD] [--vendor V] ...
+                                     Register an MCP server in the registry.
+  fulcrum mcp unregister <name>      Unregister and remove from all agents.
+  fulcrum mcp enable <name> [--agent <id> ...] [--all-agents]
+                                     Enable server and push to agents.
+  fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
+                                     Disable server and remove from agents.
+  fulcrum component list [--json]    List Fulcrum components.
+  fulcrum components status [--json] Show component lifecycle status.
+  fulcrum component info <id> [--json]
+                                     Show component details and surfaces.
+  fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
+                                     Plan component changes without applying them.
+  fulcrum auth <whoami|invite|login|logout>
+  fulcrum flags <list|set> [options]
+  fulcrum routing rules <list|add|edit|delete> [options]
+  fulcrum db <migrate|status|history> [options]
+  fulcrum web
+  fulcrum tui
+  fulcrum inference <start|status|embed|generate|stop> [--json]
+  fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum settings <list|get|set> [--json]
+  fulcrum completion --shell <bash|zsh|fish|powershell>
+  fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
+  fulcrum product projects list [--json]
+                                     List product-kernel projects.
+  fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
+                                     Run an FTS query over the product kernel search index.
+  fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
+                                     Render the assembled Markdown context for a task.
+  fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Preview approved-plan docs/tasks/dependencies through shared planning API.
+  fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
+                                     Persist approved-plan docs/tasks/dependencies through shared planning API.
+  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
+                                     Report bun, agent dirs, tool presence, policy health.
+                                     --subsystem runs only named subsystem checks via orchestrator.
+                                     --checks includes modular orchestrator checks in legacy report.
+  fulcrum version                    Print version.
+  fulcrum help                       This message.
+
+Environment:
+  FULCRUM_HOME           override ~/.fulcrum
+  FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
+  FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
+
+[exit 1]
+
+$ bun run apps/cli/src/main.ts runs --help
+fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs|attach> [--json]
+
+Subcommands:
+  list [--status <status>]                          List runs
+  show <run-id>                                     Show run detail
+  cancel <run-id>                                   Cancel a run
+  retry <run-id>                                    Retry a failed run
+  dispatch --task <id> [--project <id>] [--agent <name>] [--preview]
+                                                    Dispatch a dependency-aware run (--preview for dry-run)
+  preview --task <id> [--project <id>] [--mode <mode>]
+                                                    Preview dependency tree before dispatching
+  feed [--project <id>] [--run <id>] [--task <id>] [--watch]
+                                                    Live feedback from running dependency executions
+  worker-tick --project <id> [--trace <id>] [--worker <id>]
+                                                    Claim and execute one queued dependency-run worker job
+  logs <run-id> [--follow]                          Show run transcript logs
+  attach <run-id>                                   Attach to a running run (follow logs)
+[exit 0]

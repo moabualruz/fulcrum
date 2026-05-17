@@ -1702,3 +1702,45 @@ function toTuiTask(row: {
     labels: row.labels ?? [],
   };
 }
+
+if (import.meta.main) {
+  const isTTY = process.stdout.isTTY && process.stdin.isTTY;
+
+  if (!isTTY) {
+    console.log("fulcrum tui: no interactive terminal detected (stdout/stdin not a TTY).");
+    console.log("TUI requires an interactive terminal. Run without pipe redirection.");
+  } else {
+    const [caller, telemetry] = await Promise.all([
+      buildCaller(),
+      buildTelemetrySink(),
+    ]);
+    const { StdinInput } = await import("./stdin-input.ts");
+    const stdinInput = new StdinInput();
+    const app = new TuiApp({
+      caller,
+      telemetry,
+      input: stdinInput,
+      onExit: () => {
+        stdinInput.cleanup();
+        app.stop();
+        process.exit(0);
+      },
+    });
+
+    process.once("SIGINT", () => {
+      stdinInput.cleanup();
+      app.stop();
+      process.exit(0);
+    });
+
+    await app.mount();
+    await new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (!app.isRunning) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+}

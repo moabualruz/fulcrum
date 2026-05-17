@@ -50,6 +50,21 @@ export class SeedService {
       role: "owner",
     }, ["orgId", "userId"]);
 
+    if (await this.hasPublicOrganizationTables()) {
+      await this.em.query(`
+        INSERT INTO fulcrum_workspaces (id, slug, name, updated_at)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id)
+        DO UPDATE SET slug = EXCLUDED.slug, name = EXCLUDED.name, updated_at = EXCLUDED.updated_at
+      `, [defaultOrg.id, DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME, now]);
+      await this.em.query(`
+        INSERT INTO fulcrum_organization_members (id, org_id, user_id, role)
+        VALUES ($1, $2, $3, 'owner')
+        ON CONFLICT (org_id, user_id)
+        DO UPDATE SET role = EXCLUDED.role
+      `, [`${defaultOrg.id}:${adminUser.id}`, defaultOrg.id, adminUser.id]);
+    }
+
     await seedDefaultRules(adminUser.id, defaultOrg.id, this.em);
 
     const credentialAccount = await this.em.findOne(Account, {
@@ -96,5 +111,12 @@ export class SeedService {
       userId: adminUser.id,
       sessionToken,
     };
+  }
+
+  private async hasPublicOrganizationTables(): Promise<boolean> {
+    const rows = await this.em.query(
+      "SELECT to_regclass('public.fulcrum_workspaces') AS workspaces, to_regclass('public.fulcrum_organization_members') AS members",
+    );
+    return Boolean(rows[0]?.workspaces && rows[0]?.members);
   }
 }

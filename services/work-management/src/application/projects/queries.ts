@@ -120,7 +120,7 @@ export async function listProjectRows(em: EntityManager, ctx: AppContext): Promi
   }>>(
     `SELECT id, ${slugExpr} AS slug, name, ${descriptionExpr} AS description, updated_at
        FROM projects
-      WHERE org_id = ?
+      WHERE org_id = $1
       ORDER BY created_at ASC, id ASC`,
     [ctx.orgId],
   );
@@ -182,7 +182,7 @@ export async function listProjectOptions(em: EntityManager, ctx: AppContext): Pr
   const rows = await ormSqlConnection(em).execute<ProjectOption[]>(
     `SELECT id, name
        FROM projects
-      WHERE org_id = ?
+      WHERE org_id = $1
       ORDER BY name ASC, id ASC`,
     [ctx.orgId],
   );
@@ -197,7 +197,7 @@ export async function getProjectOrNull(
   const columns = await projectColumns(em);
   const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
   const rows = await ormSqlConnection(em).execute<ProjectRow[]>(
-    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id = ? AND org_id = ?`,
+    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id = $1 AND org_id = $2`,
     [projectId, ctx.orgId],
   );
   return rows[0] ?? null;

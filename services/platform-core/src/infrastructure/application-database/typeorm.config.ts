@@ -2,6 +2,30 @@ import { DataSource, EntitySchema, type DataSourceOptions } from "typeorm";
 import { PGliteDriver } from "typeorm-pglite";
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
+import { CoreAndAuth1715788800000 } from "./migrations/1715788800000-CoreAndAuth.ts";
+import { WorkManagement1715788800001 } from "./migrations/1715788800001-WorkManagement.ts";
+import { Knowledge1715788800002 } from "./migrations/1715788800002-Knowledge.ts";
+import { Orchestration1715788800003 } from "./migrations/1715788800003-Orchestration.ts";
+import { Integration1715788800004 } from "./migrations/1715788800004-Integration.ts";
+import { Notifications1715788800005 } from "./migrations/1715788800005-Notifications.ts";
+import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
+import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
+import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
+import { PlatformFeatureFlags1778753400000 } from "@platform-core/infrastructure/database/feature-flag.migration.ts";
+import { IdentityAccess1778623200009 } from "@identity-access/infrastructure/database/organization.migration.ts";
+import { Invitation1778757000000 } from "@identity-access/infrastructure/database/invitation.migration.ts";
+import { WorkManagement1778623200003 } from "@work-management/infrastructure/database/work-structure.migration.ts";
+import { TaskRecurrence1778760600000 } from "@work-management/infrastructure/database/task-recurrence.migration.ts";
+import { WorkAutomations1778752500000 } from "@work-management/infrastructure/database/automation.migration.ts";
+import { KnowledgeDocuments1778623200004 } from "@knowledge-workspace/infrastructure/database/document.migration.ts";
+import { RunContext1778623200005 } from "@execution-orchestration/infrastructure/database/run-context.migration.ts";
+import { Routing1778623200008 } from "@execution-orchestration/infrastructure/database/routing.migration.ts";
+import { IntegrationRepositories1778623200006 } from "@integration-hub/infrastructure/database/repository.migration.ts";
+import { IntegrationConnectors1778751600000 } from "@integration-hub/infrastructure/database/connector.migration.ts";
+import { IntegrationWebhooks1778750700000 } from "@integration-hub/infrastructure/database/webhook.migration.ts";
+import { WorkflowSpine1778623200001 } from "@workflow-coordination/infrastructure/database/workflow-spine.migration.ts";
+import { WorkflowAudit1778623200008 } from "@workflow-coordination/infrastructure/database/audit-log.migration.ts";
+import { ReviewWorkflow1778623200002 } from "@planning-review/infrastructure/database/review-workflow.migration.ts";
 
 // Platform-core owned entities (kept here)
 import { Event } from "./entities/core/Event.ts";
@@ -220,6 +244,33 @@ import {
   FulcrumGeneratedE2ETestEntity,
 } from "@planning-review/infrastructure/database/review-workflow.entities.ts";
 
+export const applicationMigrations = [
+  CoreAndAuth1715788800000,
+  WorkManagement1715788800001,
+  Knowledge1715788800002,
+  Orchestration1715788800003,
+  Integration1715788800004,
+  Notifications1715788800005,
+  Platform1715788800006,
+  WorkflowSpine1778623200001,
+  ReviewWorkflow1778623200002,
+  WorkManagement1778623200003,
+  KnowledgeDocuments1778623200004,
+  RunContext1778623200005,
+  IntegrationRepositories1778623200006,
+  Routing1778623200008,
+  WorkflowAudit1778623200008,
+  IdentityAccess1778623200009,
+  Migration20260516AcpSessionColumns1778623200002,
+  Migration20260517NotificationTraceColumn1778760600001,
+  IntegrationWebhooks1778750700000,
+  IntegrationConnectors1778751600000,
+  WorkAutomations1778752500000,
+  PlatformFeatureFlags1778753400000,
+  Invitation1778757000000,
+  TaskRecurrence1778760600000,
+];
+
 export function createDataSourceOptions(
   extraEntities: (Function | EntitySchema)[] = [],
   env: Record<string, string | undefined> = process.env,
@@ -232,7 +283,7 @@ export function createDataSourceOptions(
       ? { driver: new PGliteDriver({ dataDir: database.dataDir }).driver, installExtensions: false }
       : { url: database.url }),
     entities: [...getCoreEntities(), ...extraEntities],
-    migrations: [__dirname + "/migrations/*.{ts,js}"],
+    migrations: applicationMigrations,
     migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
     synchronize: false,
     logging: env["TYPEORM_LOGGING"] === "true",

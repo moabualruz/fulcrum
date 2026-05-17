@@ -1,0 +1,51 @@
+[
+  {
+    "path": "/api-json",
+    "status": 404,
+    "ok": false,
+    "bytes": 71,
+    "preview": "{\"message\":\"Cannot GET /api-json\",\"error\":\"Not Found\",\"statusCode\":404}"
+  },
+  {
+    "path": "/api/v1/doctor",
+    "status": 200,
+    "ok": true,
+    "bytes": 3683,
+    "preview": "{\"version\":\"1.0.0\",\"timestamp\":\"2026-05-17T10:09:45.384Z\",\"checks\":[{\"name\":\"binary-entrypoint\",\"subsystem\":\"cli\",\"durationMs\":27,\"status\":\"ok\",\"message\":\"fulcr"
+  },
+  {
+    "path": "/api/v1/docs",
+    "status": 200,
+    "ok": true,
+    "bytes": 2,
+    "preview": "[]"
+  },
+  {
+    "path": "/api/v1/artifacts",
+    "status": 200,
+    "ok": true,
+    "bytes": 2,
+    "preview": "[]"
+  },
+  {
+    "path": "/api/v1/audit",
+    "status": 200,
+    "ok": true,
+    "bytes": 21,
+    "preview": "{\"data\":[],\"total\":0}"
+  },
+  {
+    "path": "/api/v1/connectors",
+    "status": 200,
+    "ok": true,
+    "bytes": 156,
+    "preview": "[{\"name\":\"confluence\",\"enabled\":false,\"config\":null},{\"name\":\"notion\",\"enabled\":false,\"config\":null},{\"name\":\"github-issues\",\"enabled\":false,\"config\":null}]"
+  },
+  {
+    "path": "/api/v1/routing/rules",
+    "status": 200,
+    "ok": true,
+    "bytes": 2,
+    "preview": "[]"
+  }
+]

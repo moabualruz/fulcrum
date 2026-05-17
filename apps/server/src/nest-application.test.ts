@@ -7,8 +7,11 @@ type FakeNestApp = {
   readonly listenedPorts: number[];
   useGlobalPipes: (...pipes: unknown[]) => void;
   enableShutdownHooks: (...signals: unknown[]) => void;
+  get: (token: unknown, options?: unknown) => unknown;
   listen: (port: number) => Promise<void>;
 };
+
+const trpcApplyMiddleware = mock(async (_app: unknown) => {});
 
 function createFakeNestApp(): FakeNestApp {
   return {
@@ -20,6 +23,12 @@ function createFakeNestApp(): FakeNestApp {
     },
     enableShutdownHooks(...signals: unknown[]) {
       this.shutdownHooks.push(...signals);
+    },
+    get(token: unknown) {
+      if (typeof token === "function" && token.name === "TrpcRouter") {
+        return { applyMiddleware: trpcApplyMiddleware };
+      }
+      return undefined;
     },
     async listen(port: number) {
       this.listenedPorts.push(port);
@@ -73,11 +82,14 @@ mock.module("@nestjs/core", () => ({
 }));
 
 mock.module("@nestjs/swagger", () => ({
+  ApiAcceptedResponse: noopDecorator,
   ApiBody: noopDecorator,
   ApiCreatedResponse: noopDecorator,
+  ApiNoContentResponse: noopDecorator,
   ApiOkResponse: noopDecorator,
   ApiOperation: noopDecorator,
   ApiParam: noopDecorator,
+  ApiQuery: noopDecorator,
   ApiTags: noopDecorator,
   DocumentBuilder: TestDocumentBuilder,
   SwaggerModule: {
@@ -92,6 +104,7 @@ describe("Nest server application bootstrap", () => {
     nestCreate.mockClear();
     swaggerCreateDocument.mockClear();
     swaggerSetup.mockClear();
+    trpcApplyMiddleware.mockClear();
   });
 
   test("creates a Nest Express app with validation and OpenAPI configured", async () => {
@@ -117,6 +130,7 @@ describe("Nest server application bootstrap", () => {
         version: "0.1.0",
       },
     });
+    expect(trpcApplyMiddleware).toHaveBeenCalledWith(app);
   });
 
   test("starts the Nest app on the configured port", async () => {

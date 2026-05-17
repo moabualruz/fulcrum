@@ -12,7 +12,7 @@ import {
   type FulcrumTypeOrmOptions,
 } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { FulcrumTypeOrmConnectionRuntime } from "@platform-core/infrastructure/database/typeorm-connection-runtime.ts";
-import { getCoreEntities } from "../application-database/typeorm.config.ts";
+import { applicationMigrations, getCoreEntities } from "../application-database/typeorm.config.ts";
 
 // Platform-core owned repositories (kept here)
 import { EventRepository } from "../application-database/repositories/core/EventRepository.ts";
@@ -182,12 +182,14 @@ export async function createFulcrumTypeOrmModuleOptions(
   const options = await runtime.createOptions({
     env: input.env,
     entities: input.entities ?? [],
-    migrations: input.migrations ?? [],
+    migrations: input.migrations ?? applicationMigrations,
   });
 
   return {
     ...options,
     autoLoadEntities: true,
+    migrationsRun: input.migrations === undefined,
+    migrationsTransactionMode: input.migrations === undefined ? "each" : options.migrationsTransactionMode,
   };
 }
 

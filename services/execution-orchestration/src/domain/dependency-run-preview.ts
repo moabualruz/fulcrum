@@ -62,7 +62,7 @@ export function buildDependencyRunPreview(
       warnings.push(`Selected task ${targetId} was not found.`);
       continue;
     }
-    collectDependencies(targetId, 0);
+    collectDependencies(targetId, 0, new Set());
   }
 
   const includedTasks = inclusionOrder.map((id) => taskMap.get(id)).filter((task): task is DependencyRunPreviewTask => Boolean(task));
@@ -133,10 +133,15 @@ export function buildDependencyRunPreview(
     blocked: missing.size > 0 || [...blockersByTask.values()].some((blockers) => blockers.length > 0),
   };
 
-  function collectDependencies(taskId: string, depth: number): void {
+  function collectDependencies(taskId: string, depth: number, visiting: Set<string>): void {
     const task = taskMap.get(taskId);
     if (!task) {
       missing.add(taskId);
+      return;
+    }
+    if (visiting.has(taskId)) {
+      addTaskBlocker(taskId, "circular dependency detected");
+      warnings.push(`Circular dependency detected at ${taskId}.`);
       return;
     }
 
@@ -153,14 +158,16 @@ export function buildDependencyRunPreview(
       addTaskBlocker(task.id, `task is blocked by ${task.blockedBy.trim()}`);
     }
 
+    visiting.add(taskId);
     for (const dependencyId of task.dependencies?.blocked_by ?? []) {
       if (!taskMap.has(dependencyId)) {
         missing.add(dependencyId);
         addTaskBlocker(taskId, `missing dependency: ${dependencyId}`);
         continue;
       }
-      collectDependencies(dependencyId, depth + 1);
+      collectDependencies(dependencyId, depth + 1, new Set(visiting));
     }
+    visiting.delete(taskId);
   }
 
   function addTaskBlocker(taskId: string, blocker: string): void {

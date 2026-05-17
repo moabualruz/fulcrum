@@ -1,7 +1,9 @@
 import { resolveDefaultOrgId } from "@identity-access/application/auth/default-org.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import type { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
 import type { ApplicationPersistence, ApplicationOrm } from "@platform-core/application/runtime/local-database.ts";
 import { initDatabase } from "@platform-core/application/runtime/local-database.ts";
+import { DEFAULT_ADMIN_EMAIL } from "@platform-core/infrastructure/application-database/seed.ts";
 import { __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
 import { FeatureFlagRepository } from "@identity-access/infrastructure/database/repositories/auth/FeatureFlagRepository.ts";
@@ -100,19 +102,29 @@ export function clearWebRequestRuntime(_runtime: WebRequestRuntime | null): void
 
 export async function localDevSession(requestRuntime: WebRequestRuntime | null): Promise<LocalDevelopmentSession> {
   let orgId: string | null = null;
+  let userId: string | null = null;
   if (requestRuntime?.em) {
     orgId = await resolveDefaultOrgId(requestRuntime.em).catch(() => null);
+    userId = await resolveDefaultAdminUserId(requestRuntime.em, orgId).catch(() => null);
   }
 
   return {
     session: {
       id: "local-dev-session",
-      userId: "local-admin",
+      userId: userId ?? "local-admin",
       expiresAt: new Date(Date.now() + 86400000),
     },
     orgId,
-    userId: "local-admin",
+    userId: userId ?? "local-admin",
   };
+}
+
+async function resolveDefaultAdminUserId(em: ApplicationPersistence, orgId: string | null): Promise<string | null> {
+  if (!orgId) return null;
+  const user = await em.findOne(User, {
+    where: { email: DEFAULT_ADMIN_EMAIL, orgId } as never,
+  });
+  return user?.id ?? null;
 }
 
 export async function closeWebRuntimeForTest(runtime: WebRuntime | null): Promise<void> {

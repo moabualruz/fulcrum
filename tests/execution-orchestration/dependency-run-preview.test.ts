@@ -107,4 +107,21 @@ describe("dependency orchestration dependency run preview", () => {
     expect(preview.orderedTaskIds).toEqual(["B", "A"]);
     expect(preview.warnings).toContain("Selected task UNKNOWN was not found.");
   });
+
+  test("blocks circular dependencies instead of recursing forever", () => {
+    const preview = buildDependencyRunPreview({
+      mode: "task",
+      targetTaskIds: ["A"],
+      tasks: [
+        task("A", { dependencies: { blocks: ["B"], blocked_by: ["B"] } }),
+        task("B", { dependencies: { blocks: ["A"], blocked_by: ["A"] } }),
+      ],
+    });
+
+    expect(preview.blocked).toBe(true);
+    expect(preview.warnings).toContain("Circular dependency detected at A.");
+    expect(preview.tasks.find((item) => item.id === "A")?.blockers).toContain(
+      "circular dependency detected",
+    );
+  });
 });
