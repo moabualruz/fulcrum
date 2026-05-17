@@ -1,7 +1,7 @@
 /**
  * Symphony WORKFLOW.md prompt renderer.
  *
- * C6: app code uses MikroORM repositories only. Liquid strict mode is mandatory
+ * C6: app code uses TypeORM repositories only. Liquid strict mode is mandatory
  * so template mistakes fail before dispatch instead of silently rendering empty.
  */
 

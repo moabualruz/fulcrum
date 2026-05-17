@@ -19,7 +19,7 @@ describe("full workflow E2E: docs → tasks → sprints", () => {
     const doc = await caller.docs.create({
       title: "E2E Workflow Test Doc",
       bodyMd: "# Requirements\n\nBuild login feature with OAuth2.",
-      kind: "note",
+      docType: "note",
     });
     expect(doc).toBeTruthy();
     const docId = (doc as { id: string }).id;

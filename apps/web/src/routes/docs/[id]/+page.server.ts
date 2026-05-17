@@ -75,7 +75,7 @@ export const load = (event: LoadEvent) => ({
 
       if (serverUrl && event.url && event.request) {
         // HTTP path: delegate to document API via HTTP (production mode).
-        const api = createDocumentApiForEvent(event as Required<LoadEvent>);
+        const api = createDocumentApiForEvent(event as Parameters<typeof createDocumentApiForEvent>[0]);
         const doc = await api.docs.get({ id: params.id }).catch(mapDocumentNotFound) as PublicDocument;
         const body = doc.bodyMd ?? doc.body_md ?? "";
         const docResult = {
@@ -117,7 +117,7 @@ export const load = (event: LoadEvent) => ({
       }
 
       // Local/in-process path: query DB directly via application scope.
-      const { em, ctx } = await requestAppScope(event.locals);
+      const { em, ctx } = await requestAppScope(event.locals as Parameters<typeof requestAppScope>[0]);
       const { getDoc, listDocBacklinks } = await import("@knowledge-workspace/application/docs/queries.ts");
       const docRaw = await getDoc(em, ctx, params.id);
       if (!docRaw) throw mapDocumentNotFound(new Error("Document not found"));
@@ -185,7 +185,7 @@ export const actions = {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const api = createDocumentApiForEvent(event);
-    await api.docs.uploadAttachment({
+    await api.docs.createAttachment({
       id: event.params.id!,
       file: {
         buffer,

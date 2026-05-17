@@ -40,7 +40,7 @@ export class Memory {
   @JoinColumn({ name: "org_id" })
   org!: Org;
 
-  /** MikroORM compat: access org FK id directly as orgId. */
+  /** TypeORM relation-id compatibility: access org FK id directly as orgId. */
   get orgId(): string | undefined {
     return (this.org as any)?.id;
   }

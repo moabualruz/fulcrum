@@ -87,6 +87,14 @@ export async function resolveCliTuiSession(
   }
 }
 
+export async function resolveCliTuiSessionFromContainer(options: {
+  container?: DiContainer | null;
+  userAgent?: string;
+} = {}): Promise<CliTuiSession | null> {
+  const cliContext = await buildCliTuiCallerContext(options.container ?? null);
+  return resolveCliTuiSession(cliContext.em, options.userAgent);
+}
+
 export async function requireCliTuiSessionContext(
   options: LocalCallerOptions = {},
 ): Promise<CliTuiCallerContext & { session: CliTuiSession; orgId: string; userId: string }> {

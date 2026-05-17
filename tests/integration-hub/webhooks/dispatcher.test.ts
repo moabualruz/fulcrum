@@ -40,10 +40,10 @@ function fakeEntityManager(rows: ReturnType<typeof webhook>[]): WebhookDispatche
     async find() {
       return rows;
     },
-    create(_entity, data) {
+    create(_entity: unknown, data: object) {
       return { id: randomUUID(), ...data };
     },
-    persist(entity) {
+    persist(entity: unknown) {
       persisted.push(entity);
     },
     async save() {},

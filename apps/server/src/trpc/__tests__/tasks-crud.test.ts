@@ -77,7 +77,7 @@ describe("tasks CRUD tRPC baseline", () => {
   test("create, list, get, update, and soft-delete tasks inside the caller org", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const created = await caller.tasks.create({
@@ -158,7 +158,7 @@ describe("tasks CRUD tRPC baseline", () => {
   test("get, update, and delete reject tasks outside the caller org", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const otherOrgCaller = callerFor(repo, OTHER_ORG_ID);
 
@@ -208,7 +208,7 @@ describe("tasks subtasks and dependencies tRPC", () => {
   test("setParent rejects direct cycles and accepts deeper non-cycles", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const a = await caller.tasks.create({ title: "A" });
@@ -241,7 +241,7 @@ describe("tasks subtasks and dependencies tRPC", () => {
   test("listChildren returns direct children for a 3-level nesting tree", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const root = await caller.tasks.create({ title: "Root" });
@@ -264,7 +264,7 @@ describe("tasks subtasks and dependencies tRPC", () => {
   test("setDependencies rejects circular blocks with typed error", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const a = await caller.tasks.create({ title: "A" });
@@ -296,7 +296,7 @@ describe("tasks subtasks and dependencies tRPC", () => {
   test("setDependencies stores normalized directions and emits dependency_updated", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const blocked = await caller.tasks.create({ title: "Blocked" });
@@ -335,7 +335,7 @@ describe("tasks bulk operations tRPC", () => {
   test("bulkUpdate updates all matching tasks, emits one event per task, and rolls back on invalid ids", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const tasks = await Promise.all([
@@ -380,7 +380,7 @@ describe("tasks bulk operations tRPC", () => {
   test("bulkDelete soft-deletes selected tasks and returns deleted count", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const keep = await caller.tasks.create({ title: "Keep" });
@@ -400,7 +400,7 @@ describe("tasks bulk operations tRPC", () => {
   test("bulkUpdate moves selected tasks to another sprint and project", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const projectId = "33333333-3333-4333-8333-333333333333";
       const sprintId = "44444444-4444-4444-8444-444444444444";

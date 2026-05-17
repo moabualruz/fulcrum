@@ -2,7 +2,7 @@
  * AuthService — Better-Auth v1 integration for Fulcrum.
  *
  * Wires Better-Auth with:
- *   - MikroORM-backed adapter (MikroOrmBetterAuthAdapter).
+ *   - TypeORM-backed adapter.
  *   - emailAndPassword plugin (always enabled for local-first mode).
  *   - organization plugin (always enabled; org context from Session.orgId).
  *   - Gated plugins (OAuth, magic-link, email OTP) wired behind "saas-auth"
@@ -35,7 +35,7 @@ async function isFlagEnabled(em: EntityManager, flag: string): Promise<boolean> 
   if (process.env[envKey] === "false") return false;
 
   // DB lookup — global flag (orgId IS NULL, userId IS NULL)
-  // Use FilterQuery cast to satisfy MikroORM v7 strict type checker
+  // Use FilterQuery cast to satisfy the adapter type checker.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const row = await em.findOne(FeatureFlag, { where: { flag, orgId: null, userId: null } as never });
   return row?.enabled ?? false;

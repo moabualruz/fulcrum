@@ -3,7 +3,7 @@
  *
  * Implements the 5-method casbin Adapter interface against
  * EntityRepository<CasbinRule>. No raw SQL — all operations go through
- * MikroORM repository calls. No third-party casbin-typeorm-adapter or
+ * TypeORM repository calls. No third-party casbin-typeorm-adapter or
  * casbin-knex-adapter dependency.
  *
  * CasbinRule columns: id (PK), ptype, v0..v5

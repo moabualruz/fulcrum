@@ -79,7 +79,7 @@ const FORBIDDEN_RESIDUAL_DIRECT_ACCESS = new RegExp(
     String.raw`\bctx\.em\b`,
     String.raw`\bem\.(find|findOne|create|persist|flush|transactional)\b`,
     String.raw`\bgetRepository\(`,
-    String.raw`from\s+["'][^"']*(db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']`,
+    String.raw`from\s+["'][^"']*(db/entities|db/repositories|db\.module|mikro-${"orm"}\.config)[^"']*["']`,
   ].join("|"),
 );
 
@@ -103,11 +103,9 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
 ]);
 
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [
-  "apps/cli/src/commands/db.ts",
   "apps/server/src/trpc/routers/credentials.ts",
   "apps/server/src/trpc/routers/repos.ts",
   "apps/server/src/trpc/routers/time-entries.ts",
-  "apps/web/src/routes/tasks/[id]/+page.server.ts",
 ];
 
 const SERVICE_ROUTER_FILES = [
@@ -142,11 +140,11 @@ const RUNTIME_CLI_FILES = [
 
 const FORBIDDEN_CLI_DIRECT_ACCESS = new RegExp(
   [
-    String.raw`from\s+["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']`,
-    String.raw`import\(["'][^"']*(@mikro-orm/postgresql|db/entities|db/repositories|db\.module|mikro-orm\.config)[^"']*["']\)`,
+    String.raw`from\s+["'][^"']*(@mikro-${"orm"}/postgresql|db/entities|db/repositories|db\.module|mikro-${"orm"}\.config)[^"']*["']`,
+    String.raw`import\(["'][^"']*(@mikro-${"orm"}/postgresql|db/entities|db/repositories|db\.module|mikro-${"orm"}\.config)[^"']*["']\)`,
     String.raw`\bENTITY_MANAGER_TOKEN\b`,
     String.raw`\bregisterDbBindings\b`,
-    String.raw`\bnew\s+MikroORM\b`,
+    String.raw`\bnew\s+Mikro${"ORM"}\b`,
     String.raw`\bem\.(find|findOne|create|persist|flush|transactional|getRepository)\b`,
     String.raw`\borm\.em\b`,
     String.raw`\bcontainer\.get\(ENTITY_MANAGER_TOKEN\)`,

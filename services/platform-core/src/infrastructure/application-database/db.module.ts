@@ -1,5 +1,5 @@
 /**
- * db.module.ts — backward-compat barrel after MikroORM → TypeORM migration.
+ * db.module.ts — backward-compat barrel after legacy ORM → TypeORM migration.
  *
  * Previously this file registered needle-di bindings. It now re-exports
  * TypeORM repositories so existing import paths keep compiling.
@@ -23,7 +23,7 @@ export { RepoRepository } from "@integration-hub/infrastructure/database/reposit
 export { EventRepository } from "./repositories/core/EventRepository.ts";
 export { TenantSettingRepository } from "./repositories/TenantSettingRepository.ts";
 
-/** @deprecated MikroORM compat stub — no-op in TypeORM world */
+/** @deprecated Legacy ORM compat stub — no-op in TypeORM world */
 export function registerDbBindings(_container?: unknown): void {
   // no-op: TypeORM uses DataSource injection, not needle-di bindings
 }

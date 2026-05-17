@@ -5,19 +5,19 @@ import { HeuristicExtractor } from "@knowledge-workspace/application/memory/extr
 
 describe("HeuristicExtractor", () => {
   test("resolves through direct instantiation", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     expect(extractor).toBeInstanceOf(HeuristicExtractor);
   });
 
   test("returns no memories for empty input", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     expect(extractor.extractMemories("")).toEqual([]);
   });
 
   test("extracts file references from touched-file transcript lines", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     const rows = extractor.extractMemories("Agent [wrote] src/foo.ts");
 
@@ -31,7 +31,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("extracts five decision variants as high-importance decisions", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
     const text = [
       "decided: use PGlite",
       "decision: keep local-first defaults",
@@ -57,7 +57,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("extracts H2 and H3 headings as section anchors", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     const rows = extractor.extractMemories("## Summary\nbody\n### Details");
 
@@ -66,7 +66,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("extracts blocker patterns as high-importance blockers", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     const blockers = extractor.extractMemories(
       "blocked by issue #12\nwaiting on review\nneed schema migration to proceed",
@@ -81,7 +81,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("extracts wikilinks and bare URLs as links", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
 
     const links = extractor.extractMemories(
       "See [[Foo Bar]] and https://example.com/docs?q=1.",
@@ -94,7 +94,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("extracts at least one row of each kind from a mixed transcript", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
     const rows = extractor.extractMemories([
       "[read] services/knowledge-workspace/src/application/memory/extractor-heuristic.ts",
       "decided: keep extraction side-effect free",
@@ -109,7 +109,7 @@ describe("HeuristicExtractor", () => {
   });
 
   test("does not extract cross-pass duplicates for the same span", () => {
-    const extractor = new HeuristicExtractor({} as MemoryRepository);
+    const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
     const rows = extractor.extractMemories("## Decision\nuse PGlite");
 
     expect(rows).toHaveLength(1);
@@ -126,7 +126,7 @@ describe("HeuristicExtractor", () => {
         writes += 1;
         throw new Error("repository should not be used");
       },
-    }) as MemoryRepository;
+    }) as unknown as MemoryRepository;
     const extractor = new HeuristicExtractor(repo);
     const text = "[created] docs/memory.md\nwaiting on review";
 

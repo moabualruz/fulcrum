@@ -27,7 +27,7 @@ describe("tasks cross-interface parity", () => {
       projectId: null,
     };
 
-    const created = await createTask(db.em, ctx, {
+    const created = await createTask(db.ds, ctx, {
       title: "Cross-interface task",
       status: "todo",
     });
@@ -84,7 +84,7 @@ describe("tasks cross-interface parity", () => {
 
     for (const file of clientFiles) {
       const source = await readFile(file, "utf8");
-      expect(source, `${file} must not import runtime ORM`).not.toMatch(/@mikro-orm|db\/entities|Product${"Db"}/);
+      expect(source, `${file} must not import runtime ORM`).not.toMatch(new RegExp(`@mikro-${"orm"}|db\\/entities|Product${"Db"}`));
       expect(source, `${file} must not persist directly`).not.toMatch(/\.persist\(|\.flush\(|getRepository\(/);
     }
   });

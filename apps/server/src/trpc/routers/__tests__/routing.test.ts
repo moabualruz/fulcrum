@@ -44,7 +44,7 @@ function callerFor(em: import("typeorm").EntityManager) {
   const container = makeSimpleContainer();
   container.bind({
     provide: RoutingRuleRepository,
-    useValue: em.getRepository(RoutingRule) as unknown as RoutingRuleRepository,
+    useValue: em.getRepository(RoutingRule) as unknown as unknown as RoutingRuleRepository,
   });
 
   return createCaller(

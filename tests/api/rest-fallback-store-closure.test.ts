@@ -16,7 +16,7 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 describe("REST fallback store closure", () => {
-  it("task REST routes no longer live in route-local Hono fallback files", async () => {
+  it("task REST routes no longer live in route-local fallback files", async () => {
     for (const path of LEGACY_ROUTE_FILES) {
       expect(await fileExists(path), path).toBe(false);
     }

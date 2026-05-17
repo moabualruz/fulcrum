@@ -9,7 +9,7 @@ export function publicApiBaseUrl(url: URL): string {
 }
 
 export function activeOrgId(locals: App.Locals): string {
-  const localOrgId = locals.orgId;
+  const localOrgId = (locals as App.Locals & { orgId?: string | null }).orgId;
   return localOrgId && localOrgId.trim() ? localOrgId : DEFAULT_ORG_ID;
 }
 

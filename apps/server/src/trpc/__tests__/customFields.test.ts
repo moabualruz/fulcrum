@@ -91,7 +91,7 @@ describe("custom field tRPC procedures", () => {
   test("customFieldDefs.list returns task custom field definitions ordered by position", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       await createField(repo, {
@@ -124,7 +124,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.set stores validated text, number, date, and select values", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Custom field task" });
       const customer = await createField(repo, { slug: "customer", name: "Customer", type: "text" });
@@ -167,7 +167,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.set rejects invalid type, number constraints, and select options", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Validation task" });
       const requiredText = await createField(repo, {
@@ -206,7 +206,7 @@ describe("custom field tRPC procedures", () => {
   test("taskCustomFields.clear removes optional values and rejects required field clearing", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Clear task" });
       const optionalField = await createField(repo, { slug: "tag", name: "Tag", type: "text" });

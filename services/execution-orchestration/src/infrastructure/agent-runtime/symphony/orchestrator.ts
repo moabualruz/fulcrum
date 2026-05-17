@@ -5,8 +5,8 @@
  * The agent_runs_claimed_unique partial index (task_id WHERE orchestration_state='claimed')
  * is the only synchronization primitive — no advisory locks needed.
  *
- * C6: No raw SQL — MikroORM nativeUpdate + repository calls only.
- * C7: MikroORM v7 EntityManager operations.
+ * C6: No raw SQL; TypeORM repository calls only.
+ * C7: TypeORM EntityManager operations.
  *
  * Pillar 3, slice 06 — callable from the orchestrator poll loop (wired in slice 10).
  */

@@ -626,6 +626,9 @@ describe("vendor_canonical_agents schema", () => {
       "[meta]",
       "schema_version = 1",
       "",
+      "[skills.example]",
+      "source = \"https://github.com/example/example\"",
+      "subpath = \"example/skill.md\"",
       "ref = \"main\"",
       "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
       "license = \"MIT\"",
@@ -664,6 +667,9 @@ describe("vendor_canonical_agents schema", () => {
       "[meta]",
       "schema_version = 1",
       "",
+      "[skills.example]",
+      "source = \"https://github.com/example/example\"",
+      "subpath = \"example/skill.md\"",
       "ref = \"main\"",
       "tree_sha = \"0123456789abcdef0123456789abcdef01234567\"",
       "license = \"MIT\"",
@@ -688,6 +694,7 @@ describe("vendor_canonical_agents schema", () => {
       const skipLines = logs.filter((l) => l.includes("vendor-canonical install handles"));
       expect(skipLines.length).toBe(4);
       // Pi (not in list) should NOT have the skip line; should attempt copy
+      const piMirror = logs.filter((l) => l.includes("Pi") || l.includes("example"));
       expect(piMirror.length).toBeGreaterThan(0);
     } finally {
       logSpy.mockRestore();
@@ -744,6 +751,7 @@ describe("upstream skill filtering helpers", () => {
     expect(logs.some((l) => l.includes("wrangler"))).toBe(false);
   });
 
+  test("syncUpstreamSkillsBySource syncs exact Cloudflare source entries and excludes example", async () => {
     const lockPath = await writeLock([
       "[meta]",
       "schema_version = 1",
@@ -758,6 +766,9 @@ describe("upstream skill filtering helpers", () => {
       'pinned_on = "2026-04-28"',
       'review_due = "2026-07-27"',
       "",
+      "[skills.example]",
+      'source = "https://github.com/example/skills"',
+      'subpath = "skills/example"',
       'ref = "main"',
       'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
       'license = "MIT"',
@@ -781,6 +792,7 @@ describe("upstream skill filtering helpers", () => {
 
     expect(logs.some((l) => l.includes("1 curated skill(s)"))).toBe(true);
     expect(logs.some((l) => l.includes("wrangler"))).toBe(true);
+    expect(logs.some((l) => l.includes("example"))).toBe(false);
   });
 
   test("syncUpstreamSkillsBySource previews install when agent root exists without skills dir", async () => {
@@ -869,6 +881,9 @@ describe("upstream skill filtering helpers", () => {
       'pinned_on = "2026-04-28"',
       'review_due = "2026-07-27"',
       "",
+      "[skills.example]",
+      'source = "https://github.com/example/skills"',
+      'subpath = "skills/example"',
       'ref = "main"',
       'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
       'license = "MIT"',
@@ -884,9 +899,12 @@ describe("upstream skill filtering helpers", () => {
 
     for (const dir of [
       join(TMP, ".codex", "skills", "wrangler"),
+      join(TMP, ".codex", "skills", "example"),
       join(TMP, ".gemini", "skills", "wrangler"),
+      join(TMP, ".gemini", "skills", "example"),
       join(TMP, ".pi", "agent", "skills", "wrangler"),
       join(TMP, ".pi", "agent", "skills", "cloudflare-wrangler"),
+      join(TMP, ".pi", "agent", "skills", "example"),
     ]) {
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "SKILL.md"), "---\nname: installed\n---\n");
@@ -907,6 +925,9 @@ describe("upstream skill filtering helpers", () => {
     await expect(readdir(join(TMP, ".gemini", "skills", "wrangler"))).rejects.toThrow();
     await expect(readdir(join(TMP, ".pi", "agent", "skills", "wrangler"))).rejects.toThrow();
     await expect(readdir(join(TMP, ".pi", "agent", "skills", "cloudflare-wrangler"))).rejects.toThrow();
+    expect(await readFile(join(TMP, ".codex", "skills", "example", "SKILL.md"), "utf8")).toContain("installed");
+    expect(await readFile(join(TMP, ".gemini", "skills", "example", "SKILL.md"), "utf8")).toContain("installed");
+    expect(await readFile(join(TMP, ".pi", "agent", "skills", "example", "SKILL.md"), "utf8")).toContain("installed");
   });
 
   test("removeUpstreamSkills preserves unmarked user-owned vendor placements", async () => {
@@ -940,6 +961,9 @@ describe("upstream skill filtering helpers", () => {
       "[meta]",
       "schema_version = 1",
       "",
+      "[skills.example]",
+      'source = "https://github.com/example/skills"',
+      'subpath = "skills/example"',
       'ref = "main"',
       'tree_sha = "89abcdef0123456789abcdef0123456789abcdef"',
       'license = "MIT"',
@@ -950,11 +974,20 @@ describe("upstream skill filtering helpers", () => {
       "",
     ].join("\n"));
 
+    const codexExample = join(TMP, ".codex", "skills", "example");
+    const piExample = join(TMP, ".pi", "agent", "skills", "example");
+    for (const dir of [codexExample, piExample]) {
       await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "SKILL.md"), "---\nname: example\n---\n");
     }
+    const piMarker = join(TMP, ".fulcrum", "state", "global", "upstream-skills", "pi", "example.installed");
     await mkdir(join(piMarker, ".."), { recursive: true });
     await writeFile(piMarker, "installed\n");
 
+    await removeUpstreamSkills({ names: ["example"], lockPath });
+
+    expect(await readFile(join(codexExample, "SKILL.md"), "utf8")).toContain("example");
+    await expect(readdir(piExample)).rejects.toThrow();
   });
 
   test("removeUpstreamSkills ignores unsafe Pi frontmatter alias outside skills root", async () => {

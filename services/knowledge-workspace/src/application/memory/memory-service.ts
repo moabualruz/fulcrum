@@ -82,7 +82,7 @@ export class MemoryService {
   async promote(memoryId: string, orgId: string): Promise<void> {
     const em = this.repo.getEntityManager() as any;
     if (typeof em.nativeUpdate === "function") {
-      // MikroORM-style compat path (used in unit tests)
+      // Legacy ORM-style compatibility path (used in unit tests).
       await em.nativeUpdate(
         (this.repo as any).memories?.target ?? "memories",
         { id: memoryId, orgId },

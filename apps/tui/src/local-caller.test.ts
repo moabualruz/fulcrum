@@ -32,7 +32,7 @@ describe("TUI document API caller", () => {
       }) as typeof fetch,
     });
 
-    await expect(caller.docs.templates.list({})).resolves.toEqual([]);
+    await expect(caller.docs.templates.list()).resolves.toEqual([]);
     await expect(caller.docs.list({ projectId: "project-1" })).resolves.toEqual([{ id: "doc-1", title: "Doc" }]);
     await expect(caller.docs.get({ id: "doc-1" })).resolves.toEqual({ id: "doc-1", title: "Doc" });
     await expect(caller.docs.listAttachments({ docId: "doc-1" })).resolves.toEqual([{ id: "attachment-1" }]);

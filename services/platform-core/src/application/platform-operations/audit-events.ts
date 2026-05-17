@@ -4,7 +4,7 @@
  *
  * Provides:
  *   - Zod schemas for every platform event payload type (validated on emit).
- *   - `emitPlatformEvent()` — low-level emitter backed by MikroORM Event entity
+ *   - `emitPlatformEvent()` — low-level emitter backed by TypeORM Event entity
  *     or an injectable EventSink for testing.
  *   - `measureP99()` — utility: run fn N times, return p99 latency in ms.
  *
@@ -236,7 +236,7 @@ export function isPayloadSchemaRegistered(subjectKind: string, verb: string): bo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EventSink interface — decouples emitter from MikroORM for testing
+// EventSink interface decouples emitter from TypeORM for testing.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface PlatformEventInput {
@@ -304,11 +304,11 @@ export async function emitPlatformEvent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MikroORM-backed EventSink (production path)
+// TypeORM-backed EventSink (production path)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Build an EventSink backed by MikroORM EntityManager.
+ * Build an EventSink backed by TypeORM EntityManager.
  * Import lazily so web-bundle SSR never statically loads entity decorators.
  */
 export async function mkOrmEventSink(

@@ -74,8 +74,8 @@ function mockSession(userId: string, orgId: string) {
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
   const em = testOrm.em;
-  const flagRepo = em.getRepository(FeatureFlag) as FeatureFlagRepository;
-  const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
+  const flagRepo = em.getRepository(FeatureFlag) as unknown as FeatureFlagRepository;
+  const orgMemberRepo = em.getRepository(OrgMember) as unknown as OrgMemberRepository;
 
   // Rebuild registry with fresh forked EM so it sees latest DB state
   const freshRegistry = new FlagRegistry(flagRepo);

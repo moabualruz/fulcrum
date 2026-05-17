@@ -9,7 +9,7 @@
  * Date range parameter on all queries (D-55).
  *
  * Security: All queries scoped by orgId from context (T-05-11 mitigation).
- * No raw SQL — MikroORM only (C6).
+ * No raw SQL; TypeORM repository path only (C6).
  */
 
 import type { EntityManager } from "typeorm";

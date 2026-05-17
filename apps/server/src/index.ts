@@ -13,6 +13,7 @@ export { t } from "./trpc/trpc.ts";
 export {
   buildCliTuiCallerContext,
   resolveCliTuiSession,
+  resolveCliTuiSessionFromContainer,
   requireCliTuiSessionContext,
 } from "./session/local-session.ts";
 export type {

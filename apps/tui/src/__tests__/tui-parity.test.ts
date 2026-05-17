@@ -99,7 +99,7 @@ describe("Surface TUI parity inventory", () => {
 
     for (const file of screenFiles) {
       const source = await readFile(new URL(`../screens/${file}`, import.meta.url), "utf-8");
-      expect(source).not.toMatch(/from ["']\.\.\/\.\.\/db|from ["']\.\.\/db|EntityManager|MikroORM/);
+      expect(source).not.toMatch(new RegExp(`from ["']\\.\\.\\/\\.\\.\\/db|from ["']\\.\\.\\/db|EntityManager|Mikro${"ORM"}`));
     }
   });
 

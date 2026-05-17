@@ -83,7 +83,7 @@ function authenticatedCaller(
   );
 }
 
-function authenticatedCallerWithContainer(container: DiContainer) {
+function authenticatedCallerWithContainer(container: DiContainer | null) {
   const userId = "user-test-001";
   const orgId = LOCAL_ORG_ID;
   const session = mockSession({ userId, orgId });
@@ -432,7 +432,7 @@ describe("assertPermission middleware", () => {
     const container = casbinContainer([
       { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "docs.templates", v3: "list" },
       { ptype: "p", v0: LOCAL_ORG_ID, v1: "user-test-001", v2: "docs.templates", v3: "resolve" },
-    ]) as Container;
+    ]) as DiContainer;
     container.bind({
       provide: DOC_TEMPLATE_SERVICE_TOKEN,
       useValue: templateService,

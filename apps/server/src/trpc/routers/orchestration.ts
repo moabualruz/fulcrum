@@ -387,7 +387,7 @@ export const orchestrationRouter = router({
   // ---------------------------------------------------------------------------
   // dispatchRun — SND-06, SYM-25
   // Creates or updates an agent_runs row and queues the run for dispatch.
-  // Uses MikroORM EM path (ARCH-12), not legacy SQL.
+  // Uses TypeORM EntityManager path (ARCH-12), not legacy SQL.
   // Protected by permissionedProcedure with explicit resource/action metadata.
   // ---------------------------------------------------------------------------
   dispatchRun: permissionedProcedure({ resource: "orchestration", action: "dispatchRun" })

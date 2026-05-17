@@ -1,7 +1,7 @@
 /**
  * Fulcrum-backed Symphony tracker adapter.
  *
- * C6: app code uses MikroORM repositories/query builders only. Raw SQL is
+ * C6: app code uses TypeORM repositories/query builders only. Raw SQL is
  * limited to migration classes and test-only planner introspection.
  */
 

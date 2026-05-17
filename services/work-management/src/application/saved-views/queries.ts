@@ -1,6 +1,6 @@
 /**
- * Saved views — migrated from raw LegacyDatabaseHandle to MikroORM EntityManager.
- * ARCH-01/ARCH-02: All DB access via MikroORM EM connection.
+ * Saved views — migrated from raw LegacyDatabaseHandle to TypeORM EntityManager.
+ * ARCH-01/ARCH-02: All DB access via TypeORM connection.
  */
 
 import type { EntityManager } from "typeorm";

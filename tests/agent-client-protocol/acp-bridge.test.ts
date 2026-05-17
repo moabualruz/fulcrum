@@ -166,7 +166,7 @@ describe("ACP ported protocol foundation", () => {
     await Promise.resolve();
 
     expect(bridge.pendingPermissionRequest).toEqual(permission);
-    const seenRequest = observedRequest;
+    const seenRequest: PermissionRequest | null = observedRequest;
     if (!seenRequest) throw new Error("Expected permission request callback.");
     expect(seenRequest).toEqual(permission);
     bridge.resolvePermission("allow");

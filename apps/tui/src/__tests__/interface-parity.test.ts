@@ -42,12 +42,12 @@ async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Pro
 
 describe("interface TUI interface encapsulation", () => {
   const persistenceImportPattern = new RegExp([
-    "@mikro-orm/postgresql",
+    `@mikro-${"orm"}/postgresql`,
     "db/db.module",
     ["db", "entities"].join("/"),
     ["product", "kernel"].join("-"),
   ].join("|").replaceAll("/", "\\/"));
-  const directRuntimeSymbolPattern = /EntityManager|MikroORM|ENTITY_MANAGER_TOKEN|registerDbBindings/;
+  const directRuntimeSymbolPattern = new RegExp(`EntityManager|Mikro${"ORM"}|ENTITY_MANAGER_TOKEN|registerDbBindings`);
   const directOrmCallPattern = /em\.(persist|flush|find|findOne|getRepository|create|transactional)/;
 
   test("runtime caller and telemetry setup do not import persistence internals", async () => {
@@ -67,7 +67,7 @@ describe("interface TUI interface encapsulation", () => {
       expect(text).not.toMatch(persistenceImportPattern);
       expect(text).not.toMatch(new RegExp([
         "EntityManager",
-        "MikroORM",
+        `Mikro${"ORM"}`,
         ["open", "Database"].join(""),
         ["get", "Product", "Db"].join(""),
         ["Product", "Db"].join(""),

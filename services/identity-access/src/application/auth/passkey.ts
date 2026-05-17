@@ -13,7 +13,7 @@
  *   - verifyPasskeyRegistration(): wraps verifyRegistrationResponse().
  *
  * Callers should check `checkPasskeyAvailability()` before using passkey flows.
- * Credential storage uses MikroORM account and verification entities.
+ * Credential storage uses TypeORM account and verification entities.
  *
  * NOTE: @simplewebauthn/server is an optional peer dep. If not installed,
  * checkPasskeyAvailability() returns false and all helpers throw with a

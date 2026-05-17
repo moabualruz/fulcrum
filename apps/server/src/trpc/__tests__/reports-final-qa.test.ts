@@ -447,16 +447,16 @@ afterEach(() => {
 
 function caller() {
   restoreApplication = __setReportsApplicationForTest({
-    buildFinalQaReport,
-    buildFinalQaFeedbackGate,
-    buildUatCodeReviewHandoff,
-    recordUatCodeReviewDecision,
-    runGeneratedE2eRegressionTests,
-    applyConfiguredUatCodeReviewDecision,
-    buildReviewWorkbenchModel,
-    saveReviewWorkbenchSession,
-    loadReviewWorkbenchSession,
-    appendReviewWorkbenchAnnotation,
+    buildFinalQaReport: buildFinalQaReport as never,
+    buildFinalQaFeedbackGate: buildFinalQaFeedbackGate as never,
+    buildUatCodeReviewHandoff: buildUatCodeReviewHandoff as never,
+    recordUatCodeReviewDecision: recordUatCodeReviewDecision as never,
+    runGeneratedE2eRegressionTests: runGeneratedE2eRegressionTests as never,
+    applyConfiguredUatCodeReviewDecision: applyConfiguredUatCodeReviewDecision as never,
+    buildReviewWorkbenchModel: buildReviewWorkbenchModel as never,
+    saveReviewWorkbenchSession: saveReviewWorkbenchSession as never,
+    loadReviewWorkbenchSession: loadReviewWorkbenchSession as never,
+    appendReviewWorkbenchAnnotation: appendReviewWorkbenchAnnotation as never,
   });
   const createCaller = t.createCallerFactory(appRouter);
   return createCaller(createContext({

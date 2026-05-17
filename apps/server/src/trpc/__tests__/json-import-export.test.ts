@@ -74,7 +74,7 @@ describe("JSON import/export tRPC procedures", () => {
     const db = await createTestOrm();
     try {
       const em = db.em;
-      const repo = em.getRepository(Task) as TaskRepository;
+      const repo = em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const task = await caller.tasks.create({ title: "Export me", status: "ready" });
@@ -133,7 +133,7 @@ describe("JSON import/export tRPC procedures", () => {
   test("dataImport.preflight reports counts and UUID collisions", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const task = await caller.tasks.create({ title: "Existing" });
       const exportResult = await caller.dataExport.create();
@@ -155,7 +155,7 @@ describe("JSON import/export tRPC procedures", () => {
   test("dataImport.run supports dry-run, update idempotence, and error collisions", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const created = await caller.tasks.create({ title: "Before import", status: "todo" });
       const exported = JSON.parse((await caller.dataExport.create()).json);

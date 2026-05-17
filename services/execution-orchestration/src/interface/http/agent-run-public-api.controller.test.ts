@@ -53,7 +53,7 @@ describe("agent-run public API feature gate", () => {
 });
 
 describe("agent-run public Nest API", () => {
-  test("is wired as a Nest controller without a Hono route factory", () => {
+  test("is wired as a Nest controller without a legacy route factory", () => {
     const controllers = Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, AgentRunPublicApiModule) as unknown[];
 
     expect(controllers).toContain(AgentRunPublicApiController);

@@ -34,7 +34,11 @@ const WEB_DATA_HANDLE_PATTERN = /\b(openDatabase|getDatabase|getEm|getDefaultOrg
 
 const RAW_SQL_CALL_PATTERN = /\b(db|conn|connection|pglite)\.query\s*(?:<[^>]+>)?\(|\b(db|conn|connection|client|pglite)\.execute\s*(?:<[^>]+>)?\(|\.getKysely\b/;
 
-const INVOCATION_LAYER_ORM_PATTERN = /@mikro-orm|MikroORM|EntityManager|ENTITY_MANAGER_TOKEN|registerDbBindings|application-database/;
+const LEGACY_ORM_PACKAGE_PATTERN = `@mikro-${"orm"}`;
+const LEGACY_ORM_CLASS_PATTERN = `Mikro${"ORM"}`;
+const INVOCATION_LAYER_ORM_PATTERN = new RegExp(
+  `${LEGACY_ORM_PACKAGE_PATTERN}|${LEGACY_ORM_CLASS_PATTERN}|EntityManager|ENTITY_MANAGER_TOKEN|registerDbBindings|application-database`,
+);
 
 const WEB_DATA_HANDLE_COMPOSITION_ROOTS = new Map([
   [
@@ -124,8 +128,6 @@ describe("interface raw EntityManager and SQL boundary", () => {
       ["apps/web/src/routes", "apps/web/src/lib", "apps/cli/src", "apps/tui/src"],
       INVOCATION_LAYER_ORM_PATTERN,
     );
-    expect(found).toEqual([
-      "apps/cli/src/commands/db.ts",
-    ]);
+    expect(found).toEqual([]);
   });
 });

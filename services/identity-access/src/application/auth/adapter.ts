@@ -1,6 +1,6 @@
 /**
  * MikroOrmBetterAuthAdapter — maps Better-Auth v1 CRUD contract to
- * MikroORM EntityRepository calls.
+ * TypeORM repository calls.
  *
  * Better-Auth model names and how they map:
  *   "user"         → User entity        (users table)
@@ -39,7 +39,7 @@ function normalizeLocalAuthEmail(email: unknown): unknown {
 }
 
 /**
- * Build a MikroORM FilterQuery from Better-Auth CleanedWhere clauses.
+ * Build an ORM filter from Better-Auth CleanedWhere clauses.
  * Supports: eq, ne, lt, lte, gt, gte, in, not_in, contains, starts_with, ends_with.
  *
  * Returns plain Record — callers cast to their entity's FilterQuery.
@@ -93,7 +93,7 @@ function buildWhere(
   return query;
 }
 
-/** Map Better-Auth camelCase field names to MikroORM User entity property names. */
+/** Map Better-Auth camelCase field names to User entity property names. */
 const USER_FIELD_MAP: Record<string, string> = {
   id: "id",
   email: "email",
@@ -275,7 +275,7 @@ class InMemoryStore {
 
 /**
  * MikroOrmBetterAuthAdapter wires Better-Auth's CustomAdapter contract to
- * MikroORM EntityRepository calls.
+ * TypeORM repository calls.
  *
  * Usage: pass `this.createAdapter()` as the `database` option to `betterAuth()`.
  *
@@ -834,7 +834,7 @@ export class MikroOrmBetterAuthAdapter {
   }
 
   // ──────────────────────────────────────────────────────────────
-  // FIELD MAPPERS — Better-Auth ↔ MikroORM entity properties
+  // FIELD MAPPERS: Better-Auth <-> entity properties.
   // ──────────────────────────────────────────────────────────────
 
   private mapUserFromBetterAuth(data: Record<string, unknown>): Record<string, unknown> {

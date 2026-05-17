@@ -1,5 +1,5 @@
 /**
- * EntityManagerDocTemplateService — MikroORM-backed implementation of DocTemplateService.
+ * EntityManagerDocTemplateService — TypeORM-backed implementation of DocTemplateService.
  *
  * Used as the fallback when no mock is bound in the DI container.
  * Queries the doc_templates table via the forked EntityManager in tRPC context.
@@ -17,7 +17,7 @@ export class EntityManagerDocTemplateService implements DocTemplateService {
     const { DocTemplate } = await import("@knowledge-workspace/infrastructure/database/entities/docs/DocTemplate.ts");
 
     // TypeORM OR conditions use an array of conditions (each element is ANDed
-    // within itself, and OR-ed across elements). MikroORM $or is invalid here.
+    // within itself, and OR-ed across elements). Keep this filter explicit for ORM portability.
     const where = projectId
       ? [
           { org: { id: orgId }, projectId } as Record<string, unknown>,

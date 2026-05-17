@@ -155,7 +155,7 @@ class MockEntityManager {
       const [field, dir] = Object.entries(order)[0] ?? [];
       if (field) {
         filtered.sort((a, b) => {
-          const av = a[field], bv = b[field];
+          const av = String(a[field] ?? ""), bv = String(b[field] ?? "");
           const cmp = av < bv ? -1 : av > bv ? 1 : 0;
           return dir === "DESC" ? -cmp : cmp;
         });

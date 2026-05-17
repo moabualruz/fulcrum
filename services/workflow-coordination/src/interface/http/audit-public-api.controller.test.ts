@@ -139,7 +139,7 @@ describe("audit public Nest API", () => {
     });
   });
 
-  test("exports JSON rows and CSV text without going through a Hono route", async () => {
+  test("exports JSON rows and CSV text without going through a legacy route", async () => {
     const queryAuditEvents = mock(async () => ({
       data: [{
         id: "audit-1",

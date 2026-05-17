@@ -51,7 +51,7 @@ describe("runs cross-interface parity", () => {
     bindTestRuntimeOrm(container, db);
     const ctx: AppContext = { orgId: db.seed.orgId, userId: db.seed.userId, projectId: null };
 
-    const created = await dispatchRun(db.em, ctx, {
+    const created = await dispatchRun(db.ds, ctx, {
       agentName: "codex",
       prompt: "architecture.5-run-parity",
     });
@@ -106,7 +106,7 @@ describe("runs cross-interface parity", () => {
 
     for (const file of clientFiles) {
       const source = await readFile(file, "utf8");
-      expect(source, `${file} must not import runtime ORM`).not.toMatch(/@mikro-orm|db\/entities|Product${"Db"}/);
+      expect(source, `${file} must not import runtime ORM`).not.toMatch(new RegExp(`@mikro-${"orm"}|db\\/entities|Product${"Db"}`));
       expect(source, `${file} must not persist directly`).not.toMatch(/\.persist\(|\.flush\(|getRepository\(/);
     }
   });

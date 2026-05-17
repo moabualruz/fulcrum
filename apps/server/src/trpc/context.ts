@@ -9,7 +9,7 @@ import type { LegacySymphonyStore } from "@platform-core/application/legacy/symp
 /**
  * tRPC context shared by web, CLI, TUI, and tests.
  *
- * Canonical data access is via MikroORM `em` + needle-di `container`.
+ * Canonical data access is via TypeORM EntityManager and application container.
  * `legacyStore` is retained only for Symphony compatibility procedures while
  * application orchestration queries continue moving to EntityManager.
  */

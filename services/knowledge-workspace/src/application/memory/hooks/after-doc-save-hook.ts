@@ -77,7 +77,7 @@ export class AfterDocSaveMemoryHook {
 
     for (const candidate of candidates) {
       // Find-or-create Memory — idempotent by (org, projectId, kind, body, source='heuristic').
-      // MikroORM's upsert onConflictWhere places the WHERE after DO NOTHING instead of
+      // Some ORM upsert helpers place the WHERE after DO NOTHING instead of
       // before it (partial-index arbiter syntax), which PGlite rejects. Use find-then-create
       // instead; the partial index on memories still enforces uniqueness at the DB level.
       let memory = await (this.em as EntityManager).findOne(Memory, {

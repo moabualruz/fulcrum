@@ -2,7 +2,7 @@
  * Filter query AST for saved views and search.
  *
  * The `kind` facet discriminates task/doc/memory/artifact search scope.
- * compileSavedViewQuery returns a MikroORM FilterQuery expression; the ORM
+ * compileSavedViewQuery returns an ORM filter expression; the ORM
  * generates SQL.
  */
 
@@ -66,14 +66,14 @@ export type SavedViewQuery = z.infer<typeof SavedViewQuerySchema>;
 // ─── Compiler ───────────────────────────────────────────────────────────────
 
 /**
- * Compiles a SavedViewQuery to a MikroORM FilterQuery<Task>.
+ * Compiles a SavedViewQuery to a TypeORM-compatible task filter.
  *
  * Empty query → `{}` (no filter = all tasks).
  * Multiple conditions → wrapped in `$and`.
  *
  * FTS `text` fallback: `{ title: { $like: '%…%' } }`.
  * `custom_fields.<slug>` uses jsonb `$contains` (`@>` operator).
- * Native `->>'slug'` path ops need a dedicated MikroORM jsonb extension or $raw.
+ * Native `->>'slug'` path ops need a dedicated TypeORM jsonb expression.
  */
 export function compileSavedViewQuery(q: SavedViewQuery): FilterQuery<Task> {
   const conditions: Record<string, unknown>[] = [];

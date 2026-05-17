@@ -81,7 +81,7 @@ function application(): SearchPublicApplication {
 }
 
 describe("search public Nest API", () => {
-  test("is wired as a Nest controller without the product-store Hono API", () => {
+  test("is wired as a Nest controller without the product-store legacy API", () => {
     const controllers = Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, SearchPublicApiModule) as unknown[];
 
     expect(controllers).toContain(SearchPublicApiController);

@@ -69,7 +69,7 @@ function makeMockRepo(memories: Memory[] = []): MemoryRepository & { _em: MockEm
     }),
     create: mock((data: Partial<Memory>) => ({ ...data, id: "new-mem-id", body: (data as Record<string, unknown>).body, importance: (data as Record<string, unknown>).importance } as Memory)),
     getEntityManager: mock(() => em),
-  } as unknown as MemoryRepository & { _em: MockEm };
+  } as unknown as unknown as MemoryRepository & { _em: MockEm };
   return repo;
 }
 
@@ -166,7 +166,7 @@ describe("MemoryService", () => {
 
   describe("heuristic extractor integration", () => {
     test("extractMemories returns at least 1 row with body containing insight from input", () => {
-      const extractor = new HeuristicExtractor({} as MemoryRepository);
+      const extractor = new HeuristicExtractor({} as unknown as MemoryRepository);
       const transcript = "Agent [wrote] services/knowledge-workspace/src/application/memory/memory-service.ts\nDecided: use FTS ranking for memory retrieval";
 
       const memories = extractor.extractMemories(transcript);

@@ -74,7 +74,7 @@ async function createOrgProjectAndSession(db: TestOrm): Promise<{ orgId: string;
     activeOrganizationId: orgId,
     expiresAt: new Date(Date.now() + 60_000),
     createdAt: new Date(),
-    ipAddress: null,
+    ipAddress: undefined,
     userAgent: "test",
   });
   return { orgId, projectId };

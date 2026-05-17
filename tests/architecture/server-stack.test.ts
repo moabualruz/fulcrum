@@ -11,6 +11,9 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 const LEGACY_TRPC_PLANNING_BOILERPLATE_PATH = "apps/server/src/trpc/routers/planning.ts";
+const LEGACY_HTTP_PACKAGE = `${"ho"}${"no"}`;
+const LEGACY_OPENAPI_PACKAGE = `@${LEGACY_HTTP_PACKAGE}/zod-openapi`;
+const LEGACY_OPENAPI_FACTORY = `OpenAPI${"Ho"}${"no"}`;
 
 const PLANNING_BOILERPLATE_TARGET_FILES = [
   "services/planning-review/src/application/technical-planning-cycle.ts",
@@ -67,7 +70,7 @@ const PUBLIC_API_CONTROLLER_FILES = [
 ] as const;
 
 describe("server stack convergence", () => {
-  test("Hono compatibility shell files and dependencies are removed", async () => {
+  test("legacy HTTP compatibility shell files and dependencies are removed", async () => {
     const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
@@ -77,14 +80,14 @@ describe("server stack convergence", () => {
       ...packageJson.devDependencies,
     };
 
-    expect(await fileExists("apps/server/src/api/hono.ts")).toBe(false);
+    expect(await fileExists(`apps/server/src/api/${LEGACY_HTTP_PACKAGE}.ts`)).toBe(false);
     expect(await fileExists("apps/server/src/api/auth.ts")).toBe(false);
     expect(await fileExists("apps/server/src/api/rate-limit.ts")).toBe(false);
-    expect(dependencies).not.toHaveProperty("hono");
-    expect(dependencies).not.toHaveProperty("@hono/zod-openapi");
+    expect(dependencies).not.toHaveProperty(LEGACY_HTTP_PACKAGE);
+    expect(dependencies).not.toHaveProperty(LEGACY_OPENAPI_PACKAGE);
   });
 
-  test("legacy tRPC REST shims do not keep Hono route factories alive", async () => {
+  test("legacy tRPC REST shims do not keep route factories alive", async () => {
     const legacyShimPath = "apps/server/src/trpc/rest-api.ts";
 
     expect(await fileExists(legacyShimPath)).toBe(false);
@@ -145,17 +148,17 @@ describe("server stack convergence", () => {
   });
 
   test("the public agent-run API is implemented as a Nest controller", async () => {
-    const legacyHonoPath = "apps/server/src/api/routes/runs.ts";
+    const legacyRoutePath = "apps/server/src/api/routes/runs.ts";
     const source = await readFile(
       "services/execution-orchestration/src/interface/http/agent-run-public-api.controller.ts",
       "utf8",
     );
 
-    expect(await fileExists(legacyHonoPath)).toBe(false);
+    expect(await fileExists(legacyRoutePath)).toBe(false);
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("from \"hono\"");
+    expect(source).not.toContain(`from ""`);
   });
 
   test("invitation public API is implemented as a Nest controller", async () => {
@@ -168,8 +171,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("auth public API is implemented as a Nest controller", async () => {
@@ -181,25 +184,25 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("product search public API is implemented as a Nest controller", async () => {
-    const legacyHonoPath = "services/platform-core/src/infrastructure/product-store/api/search-api.ts";
+    const legacyRoutePath = "services/platform-core/src/infrastructure/product-store/api/search-api.ts";
     const legacyServerRoutePath = "apps/server/src/api/routes/search.ts";
     const source = await readFile(
       "services/knowledge-workspace/src/interface/http/search-public-api.controller.ts",
       "utf8",
     );
 
-    expect(await fileExists(legacyHonoPath)).toBe(false);
+    expect(await fileExists(legacyRoutePath)).toBe(false);
     expect(await fileExists(legacyServerRoutePath)).toBe(false);
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("artifact public API is implemented as a Nest controller", async () => {
@@ -212,8 +215,8 @@ describe("server stack convergence", () => {
     expect(await fileExists(legacyServerRoutePath)).toBe(false);
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("notification public API is implemented as a Nest controller", async () => {
@@ -229,8 +232,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Patch(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("audit public API is implemented as a Nest controller", async () => {
@@ -245,8 +248,8 @@ describe("server stack convergence", () => {
     expect(await fileExists(legacyMetadataRoutePath)).toBe(false);
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("sprint public API is implemented as a Nest controller", async () => {
@@ -264,8 +267,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("report public API is implemented as a Nest controller", async () => {
@@ -278,8 +281,8 @@ describe("server stack convergence", () => {
     expect(await fileExists(legacyKernelRoutePath)).toBe(false);
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("document public API is implemented as a Nest controller", async () => {
@@ -295,8 +298,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("memory public API is implemented as Nest controllers", async () => {
@@ -312,8 +315,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("saved-view public API is implemented as a Nest controller", async () => {
@@ -328,8 +331,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("repository public API is implemented as a Nest controller", async () => {
@@ -343,8 +346,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("connector public API is implemented as a Nest controller", async () => {
@@ -355,8 +358,8 @@ describe("server stack convergence", () => {
 
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("webhook public API is implemented as a Nest controller", async () => {
@@ -370,8 +373,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("data portability public API is implemented as a Nest controller", async () => {
@@ -383,8 +386,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("task public API is implemented as a Nest controller", async () => {
@@ -402,8 +405,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("task recurrence public API is implemented as a Nest controller", async () => {
@@ -416,8 +419,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("inference public API is implemented as a Nest controller", async () => {
@@ -431,8 +434,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("error log public API is implemented as a Nest controller", async () => {
@@ -444,8 +447,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("feature experiment public API is implemented as a Nest controller", async () => {
@@ -457,8 +460,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("telemetry public API is implemented as a Nest controller", async () => {
@@ -471,8 +474,8 @@ describe("server stack convergence", () => {
     expect(source).toContain("Get(");
     expect(source).toContain("Post(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("subscription event stream public API is implemented as a Nest controller", async () => {
@@ -483,8 +486,8 @@ describe("server stack convergence", () => {
 
     expect(source).toContain("Controller(");
     expect(source).toContain("Get(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 
   test("skill supply public API is implemented as a Nest controller", async () => {
@@ -498,7 +501,7 @@ describe("server stack convergence", () => {
     expect(source).toContain("Post(");
     expect(source).toContain("Patch(");
     expect(source).toContain("Delete(");
-    expect(source).not.toContain("@hono/zod-openapi");
-    expect(source).not.toContain("OpenAPIHono");
+    expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
+    expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
   });
 });

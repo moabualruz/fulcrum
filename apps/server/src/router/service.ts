@@ -214,7 +214,7 @@ export class RoutingService {
       matchingActiveRuleIds: allMatchingIds,
     });
 
-    // Return the draft — in a real implementation, persist via MikroORM
+    // Return the draft; real implementation persists through application services.
     return { draft, draftId: null };
   }
 
@@ -229,7 +229,7 @@ export class RoutingService {
 
   /**
    * Delete a draft.
-   * Stub for now; full implementation connects to MikroORM.
+   * Stub for now; full implementation connects through application services.
    */
   async deleteDraft(input: DeleteDraftInput): Promise<void> {
     // Stub: would delete draft row and record audit

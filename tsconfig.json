@@ -24,6 +24,7 @@
       "@fulcrum/tui/*": ["apps/tui/src/*"],
       "@fulcrum/server/*": ["apps/server/src/*"],
       "@fulcrum/web/*": ["apps/web/src/*"],
+      "$lib/*": ["apps/web/src/lib/*"],
       "@identity-access/*": ["services/identity-access/src/*"],
       "@integration-hub/*": ["services/integration-hub/src/*"],
       "@knowledge-workspace/*": ["services/knowledge-workspace/src/*"],

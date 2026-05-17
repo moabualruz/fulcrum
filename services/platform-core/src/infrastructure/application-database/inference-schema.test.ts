@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import type { EntityName } from "typeorm";
-import type { EntityManager } from "typeorm";
+import type { EntityManager, EntityTarget, ObjectLiteral } from "typeorm";
 
 import { createTestOrm } from "@test-support/application-database.ts";
 import { DEFAULT_ORG_ID } from "./seed.ts";
@@ -11,7 +10,7 @@ import { Memory } from "@knowledge-workspace/infrastructure/database/entities/me
 import { SearchDocument } from "@knowledge-workspace/infrastructure/database/entities/search/SearchDocument.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 
-function metadataFor(em: EntityManager, entity: EntityName<unknown>) {
+function metadataFor(em: EntityManager, entity: EntityTarget<ObjectLiteral>) {
   const meta = (em as any).getMetadata().get(entity);
   // Build a properties map from TypeORM ColumnMetadata
   const properties: Record<string, {
@@ -39,7 +38,7 @@ function metadataFor(em: EntityManager, entity: EntityName<unknown>) {
 
 function expectEmbeddingProperty(
   em: EntityManager,
-  entity: EntityName<unknown>,
+  entity: EntityTarget<ObjectLiteral>,
 ) {
   const meta = metadataFor(em, entity);
   const embedding = meta.properties["embedding"];

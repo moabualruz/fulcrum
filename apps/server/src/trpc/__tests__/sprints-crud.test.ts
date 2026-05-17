@@ -78,7 +78,7 @@ describe("sprints tRPC CRUD", () => {
   test("create validates date order and sets planned status", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       await expect(
@@ -117,7 +117,7 @@ describe("sprints tRPC CRUD", () => {
   test("start rejects second active sprint before hitting the DB constraint", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const active = await caller.sprints.create({
         projectId: PROJECT_ID,
@@ -142,7 +142,7 @@ describe("sprints tRPC CRUD", () => {
   test("addTask and removeTask update task sprint assignment", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const sprint = await caller.sprints.create({
         projectId: PROJECT_ID,
@@ -172,7 +172,7 @@ describe("sprints tRPC CRUD", () => {
   test("close moves unfinished tasks to backlog, writes metrics, and emits sprint.closed", async () => {
     const db = await createTestOrm();
     try {
-      const repo = db.em.getRepository(Task) as TaskRepository;
+      const repo = db.em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
       const sprint = await caller.sprints.create({
         projectId: PROJECT_ID,

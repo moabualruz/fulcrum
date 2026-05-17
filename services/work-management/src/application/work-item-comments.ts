@@ -208,7 +208,7 @@ export class WorkItemCommentService {
         (err.message.includes("unique") ||
           err.message.includes("duplicate") ||
           err.message.includes("UniqueConstraint") ||
-          // MikroORM wraps pg errors
+          // ORM adapters can wrap pg errors.
           (err as { code?: string }).code === "23505")
       ) {
         return;
@@ -347,7 +347,7 @@ export class WorkItemCommentService {
       throw new AppNotFoundError("Comment not found");
     }
 
-    // Delete all replies first (MikroORM may not cascade JSON relations)
+    // Delete all replies first; ORM adapters may not cascade JSON relations.
     const replies = await this.em.find(TaskComment, { where: {
       parentCommentId: commentId,
       org: { id: orgId },

@@ -72,8 +72,8 @@ function mockSession(userId: string, orgId: string) {
 function makeCaller(userId: string, orgId: string) {
   const session = mockSession(userId, orgId);
   const em = testOrm.em;
-  const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
-  const invitationRepo = em.getRepository(Invitation) as InvitationRepository;
+  const orgMemberRepo = em.getRepository(OrgMember) as unknown as OrgMemberRepository;
+  const invitationRepo = em.getRepository(Invitation) as unknown as InvitationRepository;
 
   const ctx = createContext({
     session: session as unknown as import("better-auth").Session,

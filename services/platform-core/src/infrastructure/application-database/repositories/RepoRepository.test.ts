@@ -14,7 +14,7 @@ async function createOrg(em: import("typeorm").EntityManager, slug: string): Pro
 
 function makeRepo(em: import("typeorm").EntityManager): RepoRepository {
   const inner = em.getRepository(Repo);
-  const repo = Object.create(RepoRepository.prototype) as RepoRepository;
+  const repo = Object.create(RepoRepository.prototype) as unknown as RepoRepository;
   Object.defineProperty(repo, "repos", { value: inner });
   return repo;
 }

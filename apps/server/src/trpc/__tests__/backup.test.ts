@@ -63,7 +63,7 @@ describe("backup tRPC router", () => {
     const db = await createTestOrm();
     try {
       const em = db.em;
-      const repo = em.getRepository(Task) as TaskRepository;
+      const repo = em.getRepository(Task) as unknown as TaskRepository;
       const caller = callerFor(repo);
 
       const created = await caller.tasks.create({
@@ -106,7 +106,7 @@ describe("backup tRPC router", () => {
   test("restore maps invalid dump input to bad request", async () => {
     const db = await createTestOrm();
     try {
-      const caller = callerFor(db.em.getRepository(Task) as TaskRepository);
+      const caller = callerFor(db.em.getRepository(Task) as unknown as TaskRepository);
       let error: TRPCError | null = null;
 
       try {

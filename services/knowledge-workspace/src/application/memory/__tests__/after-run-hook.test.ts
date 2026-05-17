@@ -103,7 +103,7 @@ describe("AfterRunMemoryHook", () => {
 });
 
 function createHook(): AfterRunMemoryHook {
-  const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+  const memRepo = Object.create(MemoryRepository.prototype) as unknown as MemoryRepository;
   // @ts-expect-error — inject underlying TypeORM repo directly (bypass NestJS DI)
   memRepo["memories"] = db.ds.getRepository(Memory);
   const extractor = new HeuristicExtractor(memRepo);

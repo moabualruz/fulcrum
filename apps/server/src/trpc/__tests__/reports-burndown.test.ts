@@ -50,7 +50,7 @@ function mockSession() {
 
 function callerFor(em: EntityManager) {
   const container = createMapContainer();
-  const repo = em.getRepository(Task) as TaskRepository;
+  const repo = em.getRepository(Task) as unknown as TaskRepository;
   container.bind({ provide: TaskRepository, useValue: repo });
 
   return createCaller(

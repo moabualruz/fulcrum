@@ -149,6 +149,6 @@ const DEFAULT_CUSTOM_FIELDS: Array<{
   { slug: "sprint", name: "Sprint", type: "text", configJson: {} },
 ];
 
-// Note: seedDefaultFields now requires TypeORM EntityManager — removed MikroORM-specific implementation.
+// Note: seedDefaultFields now requires TypeORM EntityManager; removed legacy ORM-specific implementation.
 // Caller should use TypeORM repository.upsert or insert with conflict handling.
 export { DEFAULT_CUSTOM_FIELDS };

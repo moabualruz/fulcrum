@@ -155,9 +155,7 @@ describe("MemoryRetriever", () => {
     })));
     const repo = createMemoryRepository();
     const queries: Array<{ getQuery: () => string }> = [];
-    // @ts-expect-error — accessing private field for spy
     const originalCreateQueryBuilder = (repo["memories"] as any).createQueryBuilder.bind(repo["memories"]);
-    // @ts-expect-error — monkey-patch for spy
     repo["memories"].createQueryBuilder = ((alias: string) => {
       const qb = originalCreateQueryBuilder(alias);
       queries.push(qb);
@@ -186,9 +184,7 @@ describe("MemoryRetriever", () => {
     })));
     const repo = createMemoryRepository();
     const queries: Array<{ getQuery: () => string }> = [];
-    // @ts-expect-error — accessing private field for spy
     const originalCreateQueryBuilder = (repo["memories"] as any).createQueryBuilder.bind(repo["memories"]);
-    // @ts-expect-error — monkey-patch for spy
     repo["memories"].createQueryBuilder = ((alias: string) => {
       const qb = originalCreateQueryBuilder(alias);
       queries.push(qb);
@@ -408,7 +404,7 @@ function idFor(group: number, index: number): string {
 }
 
 function createMemoryRepository(): MemoryRepository {
-  const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+  const memRepo = Object.create(MemoryRepository.prototype) as unknown as MemoryRepository;
   // @ts-expect-error — inject underlying TypeORM repo directly (bypass NestJS DI)
   memRepo["memories"] = db.ds.getRepository(Memory);
   return memRepo;

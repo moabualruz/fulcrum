@@ -9,9 +9,8 @@
 import type { DiContainer } from "@platform-core/interface/runtime-container.ts";
 
 import {
-  buildCliTuiCallerContext,
   requireCliTuiSessionContext,
-  resolveCliTuiSession,
+  resolveCliTuiSessionFromContainer,
 } from "@fulcrum/server/session/local-session.ts";
 
 import { createAuthApiCallerFromEnv } from "@identity-access/interface/http/auth-api-client.ts";
@@ -47,7 +46,7 @@ interface ApiEnv {
 /**
  * Build the unified TUI caller by composing all per-service HTTP API clients.
  *
- * Session is resolved from the local DataSource so that the caller can
+ * Session is resolved through the local application context so that the caller can
  * inject orgId/userId into scoped API client options.
  */
 export async function createTuiHttpCaller(options: {
@@ -60,8 +59,10 @@ export async function createTuiHttpCaller(options: {
   const fetchFn = options.fetch;
 
   // Resolve session from local DB to get orgId/userId for scoped API calls.
-  const cliContext = await buildCliTuiCallerContext(options.container ?? null);
-  const session = await resolveCliTuiSession(cliContext.em, options.userAgent ?? "fulcrum-tui");
+  const session = await resolveCliTuiSessionFromContainer({
+    container: options.container ?? null,
+    userAgent: options.userAgent ?? "fulcrum-tui",
+  });
 
   // Build an enriched env with session-derived values so per-service
   // callers can scope to the correct org/user.

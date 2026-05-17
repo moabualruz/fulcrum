@@ -14,7 +14,7 @@ export interface TestOrm {
   seed: SeedResult;
   close: () => Promise<void>;
   orm: { em: EntityManager; migrator?: unknown };
-  pglite: { query: (sql: string, params?: unknown[]) => Promise<unknown> };
+  pglite: { query: <T = Record<string, unknown>>(sql: string, params?: unknown[]) => Promise<{ rows: T[] }> };
 }
 
 export interface CreateTestOrmOptions {
@@ -126,7 +126,7 @@ export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<Te
   (em as any).__pendingPersist = [];
   (em as any).__persistPromise = undefined;
 
-  // MikroORM compat shims (applied once, idempotent)
+  // Legacy ORM compatibility shims (applied once, idempotent)
   if (!em.getConnection) {
     (em as any).getConnection = () => ({
       execute: async (sql: string, params?: unknown[]) => {
@@ -289,7 +289,7 @@ async function drainPersist(em: EntityManager & Record<string, unknown>, ds: Dat
 function patchEntityManager(target: EntityManager & Record<string, unknown>, ds: DataSource): void {
   function normalizeFindOptions(entityClass: Function, options: any): any {
     if (!options) return options;
-    // MikroORM allows findOne(Entity, id) with a raw string/number — convert to TypeORM { where: { id } }
+    // Previous ORM allowed findOne(Entity, id) with a raw string/number; convert to TypeORM { where: { id } }.
     if (typeof options === "string" || typeof options === "number") {
       return { where: { id: options } };
     }
@@ -404,7 +404,7 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
     if (result.affected === undefined) result.affected = count;
     return result;
   };
-  // MikroORM em.getReference(Entity, id) → create a proxy with just the id set
+  // Legacy em.getReference(Entity, id) -> create a proxy with just the id set.
   if (!target.getReference) {
     (target as any).getReference = (entityClass: Function, id: unknown) => {
       const instance = Object.create(entityClass.prototype);
@@ -412,7 +412,7 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
       return instance;
     };
   }
-  // MikroORM em.persist(entity) → immediate save via TypeORM
+  // Legacy em.persist(entity) -> immediate save via TypeORM.
   if (!target.persist) {
     (target as any).persist = (entity: unknown) => {
       (target as any).__pendingPersist = (target as any).__pendingPersist || [];
@@ -430,7 +430,7 @@ function patchEntityManager(target: EntityManager & Record<string, unknown>, ds:
       return target;
     };
   }
-  // MikroORM em.flush() → drain pending persist saves
+  // Legacy em.flush() -> drain pending persist saves.
   if (!target.flush) {
     (target as any).flush = async () => {
       if ((target as any).__persistPromise) {

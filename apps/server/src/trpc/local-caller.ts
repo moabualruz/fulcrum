@@ -16,6 +16,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 export {
   buildCliTuiCallerContext,
   resolveCliTuiSession,
+  resolveCliTuiSessionFromContainer,
   requireCliTuiSessionContext,
 } from "@fulcrum/server/session/local-session.ts";
 export type {

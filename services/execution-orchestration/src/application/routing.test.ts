@@ -30,7 +30,7 @@ describe("routing application malformed rules", () => {
       async save(input: RoutingRule) {
         saved.push(input);
       },
-    } as unknown as RoutingRuleRepository;
+    } as unknown as unknown as RoutingRuleRepository;
 
     await disableMalformedRoutingRule({ rule, repository, error: new Error("bad condition") });
 
@@ -55,7 +55,7 @@ describe("routing application service helpers", () => {
       create(input: unknown) {
         return { id: "event-1", ...(input as Record<string, unknown>) };
       },
-    } as unknown as EventRepository;
+    } as unknown as unknown as EventRepository;
 
     await recordRoutingEvent({
       dryRun: true,
@@ -117,7 +117,7 @@ describe("routing application service helpers", () => {
         expect(projectId).toBeNull();
         return [kindRule, actionRule, malformedRule];
       },
-    } as unknown as RoutingRuleRepository;
+    } as unknown as unknown as RoutingRuleRepository;
 
     expect(await detectRoutingConflicts({
       routingRuleRepository: null,
@@ -170,7 +170,7 @@ describe("routing application service helpers", () => {
       async save(rule: RoutingRule) {
         savedRules.push(rule);
       },
-    } as unknown as RoutingRuleRepository;
+    } as unknown as unknown as RoutingRuleRepository;
 
     await expect(learnRoutingRule({
       facts: { task: { kind: "bug", priority: "high", tags: ["api"], title: "Fix API" } },
@@ -198,7 +198,7 @@ describe("routing application service helpers", () => {
       conditionsJson: BUG_CONDITIONS,
     });
 
-    const persistOnlyRepository = baseRepository as unknown as RoutingRuleRepository;
+    const persistOnlyRepository = baseRepository as unknown as unknown as RoutingRuleRepository;
     const persisted = await learnRoutingRule({
       facts: { task: { kind: "chore", priority: "low", tags: [], title: "Clean up" } },
       agent: "claude",

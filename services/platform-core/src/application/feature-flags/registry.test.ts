@@ -32,7 +32,7 @@ const dbPromise = createTestOrm().then((testOrm) => {
   db = testOrm;
   const rawRepo = db.ds.getRepository(FeatureFlag);
   // Create a thin adapter matching FeatureFlagRepository.findOne(where) interface
-  const repo = { findOne: (where: any) => rawRepo.findOne({ where }) } as unknown as FeatureFlagRepository;
+  const repo = { findOne: (where: any) => rawRepo.findOne({ where }) } as unknown as unknown as FeatureFlagRepository;
   registry = new FlagRegistry(repo);
   return testOrm;
 });
@@ -44,7 +44,7 @@ beforeEach(async () => {
   await db.ds.query(`DELETE FROM feature_flags`);
   // Rebuild registry with fresh repo adapter
   const freshRawRepo = db.ds.getRepository(FeatureFlag);
-  const freshRepo = { findOne: (where: any) => freshRawRepo.findOne({ where }) } as unknown as FeatureFlagRepository;
+  const freshRepo = { findOne: (where: any) => freshRawRepo.findOne({ where }) } as unknown as unknown as FeatureFlagRepository;
   registry = new FlagRegistry(freshRepo);
   registry.clearCache();
   delete process.env["FULCRUM_FEATURES"];
@@ -314,7 +314,7 @@ describe("FlagRegistry — cache", () => {
 
     // Rebuild registry with fresh repo
     const freshRawRepo2 = db.ds.getRepository(FeatureFlag);
-    const freshRepo2 = { findOne: (where: any) => freshRawRepo2.findOne({ where }) } as unknown as FeatureFlagRepository;
+    const freshRepo2 = { findOne: (where: any) => freshRawRepo2.findOne({ where }) } as unknown as unknown as FeatureFlagRepository;
     registry = new FlagRegistry(freshRepo2);
     registry.clearCache();
 

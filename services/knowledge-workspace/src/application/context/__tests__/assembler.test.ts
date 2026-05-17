@@ -482,7 +482,7 @@ function buildAssembler(db: TestOrm, retrieverOverride?: { retrieve: Function })
   if (retrieverOverride) {
     retriever = retrieverOverride;
   } else {
-    const memRepo = Object.create(MemoryRepository.prototype) as MemoryRepository;
+    const memRepo = Object.create(MemoryRepository.prototype) as unknown as MemoryRepository;
     // @ts-expect-error — inject underlying TypeORM repo directly
     memRepo["memories"] = db.ds.getRepository(Memory);
     retriever = new MemoryRetriever(memRepo);

@@ -99,8 +99,8 @@ function makeCaller(
   options: { casbinActions?: string[] } = {},
 ) {
   const em = testOrm.em;
-  const credentialRepo = em.getRepository(Credential) as CredentialRepository;
-  const orgMemberRepo = em.getRepository(OrgMember) as OrgMemberRepository;
+  const credentialRepo = em.getRepository(Credential) as unknown as CredentialRepository;
+  const orgMemberRepo = em.getRepository(OrgMember) as unknown as OrgMemberRepository;
 
   const c = createMapContainer();
   c.bind({ provide: CredentialRepository, useValue: credentialRepo });

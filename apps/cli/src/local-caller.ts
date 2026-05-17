@@ -2,7 +2,7 @@
  * CLI caller factory — session resolution utilities for CLI commands.
  *
  * CLI commands now use per-service HTTP API clients directly.
- * This module provides session resolution from the local DataSource
+ * This module provides session resolution through the local application context
  * and the withWorkflowApiCaller overlay for backward compatibility.
  */
 
@@ -11,6 +11,7 @@ import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface
 import {
   buildCliTuiCallerContext,
   requireCliTuiSessionContext,
+  type LocalCallerOptions,
 } from "@fulcrum/server/session/local-session.ts";
 
 export { buildCliTuiCallerContext, requireCliTuiSessionContext } from "@fulcrum/server/session/local-session.ts";
@@ -34,9 +35,12 @@ type WorkflowApiOverlay<T extends object> = Omit<T, keyof ConfiguredWorkflowApiC
   >;
 };
 
-export async function createLocalCaller(container?: DiContainer | null) {
+export async function createLocalCaller(input?: DiContainer | LocalCallerOptions | null) {
   const { createApplicationLocalCaller } = await import("@fulcrum/server/trpc/local-caller.ts");
-  return createApplicationLocalCaller({ container: container ?? undefined });
+  const options: LocalCallerOptions = input && typeof input === "object" && "container" in input
+    ? input
+    : { container: input ?? undefined };
+  return createApplicationLocalCaller(options);
 }
 
 export function buildLocalCallerContext(container: DiContainer | null) {

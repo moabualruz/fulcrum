@@ -1,7 +1,7 @@
 /**
  * MigratorService + SchemaMigration ledger — TypeORM DataSource version.
  *
- * Rewritten from MikroORM after migration (Task 9).
+ * Rewritten for TypeORM after migration (Task 9).
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";

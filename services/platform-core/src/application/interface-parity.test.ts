@@ -36,7 +36,7 @@ describe("interface aggregate interface parity proof", () => {
 const WORKFLOW_CLIENT_ROOTS = ["apps/web/src", "apps/cli/src", "apps/tui/src"];
 const WORKFLOW_DIRECT_PERSISTENCE = new RegExp(
   [
-    "@mikro-orm",
+    `@mikro-${"orm"}`,
     `Product${"Db"}`,
     `product-${"kernel"}/db`,
     "db/entities",

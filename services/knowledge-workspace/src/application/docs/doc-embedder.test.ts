@@ -11,8 +11,9 @@ import {
   embedDocument,
   triggerEmbedding,
 } from "./doc-embedder.ts";
+import { createDocumentAction, updateDocumentAction } from "../document-actions.ts";
 
-// Integration tests that use MikroORM infrastructure are skipped — MikroORM
+// Integration tests that use removed legacy ORM infrastructure are skipped.
 // has been replaced by TypeORM. Unit tests (isEmbeddingsEnabled, truncateToTokens)
 // continue to run below.
 const integrationTest = it.skip;
@@ -39,9 +40,9 @@ function failingClient(err: Error): InferenceClient {
   } as unknown as InferenceClient;
 }
 
-// freshDb requires MikroORM which is removed; integration tests are skipped
+// freshDb requires removed legacy ORM infrastructure; integration tests are skipped.
 async function freshDb(_name: string): Promise<{ db: TestStore; em: EntityManager; orgId: string; close: () => Promise<void> }> {
-  throw new Error("MikroORM removed — integration test skipped");
+  throw new Error("Legacy ORM removed; integration test skipped");
 }
 
 async function readEmbedding(db: TestStore, docId: string): Promise<number[] | null> {

@@ -106,11 +106,11 @@ function makeService(templates: DocTemplateRow[]): DocTemplateService {
 
 function makeContainer(service: DocTemplateService): TestContainer {
   // Dummy TestOrm for container creation (no DB needed for in-memory service tests)
+  const bindings = new Map<unknown, unknown>([[DOC_TEMPLATE_SERVICE_TOKEN, service]]);
   const container = {
-    _map: new Map<unknown, unknown>([[DOC_TEMPLATE_SERVICE_TOKEN, service]]),
-    get(token: unknown) { return (this._map as Map<unknown, unknown>).get(token); },
-    has(token: unknown) { return (this._map as Map<unknown, unknown>).has(token); },
-    bind(binding: { provide: unknown; useValue: unknown }) { (this._map as Map<unknown, unknown>).set(binding.provide, binding.useValue); },
+    get(token: unknown) { return bindings.get(token); },
+    has(token: unknown) { return bindings.has(token); },
+    bind(binding: { provide: unknown; useValue: unknown }) { bindings.set(binding.provide, binding.useValue); },
   } as unknown as TestContainer;
   return container;
 }
