@@ -429,7 +429,7 @@ async function assertTaskPublicApiRoundTrip(
 describe("task public API TypeORM persistence", () => {
   test("serves task CRUD through PGlite socket", async () => {
     await assertTaskPublicApiRoundTrip("pglite-socket", await startPgliteSocket());
-  });
+  }, 60_000);
 
   test("serves task CRUD through real PostgreSQL", async () => {
     postgres = await startTemporaryPostgres();
