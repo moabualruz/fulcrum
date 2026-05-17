@@ -63,16 +63,18 @@ describe("scripts/ci.ts tiered pipeline gate", () => {
     expect(tiers).toEqual(["lint", "unit", "integration", "build"]);
   });
 
-  it("unit tier runs bun test on services/", () => {
+  it("unit tier runs fixture-backed test selector", () => {
     const unit = STEPS.find((s) => s.name === "unit");
     expect(unit).toBeDefined();
-    expect(unit!.cmd).toContain("services/");
+    expect(unit!.cmd).toContain("scripts/test-tier.ts");
+    expect(unit!.cmd).toContain("unit");
   });
 
-  it("integration tier runs bun test on tests/", () => {
+  it("integration tier runs DB/API contract test selector", () => {
     const integration = STEPS.find((s) => s.name === "integration");
     expect(integration).toBeDefined();
-    expect(integration!.cmd.some((c: string) => c.includes("tests/") || c === "tests/")).toBe(true);
+    expect(integration!.cmd).toContain("scripts/test-tier.ts");
+    expect(integration!.cmd).toContain("integration");
   });
 
   it("build tier includes web:check and web:build", () => {
