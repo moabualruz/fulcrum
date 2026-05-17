@@ -1,8 +1,8 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup Plan
 
-> **Status: COMPLETED (2026-05-16).** All tasks in this plan have been executed. MikroORM fully removed, TypeORM in place, platform-core split into bounded services, tRPC consolidated as NestJS-native dual-exposure, DTOs extracted. Verification: zero `@mikro-orm` production imports, zero `.sql` migrations, zero `needle-di` imports, `bun run ci` tiers 1-6 pass. Tracker evidence at `09.6-COPY-FIRST-GOAL-TRACKER.md`. Task checkboxes below were not individually ticked during execution but work is verified complete by architecture tests + CI.
+> **Status: HISTORICALLY IMPLEMENTED (2026-05-16), CURRENTLY EVIDENCE-SCOPED (2026-05-17).** Historical tracker evidence says the migration tasks were executed: MikroORM removed, TypeORM in place, platform-core split into bounded services, tRPC consolidated as NestJS-native dual-exposure, DTOs extracted, and prior `bun run ci` tiers 1-6 passed. Current evidence is narrower: architecture stack gates were rerun with `bun test tests/architecture/boundary.test.ts tests/architecture/server-stack.test.ts tests/architecture/no-raw-sql.test.ts` and passed 50 tests; `.scratch/upstream-product-replacement` has zero tracked files and remains ignored. Full CI/final release gates must be rerun in the current tree before claiming final closure.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Checked steps below record historical implementation status from the tracker/provenance, not a current full-CI rerun.
 
 **Goal:** Replace MikroORM v7 with TypeORM, split platform-core god module, extract DTOs, consolidate tRPC, remove stubs, co-locate tests. Full NestJS architecture cleanup.
 
@@ -42,13 +42,13 @@ package.json                           # MODIFY — remove MikroORM deps, add ty
 - Create: `services/platform-core/src/infrastructure/application-database/typeorm.config.ts`
 - Modify: `package.json`
 
-- [ ] **Step 1: Install typeorm-pglite**
+- [x] **Step 1: Install typeorm-pglite**
 
 ```bash
 bun add typeorm-pglite
 ```
 
-- [ ] **Step 2: Write the DataSource config**
+- [x] **Step 2: Write the DataSource config**
 
 ```typescript
 // services/platform-core/src/infrastructure/application-database/typeorm.config.ts
@@ -96,7 +96,7 @@ export function __resetDataSourceForTest(): void {
 }
 ```
 
-- [ ] **Step 3: Verify typeorm-pglite installed**
+- [x] **Step 3: Verify typeorm-pglite installed**
 
 ```bash
 bun run -e "const { PGliteDriver } = require('typeorm-pglite'); console.log('OK:', typeof PGliteDriver)"
@@ -104,7 +104,7 @@ bun run -e "const { PGliteDriver } = require('typeorm-pglite'); console.log('OK:
 
 Expected: `OK: function`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add services/platform-core/src/infrastructure/application-database/typeorm.config.ts package.json bun.lockb
@@ -136,7 +136,7 @@ This is mechanical translation. Each entity follows the same pattern. The decora
 | `@Unique({ properties: ["a", "b"] })` | `@Unique(["a", "b"])` on entity class |
 | `[OptionalProps]?: ...` | Remove (TypeORM doesn't use this) |
 
-- [ ] **Step 1: Convert a representative entity first as proof-of-concept**
+- [x] **Step 1: Convert a representative entity first as proof-of-concept**
 
 Convert `GithubConnectorState` entity. Before (MikroORM):
 
@@ -181,7 +181,7 @@ export class GithubConnectorState {
 }
 ```
 
-- [ ] **Step 2: Batch-convert all 93 entities using the same pattern**
+- [x] **Step 2: Batch-convert all 93 entities using the same pattern**
 
 Work through each subdirectory under `entities/`:
 - `core/` — Org, User, OrgMember, etc. (foundational, do first)
@@ -206,11 +206,11 @@ For every file:
 5. Remove `{ repository: () => XxxRepository }` from `@Entity()` options
 6. Add `@JoinColumn({ name: "x_id" })` to every `@ManyToOne` relation
 
-- [ ] **Step 3: Update getCoreEntities() in typeorm.config.ts**
+- [x] **Step 3: Update getCoreEntities() in typeorm.config.ts**
 
 Import all 93 converted entities and return them from `getCoreEntities()`.
 
-- [ ] **Step 4: Verify TypeScript compiles**
+- [x] **Step 4: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit --project services/platform-core/tsconfig.json
@@ -218,7 +218,7 @@ bunx tsc --noEmit --project services/platform-core/tsconfig.json
 
 Expected: No errors related to entity decorators.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/platform-core/src/infrastructure/application-database/entities/
@@ -287,7 +287,7 @@ export class RepoRepository {
 }
 ```
 
-- [ ] **Step 1: Convert all 40 repository files**
+- [x] **Step 1: Convert all 40 repository files**
 
 For each repository:
 1. Replace `@injectable()` (needle-di) with `@Injectable()` (NestJS)
@@ -298,13 +298,13 @@ For each repository:
 6. Replace `this.findOne({ ... })` with `this.repo.findOne({ where: ... })`
 7. Replace `this.em.remove(entity)` + `this.em.flush()` with `this.repo.remove(entity)`
 
-- [ ] **Step 2: Verify TypeScript compiles**
+- [x] **Step 2: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit --project services/platform-core/tsconfig.json
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add services/platform-core/src/infrastructure/application-database/repositories/
@@ -320,7 +320,7 @@ git commit -m "refactor(db): convert 40 MikroORM repositories to TypeORM Reposit
 
 Replace 414-line needle-di module with NestJS `@Module`:
 
-- [ ] **Step 1: Write the new NestJS database module**
+- [x] **Step 1: Write the new NestJS database module**
 
 ```typescript
 // services/platform-core/src/infrastructure/application-database/db.module.ts
@@ -350,17 +350,17 @@ import { RepoRepository } from "./repositories/repos/RepoRepository.js";
 export class ApplicationDatabaseModule {}
 ```
 
-- [ ] **Step 2: Update app.module.ts to import ApplicationDatabaseModule**
+- [x] **Step 2: Update app.module.ts to import ApplicationDatabaseModule**
 
 Ensure `apps/server/src/app.module.ts` imports `ApplicationDatabaseModule` and all service modules can access TypeORM repos.
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add services/platform-core/src/infrastructure/application-database/db.module.ts
@@ -376,7 +376,7 @@ git commit -m "refactor(db): replace needle-di db.module with NestJS TypeOrmModu
 - Create: `services/platform-core/src/infrastructure/application-database/migrations/` (fresh set)
 - Create: `services/platform-core/src/infrastructure/application-database/_archived-mikro-migrations/` (archive)
 
-- [ ] **Step 1: Archive old MikroORM migrations**
+- [x] **Step 1: Archive old MikroORM migrations**
 
 ```bash
 cd /Users/mkh/workspace/fulcrum
@@ -384,7 +384,7 @@ mkdir -p services/platform-core/src/infrastructure/application-database/_archive
 mv services/platform-core/src/infrastructure/application-database/migrations/*.ts services/platform-core/src/infrastructure/application-database/_archived-mikro-migrations/
 ```
 
-- [ ] **Step 2: Generate TypeORM migration from current entity state**
+- [x] **Step 2: Generate TypeORM migration from current entity state**
 
 ```bash
 bunx typeorm migration:generate -d services/platform-core/src/infrastructure/application-database/typeorm.config.ts services/platform-core/src/infrastructure/application-database/migrations/InitialSchema
@@ -402,7 +402,7 @@ If auto-generation doesn't work with PGlite, write the migration manually based 
 - `008_flags_and_skills.ts` — FeatureFlag, Skill, SkillVersion
 - `009_indexes.ts` — All 141 composite/single indexes
 
-- [ ] **Step 3: Test migrations run against PGlite**
+- [x] **Step 3: Test migrations run against PGlite**
 
 ```bash
 bun run -e "
@@ -411,7 +411,7 @@ initDataSource().then(ds => ds.runMigrations()).then(() => console.log('OK')).ca
 "
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add services/platform-core/src/infrastructure/application-database/migrations/
@@ -431,7 +431,7 @@ Each service module should:
 2. Register its domain repositories as providers
 3. Remove any needle-di container references
 
-- [ ] **Step 1: Update each service module**
+- [x] **Step 1: Update each service module**
 
 Example for work-management:
 
@@ -458,7 +458,7 @@ export class WorkManagementModule {}
 
 Repeat for: identity-access, execution-orchestration, integration-hub, knowledge-workspace, notification-center, workflow-coordination, planning-review.
 
-- [ ] **Step 2: Remove needle-di imports from all service files**
+- [x] **Step 2: Remove needle-di imports from all service files**
 
 ```bash
 rg -l "needle-di" services/ --type ts
@@ -466,13 +466,13 @@ rg -l "needle-di" services/ --type ts
 
 Replace each `@injectable()` with `@Injectable()` from `@nestjs/common`.
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add services/
@@ -488,14 +488,14 @@ git commit -m "refactor(db): wire TypeOrmModule.forFeature in all service module
 - Delete: `services/platform-core/src/infrastructure/application-database/PGliteKyselyDriver.ts`
 - Modify: ~2,100 import lines across codebase
 
-- [ ] **Step 1: Delete MikroORM config and Kysely bridge**
+- [x] **Step 1: Delete MikroORM config and Kysely bridge**
 
 ```bash
 rm services/platform-core/src/infrastructure/application-database/mikro-orm.config.ts
 rm services/platform-core/src/infrastructure/application-database/PGliteKyselyDriver.ts
 ```
 
-- [ ] **Step 2: Bulk replace remaining MikroORM imports**
+- [x] **Step 2: Bulk replace remaining MikroORM imports**
 
 ```bash
 # Find any remaining @mikro-orm imports
@@ -509,7 +509,7 @@ For each file, replace:
 - `from "@mikro-orm/sql"` → remove (TypeORM doesn't have this)
 - `from "@mikro-orm/migrations"` → remove (handled by TypeORM CLI)
 
-- [ ] **Step 3: Verify zero MikroORM imports remain**
+- [x] **Step 3: Verify zero MikroORM imports remain**
 
 ```bash
 rg "@mikro-orm" services/ apps/ src/ --type ts
@@ -517,7 +517,7 @@ rg "@mikro-orm" services/ apps/ src/ --type ts
 
 Expected: No results (except possibly in _archived-mikro-migrations/).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -531,13 +531,13 @@ git commit -m "refactor(db): remove MikroORM config, Kysely bridge, and all Mikr
 **Files:**
 - Modify: `package.json`
 
-- [ ] **Step 1: Remove MikroORM and Kysely packages**
+- [x] **Step 1: Remove MikroORM and Kysely packages**
 
 ```bash
 bun remove @mikro-orm/core @mikro-orm/decorators @mikro-orm/migrations @mikro-orm/postgresql @mikro-orm/sql @mikro-orm/knex kysely needle-di
 ```
 
-- [ ] **Step 2: Verify no MikroORM in dependencies**
+- [x] **Step 2: Verify no MikroORM in dependencies**
 
 ```bash
 cat package.json | jq '.dependencies | keys[] | select(test("mikro-orm|kysely|needle-di"))'
@@ -545,13 +545,13 @@ cat package.json | jq '.dependencies | keys[] | select(test("mikro-orm|kysely|ne
 
 Expected: No output.
 
-- [ ] **Step 3: Verify bun install succeeds**
+- [x] **Step 3: Verify bun install succeeds**
 
 ```bash
 bun install
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add package.json bun.lockb
@@ -565,13 +565,13 @@ git commit -m "chore(deps): remove @mikro-orm/*, kysely, needle-di from dependen
 **Files:**
 - Modify: All `*.test.ts` and `*.spec.ts` files that reference MikroORM
 
-- [ ] **Step 1: Find all test files referencing MikroORM patterns**
+- [x] **Step 1: Find all test files referencing MikroORM patterns**
 
 ```bash
 rg -l "EntityManager|MikroORM|mikro-orm|em\.persist|em\.flush|em\.getRepository|em\.getReference" services/ apps/ tests/ --type ts -g "*.test.*" -g "*.spec.*"
 ```
 
-- [ ] **Step 2: Update test setup to use TypeORM DataSource**
+- [x] **Step 2: Update test setup to use TypeORM DataSource**
 
 Replace MikroORM test patterns:
 
@@ -598,7 +598,7 @@ const module = await Test.createTestingModule({
 }).compile();
 ```
 
-- [ ] **Step 3: Run all tests**
+- [x] **Step 3: Run all tests**
 
 ```bash
 bun test
@@ -606,7 +606,7 @@ bun test
 
 Fix any remaining failures.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -635,7 +635,7 @@ Entity ownership mapping:
 | workflow-coordination | `artifacts/` entities |
 | platform-core (keep) | `core/` (Org, TenantSetting), `flags/`, `skills/`, `jobs/`, SchemaMigration |
 
-- [ ] **Step 1: Create infrastructure/database/ directory in each service**
+- [x] **Step 1: Create infrastructure/database/ directory in each service**
 
 ```bash
 for svc in identity-access work-management knowledge-workspace execution-orchestration integration-hub notification-center workflow-coordination; do
@@ -644,7 +644,7 @@ for svc in identity-access work-management knowledge-workspace execution-orchest
 done
 ```
 
-- [ ] **Step 2: Move entity files to owning services**
+- [x] **Step 2: Move entity files to owning services**
 
 Move each entity subdirectory to its owning service. Example for work-management:
 
@@ -657,7 +657,7 @@ mv services/platform-core/src/infrastructure/application-database/repositories/t
 
 Repeat for each service per the mapping above.
 
-- [ ] **Step 3: Update all import paths**
+- [x] **Step 3: Update all import paths**
 
 For each moved entity, find all files importing it and update the path:
 
@@ -667,7 +667,7 @@ rg -l "from.*platform-core.*entities/tasks" services/ apps/ --type ts
 
 Update imports to point to new location in the owning service.
 
-- [ ] **Step 4: Update TypeOrmModule.forFeature() in each service module**
+- [x] **Step 4: Update TypeOrmModule.forFeature() in each service module**
 
 Each service module now imports its own entities directly:
 
@@ -680,23 +680,23 @@ import { Task } from "../../infrastructure/database/entities/Task.js";
 })
 ```
 
-- [ ] **Step 5: Update platform-core's ApplicationDatabaseModule**
+- [x] **Step 5: Update platform-core's ApplicationDatabaseModule**
 
 Remove moved entities from `getCoreEntities()`. Keep only shared entities (Org, TenantSetting, FeatureFlag, etc.).
 
-- [ ] **Step 6: Verify TypeScript compiles**
+- [x] **Step 6: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 ```bash
 bun test
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -713,7 +713,7 @@ git commit -m "refactor(arch): split platform-core god module — entities owned
 
 Currently class-validator decorators are inline in controller methods. Extract to proper DTO classes.
 
-- [ ] **Step 1: Create dto/ directories in each service**
+- [x] **Step 1: Create dto/ directories in each service**
 
 ```bash
 for svc in identity-access work-management knowledge-workspace execution-orchestration integration-hub notification-center workflow-coordination platform-core; do
@@ -721,7 +721,7 @@ for svc in identity-access work-management knowledge-workspace execution-orchest
 done
 ```
 
-- [ ] **Step 2: Extract DTOs from controllers — pattern**
+- [x] **Step 2: Extract DTOs from controllers — pattern**
 
 Before (inline in controller):
 ```typescript
@@ -753,7 +753,7 @@ async create(@Body() body: CreateTaskDto) {
 }
 ```
 
-- [ ] **Step 3: Extract DTOs for each service**
+- [x] **Step 3: Extract DTOs for each service**
 
 Work through each service's controllers:
 1. Identify all `@Body()`, `@Query()`, `@Param()` inline types
@@ -761,7 +761,7 @@ Work through each service's controllers:
 3. Use `PartialType()` from `@nestjs/mapped-types` for update DTOs
 4. Add Swagger decorators (`@ApiProperty()`) to each DTO field
 
-- [ ] **Step 4: Create response DTOs — never expose entities directly**
+- [x] **Step 4: Create response DTOs — never expose entities directly**
 
 For each entity returned by a controller, create a response DTO:
 
@@ -777,13 +777,13 @@ export class TaskResponseDto {
 
 Map entity → response DTO in controller or via `ClassSerializerInterceptor`.
 
-- [ ] **Step 5: Verify TypeScript compiles**
+- [x] **Step 5: Verify TypeScript compiles**
 
 ```bash
 bunx tsc --noEmit
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/*/src/interface/http/dto/
@@ -799,7 +799,7 @@ git commit -m "refactor(api): extract DTOs from controllers, add response DTOs"
 - Modify/Move: `apps/server/src/runtime/trpc/routers/` → merge into `apps/server/src/trpc/routers/`
 - Modify: `apps/server/src/trpc/router.ts` (main AppRouter)
 
-- [ ] **Step 1: Audit both tRPC directories**
+- [x] **Step 1: Audit both tRPC directories**
 
 ```bash
 ls -la apps/server/src/trpc/routers/
@@ -808,30 +808,30 @@ ls -la apps/server/src/runtime/trpc/routers/ 2>/dev/null
 
 Identify overlapping routers, routers with business logic, and routers that are thin adapters.
 
-- [ ] **Step 2: Merge runtime/trpc/routers/ into trpc/routers/**
+- [x] **Step 2: Merge runtime/trpc/routers/ into trpc/routers/**
 
 For each router in `runtime/trpc/routers/`:
 - If duplicate exists in `trpc/routers/`, merge logic into the primary
 - If unique, move file to `trpc/routers/`
 - Extract any business logic to service layer
 
-- [ ] **Step 3: Remove runtime/trpc/ directory**
+- [x] **Step 3: Remove runtime/trpc/ directory**
 
 ```bash
 rm -rf apps/server/src/runtime/trpc/
 ```
 
-- [ ] **Step 4: Update AppRouter imports**
+- [x] **Step 4: Update AppRouter imports**
 
 Update `apps/server/src/trpc/router.ts` to only import from single `routers/` directory.
 
-- [ ] **Step 5: Verify TypeScript compiles and tests pass**
+- [x] **Step 5: Verify TypeScript compiles and tests pass**
 
 ```bash
 bunx tsc --noEmit && bun test
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/server/src/trpc/ apps/server/src/runtime/
@@ -846,13 +846,13 @@ git commit -m "refactor(api): consolidate tRPC routers to single directory"
 - Delete: `services/inference-runtime/` (empty — 0 files)
 - Evaluate: `services/agent-client-protocol/` (8 files, minimal)
 
-- [ ] **Step 1: Remove empty inference-runtime**
+- [x] **Step 1: Remove empty inference-runtime**
 
 ```bash
 rm -rf services/inference-runtime/
 ```
 
-- [ ] **Step 2: Evaluate agent-client-protocol**
+- [x] **Step 2: Evaluate agent-client-protocol**
 
 ```bash
 find services/agent-client-protocol/ -type f | head -20
@@ -861,11 +861,11 @@ wc -l services/agent-client-protocol/src/**/*.ts 2>/dev/null
 
 If stub with no real implementation → remove. If placeholder with clear future use → document timeline in AGENTS.md under "Where we are going" section.
 
-- [ ] **Step 3: Update app.module.ts**
+- [x] **Step 3: Update app.module.ts**
 
 Remove imports for deleted service modules.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -880,7 +880,7 @@ git commit -m "chore: remove empty/stub services (inference-runtime, agent-clien
 - Move: `tests/<domain>/` → co-located `*.test.ts` beside source in `services/`
 - Keep: `tests/architecture/` at root (spans multiple services)
 
-- [ ] **Step 1: List root test files and their corresponding source**
+- [x] **Step 1: List root test files and their corresponding source**
 
 ```bash
 find tests/ -name "*.test.ts" -not -path "tests/architecture/*" | sort
@@ -888,7 +888,7 @@ find tests/ -name "*.test.ts" -not -path "tests/architecture/*" | sort
 
 For each test file, identify the source file it tests and move the test beside it.
 
-- [ ] **Step 2: Move domain tests to services**
+- [x] **Step 2: Move domain tests to services**
 
 Example:
 ```bash
@@ -900,11 +900,11 @@ mv tests/platform-core/health-checks/tui-checks.test.ts \
 
 Repeat for all non-architecture test files.
 
-- [ ] **Step 3: Update import paths in moved tests**
+- [x] **Step 3: Update import paths in moved tests**
 
 Each moved test file may need updated relative imports.
 
-- [ ] **Step 4: Keep architecture tests at root**
+- [x] **Step 4: Keep architecture tests at root**
 
 ```bash
 ls tests/architecture/
@@ -912,19 +912,19 @@ ls tests/architecture/
 
 These test cross-service constraints and belong at root. Do not move.
 
-- [ ] **Step 5: Clean empty test directories**
+- [x] **Step 5: Clean empty test directories**
 
 ```bash
 find tests/ -type d -empty -delete
 ```
 
-- [ ] **Step 6: Verify all tests pass**
+- [x] **Step 6: Verify all tests pass**
 
 ```bash
 bun test
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -940,13 +940,13 @@ git commit -m "refactor(test): co-locate domain tests beside source files"
 - Modify: `CONTEXT-MAP.md`
 - Remove: Orphaned/empty directories
 
-- [ ] **Step 1: Remove empty directories**
+- [x] **Step 1: Remove empty directories**
 
 ```bash
 find services/ apps/ -type d -empty -delete
 ```
 
-- [ ] **Step 2: Verify zero MikroORM imports**
+- [x] **Step 2: Verify zero MikroORM imports**
 
 ```bash
 rg "@mikro-orm" services/ apps/ --type ts | grep -v "_archived"
@@ -954,7 +954,7 @@ rg "@mikro-orm" services/ apps/ --type ts | grep -v "_archived"
 
 Expected: No results.
 
-- [ ] **Step 3: Verify entity ownership**
+- [x] **Step 3: Verify entity ownership**
 
 ```bash
 # platform-core should only have shared entities
@@ -965,15 +965,15 @@ for svc in identity-access work-management knowledge-workspace execution-orchest
 done
 ```
 
-- [ ] **Step 4: Update AGENTS.md**
+- [x] **Step 4: Update AGENTS.md**
 
 Verify no stale MikroORM references. Update service list if services were removed.
 
-- [ ] **Step 5: Update CONTEXT-MAP.md**
+- [x] **Step 5: Update CONTEXT-MAP.md**
 
 Remove entries for deleted services. Add infrastructure/database context notes for services that now own their entities.
 
-- [ ] **Step 6: Run full CI**
+- [x] **Step 6: Run full CI (historical evidence; rerun required in current tree)**
 
 ```bash
 bun run ci
@@ -981,7 +981,7 @@ bun run ci
 
 Expected: All 6 stages pass.
 
-- [ ] **Step 7: Final commit**
+- [x] **Step 7: Final commit (historical evidence; final closure requires current gates)**
 
 ```bash
 git add -A

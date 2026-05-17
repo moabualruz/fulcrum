@@ -56,6 +56,7 @@ export async function overrideSkillConflict(
       // Resolution may fail if upstream repo is unavailable; audit note still records override.
     }
   }
+  await scopedEm.save(conflict);
   return { ok: true };
 }
 

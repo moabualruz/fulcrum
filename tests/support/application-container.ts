@@ -3,20 +3,13 @@ import type { SeedResult } from "@platform-core/infrastructure/application-datab
 import type { TestOrm } from "./application-database.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
-/**
- * MikroORM compat token — tests that did `container.bind({ provide: MikroORM, ... })`
- * now bind the DataSource class instead. This symbol is also bound so old `container.get(MikroORM)`
- * still resolves.
- */
-export const MikroORM = DataSource;
-
 export type TestContainer = DiContainer & {
   __fulcrumTestSeed?: SeedResult;
 };
 
 /**
  * Minimal DiContainer backed by a Map.
- * Replaces needle-di Container after MikroORM → TypeORM migration.
+ * Minimal test container for TypeORM-backed application tests.
  */
 class SimpleContainer implements DiContainer {
   private readonly _map = new Map<unknown, unknown>();
@@ -45,7 +38,7 @@ export function createTestContainer(input: TestOrm): TestContainer {
 
   container.bind({ provide: "DataSource", useValue: ds });
   container.bind({ provide: "EntityManager", useValue: ds.manager });
-  container.bind({ provide: DataSource, useValue: ds }); // MikroORM compat: tests use DataSource class as DI token
+  container.bind({ provide: DataSource, useValue: ds });
 
   container.__fulcrumTestSeed = input.seed;
   return container;

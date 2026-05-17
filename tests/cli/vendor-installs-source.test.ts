@@ -48,6 +48,8 @@ afterEach(() => {
 });
 
 describe("vendor integration installers", () => {
+  test("full vendor integration dry-run uses detected agents without warnings", async () => {
+    await withFakePath(["npx", "pi", "pi-mcp-adapter"]);
     const home = await mkdtemp(join(tmpdir(), "fulcrum-vendor-home-"));
     await mkdir(join(home, ".claude"), { recursive: true });
     await mkdir(join(home, ".codex"), { recursive: true });
@@ -56,18 +58,28 @@ describe("vendor integration installers", () => {
     await mkdir(join(home, ".pi/agent"), { recursive: true });
 
     const result = await captureLogs(async () => {
+      await runVendorIntegrations(home, home, { dryRun: true });
     });
 
+    const output = result.logs.join("\n");
+    expect(output).toContain("npx skills add ast-grep/agent-skill");
+    expect(output).toContain("npx skills add https://github.com/tavily-ai/skills");
+    expect(output).toContain("pi install npm:pi-mcp-adapter");
+    expect(output).toContain("Stripping duplicate vendor rule blocks");
     expect(result.warnings).toEqual([]);
   });
 
-    const bin = process.env.PATH!.split(":")[0]!;
+  test("pi adapter skips quietly when Pi agent is not detected", async () => {
+    await withFakePath(["pi", "pi-mcp-adapter"]);
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-vendor-no-pi-agent-"));
     await mkdir(join(home, ".codex"), { recursive: true });
 
     const result = await captureLogs(async () => {
+      expect(await runPiMcpAdapterIntegration(home, home, true)).toBe(false);
     });
 
     expect(result.logs).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   test("ast-grep and tavily use the real npx detection path and dry-run their canonical skill installers", async () => {

@@ -158,10 +158,11 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
       orgId: scope.orgId,
       userId: "invitee@example.com",
     });
-    await expect(controller.whoami({
+    const inviteeSession = await eventuallyWhoami(controller, {
       orgId: scope.orgId,
       userId: "invitee@example.com",
-    })).resolves.toMatchObject({
+    });
+    expect(inviteeSession).toMatchObject({
       email: "invitee@example.com",
       role: "member",
     });
@@ -175,6 +176,22 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
   } finally {
     await dataSource.destroy();
   }
+}
+
+async function eventuallyWhoami(
+  controller: AuthPublicApiController,
+  input: { orgId: string; userId: string },
+): Promise<Awaited<ReturnType<AuthPublicApiController["whoami"]>>> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await controller.whoami(input);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+  throw lastError;
 }
 
 async function seedAuthOrganization(

@@ -1,7 +1,7 @@
 /**
- * Product-kernel repository layer — MikroORM implementation.
+ * Product-kernel repository layer — TypeORM implementation.
  *
- * Migrated from raw SQL (db.query()) to MikroORM EntityManager + repository
+ * Migrated from raw SQL (db.query()) to TypeORM EntityManager + repository
  * pattern (ARCH-02). Functions accept DbHandle (EntityManager | ProductDb).
  *
  * Data contracts (Row interfaces, input types, return types) are preserved
@@ -17,7 +17,7 @@ import { Event } from "@platform-core/infrastructure/application-database/entiti
 import { eventDispatcher } from "../event-dispatcher.ts";
 
 /**
- * Database handle — accepts either MikroORM EntityManager (preferred)
+ * Database handle — accepts either TypeORM EntityManager (preferred)
  * or legacy ProductDb interface for backward compatibility.
  */
 export type DbHandle = EntityManager | ProductDb;
@@ -38,8 +38,8 @@ function assertEm(db: DbHandle): EntityManager {
     return (db as { em: EntityManager }).em;
   }
   throw new Error(
-    "repositories.ts: MikroORM EntityManager required. " +
-    "Pass em (from MikroORM) instead of raw ProductDb. " +
+    "repositories.ts: TypeORM EntityManager required. " +
+    "Pass a TypeORM EntityManager instead of raw ProductDb. " +
     "See ARCH-02 migration guide.",
   );
 }

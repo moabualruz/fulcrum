@@ -1,7 +1,7 @@
 # MikroORM → TypeORM Migration + NestJS Architecture Cleanup
 
 **Date:** 2026-05-15
-**Status:** COMPLETED (2026-05-17) — all migration work done, verified by CI + architecture tests
+**Status:** HISTORICALLY IMPLEMENTED (2026-05-17), CURRENTLY EVIDENCE-SCOPED — prior notes claim CI completion; current verification is limited to architecture stack gates passing 50 tests. Full CI/final gates must be rerun in the current tree before final closure.
 **Scope:** Full ORM migration + god module split + DTO extraction + tRPC consolidation + stub removal + test co-location
 
 ## Context
@@ -122,18 +122,20 @@ class-validator decorators are inline in controller handler methods across 60+ f
 
 ## Success Criteria
 
-- [ ] Zero `@mikro-orm/*` imports in codebase
-- [ ] Zero `kysely` imports in codebase
-- [ ] All 93 entities use TypeORM decorators
-- [ ] All repositories use TypeORM `Repository<T>` pattern
-- [ ] `TypeOrmModule.forRoot()` + `.forFeature()` wired in NestJS modules
-- [ ] Fresh TypeORM migrations create equivalent schema
-- [ ] PGlite works as default local DB via `typeorm-pglite`
-- [ ] `DATABASE_URL` switches to full PostgreSQL
-- [ ] `bun run ci` passes
-- [ ] No orphaned deps in package.json
-- [ ] Entities owned by their service (not centralized in platform-core)
-- [ ] DTOs extracted to `dto/` folders, controllers are thin
-- [ ] tRPC routers consolidated to single location, no business logic in routers
-- [ ] No empty/stub services without documented timeline
-- [ ] Tests co-located with source (except architecture tests at root)
+Checked criteria below reflect historical implementation evidence plus the current focused architecture gate evidence. They are not a current full-CI/final-gate claim; rerun full CI in the current tree before final closure.
+
+- [x] Zero `@mikro-orm/*` imports in codebase
+- [x] Zero `kysely` imports in codebase
+- [x] All 93 entities use TypeORM decorators
+- [x] All repositories use TypeORM `Repository<T>` pattern
+- [x] `TypeOrmModule.forRoot()` + `.forFeature()` wired in NestJS modules
+- [x] Fresh TypeORM migrations create equivalent schema
+- [x] PGlite works as default local DB via `typeorm-pglite`
+- [x] `DATABASE_URL` switches to full PostgreSQL
+- [x] Historical evidence: `bun run ci` passed; current tree requires rerun
+- [x] No orphaned deps in package.json
+- [x] Entities owned by their service (not centralized in platform-core)
+- [x] DTOs extracted to `dto/` folders, controllers are thin
+- [x] tRPC routers consolidated to single location, no business logic in routers
+- [x] No empty/stub services without documented timeline
+- [x] Tests co-located with source (except architecture tests at root)
