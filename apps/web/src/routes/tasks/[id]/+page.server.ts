@@ -193,7 +193,8 @@ export const actions: Actions = {
     }
   },
 
-  logTime: async ({ request, params, locals }) => {
+  logTime: async (event) => {
+    const { request, params } = event;
     const fd = await request.formData();
     const durationMinutes = Number(fd.get("durationMinutes") ?? 0);
     const loggedDate = String(fd.get("loggedDate") ?? "").trim();
@@ -201,19 +202,13 @@ export const actions: Actions = {
     if (!durationMinutes || durationMinutes < 1 || !loggedDate) {
       return fail(400, actionFail("Duration and date are required"));
     }
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
-    const { TimeEntry } = await import("@work-management/infrastructure/database/entities/tasks/TimeEntry.ts");
-    const { Org } = await import("@identity-access/infrastructure/database/entities/auth/Org.ts");
-    const { Task } = await import("@work-management/infrastructure/database/entities/tasks/Task.ts");
-    const entry = em.create(TimeEntry, {
-      org: { id: ctx.orgId } as InstanceType<typeof Org>,
-      task: { id: params.id } as InstanceType<typeof Task>,
-      userId: ctx.userId,
+    const workflowApi = createWebWorkflowApiCaller(event);
+    await workflowApi.timeEntries.log({
+      taskId: params.id,
       durationMinutes,
-      description,
       loggedDate,
+      description: description ?? undefined,
     });
-    await em.save(entry);
     return actionOk(`Logged ${durationMinutes} min`);
   },
 };
