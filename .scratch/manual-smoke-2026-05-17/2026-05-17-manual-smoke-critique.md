@@ -320,3 +320,28 @@ Status: smoke-passable after TypeORM/Nest/TUI runtime repair and current full ve
 - API/NestJS: `http://127.0.0.1:3000`
 - Web/SvelteKit: `http://127.0.0.1:5173`
 - TUI: running in current session with `FULCRUM_SERVER_URL=http://127.0.0.1:3000` and seeded local user/org.
+
+## Remediation Pass - 2026-05-17 14:25 Asia/Amman
+
+Status: closure pass. Same surfaces remain smoke-passable; `bun run ci` rerun is green after isolating the app-dev-startup runtime test from the shared scratch PGlite path, and the full smoke remediation is now landed as a single tracked commit.
+
+### Fixed Blockers
+
+- `tests/runtime/app-dev-startup.test.ts` no longer collides with the running API session over the shared `.scratch/manual-smoke-2026-05-17/home/` PGlite directory. Each test now allocates an isolated `mkdtempSync(...)` home and tears it down after the run; the API spawn under `FULCRUM_SERVER_PORT=3199` reaches Nest bootstrap without the prior PGlite `RuntimeError: Aborted()` from contending single-writer access. Focused evidence: `bun test tests/runtime/app-dev-startup.test.ts --timeout 30000` -> 2 pass / 0 fail / 3 expect() calls.
+- All previously dirty smoke code now lands as the single commit `2669f22d8 fix(smoke): manual smoke remediation — boot API/TUI, prove workflow E2E, isolate startup test`. The working tree is clean after this commit.
+
+### Current Verification Evidence
+
+- Full broad gate: `bun run ci` -> exit 0. Summary: install/typecheck/architecture/license-audit/codegen/schemas/unit/integration/build/web:check/web:build/web:test all pass; integration -> 2891 pass / 36 skip / 5 todo / 0 fail / 9931 assertions across 400 files; web:test -> 32 files pass / 200 tests pass.
+- Dev servers still bound: API on `http://127.0.0.1:3000` (PID 8129 / 8130-class Nest listener), web on `http://127.0.0.1:5173`, TUI in foreground session (PID 8849).
+- Critique, smoke logs, screenshots, and the goal definition are tracked under `.scratch/manual-smoke-2026-05-17/`; the live PGlite snapshot at `.scratch/manual-smoke-*/home/` is excluded by the new `.gitignore` rule.
+
+### Remaining Non-Blocking Polish
+
+- Same backlog as the previous pass: workflow-stage primary nav, trace-ID-aware recovery panels, richer TUI manual script, quieter optional inference backend logs, and reduced Svelte build warning backlog.
+
+### Dev Servers Left Running
+
+- API/NestJS: `http://127.0.0.1:3000`
+- Web/SvelteKit: `http://127.0.0.1:5173`
+- TUI: running in current session with `FULCRUM_SERVER_URL=http://127.0.0.1:3000` and seeded local user/org.
