@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 async function openBuildGraph(page: Page): Promise<void> {
 	await page.goto("/build-graph");
@@ -51,6 +52,38 @@ function parseCssColor(value: string): [number, number, number] {
 }
 
 test.describe("build graph doc search", () => {
+	test("keeps build graph on the documented spacing scale", async ({ page }) => {
+		await openBuildGraph(page);
+
+		const spacing = await page.evaluate(() => {
+			const probe = document.createElement("div");
+			document.body.appendChild(probe);
+			const values: Record<string, string> = {};
+			for (const token of ["1", "2", "3", "4", "6", "8", "12", "16"]) {
+				probe.className = `p-${token}`;
+				values[`space-${token}`] = getComputedStyle(probe).paddingTop;
+			}
+			probe.remove();
+			return values;
+		});
+
+		expect(spacing).toEqual({
+			"space-1": "4px",
+			"space-2": "8px",
+			"space-3": "12px",
+			"space-4": "16px",
+			"space-6": "24px",
+			"space-8": "32px",
+			"space-12": "48px",
+			"space-16": "64px",
+		});
+
+		const source = readFileSync("src/routes/build-graph/+page.svelte", "utf8");
+		const offScaleUtilities = source.match(/\b(?:[mp][trblxy]?|gap|space-[xy])-([0-9]+|\[[^\]]+\])/g)
+			?.filter((token) => !/(?:^|-)0$|(?:^|-)1$|(?:^|-)2$|(?:^|-)3$|(?:^|-)4$|(?:^|-)6$|(?:^|-)8$|(?:^|-)12$|(?:^|-)16$/.test(token));
+		expect(offScaleUtilities ?? []).toEqual([]);
+	});
+
 	test("shows dependency order, run state, blockers, and execution actions", async ({ page }) => {
 		await openBuildGraph(page);
 

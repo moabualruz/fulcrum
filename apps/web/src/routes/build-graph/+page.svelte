@@ -228,7 +228,7 @@
 </svelte:head>
 
 <main data-build-graph-search data-build-graph-ready={hydrated ? "true" : "false"} class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}>
-  <div class={cn("mx-auto flex max-w-7xl min-w-0 flex-col gap-4 px-4 py-5 lg:px-6")}>
+  <div class={cn("mx-auto flex max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 lg:px-6")}>
     <header data-build-graph-header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
       <div>
         <p data-contrast-sample class={cn("text-xs font-medium uppercase text-fg-subtle")}>Build graph</p>

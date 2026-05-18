@@ -6,7 +6,21 @@ import { allocatePortBlock } from "./e2e-ports";
 const specDir = path.join(process.cwd(), "tests/design-e2e");
 const svelteKitOutputDir = path.join(process.cwd(), ".svelte-kit/output");
 const webRoot = process.cwd();
+const repoRoot = path.resolve(webRoot, "../..");
 const playwrightCli = path.join(webRoot, "node_modules/@playwright/test/cli.js");
+const uiKitRoot = path.join(repoRoot, "packages/ui-kit");
+
+function syncUiKit(): void {
+	const result = spawnSync("bun", ["x", "svelte-kit", "sync"], {
+		cwd: uiKitRoot,
+		stdio: "inherit",
+		env: process.env,
+	});
+
+	if (result.status !== 0) {
+		process.exit(result.status ?? 1);
+	}
+}
 
 function stopDesignProcesses(port?: string): void {
 	const patterns = [
@@ -36,6 +50,8 @@ const designPorts = await allocatePortBlock({
 	count: chunkCount,
 	preferredBase: process.env.FULCRUM_DESIGN_E2E_PORT_BASE ? Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE) : undefined,
 });
+
+syncUiKit();
 
 for (let index = 0; index < specs.length; index += chunkSize) {
 	const chunk = specs.slice(index, index + chunkSize);

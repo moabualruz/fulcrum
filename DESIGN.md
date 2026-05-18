@@ -70,6 +70,10 @@ Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-res
 | `space-4` | 16 | Section gap |
 | `space-6` | 24 | Card padding |
 | `space-8` | 32 | Major section |
+| `space-12` | 48 | Large layout separation |
+| `space-16` | 64 | Page-level band separation |
+
+Tailwind v4 spacing utilities are driven from `apps/web/src/app.css` with `--spacing: 0.25rem`, so numeric utilities map to the documented 4px scale (`p-1` = 4px, `p-16` = 64px). The same file safelists the approved margin, padding, gap, and stack utilities with `@source inline(...)` so large tokens are available even before a page uses them. Web slices must use only `0/1/2/3/4/6/8/12/16` spacing utilities for margin, padding, gap, and stack spacing unless a safe-area or viewport-specific CSS expression is explicitly required.
 
 Row height baseline = 24 px (research-01 §13). Tables 28 px comfortable / 24 px cozy / 20 px compact via density toggle.
 

@@ -6,7 +6,24 @@ import { resolveRequestedE2eSpecs } from "./e2e-specs";
 
 const requestedSpecs = process.argv.slice(2);
 const resolved = resolveRequestedE2eSpecs(requestedSpecs);
-const playwrightCli = path.join(process.cwd(), "node_modules/@playwright/test/cli.js");
+const webRoot = process.cwd();
+const repoRoot = path.resolve(webRoot, "../..");
+const playwrightCli = path.join(webRoot, "node_modules/@playwright/test/cli.js");
+const uiKitRoot = path.join(repoRoot, "packages/ui-kit");
+
+function syncUiKit(): void {
+	const result = spawnSync("bun", ["x", "svelte-kit", "sync"], {
+		cwd: uiKitRoot,
+		stdio: "inherit",
+		env: process.env,
+	});
+
+	if (result.status !== 0) {
+		process.exit(result.status ?? 1);
+	}
+}
+
+syncUiKit();
 
 if (resolved.project === "design-e2e") {
 	const [designPortNumber] = await allocatePortBlock({
