@@ -1,0 +1,20 @@
+{
+	"name": "@fulcrum/ui-kit",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "svelte-kit sync && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css && bun run --bun tsc -p tsconfig.json --noEmit"
+	},
+	"peerDependencies": {
+		"svelte": "^5.55.2"
+	},
+	"devDependencies": {
+		"@sveltejs/kit": "^2.59.0",
+		"svelte-check": "^4.4.6",
+		"typescript": "^5.6.0"
+	}
+}

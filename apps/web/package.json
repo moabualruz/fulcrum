@@ -60,6 +60,7 @@
 		"vitest": "^4.1.5"
 	},
 	"dependencies": {
+		"@fulcrum/ui-kit": "workspace:*",
 		"@codemirror/lang-markdown": "^6.5.0",
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/theme-one-dark": "^6.1.3",
