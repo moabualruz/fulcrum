@@ -4,6 +4,7 @@ import type { SessionWorkbenchModel } from "@agent-client-protocol/interface/ses
 
 type Props = {
   model: SessionWorkbenchModel;
+  availableAgents?: { id: string; name: string; cli_path?: string | null; capabilities?: string[]; test_passed?: boolean | null }[];
 };
 
 describe("AgentSessionWorkbench component", () => {
@@ -91,7 +92,36 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("empty-create-btn");
     expect(body).toContain("No messages");
     expect(body).toContain("data-connect-bridge");
+    expect(body).toContain("data-agent-picker-empty");
     expect(body).not.toContain("data-session-permission");
+  });
+
+  test("renders clickable agent picker options with selected state", () => {
+    const { body } = render(AgentSessionWorkbench, {
+      props: {
+        model: idleModel(),
+        availableAgents: [
+          { id: "codex", name: "codex", cli_path: "codex", capabilities: ["code", "llm"] },
+          {
+            id: "very-long",
+            name: "very-long-agent-name-that-needs-truncation-on-mobile",
+            cli_path: "/usr/local/bin/very-long-agent-command",
+            capabilities: ["review"],
+          },
+        ],
+      },
+    });
+
+    expect(body).toContain("data-agent-picker");
+    expect(body).toContain('data-agent-option="codex"');
+    expect(body).toContain('data-selected="true"');
+    expect(body).toContain('name="agentName"');
+    expect(body).toContain('value="codex"');
+    expect(body).toContain("agent-option");
+    expect(body).toContain("very-long-agent-name-that-needs-truncation-on-mobile");
+    expect(body).toContain('name="command"');
+    expect(body).toContain('value="codex"');
+    expect(body).not.toContain("data-agent-picker-empty");
   });
 
   test("renders reconnect progress, manual recovery, and dismiss action", () => {

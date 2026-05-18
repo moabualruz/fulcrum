@@ -38,7 +38,7 @@
   <RouteSkeleton kind="list" />
 {:then payload}
   <div class={cn("mb-4")}>
-    <AgentSessionWorkbench model={payload.sessionWorkbench} />
+    <AgentSessionWorkbench model={payload.sessionWorkbench} availableAgents={payload.profiles} />
   </div>
 
   <!-- W2: ACP bridge → persisted planning session -->

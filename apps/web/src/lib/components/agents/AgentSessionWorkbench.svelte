@@ -3,11 +3,20 @@
   import { buttonVariants } from "$lib/components/ui/button";
   import type { SessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
 
-  interface Props {
-    model: SessionWorkbenchModel;
+  interface AgentPickerOption {
+    id: string;
+    name: string;
+    cli_path?: string | null;
+    capabilities?: string[];
+    test_passed?: boolean | null;
   }
 
-  let { model }: Props = $props();
+  interface Props {
+    model: SessionWorkbenchModel;
+    availableAgents?: AgentPickerOption[];
+  }
+
+  let { model, availableAgents = [] }: Props = $props();
 
   const statusLabel: Record<string, string> = {
     idle: "Idle",
@@ -27,8 +36,10 @@
   let errorDismissed = $state(false);
   let abortConfirmOpen = $state(false);
   let deleteSessionId = $state<string | null>(null);
+  let selectedAgentName = $state(availableAgents[0]?.name ?? "");
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
+  const selectedAgent = $derived(availableAgents.find((agent) => agent.name === selectedAgentName) ?? availableAgents[0] ?? null);
 
   $effect(() => {
     messageCount;
@@ -275,17 +286,47 @@
   {#if model.connection.status === "idle"}
     <form id="agent-connect-form" method="POST" action="?/connectBridge" data-connect-bridge class={cn("mt-4 grid gap-3 rounded-md border border-border p-3")}>
       <h3 class={cn("text-sm font-medium")}>Connect to agent</h3>
-      <div class={cn("grid grid-cols-2 gap-2")}>
-        <input name="agentName" placeholder="Agent name" required class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
-        <select name="transportType" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")}>
-          <option value="stdio">stdio (local)</option>
-          <option value="websocket">WebSocket (remote)</option>
-        </select>
-      </div>
-      <input name="command" placeholder="Command (for stdio)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+      {#if availableAgents.length === 0}
+        <div data-agent-picker-empty class={cn("rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground")}>
+          No agents configured. Add an agent profile before starting an AI Assist session.
+        </div>
+      {:else}
+        <fieldset data-agent-picker class={cn("grid gap-2")}>
+          <legend class={cn("text-xs font-medium text-muted-foreground")}>Agent</legend>
+          <div class={cn("grid max-h-72 gap-2 overflow-y-auto pr-1 sm:grid-cols-2", availableAgents.length > 5 ? "border-l border-border pl-2" : "")}>
+            {#each availableAgents as agent}
+              <label
+                data-agent-option={agent.name}
+                data-selected={selectedAgentName === agent.name}
+                class={cn(
+                  "agent-option grid cursor-pointer gap-2 rounded-md border border-border p-3 text-sm transition hover:bg-muted/60",
+                  selectedAgentName === agent.name ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "bg-background",
+                )}
+              >
+                <span class={cn("flex min-w-0 items-center justify-between gap-2")}>
+                  <span title={agent.name} class={cn("truncate font-medium")}>{agent.name}</span>
+                  <input type="radio" name="agentName" value={agent.name} bind:group={selectedAgentName} required class={cn("size-4 shrink-0 accent-primary")} />
+                </span>
+                <span title={agent.cli_path ?? "No command configured"} class={cn("truncate font-mono text-xs text-muted-foreground")}>
+                  {agent.cli_path ?? "No command configured"}
+                </span>
+                {#if agent.capabilities?.length}
+                  <span class={cn("flex flex-wrap gap-1")}>
+                    {#each agent.capabilities.slice(0, 3) as capability}
+                      <span class={cn("rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>{capability}</span>
+                    {/each}
+                  </span>
+                {/if}
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+      {/if}
+      <input type="hidden" name="transportType" value="stdio" />
+      <input name="command" value={selectedAgent?.cli_path ?? ""} placeholder="Command (for stdio)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
       <input name="url" placeholder="URL (for websocket)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
       <input name="cwd" placeholder="Working directory" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
-      <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }), "w-fit")}>Connect</button>
+      <button type="submit" disabled={availableAgents.length === 0} class={cn(buttonVariants({ variant: "default", size: "sm" }), "w-fit")}>Connect</button>
     </form>
   {/if}
 
