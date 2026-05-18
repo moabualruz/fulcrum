@@ -117,6 +117,8 @@ function taskQuery(input: JsonRecord): JsonRecord {
     projectId: input.projectId,
     project_id: input.project_id,
     include_deleted: input.includeDeleted ?? input.include_deleted,
+    sortField: input.sortField,
+    sortDirection: input.sortDirection,
   });
 }
 
