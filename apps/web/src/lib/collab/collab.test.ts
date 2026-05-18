@@ -1,12 +1,16 @@
 /**
  * RED → GREEN tests for gated real-time collab (issue #21).
- * No real Hocuspocus/Yjs deps — all mock-based.
+ * Flag OFF stays mock-based; flag ON requires real provider dependencies.
  */
 import { describe, it, expect, beforeEach } from "bun:test";
 import { isCollabEnabled, isWebRTCFallbackEnabled, getFeatureFlags } from "./feature-flags.js";
 import { MockCollabProvider } from "./mock-provider.js";
 import type { CollabUser } from "./types.js";
-import { createCollabProvider } from "./provider-factory.js";
+import {
+	CollabProviderConfigError,
+	createCollabProvider,
+	resolveHocuspocusUrl,
+} from "./provider-factory.js";
 
 // ---- Feature flag helpers ---------------------------------------------------
 
@@ -145,14 +149,22 @@ describe("createCollabProvider factory", () => {
 		expect(p.connected).toBe(false);
 	});
 
-	it("flag ON without real Hocuspocus → falls back to mock, connected", async () => {
-		const p = await createCollabProvider({
+	it("flag ON outside browser without Hocuspocus URL fails instead of using mock", async () => {
+		await expect(createCollabProvider({
 			docId: "doc-1",
 			user: { id: "u1", name: "User", color: "#aaa" },
 			featuresEnv: "real-time-collab-server",
-		});
-		// MockCollabProvider fallback (Hocuspocus not installed)
-		expect(p.connected).toBe(true);
+		})).rejects.toBeInstanceOf(CollabProviderConfigError);
+	});
+
+	it("derives browser Hocuspocus URL from current origin without hardcoded localhost", () => {
+		const previousWindow = (globalThis as Record<string, unknown>).window;
+		(globalThis as Record<string, unknown>).window = {
+			location: { protocol: "https:", host: "fulcrum.local" },
+		};
+
+		expect(resolveHocuspocusUrl()).toBe("wss://fulcrum.local/yjs");
+		(globalThis as Record<string, unknown>).window = previousWindow;
 	});
 
 	it("flag ON WebRTC fallback → returns provider (not crashed)", async () => {

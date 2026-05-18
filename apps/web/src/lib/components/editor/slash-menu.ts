@@ -1,8 +1,10 @@
 import type { Editor, Extension, JSONContent } from "@tiptap/core";
 import { Node } from "@tiptap/core";
+import { Collaboration } from "@tiptap/extension-collaboration";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import type { Doc } from "yjs";
 import { ExcalidrawNode, FileAttachmentNode, ImageNode, MathBlockNode, MathNode, MermaidNode } from "./embeds";
 import { MentionNode } from "./mention";
 import { WikilinkNode } from "./wikilink";
@@ -209,10 +211,15 @@ export function filterSlashMenuItems(items: SlashMenuItem[], query: string): Sla
   });
 }
 
-export function createDocEditorExtensions(): Extension[] {
-  return [
+export interface DocEditorExtensionOptions {
+  collaborationDocument?: Doc | null;
+}
+
+export function createDocEditorExtensions(options: DocEditorExtensionOptions = {}): Extension[] {
+  const extensions: Extension[] = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
+      undoRedo: options.collaborationDocument ? false : undefined,
       link: {
         autolink: true,
         linkOnPaste: true,
@@ -240,6 +247,15 @@ export function createDocEditorExtensions(): Extension[] {
     EmbedNode,
     StatusNode,
   ] as Extension[];
+
+  if (options.collaborationDocument) {
+    extensions.push(Collaboration.configure({
+      document: options.collaborationDocument,
+      field: "content",
+    }));
+  }
+
+  return extensions;
 }
 
 export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {

@@ -112,6 +112,11 @@ describe("auth rejection", () => {
 });
 
 describe("persistence", () => {
+  beforeEach(() => {
+    mockFindOne.mockReset();
+    mockSave.mockReset();
+  });
+
   it("saves YjsSnapshot after update (debounced)", async () => {
     vi.useFakeTimers();
     const mod = await import("./yjs-server.ts");
@@ -178,6 +183,130 @@ describe("persistence", () => {
     expect(receivedDoc.getMap("body").get("text")).toBe("collaborative doc body");
   });
 
+  it("broadcasts one client Yjs update to another live document client", async () => {
+    const mod = await import("./yjs-server.ts");
+    const handler = mod.createYjsServer({
+      em: mockEm as any,
+      validateSession: async () => ({ id: "sess-1", userId: "user-1" }),
+      debounceMs: 100,
+    });
+    mockFindOne.mockResolvedValue(null);
+
+    let firstMessageHandler: ((data: Buffer) => void) | undefined;
+    const firstWs = {
+      close: vi.fn(),
+      send: vi.fn(),
+      readyState: 1,
+      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
+        if (event === "message") firstMessageHandler = handler;
+      }),
+    };
+    const liveMessages: Buffer[] = [];
+    const secondWs = {
+      close: vi.fn(),
+      send: vi.fn((data: Buffer) => liveMessages.push(Buffer.from(data))),
+      readyState: 1,
+      on: vi.fn(),
+    };
+
+    await handler.handleConnection(firstWs as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-live",
+    });
+    await handler.handleConnection(secondWs as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-live",
+    });
+
+    const before = liveMessages.length;
+    const clientDoc = new Y.Doc();
+    clientDoc.getMap("body").set("text", "live collaborative doc body");
+    const update = Buffer.from(Y.encodeStateAsUpdate(clientDoc));
+    firstMessageHandler?.(Buffer.concat([Buffer.from([0]), update]));
+
+    const broadcast = liveMessages.slice(before).at(-1);
+    expect(broadcast).toBeDefined();
+    const receivedDoc = new Y.Doc();
+    Y.applyUpdate(receivedDoc, broadcast!.subarray(1));
+    expect(receivedDoc.getMap("body").get("text")).toBe("live collaborative doc body");
+  });
+
+  it("keeps presence messages out of persisted document snapshots", async () => {
+    vi.useFakeTimers();
+    const mod = await import("./yjs-server.ts");
+    const handler = mod.createYjsServer({
+      em: mockEm as any,
+      validateSession: async () => ({ id: "sess-1", userId: "user-1" }),
+      debounceMs: 25,
+    });
+    mockFindOne.mockResolvedValue(null);
+
+    let messageHandler: ((data: Buffer) => void) | undefined;
+    const ws = {
+      close: vi.fn(),
+      send: vi.fn(),
+      readyState: 1,
+      on: vi.fn((event: string, handler: (data: Buffer) => void) => {
+        if (event === "message") messageHandler = handler;
+      }),
+    };
+
+    await handler.handleConnection(ws as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-presence",
+    });
+    messageHandler?.(Buffer.from([1, ...Buffer.from(JSON.stringify({ cursor: { anchor: 1, head: 3 } }))]));
+    vi.advanceTimersByTime(50);
+
+    expect(mockSave).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("reloads a persisted Yjs snapshot after handler restart", async () => {
+    const snapshots = new Map<string, { docName: string; state: Buffer; updatedAt: Date }>();
+    const em = {
+      findOne: vi.fn(async (_entity: unknown, options: { where?: { docName?: string } }) => {
+        const docName = options.where?.docName;
+        return docName ? snapshots.get(docName) ?? null : null;
+      }),
+      save: vi.fn(async (snapshot: { docName: string; state: Buffer; updatedAt: Date }) => {
+        snapshots.set(snapshot.docName, { ...snapshot });
+        return snapshot;
+      }),
+    };
+
+    const mod = await import("./yjs-server.ts");
+    const firstHandler = mod.createYjsServer({
+      em: em as any,
+      validateSession: async () => ({ id: "sess-1", userId: "user-1" }),
+    });
+    const sourceDoc = new Y.Doc();
+    sourceDoc.getMap("body").set("text", "snapshot survives restart");
+    await firstHandler.persistDoc("doc-restart", Buffer.from(Y.encodeStateAsUpdate(sourceDoc)));
+
+    const secondHandler = mod.createYjsServer({
+      em: em as any,
+      validateSession: async () => ({ id: "sess-2", userId: "user-2" }),
+    });
+    const sentUpdates: Buffer[] = [];
+    const ws = {
+      close: vi.fn(),
+      send: vi.fn((data: Buffer) => sentUpdates.push(Buffer.from(data))),
+      readyState: 1,
+      on: vi.fn(),
+    };
+    await secondHandler.handleConnection(ws as any, {
+      headers: { authorization: "Bearer valid-token" },
+      url: "/yjs/doc-restart",
+    });
+
+    const reloadedDoc = new Y.Doc();
+    const latest = sentUpdates.at(-1);
+    expect(latest).toBeDefined();
+    Y.applyUpdate(reloadedDoc, latest!.subarray(1));
+    expect(reloadedDoc.getMap("body").get("text")).toBe("snapshot survives restart");
+  });
+
   it("loads existing snapshot on doc init", async () => {
     const existingState = Buffer.from([4, 5, 6]);
     mockFindOne.mockResolvedValueOnce({
@@ -193,7 +322,7 @@ describe("persistence", () => {
     expect(state).toEqual(existingState);
     expect(mockFindOne).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ docName: "task-abc" })
+      expect.objectContaining({ where: { docName: "task-abc" } })
     );
   });
 

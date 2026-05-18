@@ -231,7 +231,14 @@
 		<div class={cn("flex flex-col gap-1.5")}>
 			<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
 			<div class="relative">
-				<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
+				{#key collabProvider?.document ?? "local-editor"}
+					<DocEditor
+						content={contentJson}
+						collabProvider={collabProvider}
+						onchange={handleDocChange}
+						ariaLabel="Document body"
+					/>
+				{/key}
 				<FeatureGate flag="real-time-collab-server" flags={featureFlags} fallback={false}>
 					<CursorOverlay cursors={remoteCursors} />
 				</FeatureGate>

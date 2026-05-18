@@ -116,6 +116,7 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
 
   // In-memory document store: docName -> Y.Doc
   const docs = new Map<string, Y.Doc>();
+  const socketsByDocName = new Map<string, Set<WebSocket>>();
 
   // ── persistDoc ────────────────────────────────────────────────────────
 
@@ -146,6 +147,24 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
     return docs.get(docName)!;
   }
 
+  function getDocSockets(docName: string): Set<WebSocket> {
+    let sockets = socketsByDocName.get(docName);
+    if (!sockets) {
+      sockets = new Set<WebSocket>();
+      socketsByDocName.set(docName, sockets);
+    }
+    return sockets;
+  }
+
+  function broadcastDocUpdate(docName: string, source: WebSocket, data: Uint8Array): void {
+    const sockets = socketsByDocName.get(docName);
+    if (!sockets) return;
+    for (const socket of sockets) {
+      if (socket === source || socket.readyState !== WebSocket.OPEN) continue;
+      socket.send(Buffer.from(data));
+    }
+  }
+
   // ── handleConnection ──────────────────────────────────────────────────
 
   async function handleConnection(
@@ -171,6 +190,8 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
     const docName = urlPath.split("/").pop() ?? "unknown";
 
     const doc = getOrCreateDoc(docName);
+    const docSockets = getDocSockets(docName);
+    docSockets.add(ws);
 
     // Load snapshot on first connection to this doc (rehydrate from DB)
     const existingState = await loadDoc(docName);
@@ -206,6 +227,9 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
         // Apply Yjs update from client (messageSync = 0)
         if (update[0] === 0) {
           Y.applyUpdate(doc, update.slice(1));
+          broadcastDocUpdate(docName, ws, update);
+        } else {
+          broadcastDocUpdate(docName, ws, update);
         }
       } catch (_e) {
         // Ignore malformed messages
@@ -213,6 +237,8 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
     });
 
     ws.on("close", () => {
+      docSockets.delete(ws);
+      if (docSockets.size === 0) socketsByDocName.delete(docName);
       doc.off("update", debouncedPersist);
     });
   }

@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { Editor as CoreEditor, JSONContent } from "@tiptap/core";
+  import type { Doc } from "yjs";
   import { createEventDispatcher, onDestroy, onMount, tick } from "svelte";
   import type { Unsubscriber } from "svelte/store";
   import { createEditor, EditorContent } from "svelte-tiptap";
+  import type { CollabProvider } from "$lib/collab/types.js";
   import { handleAttachmentFiles } from "./embeds";
   import {
     createAutosaveScheduler,
@@ -18,6 +20,7 @@
     save?: (contentJson: JSONContent, bodyMd: string) => Promise<void> | void;
     onchange?: (event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>) => void;
     oncomment?: (event: CustomEvent<{ anchorRange: { from: number; to: number; text_preview: string } }>) => void;
+    collabProvider?: CollabProvider | null;
     ariaLabel?: string;
   }
 
@@ -33,6 +36,7 @@
     save,
     onchange,
     oncomment,
+    collabProvider = null,
     ariaLabel = "Document editor",
   }: Props = $props();
 
@@ -196,9 +200,10 @@
   }
 
   onMount(() => {
+    const collaborationDocument = collabProvider?.document as Doc | undefined;
     const store = createEditor({
-      extensions: createDocEditorExtensions(),
-      content,
+      extensions: createDocEditorExtensions({ collaborationDocument }),
+      content: collaborationDocument ? undefined : content,
       editorProps: {
         attributes: {
           "aria-label": ariaLabel,
