@@ -138,6 +138,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /task-filters                                             internal design-e2e preview for persistent task filters, AND/OR logic, and saved filtered views
 /palette                                                  internal design-e2e preview for permission-aware CommandPalette actions and SavedView access
 /comments                                                 internal design-e2e preview for task detail side panel with inline edit, properties, comments, activity, related tasks, and runs
+/auth-flows                                               internal design-e2e preview for login form, OAuth provider POST payloads, passkey support detection, and recovery guidance
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 

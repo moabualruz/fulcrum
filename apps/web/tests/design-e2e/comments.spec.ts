@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test.describe("task detail panel", () => {
 	test("supports inline title, description, properties, comments, activity, and runs", async ({ page }) => {
 		await page.goto("/comments");
+		await expect(page.locator("[data-comments-page]")).toHaveAttribute("data-hydrated", "true");
 
 		await expect(page.locator("[data-comments-header]")).toContainText("Task context panel");
 		await expect(page.locator("[data-task-detail-panel]")).toBeVisible();
@@ -39,6 +40,7 @@ test.describe("task detail panel", () => {
 	test("keeps the task detail panel usable on mobile without horizontal overflow", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/comments");
+		await expect(page.locator("[data-comments-page]")).toHaveAttribute("data-hydrated", "true");
 
 		await expect(page.locator("[data-task-detail-panel]")).toBeVisible();
 		await page.locator("[data-testid=task-title]").click();

@@ -45,6 +45,7 @@ async function readTokenValues(page: import("@playwright/test").Page, tokens: re
 test.describe("wave 0a color tokens", () => {
 	test("exposes OKLCH semantic tokens for light, dark, and high contrast modes", async ({ page }) => {
 		await page.goto("/wave-0a-foundation");
+		await expect(page.locator("[data-token-scope]")).toHaveAttribute("data-hydrated", "true");
 
 		for (const mode of ["light", "dark", "high-contrast"]) {
 			await page.locator(`[data-mode-button='${mode}']`).click();
@@ -73,6 +74,7 @@ test.describe("wave 0a color tokens", () => {
 test.describe("wave 0a shadow scale", () => {
 	test("defines elevation tokens and adjusts shadow opacity by mode", async ({ page }) => {
 		await page.goto("/wave-0a-foundation");
+		await expect(page.locator("[data-token-scope]")).toHaveAttribute("data-hydrated", "true");
 
 		const tokenValues = await readTokenValues(page, requiredShadowTokens.map(([token]) => token));
 		for (const [token, value] of requiredShadowTokens) {

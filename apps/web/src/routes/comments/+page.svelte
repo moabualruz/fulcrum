@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
 
   type SaveState = "saved" | "saving";
@@ -102,12 +103,17 @@
   let module = $state("quality");
   let activeTab = $state<"comments" | "activity">("comments");
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let hydrated = $state(false);
 
   const selectedState = $derived(STATE_OPTIONS.find((option) => option.value === state)?.label ?? "Unknown");
   const selectedPriority = $derived(PRIORITY_OPTIONS.find((option) => option.value === priority)?.label ?? "Unknown");
   const selectedAssignee = $derived(ASSIGNEE_OPTIONS.find((option) => option.value === assignee)?.label ?? "Unassigned");
   const selectedSprint = $derived(SPRINT_OPTIONS.find((option) => option.value === sprint)?.label ?? "No cycle");
   const selectedModule = $derived(MODULE_OPTIONS.find((option) => option.value === module)?.label ?? "No module");
+
+  onMount(() => {
+    hydrated = true;
+  });
 
   function debounceSave(kind: "title" | "description"): void {
     if (saveTimer) clearTimeout(saveTimer);
@@ -133,7 +139,7 @@
   <title>Task detail panel</title>
 </svelte:head>
 
-<main data-comments-page class={cn("min-h-screen overflow-x-hidden bg-muted/35 text-foreground")}>
+<main data-comments-page data-hydrated={hydrated} class={cn("min-h-screen overflow-x-hidden bg-muted/35 text-foreground")}>
   <div class={cn("mx-auto grid max-w-7xl gap-4 px-4 py-5 lg:grid-cols-[minmax(0,1fr)_420px] lg:px-6")}>
     <section class={cn("min-w-0 space-y-4")}>
       <header data-comments-header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import type { PageData } from "./$types";
 
 	type TokenMode = "light" | "dark" | "high-contrast";
@@ -35,13 +36,23 @@
 
 	const { data }: { data: PageData } = $props();
 	let mode = $state(data.mode as TokenMode);
+	let hydrated = $state(false);
+
+	onMount(() => {
+		hydrated = true;
+	});
 </script>
 
 <svelte:head>
 	<title>Wave 0a Foundation Tokens</title>
 </svelte:head>
 
-<main data-token-scope data-theme={mode} class="min-h-screen bg-surface px-6 py-8 text-fg sm:px-8">
+<main
+	data-token-scope
+	data-hydrated={hydrated}
+	data-theme={mode}
+	class="min-h-screen bg-surface px-6 py-8 text-fg sm:px-8"
+>
 	<section class="mx-auto flex max-w-6xl flex-col gap-6">
 		<header class="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
 			<div class="max-w-3xl">
