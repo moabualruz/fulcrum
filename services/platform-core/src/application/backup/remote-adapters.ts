@@ -81,6 +81,7 @@ export function parseDSN(dsn: string): ParsedDSN {
   if (!match) throw new Error(`Invalid backup DSN: ${dsn}`);
   const provider = match[1] as ParsedDSN["provider"];
   const bucket = match[2];
+  if (!bucket) throw new Error(`Invalid backup DSN: ${dsn}`);
   if (bucket.includes("@")) throw new Error("Remote backup DSN must not contain inline credentials; use credentialRef");
   const prefix = match[3] ?? "";
   return { provider, bucket, prefix };

@@ -164,8 +164,8 @@ describe("uploadBackup — S3", () => {
     expect(result.success).toBe(true);
     expect(result.provider).toBe("s3");
     expect(calls).toHaveLength(1);
-    expect(calls[0].Bucket).toBe("my-bucket");
-    expect(calls[0].Key).toBe("backups/backup-test.tar.gz");
+    expect(calls[0]!.Bucket).toBe("my-bucket");
+    expect(calls[0]!.Key).toBe("backups/backup-test.tar.gz");
     expect(result.attempts).toBe(1);
   });
 
@@ -192,7 +192,7 @@ describe("uploadBackup — S3", () => {
     const result = await uploadBackup(archive, "r2://r2-bucket/prefix", { s3Put, retryBaseMs: 1 });
     expect(result.success).toBe(true);
     expect(result.provider).toBe("r2");
-    expect(calls[0].Bucket).toBe("r2-bucket");
+    expect(calls[0]!.Bucket).toBe("r2-bucket");
   });
 
   test("B2 DSN uses same s3Put adapter", async () => {
@@ -308,9 +308,9 @@ describe("uploadBackup — Azure", () => {
 
     expect(result.success).toBe(true);
     expect(result.provider).toBe("azure");
-    expect(calls[0].container).toBe("my-container");
-    expect(calls[0].blob).toBe("bkp/backup-azure.tar.gz");
-    expect(calls[0].path).toBe(archive);
+    expect(calls[0]!.container).toBe("my-container");
+    expect(calls[0]!.blob).toBe("bkp/backup-azure.tar.gz");
+    expect(calls[0]!.path).toBe(archive);
   });
 });
 
