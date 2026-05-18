@@ -1,4 +1,4 @@
-import { fail } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
 import {
@@ -13,13 +13,22 @@ import { requestProjectScope } from "../../project-request-scope";
 const MODULE_STATUSES = ["planned", "active", "completed", "archived"] as const;
 
 export const load: PageServerLoad = async ({ params, locals }) => {
-  const { em, ctx } = await requestProjectScope(locals, params.id);
-  return {
-    projectId: params.id,
-    streamed: {
-      data: (async () => ({ modules: await listProjectModules(em, ctx) }))(),
-    },
-  };
+  try {
+    const { em, ctx } = await requestProjectScope(locals, params.id);
+    const modules = await listProjectModules(em, ctx);
+    return {
+      projectId: params.id,
+      streamed: {
+        data: Promise.resolve({ modules }),
+      },
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/not found|invalid input syntax for type uuid|request failed with 404|project id required/i.test(message)) {
+      throw error(404, "Project not found");
+    }
+    throw err;
+  }
 };
 
 export const actions: Actions = {
