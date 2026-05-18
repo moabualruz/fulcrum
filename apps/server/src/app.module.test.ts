@@ -34,6 +34,7 @@ import { WorkflowCycleModule } from "@workflow-coordination/interface/http/workf
 import { AutomationPublicApiModule } from "@work-management/interface/http/automation-public-api.controller.ts";
 import { CustomFieldPublicApiModule } from "@work-management/interface/http/custom-field-public-api.controller.ts";
 import { FieldDependencyPublicApiModule } from "@work-management/interface/http/field-dependency-public-api.controller.ts";
+import { PlanningStructurePublicApiModule } from "@work-management/interface/http/planning-structure-public-api.controller.ts";
 import { ProjectPublicApiModule } from "@work-management/interface/http/project-public-api.controller.ts";
 import { RelationshipPublicApiModule } from "@work-management/interface/http/relationship-public-api.controller.ts";
 import { ReportPublicApiModule } from "@work-management/interface/http/report-public-api.controller.ts";
@@ -86,6 +87,7 @@ describe("AppModule", () => {
       AutomationPublicApiModule,
       CustomFieldPublicApiModule,
       FieldDependencyPublicApiModule,
+      PlanningStructurePublicApiModule,
       ProjectPublicApiModule,
       SprintPublicApiModule,
       TaskCommentPublicApiModule,

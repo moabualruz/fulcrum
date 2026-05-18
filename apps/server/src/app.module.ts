@@ -35,6 +35,7 @@ import { SavedViewPublicApiModule } from "@work-management/interface/http/saved-
 import { AutomationPublicApiModule } from "@work-management/interface/http/automation-public-api.controller.ts";
 import { CustomFieldPublicApiModule } from "@work-management/interface/http/custom-field-public-api.controller.ts";
 import { FieldDependencyPublicApiModule } from "@work-management/interface/http/field-dependency-public-api.controller.ts";
+import { PlanningStructurePublicApiModule } from "@work-management/interface/http/planning-structure-public-api.controller.ts";
 import { ProjectPublicApiModule } from "@work-management/interface/http/project-public-api.controller.ts";
 import { SprintPublicApiModule } from "@work-management/interface/http/sprint-public-api.controller.ts";
 import { TaskCommentPublicApiModule } from "@work-management/interface/http/task-comment-public-api.controller.ts";
@@ -83,6 +84,7 @@ Module({
     AutomationPublicApiModule,
     CustomFieldPublicApiModule,
     FieldDependencyPublicApiModule,
+    PlanningStructurePublicApiModule,
     ProjectPublicApiModule,
     SprintPublicApiModule,
     TaskCommentPublicApiModule,

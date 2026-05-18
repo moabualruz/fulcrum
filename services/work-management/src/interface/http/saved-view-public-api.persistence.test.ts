@@ -150,7 +150,7 @@ async function assertSavedViewPublicApiRoundTrip(
       name: "Created view",
       scope: "private",
       viewType: "table",
-      filters: { status: "pending", priority: "high" },
+      filters: { statuses: ["pending"], cycleIds: ["cycle-1"], moduleIds: ["module-1"], priority: "high" },
       sortBy: "-updated_at",
       isDefault: true,
     });
@@ -160,12 +160,25 @@ async function assertSavedViewPublicApiRoundTrip(
       name: "Created view",
       scope: "private",
       viewType: "table",
-      filters: { status: "pending", priority: "high" },
+      filters: { statuses: ["pending"], cycleIds: ["cycle-1"], moduleIds: ["module-1"], priority: "high" },
       sortBy: "-updated_at",
       isDefault: true,
     }));
 
     const createdId = (created as { id: string }).id;
+    await controller.createSavedView({
+      orgId: ORG_ID,
+      projectId: PROJECT_ID,
+      name: "Default board",
+      scope: "project",
+      viewType: "kanban",
+      filters: { statuses: ["todo"] },
+      sortBy: "priority",
+      isDefault: true,
+    });
+    await expect(controller.getSavedView({ id: createdId })).resolves.toEqual(
+      expect.objectContaining({ id: createdId, isDefault: false }),
+    );
     await expect(controller.getSavedView({ id: createdId })).resolves.toEqual(
       expect.objectContaining({ id: createdId, name: "Created view" }),
     );
