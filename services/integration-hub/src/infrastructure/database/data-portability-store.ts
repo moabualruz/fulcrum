@@ -12,6 +12,7 @@ import {
 } from "@integration-hub/application/data-exchange/export-redaction.ts";
 
 export const FULCRUM_BACKUP_FORMAT = "fulcrum.db-dump.v1" as const;
+export const FULCRUM_BACKUP_SCHEMA_VERSION = 1 as const;
 export const FULCRUM_DATA_EXPORT_FORMAT = "fulcrum.json-export.v1" as const;
 export const FULCRUM_DATA_EXPORT_SCHEMA_VERSION = 1 as const;
 
@@ -30,6 +31,7 @@ export interface BackupDumpTable {
 
 export interface BackupDump {
   format: typeof FULCRUM_BACKUP_FORMAT;
+  schemaVersion: typeof FULCRUM_BACKUP_SCHEMA_VERSION;
   createdAt: string;
   tables: Record<string, BackupDumpTable>;
 }
@@ -46,10 +48,17 @@ export interface DataExportManifest {
   [table: string]: unknown;
 }
 
+export interface ImportRunFailure {
+  kind: string;
+  id: string;
+  error: string;
+}
+
 export interface ImportRunResult {
   imported: number;
   updated: number;
   skipped: number;
+  failures: ImportRunFailure[];
 }
 
 export class DataPortabilityPermissionError extends Error {}
@@ -63,6 +72,7 @@ export class DataPortabilityStore {
 
   async createBackup(input: DataPortabilityScope): Promise<{
     format: typeof FULCRUM_BACKUP_FORMAT;
+    schemaVersion: typeof FULCRUM_BACKUP_SCHEMA_VERSION;
     dump: string;
     entityCounts: Record<string, number>;
   }> {
@@ -70,6 +80,7 @@ export class DataPortabilityStore {
     const dump = await createBackupDump(this.dataSource);
     return {
       format: FULCRUM_BACKUP_FORMAT,
+      schemaVersion: FULCRUM_BACKUP_SCHEMA_VERSION,
       dump: encodeBackupDump(dump),
       entityCounts: entityCounts(dump.tables),
     };
@@ -77,6 +88,7 @@ export class DataPortabilityStore {
 
   async restoreBackup(input: DataPortabilityScope & { dump: string }): Promise<{
     format: typeof FULCRUM_BACKUP_FORMAT;
+    schemaVersion: typeof FULCRUM_BACKUP_SCHEMA_VERSION;
     entityCounts: Record<string, number>;
   }> {
     await this.requireAdminAccess(input);
@@ -84,6 +96,7 @@ export class DataPortabilityStore {
     await restoreBackupDump(this.dataSource, dump);
     return {
       format: FULCRUM_BACKUP_FORMAT,
+      schemaVersion: FULCRUM_BACKUP_SCHEMA_VERSION,
       entityCounts: entityCounts(dump.tables),
     };
   }
@@ -128,6 +141,7 @@ export class DataPortabilityStore {
     dryRun?: boolean;
     onConflict?: ConflictPolicy;
   }): Promise<ImportRunResult & {
+    /** Convenience mirror of failures.length so older callers keep working. */
     errors: number;
     counts: Record<string, number>;
   }> {
@@ -138,6 +152,7 @@ export class DataPortabilityStore {
         imported: 0,
         updated: 0,
         skipped: 0,
+        failures: [],
         errors: 0,
         counts: manifest.manifest.counts,
       };
@@ -148,7 +163,7 @@ export class DataPortabilityStore {
     );
     return {
       ...result,
-      errors: 0,
+      errors: result.failures.length,
       counts: manifest.manifest.counts,
     };
   }
@@ -180,6 +195,7 @@ async function createBackupDump(dataSource: DataSource): Promise<BackupDump> {
   }
   return {
     format: FULCRUM_BACKUP_FORMAT,
+    schemaVersion: FULCRUM_BACKUP_SCHEMA_VERSION,
     createdAt: new Date().toISOString(),
     tables,
   };
@@ -303,6 +319,7 @@ async function importManifestRows(
   let imported = 0;
   let updated = 0;
   let skipped = 0;
+  const failures: ImportRunFailure[] = [];
 
   for (const [kind, rows] of entityEntries(manifest)) {
     if (!tables.has(kind) || !isImportableTable(kind)) {
@@ -342,40 +359,54 @@ async function importManifestRows(
       const values = columns.map((column) => sqlValue(row[column], columnTypes[column]));
       const placeholders = columns.map((column, index) => placeholder(index + 1, columnTypes[column])).join(", ");
 
-      if (collides) {
-        const updates = columns
-          .filter((column) => column !== "id")
-          .map((column) => `${quoteIdent(column)} = excluded.${quoteIdent(column)}`)
-          .join(", ");
-        if (!updates) {
-          skipped += 1;
-          continue;
+      const savepoint = `sp_import_${imported + updated + skipped + failures.length}`;
+      await query(manager, `savepoint ${savepoint}`);
+      try {
+        if (collides) {
+          const updates = columns
+            .filter((column) => column !== "id")
+            .map((column) => `${quoteIdent(column)} = excluded.${quoteIdent(column)}`)
+            .join(", ");
+          if (!updates) {
+            skipped += 1;
+            await query(manager, `release savepoint ${savepoint}`);
+            continue;
+          }
+          await query(
+            manager,
+            `
+              insert into ${quoteIdent(kind)} (${insertColumns})
+              values (${placeholders})
+              on conflict (${quoteIdent("id")}) do update set ${updates}
+            `,
+            values,
+          );
+          updated += 1;
+        } else {
+          await query(
+            manager,
+            `
+              insert into ${quoteIdent(kind)} (${insertColumns})
+              values (${placeholders})
+            `,
+            values,
+          );
+          imported += 1;
         }
-        await query(
-          manager,
-          `
-            insert into ${quoteIdent(kind)} (${insertColumns})
-            values (${placeholders})
-            on conflict (${quoteIdent("id")}) do update set ${updates}
-          `,
-          values,
-        );
-        updated += 1;
-      } else {
-        await query(
-          manager,
-          `
-            insert into ${quoteIdent(kind)} (${insertColumns})
-            values (${placeholders})
-          `,
-          values,
-        );
-        imported += 1;
+        await query(manager, `release savepoint ${savepoint}`);
+      } catch (cause) {
+        await query(manager, `rollback to savepoint ${savepoint}`).catch(() => undefined);
+        await query(manager, `release savepoint ${savepoint}`).catch(() => undefined);
+        failures.push({
+          kind,
+          id: row.id,
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
       }
     }
   }
 
-  return { imported, updated, skipped };
+  return { imported, updated, skipped, failures };
 }
 
 async function tableNames(executor: Queryable): Promise<string[]> {
@@ -481,7 +512,11 @@ async function query<T extends Record<string, unknown>>(
 
 function assertBackupDump(value: unknown): asserts value is BackupDump {
   const record = asRecord(value);
-  if (record.format !== FULCRUM_BACKUP_FORMAT || typeof record.createdAt !== "string") {
+  if (
+    record.format !== FULCRUM_BACKUP_FORMAT ||
+    record.schemaVersion !== FULCRUM_BACKUP_SCHEMA_VERSION ||
+    typeof record.createdAt !== "string"
+  ) {
     throw new Error("invalid backup header");
   }
   const tables = asRecord(record.tables);
