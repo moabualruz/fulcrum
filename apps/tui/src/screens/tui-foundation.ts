@@ -3,6 +3,7 @@ import type { KeyBinding } from "../widgets/HelpOverlay.ts";
 
 export const BOOT_SPLASH_TITLE = "Fulcrum TUI";
 export const BOOT_SPLASH_SUBTITLE = "Booting local-first agent OS";
+export const SELECTED_ROW_FOCUS_MARKER = ">";
 export const FOUNDATION_KEY_BINDINGS = [
   { key: "j/k", action: "Move selection" },
   { key: "Enter/Space", action: "Open selected item or toggle selection" },
@@ -22,4 +23,8 @@ export function renderBootSplash(renderer: Renderer): void {
   renderer.writeln();
   renderer.writeln(centered(c.bold(BOOT_SPLASH_TITLE), renderer.width));
   renderer.writeln(centered(c.dim(BOOT_SPLASH_SUBTITLE), renderer.width));
+}
+
+export function formatFocusedRowLabel(label: string, selected: boolean): string {
+  return selected ? `${SELECTED_ROW_FOCUS_MARKER} ${c.bold(label)}` : `  ${label}`;
 }

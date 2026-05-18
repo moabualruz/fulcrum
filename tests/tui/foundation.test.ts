@@ -18,6 +18,8 @@ import {
   BOOT_SPLASH_SUBTITLE,
   BOOT_SPLASH_TITLE,
   FOUNDATION_KEY_BINDINGS,
+  SELECTED_ROW_FOCUS_MARKER,
+  formatFocusedRowLabel,
   renderBootSplash,
 } from "@fulcrum/tui/screens/tui-foundation.ts";
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
@@ -200,6 +202,28 @@ describe("TuiApp foundation behavior", () => {
     expect(app.screen).toBe("nav");
     expect(tty.plainText()).toContain("Domain nav");
     app.stop();
+  });
+
+  it("renders selected nav row with durable focus marker", async () => {
+    const tty = new FakeTTY({ columns: 80, rows: 24 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+    });
+
+    await app.mount();
+    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Projects`);
+
+    tty.inject("j");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Tasks`);
+    app.stop();
+  });
+
+  it("formats focused rows with marker independent of ANSI color", () => {
+    expect(formatFocusedRowLabel("Projects", true)).toContain(`${SELECTED_ROW_FOCUS_MARKER} `);
+    expect(formatFocusedRowLabel("Projects", false)).not.toContain(SELECTED_ROW_FOCUS_MARKER);
   });
 
   it("writes telemetry per screen render", async () => {

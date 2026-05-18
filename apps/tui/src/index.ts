@@ -30,7 +30,7 @@ import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
-import { FOUNDATION_KEY_BINDINGS, renderBootSplash } from "./screens/tui-foundation.ts";
+import { FOUNDATION_KEY_BINDINGS, formatFocusedRowLabel, renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
 import type { TuiTask } from "./screens/task-types.ts";
@@ -833,7 +833,8 @@ export class TuiApp {
     for (let i = 0; i < NAV_ENTRIES.length; i++) {
       const entry = NAV_ENTRIES[i];
       if (!entry) continue;
-      r.navItem(entry.label, i === this.navCursor);
+      const selected = i === this.navCursor;
+      r.navItem(formatFocusedRowLabel(entry.label, selected), selected);
     }
 
     r.writeln();
