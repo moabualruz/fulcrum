@@ -46,6 +46,8 @@
 		"happy-dom": "20.9.0",
 		"jsdom": "^29.1.1",
 		"mode-watcher": "^1.1.0",
+		"msw": "2.14.6",
+		"msw-trpc": "2.0.1",
 		"shadcn-svelte": "^1.2.7",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
@@ -61,6 +63,7 @@
 	},
 	"dependencies": {
 		"@fulcrum/ui-kit": "workspace:*",
+		"@trpc/client": "11.7.2",
 		"@codemirror/lang-markdown": "^6.5.0",
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/theme-one-dark": "^6.1.3",
