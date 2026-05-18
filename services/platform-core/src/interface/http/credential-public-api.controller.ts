@@ -17,6 +17,8 @@ import {
   CredentialPermissionError,
   CredentialStore,
   type CredentialPublicRow,
+  credentialAuditReference,
+  type CredentialAuditReference,
 } from "@platform-core/infrastructure/database/credential-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
@@ -40,12 +42,15 @@ export class CredentialPublicApiService {
     return await this.mapStoreErrors(() => this.requireStore().list(input));
   }
 
-  async getCredential(params: CredentialNameParamsDto, input: CredentialReadQueryDto): Promise<{ name: string; value: string }> {
-    return await this.mapStoreErrors(() => this.requireResult(this.requireStore().get({
+  async getCredential(params: CredentialNameParamsDto, input: CredentialReadQueryDto): Promise<CredentialPublicRow> {
+    return await this.mapStoreErrors(() => this.requireResult(this.requireStore().getPublic({
       ...input,
       name: params.name,
-      keyring: this.keyring(),
     })));
+  }
+
+  async getCredentialReference(params: CredentialNameParamsDto, input: CredentialReadQueryDto): Promise<CredentialAuditReference> {
+    return credentialAuditReference(await this.getCredential(params, input));
   }
 
   async setCredential(input: CredentialSetDto): Promise<{ id: string; name: string }> {
@@ -117,7 +122,7 @@ export class CredentialPublicApiController {
     return await this.credentials.setCredential(body);
   }
 
-  async getCredential(params: CredentialNameParamsDto, query: CredentialReadQueryDto): Promise<{ name: string; value: string }> {
+  async getCredential(params: CredentialNameParamsDto, query: CredentialReadQueryDto): Promise<CredentialPublicRow> {
     return await this.credentials.getCredential(params, query);
   }
 
