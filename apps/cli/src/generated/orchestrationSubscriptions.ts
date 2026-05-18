@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { runGeneratedSubscriptionWatch } from "./subscriptionWatch.ts";
 
 export function createOrchestrationSubscriptionsCommand(): Command {
   const command = new Command("orchestrationSubscriptions");
@@ -27,14 +28,4 @@ export function createOrchestrationSubscriptionsCommand(): Command {
   });
 
   return command;
-}
-
-async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {
-  const shutdown = new Promise<void>((resolve) => {
-    process.once("SIGINT", () => resolve());
-  });
-  await Promise.race([
-    shutdown,
-    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
-  ]);
 }

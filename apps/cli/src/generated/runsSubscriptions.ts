@@ -1,4 +1,5 @@
 import { Command, Option } from "commander";
+import { runGeneratedSubscriptionWatch } from "./subscriptionWatch.ts";
 
 export function createRunsSubscriptionsCommand(): Command {
   const command = new Command("runsSubscriptions");
@@ -12,7 +13,10 @@ export function createRunsSubscriptionsCommand(): Command {
   onRunUpdateCommand.action(async (options) => {
     try {
       if (options.watch === true) {
-        await runGeneratedSubscriptionWatch({ procedurePath: "runsSubscriptions.onRunUpdate" });
+        await runGeneratedSubscriptionWatch({
+          procedurePath: "runsSubscriptions.onRunUpdate",
+          args: { runId: options.runId },
+        });
         return;
       }
       throw new Error("Generated tRPC invocation for runsSubscriptions.onRunUpdate requires an explicit surface adapter.");
@@ -28,14 +32,4 @@ export function createRunsSubscriptionsCommand(): Command {
   });
 
   return command;
-}
-
-async function runGeneratedSubscriptionWatch(options: { procedurePath: string }): Promise<void> {
-  const shutdown = new Promise<void>((resolve) => {
-    process.once("SIGINT", () => resolve());
-  });
-  await Promise.race([
-    shutdown,
-    Promise.reject(new Error(`Generated tRPC subscription for ${options.procedurePath} requires an explicit surface adapter.`)),
-  ]);
 }

@@ -26,6 +26,9 @@ describe("EventBus", () => {
 
     expect(received).toHaveLength(1);
     expect(received[0]!.topic).toBe("test.topic");
+    expect(received[0]!.id).toStartWith("test.topic:");
+    expect(received[0]!.type).toBe("test.topic");
+    expect(received[0]!.traceId).toBeNull();
     expect(received[0]!.payload).toEqual({ hello: "world" });
     expect(received[0]!.timestamp).toBeInstanceOf(Date);
   });
@@ -96,11 +99,17 @@ describe("EventBus", () => {
 
   test("serializes a stable transport event envelope", () => {
     expect(serializeSubscriptionEvent({
+      id: "evt-1",
       topic: "agent_run.1",
+      type: "agent_run.1",
+      traceId: "trace-1",
       payload: { status: "running" },
       timestamp: new Date("2026-05-18T00:00:00.000Z"),
     })).toEqual({
+      id: "evt-1",
       topic: "agent_run.1",
+      type: "agent_run.1",
+      traceId: "trace-1",
       payload: { status: "running" },
       timestamp: "2026-05-18T00:00:00.000Z",
     });

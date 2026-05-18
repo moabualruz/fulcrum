@@ -13,7 +13,7 @@ import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
 
-import { getEventBus, serializeSubscriptionEvent } from "@platform-core/application/subscriptions/event-bus.ts";
+import { formatSubscriptionServerSentEvent, getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
 import { SubscriptionStreamQueryDto, RunUpdateStreamQueryDto } from "./dto/subscription.dto.ts";
@@ -62,6 +62,7 @@ export class SubscriptionEventStreamService {
     response.setHeader("Cache-Control", "no-cache, no-transform");
     response.setHeader("Connection", "keep-alive");
     response.setHeader("X-Fulcrum-Backpressure", "close-at-event-limit");
+    response.setHeader("X-Fulcrum-Reconnect", "send-last-event-id");
 
     await new Promise<void>((resolve) => {
       let closed = false;
@@ -77,7 +78,7 @@ export class SubscriptionEventStreamService {
       const unsubscribe = getEventBus().subscribe(topic, (event) => {
         if (closed) return;
         eventCount += 1;
-        response.write(`event: message\ndata: ${JSON.stringify(serializeSubscriptionEvent(event))}\n\n`);
+        response.write(formatSubscriptionServerSentEvent(event));
         if (query.once === true || eventCount >= maxEvents) finish();
       });
       response.on?.("close", finish);
@@ -125,6 +126,8 @@ for (const target of [SubscriptionStreamQueryDto, RunUpdateStreamQueryDto] as co
   MinLength(1)(target.prototype, "userId");
   IsOptional()(target.prototype, "once");
   IsBoolean()(target.prototype, "once");
+  IsOptional()(target.prototype, "lastEventId");
+  IsString()(target.prototype, "lastEventId");
 }
 IsString()(RunUpdateStreamQueryDto.prototype, "runId");
 MinLength(1)(RunUpdateStreamQueryDto.prototype, "runId");

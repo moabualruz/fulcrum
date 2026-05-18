@@ -4,6 +4,14 @@ export interface TuiSubscription {
   unsubscribe: () => void;
 }
 
+interface StreamEnvelope<TPayload> {
+  id: string;
+  type: string;
+  traceId: string | null;
+  timestamp: string;
+  payload: TPayload;
+}
+
 export class SubscriptionBridge {
   constructor(private readonly bus: EventEmitter) {}
 
@@ -11,7 +19,9 @@ export class SubscriptionBridge {
     eventName: string,
     callback: (payload: TPayload) => void,
   ): TuiSubscription {
-    const listener = (payload: TPayload) => callback(payload);
+    const listener = (payload: TPayload | StreamEnvelope<TPayload>) => {
+      callback(isStreamEnvelope(payload) ? payload.payload : payload);
+    };
     this.bus.on(eventName, listener);
     return {
       unsubscribe: () => {
@@ -19,4 +29,15 @@ export class SubscriptionBridge {
       },
     };
   }
+}
+
+function isStreamEnvelope<TPayload>(value: TPayload | StreamEnvelope<TPayload>): value is StreamEnvelope<TPayload> {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "id" in value &&
+      "type" in value &&
+      "timestamp" in value &&
+      "payload" in value,
+  );
 }

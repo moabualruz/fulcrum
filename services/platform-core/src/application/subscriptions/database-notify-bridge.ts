@@ -4,7 +4,7 @@
  * Topics: agent_run.<id>, project.<id>.tasks, org.<id>.notifications, orchestration.<orgId>.
  */
 
-import type { EventBus, SerializedSubscriptionEvent } from "./event-bus.ts";
+import { createSubscriptionEvent, serializeSubscriptionEvent, type EventBus } from "./event-bus.ts";
 
 const CHANNEL_PREFIX_MAP: Record<string, string> = {
   agent_run: "agent_run",
@@ -67,11 +67,10 @@ export async function emitNotify(
   topic: string,
   data: unknown,
 ): Promise<void> {
-  const event: SerializedSubscriptionEvent = {
+  const event = serializeSubscriptionEvent(createSubscriptionEvent({
     topic,
     payload: data,
-    timestamp: new Date().toISOString(),
-  };
+  }));
   await client.notify?.(topicToPGChannel(topic), JSON.stringify(event));
 }
 

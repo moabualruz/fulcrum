@@ -51,6 +51,16 @@ describe("/api/review/stream", () => {
     expect(response.headers.get("content-type")).toBe("text/event-stream");
     const body = await response.text();
     expect(body).toContain("event: review-started");
+    const firstEvent = JSON.parse(body.match(/^data: (.*)$/m)?.[1] ?? "{}");
+    expect(firstEvent).toMatchObject({
+      type: "review-started",
+      traceId: "trace-1",
+      payload: {
+        projectId: "project-1",
+        traceId: "trace-1",
+        persisted: true,
+      },
+    });
     expect(body).toContain('"projectId":"project-1"');
     expect(body).toContain('"filePath":"src/app.ts"');
     expect(body).toContain('"persisted":true');
@@ -92,6 +102,7 @@ describe("/api/review/stream", () => {
     expect(response.status).toBe(404);
     const body = await response.text();
     expect(body).toContain("event: error");
+    expect(body).toContain('"type":"error"');
     expect(body).toContain("Review session not found.");
     expect(calls).toEqual([
       "scope:project-1",

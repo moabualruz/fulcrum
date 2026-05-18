@@ -13,7 +13,11 @@ import { observable } from "@trpc/server/observable";
 
 import { t } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
-import { getEventBus, type SubscriptionEvent } from "@platform-core/application/subscriptions/event-bus.ts";
+import {
+  getEventBus,
+  serializeSubscriptionEvent,
+  type SerializedSubscriptionEvent,
+} from "@platform-core/application/subscriptions/event-bus.ts";
 
 // --- Schemas ---
 
@@ -24,6 +28,7 @@ const RunUpdatePayloadSchema = z.object({
   timestamp: z.date(),
 });
 export type RunUpdatePayload = z.infer<typeof RunUpdatePayloadSchema>;
+export type RunUpdateEvent = SerializedSubscriptionEvent<RunUpdatePayload>;
 
 const NotificationPayloadSchema = z.object({
   id: z.string(),
@@ -34,6 +39,7 @@ const NotificationPayloadSchema = z.object({
   timestamp: z.date(),
 });
 export type NotificationPayload = z.infer<typeof NotificationPayloadSchema>;
+export type NotificationEvent = SerializedSubscriptionEvent<NotificationPayload>;
 
 const OrchestrationStatePayloadSchema = z.object({
   runId: z.string().optional(),
@@ -42,6 +48,7 @@ const OrchestrationStatePayloadSchema = z.object({
   timestamp: z.date(),
 });
 export type OrchestrationStatePayload = z.infer<typeof OrchestrationStatePayloadSchema>;
+export type OrchestrationStateEvent = SerializedSubscriptionEvent<OrchestrationStatePayload>;
 
 // --- Subscription procedures ---
 
@@ -52,9 +59,9 @@ export const runsSubscriptionRouter = t.router({
       const bus = getEventBus();
       const topic = `agent_run.${input.runId}`;
 
-      return observable<RunUpdatePayload>((emit) => {
+      return observable<RunUpdateEvent>((emit) => {
         const unsub = bus.subscribe<RunUpdatePayload>(topic, (event) => {
-          emit.next(event.payload);
+          emit.next(serializeSubscriptionEvent(event));
         });
         return unsub;
       });
@@ -67,9 +74,9 @@ export const notifySubscriptionRouter = t.router({
       const bus = getEventBus();
       const topic = `org.${ctx.orgId}.notifications`;
 
-      return observable<NotificationPayload>((emit) => {
+      return observable<NotificationEvent>((emit) => {
         const unsub = bus.subscribe<NotificationPayload>(topic, (event) => {
-          emit.next(event.payload);
+          emit.next(serializeSubscriptionEvent(event));
         });
         return unsub;
       });
@@ -82,9 +89,9 @@ export const orchestrationSubscriptionRouter = t.router({
       const bus = getEventBus();
       const topic = `orchestration.${ctx.orgId}`;
 
-      return observable<OrchestrationStatePayload>((emit) => {
+      return observable<OrchestrationStateEvent>((emit) => {
         const unsub = bus.subscribe<OrchestrationStatePayload>(topic, (event) => {
-          emit.next(event.payload);
+          emit.next(serializeSubscriptionEvent(event));
         });
         return unsub;
       });

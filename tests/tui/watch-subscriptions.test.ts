@@ -88,7 +88,13 @@ describe("TUI live subscription screens", () => {
     await second.load();
     expect(bus.listenerCount("runs.onRunUpdate")).toBe(1);
 
-    bus.emit("runs.onRunUpdate", { id: "run-1", status: "running", logLine: "streamed once" });
+    bus.emit("runs.onRunUpdate", {
+      id: "evt-1",
+      type: "agent_run.run-1",
+      traceId: "trace-1",
+      timestamp: "2026-05-18T00:00:00.000Z",
+      payload: { id: "run-1", status: "running", logLine: "streamed once" },
+    });
     const text = renderPlain((renderer) => second.render(renderer));
     expect(text.match(/streamed once/g)).toHaveLength(1);
     expect(renderPlain((renderer) => first.render(renderer))).not.toContain("streamed once");

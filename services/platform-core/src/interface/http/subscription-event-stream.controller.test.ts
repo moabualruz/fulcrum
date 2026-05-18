@@ -122,10 +122,17 @@ async function expectStream(
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
       "X-Fulcrum-Backpressure": "close-at-event-limit",
+      "X-Fulcrum-Reconnect": "send-last-event-id",
     });
     expect(response.ended).toBe(true);
   const event = JSON.parse(response.chunks.join("").match(/^data: (.*)$/m)?.[1] ?? "{}");
-  expect(event).toMatchObject({ topic, payload });
+  expect(event).toMatchObject({
+    topic,
+    type: topic,
+    traceId: null,
+    payload,
+  });
+  expect(event.id).toStartWith(`${topic}:`);
   expect(new Date(event.timestamp).toString()).not.toBe("Invalid Date");
 }
 

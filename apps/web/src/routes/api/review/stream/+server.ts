@@ -4,15 +4,24 @@ import {
   buildReviewWorkbenchModel,
   loadReviewWorkbenchSession,
 } from "@planning-review/interface/project-review-reports.ts";
+import {
+  createSubscriptionEvent,
+  formatSubscriptionServerSentEvent,
+} from "@platform-core/application/subscriptions/event-bus.ts";
 
-function sse(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+function sse(type: string, traceId: string | undefined, payload: unknown): string {
+  return formatSubscriptionServerSentEvent(createSubscriptionEvent({
+    topic: `review.${traceId ?? "draft"}.${type}`,
+    type,
+    traceId: traceId ?? null,
+    payload,
+  }));
 }
 
 export const GET: RequestHandler = async ({ url, locals }) => {
   const projectId = url.searchParams.get("projectId");
   if (!projectId) {
-    return new Response(sse("error", { error: "projectId required" }), {
+    return new Response(sse("error", undefined, { error: "projectId required" }), {
       status: 400,
       headers: { "content-type": "text/event-stream" },
     });
@@ -35,7 +44,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     : null;
   if (reviewSession instanceof Error) {
     const status = reviewSession.message.toLowerCase().includes("not found") ? 404 : 400;
-    return new Response(sse("error", { error: reviewSession.message }), {
+    return new Response(sse("error", traceId, { error: reviewSession.message }), {
       status,
       headers: { "content-type": "text/event-stream" },
     });
@@ -50,7 +59,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   const body = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
-      controller.enqueue(encoder.encode(sse("review-started", {
+      controller.enqueue(encoder.encode(sse("review-started", traceId, {
         projectId,
         traceId,
         reviewId,
@@ -60,12 +69,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
         lineStart,
         lineEnd,
       })));
-      controller.enqueue(encoder.encode(sse("review-summary", {
+      controller.enqueue(encoder.encode(sse("review-summary", traceId, {
         files: model.summary.fileCount,
         annotations: model.summary.annotationCount,
         blockers: model.summary.blockingAnnotationCount,
       })));
-      controller.enqueue(encoder.encode(sse("done", { ok: true })));
+      controller.enqueue(encoder.encode(sse("done", traceId, { ok: true })));
       controller.close();
     },
   });
@@ -74,6 +83,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     headers: {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
+      "x-fulcrum-reconnect": "send-last-event-id",
     },
   });
 };
