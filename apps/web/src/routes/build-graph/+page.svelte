@@ -4,6 +4,7 @@
 
   type DocType = "decision" | "runbook" | "note" | "spec";
   type DependencyStatus = "done" | "running" | "blocked" | "waiting";
+  type ExportScope = "single" | "subtree";
   type RunState = "ready" | "running" | "cancelled";
 
   interface DocSearchResult {
@@ -34,6 +35,38 @@
     dependencies: string[];
     blocker: string;
     feedback: string;
+  }
+
+  interface DocumentExportPackage {
+    scope: ExportScope;
+    label: string;
+    manifestVersion: string;
+    rootDoc: string;
+    docs: string[];
+    bodyFormat: string;
+    frontmatterFields: string[];
+    attachments: string[];
+    linkMap: string[];
+    traceRefs: string[];
+    artifactTarget: string;
+    metadataPolicy: string;
+  }
+
+  interface ImportConflict {
+    id: string;
+    incoming: string;
+    existing: string;
+    resolution: string;
+  }
+
+  interface ImportPreview {
+    destination: string;
+    conflicts: ImportConflict[];
+    missingAttachments: string[];
+    remappedLinks: string[];
+    traceRefs: string[];
+    sourceEvent: string;
+    overwriteGuard: string;
   }
 
   const RESULTS: DocSearchResult[] = [
@@ -133,6 +166,68 @@
     },
   ];
 
+  const EXPORT_PACKAGES: Record<ExportScope, DocumentExportPackage> = {
+    single: {
+      scope: "single",
+      label: "Single document package",
+      manifestVersion: "manifest:v1",
+      rootDoc: "doc-kernel-notes",
+      docs: ["doc-kernel-notes"],
+      bodyFormat: "markdown body",
+      frontmatterFields: ["title", "docType", "owner", "task", "run", "updatedAt"],
+      attachments: ["kernel-search-proof.png"],
+      linkMap: ["doc-kernel-notes -> task-search-17", "doc-kernel-notes -> run-docs-004"],
+      traceRefs: ["trace-e2e-proof", "run-docs-004", "task-search-17"],
+      artifactTarget: "review handoff artifact",
+      metadataPolicy: "Internal-only metadata excluded by default",
+    },
+    subtree: {
+      scope: "subtree",
+      label: "Subtree package",
+      manifestVersion: "manifest:v1",
+      rootDoc: "doc-kernel-notes",
+      docs: ["doc-kernel-notes", "doc-filter-map", "doc-graph-actions", "doc-runbook-index"],
+      bodyFormat: "markdown body bundle",
+      frontmatterFields: ["title", "docType", "owner", "task", "run", "updatedAt", "parentId"],
+      attachments: ["kernel-search-proof.png", "graph-actions.json", "handoff-review.txt"],
+      linkMap: [
+        "doc-kernel-notes -> doc-filter-map",
+        "doc-graph-actions -> doc-kernel-notes",
+        "doc-runbook-index -> task-search-17",
+      ],
+      traceRefs: ["trace-e2e-proof", "run-docs-004", "task-search-17", "artifact-review-012"],
+      artifactTarget: "review handoff artifact",
+      metadataPolicy: "Internal-only metadata excluded by default",
+    },
+  };
+
+  const IMPORT_PREVIEW: ImportPreview = {
+    destination: "fulcrum / Project docs / Imported handoff",
+    conflicts: [
+      {
+        id: "doc-kernel-notes",
+        incoming: "Kernel search notes",
+        existing: "Kernel search notes",
+        resolution: "rename incoming to Kernel search notes imported",
+      },
+      {
+        id: "doc-filter-map",
+        incoming: "Filter map",
+        existing: "Filter map draft",
+        resolution: "keep target and import as sibling",
+      },
+    ],
+    missingAttachments: ["handoff-review.txt missing - blocked until replacement mapped"],
+    remappedLinks: [
+      "doc-kernel-notes -> imported/doc-kernel-notes",
+      "task-search-17 -> task-search-17",
+      "run-docs-004 -> run-docs-004",
+    ],
+    traceRefs: ["trace-e2e-proof preserved", "artifact-review-012 remapped"],
+    sourceEvent: "source import event: package imported from review handoff artifact at 2026-05-18 10:35",
+    overwriteGuard: "No overwrite until conflict preview accepted.",
+  };
+
   const STATUS_COPY: Record<DependencyStatus, string> = {
     done: "done",
     running: "running",
@@ -159,6 +254,8 @@
   let runState = $state<RunState>("ready");
   let hydrated = $state(false);
   let dependencyTasks = $state<DependencyTask[]>(DEPENDENCY_TASKS);
+  let exportScope = $state<ExportScope>("subtree");
+  let exportArtifactAttached = $state(false);
   let runFeedback = $state([
     "Run state loaded from dependency execution API snapshot",
     "Blocked node task-build explains approval gate before write",
@@ -166,6 +263,7 @@
 
   const blockedTasks = $derived(dependencyTasks.filter((task) => task.blocker));
   const activeTask = $derived(dependencyTasks.find((task) => task.status === "running") ?? dependencyTasks[0]);
+  const exportPackage = $derived(EXPORT_PACKAGES[exportScope]);
 
   const filteredResults = $derived.by(() => RESULTS.filter((result) =>
     (!selectedProject || result.project === selectedProject)
@@ -220,6 +318,10 @@
   function cancelDependencyRun(): void {
     runState = "cancelled";
     runFeedback = ["cancel requested: downstream waiting nodes held", ...runFeedback];
+  }
+
+  function attachExportArtifact(): void {
+    exportArtifactAttached = true;
   }
 </script>
 
@@ -290,6 +392,100 @@
           <li>Revision 13 · agent-runner · conflict-safe merge</li>
         </ul>
         <p data-collab-flag-off class={cn("text-xs text-muted-foreground")}>Flag off: single-user save remains available; no dead presence controls render.</p>
+      </div>
+    </section>
+
+    <section data-doc-import-export-workflow class={cn("grid min-w-0 gap-3 rounded-md border border-border bg-card p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+      <div data-doc-export-panel class={cn("min-w-0 space-y-3")}>
+        <div class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3")}>
+          <div>
+            <p data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Document export</p>
+            <h2 class={cn("type-h2 text-foreground")}>Package manifest preview</h2>
+            <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Exports show contents before handoff, including body, frontmatter, attachments, links, and trace refs.</p>
+          </div>
+          <label data-contrast-sample class={cn("text-xs font-medium text-fg-subtle")}>
+            Scope
+            <select data-export-scope bind:value={exportScope} class={cn("mt-1 h-8 rounded-sm border border-input bg-background px-2 text-sm text-foreground")}>
+              <option value="single">single doc</option>
+              <option value="subtree">subtree</option>
+            </select>
+          </label>
+        </div>
+
+        <div data-export-manifest data-contrast-sample class={cn("rounded-sm border border-border bg-background p-3 text-xs text-foreground")}>
+          <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+            <span class={cn("font-semibold")}>{exportPackage.label}</span>
+            <span>{exportPackage.manifestVersion}</span>
+          </div>
+          <p class={cn("mt-2 text-fg-subtle")}>root:{exportPackage.rootDoc} docs:{exportPackage.docs.length}</p>
+        </div>
+
+        <div class={cn("grid gap-3 md:grid-cols-2")}>
+          <div data-export-body data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>
+            Body: {exportPackage.bodyFormat}
+          </div>
+          <div data-export-frontmatter data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>
+            Frontmatter: {exportPackage.frontmatterFields.join(", ")}
+          </div>
+          <div data-export-attachments data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>
+            Attachments: {exportPackage.attachments.join(", ")}
+          </div>
+          <div data-export-link-map data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>
+            Link map: {exportPackage.linkMap.join("; ")}
+          </div>
+        </div>
+
+        <div data-export-trace-refs data-contrast-sample class={cn("rounded-sm border border-border-strong bg-background p-3 text-xs text-foreground")}>
+          Trace refs: {exportPackage.traceRefs.join(", ")}
+        </div>
+        <div data-export-metadata-policy data-contrast-sample class={cn("rounded-sm border border-border bg-muted px-2 py-1.5 text-xs text-foreground")}>
+          {exportPackage.metadataPolicy}
+        </div>
+        <div class={cn("flex flex-wrap items-center gap-2")}>
+          <button data-attach-export-artifact type="button" onclick={attachExportArtifact} class={cn("rounded-sm border border-border-strong px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Attach to review artifact</button>
+          <span data-export-artifact-status data-contrast-sample class={cn("rounded-sm bg-muted px-2 py-1.5 text-xs text-foreground")}>
+            {exportArtifactAttached ? `attached:${exportPackage.artifactTarget}` : "artifact attachment ready"}
+          </span>
+        </div>
+      </div>
+
+      <div data-doc-import-preview class={cn("min-w-0 space-y-3")}>
+        <div class={cn("border-b border-border pb-3")}>
+          <p data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Import preview</p>
+          <h2 class={cn("type-h2 text-foreground")}>Conflict-safe destination</h2>
+          <p data-import-destination data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Destination: {IMPORT_PREVIEW.destination}</p>
+        </div>
+
+        <div class={cn("space-y-2")}>
+          {#each IMPORT_PREVIEW.conflicts as conflict (conflict.id)}
+            <article data-import-conflict-row data-contrast-sample class={cn("rounded-sm border border-destructive/40 bg-destructive/5 p-3 text-xs text-foreground")}>
+              <div class={cn("font-semibold")}>Conflict: {conflict.incoming}</div>
+              <p class={cn("mt-1 text-fg-subtle")}>Existing: {conflict.existing}</p>
+              <p class={cn("mt-1")}>Resolution: {conflict.resolution}</p>
+            </article>
+          {/each}
+        </div>
+
+        <div class={cn("grid gap-3 md:grid-cols-2")}>
+          <div data-missing-attachment-list class={cn("space-y-2")}>
+            {#each IMPORT_PREVIEW.missingAttachments as attachment}
+              <p data-missing-attachment-row data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>{attachment}</p>
+            {/each}
+          </div>
+          <div data-remapped-link-list class={cn("space-y-2")}>
+            {#each IMPORT_PREVIEW.remappedLinks as link}
+              <p data-remapped-link-row data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>{link}</p>
+            {/each}
+          </div>
+        </div>
+
+        <div data-import-trace-refs class={cn("space-y-2")}>
+          {#each IMPORT_PREVIEW.traceRefs as traceRef}
+            <p data-import-trace-ref data-contrast-sample class={cn("rounded-sm border border-border bg-background px-2 py-1.5 text-xs text-foreground")}>{traceRef}</p>
+          {/each}
+        </div>
+        <p data-source-import-event data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>{IMPORT_PREVIEW.sourceEvent}</p>
+        <p data-import-overwrite-guard data-contrast-sample class={cn("rounded-sm border border-border-strong bg-background px-2 py-1.5 text-xs font-medium text-foreground")}>{IMPORT_PREVIEW.overwriteGuard}</p>
       </div>
     </section>
 

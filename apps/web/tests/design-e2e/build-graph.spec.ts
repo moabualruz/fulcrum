@@ -184,6 +184,39 @@ test.describe("build graph doc search", () => {
 		await expect(page.locator("[data-collab-flag-off]")).toContainText("single-user save remains available");
 	});
 
+	test("previews document export package and conflict-safe import", async ({ page }) => {
+		await openBuildGraph(page);
+
+		await expect(page.locator("[data-doc-import-export-workflow]")).toBeVisible();
+		await expect(page.locator("[data-doc-export-panel]")).toContainText("Package manifest preview");
+		await expect(page.locator("[data-export-scope]")).toHaveValue("subtree");
+		await expect(page.locator("[data-export-manifest]")).toContainText("manifest:v1");
+		await expect(page.locator("[data-export-manifest]")).toContainText("docs:4");
+		await expect(page.locator("[data-export-body]")).toContainText("markdown body bundle");
+		await expect(page.locator("[data-export-frontmatter]")).toContainText("parentId");
+		await expect(page.locator("[data-export-attachments]")).toContainText("handoff-review.txt");
+		await expect(page.locator("[data-export-link-map]")).toContainText("doc-kernel-notes -> doc-filter-map");
+		await expect(page.locator("[data-export-trace-refs]")).toContainText("trace-e2e-proof");
+		await expect(page.locator("[data-export-metadata-policy]")).toContainText("Internal-only metadata excluded by default");
+
+		await page.locator("[data-export-scope]").selectOption("single");
+		await expect(page.locator("[data-export-manifest]")).toContainText("docs:1");
+		await page.locator("[data-export-scope]").selectOption("subtree");
+		await page.locator("[data-attach-export-artifact]").click();
+		await expect(page.locator("[data-export-artifact-status]")).toContainText("attached:review handoff artifact");
+
+		await expect(page.locator("[data-doc-import-preview]")).toContainText("Conflict-safe destination");
+		await expect(page.locator("[data-import-destination]")).toContainText("Imported handoff");
+		await expect(page.locator("[data-import-conflict-row]")).toHaveCount(2);
+		await expect(page.locator("[data-import-conflict-row]").first()).toContainText("rename incoming");
+		await expect(page.locator("[data-missing-attachment-row]")).toContainText("blocked until replacement mapped");
+		await expect(page.locator("[data-remapped-link-row]").first()).toContainText("imported/doc-kernel-notes");
+		await expect(page.locator("[data-import-trace-ref]").first()).toContainText("preserved");
+		await expect(page.locator("[data-import-trace-ref]").last()).toContainText("remapped");
+		await expect(page.locator("[data-source-import-event]")).toContainText("source import event");
+		await expect(page.locator("[data-import-overwrite-guard]")).toContainText("No overwrite until conflict preview accepted");
+	});
+
 	test("filters by owner and attachment state without leaking unrelated rows", async ({ page }) => {
 		await openBuildGraph(page);
 
@@ -239,11 +272,19 @@ test.describe("build graph doc search", () => {
 		await openBuildGraph(page);
 
 		const samples = await page.locator("[data-contrast-sample]").evaluateAll((elements) => elements.map((element) => {
+			function isTransparentColor(background: string): boolean {
+				if (background === "transparent" || background === "rgba(0, 0, 0, 0)") return true;
+				const rgbaAlpha = background.match(/rgba\(\d+,\s*\d+,\s*\d+,\s*([\d.]+)\)/)?.[1];
+				if (rgbaAlpha !== undefined && Number(rgbaAlpha) < 1) return true;
+				const colorFunctionAlpha = background.match(/\/\s*([\d.]+)\)$/)?.[1];
+				return colorFunctionAlpha !== undefined && Number(colorFunctionAlpha) < 1;
+			}
+
 			function effectiveBackground(target: Element): string {
 				let current: Element | null = target;
 				while (current) {
 					const background = getComputedStyle(current).backgroundColor;
-					if (!background.endsWith(", 0)") && background !== "rgba(0, 0, 0, 0)" && background !== "transparent") return background;
+					if (!isTransparentColor(background)) return background;
 					current = current.parentElement;
 				}
 				return getComputedStyle(document.body).backgroundColor;
