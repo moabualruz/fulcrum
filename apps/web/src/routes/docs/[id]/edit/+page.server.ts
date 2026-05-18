@@ -101,7 +101,9 @@ export const actions = {
 
 function mapNotFound(errorValue: unknown): never {
   const message = errorValue instanceof Error ? errorValue.message : String(errorValue);
-  if (/not found/i.test(message)) throw error(404, "Document not found");
+  if (/not found|invalid input syntax for type uuid/i.test(message)) {
+    throw error(404, "Document not found");
+  }
   throw errorValue;
 }
 
