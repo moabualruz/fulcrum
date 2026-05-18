@@ -10,8 +10,11 @@
 import { describe, expect, test } from "bun:test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { appRouter } from "../router.ts";
+
+const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 function countInFile(content: string, pattern: string): number {
   let count = 0;
@@ -41,12 +44,12 @@ describe("root wiring — canonical router mounts", () => {
 
 describe("doctor inference check names", () => {
   test("inference-sidecar check is registered", async () => {
-    const src = await readFile(join(process.cwd(), "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
+    const src = await readFile(join(repoRoot, "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
     expect(src).toContain("inference-sidecar");
   });
 
   test("inference-backends check is registered", async () => {
-    const src = await readFile(join(process.cwd(), "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
+    const src = await readFile(join(repoRoot, "services/platform-core/src/application/health-checks/checks/inference.ts"), "utf-8");
     expect(src).toContain("inference-backends");
   });
 });
@@ -78,7 +81,7 @@ describe("LangGraph/LangChain boundary — no leaks to agent, orchestration, or 
   for (const dir of BOUNDARY_DIRS) {
     FORBIDDEN_PATTERNS.forEach((pattern) => {
       test(`no '${pattern}' in ${dir}`, async () => {
-        const absDir = join(process.cwd(), dir);
+        const absDir = join(repoRoot, dir);
         const foundIn = await findPatternInDir(absDir, pattern);
         expect(foundIn).toBeNull();
       });

@@ -20,6 +20,7 @@ import { SprintPublicApiModule } from "@work-management/interface/http/sprint-pu
 import { TaskPublicApiModule } from "@work-management/interface/http/task-public-api.controller.ts";
 
 const NEST_PUBLIC_API_DOMAINS = [
+  "projects",
   "tasks",
   "search",
   "runs",
@@ -29,6 +30,10 @@ const NEST_PUBLIC_API_DOMAINS = [
   "docs",
   "memory",
   "repos",
+  "reports",
+  "planning",
+  "review",
+  "settings",
 ] as const;
 
 const REQUIRED_API_MODULES = [

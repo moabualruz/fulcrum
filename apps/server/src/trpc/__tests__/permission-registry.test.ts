@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { TRPC_ACTIONS, TRPC_RESOURCES } from "@fulcrum/server/trpc/permissions.ts";
+
+const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 type PermissionUsage = {
   file: string;
@@ -19,12 +22,12 @@ function collectRouterFiles(dir: string): string[] {
 }
 
 function permissionUsages(): PermissionUsage[] {
-  const routerDir = join(process.cwd(), "apps/server/src/trpc/routers");
+  const routerDir = join(repoRoot, "apps/server/src/trpc/routers");
   return collectRouterFiles(routerDir).flatMap((file) => {
     const source = readFileSync(file, "utf8");
     return [...source.matchAll(/permissionedProcedure\(\{\s*resource:\s*"([^"]+)",\s*action:\s*"([^"]+)"/g)]
       .map((match) => ({
-        file: relative(process.cwd(), file),
+        file: relative(repoRoot, file),
         resource: match[1]!,
         action: match[2]!,
       }));

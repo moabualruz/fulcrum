@@ -140,7 +140,7 @@ async function assertCredentialRoundTrip(source: FulcrumTypeOrmConnectionSource,
         userId: `owner-credential-${source}`,
         newValue: "rotated-fixture-value",
       },
-    )).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true, trace_id: "trace-credential-rotate-LINEAR_API_KEY" });
     await expect(controller.getCredential(
       { name: "LINEAR_API_KEY" },
       {
@@ -154,7 +154,7 @@ async function assertCredentialRoundTrip(source: FulcrumTypeOrmConnectionSource,
         orgId: `workspace-credential-${source}`,
         userId: `owner-credential-${source}`,
       },
-    )).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true, trace_id: "trace-credential-archive-LINEAR_API_KEY" });
     await expect(controller.listCredentials({
       orgId: `workspace-credential-${source}`,
       userId: `owner-credential-${source}`,
@@ -190,6 +190,10 @@ describe("credential public Nest API", () => {
       .toBe(RequestMethod.POST);
     expect(Reflect.getMetadata(METHOD_METADATA, CredentialPublicApiController.prototype.removeCredential))
       .toBe(RequestMethod.DELETE);
+    expect(Reflect.getMetadata(PATH_METADATA, CredentialPublicApiController.prototype.archiveCredential))
+      .toBe(":name/archive");
+    expect(Reflect.getMetadata(PATH_METADATA, CredentialPublicApiController.prototype.rotateCredential))
+      .toBe(":name/rotate");
   });
 
   test("hides the default unconfigured route when the public API feature is off", async () => {

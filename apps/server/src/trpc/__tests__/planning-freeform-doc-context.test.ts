@@ -80,6 +80,7 @@ const technicalPlanningInput = {
 };
 
 const output = {
+  traceId: "trace-freeform-trpc",
   context: {
     traceId: "trace-freeform-trpc",
     sourceRefs: [{ kind: "doc", id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
@@ -97,6 +98,7 @@ const output = {
 
 const startOutput = {
   status: "ready_for_planning" as const,
+  traceId: "trace-freeform-start-trpc",
   eventId: "event-freeform-start",
   document: {
     id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -135,6 +137,7 @@ const startOutput = {
 
 const guidedAcpOutput = {
   status: "ready_for_acp_prompt" as const,
+  traceId: "trace-guided-acp-trpc",
   eventId: "event-guided-acp-start",
   session: {
     acpSessionId: "acp-guided-session-trpc",
@@ -226,6 +229,7 @@ const continuousUpdateOutput = {
 
 const technicalPlanningOutput = {
   status: "ready_for_plan_review" as const,
+  traceId: "trace-technical-planning-trpc",
   eventId: "event-technical-planning-trpc",
   context: {
     traceId: "trace-technical-planning-trpc",

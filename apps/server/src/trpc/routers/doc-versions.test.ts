@@ -139,6 +139,7 @@ describe("docVersionsRouter.restore", () => {
         persisted = obj;
         return obj;
       },
+      save: async (entity: unknown) => entity,
       persistAndFlush: async () => undefined,
     });
 

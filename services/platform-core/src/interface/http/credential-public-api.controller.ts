@@ -22,8 +22,8 @@ import {
 } from "@platform-core/infrastructure/database/credential-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { CredentialListQueryDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto } from "./dto/credential.dto.ts";
-export { CredentialListQueryDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto };
+import { CredentialListQueryDto, CredentialMutationResponseDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto } from "./dto/credential.dto.ts";
+export { CredentialListQueryDto, CredentialMutationResponseDto, CredentialNameParamsDto, CredentialReadQueryDto, CredentialSetDto, CredentialRotateDto, CredentialTargetDto };
 
 export const CREDENTIAL_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.credentialPublicApi.options");
 
@@ -57,18 +57,18 @@ export class CredentialPublicApiService {
     return await this.mapStoreErrors(() => this.requireStore().set({ ...input, keyring: this.keyring() }));
   }
 
-  async rotateCredential(params: CredentialNameParamsDto, input: CredentialRotateDto): Promise<{ ok: true }> {
+  async rotateCredential(params: CredentialNameParamsDto, input: CredentialRotateDto): Promise<CredentialMutationResponseDto> {
     await this.mapStoreErrors(() => this.requireBoolean(this.requireStore().rotate({
       ...input,
       name: params.name,
       keyring: this.keyring(),
     })));
-    return { ok: true };
+    return mutationResponse(params.name, "rotate");
   }
 
-  async archiveCredential(params: CredentialNameParamsDto, input: CredentialTargetDto): Promise<{ ok: true }> {
+  async archiveCredential(params: CredentialNameParamsDto, input: CredentialTargetDto): Promise<CredentialMutationResponseDto> {
     await this.mapStoreErrors(() => this.requireBoolean(this.requireStore().archive({ ...input, name: params.name })));
-    return { ok: true };
+    return mutationResponse(params.name, "archive");
   }
 
   async removeCredential(params: CredentialNameParamsDto, input: CredentialTargetDto): Promise<{ ok: true }> {
@@ -126,11 +126,11 @@ export class CredentialPublicApiController {
     return await this.credentials.getCredential(params, query);
   }
 
-  async rotateCredential(params: CredentialNameParamsDto, body: CredentialRotateDto): Promise<{ ok: true }> {
+  async rotateCredential(params: CredentialNameParamsDto, body: CredentialRotateDto): Promise<CredentialMutationResponseDto> {
     return await this.credentials.rotateCredential(params, body);
   }
 
-  async archiveCredential(params: CredentialNameParamsDto, body: CredentialTargetDto): Promise<{ ok: true }> {
+  async archiveCredential(params: CredentialNameParamsDto, body: CredentialTargetDto): Promise<CredentialMutationResponseDto> {
     return await this.credentials.archiveCredential(params, body);
   }
 
@@ -182,6 +182,8 @@ IsString()(CredentialSetDto.prototype, "value");
 MinLength(1)(CredentialSetDto.prototype, "value");
 IsString()(CredentialRotateDto.prototype, "newValue");
 MinLength(1)(CredentialRotateDto.prototype, "newValue");
+IsBoolean()(CredentialMutationResponseDto.prototype, "ok");
+IsString()(CredentialMutationResponseDto.prototype, "trace_id");
 
 const routeDescriptors = {
   listCredentials: Object.getOwnPropertyDescriptor(CredentialPublicApiController.prototype, "listCredentials"),
@@ -202,8 +204,8 @@ ApiTags("credentials")(CredentialPublicApiController);
 applyGetRoute("listCredentials", "", CredentialListQueryDto, "List credentials");
 applyPostRoute("setCredential", "", CredentialSetDto, "Set credential");
 applyGetRoute("getCredential", ":name", CredentialReadQueryDto, "Get credential", true);
-applyPostRoute("rotateCredential", ":name/rotate", CredentialRotateDto, "Rotate credential", true);
-applyPostRoute("archiveCredential", ":name/archive", CredentialTargetDto, "Archive credential", true);
+applyPostRoute("rotateCredential", ":name/rotate", CredentialRotateDto, "Rotate credential", true, CredentialMutationResponseDto);
+applyPostRoute("archiveCredential", ":name/archive", CredentialTargetDto, "Archive credential", true, CredentialMutationResponseDto);
 applyDeleteRoute("removeCredential", ":name", CredentialTargetDto, "Remove credential");
 
 Module({
@@ -248,6 +250,7 @@ function applyPostRoute(
   bodyType: new () => unknown,
   summary: string,
   hasName = false,
+  responseType?: new () => unknown,
 ): void {
   const descriptor = routeDescriptors[method]!;
   Post(path)(CredentialPublicApiController.prototype, method, descriptor);
@@ -260,7 +263,7 @@ function applyPostRoute(
   }
   ApiOperation({ summary })(CredentialPublicApiController.prototype, method, descriptor);
   ApiBody({ type: bodyType })(CredentialPublicApiController.prototype, method, descriptor);
-  ApiOkResponse({ description: summary })(CredentialPublicApiController.prototype, method, descriptor);
+  ApiOkResponse({ description: summary, ...(responseType ? { type: responseType } : {}) })(CredentialPublicApiController.prototype, method, descriptor);
 }
 
 function applyDeleteRoute(method: keyof typeof routeDescriptors, path: string, queryType: new () => unknown, summary: string): void {
@@ -272,4 +275,11 @@ function applyDeleteRoute(method: keyof typeof routeDescriptors, path: string, q
   ApiQuery({ type: queryType })(CredentialPublicApiController.prototype, method, descriptor);
   ApiOperation({ summary })(CredentialPublicApiController.prototype, method, descriptor);
   ApiOkResponse({ description: summary })(CredentialPublicApiController.prototype, method, descriptor);
+}
+
+function mutationResponse(name: string, action: "archive" | "rotate"): CredentialMutationResponseDto {
+  return {
+    ok: true,
+    trace_id: `trace-credential-${action}-${encodeURIComponent(name)}`,
+  };
 }

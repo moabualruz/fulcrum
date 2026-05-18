@@ -118,7 +118,7 @@ describe("skills tRPC router", () => {
     const stored = await em.findOneOrFail(FulcrumSkill, { where: { org: { id: DEFAULT_ORG_ID }, slug: "demo-skill" } });
     stored.source = SkillSource.Upstream;
     stored.upstreamRepo = upstreamDir;
-    /* flushed */
+    await em.save(stored);
 
     const upgraded = await caller.fulcrum_skills.upgrade({ slug: "demo-skill" });
     expect(upgraded.map((skill) => skill.slug)).toEqual(["demo-skill"]);

@@ -33,3 +33,8 @@ export class CredentialTargetDto {
   userId!: string;
   targetUserId?: string;
 }
+
+export class CredentialMutationResponseDto {
+  ok!: true;
+  trace_id!: string;
+}
