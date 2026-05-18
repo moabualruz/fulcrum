@@ -51,6 +51,7 @@ function publicApiBaseUrl(url: URL): string {
   return (
     process.env["FULCRUM_SERVER_URL"] ??
     process.env["FULCRUM_PUBLIC_API_URL"] ??
+    process.env["FULCRUM_API_URL"] ??
     `${url.protocol}//${url.host}`
   ).replace(/\/+$/, "");
 }
