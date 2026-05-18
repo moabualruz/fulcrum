@@ -56,6 +56,10 @@ _Avoid_: migration record, version row, ledger entry
 The selected product database execution mode: managed local PGlite under `FULCRUM_HOME` or PostgreSQL from `FULCRUM_DATABASE_URL` / `DATABASE_URL`, while keeping one TypeORM entity and migration set.
 _Avoid_: database mode fork, schema branch, local-only database
 
+**LocalBootstrapSeed**:
+The idempotent first-run seed that creates the default local org, admin user, workspace, project, notification rules, credential account, and `local.bootstrap.seed.status` **TenantSetting** for doctor visibility.
+_Avoid_: test seed, fixture reset, demo data
+
 **ComponentLedger**:
 The SQLite store at `~/.fulcrum/state/global/components.db` recording component status, surfaces, artifacts, operations, and operation steps.
 _Avoid_: install log, state file, db
@@ -74,6 +78,7 @@ _Avoid_: hook input, hook message, hook event
 - A **DomainEventOutbox** row is dispatched once → produces a downstream effect → marked `processedAt`; an **Event** is appended for audit and never reprocessed.
 - A **SchemaMigration** row exists per applied **TypeORM migration**; the ledger is append-only.
 - A **DatabaseRuntime** selects the connection target only; it does not select a different schema, entity list, or migration list.
+- A **LocalBootstrapSeed** runs after migrations and before first workflow use; it updates existing rows, never resets data, and records version/status in **TenantSetting** key `local.bootstrap.seed.status`.
 - The **ComponentLedger** records every install of a **Surface** (skill sync, hook registration, mcp entry, sentinel block, …).
 
 ## Example dialogue

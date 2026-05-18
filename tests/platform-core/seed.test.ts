@@ -3,6 +3,10 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  LOCAL_BOOTSTRAP_SEED_STATUS_KEY,
+  LOCAL_BOOTSTRAP_SEED_VERSION,
+} from "../../services/platform-core/src/infrastructure/application-database/seed.ts";
 
 const repoRoot = process.cwd();
 
@@ -19,9 +23,13 @@ import { PGlite } from ${JSON.stringify(moduleUrl("node_modules/@electric-sql/pg
 import { DataSource } from ${JSON.stringify(moduleUrl("node_modules/typeorm/index.mjs"))};
 import { EventEmitter } from "node:events";
 
-import { getCoreEntities } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/typeorm.config.ts"))};
+import {
+  applicationMigrations,
+  getCoreEntities,
+} from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/typeorm.config.ts"))};
 import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/database/typeorm-data-source.ts"))};
 import { Org } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/Org.ts"))};
+import { OrganizationMemberEntity } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/organization.entities.ts"))};
 import {
   Account,
   FeatureFlag,
@@ -30,8 +38,18 @@ import {
   Session,
   User,
 } from ${JSON.stringify(moduleUrl("services/identity-access/src/infrastructure/database/entities/auth/index.ts"))};
-import { SeedService } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.ts"))};
+import {
+  DEFAULT_PROJECT_ID,
+  LOCAL_BOOTSTRAP_SEED_STATUS_KEY,
+  LOCAL_BOOTSTRAP_SEED_VERSION,
+  SeedService,
+} from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/seed.ts"))};
+import { TenantSetting } from ${JSON.stringify(moduleUrl("services/platform-core/src/infrastructure/application-database/entities/TenantSetting.ts"))};
 import { NotificationRule } from ${JSON.stringify(moduleUrl("services/notification-center/src/infrastructure/database/entities/notifications/NotificationRule.ts"))};
+import {
+  FulcrumProjectEntity,
+  FulcrumWorkspaceEntity,
+} from ${JSON.stringify(moduleUrl("services/workflow-coordination/src/infrastructure/database/workflow-spine.entities.ts"))};
 
 const dbDir = process.argv[2];
 if (!dbDir) throw new Error("missing db dir");
@@ -72,9 +90,7 @@ const ds = new DataSource({
   type: "postgres",
   driver,
   entities: getCoreEntities(),
-  migrations: [
-    ${JSON.stringify(join(repoRoot, "services/platform-core/src/infrastructure/application-database/migrations"))} + "/*.ts",
-  ],
+  migrations: applicationMigrations,
   migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
   synchronize: false,
   installExtensions: false,
@@ -95,6 +111,10 @@ try {
     orgMembers: await em.count(OrgMember, {}),
     accounts: await em.count(Account, {}),
     notificationRules: await em.count(NotificationRule, {}),
+    publicWorkspaces: await em.count(FulcrumWorkspaceEntity, {}),
+    publicOrgMembers: await em.count(OrganizationMemberEntity, {}),
+    publicProjects: await em.count(FulcrumProjectEntity, {}),
+    tenantSettings: await em.count(TenantSetting, {}),
   };
 
   const second = await seed.run();
@@ -105,14 +125,22 @@ try {
     orgMembers: await em.count(OrgMember, {}),
     accounts: await em.count(Account, {}),
     notificationRules: await em.count(NotificationRule, {}),
+    publicWorkspaces: await em.count(FulcrumWorkspaceEntity, {}),
+    publicOrgMembers: await em.count(OrganizationMemberEntity, {}),
+    publicProjects: await em.count(FulcrumProjectEntity, {}),
+    tenantSettings: await em.count(TenantSetting, {}),
   };
 
   const rules = await em.find(
     NotificationRule,
     { where: { userId: first.userId }, order: { name: "ASC" } },
   );
+  const publicProject = await em.findOneOrFail(FulcrumProjectEntity, { where: { id: DEFAULT_PROJECT_ID } });
+  const seedStatus = await em.findOneOrFail(TenantSetting, {
+    where: { orgId: first.orgId, key: LOCAL_BOOTSTRAP_SEED_STATUS_KEY },
+  });
 
-  console.log(JSON.stringify({ first, second, afterFirst, afterSecond, rules }));
+  console.log(JSON.stringify({ first, second, afterFirst, afterSecond, rules, publicProject, seedStatus }));
 } finally {
   await ds.destroy();
   await pglite.close().catch(() => {});
@@ -123,8 +151,8 @@ try {
 }
 
 async function runSeedTwice(scratch: string): Promise<{
-  first: { orgId: string; userId: string; sessionToken: string };
-  second: { orgId: string; userId: string; sessionToken: string };
+  first: { orgId: string; projectId: string; userId: string; sessionToken: string; seedVersion: string; seedStatus: "ready" };
+  second: { orgId: string; projectId: string; userId: string; sessionToken: string; seedVersion: string; seedStatus: "ready" };
   afterFirst: Record<string, number>;
   afterSecond: Record<string, number>;
   rules: Array<{
@@ -135,6 +163,18 @@ async function runSeedTwice(scratch: string): Promise<{
     channels: string[];
     eventPattern: Record<string, unknown>;
   }>;
+  publicProject: {
+    id: string;
+    workspaceId: string;
+    slug: string;
+    name: string;
+    status: string;
+    ownerId: string;
+    methodology: string;
+    workflowConfig: Record<string, unknown>;
+    enabledTaskTypes: string[];
+  };
+  seedStatus: { orgId: string; key: string; value: Record<string, unknown> };
 }> {
   const runner = await writeRunner(scratch);
   const dbDir = join(scratch, "db");
@@ -168,11 +208,66 @@ describe("SeedService", () => {
     const result = await runSeedTwice(scratch);
 
     expect(result.first.orgId).toBe("00000000-0000-0000-0000-000000000001");
+    expect(result.first.projectId).toBe("local-project");
+    expect(result.first.seedVersion).toBe("2026-05-18.local-bootstrap.v1");
+    expect(result.first.seedStatus).toBe("ready");
     expect(result.second.orgId).toBe(result.first.orgId);
+    expect(result.second.projectId).toBe(result.first.projectId);
     expect(result.second.userId).toBe(result.first.userId);
     expect(result.second.sessionToken).toBe(result.first.sessionToken);
-    expect(result.afterFirst).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1, notificationRules: 4 });
-    expect(result.afterSecond).toEqual({ orgs: 1, users: 1, sessions: 1, orgMembers: 1, accounts: 1, notificationRules: 4 });
+    expect(result.afterFirst).toEqual({
+      orgs: 1,
+      users: 1,
+      sessions: 1,
+      orgMembers: 1,
+      accounts: 1,
+      notificationRules: 4,
+      publicWorkspaces: 1,
+      publicOrgMembers: 1,
+      publicProjects: 1,
+      tenantSettings: 1,
+    });
+    expect(result.afterSecond).toEqual({
+      orgs: 1,
+      users: 1,
+      sessions: 1,
+      orgMembers: 1,
+      accounts: 1,
+      notificationRules: 4,
+      publicWorkspaces: 1,
+      publicOrgMembers: 1,
+      publicProjects: 1,
+      tenantSettings: 1,
+    });
+    expect(result.publicProject).toMatchObject({
+      id: result.first.projectId,
+      workspaceId: result.first.orgId,
+      slug: "local-project",
+      name: "Local Project",
+      status: "active",
+      ownerId: result.first.userId,
+      methodology: "kanban",
+      enabledTaskTypes: ["task", "bug", "feature"],
+    });
+    expect(result.publicProject.workflowConfig).toEqual({
+      transitions: {
+        backlog: ["todo"],
+        todo: ["in_progress"],
+        in_progress: ["review", "done"],
+        review: ["in_progress", "done"],
+      },
+    });
+    expect(result.seedStatus).toMatchObject({
+      orgId: result.first.orgId,
+      key: LOCAL_BOOTSTRAP_SEED_STATUS_KEY,
+    });
+    expect(result.seedStatus.value).toMatchObject({
+      version: LOCAL_BOOTSTRAP_SEED_VERSION,
+      status: "ready",
+      orgId: result.first.orgId,
+      userId: result.first.userId,
+      projectId: result.first.projectId,
+    });
   });
 
   test("seeds default notification rules with matchable patterns", async () => {
@@ -214,6 +309,15 @@ describe("SeedService", () => {
     const source = await Bun.file(join(repoRoot, "services/platform-core/src/infrastructure/application-database/seed.ts")).text();
 
     expect(source).toContain("await this.em.save(session)");
+  });
+
+  test("uses TypeORM repositories for public bootstrap rows", async () => {
+    const source = await Bun.file(join(repoRoot, "services/platform-core/src/infrastructure/application-database/seed.ts")).text();
+
+    expect(source).toContain("this.em.getRepository(FulcrumWorkspaceEntity).save");
+    expect(source).toContain("this.em.getRepository(FulcrumProjectEntity).save");
+    expect(source).not.toContain("INSERT INTO fulcrum_workspaces");
+    expect(source).not.toContain("INSERT INTO fulcrum_projects");
   });
 
   test.skip("layout-server seed hook deferred to Pillar 13/16", () => {
