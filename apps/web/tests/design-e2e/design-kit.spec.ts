@@ -200,4 +200,39 @@ test.describe("ui-kit form primitives reference", () => {
 		).toHaveAttribute("aria-label", "Dismiss notification");
 		await expect(section.locator("[data-design-kit-toast-count]")).toContainText("Active: 2");
 	});
+
+	test("textarea reflects typed length and auto-resizes", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='textarea']");
+		const textarea = section.locator("[data-design-kit-textarea]");
+		await expect(textarea).toHaveAttribute("data-auto-resize", "true");
+		await textarea.fill("Hello fulcrum");
+		await expect(section.locator("[data-design-kit-textarea-length]")).toContainText("Length: 13");
+	});
+
+	test("switch toggles the bound state via click", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='switch']");
+		const toggle = section.locator("[data-slot='switch']");
+		await expect(toggle).toHaveAttribute("data-state", "checked");
+		await toggle.click();
+		await expect(toggle).toHaveAttribute("data-state", "unchecked");
+		await expect(section.locator("[data-design-kit-switch-state]")).toContainText("false");
+	});
+
+	test("form-field renders label, description, error, and toggles aria-invalid", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='form-field']");
+		const fields = section.locator("[data-slot='form-field']");
+		await expect(fields).toHaveCount(2);
+		await expect(fields.nth(0)).toHaveAttribute("data-invalid", "true");
+		await expect(fields.nth(0).locator("[data-slot='field-error']")).toContainText(
+			"Title is required.",
+		);
+		const input = section.locator("[data-design-kit-form-input]");
+		await input.fill("Plan refactor");
+		await expect(fields.nth(0)).not.toHaveAttribute("data-invalid", "true");
+		await expect(fields.nth(0).locator("[data-slot='form-field-description']")).toBeVisible();
+		await expect(fields.nth(1).locator("[data-slot='label'][data-optional='true']")).toBeVisible();
+	});
 });

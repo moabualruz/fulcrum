@@ -23,12 +23,20 @@
 		EmptyState,
 		ToastRegion,
 		ToastStore,
+		Textarea,
+		Switch,
+		FormField,
 	} from "@fulcrum/ui-kit";
 
 	let progressValue = $state(42);
 	let chipRemoved = $state(false);
 	let bannerVisible = $state(true);
 	const toastStore = new ToastStore();
+
+	let bioValue = $state("");
+	let notifyEnabled = $state(true);
+	let titleValue = $state("");
+	const titleError = $derived(titleValue.trim().length > 0 ? "" : "Title is required.");
 
 	let agreeChecked = $state(false);
 	let alphaChecked = $state(true);
@@ -374,6 +382,76 @@
 				<span class="text-xs text-muted-foreground" data-design-kit-toast-count>
 					Active: {toastStore.items.length}
 				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="textarea"
+		>
+			<h2 class="text-lg font-semibold">Textarea</h2>
+			<div class="grid gap-3 sm:max-w-md">
+				<Textarea
+					bind:value={bioValue}
+					placeholder="Share something about yourself"
+					autoResize
+					minRows={3}
+					maxRows={8}
+					aria-label="Bio"
+					data-design-kit-textarea
+				/>
+				<span class="text-xs text-muted-foreground" data-design-kit-textarea-length>
+					Length: {bioValue.length}
+				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="switch"
+		>
+			<h2 class="text-lg font-semibold">Switch</h2>
+			<label class="flex items-center gap-3 text-sm">
+				<Switch bind:checked={notifyEnabled} aria-label="Notifications" />
+				<span>Notifications enabled: <strong data-design-kit-switch-state>{notifyEnabled}</strong></span>
+			</label>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="form-field"
+		>
+			<h2 class="text-lg font-semibold">FormField</h2>
+			<div class="grid gap-4 sm:max-w-md">
+				<FormField
+					label="Task title"
+					required
+					htmlFor="form-field-title"
+					description="Describe the outcome in a single sentence."
+					error={titleError}
+				>
+					<input
+						id="form-field-title"
+						type="text"
+						bind:value={titleValue}
+						aria-invalid={titleError ? "true" : undefined}
+						aria-describedby={titleError ? "form-field-title-error" : "form-field-title-description"}
+						class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive aria-invalid:ring-destructive/30 aria-invalid:ring-2"
+						data-design-kit-form-input
+					/>
+				</FormField>
+				<FormField
+					label="Owner"
+					optional
+					htmlFor="form-field-owner"
+					description="Pick a default assignee for this task type."
+				>
+					<input
+						id="form-field-owner"
+						type="text"
+						class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+					/>
+				</FormField>
 			</div>
 		</article>
 	</section>

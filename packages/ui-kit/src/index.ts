@@ -167,3 +167,39 @@ export type {
 	ToastInput,
 	ToastTone,
 } from "./components/toast/index.js";
+export {
+	Textarea,
+	Root as TextareaRoot,
+} from "./components/textarea/index.js";
+export type { TextareaProps } from "./components/textarea/index.js";
+export {
+	Switch,
+	Root as SwitchRoot,
+} from "./components/switch/index.js";
+export type { SwitchProps } from "./components/switch/index.js";
+export {
+	FormField,
+	Root as FormFieldRoot,
+} from "./components/form-field/index.js";
+export type { FormFieldProps } from "./components/form-field/index.js";
+export {
+	FieldError,
+	Root as FieldErrorRoot,
+} from "./components/field-error/index.js";
+export type { FieldErrorProps } from "./components/field-error/index.js";
+export {
+	Combobox,
+	ComboboxInput,
+	ComboboxContent,
+	ComboboxItem,
+	Root as ComboboxRoot,
+	Input as ComboboxInputRoot,
+	Content as ComboboxContentRoot,
+	Item as ComboboxItemRoot,
+} from "./components/combobox/index.js";
+export type {
+	ComboboxProps,
+	ComboboxInputProps,
+	ComboboxContentProps,
+	ComboboxItemProps,
+} from "./components/combobox/index.js";
