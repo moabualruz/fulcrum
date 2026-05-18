@@ -72,6 +72,15 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-message-toolcalls");
     expect(body).toContain("Build the <strong>plan</strong>");
     expect(body).toContain("session/update");
+    expect(body).toContain("tool-call-card");
+    expect(body).toContain("data-tool-kind-icon");
+    expect(body).toContain("RD");
+    expect(body).toContain('data-tool-status="in_progress"');
+    expect(body).toContain("copy-args-btn");
+    expect(body).toContain("copy-result-btn");
+    expect(body).toContain("data-tool-args");
+    expect(body).toContain("data-tool-result");
+    expect(body).toContain("services/planning-review/brief.md");
     expect(body).toContain("abort-btn");
     expect(body).toContain("pause-btn");
     expect(body).not.toContain("data-session-empty");
@@ -218,7 +227,15 @@ function activeModel(): SessionWorkbenchModel {
     ],
     toolCalls: {
       items: [
-        { toolCallId: "tool-1", title: "Read brief", kind: "read", status: "in_progress" },
+        {
+          toolCallId: "tool-1",
+          title: "Read brief",
+          kind: "read",
+          status: "in_progress",
+          args: { path: "services/planning-review/brief.md" },
+          result: { bytes: 1200 },
+          locations: [{ path: "services/planning-review/brief.md" }],
+        },
         {
           toolCallId: "tool-diff",
           title: "Edit src/app.ts",

@@ -33,6 +33,7 @@
   let reconnectFormEl: HTMLFormElement | undefined = $state();
   let autoscrollLocked = $state(false);
   let copiedMessageId = $state<string | null>(null);
+  let copiedToolDetailId = $state<string | null>(null);
   let errorDismissed = $state(false);
   let abortConfirmOpen = $state(false);
   let deleteSessionId = $state<string | null>(null);
@@ -110,6 +111,14 @@
     copiedMessageId = messageId;
     setTimeout(() => {
       if (copiedMessageId === messageId) copiedMessageId = null;
+    }, 1600);
+  }
+
+  async function copyToolDetail(id: string, value: unknown): Promise<void> {
+    await navigator.clipboard?.writeText(formatJson(value));
+    copiedToolDetailId = id;
+    setTimeout(() => {
+      if (copiedToolDetailId === id) copiedToolDetailId = null;
     }, 1600);
   }
 
@@ -200,6 +209,28 @@
     if (kind === "add") return "+";
     if (kind === "remove") return "-";
     return " ";
+  }
+
+  function formatJson(value: unknown): string {
+    if (value === undefined) return "{}";
+    return JSON.stringify(value, null, 2);
+  }
+
+  function toolStatusClass(status: string): string {
+    if (status === "pending") return "border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+    if (status === "in_progress") return "border-blue-500/60 bg-blue-500/10 text-blue-700 dark:text-blue-300";
+    if (status === "completed") return "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    if (status === "failed") return "border-rose-500/60 bg-rose-500/10 text-rose-700 dark:text-rose-300";
+    return "border-border text-muted-foreground";
+  }
+
+  function toolKindBadge(kind: string): string {
+    const normalized = kind.toLowerCase();
+    if (normalized.includes("read")) return "RD";
+    if (normalized.includes("write") || normalized.includes("edit")) return "WR";
+    if (normalized.includes("exec") || normalized.includes("shell")) return "SH";
+    if (normalized.includes("search")) return "SE";
+    return "TL";
   }
 
   function permissionOptionClass(optionId: string, kind: string): string {
@@ -603,11 +634,49 @@
       {#if model.toolCalls.items.length > 0}
         <ol class={cn("space-y-3")}>
           {#each model.toolCalls.items as toolCall}
-            <li data-session-toolcall={toolCall.toolCallId} class={cn("space-y-2 rounded-md border border-border p-2")}>
-              <div class={cn("flex flex-wrap items-center justify-between gap-2 text-xs")}>
-                <span class={cn("font-medium")}>{toolCall.title}</span>
-                <span class={cn("rounded-md border border-border px-2 py-0.5 text-muted-foreground")}>{toolCall.status}</span>
-              </div>
+            <li data-session-toolcall={toolCall.toolCallId} class={cn("tool-call-card space-y-2 rounded-md border border-border p-2")}>
+              <details data-tool-call-details class={cn("group min-w-0")}>
+                <summary class={cn("grid cursor-pointer list-none gap-2 text-xs sm:grid-cols-[auto_1fr_auto] sm:items-center")}>
+                  <span data-tool-kind-icon class={cn("inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted font-mono text-[0.65rem] text-muted-foreground")}>
+                    {toolKindBadge(toolCall.kind)}
+                  </span>
+                  <span class={cn("min-w-0")}>
+                    <span class={cn("block truncate font-medium")}>{toolCall.title}</span>
+                    <span class={cn("block truncate text-muted-foreground")}>{toolCall.kind}</span>
+                  </span>
+                  <span data-tool-status={toolCall.status} class={cn("inline-flex w-fit items-center gap-1 rounded-md border px-2 py-0.5", toolStatusClass(toolCall.status))}>
+                    <span class={cn("h-1.5 w-1.5 rounded-full bg-current")} aria-hidden="true"></span>
+                    {toolCall.status}
+                  </span>
+                </summary>
+                {#if toolCall.locations?.length}
+                  <ul data-tool-locations class={cn("mt-2 space-y-1 rounded-md bg-muted/40 p-2 text-xs")}>
+                    {#each toolCall.locations as location}
+                      <li class={cn("break-all font-mono text-muted-foreground")}>{location.path}</li>
+                    {/each}
+                  </ul>
+                {/if}
+                <div class={cn("mt-2 grid gap-2")}>
+                  <section data-tool-args class={cn("min-w-0 rounded-md border border-border")}>
+                    <div class={cn("flex items-center justify-between gap-2 border-b border-border px-2 py-1 text-xs")}>
+                      <span class={cn("font-medium")}>Args</span>
+                      <button type="button" class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "copy-args-btn h-7 px-2 text-xs")} onclick={() => copyToolDetail(`${toolCall.toolCallId}:args`, toolCall.args)}>
+                        {copiedToolDetailId === `${toolCall.toolCallId}:args` ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre class={cn("max-h-48 overflow-auto whitespace-pre-wrap break-words p-2 text-xs")}><code>{formatJson(toolCall.args)}</code></pre>
+                  </section>
+                  <section data-tool-result class={cn("min-w-0 rounded-md border border-border")}>
+                    <div class={cn("flex items-center justify-between gap-2 border-b border-border px-2 py-1 text-xs")}>
+                      <span class={cn("font-medium")}>{toolCall.status === "failed" ? "Error" : "Result"}</span>
+                      <button type="button" class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "copy-result-btn h-7 px-2 text-xs")} onclick={() => copyToolDetail(`${toolCall.toolCallId}:result`, toolCall.errorMessage ?? toolCall.result)}>
+                        {copiedToolDetailId === `${toolCall.toolCallId}:result` ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre class={cn("max-h-48 overflow-auto whitespace-pre-wrap break-words p-2 text-xs")}><code>{formatJson(toolCall.errorMessage ?? toolCall.result)}</code></pre>
+                  </section>
+                </div>
+              </details>
               {#if toolCall.diffs?.length}
                 <div data-inline-diff-list class={cn("space-y-2")}>
                   {#each toolCall.diffs as diff}

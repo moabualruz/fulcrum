@@ -65,6 +65,9 @@ export interface ToolCallInfo {
   title: string;
   kind: string;
   status: "pending" | "in_progress" | "completed" | "failed";
+  args?: unknown;
+  result?: unknown;
+  errorMessage?: string;
   locations?: { path: string }[];
   diffs?: ToolCallDiff[];
 }

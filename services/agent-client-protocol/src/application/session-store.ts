@@ -213,6 +213,9 @@ function applyToolCall(state: AcpSessionState, update: Record<string, unknown>):
     title: stringValue(update.title),
     kind: stringValue(update.kind) || "other",
     status: toolStatus(update.status),
+    args: update.args ?? update.input,
+    result: update.result,
+    errorMessage: optionalString(update.errorMessage) ?? optionalString(update.error),
     locations: locationsFromUnknown(update.locations),
   };
   const last = state.messages.at(-1);
@@ -230,12 +233,20 @@ function applyToolCallUpdate(state: AcpSessionState, update: Record<string, unkn
   if (existing) {
     if (typeof update.status === "string") existing.status = toolStatus(update.status);
     if (typeof update.title === "string") existing.title = update.title;
+    if ("args" in update || "input" in update) existing.args = update.args ?? update.input;
+    if ("result" in update) existing.result = update.result;
+    if (typeof update.errorMessage === "string") existing.errorMessage = update.errorMessage;
+    if (typeof update.error === "string") existing.errorMessage = update.error;
   }
   for (const message of state.messages) {
     for (const toolCall of message.toolCalls ?? []) {
       if (toolCall.toolCallId !== toolCallId) continue;
       if (typeof update.status === "string") toolCall.status = toolStatus(update.status);
       if (typeof update.title === "string") toolCall.title = update.title;
+      if ("args" in update || "input" in update) toolCall.args = update.args ?? update.input;
+      if ("result" in update) toolCall.result = update.result;
+      if (typeof update.errorMessage === "string") toolCall.errorMessage = update.errorMessage;
+      if (typeof update.error === "string") toolCall.errorMessage = update.error;
     }
   }
 }
@@ -273,6 +284,10 @@ function toolStatus(value: unknown): ToolCallInfo["status"] {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function toRecord(value: unknown): Record<string, unknown> {

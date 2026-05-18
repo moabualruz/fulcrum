@@ -241,12 +241,19 @@ function cloneMessage(message: ChatMessage): ChatMessage {
 function cloneToolCall(toolCall: ToolCallInfo): ToolCallInfo {
   return {
     ...toolCall,
+    args: cloneJson(toolCall.args),
+    result: cloneJson(toolCall.result),
     locations: toolCall.locations?.map((location) => ({ ...location })),
     diffs: toolCall.diffs?.map((diff) => ({
       ...diff,
       lines: diff.lines.map((line) => ({ ...line })),
     })),
   };
+}
+
+function cloneJson(value: unknown): unknown {
+  if (value === undefined || value === null) return value;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function summarizeToolCalls(toolCalls: ToolCallInfo[]): ToolCallSummary {
