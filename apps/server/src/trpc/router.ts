@@ -62,6 +62,7 @@ import { searchRouter } from "./routers/search.ts";
 import { connectorsRouter } from "./routers/connectors.ts";
 import { doctorRouter } from "./routers/doctor.ts";
 import { invitationsRouter } from "./routers/invitations.ts";
+import { timeEntriesRouter } from "./routers/time-entries.ts";
 
 const dbRouter = t.router({
   ping: publicProcedure
@@ -124,6 +125,7 @@ export const appRouter = t.router({
   planning: planningRouter,
   review: reviewRouter,
   credentials: credentialsRouter,
+  timeEntries: timeEntriesRouter,
 
   db: dbRouter,
   health: healthRouter,

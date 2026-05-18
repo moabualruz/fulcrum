@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
@@ -22,6 +23,7 @@ const REQUIRED_NAMESPACES = [
   "routing",
   "skills",
   "inference",
+  "timeEntries",
 ];
 
 const ROOT_ALIASES: Record<string, string> = {
@@ -126,5 +128,17 @@ describe("all tRPC router contract gate", () => {
     for (const [namespace, reason] of Object.entries(ALLOWLIST)) {
       expect(reason.trim().length, namespace).toBeGreaterThan(20);
     }
+  });
+
+  test("CLI/TUI local caller appRouter includes every Nest-mounted tRPC namespace", async () => {
+    const nestRouterSource = await readFile(new URL("../trpc.router.ts", import.meta.url), "utf-8");
+    const nestNamespaces = [...nestRouterSource.matchAll(/^      ([a-zA-Z_][a-zA-Z0-9_]*): /gm)]
+      .map((match) => match[1]!)
+      .filter((namespace) => !namespace.endsWith("Subscriptions"))
+      .filter((namespace) => namespace !== "ping")
+      .sort();
+    const localCallerNamespaces = procedureNamespaces();
+
+    expect(localCallerNamespaces).toEqual(expect.arrayContaining(nestNamespaces));
   });
 });
