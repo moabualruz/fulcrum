@@ -1,7 +1,25 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "@fulcrum/ui-kit";
+  import {
+    Badge,
+    Button,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Label,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    buttonVariants,
+  } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
   interface Props {
@@ -18,10 +36,27 @@
     upstream_repo: string | null;
     content_hash: string | null;
     enabled_agents: string[];
-    upstream_conflict: { local_content: string; upstream_content: string } | null;
+    upstream_conflict: SkillConflict | null;
+  }
+
+  type ConflictResolution = "keep_local" | "use_upstream" | "force" | "alt_version" | "skip" | "upgrade_installed";
+
+  interface SkillConflict {
+    local_content: string;
+    upstream_content: string;
+    installed_skill: string;
+    installed_version: string;
+    requested_skill: string;
+    requested_version: string;
+    reason: string;
+    alt_versions: string[];
+    recommended_resolution: ConflictResolution;
+    force_safe: boolean;
+    session_resolution: ConflictResolution | null;
   }
 
   type SkillsPayload = { skills: SkillItem[] };
+  const SESSION_RESOLUTION_KEY = "fulcrum.skillConflictResolution";
 
   // Install form state
   let installSlug = $state("");
@@ -44,6 +79,13 @@
   }
 
   let installLog = $state<InstallLogEntry[]>([]);
+  let selectedAltVersion = $state<string | null>(null);
+  let forceAcknowledged = $state(false);
+  let sessionConflictChoice = $state<string | null>(null);
+
+  onMount(() => {
+    sessionConflictChoice = sessionStorage.getItem(SESSION_RESOLUTION_KEY);
+  });
 
   function recordLog(action: string, slug: string, result: "ok" | "error", message?: string): void {
     installLog = [
@@ -141,12 +183,22 @@
     }
   }
 
-  async function handleResolveConflict(slug: string, resolution: "keep_local" | "use_upstream"): Promise<void> {
-    const res = await apiCall({ action: "resolve_conflict", slug, resolution });
+  async function handleResolveConflict(slug: string, resolution: ConflictResolution, altVersion?: string): Promise<void> {
+    const res = await apiCall({ action: "resolve_conflict", slug, resolution, alt_version: altVersion });
     if (res.ok) {
       const updated = (await res.json()) as SkillItem;
       localSkills = (localSkills ?? []).map((s) => (s.slug === slug ? updated : s));
+      const choice = JSON.stringify({ slug, resolution, alt_version: altVersion ?? null });
+      sessionStorage.setItem(SESSION_RESOLUTION_KEY, choice);
+      sessionConflictChoice = choice;
+      recordLog("resolve-conflict", slug, "ok", resolution);
+    } else {
+      recordLog("resolve-conflict", slug, "error", `HTTP ${res.status}`);
     }
+  }
+
+  function recommendedLabel(resolution: ConflictResolution): string {
+    return resolution.replace(/_/g, " ");
   }
 
   const AGENTS = ["claude", "codex", "gemini", "opencode", "pi"] as const;
@@ -157,11 +209,11 @@
   class={cn("flex items-center justify-between gap-4 border-b border-border pb-4 mb-4")}
 >
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Skills</h1>
-  <button
+  <Button
     data-upgrade-all
     onclick={handleUpgradeAll}
-    class={cn(buttonVariants({ variant: "outline" }))}
-  >Upgrade all</button>
+    variant="outline"
+  >Upgrade all</Button>
 </header>
 
 <!-- Install form -->
@@ -289,11 +341,12 @@
               </td>
               <td data-slot="table-cell" class={cn("p-2 align-middle")}>
                 <div class="flex gap-1">
-                  <button
+                  <Button
                     data-upgrade-skill
                     onclick={() => void handleUpgrade(skill.slug)}
-                    class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                  >Upgrade</button>
+                    variant="outline"
+                    size="sm"
+                  >Upgrade</Button>
                   {#if confirmUninstall === skill.slug}
                     {@const dependents = dependentsOf(skill.slug, skills)}
                     <div data-uninstall-confirm={skill.slug} class="flex flex-col gap-1">
@@ -305,24 +358,27 @@
                           >No dependents detected.</span>
                       {/if}
                       <div class="flex gap-1">
-                        <button
+                        <Button
                           data-confirm-uninstall
                           onclick={() => void handleUninstall(skill.slug)}
-                          class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
-                        >Confirm</button>
-                        <button
+                          variant="destructive"
+                          size="sm"
+                        >Confirm</Button>
+                        <Button
                           data-cancel-uninstall
                           onclick={() => (confirmUninstall = null)}
-                          class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                        >Cancel</button>
+                          variant="ghost"
+                          size="sm"
+                        >Cancel</Button>
                       </div>
                     </div>
                   {:else}
-                    <button
+                    <Button
                       data-uninstall-skill
                       onclick={() => (confirmUninstall = skill.slug)}
-                      class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                    >Uninstall</button>
+                      variant="outline"
+                      size="sm"
+                    >Uninstall</Button>
                   {/if}
                 </div>
               </td>
@@ -330,31 +386,140 @@
             {#if skill.upstream_conflict}
               <tr data-conflict-card data-conflict-slug={skill.slug} class={cn("border-b")}>
                 <td colspan="6" class={cn("p-4")}>
-                  <div class={cn("rounded-lg border border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 p-4")}>
-                    <h3 class={cn("text-sm font-semibold mb-2")}>Upstream conflict for "{skill.slug}"</h3>
-                    <div class="grid grid-cols-2 gap-4 mb-3">
-                      <div>
-                        <h4 class={cn("text-xs font-medium mb-1 text-muted-foreground")}>Local</h4>
-                        <pre data-conflict-local class={cn("rounded bg-muted p-2 text-xs overflow-x-auto whitespace-pre-wrap")}>{skill.upstream_conflict.local_content}</pre>
+                  <Dialog open>
+                    <DialogContent
+                      data-conflict-resolution-dialog={skill.slug}
+                      class="sm:max-w-3xl"
+                      showCloseButton={false}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>Resolve skill conflict</DialogTitle>
+                        <DialogDescription>
+                          {skill.upstream_conflict.installed_skill} {skill.upstream_conflict.installed_version}
+                          conflicts with {skill.upstream_conflict.requested_skill} {skill.upstream_conflict.requested_version}.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      <div class={cn("space-y-4")}>
+                        <div class={cn("flex flex-wrap items-center gap-2")}>
+                          <Badge variant="warning" data-recommended-resolution={skill.upstream_conflict.recommended_resolution}>
+                            Recommended: {recommendedLabel(skill.upstream_conflict.recommended_resolution)}
+                          </Badge>
+                          {#if sessionConflictChoice || skill.upstream_conflict.session_resolution}
+                            <Badge variant="outline" data-session-resolution>Session choice saved</Badge>
+                          {/if}
+                        </div>
+
+                        <p data-conflict-reason class={cn("text-sm text-muted-foreground")}>
+                          {skill.upstream_conflict.reason}
+                        </p>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <h4 class={cn("mb-1 text-xs font-medium text-muted-foreground")}>Installed</h4>
+                            <p data-installed-skill-version class={cn("mb-2 text-sm font-medium")}>
+                              {skill.upstream_conflict.installed_skill} {skill.upstream_conflict.installed_version}
+                            </p>
+                            <pre data-conflict-local class={cn("max-h-32 overflow-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap")}>{skill.upstream_conflict.local_content}</pre>
+                          </div>
+                          <div>
+                            <h4 class={cn("mb-1 text-xs font-medium text-muted-foreground")}>Requested</h4>
+                            <p data-requested-skill-version class={cn("mb-2 text-sm font-medium")}>
+                              {skill.upstream_conflict.requested_skill} {skill.upstream_conflict.requested_version}
+                            </p>
+                            <pre data-conflict-upstream class={cn("max-h-32 overflow-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap")}>{skill.upstream_conflict.upstream_content}</pre>
+                          </div>
+                        </div>
+
+                        <div class={cn("grid gap-3 md:grid-cols-2")}>
+                          <div data-conflict-option="alt_version" class={cn("rounded-md border border-border p-3")}>
+                            <div class={cn("mb-2 flex items-center justify-between gap-2")}>
+                              <Label for="skill-alt-version">Use alternative version</Label>
+                              {#if skill.upstream_conflict.recommended_resolution === "alt_version"}
+                                <Badge variant="success" size="sm">Recommended</Badge>
+                              {/if}
+                            </div>
+                            <Select bind:value={selectedAltVersion} type="single">
+                              <SelectTrigger id="skill-alt-version" data-alt-version-select aria-label="Alternative skill version">
+                                <SelectValue placeholder={skill.upstream_conflict.alt_versions[0] ?? "No compatible version"} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {#each skill.upstream_conflict.alt_versions as version (version)}
+                                  <SelectItem value={version} label={version} />
+                                {/each}
+                              </SelectContent>
+                            </Select>
+                            <p class={cn("mt-2 text-xs text-muted-foreground")}>Installs a compatible version without changing the installed skill.</p>
+                          </div>
+
+                          <div data-conflict-option="force" class={cn("rounded-md border border-border p-3")}>
+                            <div class={cn("mb-2 flex items-center gap-2")}>
+                              <Checkbox bind:checked={forceAcknowledged} data-force-warning-ack aria-label="Acknowledge force warning" />
+                              <Label>Force with warning</Label>
+                            </div>
+                            <p class={cn("text-xs text-muted-foreground")}>
+                              Only available when the conflict is marked safe. May bypass compatibility checks.
+                            </p>
+                          </div>
+
+                          <div data-conflict-option="skip" class={cn("rounded-md border border-border p-3")}>
+                            <h4 class={cn("text-sm font-medium")}>Skip this skill</h4>
+                            <p class={cn("mt-1 text-xs text-muted-foreground")}>Leaves the current installation unchanged for this session.</p>
+                          </div>
+
+                          <div data-conflict-option="upgrade_installed" class={cn("rounded-md border border-border p-3")}>
+                            <h4 class={cn("text-sm font-medium")}>Upgrade installed first</h4>
+                            <p class={cn("mt-1 text-xs text-muted-foreground")}>Updates the installed skill before retrying the requested install.</p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h4 class={cn("text-xs font-medium mb-1 text-muted-foreground")}>Upstream</h4>
-                        <pre data-conflict-upstream class={cn("rounded bg-muted p-2 text-xs overflow-x-auto whitespace-pre-wrap")}>{skill.upstream_conflict.upstream_content}</pre>
-                      </div>
-                    </div>
-                    <div class="flex gap-2">
-                      <button
-                        data-keep-local
-                        onclick={() => void handleResolveConflict(skill.slug, "keep_local")}
-                        class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                      >Keep Local</button>
-                      <button
-                        data-use-upstream
-                        onclick={() => void handleResolveConflict(skill.slug, "use_upstream")}
-                        class={cn(buttonVariants({ variant: "default", size: "sm" }))}
-                      >Use Upstream</button>
-                    </div>
-                  </div>
+
+                      <DialogFooter class="flex-wrap gap-2">
+                        <Button
+                          data-alt-version-confirm
+                          variant="default"
+                          size="sm"
+                          disabled={skill.upstream_conflict.alt_versions.length === 0}
+                          onclick={() => void handleResolveConflict(
+                            skill.slug,
+                            "alt_version",
+                            selectedAltVersion ?? skill.upstream_conflict?.alt_versions[0],
+                          )}
+                        >Use alt version</Button>
+                        <Button
+                          data-force-conflict
+                          variant="destructive"
+                          size="sm"
+                          disabled={!skill.upstream_conflict.force_safe || !forceAcknowledged}
+                          onclick={() => void handleResolveConflict(skill.slug, "force")}
+                        >Force</Button>
+                        <Button
+                          data-skip-conflict
+                          variant="outline"
+                          size="sm"
+                          onclick={() => void handleResolveConflict(skill.slug, "skip")}
+                        >Skip</Button>
+                        <Button
+                          data-upgrade-installed-first
+                          variant="outline"
+                          size="sm"
+                          onclick={() => void handleResolveConflict(skill.slug, "upgrade_installed")}
+                        >Upgrade installed first</Button>
+                        <Button
+                          data-keep-local
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => void handleResolveConflict(skill.slug, "keep_local")}
+                        >Keep local</Button>
+                        <Button
+                          data-use-upstream
+                          variant="ghost"
+                          size="sm"
+                          onclick={() => void handleResolveConflict(skill.slug, "use_upstream")}
+                        >Use requested</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </td>
               </tr>
             {/if}

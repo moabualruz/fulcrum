@@ -18,6 +18,15 @@ export interface SkillsWebScope {
 export interface UpstreamConflict {
   local_content: string;
   upstream_content: string;
+  installed_skill: string;
+  installed_version: string;
+  requested_skill: string;
+  requested_version: string;
+  reason: string;
+  alt_versions: string[];
+  recommended_resolution: ConflictResolution;
+  force_safe: boolean;
+  session_resolution: ConflictResolution | null;
 }
 
 export interface SkillRow {
@@ -41,10 +50,12 @@ export interface InstallSkillInput {
 
 export interface ResolveConflictInput {
   slug: string;
-  resolution: "keep_local" | "use_upstream";
+  resolution: ConflictResolution;
+  altVersion?: string;
 }
 
 const INITIAL_VERSION = "0.0.0";
+export type ConflictResolution = "keep_local" | "use_upstream" | "force" | "alt_version" | "skip" | "upgrade_installed";
 
 export async function listWebSkills(scope: SkillsWebScope): Promise<SkillRow[]> {
   const em = scope.em;
@@ -113,6 +124,7 @@ export async function updateWebSkillEnabledAgents(
   const em = scope.em;
   const skill = await findSkill(em, scope.ctx.orgId, slug);
   skill.enabledAgents = enabledAgents;
+  await em.save(skill);
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
 
@@ -127,12 +139,28 @@ export async function resolveWebSkillConflict(
     status: SkillConflictStatus.Open,
   } as never, order: { createdAt: "DESC" } });
   if (!conflict) throw new Error(`skill '${input.slug}' has no conflict`);
+  const forceSafe = Boolean(conflict.auditNote?.includes("force-safe"));
+  if (input.resolution === "force" && !forceSafe) {
+    throw new Error(`skill '${input.slug}' conflict is not marked safe for force`);
+  }
 
   conflict.status = SkillConflictStatus.Resolved;
   conflict.updatedAt = new Date();
-  if (input.resolution === "use_upstream") {
+  conflict.suggestedResolution = input.resolution === "alt_version" && input.altVersion
+    ? `alt-version:${input.altVersion}`
+    : input.resolution;
+  if (input.resolution === "use_upstream" || input.resolution === "force" || input.resolution === "alt_version") {
     const latest = await latestVersion(em, skill);
-    if (latest) latest.hashVerified = conflict.upstreamHash ?? conflict.actualSha256 ?? latest.hashVerified;
+    if (latest) {
+      latest.hashVerified = input.resolution === "alt_version" && input.altVersion
+        ? input.altVersion
+        : conflict.upstreamHash ?? conflict.actualSha256 ?? latest.hashVerified;
+      await em.save(latest);
+    }
+  }
+  await em.save(conflict);
+  if (input.resolution === "upgrade_installed") {
+    return upgradeWebSkill(scope, input.slug);
   }
   return serializeWebSkill(em, scope.ctx.orgId, skill);
 }
@@ -154,9 +182,26 @@ async function openConflict(em: EntityManager, slug: string): Promise<UpstreamCo
     status: SkillConflictStatus.Open,
   } as never, order: { createdAt: "DESC" } });
   if (!conflict) return null;
+  const installedVersion = normalizeConflictVersion(conflict.localHash ?? conflict.actualSha256, "v1");
+  const requestedVersion = normalizeConflictVersion(conflict.upstreamHash ?? conflict.expectedSha256, "v2");
+  const altVersions = altVersionsFor(installedVersion, requestedVersion);
+  const recommendation = conflict.suggestedResolution && isConflictResolution(conflict.suggestedResolution)
+    ? conflict.suggestedResolution
+    : altVersions.length > 0
+      ? "alt_version"
+      : "skip";
   return {
     local_content: conflict.localHash ?? conflict.actualSha256 ?? "",
     upstream_content: conflict.upstreamHash ?? conflict.expectedSha256 ?? "",
+    installed_skill: slug,
+    installed_version: installedVersion,
+    requested_skill: `${slug}-candidate`,
+    requested_version: requestedVersion,
+    reason: "Incompatible tool/API requirements between installed and requested skill versions.",
+    alt_versions: altVersions,
+    recommended_resolution: recommendation,
+    force_safe: Boolean(conflict.auditNote?.includes("force-safe")),
+    session_resolution: null,
   };
 }
 
@@ -191,4 +236,22 @@ function compareVersion(left: string, right: string): number {
     if (diff !== 0) return diff;
   }
   return 0;
+}
+
+function normalizeConflictVersion(value: string | null | undefined, fallback: string): string {
+  if (!value) return fallback;
+  const version = value.match(/v?\d+(?:\.\d+){0,2}/)?.[0];
+  return version ?? value.slice(0, 12);
+}
+
+function altVersionsFor(installed: string, requested: string): string[] {
+  const requestedMajor = Number.parseInt(requested.replace(/^v/, "").split(".")[0] ?? "", 10);
+  const installedMajor = Number.parseInt(installed.replace(/^v/, "").split(".")[0] ?? "", 10);
+  if (Number.isFinite(requestedMajor) && requestedMajor > 1) return [`v${requestedMajor - 1}.latest`, `v${requestedMajor}.compat`];
+  if (Number.isFinite(installedMajor)) return [`v${installedMajor}.compat`];
+  return ["compatible-latest"];
+}
+
+function isConflictResolution(value: string): value is ConflictResolution {
+  return ["keep_local", "use_upstream", "force", "alt_version", "skip", "upgrade_installed"].includes(value);
 }

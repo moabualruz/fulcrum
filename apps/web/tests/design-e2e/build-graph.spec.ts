@@ -5,6 +5,10 @@ import { readFileSync } from "node:fs";
 async function openBuildGraph(page: Page): Promise<void> {
 	await page.goto("/build-graph");
 	await expect(page.locator("[data-build-graph-ready='true']")).toBeVisible();
+	await page.evaluate(async () => {
+		await document.fonts.ready;
+		await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+	});
 }
 
 function channelToLinear(value: number): number {

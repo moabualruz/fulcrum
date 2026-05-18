@@ -287,6 +287,8 @@ Per Plannotator review-editor (research-07 §4.2). Two-pane (split) or unified, 
 
 Hard ban: two modals open at once. Sheets stack into drawer.
 
+Skill install conflicts use the full modal pattern because resolution is a focused multi-option workflow. The modal must name the installed skill/version, requested skill/version, incompatibility reason, recommended path, alternative-version select, skip action, upgrade-installed-first action, and force action only when the compatibility check marks it safe. The same state is covered in `/design-kit` under `data-design-kit-section="skill-conflict-dialog"` before production routes consume it.
+
 ### 4.8 Empty state
 
 Per research-01 §9. Universal template:

@@ -1,4 +1,5 @@
 import type { Component } from "svelte";
+import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 
 mock.module("$app/state", () => ({
@@ -27,7 +28,19 @@ interface SkillItem {
   upstream_repo: string | null;
   content_hash: string | null;
   enabled_agents: string[];
-  upstream_conflict: { local_content: string; upstream_content: string } | null;
+  upstream_conflict: {
+    local_content: string;
+    upstream_content: string;
+    installed_skill: string;
+    installed_version: string;
+    requested_skill: string;
+    requested_version: string;
+    reason: string;
+    alt_versions: string[];
+    recommended_resolution: "alt_version" | "skip" | "force" | "keep_local" | "use_upstream" | "upgrade_installed";
+    force_safe: boolean;
+    session_resolution: "alt_version" | "skip" | "force" | "keep_local" | "use_upstream" | "upgrade_installed" | null;
+  } | null;
 }
 
 type PageProps = {
@@ -73,6 +86,15 @@ const CONFLICT_SAMPLE: SkillItem[] = [
     upstream_conflict: {
       local_content: "local version content",
       upstream_content: "upstream version content",
+      installed_skill: "conflicted",
+      installed_version: "v1",
+      requested_skill: "conflicted-candidate",
+      requested_version: "v2",
+      reason: "Incompatible tools/API",
+      alt_versions: ["v1.latest", "v2.compat"],
+      recommended_resolution: "alt_version",
+      force_safe: false,
+      session_resolution: null,
     },
   },
 ];
@@ -154,16 +176,30 @@ describe("/settings/skills +page.svelte", () => {
     expect(claudeToggle).not.toBeNull();
   });
 
-  test("renders conflict card when upstream_conflict present", () => {
+  test("renders conflict dialog when upstream_conflict present", () => {
     const { body } = render(Page, { props: { data: pageData(CONFLICT_SAMPLE) } });
+    const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
     expect(body).toContain("data-conflict-card");
     expect(body).toContain('data-conflict-slug="conflicted"');
-    expect(body).toContain("local version content");
-    expect(body).toContain("upstream version content");
-    expect(body).toContain("data-keep-local");
-    expect(body).toContain("data-use-upstream");
-    expect(body).toContain("Keep Local");
-    expect(body).toContain("Use Upstream");
+    expect(source).toContain("data-conflict-resolution-dialog");
+    expect(source).toContain("installed_version");
+    expect(source).toContain("requested_version");
+    expect(source).toContain("reason");
+    expect(source).toContain("data-recommended-resolution");
+    expect(source).toContain('data-conflict-option="alt_version"');
+    expect(source).toContain('data-conflict-option="force"');
+    expect(source).toContain('data-conflict-option="skip"');
+    expect(source).toContain('data-conflict-option="upgrade_installed"');
+    expect(source).toContain("data-alt-version-select");
+    expect(source).toContain("data-force-warning-ack");
+    expect(source).toContain("data-alt-version-confirm");
+    expect(source).toContain("data-force-conflict");
+    expect(source).toContain("data-skip-conflict");
+    expect(source).toContain("data-upgrade-installed-first");
+    expect(source).toContain("data-keep-local");
+    expect(source).toContain("data-use-upstream");
+    expect(source).toContain("Use alt version");
+    expect(source).toContain("Upgrade installed first");
   });
 
   test("does not render conflict card when no conflict", () => {
@@ -177,8 +213,14 @@ describe("/settings/skills +page.svelte", () => {
   });
 
   test("side-by-side diff shows Local and Upstream columns", () => {
-    const { body } = render(Page, { props: { data: pageData(CONFLICT_SAMPLE) } });
-    expect(body).toContain("data-conflict-local");
-    expect(body).toContain("data-conflict-upstream");
+    const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+    expect(source).toContain("data-conflict-local");
+    expect(source).toContain("data-conflict-upstream");
+  });
+
+  test("conflict choices are persisted to session storage", () => {
+    const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+    expect(source).toContain("sessionStorage.setItem");
+    expect(source).toContain("fulcrum.skillConflictResolution");
   });
 });

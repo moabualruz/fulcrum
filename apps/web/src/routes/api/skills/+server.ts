@@ -96,11 +96,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const slug = payload.slug as string | undefined;
       const resolution = payload.resolution as string | undefined;
       if (!slug) return jsonError("slug is required");
-      if (resolution !== "keep_local" && resolution !== "use_upstream") {
-        return jsonError("resolution must be 'keep_local' or 'use_upstream'");
+      if (
+        resolution !== "keep_local" &&
+        resolution !== "use_upstream" &&
+        resolution !== "force" &&
+        resolution !== "alt_version" &&
+        resolution !== "skip" &&
+        resolution !== "upgrade_installed"
+      ) {
+        return jsonError("resolution must be keep_local, use_upstream, force, alt_version, skip, or upgrade_installed");
       }
       try {
-        const skill = await resolveConflict(scope, { slug, resolution });
+        const skill = await resolveConflict(scope, {
+          slug,
+          resolution,
+          altVersion: payload.alt_version as string | undefined,
+        });
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "resolve failed";

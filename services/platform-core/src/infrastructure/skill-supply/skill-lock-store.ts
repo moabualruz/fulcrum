@@ -56,15 +56,26 @@ export class SkillLockStore {
     return await this.list();
   }
 
-  async install(input: { path: string }): Promise<SkillSupplyRow> {
+  async install(input: {
+    path: string;
+    forceConflict?: boolean;
+    conflictResolution?: "alt-version" | "skip" | "upgrade-installed";
+  }): Promise<SkillSupplyRow> {
     const source = await readSkillSource(input.path);
     const slug = normalizeSlug(source.name ?? source.slug);
     const lock = await this.readLock();
+    const existing = lock[slug];
+    if (existing?.upstream_conflict && !input.forceConflict && !input.conflictResolution) {
+      throw new Error(`Skill ${slug} has an unresolved conflict. Use --force-conflict or --resolve-conflict.`);
+    }
+    if (existing?.upstream_conflict && input.conflictResolution === "skip") {
+      return rowFromEntry(slug, existing);
+    }
     const entry: SkillsLockEntry = {
       version: source.version,
       hash: sha256Hex(source.content),
       installedAt: new Date().toISOString(),
-      enabled_agents: lock[slug]?.enabled_agents ?? ["claude", "codex", "gemini", "opencode", "pi"],
+      enabled_agents: existing?.enabled_agents ?? ["claude", "codex", "gemini", "opencode", "pi"],
     };
     lock[slug] = entry;
     await this.writeLock(lock);
@@ -98,15 +109,17 @@ export class SkillLockStore {
 
   async resolveConflict(input: {
     slug: string;
-    resolution: "local" | "upstream" | "editor";
+    resolution: "local" | "upstream" | "editor" | "force" | "alt-version" | "skip" | "upgrade-installed";
+    altVersion?: string;
   }): Promise<SkillSupplyRow> {
     const lock = await this.readLock();
     const entry = lock[input.slug];
     if (!entry) throw new SkillSupplyNotFoundError(`Skill ${input.slug} not found`);
+    if (input.resolution === "skip") return rowFromEntry(input.slug, entry);
     const upstreamHash = entry.upstream_conflict;
     const resolvedEntry: SkillsLockEntry = {
-      version: entry.version,
-      hash: input.resolution === "upstream" && upstreamHash ? upstreamHash : entry.hash,
+      version: input.resolution === "upgrade-installed" ? bumpPatch(entry.version) : (input.altVersion ?? entry.version),
+      hash: (input.resolution === "upstream" || input.resolution === "force" || input.resolution === "alt-version") && upstreamHash ? upstreamHash : entry.hash,
       installedAt: new Date().toISOString(),
       enabled_agents: entry.enabled_agents,
     };
@@ -226,4 +239,12 @@ function normalizeSlug(value: string): string {
   const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   if (!slug) throw new Error("Skill slug is required.");
   return slug;
+}
+
+function bumpPatch(version: string): string {
+  const parts = version.split(".").map((part) => Number.parseInt(part, 10));
+  const major = Number.isFinite(parts[0]) ? parts[0]! : 0;
+  const minor = Number.isFinite(parts[1]) ? parts[1]! : 0;
+  const patch = Number.isFinite(parts[2]) ? parts[2]! + 1 : 1;
+  return `${major}.${minor}.${patch}`;
 }

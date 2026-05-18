@@ -153,6 +153,10 @@ IsString()(SkillSupplyListQueryDto.prototype, "orgId");
 
 IsString()(SkillSupplyInstallDto.prototype, "path");
 MinLength(1)(SkillSupplyInstallDto.prototype, "path");
+IsOptional()(SkillSupplyInstallDto.prototype, "forceConflict");
+IsBoolean()(SkillSupplyInstallDto.prototype, "forceConflict");
+IsOptional()(SkillSupplyInstallDto.prototype, "conflictResolution");
+IsIn(["alt-version", "skip", "upgrade-installed"])(SkillSupplyInstallDto.prototype, "conflictResolution");
 
 IsString()(SkillSupplyUpgradeDto.prototype, "slug");
 MinLength(1)(SkillSupplyUpgradeDto.prototype, "slug");
@@ -162,7 +166,9 @@ IsBoolean()(SkillSupplySyncDto.prototype, "fetchUpstream");
 
 IsString()(SkillSupplyResolveConflictDto.prototype, "slug");
 MinLength(1)(SkillSupplyResolveConflictDto.prototype, "slug");
-IsIn(["local", "upstream", "editor"])(SkillSupplyResolveConflictDto.prototype, "resolution");
+IsIn(["local", "upstream", "editor", "force", "alt-version", "skip", "upgrade-installed"])(SkillSupplyResolveConflictDto.prototype, "resolution");
+IsOptional()(SkillSupplyResolveConflictDto.prototype, "altVersion");
+IsString()(SkillSupplyResolveConflictDto.prototype, "altVersion");
 
 IsString()(SkillSupplyOverrideConflictDto.prototype, "conflictId");
 MinLength(1)(SkillSupplyOverrideConflictDto.prototype, "conflictId");

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		Label,
+		Button,
 		Checkbox,
 		RadioGroup,
 		RadioGroupItem,
@@ -40,6 +41,13 @@
 		AlertDialogDescription,
 		AlertDialogAction,
 		AlertDialogCancel,
+		Dialog,
+		DialogContent,
+		DialogDescription,
+		DialogFooter,
+		DialogHeader,
+		DialogTitle,
+		DialogTrigger,
 		CommandPalette,
 		CommandPaletteInput,
 		CommandPaletteList,
@@ -155,6 +163,10 @@
 	let popoverOpen = $state(false);
 	let alertDialogOpen = $state(false);
 	let alertDialogChoice = $state<"" | "confirmed" | "cancelled">("");
+	let skillConflictOpen = $state(false);
+	let skillConflictChoice = $state("");
+	let skillConflictAltVersion = $state<string | undefined>("v1.latest");
+	let skillConflictForceAcknowledged = $state(false);
 	let paletteOpen = $state(false);
 	let paletteChoice = $state<string | null>(null);
 
@@ -678,6 +690,82 @@
 				</AlertDialog>
 				<span class="text-xs text-muted-foreground" data-design-kit-alert-state>
 					Choice: {alertDialogChoice || "—"}
+				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="skill-conflict-dialog"
+		>
+			<h2 class="text-lg font-semibold">Skill conflict dialog</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<Dialog bind:open={skillConflictOpen}>
+					<DialogTrigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="outline" data-design-kit-skill-conflict-trigger>
+								Resolve conflict
+							</Button>
+						{/snippet}
+					</DialogTrigger>
+					<DialogContent data-design-kit-skill-conflict-content class="sm:max-w-3xl">
+						<DialogHeader>
+							<DialogTitle>Resolve skill conflict</DialogTitle>
+							<DialogDescription>
+								formatter v1 conflicts with formatter-candidate v2 because tool APIs changed.
+							</DialogDescription>
+						</DialogHeader>
+						<div class="grid gap-3 md:grid-cols-2">
+							<div class="rounded-md border border-border p-3">
+								<Badge variant="success" size="sm">Recommended</Badge>
+								<Label for="design-skill-alt-version" class="mt-3">Alternative version</Label>
+								<Select bind:value={skillConflictAltVersion} type="single">
+									<SelectTrigger
+										id="design-skill-alt-version"
+										aria-label="Alternative skill version"
+										data-design-kit-skill-conflict-alt
+									>
+										<SelectValue placeholder="v1.latest" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="v1.latest" label="v1.latest" />
+										<SelectItem value="v2.compat" label="v2.compat" />
+									</SelectContent>
+								</Select>
+							</div>
+							<div class="rounded-md border border-border p-3">
+								<div class="flex items-center gap-2">
+									<Checkbox
+										bind:checked={skillConflictForceAcknowledged}
+										aria-label="Acknowledge force warning"
+										data-design-kit-skill-conflict-force-ack
+									/>
+									<span class="text-sm font-medium">Force if safe</span>
+								</div>
+								<p class="mt-2 text-xs text-muted-foreground">
+									Requires compatibility check and explicit warning acknowledgement.
+								</p>
+							</div>
+						</div>
+						<DialogFooter class="flex-wrap gap-2">
+							<Button
+								data-design-kit-skill-conflict-confirm-alt
+								onclick={() => (skillConflictChoice = `alt:${skillConflictAltVersion}`)}
+							>
+								Use alt version
+							</Button>
+							<Button
+								variant="outline"
+								data-design-kit-skill-conflict-skip
+								onclick={() => (skillConflictChoice = "skip")}
+							>
+								Skip
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<span class="text-xs text-muted-foreground" data-design-kit-skill-conflict-state>
+					Choice: {skillConflictChoice || "—"}
 				</span>
 			</div>
 		</article>

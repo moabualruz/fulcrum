@@ -235,6 +235,15 @@ One sentence naming the next workflow action.
 
 - Modal (see error template above). Type the name. Type-exact match enabled, no `--force` analog visible.
 
+### Skill conflict resolution
+
+- Title: `Resolve skill conflict`.
+- Lead sentence names both sides: `<installed skill> <version> conflicts with <requested skill> <version>`.
+- Reason sentence is specific: incompatible tool/API requirements, missing capability, or version mismatch.
+- Option copy stays consequence-first: `Use alt version`, `Skip`, `Upgrade installed first`, `Force`.
+- `Force` is hidden or disabled unless safety is proven, and always paired with explicit warning acknowledgement.
+- Persisted one-time choices say `Session choice saved`; do not imply future installs inherit it.
+
 ---
 
 ## 5. Mode affordance copy

@@ -198,6 +198,44 @@ describe("fulcrum skills install", () => {
     expect(skill.slug).toBe("bat");
   });
 
+  test("passes one-time conflict resolution flags to install caller", async () => {
+    let received: { path: string; forceConflict?: boolean; conflictResolution?: "alt-version" | "skip" | "upgrade-installed" } | undefined;
+    const { exitCode } = await runSkills([
+      "install",
+      "/tmp/bat/SKILL.md",
+      "--force-conflict",
+      "--resolve-conflict=alt-version",
+      "--json",
+    ], {
+      caller: {
+        install: async (input) => {
+          received = input;
+          return {
+            id: "sk-2",
+            name: "bat",
+            slug: "bat",
+            source: "local",
+            upstreamRepo: null,
+            upstreamRef: null,
+            enabledAgents: ["claude"],
+          };
+        },
+      } as Partial<SkillsCaller> as SkillsCaller,
+    });
+    expect(exitCode).toBe(0);
+    expect(received).toEqual({
+      path: "/tmp/bat/SKILL.md",
+      forceConflict: true,
+      conflictResolution: "alt-version",
+    });
+  });
+
+  test("rejects invalid conflict resolution flag", async () => {
+    const { captured, exitCode } = await runSkills(["install", "/tmp/bat/SKILL.md", "--resolve-conflict=bad"]);
+    expect(exitCode).toBe(1);
+    expect(captured.join("\n")).toContain("--resolve-conflict must be alt-version, skip, or upgrade-installed");
+  });
+
   test("missing path exits 1", async () => {
     const { exitCode } = await runSkills(["install"]);
     expect(exitCode).toBe(1);

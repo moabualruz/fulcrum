@@ -175,6 +175,7 @@ fulcrum hooks disable     <name>
 fulcrum hooks test        <name>
 
 fulcrum skills sync       [--codex-global] [--codex-project <dir>]
+fulcrum skills install    <path> [--force-conflict] [--resolve-conflict=alt-version|skip|upgrade-installed]
 fulcrum skills lint       <path>
 fulcrum skills list       [--installed]
 fulcrum skills upstream   [--update-pins]

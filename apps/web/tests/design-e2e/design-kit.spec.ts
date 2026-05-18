@@ -266,6 +266,20 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(section.locator("[data-design-kit-alert-state]")).toContainText("confirmed");
 	});
 
+	test("skill conflict dialog exposes recommendation, alt version, warning ack, and skip choices", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='skill-conflict-dialog']");
+		await section.locator("[data-design-kit-skill-conflict-trigger]").click();
+		const content = page.locator("[data-design-kit-skill-conflict-content]");
+		await expect(content).toBeVisible();
+		await expect(content).toContainText("formatter v1");
+		await expect(content).toContainText("Recommended");
+		await expect(content.locator("[data-design-kit-skill-conflict-alt]")).toBeVisible();
+		await content.locator("[data-design-kit-skill-conflict-force-ack]").click();
+		await content.locator("[data-design-kit-skill-conflict-confirm-alt]").click();
+		await expect(section.locator("[data-design-kit-skill-conflict-state]")).toContainText("alt:v1.latest");
+	});
+
 	test("command palette opens and exposes searchable items", async ({ page }) => {
 		await openDesignKit(page);
 		const section = page.locator("[data-design-kit-section='command-palette']");

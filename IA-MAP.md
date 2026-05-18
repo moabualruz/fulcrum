@@ -478,7 +478,8 @@ fulcrum mcp      <list|register|unregister|enable|disable|test|reload>
 fulcrum plugin   <list|install|enable|disable|update|remove>
                  [--agent <id>] [--all-agents]
 fulcrum hooks    <list|enable|disable|test>
-fulcrum skills   <list|sync|lint|upstream>
+fulcrum skills   <list|install|sync|lint|upstream>
+                 install <path> [--force-conflict] [--resolve-conflict=alt-version|skip|upgrade-installed]
 fulcrum install  [--profile minimal|rules-only|full] [--dry-run]
 fulcrum compress [--check]
 fulcrum config   <get|set|edit|path>
