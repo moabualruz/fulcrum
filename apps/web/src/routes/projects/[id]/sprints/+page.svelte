@@ -14,18 +14,10 @@
       };
     };
   }
-  const { data }: Props = $props();
+  let { data }: Props = $props();
 
   let resolvedSprints = $state<SprintListing[]>([]);
   let resolvedVelocity = $state<VelocityPoint[]>([]);
-
-  {
-    const d = data.streamed.data;
-    if (!(d instanceof Promise)) {
-      resolvedSprints = d.sprints;
-      resolvedVelocity = d.velocity;
-    }
-  }
 
   $effect(() => {
     const d = data.streamed.data;
@@ -44,7 +36,7 @@
     }
   });
 
-  const planned = $derived(resolvedSprints.filter((s) => s.status === "planned"));
+  const planned = $derived(resolvedSprints.filter((s) => s.status === "planned" || s.status === "planning"));
   const active = $derived(resolvedSprints.filter((s) => s.status === "active"));
   const completed = $derived(resolvedSprints.filter((s) => s.status === "completed"));
 
@@ -60,8 +52,9 @@
   let narrativeSprintId = $state<string | null>(null);
 </script>
 
-<header data-sprints-header class={cn("flex items-center justify-between border-b border-border pb-3 mb-4")}>
-  <div class={cn("flex items-baseline gap-3")}>
+<main data-project-sprints class={cn("mx-auto flex min-w-0 max-w-6xl flex-col gap-4 overflow-x-hidden px-4 py-6")}>
+<header data-sprints-header class={cn("flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between")}>
+  <div class={cn("flex min-w-0 flex-wrap items-baseline gap-3")}>
     <a href="/projects/{data.projectId}" class={cn("text-sm text-muted-foreground hover:underline")}>← Project</a>
     <h1 class={cn("text-2xl font-semibold tracking-tight")}>Sprints</h1>
   </div>
@@ -74,7 +67,7 @@
 </header>
 
 {#if showCreate}
-  <form method="POST" action="?/createSprint" data-create-sprint-form class={cn("mb-6 rounded-lg border border-border p-4 max-w-lg")}>
+  <form method="POST" action="?/createSprint" data-create-sprint-form class={cn("mb-6 max-w-lg rounded-lg border border-border p-4")}>
     <div class={cn("mb-3")}>
       <label for="sprint-name" class={cn("block text-sm font-medium mb-1")}>Name</label>
       <input id="sprint-name" name="name" type="text" required maxlength="120"
@@ -126,8 +119,8 @@
       <h2 class={cn("text-lg font-semibold mb-2")}>Active</h2>
       {#each active as sprint (sprint.id)}
         <div data-sprint-card data-sprint-status="active" class={cn("rounded-lg border border-primary/30 bg-primary/5 p-4 mb-2")}>
-          <div class={cn("flex items-center justify-between")}>
-            <a href="/projects/{data.projectId}/sprint/{sprint.id}" class={cn("text-base font-medium hover:underline")}>{sprint.name}</a>
+          <div class={cn("flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between")}>
+            <a href="/projects/{data.projectId}/sprint/{sprint.id}" class={cn("min-w-0 text-base font-medium hover:underline")}>{sprint.name}</a>
             <form
               method="POST"
               action="?/completeSprint"
@@ -156,7 +149,7 @@
             </form>
           </div>
           {#if sprint.goal}<p class={cn("text-sm text-muted-foreground mt-1")}>{sprint.goal}</p>{/if}
-          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count} tasks · {sprint.total_estimate} pts</p>
+          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count ?? 0} tasks · {sprint.total_estimate ?? 0} pts</p>
         </div>
       {/each}
     </section>
@@ -187,15 +180,15 @@
       <h2 class={cn("text-lg font-semibold mb-2")}>Planned</h2>
       {#each planned as sprint (sprint.id)}
         <div data-sprint-card data-sprint-status="planned" class={cn("rounded-lg border border-border p-4 mb-2")}>
-          <div class={cn("flex items-center justify-between")}>
-            <span class={cn("text-base font-medium")}>{sprint.name}</span>
+          <div class={cn("flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between")}>
+            <span class={cn("min-w-0 text-base font-medium")}>{sprint.name}</span>
             <form method="POST" action="?/startSprint" class={cn("inline")}>
               <input type="hidden" name="id" value={sprint.id} />
               <button type="submit" data-start-sprint-btn class={cn("text-xs text-primary hover:underline")}>Start Sprint</button>
             </form>
           </div>
           {#if sprint.goal}<p class={cn("text-sm text-muted-foreground mt-1")}>{sprint.goal}</p>{/if}
-          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count} tasks · {sprint.total_estimate} / {sprint.capacity} pts</p>
+          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count ?? 0} tasks · {sprint.total_estimate ?? 0} / {sprint.capacity_points ?? sprint.capacity ?? 0} pts</p>
         </div>
       {/each}
     </section>
@@ -208,7 +201,7 @@
       {#each completed as sprint (sprint.id)}
         <div data-sprint-card data-sprint-status="completed" class={cn("rounded-lg border border-border/50 bg-muted/20 p-4 mb-2")}>
           <span class={cn("text-base font-medium text-muted-foreground")}>{sprint.name}</span>
-          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count} tasks · {sprint.total_estimate} pts</p>
+          <p class={cn("text-xs text-muted-foreground mt-1")}>{sprint.task_count ?? 0} tasks · {sprint.total_estimate ?? 0} pts</p>
         </div>
       {/each}
     </section>
@@ -218,3 +211,4 @@
     <p class={cn("py-8 text-center text-muted-foreground")}>No sprints yet. Click "New Sprint" to create one.</p>
   {/if}
 {/await}
+</main>

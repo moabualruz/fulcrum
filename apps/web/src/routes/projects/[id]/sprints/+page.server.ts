@@ -1,4 +1,4 @@
-import { fail } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import {
@@ -16,9 +16,11 @@ import { actionOk, actionFail } from "$lib/feedback/action-result";
 import { generateNarration } from "$lib/server/reports";
 import { isFeatureEnabled } from "$lib/server/feature-flags";
 import { requestProjectScope } from "../../project-request-scope";
+import { loadProjectOverview } from "@work-management/interface/project-lifecycle.ts";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const projectId = params.id;
+  await ensureProject(locals, projectId);
   return {
     projectId,
     streamed: {
@@ -106,3 +108,9 @@ export const actions: Actions = {
     }
   },
 };
+
+async function ensureProject(locals: App.Locals, id: string): Promise<void> {
+  const { em, ctx } = await requestProjectScope(locals, id);
+  const project = await loadProjectOverview(em, ctx, id);
+  if (!project) throw error(404, "Project not found");
+}

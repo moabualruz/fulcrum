@@ -61,6 +61,10 @@ mock.module("@work-management/interface/project-sprints.ts", () => ({
   },
 }));
 
+mock.module("@work-management/interface/project-lifecycle.ts", () => ({
+  loadProjectOverview: async (_em: unknown, _ctx: unknown, projectId: string) => ({ id: projectId, name: "Project" }),
+}));
+
 beforeEach(() => {
   calls.splice(0, calls.length);
   delete process.env["FULCRUM_FEATURES"];

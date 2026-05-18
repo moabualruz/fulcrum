@@ -64,7 +64,7 @@ export async function createProjectSprint(
   const end = new Date(now.getTime() + 14 * 86400000);
   await ormSqlConnection(em).execute(
     `INSERT INTO sprints (id, org_id, project_id, name, goal, status, capacity_points, start_date, end_date, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, 'planning', $6, $7, $8, now(), now())`,
+     VALUES ($1, $2, $3, $4, $5, 'planned', $6, $7, $8, now(), now())`,
     [id, ctx.orgId, ctx.projectId ?? null, input.name, input.goal ?? null, input.capacity ?? null, now.toISOString(), end.toISOString()],
   );
   return { id };
