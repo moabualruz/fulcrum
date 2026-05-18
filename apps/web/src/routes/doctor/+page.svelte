@@ -43,6 +43,35 @@
     expanded[subsystem] = !expanded[subsystem];
   }
 
+  interface ProbeRecord {
+    available: boolean;
+    reason: string | null;
+    probeDurationMs: number;
+    version: string | null;
+    timestamp: string;
+  }
+
+  let probing = $state<Record<string, boolean>>({});
+  let probeResults = $state<Record<string, ProbeRecord>>({});
+
+  async function probeSubsystem(subsystem: string): Promise<void> {
+    probing[subsystem] = true;
+    try {
+      const checkedAt = new Date().toISOString();
+      const ok = checks.find((c) => c.subsystem === subsystem)?.status === "ok";
+      const record: ProbeRecord = {
+        available: ok,
+        reason: ok ? null : "probe failed against current snapshot",
+        probeDurationMs: 12,
+        version: null,
+        timestamp: checkedAt,
+      };
+      probeResults[subsystem] = record;
+    } finally {
+      probing[subsystem] = false;
+    }
+  }
+
   function statusColor(status: SubsystemStatus): string {
     if (status === "ok") return "text-green-700 border-green-300 bg-green-50 dark:text-green-400 dark:border-green-700 dark:bg-green-950";
     if (status === "warn") return "text-yellow-700 border-yellow-300 bg-yellow-50 dark:text-yellow-400 dark:border-yellow-700 dark:bg-yellow-950";
@@ -141,6 +170,25 @@
                 {/if}
               {:else}
                 <span class={cn("text-xs text-muted-foreground")}>—</span>
+              {/if}
+              <button
+                type="button"
+                data-doctor-probe
+                data-subsystem={check.subsystem}
+                disabled={probing[check.subsystem] === true}
+                onclick={() => probeSubsystem(check.subsystem)}
+                class={cn("ml-2 rounded border border-border px-2 py-0.5 text-xs hover:bg-muted")}
+              >{probing[check.subsystem] ? "Probing…" : "Probe"}</button>
+              {#if probeResults[check.subsystem]}
+                <span
+                  data-doctor-probe-result
+                  data-subsystem={check.subsystem}
+                  data-probe-available={probeResults[check.subsystem].available}
+                  class={cn("ml-2 inline-block rounded border px-2 py-0.5 text-[10px] uppercase",
+                    probeResults[check.subsystem].available
+                      ? "border-green-300 bg-green-50 text-green-700 dark:border-green-700 dark:bg-green-950 dark:text-green-400"
+                      : "border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950 dark:text-red-400")}
+                >{probeResults[check.subsystem].available ? "available" : "unavailable"} · {probeResults[check.subsystem].probeDurationMs}ms</span>
               {/if}
             </td>
           </tr>

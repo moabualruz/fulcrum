@@ -8,8 +8,17 @@ type DoctorCaller = {
   doctor: {
     run(input?: Record<string, never>): Promise<unknown>;
     subsystems(input?: Record<string, never>): Promise<unknown>;
+    probe?(input: { name: string }): Promise<unknown>;
   };
 };
+
+interface ProbeResultShape {
+  available: boolean;
+  reason: string | null;
+  probeDurationMs: number;
+  version: string | null;
+  status: SubsystemStatusRow;
+}
 
 export interface DoctorRunOptions {
   caller?: DoctorCaller;
@@ -25,6 +34,7 @@ const HELP = `fulcrum doctor
 Usage:
   fulcrum doctor [--json]
   fulcrum doctor subsystems [--json]
+  fulcrum doctor probe <subsystem> [--json]
 `;
 
 export async function run(argv: readonly string[], opts: DoctorRunOptions = {}): Promise<void> {
@@ -51,6 +61,29 @@ export async function run(argv: readonly string[], opts: DoctorRunOptions = {}):
           return;
         }
         printSubsystemsTable(result, io.print);
+        return;
+      }
+      case "probe": {
+        const name = commandArgs.find((arg) => !arg.startsWith("--"));
+        if (!name) {
+          io.printErr("fulcrum doctor probe: missing required argument <subsystem>");
+          io.exit(2);
+          return;
+        }
+        const caller = await resolveCaller(opts);
+        if (!caller.doctor.probe) {
+          io.printErr("fulcrum doctor probe: probe operation is not available on this caller");
+          io.exit(1);
+          return;
+        }
+        const result = await caller.doctor.probe({ name }) as ProbeResultShape;
+        if (commandArgs.includes("--json")) {
+          io.print(JSON.stringify(result));
+          return;
+        }
+        const icon = result.available ? "✓" : "✗";
+        io.print(`${icon} ${name} available=${result.available} version=${result.version ?? "n/a"} duration=${result.probeDurationMs}ms`);
+        if (result.reason) io.print(`  reason: ${result.reason}`);
         return;
       }
       case "help":

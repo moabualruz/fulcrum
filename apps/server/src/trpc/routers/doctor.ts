@@ -40,7 +40,48 @@ export const doctorRouter = t.router({
     .input(EmptyInputSchema)
     .output(z.array(SubsystemStatusSchema))
     .query(() => collectSubsystemStatuses()),
+
+  probe: permissionedProcedure({ resource: "doctor", action: "probe" })
+    .input(z.object({ name: z.string().min(1) }))
+    .output(z.object({
+      available: z.boolean(),
+      reason: z.string().nullable(),
+      probeDurationMs: z.number(),
+      version: z.string().nullable(),
+      status: SubsystemStatusSchema,
+    }))
+    .query(({ input }) => probeSubsystem(input.name)),
 });
+
+export function probeSubsystem(name: string): {
+  available: boolean;
+  reason: string | null;
+  probeDurationMs: number;
+  version: string | null;
+  status: DoctorSubsystemStatus;
+} {
+  const started = Date.now();
+  const statuses = collectSubsystemStatuses();
+  const match = statuses.find((row) => row.name === name);
+  const probeDurationMs = Date.now() - started;
+  if (!match) {
+    const fallback: DoctorSubsystemStatus = {
+      name,
+      status: "broken",
+      message: `Unknown subsystem: ${name}`,
+      recoveryAction: null,
+      checkedAt: new Date().toISOString(),
+    };
+    return { available: false, reason: fallback.message, probeDurationMs, version: null, status: fallback };
+  }
+  return {
+    available: match.status !== "broken",
+    reason: match.status === "healthy" ? null : match.message,
+    probeDurationMs,
+    version: name === "node-runtime" ? process.versions.node : null,
+    status: match,
+  };
+}
 
 export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsystemStatus[] {
   const checkedAt = now.toISOString();
