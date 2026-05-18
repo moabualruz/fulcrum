@@ -20,18 +20,22 @@ export interface SerializedOutboxEvent extends Required<Omit<OutboxEventInput, "
   subjectId: string | null;
   payload: Record<string, unknown>;
   eventKey: string;
+  schemaVersion: 1;
+  eventType: string;
+}
+
+export interface OutboxConsumer {
+  handleEvent(event: SerializedOutboxEvent): Promise<void>;
 }
 
 export interface OutboxDispatcher {
   eventBus: {
     publish(topic: string, payload: unknown): void;
   };
-  search?: {
-    handleEvent(event: SerializedOutboxEvent): Promise<void>;
-  };
-  notifications?: {
-    handleEvent(event: SerializedOutboxEvent): Promise<void>;
-  };
+  search?: OutboxConsumer;
+  notifications?: OutboxConsumer;
+  audit?: OutboxConsumer;
+  workflow?: OutboxConsumer;
 }
 
 export interface OutboxWorkerOptions {
@@ -51,6 +55,19 @@ export interface OutboxWorker {
   stop(): Promise<void>;
 }
 
+export const OUTBOX_PGLITE_FALLBACK_BEHAVIOR =
+  "PGlite dispatch uses polling after commit; LISTEN/NOTIFY fast path is unavailable, so delivery is at pollingIntervalMs latency.";
+
+export const OUTBOX_CONSUMER_MAP = [
+  { key: "eventBus", domain: "subscription", effect: "publish topic-scoped live update" },
+  { key: "search", domain: "search", effect: "index mutated entity" },
+  { key: "notifications", domain: "notification", effect: "fan out user-visible notification" },
+  { key: "audit", domain: "audit", effect: "record audit-safe event reference" },
+  { key: "workflow", domain: "workflow", effect: "advance workflow orchestration consumers" },
+] as const;
+
+const DEFAULT_MAX_DISPATCH_ATTEMPTS = 3;
+
 export function serializeOutboxEvent(input: OutboxEventInput): SerializedOutboxEvent {
   const subjectId = input.subjectId ?? null;
   return {
@@ -61,6 +78,8 @@ export function serializeOutboxEvent(input: OutboxEventInput): SerializedOutboxE
     subjectId,
     payload: input.payload ?? {},
     eventKey: crypto.randomUUID(),
+    schemaVersion: 1,
+    eventType: input.verb,
   };
 }
 
@@ -106,12 +125,16 @@ export async function writeOutboxEvent(
 export async function dispatchPendingOutboxEvents(
   em: EntityManager,
   dispatcher: OutboxDispatcher,
-): Promise<{ dispatched: number }> {
+  options: { maxAttempts?: number } = {},
+): Promise<{ dispatched: number; retried: number; deadLettered: number }> {
   const rows = await em.find(DomainEventOutbox, {
     where: { processedAt: IsNull() } as never,
     order: { createdAt: "ASC" },
   });
   let dispatched = 0;
+  let retried = 0;
+  let deadLettered = 0;
+  const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_DISPATCH_ATTEMPTS;
 
   for (const row of rows) {
     const event: SerializedOutboxEvent = {
@@ -122,17 +145,50 @@ export async function dispatchPendingOutboxEvents(
       subjectId: row.subjectId ?? null,
       payload: row.payload,
       eventKey: row.eventKey,
+      schemaVersion: 1,
+      eventType: row.verb,
     };
-    dispatcher.eventBus.publish(topicForOutboxEvent(event), event);
-    await dispatcher.search?.handleEvent(event);
-    await dispatcher.notifications?.handleEvent(event);
-    row.processedAt = new Date();
-    row.attempts += 1;
-    await em.save(row);
-    dispatched += 1;
+    try {
+      await dispatcher.search?.handleEvent(event);
+      await dispatcher.notifications?.handleEvent(event);
+      await dispatcher.audit?.handleEvent(event);
+      await dispatcher.workflow?.handleEvent(event);
+      dispatcher.eventBus.publish(topicForOutboxEvent(event), event);
+      row.processedAt = new Date();
+      row.attempts += 1;
+      await em.save(row);
+      dispatched += 1;
+    } catch (error) {
+      row.attempts += 1;
+      row.payload = withOutboxFailure(row.payload, error, row.attempts, row.attempts >= maxAttempts);
+      if (row.attempts >= maxAttempts) {
+        row.processedAt = new Date();
+        deadLettered += 1;
+      } else {
+        retried += 1;
+      }
+      await em.save(row);
+    }
   }
 
-  return { dispatched };
+  return { dispatched, retried, deadLettered };
+}
+
+function withOutboxFailure(
+  payload: Record<string, unknown>,
+  error: unknown,
+  attempts: number,
+  deadLettered: boolean,
+): Record<string, unknown> {
+  return {
+    ...payload,
+    _outbox: {
+      attempts,
+      deadLettered,
+      lastError: error instanceof Error ? error.message : String(error),
+      failedAt: new Date().toISOString(),
+    },
+  };
 }
 
 export function createOutboxWorker(options: OutboxWorkerOptions): OutboxWorker {
