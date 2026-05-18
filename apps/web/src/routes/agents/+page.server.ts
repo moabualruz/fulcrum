@@ -110,6 +110,33 @@ export const actions: Actions = {
     return actionOk("AI Assist reconnected");
   },
 
+  abortSession: async ({ locals }) => {
+    const { em } = await requestServiceScope(locals);
+    const { abortActiveSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await abortActiveSession(em);
+    return actionOk("AI Assist session aborted");
+  },
+
+  pauseSession: async ({ locals }) => {
+    const { em } = await requestServiceScope(locals);
+    const { pauseActiveSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await pauseActiveSession(em);
+    return actionOk("AI Assist paused");
+  },
+
+  resumeSession: async ({ locals }) => {
+    const { em } = await requestServiceScope(locals);
+    const { resumeActiveSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await resumeActiveSession(em);
+    return actionOk("AI Assist resumed");
+  },
+
   connectBridge: async ({ request, locals }) => {
     const form = await request.formData();
     const agentName = form.get("agentName") as string;

@@ -25,7 +25,9 @@
   let autoscrollLocked = $state(false);
   let copiedMessageId = $state<string | null>(null);
   let errorDismissed = $state(false);
+  let abortConfirmOpen = $state(false);
   const messageCount = $derived(model.messages.length);
+  const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
 
   $effect(() => {
     messageCount;
@@ -162,6 +164,14 @@
     }
     return "option-allow-once border-emerald-500/60 bg-emerald-600 text-white hover:bg-emerald-700";
   }
+
+  function requestAbort(): void {
+    if (hasMutatingToolCalls) {
+      abortConfirmOpen = true;
+      return;
+    }
+    document.querySelector<HTMLFormElement>("[data-abort-session-form]")?.requestSubmit();
+  }
 </script>
 
 <section
@@ -279,7 +289,53 @@
     <button type="button" disabled={!model.controls.canDisconnect} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
       Disconnect
     </button>
+    <button type="button" disabled={!model.controls.canAbort} onclick={requestAbort} class={cn(buttonVariants({ variant: "destructive", size: "sm" }), "abort-btn")}>
+      Abort
+    </button>
+    {#if model.controls.canPauseSession}
+      <form method="POST" action="?/pauseSession">
+        <button type="submit" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "pause-btn border-amber-500/60 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300")}>
+          Pause
+        </button>
+      </form>
+    {/if}
+    {#if model.controls.canResumeSession}
+      <form method="POST" action="?/resumeSession">
+        <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }), "resume-btn")}>
+          Resume
+        </button>
+      </form>
+    {/if}
   </div>
+
+  <form method="POST" action="?/abortSession" data-abort-session-form class={cn("hidden")}></form>
+
+  {#if model.connection.paused}
+    <div data-session-paused class={cn("mt-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm")}>
+      AI Assist is paused. Resume when you want the agent to continue.
+    </div>
+  {/if}
+
+  {#if abortConfirmOpen}
+    <div data-abort-confirmation class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4")}>
+      <div role="dialog" aria-modal="true" aria-labelledby="abort-title" class={cn("w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl")}>
+        <h3 id="abort-title" class={cn("text-base font-semibold")}>Abort active work?</h3>
+        <p class={cn("mt-2 text-sm text-muted-foreground")}>
+          AI Assist has active tool calls. Aborting stops the session and may leave partial file changes for review.
+        </p>
+        <div class={cn("mt-4 flex justify-end gap-2")}>
+          <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
+            Keep running
+          </button>
+          <form method="POST" action="?/abortSession">
+            <button type="submit" data-abort-confirm class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>
+              Abort session
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <div class={cn("mt-4 grid gap-4 md:grid-cols-3")}>
     <div data-session-selectors class={cn("space-y-3")}>

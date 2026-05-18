@@ -34,6 +34,7 @@ export interface SessionWorkbenchModel {
       exhausted: boolean;
       agentName: string | null;
     };
+    paused: boolean;
   };
   session: SessionWorkbenchSession | null;
   controls: {
@@ -45,6 +46,9 @@ export interface SessionWorkbenchModel {
     canChangeModel: boolean;
     canResume: boolean;
     canReconnect: boolean;
+    canAbort: boolean;
+    canPauseSession: boolean;
+    canResumeSession: boolean;
   };
   modes: SessionWorkbenchMode[];
   models: SessionWorkbenchModelOption[];
@@ -136,6 +140,7 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
         exhausted: state.reconnectAttempts >= state.reconnectMaxAttempts,
         agentName: session?.agentName ?? null,
       },
+      paused: state.isPaused,
     },
     session,
     controls: {
@@ -147,6 +152,9 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
       canChangeModel: state.isConnected && session !== null && state.availableModels.length > 0,
       canResume: state.resumableSessions.length > 0,
       canReconnect: !state.isConnected && session !== null && session.supportsResume,
+      canAbort: session !== null && (state.isConnected || state.isLoading || state.isPaused),
+      canPauseSession: state.isConnected && session !== null && !state.isPaused,
+      canResumeSession: session !== null && state.isPaused,
     },
     modes: state.availableModes.map((mode) => ({ ...mode, selected: mode.id === state.currentModeId })),
     models: state.availableModels.map((model) => ({ ...model, selected: model.modelId === state.currentModelId })),

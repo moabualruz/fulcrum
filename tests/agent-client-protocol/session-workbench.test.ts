@@ -86,6 +86,7 @@ describe("agent session workbench model", () => {
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
       reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: "codex" },
+      paused: false,
     });
     expect(model.session).toEqual({
       id: "row-1",
@@ -105,6 +106,9 @@ describe("agent session workbench model", () => {
       canChangeModel: true,
       canResume: true,
       canReconnect: false,
+      canAbort: true,
+      canPauseSession: true,
+      canResumeSession: false,
     });
     expect(model.modes.map((mode) => [mode.id, mode.selected])).toEqual([
       ["planning", true],
@@ -150,6 +154,9 @@ describe("agent session workbench model", () => {
       canChangeModel: false,
       canResume: false,
       canReconnect: false,
+      canAbort: false,
+      canPauseSession: false,
+      canResumeSession: false,
     });
   });
 
@@ -172,6 +179,28 @@ describe("agent session workbench model", () => {
     expect(model.connection.status).toBe("error");
     expect(model.connection.reconnect).toEqual({ attempts: 3, maxAttempts: 3, exhausted: true, agentName: "codex" });
     expect(model.controls.canReconnect).toBe(true);
+  });
+
+  test("reports paused sessions with resume control", () => {
+    const state = createAcpSessionState();
+    state.currentSession = {
+      id: "row-1",
+      agentName: "codex",
+      sessionId: "agent-session-1",
+      title: "Plan work",
+      lastUpdated: 20,
+      cwd: "/repo",
+      supportsLoadSession: true,
+    };
+    state.isConnected = true;
+    state.isPaused = true;
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.connection.paused).toBe(true);
+    expect(model.controls.canAbort).toBe(true);
+    expect(model.controls.canPauseSession).toBe(false);
+    expect(model.controls.canResumeSession).toBe(true);
   });
 
   test("builds an idle model for surfaces before a live runtime connects", () => {

@@ -23,6 +23,7 @@ export interface AcpSessionState {
   isLoading: boolean;
   isConnecting: boolean;
   isReconnecting: boolean;
+  isPaused: boolean;
   reconnectAttempts: number;
   reconnectMaxAttempts: number;
   error: string | null;
@@ -54,6 +55,7 @@ class MutableAcpSessionState implements AcpSessionState {
   isLoading = false;
   isConnecting = false;
   isReconnecting = false;
+  isPaused = false;
   reconnectAttempts = 0;
   reconnectMaxAttempts = 3;
   error: string | null = null;
@@ -101,6 +103,7 @@ class MutableAcpSessionState implements AcpSessionState {
   disconnectState(): void {
     this.currentSession = null;
     this.isConnected = false;
+    this.isPaused = false;
     this.messages = [];
     this.toolCalls.clear();
     this.availableModes = [];

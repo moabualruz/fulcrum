@@ -355,6 +355,31 @@ describe("ACP ported session manager", () => {
     expect(state.error).toBe("Connection lost: network down. AI Assist will try to reconnect when the app is active.");
   });
 
+  test("pauses, resumes, and aborts active sessions", async () => {
+    const state = createAcpSessionState({ createId: () => "session-row-1" });
+    const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });
+    const manager = new AcpSessionManager({
+      state,
+      config: createAcpConfigState({ config }),
+      createBridge: async () => bridge,
+    });
+    await manager.createSession("codex", "/repo");
+
+    manager.pauseSession();
+    expect(state.isPaused).toBe(true);
+    const currentSession = state.currentSession;
+    if (!currentSession) throw new Error("Expected active session.");
+    await expect(manager.resumePausedSession()).resolves.toBe(currentSession);
+    expect(state.isPaused).toBe(false);
+
+    await manager.abortSession();
+
+    expect(bridge.cancelCalls).toEqual([{ sessionId: "agent-session-1" }]);
+    expect(bridge.disconnectCalls).toBe(1);
+    expect(state.currentSession).toBeNull();
+    expect(state.isConnected).toBe(false);
+  });
+
   test("disconnect tears down bridge and session state", async () => {
     const state = createAcpSessionState({ createId: () => "session-row-1" });
     const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });

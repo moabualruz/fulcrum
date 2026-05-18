@@ -275,6 +275,30 @@ export class AcpSessionManager {
     await client.cancel({ sessionId: session.sessionId });
   }
 
+  async abortSession(): Promise<void> {
+    const client = this.acpClient;
+    const session = this.state.currentSession;
+    if (client && session) {
+      await client.cancel({ sessionId: session.sessionId });
+      await client.disconnect();
+    }
+    this.acpClient = null;
+    this.state.disconnectState();
+  }
+
+  pauseSession(): void {
+    if (!this.state.currentSession) throw new Error("No active session to pause");
+    this.state.isPaused = true;
+    this.state.isLoading = false;
+  }
+
+  async resumePausedSession(): Promise<SavedSession> {
+    if (!this.state.currentSession) throw new Error("No paused session to resume");
+    this.state.isPaused = false;
+    if (!this.state.isConnected) return this.reconnectActiveSession();
+    return this.state.currentSession;
+  }
+
   resolvePermission(optionId: string): void {
     this.acpClient?.resolvePermission(optionId);
   }
@@ -319,6 +343,7 @@ export class AcpSessionManager {
       this.acpClient = null;
       this.state.isConnected = false;
       this.state.isLoading = false;
+      this.state.isPaused = false;
       this.state.pendingPermission = null;
       this.state.error = `Connection lost: ${reason ?? "transport closed"}. AI Assist will try to reconnect when the app is active.`;
     };
@@ -420,6 +445,24 @@ export async function reconnectActiveSession(_em: unknown): Promise<void> {
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active AI Assist session manager");
   await manager.reconnectActiveSession();
+}
+
+export async function abortActiveSession(_em: unknown): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.abortSession();
+}
+
+export async function pauseActiveSession(_em: unknown): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  manager.pauseSession();
+}
+
+export async function resumeActiveSession(_em: unknown): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.resumePausedSession();
 }
 
 export async function updateTrafficControl(

@@ -67,6 +67,8 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-message-toolcalls");
     expect(body).toContain("Build the <strong>plan</strong>");
     expect(body).toContain("session/update");
+    expect(body).toContain("abort-btn");
+    expect(body).toContain("pause-btn");
     expect(body).not.toContain("data-session-empty");
     expect(body).not.toContain("data-reconnect-banner");
   });
@@ -100,6 +102,20 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("dismiss-error-btn");
     expect(body).toContain("Check the agent process");
   });
+
+  test("renders paused session resume state and abort confirmation affordance", () => {
+    const model = activeModel();
+    model.connection.paused = true;
+    model.controls.canPauseSession = false;
+    model.controls.canResumeSession = true;
+    const { body } = render(AgentSessionWorkbench, { props: { model } });
+
+    expect(body).toContain("data-session-paused");
+    expect(body).toContain("AI Assist is paused.");
+    expect(body).toContain("resume-btn");
+    expect(body).toContain("abort-btn");
+    expect(body).toContain("data-abort-session-form");
+  });
 });
 
 function activeModel(): SessionWorkbenchModel {
@@ -110,6 +126,7 @@ function activeModel(): SessionWorkbenchModel {
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
       reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: "codex" },
+      paused: false,
     },
     session: {
       id: "row-1",
@@ -129,6 +146,9 @@ function activeModel(): SessionWorkbenchModel {
       canChangeModel: true,
       canResume: true,
       canReconnect: false,
+      canAbort: true,
+      canPauseSession: true,
+      canResumeSession: false,
     },
     modes: [
       { id: "planning", name: "Planning", selected: true },
@@ -254,6 +274,7 @@ function idleModel(): SessionWorkbenchModel {
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
       reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: null },
+      paused: false,
     },
     session: null,
     controls: {
@@ -265,6 +286,9 @@ function idleModel(): SessionWorkbenchModel {
       canChangeModel: false,
       canResume: false,
       canReconnect: false,
+      canAbort: false,
+      canPauseSession: false,
+      canResumeSession: false,
     },
     modes: [],
     models: [],
