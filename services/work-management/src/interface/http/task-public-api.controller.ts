@@ -84,6 +84,7 @@ export interface TaskPublicApplication {
     priority?: number;
     points?: number;
     assigneeId?: string;
+    traceId?: string;
   }): Promise<unknown>;
   getTask(input: {
     orgId: string;
@@ -195,7 +196,7 @@ export class TaskPublicApiService {
     }));
   }
 
-  async createTask(body: TaskCreateBodyDto): Promise<{ id: string }> {
+  async createTask(body: TaskCreateBodyDto): Promise<{ id: string; traceId?: string }> {
     const task = await this.requireApplication().createTask({
       orgId: body.orgId,
       userId: body.userId,
@@ -208,12 +209,13 @@ export class TaskPublicApiService {
       priority: body.priority,
       points: body.points,
       assigneeId: body.assigneeId,
+      traceId: body.traceId,
     });
     const id = extractId(task);
     if (!id) {
       throw new InternalServerErrorException("Task public API create facade returned no task ID.");
     }
-    return { id };
+    return { id, traceId: extractTraceId(task) ?? undefined };
   }
 
   async getTask(params: TaskIdParamsDto, query: TaskRequestContextDto): Promise<unknown> {
@@ -406,7 +408,7 @@ export class TaskPublicApiController {
     return await this.tasks.manualTaskWorkbench(query);
   }
 
-  async createTask(body: TaskCreateBodyDto): Promise<{ id: string }> {
+  async createTask(body: TaskCreateBodyDto): Promise<{ id: string; traceId?: string }> {
     return await this.tasks.createTask(body);
   }
 
@@ -496,6 +498,12 @@ function extractId(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
   const id = (value as Record<string, unknown>)["id"];
   return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+function extractTraceId(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const traceId = (value as Record<string, unknown>)["traceId"];
+  return typeof traceId === "string" && traceId.length > 0 ? traceId : null;
 }
 
 function toJsonDates(value: unknown): unknown {
@@ -600,6 +608,9 @@ IsIn(TASK_STATUSES)(TaskCreateBodyDto.prototype, "status");
 IsOptional()(TaskCreateBodyDto.prototype, "assigneeId");
 IsString()(TaskCreateBodyDto.prototype, "assigneeId");
 MinLength(1)(TaskCreateBodyDto.prototype, "assigneeId");
+IsOptional()(TaskCreateBodyDto.prototype, "traceId");
+IsString()(TaskCreateBodyDto.prototype, "traceId");
+MinLength(1)(TaskCreateBodyDto.prototype, "traceId");
 
 for (const property of ["title", "descriptionText", "assigneeId"] as const) {
   IsOptional()(TaskPatchBodyDto.prototype, property);

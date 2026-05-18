@@ -53,6 +53,7 @@ export class TaskCreateBodyDto {
   priority?: number;
   points?: number;
   assigneeId?: string;
+  traceId?: string;
 }
 
 export class TaskPatchBodyDto {

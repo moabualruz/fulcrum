@@ -142,6 +142,7 @@ export class TaskPublicStore {
     priority?: number;
     points?: number;
     assigneeId?: string;
+    traceId?: string;
   }): Promise<TaskPublicRow | null> {
     const project = await this.resolveProject(input);
     if (!project) return null;
@@ -161,7 +162,7 @@ export class TaskPublicStore {
       assigneeId: input.assigneeId ?? null,
       parentTaskId: null,
       successCriteria: [],
-      traceId: `trace-task-${id}`,
+      traceId: input.traceId ?? `trace-task-${id}`,
       deletedAt: null,
     });
 

@@ -325,8 +325,10 @@ async function assertTaskPublicApiRoundTrip(
       priority: 1,
       points: 8,
       assigneeId: USER_ID,
+      traceId: `trace-created-task-${source}`,
     });
     expect(created.id).toEqual(expect.any(String));
+    expect(created.traceId).toBe(`trace-created-task-${source}`);
 
     await expect(controller.getTask(
       { id: created.id },
@@ -339,6 +341,7 @@ async function assertTaskPublicApiRoundTrip(
       priority: 1,
       points: 8,
       assigneeId: USER_ID,
+      traceId: `trace-created-task-${source}`,
     }));
 
     await expect(controller.patchTask(
