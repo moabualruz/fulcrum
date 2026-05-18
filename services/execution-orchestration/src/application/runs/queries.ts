@@ -235,10 +235,20 @@ export interface RunRow {
   model: string | null;
   status: string;
   project_id: string | null;
+  task_id: string | null;
+  task_title: string | null;
   started_at: string;
   ended_at: string | null;
   sandbox_mode: string | null;
   iteration_count: number | null;
+  last_event_at: string | null;
+  recent_events: Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    created_at: string;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 export interface RunRowsFilter {
@@ -246,6 +256,8 @@ export interface RunRowsFilter {
   agent?: string | null;
   status?: string | null;
   range?: "24h" | "7d" | "30d" | "all";
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 export interface RunsPageData {
@@ -278,11 +290,13 @@ export async function listRunRows(
   const agentExpr = columns.has("agent") ? "ar.agent" : "ar.agent_name";
   const modelExpr = columns.has("model") ? "ar.model" : "ar.agent_version";
   const statusExpr = columns.has("status") ? "ar.status" : "NULL::text";
-  const projectExpr = hasProjectId ? "ar.project_id" : "t.project_id";
+  const hasTaskId = columns.has("task_id");
+  const projectExpr = hasProjectId ? "ar.project_id" : hasTaskId ? "t.project_id" : "NULL::text";
+  const taskExpr = hasTaskId ? "ar.task_id" : "NULL::text";
   const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
   const sandboxExpr = columns.has("sandbox_mode") ? "ar.sandbox_mode" : "NULL::text";
   const iterationExpr = columns.has("iteration_count") ? "ar.iteration_count" : "NULL::int";
-  const joins = hasProjectId ? "" : "LEFT JOIN tasks t ON t.id = ar.task_id";
+  const joins = hasTaskId ? "LEFT JOIN tasks t ON t.id = ar.task_id" : "";
   const params: unknown[] = [];
   const bind = (value: unknown): string => {
     params.push(value);
@@ -308,6 +322,12 @@ export async function listRunRows(
     const hours = filter.range === "24h" ? 24 : filter.range === "7d" ? 24 * 7 : 24 * 30;
     conditions.push(`ar.started_at >= ${bind(new Date(Date.now() - hours * 60 * 60 * 1000))}`);
   }
+  if (filter.dateFrom) {
+    conditions.push(`ar.started_at >= ${bind(`${filter.dateFrom}T00:00:00.000Z`)}`);
+  }
+  if (filter.dateTo) {
+    conditions.push(`ar.started_at <= ${bind(`${filter.dateTo}T23:59:59.999Z`)}`);
+  }
 
   const rows = await ormSqlConnection(em).execute<Array<{
     id: string;
@@ -315,6 +335,8 @@ export async function listRunRows(
     model: string | null;
     status: string | null;
     project_id: string | null;
+    task_id: string | null;
+    task_title: string | null;
     started_at: string | Date;
     ended_at: string | Date | null;
     sandbox_mode: string | null;
@@ -325,6 +347,8 @@ export async function listRunRows(
             ${modelExpr} AS model,
             ${statusExpr} AS status,
             ${projectExpr} AS project_id,
+            ${taskExpr} AS task_id,
+            ${hasTaskId ? "t.title" : "NULL::text"} AS task_title,
             ar.started_at,
             ${endedExpr} AS ended_at,
             ${sandboxExpr} AS sandbox_mode,
@@ -335,17 +359,58 @@ export async function listRunRows(
       ORDER BY ar.started_at DESC, ar.id ASC`,
     params,
   );
-  return rows.map((row) => ({
-    id: row.id,
-    agent: row.agent ?? "",
-    model: row.model ?? null,
-    status: row.status ?? "queued",
-    project_id: row.project_id ?? null,
-    started_at: isoStamp(row.started_at),
-    ended_at: nullableIsoStamp(row.ended_at),
-    sandbox_mode: row.sandbox_mode ?? null,
-    iteration_count: row.iteration_count === null ? null : Number(row.iteration_count),
-  }));
+  const runIds = rows.map((row) => row.id);
+  const events = runIds.length > 0
+    ? await optionalRows<{
+        id: string;
+        subject_id: string;
+        verb: string;
+        actor: string;
+        payload: Record<string, unknown> | null;
+        created_at: string | Date;
+      }>(
+        ormSqlConnection(em),
+        `SELECT id, subject_id, verb, actor, payload, created_at
+           FROM events
+          WHERE org_id = $1
+            AND subject_kind = 'agent_run'
+            AND subject_id IN (${runIds.map((_, index) => `$${index + 2}`).join(", ")})
+          ORDER BY created_at DESC, id DESC`,
+        [ctx.orgId, ...runIds],
+      )
+    : [];
+  const eventsByRun = new Map<string, RunRow["recent_events"]>();
+  for (const event of events) {
+    const bucket = eventsByRun.get(event.subject_id) ?? [];
+    if (bucket.length < 5) {
+      bucket.push({
+        id: event.id,
+        verb: event.verb,
+        actor: event.actor,
+        payload: event.payload ?? {},
+        created_at: isoStamp(event.created_at),
+      });
+    }
+    eventsByRun.set(event.subject_id, bucket);
+  }
+  return rows.map((row) => {
+    const recentEvents = eventsByRun.get(row.id) ?? [];
+    return {
+      id: row.id,
+      agent: row.agent ?? "",
+      model: row.model ?? null,
+      status: row.status ?? "queued",
+      project_id: row.project_id ?? null,
+      task_id: row.task_id ?? null,
+      task_title: row.task_title ?? null,
+      started_at: isoStamp(row.started_at),
+      ended_at: nullableIsoStamp(row.ended_at),
+      sandbox_mode: row.sandbox_mode ?? null,
+      iteration_count: row.iteration_count === null ? null : Number(row.iteration_count),
+      last_event_at: recentEvents[0]?.created_at ?? null,
+      recent_events: recentEvents,
+    };
+  });
 }
 
 export async function listProjectRuns(em: EntityManager, ctx: AppContext): Promise<ProjectRunRow[]> {

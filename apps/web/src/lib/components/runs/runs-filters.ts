@@ -4,9 +4,11 @@ export type RunRange = "24h" | "7d" | "30d" | "all";
 
 export interface RunsFilterState {
   agent?: string;
-  status?: RunStatus;
+  status?: RunStatus | "";
   project?: string;
   range: RunRange;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 export interface RunRow {
@@ -19,6 +21,16 @@ export interface RunRow {
   ended_at: string | null;
   sandbox_mode: string | null;
   iteration_count: number | null;
+  task_id?: string | null;
+  task_title?: string | null;
+  last_event_at?: string | null;
+  recent_events?: Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    created_at: string;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 const RANGE_MS: Record<Exclude<RunRange, "all">, number> = {
@@ -46,9 +58,9 @@ export function applyRunsFilters(
       : now.getTime() - RANGE_MS[filter.range];
 
   return rows.filter((row) => {
-    if (filter.agent !== undefined && row.agent !== filter.agent) return false;
-    if (filter.status !== undefined && row.status !== filter.status) return false;
-    if (filter.project !== undefined) {
+    if (filter.agent !== undefined && filter.agent !== "" && row.agent !== filter.agent) return false;
+    if (filter.status !== undefined && filter.status !== "" && row.status !== filter.status) return false;
+    if (filter.project !== undefined && filter.project !== "__any__") {
       if (filter.project === "") {
         if (row.project_id !== null) return false;
       } else if (row.project_id !== filter.project) {
@@ -58,6 +70,16 @@ export function applyRunsFilters(
     if (cutoff !== null) {
       const startedMs = Date.parse(row.started_at);
       if (Number.isFinite(startedMs) && startedMs < cutoff) return false;
+    }
+    if (filter.dateFrom) {
+      const startedMs = Date.parse(row.started_at);
+      const fromMs = Date.parse(`${filter.dateFrom}T00:00:00.000Z`);
+      if (Number.isFinite(startedMs) && Number.isFinite(fromMs) && startedMs < fromMs) return false;
+    }
+    if (filter.dateTo) {
+      const startedMs = Date.parse(row.started_at);
+      const toMs = Date.parse(`${filter.dateTo}T23:59:59.999Z`);
+      if (Number.isFinite(startedMs) && Number.isFinite(toMs) && startedMs > toMs) return false;
     }
     return true;
   });

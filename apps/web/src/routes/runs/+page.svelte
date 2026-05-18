@@ -2,6 +2,7 @@
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
   import RunsTable from "$lib/components/runs/RunsTable.svelte";
+  import { applyRunsFilters, type RunRow } from "$lib/components/runs/runs-filters";
   import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
   import type { SortColumn, SortDirection } from "$lib/components/runs/runs-table-sort";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
@@ -27,6 +28,12 @@
   let sort = $state<{ column: SortColumn; direction: SortDirection } | undefined>(
     undefined,
   );
+  let selectedAgent = $state(data.filter.agent);
+  let selectedStatus = $state(data.filter.status);
+  let selectedProject = $state(data.filter.project);
+  let selectedRange = $state(data.filter.range);
+  let selectedDateFrom = $state(data.filter.dateFrom ?? "");
+  let selectedDateTo = $state(data.filter.dateTo ?? "");
 
   function onSort(column: SortColumn): void {
     if (sort && sort.column === column) {
@@ -34,6 +41,17 @@
     } else {
       sort = { column, direction: "asc" };
     }
+  }
+
+  function visibleRuns(runs: RunRow[]): RunRow[] {
+    return applyRunsFilters(runs, {
+      agent: selectedAgent,
+      status: selectedStatus,
+      project: selectedProject,
+      range: selectedRange,
+      dateFrom: selectedDateFrom,
+      dateTo: selectedDateTo,
+    });
   }
 </script>
 
@@ -48,6 +66,7 @@
   <RouteSkeleton kind="list" />
 {:then payload}
   {@const runs = payload.runs}
+  {@const filteredRuns = visibleRuns(runs)}
   {@const tasks = payload.tasks ?? []}
   {@const projectOptions = payload.projects ?? []}
   {@const agents = Array.from(new Set(runs.map((r) => r.agent))).sort()}
@@ -100,70 +119,79 @@
     <button type="submit" class={cn(buttonVariants())}>Dispatch</button>
   </form>
 
-  <form
+  <section
     data-runs-filter
-    method="GET"
     class={cn("mb-3 flex flex-wrap items-center gap-2")}
   >
     <select
       data-runs-agent-filter
       name="agent"
       aria-label="Filter by agent"
+      bind:value={selectedAgent}
       class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
     >
-      <option value="" selected={data.filter.agent === ""}>All agents</option>
+      <option value="">All agents</option>
       {#each agents as agent (agent)}
-        <option value={agent} selected={data.filter.agent === agent}>{agent}</option>
+        <option value={agent}>{agent}</option>
       {/each}
     </select>
     <select
       data-runs-status-filter
       name="status"
       aria-label="Filter by status"
+      bind:value={selectedStatus}
       class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
     >
-      <option value="" selected={data.filter.status === ""}>All statuses</option>
+      <option value="">All statuses</option>
       {#each STATUSES as status (status)}
-        <option value={status} selected={data.filter.status === status}>{status}</option>
+        <option value={status}>{status}</option>
       {/each}
     </select>
     <select
       data-runs-project-filter
       name="project"
       aria-label="Filter by project"
+      bind:value={selectedProject}
       class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
     >
-      <option value="__any__" selected={data.filter.project === "__any__"}
-        >All projects</option
-      >
+      <option value="__any__">All projects</option>
       {#each projects as project (project)}
-        <option value={project} selected={data.filter.project === project}
-          >{project === "" ? "(no project)" : project}</option
-        >
+        <option value={project}>{project === "" ? "(no project)" : project}</option>
       {/each}
     </select>
     <select
       data-runs-range-filter
       name="range"
       aria-label="Filter by time range"
+      bind:value={selectedRange}
       class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
     >
       {#each RANGES as range (range)}
-        <option value={range} selected={data.filter.range === range}>{range}</option>
+        <option value={range}>{range}</option>
       {/each}
     </select>
-    <button
-      type="submit"
-      class={cn(buttonVariants({ variant: "outline" }))}
-    >Apply</button>
-  </form>
+    <input
+      data-runs-date-from-filter
+      type="date"
+      aria-label="Filter from date"
+      bind:value={selectedDateFrom}
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
+    <input
+      data-runs-date-to-filter
+      type="date"
+      aria-label="Filter to date"
+      bind:value={selectedDateTo}
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
+  </section>
 
-  {#if runs.length === 0}
+  {#if filteredRuns.length === 0}
     <div
       data-empty-runs
       class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
     >No agent runs match the current filters.</div>
   {:else}
-    <RunsTable rows={runs} {sort} {onSort} />
+    <RunsTable rows={filteredRuns} {sort} {onSort} />
   {/if}
 {/await}

@@ -17,6 +17,7 @@ const VALID_STATUS = new Set<RunStatus>([
 ]);
 
 const VALID_RANGE = new Set<RunRange>(["24h", "7d", "30d", "all"]);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const load: PageServerLoad = ({ url, locals }) => {
   const agent = (url.searchParams.get("agent") ?? "").trim();
@@ -24,6 +25,10 @@ export const load: PageServerLoad = ({ url, locals }) => {
   const rangeRaw = (url.searchParams.get("range") ?? "all").trim();
   const projectParam = url.searchParams.get("project");
   const projectRaw = projectParam === null ? undefined : projectParam.trim();
+  const dateFromRaw = (url.searchParams.get("dateFrom") ?? "").trim();
+  const dateToRaw = (url.searchParams.get("dateTo") ?? "").trim();
+  const dateFrom = DATE_RE.test(dateFromRaw) ? dateFromRaw : "";
+  const dateTo = DATE_RE.test(dateToRaw) ? dateToRaw : "";
 
   const range: RunRange = VALID_RANGE.has(rangeRaw as RunRange)
     ? (rangeRaw as RunRange)
@@ -38,6 +43,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
     status: statusRaw,
     range,
     project: projectRaw ?? "__any__",
+    dateFrom,
+    dateTo,
   };
 
   return {
@@ -54,6 +61,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
           ...(agent ? { agent } : {}),
           ...(status ? { status } : {}),
           ...(projectRaw !== undefined ? { projectId: projectRaw || null } : {}),
+          ...(dateFrom ? { dateFrom } : {}),
+          ...(dateTo ? { dateTo } : {}),
         });
         return { runs: data.runs.map((run) => ({ ...run, status: run.status as RunStatus })), projects: data.projects, tasks: data.tasks };
       })(),
