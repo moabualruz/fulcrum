@@ -300,6 +300,28 @@ export function createDataSourceOptions(
   };
 }
 
+export function resolveApplicationDatabaseRuntime(
+  env: Record<string, string | undefined> = process.env,
+): {
+  backend: "pglite" | "postgres";
+  source: "fulcrum-home" | "database-url";
+  target: string;
+  migrationsTableName: string;
+  migrationCount: number;
+  entityCount: number;
+} {
+  const database = resolveDatabaseConfig({ env });
+  const entities = getCoreEntities();
+  return {
+    backend: database.backend,
+    source: database.backend === "postgres" ? "database-url" : "fulcrum-home",
+    target: database.backend === "postgres" ? database.url : database.dataDir,
+    migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+    migrationCount: applicationMigrations.length,
+    entityCount: entities.length,
+  };
+}
+
 export function getCoreEntities(): (Function | EntitySchema)[] {
   return [
     // platform-core

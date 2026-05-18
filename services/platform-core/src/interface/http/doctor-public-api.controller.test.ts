@@ -39,7 +39,12 @@ describe("doctor public Nest API", () => {
     expect(report.version).toBe("1.0.0");
     expect(Array.isArray(report.checks)).toBe(true);
     expect(report.summary?.total).toBe(report.checks?.length);
+    expect(report.checks).toContainEqual(expect.objectContaining({
+      name: "product-database",
+      subsystem: "database",
+    }));
     expect(subsystems).toContain("cli");
+    expect(subsystems).toContain("database");
     expect([...subsystems].sort()).toEqual(subsystems);
   });
 });

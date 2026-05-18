@@ -52,6 +52,10 @@ _Avoid_: model registry, weights record, download
 An audit row in `fulcrum_schema_migrations` recording an applied migration `version`, `name`, `checksum`, and `direction` (`up|down`).
 _Avoid_: migration record, version row, ledger entry
 
+**DatabaseRuntime**:
+The selected product database execution mode: managed local PGlite under `FULCRUM_HOME` or PostgreSQL from `FULCRUM_DATABASE_URL` / `DATABASE_URL`, while keeping one TypeORM entity and migration set.
+_Avoid_: database mode fork, schema branch, local-only database
+
 **ComponentLedger**:
 The SQLite store at `~/.fulcrum/state/global/components.db` recording component status, surfaces, artifacts, operations, and operation steps.
 _Avoid_: install log, state file, db
@@ -69,6 +73,7 @@ _Avoid_: hook input, hook message, hook event
 - A **Job** belongs to one **Org**, optional `projectId`, one `queue`, and one `kind`.
 - A **DomainEventOutbox** row is dispatched once → produces a downstream effect → marked `processedAt`; an **Event** is appended for audit and never reprocessed.
 - A **SchemaMigration** row exists per applied **TypeORM migration**; the ledger is append-only.
+- A **DatabaseRuntime** selects the connection target only; it does not select a different schema, entity list, or migration list.
 - The **ComponentLedger** records every install of a **Surface** (skill sync, hook registration, mcp entry, sentinel block, …).
 
 ## Example dialogue

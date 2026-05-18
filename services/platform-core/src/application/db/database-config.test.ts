@@ -41,6 +41,19 @@ describe("database configuration resolver", () => {
     });
   });
 
+  test("ignores socket-only TypeORM mode for product DB status and keeps local PGlite default", () => {
+    expect(resolveDatabaseConfig({
+      env: {
+        FULCRUM_HOME: "/tmp/fulcrum-home",
+        FULCRUM_TYPEORM_PGLITE_SOCKET_URL: "postgresql://postgres:postgres@127.0.0.1:6543/postgres",
+      },
+      config: {},
+    })).toEqual({
+      backend: "pglite",
+      dataDir: "/tmp/fulcrum-home/pglite.data",
+    });
+  });
+
   test("rejects every configured non-PostgreSQL URL before local fallback", () => {
     expect(() =>
       resolveDatabaseConfig({

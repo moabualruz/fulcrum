@@ -1,4 +1,5 @@
 import { resolveDatabaseConfig, type DbBackend, type ResolvedDatabaseConfig } from "./database-config.ts";
+import { resolveApplicationDatabaseRuntime } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 export type ProductDbConnectionSummary =
   | {
@@ -13,6 +14,7 @@ export type ProductDbConnectionSummary =
 export interface ProductDbStatus {
   backend: DbBackend;
   connection: ProductDbConnectionSummary;
+  runtime: ReturnType<typeof resolveApplicationDatabaseRuntime>;
   current: string | null;
   pending: string[];
   pastDue: number;
@@ -37,6 +39,7 @@ export function defaultProductDbStatus(): ProductDbStatus {
   return {
     backend: config.backend,
     connection: describeDatabaseConnection(config),
+    runtime: resolveApplicationDatabaseRuntime(),
     current: null,
     pending: [],
     pastDue: 0,
