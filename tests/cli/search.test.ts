@@ -42,6 +42,10 @@ function fakeCaller() {
         calls.push(["savedDelete", input]);
         return { ok: true };
       },
+      addToContext: async (input: unknown) => {
+        calls.push(["addToContext", input]);
+        return { contextId: "ctx-1", sourceRefs: ["doc-1", "doc-2"] };
+      },
     },
     tasks: {
       create: async (input: unknown) => {
@@ -231,6 +235,27 @@ describe("search CLI commands", () => {
     expect(JSON.parse(deleted.lines[0] as string)).toEqual({ ok: true });
   });
 
+  it("adds search results to planning context from CLI", async () => {
+    const caller = fakeCaller();
+    const result = await runSearch([
+      "context",
+      "add",
+      "--ids",
+      "doc-1,doc-2",
+      "--project",
+      "project-1",
+      "--task",
+      "task-1",
+      "--json",
+    ], caller);
+
+    expect(result.exitCode).toBeUndefined();
+    expect(caller.calls).toEqual([
+      ["addToContext", { ids: ["doc-1", "doc-2"], project: "project-1", task: "task-1" }],
+    ]);
+    expect(JSON.parse(result.lines[0] as string)).toEqual({ contextId: "ctx-1", sourceRefs: ["doc-1", "doc-2"] });
+  });
+
   it("dispatches cmdk create-task and rejects unknown commands", async () => {
     const caller = fakeCaller();
     const created = await runCmdk([
@@ -311,6 +336,7 @@ describe("search CLI commands", () => {
     const cmdk = await runCmdk(["--help"]);
 
     expect(search.lines.join("\n")).toContain("fulcrum search <query>");
+    expect(search.lines.join("\n")).toContain("fulcrum search context add");
     expect(search.lines.join("\n")).toContain("fulcrum search saved create");
     expect(cmdk.lines.join("\n")).toContain("fulcrum cmdk <command-name>");
   });

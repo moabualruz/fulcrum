@@ -10,6 +10,11 @@ export interface TuiSearchResult {
   kind: TuiSearchKind;
   title: string;
   subtitle?: string | null;
+  snippet?: string | null;
+  scope?: string | null;
+  docType?: string | null;
+  updatedAt?: string | null;
+  graphCounts?: { backlinks?: number; tasks?: number; runs?: number } | null;
 }
 
 export interface SearchScreenOptions {
@@ -20,6 +25,9 @@ export interface SearchScreenOptions {
     };
   };
   onOpenEntity?: (entity: { kind: TuiSearchKind; id: string }) => void;
+  onAddToPlanningContext?: (entity: { kind: TuiSearchKind; id: string }) => void;
+  onCopyLink?: (entity: { kind: TuiSearchKind; id: string; link: string }) => void;
+  onRevealInTree?: (entity: { kind: TuiSearchKind; id: string }) => void;
 }
 
 export type TuiSearchScope = "current" | "all" | "global";
@@ -60,6 +68,13 @@ export class SearchScreen {
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const subtitle = result.subtitle ? `  ${c.dim(result.subtitle)}` : "";
         renderer.writeln(`${pointer} ${result.title}${subtitle}`);
+        if (result.snippet) renderer.writeln(`    ${result.snippet}`);
+        if (result.scope || result.docType || result.updatedAt || result.graphCounts) {
+          const graph = result.graphCounts
+            ? `graph:${result.graphCounts.backlinks ?? 0}/${result.graphCounts.tasks ?? 0}/${result.graphCounts.runs ?? 0}`
+            : "";
+          renderer.writeln(c.dim(`    ${[result.scope, result.docType, result.updatedAt, graph].filter(Boolean).join("  ")}`));
+        }
       }
       renderer.writeln();
     }
@@ -67,7 +82,7 @@ export class SearchScreen {
     if (this.results.length === 0) renderer.writeln(c.dim("  No results."));
 
     renderer.writeln();
-    renderer.writeln(c.dim("  Cmd+K palette  S full search  g scope  Tab facet  Space toggle  Enter open  q back"));
+    renderer.writeln(c.dim("  Cmd+K palette  S full search  g scope  Tab facet  Space toggle  Enter open  a context  c copy  r reveal  q back"));
 
     if (this.paletteOpen) this.renderPalette(renderer);
   }
@@ -134,6 +149,27 @@ export class SearchScreen {
       // P11#16: record click telemetry
       this.maybeRecordClick(result, this.cursor);
       this.opts.onOpenEntity?.({ kind: result.kind, id: result.id });
+      return true;
+    }
+
+    if (key === "a") {
+      const result = this.results[this.cursor];
+      if (!result) return false;
+      this.opts.onAddToPlanningContext?.({ kind: result.kind, id: result.id });
+      return true;
+    }
+
+    if (key === "c") {
+      const result = this.results[this.cursor];
+      if (!result) return false;
+      this.opts.onCopyLink?.({ kind: result.kind, id: result.id, link: `/${result.kind}/${result.id}` });
+      return true;
+    }
+
+    if (key === "r") {
+      const result = this.results[this.cursor];
+      if (!result) return false;
+      this.opts.onRevealInTree?.({ kind: result.kind, id: result.id });
       return true;
     }
 

@@ -133,6 +133,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 # System surfaces (internal previews + platform shells)
 /desktop                                                  desktop-shell preview (Tauri window chrome, gated by FULCRUM_FEATURES=desktop-app)
 /os-widgets                                               gallery of macOS-style OS-level surfaces (tray menu, native notification, dock badge); internal preview only; not part of web shell production routes
+/build-graph                                              internal design-e2e preview for doc search, scoped filters, snippets, graph counts, and planning-context actions
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 
