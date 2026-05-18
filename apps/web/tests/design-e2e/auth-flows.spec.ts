@@ -48,6 +48,18 @@ test.describe("auth login flow", () => {
 		await expect(page.locator("[data-passkey-unsupported]")).toContainText("Continue with email and password");
 	});
 
+	test("renders data-auth-error when the default action returns a validation failure", async ({ page }) => {
+		await page.goto("/auth-flows");
+
+		await page.locator("#login-email").evaluate((node: Element) => { (node as HTMLInputElement).removeAttribute("required"); });
+		await page.locator("#login-password").evaluate((node: Element) => { (node as HTMLInputElement).removeAttribute("required"); });
+		await page.locator("[data-login-form]").evaluate((form: Element) => {
+			(form as HTMLFormElement).submit();
+		});
+
+		await expect(page.locator("[data-auth-error]")).toContainText("Email and password are required.");
+	});
+
 	test("keeps auth flow controls usable on mobile without horizontal overflow", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/auth-flows");

@@ -124,6 +124,9 @@
         </label>
 
         <button type="submit" class={cn("h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs")}>Log in</button>
+        {#if form?.error}
+          <p data-auth-error class={cn("mt-1 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive")}>{form.error}</p>
+        {/if}
       </form>
 
       <section data-passkey-capability class={cn("mt-5 border-t border-border pt-5")}>
