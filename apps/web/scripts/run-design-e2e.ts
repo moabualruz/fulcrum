@@ -10,10 +10,11 @@ const playwrightCli = path.join(webRoot, "node_modules/@playwright/test/cli.js")
 
 function stopDesignProcesses(port?: string): void {
 	const patterns = [
-		port ? `${webRoot}.*bun run build.*bun run preview.*${port}` : `${webRoot}.*bun run build.*bun run preview`,
+		`${webRoot}.*bun run build.*bun run preview`,
+		`${webRoot}.*bun run build`,
+		`${webRoot}.*vite build`,
 		port ? `${webRoot}.*bun run preview.*${port}` : `${webRoot}.*bun run preview`,
 		port ? `${webRoot}.*vite preview.*${port}` : `${webRoot}.*vite preview`,
-		`${webRoot}.*vite build`,
 	].filter((pattern): pattern is string => Boolean(pattern));
 
 	for (const pattern of patterns) {
@@ -29,7 +30,7 @@ const specs =
 				.sort()
 				.map((file) => path.join("tests/design-e2e", file));
 
-const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "1");
+const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? String(specs.length || 1));
 const chunkCount = Math.ceil(specs.length / chunkSize);
 const designPorts = await allocatePortBlock({
 	count: chunkCount,
@@ -41,7 +42,7 @@ for (let index = 0; index < specs.length; index += chunkSize) {
 	const chunkNumber = Math.floor(index / chunkSize) + 1;
 	const designPort = String(designPorts[chunkNumber - 1]);
 	console.log(`design-e2e chunk ${chunkNumber}: ${chunk.join(", ")}`);
-	stopDesignProcesses(designPort);
+	if (chunkCount > 1) stopDesignProcesses(designPort);
 	rmSync(svelteKitOutputDir, { recursive: true, force: true });
 	const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
 		stdio: "inherit",
