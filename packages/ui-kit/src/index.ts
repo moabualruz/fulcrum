@@ -276,3 +276,34 @@ export type {
 	CommandPaletteItemProps,
 	CommandPaletteEmptyProps,
 } from "./components/command-palette/index.js";
+export {
+	Tabs,
+	TabsList,
+	TabsTrigger,
+	TabsContent,
+	Root as TabsRoot,
+	List as TabsListRoot,
+	Trigger as TabsTriggerRoot,
+	Content as TabsContentRoot,
+} from "./components/tabs/index.js";
+export type {
+	TabsProps,
+	TabsListProps,
+	TabsTriggerProps,
+	TabsContentProps,
+} from "./components/tabs/index.js";
+export {
+	Breadcrumb,
+	Root as BreadcrumbRoot,
+} from "./components/breadcrumb/index.js";
+export type { BreadcrumbProps, BreadcrumbItem } from "./components/breadcrumb/index.js";
+export {
+	Pagination,
+	Root as PaginationRoot,
+} from "./components/pagination/index.js";
+export type { PaginationProps } from "./components/pagination/index.js";
+export {
+	Stepper,
+	Root as StepperRoot,
+} from "./components/stepper/index.js";
+export type { StepperProps, StepperStep } from "./components/stepper/index.js";

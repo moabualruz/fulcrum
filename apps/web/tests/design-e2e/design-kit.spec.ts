@@ -274,4 +274,50 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(page.locator("[data-slot='command-palette-item']")).toHaveCount(3);
 		await expect(page.getByText("Dispatch run")).toBeVisible();
 	});
+
+	test("tabs switch active panel via trigger click", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='tabs']");
+		await expect(section.locator("[data-design-kit-tab='overview']")).toHaveAttribute(
+			"data-state",
+			"active",
+		);
+		await section.locator("[data-design-kit-tab='runs']").click();
+		await expect(section.locator("[data-design-kit-tab='runs']")).toHaveAttribute(
+			"data-state",
+			"active",
+		);
+		await expect(section.locator("[data-design-kit-tab-panel='runs']")).toBeVisible();
+	});
+
+	test("breadcrumb marks the final crumb as current with aria-current", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='breadcrumb']");
+		const items = section.locator("[data-slot='breadcrumb-item']");
+		await expect(items).toHaveCount(3);
+		await expect(items.last()).toHaveAttribute("data-current", "true");
+		await expect(items.last().getByText("Tasks")).toHaveAttribute("aria-current", "page");
+	});
+
+	test("pagination advances pages via next button", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='pagination']");
+		await expect(section.locator("[data-design-kit-pagination-value]")).toContainText(
+			"Current page: 2",
+		);
+		await section.locator("[data-slot='pagination-next']").click();
+		await expect(section.locator("[data-design-kit-pagination-value]")).toContainText(
+			"Current page: 3",
+		);
+	});
+
+	test("stepper marks complete, current, and upcoming statuses", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='stepper']");
+		const steps = section.locator("[data-slot='stepper-step']");
+		await expect(steps).toHaveCount(3);
+		await expect(steps.nth(0)).toHaveAttribute("data-status", "complete");
+		await expect(steps.nth(1)).toHaveAttribute("data-status", "current");
+		await expect(steps.nth(2)).toHaveAttribute("data-status", "upcoming");
+	});
 });

@@ -45,7 +45,27 @@
 		CommandPaletteList,
 		CommandPaletteItem,
 		CommandPaletteEmpty,
+		Tabs,
+		TabsList,
+		TabsTrigger,
+		TabsContent,
+		Breadcrumb,
+		Pagination,
+		Stepper,
 	} from "@fulcrum/ui-kit";
+
+	let activeTab = $state<string>("overview");
+	let currentPage = $state(2);
+	const breadcrumbItems = [
+		{ label: "Projects", href: "/projects" },
+		{ label: "Fulcrum", href: "/projects/fulcrum" },
+		{ label: "Tasks", current: true },
+	];
+	const stepperSteps = [
+		{ id: "draft", label: "Draft" },
+		{ id: "review", label: "Review" },
+		{ id: "ship", label: "Ship" },
+	];
 
 	let progressValue = $state(42);
 	let chipRemoved = $state(false);
@@ -641,6 +661,56 @@
 					<CommandPaletteEmpty>No matches.</CommandPaletteEmpty>
 				</CommandPaletteList>
 			</CommandPalette>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="tabs"
+		>
+			<h2 class="text-lg font-semibold">Tabs</h2>
+			<Tabs bind:value={activeTab}>
+				<TabsList data-design-kit-tabs-list>
+					<TabsTrigger value="overview" data-design-kit-tab="overview">Overview</TabsTrigger>
+					<TabsTrigger value="runs" data-design-kit-tab="runs">Runs</TabsTrigger>
+					<TabsTrigger value="settings" data-design-kit-tab="settings">Settings</TabsTrigger>
+				</TabsList>
+				<TabsContent value="overview" data-design-kit-tab-panel="overview">
+					<p class="text-sm">Overview panel content.</p>
+				</TabsContent>
+				<TabsContent value="runs" data-design-kit-tab-panel="runs">
+					<p class="text-sm">Runs panel content.</p>
+				</TabsContent>
+				<TabsContent value="settings" data-design-kit-tab-panel="settings">
+					<p class="text-sm">Settings panel content.</p>
+				</TabsContent>
+			</Tabs>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="breadcrumb"
+		>
+			<h2 class="text-lg font-semibold">Breadcrumb</h2>
+			<Breadcrumb items={breadcrumbItems} />
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="pagination"
+		>
+			<h2 class="text-lg font-semibold">Pagination</h2>
+			<Pagination bind:page={currentPage} count={47} perPage={10} siblingCount={1} />
+			<span class="text-xs text-muted-foreground" data-design-kit-pagination-value>
+				Current page: {currentPage}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="stepper"
+		>
+			<h2 class="text-lg font-semibold">Stepper</h2>
+			<Stepper steps={stepperSteps} currentStep={1} />
 		</article>
 	</section>
 	<ToastRegion store={toastStore} position="bottom-right" />
