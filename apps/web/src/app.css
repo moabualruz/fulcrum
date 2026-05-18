@@ -56,6 +56,11 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-xs: 0 1px 2px var(--shadow-xs-color);
+  --shadow-sm: 0 2px 4px var(--shadow-sm-color);
+  --shadow-md: 0 4px 8px var(--shadow-md-color);
+  --shadow-lg: 0 8px 16px var(--shadow-lg-color);
+  --shadow-xl: 0 16px 32px var(--shadow-xl-color);
 }
 
 :root {
@@ -106,6 +111,11 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  --shadow-xs-color: oklch(0.18 0.01 270 / 0.06);
+  --shadow-sm-color: oklch(0.18 0.01 270 / 0.08);
+  --shadow-md-color: oklch(0.18 0.01 270 / 0.10);
+  --shadow-lg-color: oklch(0.18 0.01 270 / 0.14);
+  --shadow-xl-color: oklch(0.18 0.01 270 / 0.18);
   --sidebar: var(--surface-sunken);
   --sidebar-foreground: var(--fg);
   --sidebar-primary: var(--primary);
@@ -164,6 +174,11 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
+  --shadow-xs-color: oklch(0 0 0 / 0.24);
+  --shadow-sm-color: oklch(0 0 0 / 0.30);
+  --shadow-md-color: oklch(0 0 0 / 0.36);
+  --shadow-lg-color: oklch(0 0 0 / 0.44);
+  --shadow-xl-color: oklch(0 0 0 / 0.52);
   --sidebar: var(--surface-sunken);
   --sidebar-foreground: var(--fg);
   --sidebar-primary: var(--primary);
@@ -217,6 +232,11 @@
   --border-focus: oklch(0.45 0.24 250);
   --input: var(--border);
   --ring: var(--border-focus);
+  --shadow-xs-color: oklch(0.08 0 270 / 0.10);
+  --shadow-sm-color: oklch(0.08 0 270 / 0.14);
+  --shadow-md-color: oklch(0.08 0 270 / 0.18);
+  --shadow-lg-color: oklch(0.08 0 270 / 0.22);
+  --shadow-xl-color: oklch(0.08 0 270 / 0.26);
 }
 
 @layer base {

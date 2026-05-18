@@ -25,6 +25,14 @@
 		{ token: "--radius-4xl", className: "rounded-4xl", label: "4x large" },
 	];
 
+	const shadowTokens = [
+		{ token: "--shadow-xs", className: "shadow-xs", label: "Extra small" },
+		{ token: "--shadow-sm", className: "shadow-sm", label: "Small" },
+		{ token: "--shadow-md", className: "shadow-md", label: "Medium" },
+		{ token: "--shadow-lg", className: "shadow-lg", label: "Large" },
+		{ token: "--shadow-xl", className: "shadow-xl", label: "Extra large" },
+	];
+
 	const { data }: { data: PageData } = $props();
 	const mode = data.mode as TokenMode;
 </script>
@@ -129,6 +137,64 @@
 			>
 				Override specimen
 			</article>
+		</section>
+
+		<section data-shadow-token-grid class="grid gap-3 md:grid-cols-5">
+			{#each shadowTokens as shadow}
+				<article
+					data-shadow-token={shadow.token}
+					class={`${shadow.className} rounded-lg border border-border bg-surface-elevated p-4`}
+				>
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold text-fg">{shadow.label}</h2>
+						<p class="font-mono text-xs text-fg-muted">{shadow.token}</p>
+					</div>
+				</article>
+			{/each}
+		</section>
+
+		<section data-shadow-component-contracts class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+			<div
+				data-shadow-popover
+				role="tooltip"
+				class="rounded-md border border-border bg-surface-elevated p-4 shadow-sm"
+			>
+				<h2 class="text-sm font-semibold text-fg">Popover</h2>
+				<p class="mt-1 text-xs text-fg-muted">Small elevation</p>
+			</div>
+
+			<div data-shadow-dropdown class="rounded-md border border-border bg-surface-elevated p-4 shadow-md">
+				<h2 class="text-sm font-semibold text-fg">Dropdown</h2>
+				<p class="mt-1 text-xs text-fg-muted">Menu elevation</p>
+			</div>
+
+			<div
+				data-shadow-dialog
+				role="dialog"
+				aria-label="Shadow modal specimen"
+				class="rounded-xl border border-border bg-surface-elevated p-4 shadow-lg"
+			>
+				<h2 class="text-sm font-semibold text-fg">Modal</h2>
+				<p class="mt-1 text-xs text-fg-muted">Overlay elevation</p>
+			</div>
+
+			<article
+				data-shadow-hover-card
+				class="rounded-lg border border-border bg-surface-elevated p-4 shadow-sm transition-shadow hover:shadow-md"
+			>
+				<h2 class="text-sm font-semibold text-fg">Hover card</h2>
+				<p class="mt-1 text-xs text-fg-muted">Hover raises one level</p>
+			</article>
+
+			<input
+				data-shadow-input
+				aria-label="Input without shadow"
+				class="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg xl:col-span-2"
+				value="No input shadow"
+				readonly
+			/>
+
+			<p data-shadow-text class="text-sm text-fg-muted xl:col-span-2">Text keeps zero elevation.</p>
 		</section>
 	</section>
 </main>
