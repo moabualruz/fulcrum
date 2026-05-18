@@ -78,7 +78,7 @@ Usage:
   fulcrum product init [--json]
   fulcrum product projects list [--json] [--limit <N>]
   fulcrum product tasks create --title <T> --project <P> [--json]
-  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--json]
+  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--limit <N>] [--offset <N>] [--json]
   fulcrum product tasks workbench [--project <P>] [--trace <T>] [--view <board|list|table>] [--status <S>] [--state-group <G>] [--labels <L1,L2>] [--assignee <A>] [--cycle <C>] [--module <M>] [--task-type <T>] [--priority <N>] [--search <text>] [--json]
   fulcrum product tasks update <id> --status <S> [--json]
   fulcrum product tasks bulk <id,id,...> --status <S> [--json]
@@ -93,7 +93,7 @@ Usage:
   fulcrum product sprints list --project <P> [--json]
   fulcrum product sprints activate <id> [--json]
   fulcrum product sprints complete <id> [--json]
-  fulcrum product search <query> [--org-slug <slug>] [--kind <kind>] [--limit <N>] [--json]
+  fulcrum product search <query> [--org-slug <slug>] [--kind <kind>] [--limit <N>] [--offset <N>] [--json]
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
   fulcrum product reports final-qa --project <id> [--trace <id>] [--json]
   fulcrum product reports final-qa-gate --project <id> [--trace <id>] [--worker <id>] [--reviewer-agent <A>] [--feedback-agent <A>] [--feedback-model <M>] [--max-iterations <N>] [--cwd <path>] [--copy-to-worktree <path,path,...>] [--json]
@@ -157,6 +157,7 @@ const VALUE_FLAGS = new Set<string>([
   "--module",
   "--org-slug",
   "--original-code",
+  "--offset",
   "--plan",
   "--prompt",
   "--prototype-paths",
@@ -323,6 +324,8 @@ async function runTasks(caller: ProductCaller, argv: readonly string[], io: Io):
         projectId: flagValue(rest, "--project"),
         status: flagValue(rest, "--status"),
         assigneeId: flagValue(rest, "--assignee"),
+        limit: numberFlag(rest, "--limit"),
+        offset: numberFlag(rest, "--offset"),
       });
       return printValue(Array.isArray(result) ? result : result.data ?? [], rest, io.print);
     }
@@ -412,6 +415,7 @@ async function runSearch(caller: ProductCaller, argv: readonly string[], io: Io)
     query,
     kind: flagValue(argv, "--kind"),
     limit: numberFlag(argv, "--limit") ?? 25,
+    offset: numberFlag(argv, "--offset"),
   }) ?? [], argv, io.print);
 }
 

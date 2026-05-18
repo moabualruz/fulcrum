@@ -1,5 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
 
 export interface TuiArtifact {
   id: string;
@@ -86,9 +87,8 @@ export class ArtifactsScreen {
         const index = this.artifacts.indexOf(artifact);
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const checked = this.selectedIds.has(artifact.id) ? "[x]" : "[ ]";
-        renderer.writeln(
-          `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${retentionBadge(artifact)}  preview:${previewBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
-        );
+        const line = `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${retentionBadge(artifact)}  preview:${previewBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`;
+        renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
       }
     }
 
@@ -97,10 +97,10 @@ export class ArtifactsScreen {
     if (this.selectedArtifact) {
       renderer.writeln(`  ${previewSummary(this.selectedArtifact)}`);
     }
-    for (const line of this.previewLines) renderer.writeln(`  ${line}`);
+    for (const line of this.previewLines) renderer.writeln(truncateWide(`  ${line}`, Math.max(20, renderer.width)));
 
     renderer.writeln();
-    renderer.writeln(c.dim("  j/k navigate  u upload  d download  a archive  D delete  f filter  Enter preview  q back"));
+    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  Enter preview  q back", Math.max(20, renderer.width))));
 
     if (this.overlay === "upload") {
       renderer.writeln();
