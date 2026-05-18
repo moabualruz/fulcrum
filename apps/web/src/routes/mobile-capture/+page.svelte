@@ -25,6 +25,10 @@
   let sendCount = $state(0);
   let longTaskCount = $state(0);
   let interactionState = $state("Ready");
+  let activePanel = $state<"queue" | "review" | "status">("queue");
+  let reviewNote = $state("");
+  let captureStatus = $state("triage");
+  let quickAction = $state("None");
 
   const allGreen = $derived(metrics.every((metric) => metric.value <= metric.budget) && longTaskCount === 0);
   const lighthouseScore = $derived(allGreen ? 96 : 74);
@@ -58,11 +62,16 @@
   function measureInteraction(): void {
     const started = performance.now();
     interactionState = "Captured";
+    quickAction = "Capture queued";
     requestAnimationFrame(() => {
       const duration = performance.now() - started;
       updateMetric("INP", Math.min(duration, 48));
       emitVital({ ...metrics.find((metric) => metric.name === "INP")!, value: Math.min(duration, 48) });
     });
+  }
+
+  function submitReview(): void {
+    quickAction = reviewNote.trim() ? "Review saved" : "Review needs note";
   }
 
   onMount(() => {
@@ -108,8 +117,8 @@
   <title>Mobile capture performance</title>
 </svelte:head>
 
-<main data-mobile-capture data-hydrated={hydrated} class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}>
-  <div class={cn("mx-auto flex max-w-6xl flex-col gap-4 px-4 py-5 lg:px-6")}>
+<main data-mobile-capture data-hydrated={hydrated} class={cn("min-h-screen w-full overflow-x-hidden bg-background text-foreground")}>
+  <div class={cn("mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-4 px-4 py-5 lg:px-6")}>
     <header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
       <div class={cn("min-w-0")}>
         <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Capture · Performance</p>
@@ -144,8 +153,30 @@
       {/each}
     </section>
 
-    <section class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]")}>
-      <div data-mobile-workspace class={cn("rounded-md border border-border bg-card p-4")}>
+    <section class={cn("grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]")}>
+      <div data-mobile-workspace class={cn("min-w-0 rounded-md border border-border bg-card p-4")}>
+        <nav
+          data-mobile-workflow-nav
+          aria-label="Mobile capture sections"
+          class={cn("mb-3 grid grid-cols-3 gap-2 rounded-md border border-border bg-background p-1")}
+        >
+          {#each [
+            ["queue", "Queue"],
+            ["review", "Review"],
+            ["status", "Status"],
+          ] as [panel, label] (panel)}
+            <button
+              data-mobile-nav-item={panel}
+              type="button"
+              class={cn(
+                "min-h-10 rounded-sm px-2 text-sm font-medium",
+                activePanel === panel ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+              )}
+              onclick={() => (activePanel = panel)}
+            >{label}</button>
+          {/each}
+        </nav>
+
         <div class={cn("grid min-h-[320px] gap-4 md:grid-cols-[180px_minmax(0,1fr)]")}>
           <aside class={cn("rounded-md border border-border bg-background p-3")}>
             <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Queue</p>
@@ -167,6 +198,99 @@
               <span data-interaction-state class={cn("flex h-10 items-center rounded-md border border-border px-3 text-sm")}>{interactionState}</span>
             </div>
           </article>
+        </div>
+
+        <section data-mobile-review-panel class={cn("mt-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_280px]")}>
+          <form data-mobile-review-form class={cn("min-w-0 rounded-md border border-border bg-background p-3")} onsubmit={(event) => { event.preventDefault(); submitReview(); }}>
+            <label class={cn("block text-xs font-medium uppercase text-muted-foreground")} for="mobile-review-note">Review note</label>
+            <textarea
+              id="mobile-review-note"
+              data-mobile-review-note
+              bind:value={reviewNote}
+              rows="3"
+              class={cn("mt-2 min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm")}
+              placeholder="Summarize capture quality"
+            ></textarea>
+            <div class={cn("mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]")}>
+              <select
+                data-mobile-status-select
+                bind:value={captureStatus}
+                aria-label="Capture status"
+                class={cn("h-11 rounded-md border border-input bg-background px-3 text-sm")}
+              >
+                <option value="triage">Triage</option>
+                <option value="review">Ready for review</option>
+                <option value="approved">Approved</option>
+              </select>
+              <button data-mobile-review-submit type="submit" class={cn("h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>Save review</button>
+            </div>
+          </form>
+
+          <div data-mobile-status-panel class={cn("min-w-0 rounded-md border border-border bg-background p-3 text-sm")}>
+            <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Quick action</p>
+            <div class={cn("mt-3 grid grid-cols-2 gap-2")}>
+              {#each ["Assign", "Block", "Approve", "Escalate"] as action}
+                <button
+                  data-mobile-quick-action={action}
+                  type="button"
+                  class={cn("min-h-11 rounded-md border border-input px-2 text-sm hover:bg-muted")}
+                  onclick={() => (quickAction = action)}
+                >{action}</button>
+              {/each}
+            </div>
+            <p class={cn("mt-3 rounded-md bg-muted px-3 py-2")}>
+              <span class={cn("text-muted-foreground")}>Status:</span>
+              <span data-mobile-status-value>{captureStatus}</span>
+            </p>
+            <p data-mobile-quick-action-state class={cn("mt-2 rounded-md bg-muted px-3 py-2")}>{quickAction}</p>
+          </div>
+        </section>
+
+        <div data-mobile-review-table class={cn("mt-4 min-w-0 rounded-md border border-border bg-background")}>
+          <div class={cn("grid gap-2 p-2 sm:hidden")}>
+            {#each [
+              ["Inbox note", "triage", "PM"],
+              ["Voice memo", "review", "Agent"],
+              ["Screenshot", "approved", "Design"],
+            ] as row (row[0])}
+              <article class={cn("rounded-md border border-border/70 p-3 text-sm")}>
+                <div class={cn("flex items-start justify-between gap-3")}>
+                  <div class={cn("min-w-0")}>
+                    <p class={cn("font-medium")}>{row[0]}</p>
+                    <p class={cn("text-xs text-muted-foreground")}>{row[2]}</p>
+                  </div>
+                  <span class={cn("shrink-0 rounded-full bg-muted px-2 py-1 text-xs")}>{row[1]}</span>
+                </div>
+                <button type="button" class={cn("mt-3 h-10 w-full rounded-md border border-input px-3 text-sm hover:bg-muted")}>Open</button>
+              </article>
+            {/each}
+          </div>
+          <div class={cn("hidden max-w-full overflow-x-auto sm:block")}>
+          <table class={cn("w-full min-w-[520px] text-sm")}>
+            <thead>
+              <tr class={cn("border-b border-border text-left")}>
+                <th class={cn("px-3 py-2 font-medium")}>Item</th>
+                <th class={cn("px-3 py-2 font-medium")}>State</th>
+                <th class={cn("px-3 py-2 font-medium")}>Owner</th>
+                <th class={cn("px-3 py-2 font-medium")}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each [
+                ["Inbox note", "triage", "PM"],
+                ["Voice memo", "review", "Agent"],
+                ["Screenshot", "approved", "Design"],
+              ] as row (row[0])}
+                <tr class={cn("border-b border-border/60 last:border-b-0")}>
+                  <td class={cn("px-3 py-2")}>{row[0]}</td>
+                  <td class={cn("px-3 py-2")}>{row[1]}</td>
+                  <td class={cn("px-3 py-2")}>{row[2]}</td>
+                  <td class={cn("px-3 py-2")}><button type="button" class={cn("h-9 rounded-md border border-input px-3 hover:bg-muted")}>Open</button></td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+          </div>
         </div>
       </div>
 

@@ -27,6 +27,7 @@ test.describe("mobile capture web vitals", () => {
 
 	test("measures interaction without exceeding INP budget", async ({ page }) => {
 		await page.goto("/mobile-capture");
+		await expect(page.locator("[data-mobile-capture]")).toHaveAttribute("data-hydrated", "true");
 
 		await page.locator("[data-capture-action]").click();
 		await expect(page.locator("[data-interaction-state]")).toContainText("Captured");
@@ -43,8 +44,22 @@ test.describe("mobile capture web vitals", () => {
 
 		await expect(page.locator("[data-mobile-workspace]")).toBeVisible();
 		await expect(page.locator("[data-performance-contract]")).toBeVisible();
+		await expect(page.locator("[data-mobile-workflow-nav]")).toBeVisible();
+		await page.locator("[data-mobile-nav-item='review']").click();
+		await page.locator("[data-mobile-review-note]").fill("Reviewed on mobile without clipped controls.");
+		await page.locator("[data-mobile-status-select]").selectOption("approved");
+		await page.locator("[data-mobile-review-submit]").click();
+		await expect(page.locator("[data-mobile-status-value]")).toContainText("approved");
+		await expect(page.locator("[data-mobile-quick-action-state]")).toContainText("Review saved");
+		await page.locator("[data-mobile-quick-action='Block']").click();
+		await expect(page.locator("[data-mobile-quick-action-state]")).toContainText("Block");
+		await expect(page.locator("[data-mobile-review-table]")).toBeVisible();
 
 		const overflow = await page.locator("[data-mobile-capture]").evaluate((element) => element.scrollWidth - element.clientWidth);
 		expect(overflow).toBeLessThanOrEqual(1);
+		const touchTargets = await page.locator("[data-mobile-workflow-nav] button, [data-mobile-review-submit], [data-mobile-quick-action]").evaluateAll((elements) =>
+			elements.map((element) => Math.round(element.getBoundingClientRect().height)),
+		);
+		expect(touchTargets.every((height) => height >= 40)).toBe(true);
 	});
 });
