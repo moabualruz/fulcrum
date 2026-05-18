@@ -6,6 +6,7 @@ export interface FulcrumJob {
   id: string;
   orgId: string;
   projectId: string | null;
+  traceId: string | null;
   queue: string;
   kind: string;
   payload: Record<string, unknown>;
@@ -27,6 +28,7 @@ export const FulcrumJobEntity = new EntitySchema<FulcrumJob>({
     id: { type: "varchar", length: 128, primary: true },
     orgId: { name: "org_id", type: "varchar", length: 128 },
     projectId: { name: "project_id", type: "varchar", length: 128, nullable: true },
+    traceId: { name: "trace_id", type: "varchar", length: 160, nullable: true },
     queue: { type: "varchar", length: 120 },
     kind: { type: "varchar", length: 120 },
     payload: {
@@ -47,6 +49,7 @@ export const FulcrumJobEntity = new EntitySchema<FulcrumJob>({
     { name: "fulcrum_jobs_claim_idx", columns: ["queue", "status", "availableAt", "createdAt"] },
     { name: "fulcrum_jobs_scope_idx", columns: ["orgId", "projectId", "status"] },
     { name: "fulcrum_jobs_kind_idx", columns: ["queue", "kind"] },
+    { name: "fulcrum_jobs_trace_idx", columns: ["traceId"] },
   ],
 });
 

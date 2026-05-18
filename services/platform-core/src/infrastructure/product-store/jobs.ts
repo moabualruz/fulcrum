@@ -7,6 +7,7 @@ export interface JobRow {
   id: string;
   org_id: string;
   project_id: string | null;
+  trace_id: string | null;
   queue: string;
   kind: string;
   payload: Record<string, unknown>;
@@ -24,6 +25,7 @@ export interface JobRow {
 export interface EnqueueJobInput {
   orgId: string;
   projectId?: string | null;
+  traceId?: string | null;
   queue: string;
   kind: string;
   payload?: Record<string, unknown>;
@@ -35,12 +37,13 @@ export async function enqueueJob(db: ProductDb, input: EnqueueJobInput): Promise
   const id = newUlid();
   await db.query(
     `INSERT INTO jobs
-       (id, org_id, project_id, queue, kind, payload, status, max_attempts, available_at)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, 'queued', $7, $8)`,
+       (id, org_id, project_id, trace_id, queue, kind, payload, status, max_attempts, available_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, 'queued', $8, $9)`,
     [
       id,
       input.orgId,
       input.projectId ?? null,
+      input.traceId ?? null,
       input.queue,
       input.kind,
       JSON.stringify(input.payload ?? {}),

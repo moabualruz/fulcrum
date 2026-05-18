@@ -9,6 +9,7 @@ export class JobQueue1778751000000 implements MigrationInterface {
         id varchar(128) PRIMARY KEY,
         org_id varchar(128) NOT NULL REFERENCES fulcrum_workspaces(id) ON DELETE CASCADE,
         project_id varchar(128) REFERENCES fulcrum_projects(id) ON DELETE CASCADE,
+        trace_id varchar(160),
         queue varchar(120) NOT NULL,
         kind varchar(120) NOT NULL,
         payload jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -33,6 +34,9 @@ export class JobQueue1778751000000 implements MigrationInterface {
     );
     await queryRunner.query(
       "CREATE INDEX fulcrum_jobs_kind_idx ON fulcrum_jobs (queue, kind)",
+    );
+    await queryRunner.query(
+      "CREATE INDEX fulcrum_jobs_trace_idx ON fulcrum_jobs (trace_id)",
     );
   }
 
