@@ -1,5 +1,7 @@
 import { createWorkflowApiCaller } from "@workflow-coordination/interface/http/workflow-api-client";
 
+import { cookieHeaders } from "$lib/server/public-api";
+
 interface WorkflowApiRouteEvent {
   fetch: typeof fetch;
   locals?: {
@@ -8,7 +10,7 @@ interface WorkflowApiRouteEvent {
     workspaceSlug?: string | null;
     workspaceName?: string | null;
   };
-  request: { headers: { get(name: string): string | null } };
+  request: Request;
 }
 
 interface WorkflowApiProjectMetadata {
@@ -29,9 +31,7 @@ export function createWebWorkflowApiCaller(
   return createWorkflowApiCaller({
     baseUrl: raw,
     fetch: event.fetch,
-    headers: {
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
+    headers: cookieHeaders(event.request),
   });
 }
 
