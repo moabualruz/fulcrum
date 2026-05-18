@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
-import { NotFoundException, RequestMethod } from "@nestjs/common";
+import { BadRequestException, NotFoundException, RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 
 import { AppModule } from "@fulcrum/server/app.module.ts";
@@ -130,11 +130,23 @@ async function assertRoutingRoundTrip(source: FulcrumTypeOrmConnectionSource, ur
     await expect(controller.dryRun({
       orgId: `workspace-routing-${source}`,
       userId: `user-routing-${source}`,
-      taskJson: { title: "Fix login", kind: "bug", priority: "high", tags: ["auth"] },
+      taskJson: {
+        title: "Fix login",
+        kind: "bug",
+        priority: "high",
+        tags: ["auth"],
+        connectorContext: { provider: "github", repository: "fulcrum" },
+      },
     })).resolves.toEqual(expect.objectContaining({
       status: "matched",
       matchedRuleId: created.id,
       confidence: 1,
+      requestContext: expect.objectContaining({
+        orgId: `workspace-routing-${source}`,
+        userId: `user-routing-${source}`,
+        connectorContext: { provider: "github", repository: "fulcrum" },
+      }),
+      evidence: expect.arrayContaining(["connector-context: included in routing facts"]),
     }));
     await expect(controller.testTask({
       orgId: `workspace-routing-${source}`,
@@ -144,6 +156,32 @@ async function assertRoutingRoundTrip(source: FulcrumTypeOrmConnectionSource, ur
       status: "matched",
       matchedRuleId: created.id,
       factsUsed: expect.objectContaining({ task: expect.objectContaining({ kind: "bug" }) }),
+    }));
+    const noMatch = await controller.testTask({
+      orgId: `workspace-routing-${source}`,
+      userId: `user-routing-${source}`,
+      taskId: `task-routing-unmatched-${source}`,
+    });
+    expect(noMatch).toEqual(expect.objectContaining({
+      status: "draft_created",
+      matchedRuleId: null,
+      draftId: expect.any(String),
+      requestContext: expect.objectContaining({
+        orgId: `workspace-routing-${source}`,
+        userId: `user-routing-${source}`,
+      }),
+      evidence: expect.arrayContaining([
+        "llm-fallback: disabled unless router-llm feature is enabled",
+        expect.stringContaining("draft-created:"),
+      ]),
+    }));
+    await expect(dataSource.getRepository(FulcrumRoutingDraftEntity).findOneBy({
+      id: noMatch.draftId ?? "",
+      orgId: `workspace-routing-${source}`,
+    })).resolves.toEqual(expect.objectContaining({
+      enabled: false,
+      status: "review_needed",
+      source: "no_match",
     }));
     await dataSource.getRepository(FulcrumRoutingDraftEntity).save({
       id: `draft-routing-${source}`,
@@ -165,7 +203,9 @@ async function assertRoutingRoundTrip(source: FulcrumTypeOrmConnectionSource, ur
       orgId: `workspace-routing-${source}`,
       userId: `user-routing-${source}`,
       status: "review_needed",
-    })).resolves.toEqual([expect.objectContaining({ draftId: `draft-routing-${source}`, status: "review_needed" })]);
+    })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ draftId: `draft-routing-${source}`, status: "review_needed" }),
+    ]));
     await expect(controller.updateDraft(
       { id: `draft-routing-${source}` },
       { orgId: `workspace-routing-${source}`, userId: `user-routing-${source}`, actionAgent: "claude" },
@@ -212,6 +252,19 @@ describe("routing public Nest API", () => {
     );
   });
 
+  test("rejects incomplete routing request context before public store dispatch", async () => {
+    const controller = new RoutingPublicApiController(new RoutingPublicApiService(
+      { featuresEnv: "public-api" },
+      null,
+    ));
+
+    await expect(controller.dryRun({
+      orgId: "",
+      userId: "user-1",
+      taskJson: { title: "Fix login", kind: "bug", priority: "high", tags: [], connectorContext: "github" },
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   test("persists routing rules and decisions through PGlite socket", async () => {
     await assertRoutingRoundTrip("pglite-socket", await startPgliteSocket());
   });
@@ -253,6 +306,23 @@ async function seedRoutingProject(
     parentTaskId: null,
     successCriteria: [],
     traceId: `trace-task-routing-${source}`,
+    deletedAt: null,
+  });
+  await dataSource.getRepository(FulcrumTaskEntity).save({
+    id: `task-routing-unmatched-${source}`,
+    projectId: `project-routing-${source}`,
+    externalId: null,
+    title: "Unmatched task",
+    description: null,
+    descriptionText: null,
+    tiptapContent: {},
+    status: "incident",
+    priority: 2,
+    points: null,
+    assigneeId: null,
+    parentTaskId: null,
+    successCriteria: [],
+    traceId: `trace-task-routing-unmatched-${source}`,
     deletedAt: null,
   });
 }

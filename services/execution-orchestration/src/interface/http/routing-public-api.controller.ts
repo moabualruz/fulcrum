@@ -1,6 +1,7 @@
 import "reflect-metadata";
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -71,10 +72,13 @@ export class RoutingPublicApiService {
   }
 
   async dryRun(input: RoutingDecisionDryRunDto): Promise<RoutingDecisionPublicRow> {
+    validateRoutingRequestContext(input);
+    validateRoutingTaskJson(input.taskJson);
     return await this.requireStore().dryRun(input);
   }
 
   async testTask(input: RoutingDecisionTestDto): Promise<RoutingDecisionPublicRow> {
+    validateRoutingRequestContext(input);
     return await this.requireResult(this.requireStore().testTask(input));
   }
 
@@ -123,6 +127,25 @@ export class RoutingPublicApiService {
       throw new InternalServerErrorException("Routing public API TypeORM store is not configured.");
     }
     return this.store;
+  }
+}
+
+function validateRoutingRequestContext(input: { orgId?: string; userId?: string }): void {
+  if (!input.orgId?.trim() || !input.userId?.trim()) {
+    throw new BadRequestException({ error: "Routing request context requires orgId and userId." });
+  }
+}
+
+function validateRoutingTaskJson(taskJson: unknown): void {
+  if (!taskJson || typeof taskJson !== "object" || Array.isArray(taskJson)) {
+    throw new BadRequestException({ error: "Routing dry-run requires taskJson object." });
+  }
+  const record = taskJson as Record<string, unknown>;
+  if (record["connectorContext"] !== undefined) {
+    const connectorContext = record["connectorContext"];
+    if (!connectorContext || typeof connectorContext !== "object" || Array.isArray(connectorContext)) {
+      throw new BadRequestException({ error: "Routing connectorContext must be an object when provided." });
+    }
   }
 }
 
