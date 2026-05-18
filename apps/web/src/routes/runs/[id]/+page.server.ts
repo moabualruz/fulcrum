@@ -65,18 +65,19 @@ function isoStamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+  let preloadedData;
+  try {
+    preloadedData = await getProjectRunPageData(em, ctx, params.id);
+  } catch {
+    throw error(404, "Run not found");
+  }
   return {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
-        let data;
-        try {
-          data = await getProjectRunPageData(em, ctx, params.id);
-        } catch {
-          throw error(404, "Run not found");
-        }
+        const data = preloadedData;
 
         const run = { ...data.run, status: data.run.status as RunStatus };
         const transcript = data.transcript;
