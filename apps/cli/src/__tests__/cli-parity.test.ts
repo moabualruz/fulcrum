@@ -59,17 +59,39 @@ const JSON_COMMANDS = [
 
 async function runCli(command: string): Promise<CliResult> {
   const home = await mkdtemp(join(tmpdir(), "fulcrum-surface-cli-"));
+  const server = startJsonApiServer();
   try {
     if (!command.startsWith("fulcrum completion ")) {
-      await runCliWithHome("fulcrum init", home);
+      await runCliWithHome("fulcrum product init", home, server.url);
     }
-    return await runCliWithHome(command, home);
+    return await runCliWithHome(command, home, server.url);
   } finally {
+    server.stop(true);
     await rm(home, { recursive: true, force: true });
   }
 }
 
-async function runCliWithHome(command: string, home: string): Promise<CliResult> {
+function startJsonApiServer(): { url: string; stop(force?: boolean): void } {
+  const server = Bun.serve({
+    port: 0,
+    fetch(request) {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/v1/inference/health") {
+        return Response.json({ status: "ok", backends: [] });
+      }
+      if (url.pathname === "/api/v1/inference/backends/probe") {
+        return Response.json([]);
+      }
+      return Response.json([]);
+    },
+  });
+  return {
+    url: `http://127.0.0.1:${server.port}`,
+    stop: (force?: boolean) => server.stop(force),
+  };
+}
+
+async function runCliWithHome(command: string, home: string, serverUrl: string): Promise<CliResult> {
   const [, ...args] = command.split(" ");
   const proc = Bun.spawn(["bun", "apps/cli/src/main.ts", ...args], {
     stdout: "pipe",
@@ -78,6 +100,10 @@ async function runCliWithHome(command: string, home: string): Promise<CliResult>
       ...process.env,
       FULCRUM_HOME: home,
       FULCRUM_FEATURES: "trpc-permission-local-dev-bypass",
+      FULCRUM_SERVER_URL: serverUrl,
+      FULCRUM_ORG_ID: "11111111-1111-4111-8111-111111111111",
+      FULCRUM_USER_ID: "22222222-2222-4222-8222-222222222222",
+      FULCRUM_API_TOKEN: "test-token",
     },
   });
   const [stdout, stderr, exitCode] = await Promise.all([

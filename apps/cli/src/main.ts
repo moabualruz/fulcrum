@@ -101,7 +101,7 @@ async function main() {
       return;
     }
     case "init": {
-      const { run: runInit } = await import("./commands/init.ts");
+      const { run: runInit } = await import("./init.ts");
       await runInit(rest);
       return;
     }

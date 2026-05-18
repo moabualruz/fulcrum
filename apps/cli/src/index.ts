@@ -20,7 +20,7 @@ import {
 const HELP = `fulcrum
 
 Usage:
-  fulcrum init
+  fulcrum init [DIR]
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum projects <list|stats> [--json]
   fulcrum tasks <list|get|create|update|delete> [--json]
@@ -184,7 +184,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
 
   switch (cmd) {
     case "init": {
-      const { run: runInit } = await import("./commands/init.ts");
+      const { run: runInit } = await import("./init.ts");
       await runInit(rest);
       return;
     }

@@ -801,7 +801,10 @@ async function runStop(
   opts: InferenceRunOptions & { print: (line: string) => void },
 ): Promise<void> {
   const json = hasFlag(argv, "json");
-  const { lifecycle } = resolveServices(opts);
+  const lifecycle = opts.lifecycle ?? opts.container?.get(InferenceLifecycle);
+  if (!lifecycle?.stop) {
+    throw new Error("stop requires an inference lifecycle with stop support or container");
+  }
   const stopped = await lifecycle.stop();
 
   if (json) {

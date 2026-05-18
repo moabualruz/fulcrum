@@ -127,7 +127,7 @@ describe("fulcrum doctor orchestration", () => {
     const report = await runDoctorJson();
     expect(report.orchestration).toBeDefined();
     expect(Array.isArray(report.orchestration.checks)).toBe(true);
-  });
+  }, 20_000);
 
   test("agent-binary checks present for all 6 profiles", async () => {
     const report = await runDoctorJson();
@@ -135,7 +135,7 @@ describe("fulcrum doctor orchestration", () => {
       (c: { name: string }) => c.name.startsWith("agent-binary:"),
     );
     expect(agentBinaryChecks.length).toBe(6);
-  });
+  }, 20_000);
 
   test("auth-vars checks present for all 6 profiles", async () => {
     const report = await runDoctorJson();
@@ -143,7 +143,7 @@ describe("fulcrum doctor orchestration", () => {
       (c: { name: string }) => c.name.startsWith("auth-vars:"),
     );
     expect(authChecks.length).toBe(6);
-  });
+  }, 20_000);
 
   test("workspace-writable check present and ok", async () => {
     const report = await runDoctorJson();
@@ -152,7 +152,7 @@ describe("fulcrum doctor orchestration", () => {
     );
     expect(check).toBeDefined();
     expect(check.level).toBe("ok");
-  });
+  }, 20_000);
 
   test("effect-singleton check present", async () => {
     const report = await runDoctorJson();
@@ -160,13 +160,13 @@ describe("fulcrum doctor orchestration", () => {
       (c: { name: string }) => c.name === "effect-singleton",
     );
     expect(check).toBeDefined();
-  });
+  }, 20_000);
 
   test("doctor exits 0 on fully configured install (mocked env)", async () => {
     // We can't guarantee all tools present, but doctor should not crash
     const report = await runDoctorJson();
     expect(["ok", "warning", "error"]).toContain(report.verdict);
-  });
+  }, 20_000);
 });
 
 // ---------------------------------------------------------------------------

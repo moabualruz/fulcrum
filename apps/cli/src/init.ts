@@ -38,6 +38,16 @@ const GITIGNORE_LINES = [
   ".claude/.cache/",
 ];
 
+const HELP = `fulcrum init [DIR]
+
+Bootstrap a project with AGENTS.md, .claude/CLAUDE.md, and .gitignore entries.
+
+Usage:
+  fulcrum init [DIR]
+  fulcrum init --dry-run [DIR]
+  fulcrum init reindex [DIR]
+`;
+
 /** Dry-run state — set by tests or --dry-run flag. */
 let DRY_RUN = false;
 
@@ -74,6 +84,11 @@ async function af(path: string, data: string): Promise<void> {
 
 
 export async function run(args: string[]): Promise<void> {
+  if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
+    console.log(HELP);
+    return;
+  }
+
   // Handle `fulcrum init reindex [DIR]` subcommand.
   if (args[0] === "reindex") {
     DRY_RUN = false;

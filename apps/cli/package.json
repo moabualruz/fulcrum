@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "bun run src/main.ts",
-    "test": "bun test src",
+    "test": "cd ../.. && bun test apps/cli/src",
     "typecheck": "bun run --bun tsc --noEmit -p ../../tsconfig.json"
   }
 }

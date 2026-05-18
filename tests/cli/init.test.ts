@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -10,11 +10,13 @@ async function runCli(fulcrumHome: string, args: readonly string[]): Promise<{
   stdout: string;
   stderr: string;
 }> {
-  const proc = Bun.spawn(["bun", "run", CLI, ...args], {
+  const proc = Bun.spawn([process.execPath, "run", CLI, ...args], {
     cwd: process.cwd(),
     env: {
       ...process.env,
       FULCRUM_HOME: fulcrumHome,
+      HOME: join(fulcrumHome, "home"),
+      PATH: `${join(fulcrumHome, "bin")}:/bin:/usr/bin`,
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -27,8 +29,8 @@ async function runCli(fulcrumHome: string, args: readonly string[]): Promise<{
   return { exitCode, stdout, stderr };
 }
 
-async function runInit(fulcrumHome: string) {
-  return runCli(fulcrumHome, ["init"]);
+async function runInit(fulcrumHome: string, project: string) {
+  return runCli(fulcrumHome, ["init", project]);
 }
 
 describe("fulcrum init", () => {
@@ -36,6 +38,8 @@ describe("fulcrum init", () => {
 
   beforeEach(async () => {
     scratch = await mkdtemp(join(tmpdir(), "fulcrum-init-cli-"));
+    await mkdir(join(scratch, ".fulcrum", "home"), { recursive: true });
+    await mkdir(join(scratch, ".fulcrum", "bin"), { recursive: true });
   });
 
   afterEach(async () => {
@@ -45,21 +49,24 @@ describe("fulcrum init", () => {
   test("exits 0 on first run and second run", async () => {
     const fulcrumHome = join(scratch, ".fulcrum");
 
-    const first = await runInit(fulcrumHome);
+    const first = await runInit(fulcrumHome, scratch);
     expect(first.exitCode).toBe(0);
     expect(first.stderr).toBe("");
+    expect(await readFile(join(scratch, "AGENTS.md"), "utf8")).toContain("# AGENTS.md");
+    expect(await readFile(join(scratch, ".claude", "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
 
-    const second = await runInit(fulcrumHome);
+    const second = await runInit(fulcrumHome, scratch);
     expect(second.exitCode).toBe(0);
     expect(second.stderr).toBe("");
-    expect(second.stdout).toContain("Already initialized");
+    expect(second.stdout).toContain("AGENTS.md  (kept)");
+    expect(second.stdout).toContain(".claude/CLAUDE.md  (kept)");
   }, 15_000);
 
   test.skip("initializes migration ledger so db commands agree on local state", async () => {
     // Skip: `db status` depends on DI container resolving MigratorService — pre-existing wiring gap
     const fulcrumHome = join(scratch, ".fulcrum");
 
-    const init = await runInit(fulcrumHome);
+    const init = await runInit(fulcrumHome, scratch);
     expect(init.exitCode).toBe(0);
     expect(init.stderr).toBe("");
 
