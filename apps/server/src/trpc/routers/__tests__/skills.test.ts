@@ -126,6 +126,8 @@ describe("skills tRPC router", () => {
 
     await writeFile(join(home, ".claude", "skills", "demo-skill", "SKILL.md"), SKILL_V1, "utf8");
     const syncResult = await caller.fulcrum_skills.sync({ fetchUpstream: true });
+    expect(syncResult.ok).toBe(true);
+    expect(typeof syncResult.trace_id).toBe("string");
     expect(syncResult.conflicts).toEqual(["demo-skill"]);
     // upstream_conflict may be undefined (replaced by SkillConflict entity in 04-05)
     if ((await readSkillsLockFile())["demo-skill"]?.upstream_conflict) {

@@ -22,6 +22,7 @@ import {
 } from "@platform-core/domain/skills.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
+import { ensureRequestId } from "@fulcrum/server/trpc/context.ts";
 
 const InstallInputSchema = z.object({
   path: z.string().min(1),
@@ -40,6 +41,8 @@ const SyncInputSchema = z.object({
 });
 
 const SyncResultSchema = z.object({
+  ok: z.literal(true),
+  trace_id: z.string().min(1),
   merged: z.array(z.string()),
   conflicts: z.array(z.string()),
   errors: z.array(z.string()),
@@ -102,7 +105,11 @@ export const skillsRouter = t.router({
   sync: permissionedProcedure({ resource: "fulcrum_skills", action: "sync" })
     .input(SyncInputSchema)
     .output(SyncResultSchema)
-    .mutation(({ ctx, input }) => syncFulcrumSkills(appContext(ctx), input)),
+    .mutation(async ({ ctx, input }) => ({
+      ok: true,
+      trace_id: ensureRequestId(ctx),
+      ...await syncFulcrumSkills(appContext(ctx), input),
+    })),
 
   resolveConflict: permissionedProcedure({ resource: "fulcrum_skills", action: "resolveConflict" })
     .input(ResolveConflictInputSchema)

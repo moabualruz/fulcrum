@@ -87,7 +87,7 @@ export class SkillLockStore {
     return { ok: true, slug: input.slug };
   }
 
-  async sync(input: { fetchUpstream: boolean }): Promise<SkillSupplySyncResult> {
+  async sync(input: { fetchUpstream?: boolean } = {}): Promise<SkillSupplySyncResult> {
     const conflicts = (await this.listConflicts()).map((conflict) => conflict.slug);
     return {
       merged: [],

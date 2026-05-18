@@ -11,7 +11,7 @@ export class SkillSupplyUpgradeDto {
 }
 
 export class SkillSupplySyncDto {
-  fetchUpstream!: boolean;
+  fetchUpstream?: boolean;
 }
 
 export class SkillSupplyResolveConflictDto {
