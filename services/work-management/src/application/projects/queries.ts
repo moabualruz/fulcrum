@@ -171,7 +171,7 @@ export async function resolveProjectIdByKey(
 ): Promise<string | null> {
   if (!projectKey) return null;
   const idPredicate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectKey)
-    ? " OR id = $2"
+    ? " OR id::text = $2"
     : "";
   const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
     `SELECT id FROM projects WHERE org_id = $1 AND (slug = $2${idPredicate}) LIMIT 1`,
