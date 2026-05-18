@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { getWorkspaceDiff, paginateLogs } from "$lib/server/agents";
+import { paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
@@ -82,7 +82,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
         const run = { ...data.run, status: data.run.status as RunStatus };
         const transcript = data.transcript;
         const logs = transcript ? paginateLogs(transcript, 0, 100) : null;
-        const diff = await getWorkspaceDiff();
+        const diff = data.diff;
         const observability: RunObservabilityPayload = {
           context: {
             sourceRefs: [],

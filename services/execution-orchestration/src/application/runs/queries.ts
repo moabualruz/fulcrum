@@ -202,6 +202,7 @@ export interface AgentRunDetailRow extends ProjectRunRow {
   prompt: string | null;
   parent_run_id: string | null;
   transcript_path: string | null;
+  workspace_diff_path: string | null;
 }
 
 export interface RunEventRow {
@@ -393,6 +394,7 @@ export async function getProjectRunPageData(
 ): Promise<{
   run: AgentRunDetailRow;
   transcript: string | null;
+  diff: string | null;
   artifacts: Array<{
     id: string;
     org_id: string;
@@ -428,6 +430,7 @@ export async function getProjectRunPageData(
   const parentExpr = columns.has("parent_run_id") ? "ar.parent_run_id" : "NULL::text";
   const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
   const transcriptExpr = columns.has("transcript_path") ? "ar.transcript_path" : "NULL::text";
+  const diffExpr = columns.has("workspace_diff_path") ? "ar.workspace_diff_path" : "NULL::text";
   const errorExpr = columns.has("last_error_kind") ? "ar.last_error_kind" : "NULL::text";
   const retryExpr = columns.has("retry_count") ? "ar.retry_count" : columns.has("attempt_count") ? "ar.attempt_count" : "0";
   const workspaceExpr = columns.has("workspace_path") ? "ar.workspace_path" : "NULL::text";
@@ -446,6 +449,7 @@ export async function getProjectRunPageData(
             ar.started_at,
             ${endedExpr} AS ended_at,
             ${transcriptExpr} AS transcript_path,
+            ${diffExpr} AS workspace_diff_path,
             ${errorExpr} AS last_error_kind,
             ${retryExpr} AS retry_count,
             ${workspaceExpr} AS workspace_path
@@ -467,6 +471,16 @@ export async function getProjectRunPageData(
   if (run.transcript_path) {
     try {
       transcript = await readFile(run.transcript_path, "utf8");
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+    }
+  }
+
+  let diff: string | null = null;
+  if (run.workspace_diff_path) {
+    try {
+      diff = await readFile(run.workspace_diff_path, "utf8");
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
@@ -535,7 +549,7 @@ export async function getProjectRunPageData(
     ...event,
     created_at: isoStamp(event.created_at),
   }));
-  return { run, transcript, artifacts, events, approvalQueue: buildApprovalQueue(events) };
+  return { run, transcript, diff, artifacts, events, approvalQueue: buildApprovalQueue(events) };
 }
 
 function buildApprovalQueue(events: Array<RunEventRow & { created_at: string }>): ApprovalQueueItem[] {

@@ -15,7 +15,7 @@
 
   let { data }: Props = $props();
 
-  type Tab = "transcript" | "payload" | "events";
+  type Tab = "transcript" | "diff" | "payload" | "events";
   let tab = $state<Tab>("transcript");
   let showCancel = $state(false);
   let showRetry = $state(false);
@@ -43,6 +43,14 @@
     argsSummary: string | null;
     resultStatus: string | null;
     copyText: string;
+  };
+
+  type DiffLine = {
+    key: string;
+    kind: "file" | "hunk" | "add" | "delete" | "context";
+    oldLine: number | null;
+    newLine: number | null;
+    text: string;
   };
 
   function payloadString(payload: Record<string, unknown>, keys: string[]): string | null {
@@ -113,6 +121,50 @@
       }));
   }
 
+  function diffFiles(diff: string | null): string[] {
+    if (!diff) return [];
+    return diff
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("diff --git "))
+      .map((line) => line.replace(/^diff --git a\//, "").replace(/ b\/.*$/, ""))
+      .filter(Boolean);
+  }
+
+  function diffLines(diff: string | null): DiffLine[] {
+    if (!diff) return [];
+    let oldLine: number | null = null;
+    let newLine: number | null = null;
+    return diff.split(/\r?\n/).map((text, index) => {
+      const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
+      if (text.startsWith("diff --git ")) {
+        oldLine = null;
+        newLine = null;
+        return { key: `${index}:file`, kind: "file", oldLine: null, newLine: null, text };
+      }
+      if (hunk) {
+        oldLine = Number(hunk[1]);
+        newLine = Number(hunk[2]);
+        return { key: `${index}:hunk`, kind: "hunk", oldLine: null, newLine: null, text };
+      }
+      if (text.startsWith("+") && !text.startsWith("+++")) {
+        const line = { key: `${index}:add`, kind: "add" as const, oldLine: null, newLine, text };
+        if (newLine !== null) newLine += 1;
+        return line;
+      }
+      if (text.startsWith("-") && !text.startsWith("---")) {
+        const line = { key: `${index}:delete`, kind: "delete" as const, oldLine, newLine: null, text };
+        if (oldLine !== null) oldLine += 1;
+        return line;
+      }
+      const line = { key: `${index}:context`, kind: "context" as const, oldLine, newLine, text };
+      if (oldLine !== null && newLine !== null && !text.startsWith("+++") && !text.startsWith("---")) {
+        oldLine += 1;
+        newLine += 1;
+      }
+      return line;
+    });
+  }
+
   async function copyText(value: string): Promise<void> {
     if (!browser || !navigator.clipboard) return;
     await navigator.clipboard.writeText(value);
@@ -138,9 +190,12 @@
 {:then payload}
   {@const run = payload.run}
   {@const transcript = payload.transcript}
+  {@const diff = payload.diff}
   {@const events = payload.events}
   {@const approvalQueue = payload.approvalQueue}
   {@const liveSessionItems = buildLiveSessionItems(events, transcript)}
+  {@const changedFiles = diffFiles(diff)}
+  {@const renderedDiffLines = diffLines(diff)}
   <header
     data-project-run-detail-header
     class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -306,11 +361,51 @@
         {/each}
       </ol>
     </div>
+    <div data-live-file-diff-pane class={cn("border-t border-border p-3")}>
+      <div class={cn("mb-2 flex flex-wrap items-center justify-between gap-2")}>
+        <div>
+          <h3 class={cn("text-sm font-semibold")}>File changes</h3>
+          <p data-file-scope-validation class={cn("text-xs text-muted-foreground")}>
+            {changedFiles.length} changed {changedFiles.length === 1 ? "file" : "files"} · deletions marked · scope validated before unsafe writes
+          </p>
+        </div>
+        {#if changedFiles.length > 0}
+          <div data-file-scope-list class={cn("flex flex-wrap gap-1")}>
+            {#each changedFiles as file}
+              <code class={cn("rounded bg-muted px-1.5 py-0.5 text-[11px]")}>{file}</code>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      {#if renderedDiffLines.length > 0}
+        <ol data-live-unified-diff class={cn("max-h-[34vh] overflow-auto rounded-md border border-border bg-muted/20 font-mono text-[11px]")}>
+          {#each renderedDiffLines as line (line.key)}
+            <li
+              data-diff-line={line.kind}
+              class={cn(
+                "grid grid-cols-[4rem_4rem_minmax(0,1fr)] gap-2 px-2 py-0.5",
+                line.kind === "add" && "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+                line.kind === "delete" && "bg-destructive/10 text-destructive",
+                line.kind === "hunk" && "bg-primary/10 text-primary",
+                line.kind === "file" && "bg-muted text-foreground font-semibold",
+              )}
+            >
+              <span data-diff-old-line class={cn("select-none text-right text-muted-foreground")}>{line.oldLine ?? ""}</span>
+              <span data-diff-new-line class={cn("select-none text-right text-muted-foreground")}>{line.newLine ?? ""}</span>
+              <code class={cn("min-w-0 whitespace-pre-wrap break-words")}>{line.text}</code>
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <div data-live-unified-diff-empty class={cn("rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground")}>No file changes recorded yet.</div>
+      {/if}
+    </div>
   </section>
 
   <!-- Tabs -->
   <div data-runs-tabs role="tablist" class={cn("mb-2 flex items-center gap-2 border-b border-border")}>
     <button type="button" role="tab" data-tab="transcript" data-active={tab === "transcript"} onclick={() => selectTab("transcript")} class={cn("h-9 px-3 text-sm", tab === "transcript" && "font-semibold border-b-2 border-primary")}>Transcript</button>
+    <button type="button" role="tab" data-tab="diff" data-active={tab === "diff"} onclick={() => selectTab("diff")} class={cn("h-9 px-3 text-sm", tab === "diff" && "font-semibold border-b-2 border-primary")}>Diff</button>
     <button type="button" role="tab" data-tab="payload" data-active={tab === "payload"} onclick={() => selectTab("payload")} class={cn("h-9 px-3 text-sm", tab === "payload" && "font-semibold border-b-2 border-primary")}>Payload</button>
     <button type="button" role="tab" data-tab="events" data-active={tab === "events"} onclick={() => selectTab("events")} class={cn("h-9 px-3 text-sm", tab === "events" && "font-semibold border-b-2 border-primary")}>Events</button>
   </div>
@@ -320,6 +415,31 @@
       <pre data-runs-transcript class={cn("max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap")}>{transcript}</pre>
     {:else}
       <div data-runs-transcript-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>No transcript recorded</div>
+    {/if}
+  </div>
+
+  <div role="tabpanel" data-runs-tabpanel="diff" hidden={tab !== "diff"}>
+    {#if renderedDiffLines.length > 0}
+      <ol data-runs-diff class={cn("max-h-[60vh] overflow-auto rounded-md border border-border bg-muted/20 font-mono text-xs")}>
+        {#each renderedDiffLines as line (line.key)}
+          <li
+            data-diff-line={line.kind}
+            class={cn(
+              "grid grid-cols-[4rem_4rem_minmax(0,1fr)] gap-2 px-2 py-0.5",
+              line.kind === "add" && "bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
+              line.kind === "delete" && "bg-destructive/10 text-destructive",
+              line.kind === "hunk" && "bg-primary/10 text-primary",
+              line.kind === "file" && "bg-muted text-foreground font-semibold",
+            )}
+          >
+            <span data-diff-old-line class={cn("select-none text-right text-muted-foreground")}>{line.oldLine ?? ""}</span>
+            <span data-diff-new-line class={cn("select-none text-right text-muted-foreground")}>{line.newLine ?? ""}</span>
+            <code class={cn("min-w-0 whitespace-pre-wrap break-words")}>{line.text}</code>
+          </li>
+        {/each}
+      </ol>
+    {:else}
+      <div data-runs-diff-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>No workspace diff recorded</div>
     {/if}
   </div>
 

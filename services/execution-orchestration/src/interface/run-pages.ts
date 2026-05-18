@@ -22,6 +22,7 @@ export type {
 export interface ProjectRunPageData {
   run: AgentRunDetailRow;
   transcript: string | null;
+  diff: string | null;
   artifacts: Array<{
     id: string;
     org_id: string;

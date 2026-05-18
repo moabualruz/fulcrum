@@ -19,10 +19,13 @@ describe("/projects/[id]/runs/[runId] +page.svelte source", () => {
   test("renders transcript, payload, and event tabs for dependency run feedback", () => {
     expect(source).toContain("data-runs-tabs");
     expect(source).toContain('data-tab="transcript"');
+    expect(source).toContain('data-tab="diff"');
     expect(source).toContain('data-tab="payload"');
     expect(source).toContain('data-tab="events"');
     expect(source).toContain('data-runs-tabpanel="transcript"');
+    expect(source).toContain('data-runs-tabpanel="diff"');
     expect(source).toContain("data-runs-transcript");
+    expect(source).toContain("data-runs-diff");
     expect(source).toContain("data-runs-payload");
     expect(source).toContain("data-runs-events");
     expect(source).toContain("event.verb");
@@ -41,6 +44,12 @@ describe("/projects/[id]/runs/[runId] +page.svelte source", () => {
     expect(source).toContain("data-tool-output-copy");
     expect(source).toContain("data-diff-preview");
     expect(source).toContain("data-approval-gate");
+    expect(source).toContain("data-live-file-diff-pane");
+    expect(source).toContain("data-file-scope-validation");
+    expect(source).toContain("data-live-unified-diff");
+    expect(source).toContain("data-diff-old-line");
+    expect(source).toContain("data-diff-new-line");
+    expect(source).toContain("data-diff-line");
     expect(source).toContain("navigator.clipboard.writeText");
   });
 

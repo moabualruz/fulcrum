@@ -39,8 +39,10 @@ const mockEvents = [
 const mockPageData = {
   run: mockRun,
   transcript: "Hello world transcript",
+  diff: "diff --git a/src/app.ts b/src/app.ts\n@@ -1 +1 @@\n-old\n+new\n",
   artifacts: [],
   events: mockEvents,
+  approvalQueue: [],
 };
 
 mock.module("$lib/server/request-service-scope", () => ({
@@ -67,6 +69,10 @@ mock.module("@execution-orchestration/interface/run-actions.ts", () => ({
   retryRun: async (_em: unknown, _ctx: unknown, runId: string) => {
     calls.push(`retry:${runId}`);
     return { id: "run-2" };
+  },
+  recordRunApprovalDecision: async (_em: unknown, _ctx: unknown, input: { runId: string; approvalId: string; decision: string }) => {
+    calls.push(`approval:${input.runId}:${input.approvalId}:${input.decision}`);
+    return { ok: true };
   },
 }));
 
@@ -111,6 +117,7 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     expect(payload.run.agent).toBe("codex");
     expect(payload.run.status).toBe("succeeded");
     expect(payload.transcript).toBe("Hello world transcript");
+    expect(payload.diff).toContain("diff --git");
     expect(payload.events).toHaveLength(1);
     expect(payload.events[0].verb).toBe("run.started");
     expect(calls).toEqual(["getRunPage:run-1"]);
