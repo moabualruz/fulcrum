@@ -44,13 +44,47 @@ function validPageTreeInput(): DocumentWorkspacePageTreeRequestDto {
 function validPageOperationsInput(): DocumentWorkspacePageOperationsRequestDto {
   return Object.assign(new DocumentWorkspacePageOperationsRequestDto(), {
     pages: [
-      { id: "root", parentPageId: null },
-      { id: "visible", parentPageId: "root" },
-      { id: "blocked", parentPageId: "root" },
-      { id: "blocked-child", parentPageId: "blocked" },
+      { id: "root", parentPageId: null, title: "Root", position: "10", projectId: "space-docs" },
+      { id: "visible", parentPageId: "root", title: "Visible", position: "10", projectId: "space-docs" },
+      { id: "blocked", parentPageId: "root", title: "Blocked", position: "20", projectId: "space-docs" },
+      { id: "blocked-child", parentPageId: "blocked", title: "Blocked child", position: "10", projectId: "space-docs" },
     ],
     rootPageId: "root",
     accessibleTreePageIds: ["root", "visible", "blocked-child"],
+    operations: {
+      rename: { nodeId: "visible", name: "Visible renamed" },
+      icon: { nodeId: "visible", icon: "spark" },
+      deleteIds: ["blocked"],
+      appendChildren: [{
+        nodeId: "visible",
+        children: [{
+          id: "visible-child",
+          slugId: "visible-child",
+          name: "Visible child",
+          position: "20",
+          spaceId: "space-docs",
+          parentPageId: "visible",
+          hasChildren: false,
+          children: [],
+        }],
+      }],
+      mergeRoots: [{
+        id: "incoming-root",
+        slugId: "incoming-root",
+        name: "Incoming root",
+        position: "30",
+        spaceId: "space-docs",
+        parentPageId: null,
+        hasChildren: false,
+        children: [],
+      }],
+      move: {
+        nodeId: "incoming-root",
+        parentPageId: "root",
+        previousSiblingPosition: "20",
+        nextSiblingPosition: "40",
+      },
+    },
     sidebar: {
       result: {
         items: [
@@ -117,6 +151,7 @@ describe("Workflow docs Nest controller", () => {
       async previewPageOperations() {
         return {
           accessibleTree: [],
+          operationsPreview: { tree: [], persistedMoves: [], applied: [] },
           sidebar: { items: [], meta: { limit: 20 } },
           recent: { items: [], meta: { limit: 20 } },
         };
@@ -132,6 +167,7 @@ describe("Workflow docs Nest controller", () => {
     const input = validPageOperationsInput();
     const preview: DocumentWorkspacePageOperationsOutput = {
       accessibleTree: [],
+      operationsPreview: { tree: [], persistedMoves: [], applied: [] },
       sidebar: { items: [], meta: { limit: 20 } },
       recent: { items: [], meta: { limit: 20 } },
     };
@@ -194,6 +230,21 @@ describe("Workflow docs Nest controller", () => {
     const result = await service.previewPageOperations(validPageOperationsInput());
 
     expect(result.accessibleTree.map((page) => page.id)).toEqual(["root", "visible"]);
+    expect(result.operationsPreview.applied).toEqual(["rename", "icon", "delete", "append", "merge", "move"]);
+    expect(result.operationsPreview.persistedMoves).toEqual([{
+      id: "incoming-root",
+      parentPageId: "root",
+      position: "30",
+    }]);
+    expect(result.operationsPreview.tree[0]?.children.map((node) => node.id)).toEqual([
+      "visible",
+      "incoming-root",
+    ]);
+    expect(result.operationsPreview.tree[0]?.children[0]).toMatchObject({
+      id: "visible",
+      name: "Visible renamed",
+      icon: "spark",
+    });
     expect(result.sidebar.items).toEqual([
       { id: "root", hasChildren: true, canEdit: true },
       { id: "visible", hasChildren: false, canEdit: false },

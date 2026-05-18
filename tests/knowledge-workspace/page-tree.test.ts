@@ -6,6 +6,7 @@ import {
   deleteDocumentTreeNode,
   findDocumentBreadcrumbPath,
   mergeDocumentRootTrees,
+  previewDocumentTreeOperations,
   renameDocumentTreeNode,
   setDocumentTreeNodeIcon,
   sortDocumentPositionKeys,
@@ -64,12 +65,12 @@ const docs: FulcrumDocTreePage[] = [
 describe("document workspace page tree behavior", () => {
   test("sorts position keys the way document tree nodes are ordered", () => {
     const sorted = sortDocumentPositionKeys([
-      { id: "b", position: "20" },
       { id: "a", position: "10" },
+      { id: "b", position: "2" },
       { id: "c", position: "30" },
     ]);
 
-    expect(sorted.map((item) => item.id)).toEqual(["a", "b", "c"]);
+    expect(sorted.map((item) => item.id)).toEqual(["b", "a", "c"]);
   });
 
   test("builds a nested page tree from flat Fulcrum docs and sorts each level", () => {
@@ -173,5 +174,55 @@ describe("document workspace page tree behavior", () => {
 
     expect(merged.map((node) => node.id)).toEqual(["root-a", "root-b", "root-c"]);
     expect(merged[0]?.slugId).toBe("root-a");
+  });
+
+  test("previews rename, icon, delete, append, merge, and persisted move operations", () => {
+    const tree = buildDocumentPageTree(docs);
+    const preview = previewDocumentTreeOperations({
+      tree,
+      rename: { nodeId: "child-a", name: "Renamed child" },
+      icon: { nodeId: "child-a", icon: "spark" },
+      deleteIds: ["child-b"],
+      appendChildren: [{
+        nodeId: "child-a",
+        children: [{
+          id: "child-a-new",
+          slugId: "child-a-new",
+          name: "New child",
+          position: "20",
+          spaceId: "space-1",
+          parentPageId: "child-a",
+          hasChildren: false,
+          children: [],
+        }],
+      }],
+      mergeRoots: [{
+        id: "root-c",
+        slugId: "root-c",
+        name: "Root C",
+        position: "30",
+        spaceId: "space-1",
+        parentPageId: null,
+        hasChildren: false,
+        children: [],
+      }],
+      move: {
+        nodeId: "root-c",
+        parentPageId: "root-b",
+        previousSiblingPosition: "20",
+        nextSiblingPosition: "40",
+      },
+    });
+
+    expect(preview.applied).toEqual(["rename", "icon", "delete", "append", "merge", "move"]);
+    expect(preview.persistedMoves).toEqual([{ id: "root-c", parentPageId: "root-b", position: "30" }]);
+    expect(preview.tree.map((node) => node.id)).toEqual(["root-a", "root-b"]);
+    expect(preview.tree[1]?.children.map((node) => node.id)).toEqual(["child-a", "root-c"]);
+    expect(preview.tree[1]?.children[0]).toMatchObject({
+      id: "child-a",
+      name: "Renamed child",
+      icon: "spark",
+    });
+    expect(preview.tree[1]?.children[0]?.children.map((node) => node.id)).toEqual(["child-a-new"]);
   });
 });
