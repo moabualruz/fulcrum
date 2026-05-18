@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Region from "./toast-region.svelte";
 
 export type { ToastRegionProps } from "./toast-region.svelte";

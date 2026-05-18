@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
   import { dndzone, type DndEvent } from "svelte-dnd-action";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";

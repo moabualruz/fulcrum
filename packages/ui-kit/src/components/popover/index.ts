@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./popover.svelte";
 import Trigger from "./popover-trigger.svelte";
 import Content from "./popover-content.svelte";

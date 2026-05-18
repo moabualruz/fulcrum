@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
-  import { buttonVariants } from "$lib/components/ui/button/index.js";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import type { TaskStatus } from "$lib/server/tasks";
   import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";

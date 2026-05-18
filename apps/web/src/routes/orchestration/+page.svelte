@@ -6,7 +6,7 @@
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import { SYMPHONY_COLORS, type SymphonyState } from "$lib/orchestration";
 
   interface Props {

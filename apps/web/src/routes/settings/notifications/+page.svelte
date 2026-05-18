@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageData, ActionData } from "./$types";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

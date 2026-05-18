@@ -1,6 +1,10 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./button.svelte";
+export {
+	buttonVariants,
+	type ButtonProps,
+	type ButtonSize,
+	type ButtonVariant,
+} from "./button.svelte";
 
 export {
 	Root,

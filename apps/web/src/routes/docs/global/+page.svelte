@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 	import type { DocTreeNode } from "$lib/server/doc-tree";
 

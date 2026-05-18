@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./card.svelte";
 import Content from "./card-content.svelte";
 import Description from "./card-description.svelte";

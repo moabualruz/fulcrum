@@ -2,7 +2,7 @@
   import type { PageData, ActionData } from "./$types";
   import { enhance } from "$app/forms";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import { toast } from "svelte-sonner";
 
   interface Props { data: PageData; form: ActionData }

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import * as Sheet from "$lib/components/ui/sheet";
+  import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
   import * as ScrollArea from "$lib/components/ui/scroll-area";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import HistoryIcon from "@lucide/svelte/icons/history";
   import UserIcon from "@lucide/svelte/icons/user";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
@@ -90,14 +90,14 @@
   }
 </script>
 
-<Sheet.Root bind:open>
-  <Sheet.Content side="right" class={cn("w-[360px] p-0")}>
-    <Sheet.Header class={cn("border-b border-border px-4 py-3")}>
-      <Sheet.Title class={cn("flex items-center gap-2 text-base")}>
+<Sheet bind:open>
+  <SheetContent side="right" class={cn("w-[360px] p-0")}>
+    <SheetHeader class={cn("border-b border-border px-4 py-3")}>
+      <SheetTitle class={cn("flex items-center gap-2 text-base")}>
         <HistoryIcon class={cn("size-4")} />
         Version history
-      </Sheet.Title>
-    </Sheet.Header>
+      </SheetTitle>
+    </SheetHeader>
 
     <ScrollArea.Root class={cn("h-[calc(100vh-60px)]")}>
       <ScrollArea.Viewport class={cn("px-0 py-2")}>
@@ -230,5 +230,5 @@
       </ScrollArea.Viewport>
       <ScrollArea.Scrollbar orientation="vertical" />
     </ScrollArea.Root>
-  </Sheet.Content>
-</Sheet.Root>
+  </SheetContent>
+</Sheet>

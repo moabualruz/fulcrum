@@ -3,7 +3,7 @@
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import {
 		applyTemplateSelectionChange,
 		buildDocTypeOptions,

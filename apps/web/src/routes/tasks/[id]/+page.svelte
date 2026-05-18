@@ -3,7 +3,7 @@
   import type { TaskStatus } from "$lib/server/tasks";
   import { TASK_STATUSES, describeStatus } from "$lib/components/board/board-helpers";
   import { matchTaskShortcut } from "$lib/components/task-detail/task-detail-helpers";
-  import { buttonVariants } from "$lib/components/ui/button/index.js";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 

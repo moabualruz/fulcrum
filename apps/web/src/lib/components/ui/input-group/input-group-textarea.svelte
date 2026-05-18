@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from "$lib/utils.js";
-	import { Textarea } from "$lib/components/ui/textarea/index.js";
+	import { Textarea } from "@fulcrum/ui-kit";
 	import type { ComponentProps } from "svelte";
 
 	let {

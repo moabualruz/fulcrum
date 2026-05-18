@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { cn } from "$lib/utils.js";
 

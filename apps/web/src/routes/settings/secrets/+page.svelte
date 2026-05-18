@@ -2,9 +2,9 @@
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import * as Sheet from "$lib/components/ui/sheet";
+  import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
 
   interface Props { data: PageData }
   let { data }: Props = $props();
@@ -28,11 +28,11 @@
   >Add secret</button>
 </header>
 
-<Sheet.Root bind:open={sheetOpen}>
-  <Sheet.Content side="right" class="w-96">
-    <Sheet.Header>
-      <Sheet.Title>Add secret</Sheet.Title>
-    </Sheet.Header>
+<Sheet bind:open={sheetOpen}>
+  <SheetContent side="right" class="w-96">
+    <SheetHeader>
+      <SheetTitle>Add secret</SheetTitle>
+    </SheetHeader>
     <form
       method="POST"
       action="?/add"
@@ -69,8 +69,8 @@
       </label>
       <button type="submit" class={cn(buttonVariants({ variant: "default" }))}>Save</button>
     </form>
-  </Sheet.Content>
-</Sheet.Root>
+  </SheetContent>
+</Sheet>
 
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />

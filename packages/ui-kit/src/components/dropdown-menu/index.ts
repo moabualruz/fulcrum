@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./dropdown-menu.svelte";
 import Sub from "./dropdown-menu-sub.svelte";
 import CheckboxGroup from "./dropdown-menu-checkbox-group.svelte";

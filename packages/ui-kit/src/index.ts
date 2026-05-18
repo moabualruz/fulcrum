@@ -1,8 +1,10 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 export {
 	Button,
+	buttonVariants,
 	Root as ButtonRoot,
+	type ButtonProps,
+	type ButtonSize,
+	type ButtonVariant,
 } from "./components/button/index.js";
 export { Input, Root as InputRoot } from "./components/input/index.js";
 export {

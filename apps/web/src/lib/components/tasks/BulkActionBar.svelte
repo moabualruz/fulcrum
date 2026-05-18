@@ -3,9 +3,9 @@
    * BulkActionBar — multi-select bulk action toolbar.
    */
   import { createEventDispatcher } from "svelte";
-  import * as Popover from "$lib/components/ui/popover/index.js";
-  import { Button } from "$lib/components/ui/button/index.js";
-  import * as Select from "$lib/components/ui/select/index.js";
+  import { Popover, PopoverTrigger, PopoverContent } from "@fulcrum/ui-kit";
+  import { Button } from "@fulcrum/ui-kit";
+  import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@fulcrum/ui-kit";
   import BulkCustomFieldEdit from "./BulkCustomFieldEdit.svelte";
   import {
     submitBulkTaskCustomFieldPatch,
@@ -217,33 +217,33 @@
     <div class="h-4 w-px bg-border mx-1" />
 
     <!-- Set Status -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Status
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-48 p-2 space-y-2">
-        <Select.Root onSelectedChange={(v) => { statusValue = v?.value ?? ""; }}>
-          <Select.Trigger class="w-full h-8 text-xs"><Select.Value placeholder="Pick status..." /></Select.Trigger>
-          <Select.Content>
+      </PopoverTrigger>
+      <PopoverContent class="w-48 p-2 space-y-2">
+        <Select onSelectedChange={(v) => { statusValue = v?.value ?? ""; }}>
+          <SelectTrigger class="w-full h-8 text-xs"><SelectValue placeholder="Pick status..." /></SelectTrigger>
+          <SelectContent>
             {#each STATUS_OPTIONS as opt}
-              <Select.Item value={opt.value} label={opt.label}>{opt.label}</Select.Item>
+              <SelectItem value={opt.value} label={opt.label}>{opt.label}</SelectItem>
             {/each}
-          </Select.Content>
-        </Select.Root>
+          </SelectContent>
+        </Select>
         <Button size="sm" class="w-full h-7 text-xs" on:click={handleSetStatus} disabled={!statusValue}>Apply</Button>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Set Assignee -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Assignee
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-48 p-2 space-y-2">
+      </PopoverTrigger>
+      <PopoverContent class="w-48 p-2 space-y-2">
         <input
           type="text"
           class="w-full h-8 text-xs border rounded px-2"
@@ -251,37 +251,37 @@
           bind:value={assigneeValue}
         />
         <Button size="sm" class="w-full h-7 text-xs" on:click={handleSetAssignee}>Apply</Button>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Set Priority -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Priority
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-44 p-2 space-y-2">
-        <Select.Root onSelectedChange={(v) => { priorityValue = v?.value ?? ""; }}>
-          <Select.Trigger class="w-full h-8 text-xs"><Select.Value placeholder="Pick priority..." /></Select.Trigger>
-          <Select.Content>
+      </PopoverTrigger>
+      <PopoverContent class="w-44 p-2 space-y-2">
+        <Select onSelectedChange={(v) => { priorityValue = v?.value ?? ""; }}>
+          <SelectTrigger class="w-full h-8 text-xs"><SelectValue placeholder="Pick priority..." /></SelectTrigger>
+          <SelectContent>
             {#each PRIORITY_OPTIONS as opt}
-              <Select.Item value={opt.value} label={opt.label}>{opt.label}</Select.Item>
+              <SelectItem value={opt.value} label={opt.label}>{opt.label}</SelectItem>
             {/each}
-          </Select.Content>
-        </Select.Root>
+          </SelectContent>
+        </Select>
         <Button size="sm" class="w-full h-7 text-xs" on:click={handleSetPriority} disabled={!priorityValue}>Apply</Button>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Add Label -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Add Label
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-48 p-2 space-y-2">
+      </PopoverTrigger>
+      <PopoverContent class="w-48 p-2 space-y-2">
         <input
           type="text"
           class="w-full h-8 text-xs border rounded px-2"
@@ -292,17 +292,17 @@
           <Button size="sm" class="flex-1 h-7 text-xs" on:click={handleAddLabel}>Add</Button>
           <Button variant="outline" size="sm" class="flex-1 h-7 text-xs" on:click={handleRemoveLabel}>Remove</Button>
         </div>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Move to Sprint -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Move to Sprint
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-48 p-2 space-y-2">
+      </PopoverTrigger>
+      <PopoverContent class="w-48 p-2 space-y-2">
         <input
           type="text"
           class="w-full h-8 text-xs border rounded px-2"
@@ -310,41 +310,41 @@
           bind:value={sprintValue}
         />
         <Button size="sm" class="w-full h-7 text-xs" on:click={handleMoveToSprint}>Apply</Button>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Set Due Date -->
-    <Popover.Root>
-      <Popover.Trigger asChild let:builder>
+    <Popover>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Due Date
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-44 p-2 space-y-2">
+      </PopoverTrigger>
+      <PopoverContent class="w-44 p-2 space-y-2">
         <input
           type="date"
           class="w-full h-8 text-xs border rounded px-2"
           bind:value={dueDateValue}
         />
         <Button size="sm" class="w-full h-7 text-xs" on:click={handleSetDueDate} disabled={!dueDateValue}>Apply</Button>
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <!-- Edit Custom Fields -->
-    <Popover.Root bind:open={showCustomFieldEdit}>
-      <Popover.Trigger asChild let:builder>
+    <Popover bind:open={showCustomFieldEdit}>
+      <PopoverTrigger asChild let:builder>
         <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Custom Fields
         </Button>
-      </Popover.Trigger>
-      <Popover.Content class="w-72 p-3">
+      </PopoverTrigger>
+      <PopoverContent class="w-72 p-3">
         <BulkCustomFieldEdit
           {customFieldDefs}
           on:patch={handleCustomFieldPatch}
           on:cancel={() => { showCustomFieldEdit = false; }}
         />
-      </Popover.Content>
-    </Popover.Root>
+      </PopoverContent>
+    </Popover>
 
     <div class="h-4 w-px bg-border mx-1" />
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
+	import { Button, type ButtonProps } from "@fulcrum/ui-kit";
 
 	let { ref = $bindable(null), ...restProps }: ButtonProps = $props();
 </script>

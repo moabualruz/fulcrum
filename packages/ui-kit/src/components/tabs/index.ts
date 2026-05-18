@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./tabs.svelte";
 import List from "./tabs-list.svelte";
 import Trigger from "./tabs-trigger.svelte";

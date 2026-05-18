@@ -2,7 +2,7 @@
 	import Sun from "@lucide/svelte/icons/sun";
 	import Cpu from "@lucide/svelte/icons/cpu";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";

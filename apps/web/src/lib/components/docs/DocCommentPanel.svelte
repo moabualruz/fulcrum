@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import CheckIcon from "@lucide/svelte/icons/check";
   import MessageSquareIcon from "@lucide/svelte/icons/message-square";
   import UserIcon from "@lucide/svelte/icons/user";

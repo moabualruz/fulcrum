@@ -5,7 +5,7 @@
 	import * as Dialog from "./index.js";
 	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
 	import type { ComponentProps } from "svelte";
-	import { Button } from "$lib/components/ui/button/index.js";
+	import { Button } from "@fulcrum/ui-kit";
 	import XIcon from '@lucide/svelte/icons/x';
 
 	let {

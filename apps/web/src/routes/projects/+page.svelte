@@ -6,7 +6,7 @@
 	import XIcon from "@lucide/svelte/icons/x";
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import SetActiveButton from "$lib/components/projects/SetActiveButton.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import { cn } from "$lib/utils.js";

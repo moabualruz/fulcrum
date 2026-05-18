@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./radio-group.svelte";
 import Item from "./radio-group-item.svelte";
 

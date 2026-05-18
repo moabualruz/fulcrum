@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from "$app/state";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	import { LUCIDE_ICONS, NAV_GROUPS, type NavItem } from "./nav-items.ts";

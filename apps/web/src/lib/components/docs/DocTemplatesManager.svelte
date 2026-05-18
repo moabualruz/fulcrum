@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DOC_TYPE_LABELS, groupTemplatesByDocType, type WebDocTemplate } from "$lib/docs/doc-templates";
 	import { SEEDED_DOC_TYPES } from "$lib/docs/template-picker";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {

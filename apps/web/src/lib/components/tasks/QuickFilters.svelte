@@ -6,7 +6,7 @@
   import { createEventDispatcher } from "svelte";
   import type { SavedViewQuery } from "@work-management/interface/saved-view-filters.ts";
   import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
-  import { Button } from "$lib/components/ui/button/index.js";
+  import { Button } from "@fulcrum/ui-kit";
 
   interface Props {
     currentUserId?: string;

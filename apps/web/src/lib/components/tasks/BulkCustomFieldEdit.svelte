@@ -5,9 +5,9 @@
    * user, url, boolean, checkbox.
    */
   import { createEventDispatcher } from "svelte";
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import * as Select from "$lib/components/ui/select/index.js";
+  import { Button } from "@fulcrum/ui-kit";
+  import { Input } from "@fulcrum/ui-kit";
+  import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@fulcrum/ui-kit";
 
   interface Props {
     customFieldDefs?: Array<{
@@ -90,19 +90,19 @@
   <!-- Field picker -->
   <div class="space-y-1">
     <label class="text-xs text-muted-foreground">Field</label>
-    <Select.Root onSelectedChange={(v) => onFieldSelect(v?.value ?? "")}>
-      <Select.Trigger class="w-full h-8 text-xs">
-        <Select.Value placeholder="Select field..." />
-      </Select.Trigger>
-      <Select.Content>
+    <Select onSelectedChange={(v) => onFieldSelect(v?.value ?? "")}>
+      <SelectTrigger class="w-full h-8 text-xs">
+        <SelectValue placeholder="Select field..." />
+      </SelectTrigger>
+      <SelectContent>
         {#each customFieldDefs as field}
-          <Select.Item value={field.id} label={field.name}>
+          <SelectItem value={field.id} label={field.name}>
             {field.name}
             <span class="text-muted-foreground text-xs ml-1">({field.fieldType})</span>
-          </Select.Item>
+          </SelectItem>
         {/each}
-      </Select.Content>
-    </Select.Root>
+      </SelectContent>
+    </Select>
   </div>
 
   <!-- Value input — type-aware (all 9 types) -->
@@ -126,16 +126,16 @@
         <Input type="text" bind:value={fieldValue} class="h-8 text-xs" placeholder="User ID or email..." />
 
       {:else if selectedField.fieldType === "select"}
-        <Select.Root onSelectedChange={(v) => { fieldValue = v?.value; }}>
-          <Select.Trigger class="w-full h-8 text-xs">
-            <Select.Value placeholder="Select option..." />
-          </Select.Trigger>
-          <Select.Content>
+        <Select onSelectedChange={(v) => { fieldValue = v?.value; }}>
+          <SelectTrigger class="w-full h-8 text-xs">
+            <SelectValue placeholder="Select option..." />
+          </SelectTrigger>
+          <SelectContent>
             {#each fieldOptions as opt}
-              <Select.Item value={opt.value} label={opt.label}>{opt.label}</Select.Item>
+              <SelectItem value={opt.value} label={opt.label}>{opt.label}</SelectItem>
             {/each}
-          </Select.Content>
-        </Select.Root>
+          </SelectContent>
+        </Select>
 
       {:else if selectedField.fieldType === "multi_select"}
         <div class="flex flex-wrap gap-1 border rounded p-2 min-h-8">

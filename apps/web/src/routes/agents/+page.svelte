@@ -4,7 +4,7 @@
   import AgentSessionWorkbench from "$lib/components/agents/AgentSessionWorkbench.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

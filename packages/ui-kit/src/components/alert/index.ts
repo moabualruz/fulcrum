@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./alert.svelte";
 
 export type { AlertProps, AlertTone } from "./alert.svelte";

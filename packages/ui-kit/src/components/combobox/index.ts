@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./combobox.svelte";
 import Input from "./combobox-input.svelte";
 import Content from "./combobox-content.svelte";

@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./alert-dialog.svelte";
 import Trigger from "./alert-dialog-trigger.svelte";
 import Content from "./alert-dialog-content.svelte";

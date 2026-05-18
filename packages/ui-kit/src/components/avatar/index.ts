@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./avatar.svelte";
 import Image from "./avatar-image.svelte";
 import Fallback from "./avatar-fallback.svelte";

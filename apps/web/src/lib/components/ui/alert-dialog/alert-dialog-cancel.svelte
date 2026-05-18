@@ -4,7 +4,7 @@
 		buttonVariants,
 		type ButtonVariant,
 		type ButtonSize,
-	} from "$lib/components/ui/button/index.js";
+	} from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	let {

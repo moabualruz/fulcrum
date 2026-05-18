@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./select.svelte";
 import Trigger from "./select-trigger.svelte";
 import Content from "./select-content.svelte";

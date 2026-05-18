@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./tooltip.svelte";
 import Trigger from "./tooltip-trigger.svelte";
 import Content from "./tooltip-content.svelte";

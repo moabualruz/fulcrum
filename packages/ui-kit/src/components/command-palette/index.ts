@@ -1,5 +1,3 @@
-import "@fulcrum/ui-kit/styles/tokens.css";
-
 import Root from "./command-palette.svelte";
 import Input from "./command-palette-input.svelte";
 import List from "./command-palette-list.svelte";

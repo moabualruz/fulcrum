@@ -14,8 +14,8 @@
 	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
 	import { buildProjectCommandItems } from "$lib/components/command-palette/project-command-items";
 	import ShortcutHelpOverlay from "$lib/components/ShortcutHelpOverlay.svelte";
-	import * as Sheet from "$lib/components/ui/sheet";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { Sheet, SheetContent, SheetTrigger } from "@fulcrum/ui-kit";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import {
 		MOBILE_QUERY,
 		browserDriver,
@@ -173,13 +173,13 @@
 
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
-		<Sheet.Root bind:open={sheetOpen}>
-			<Sheet.Content side="left" class="w-64 p-0" aria-label="Navigation menu">
+		<Sheet bind:open={sheetOpen}>
+			<SheetContent side="left" class="w-64 p-0" aria-label="Navigation menu">
 				<AppSidebar activeProjectId={data.activeProjectId} />
-			</Sheet.Content>
+			</SheetContent>
 			<div class={cn("flex min-w-0 flex-1 flex-col")}>
 				<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
-					<Sheet.Trigger
+					<SheetTrigger
 						data-mobile-sheet-trigger
 						aria-label="Open navigation menu"
 						aria-expanded={sheetOpen}
@@ -189,7 +189,7 @@
 						)}
 					>
 						<span aria-hidden="true">☰</span>
-					</Sheet.Trigger>
+					</SheetTrigger>
 					<div class="flex-1">
 						<AppTopbar
 							pathname={page.url.pathname}
@@ -202,7 +202,7 @@
 					{@render children?.()}
 				</main>
 			</div>
-		</Sheet.Root>
+		</Sheet>
 	{:else}
 		<div class={cn("sticky top-0 h-screen")}>
 			<AppSidebar activeProjectId={data.activeProjectId} />
