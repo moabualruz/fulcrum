@@ -140,6 +140,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /comments                                                 internal design-e2e preview for task detail side panel with inline edit, properties, comments, activity, related tasks, and runs
 /auth-flows                                               internal design-e2e preview for login form, OAuth provider POST payloads, passkey support detection, and recovery guidance
 /cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
+/mobile-capture                                           internal design-e2e preview for mobile capture Core Web Vitals budgets, layout stability, and opt-in metric delivery
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 
