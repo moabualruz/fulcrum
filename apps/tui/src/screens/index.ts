@@ -5,6 +5,8 @@ export { DocsTreeScreen, DocsReaderEditorScreen } from "./docs-tree-screen.ts";
 export { MemoryBrowserScreen } from "./memory-browser.ts";
 export { RunsScreen, RunDetailScreen } from "./runs.ts";
 export { ReposScreen, RepoDetailScreen } from "./repos.ts";
+export { ConnectorsScreen } from "./connectors.ts";
+export { WebhooksScreen } from "./webhooks.ts";
 export { ArtifactsScreen } from "./artifacts.ts";
 export { NotificationsScreen } from "./notifications.ts";
 export { RoutingRulesScreen } from "./routing-rules.ts";
