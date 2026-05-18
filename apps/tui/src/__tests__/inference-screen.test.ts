@@ -59,7 +59,7 @@ function makeCaller(overrides: {
       models: {
         list: async () => models,
         pull: async function* (_input: { modelId: string; force?: boolean }): AsyncGenerator<ModelPullProgress> {
-          yield { pct: 50, downloaded: 500, total: 1000 };
+          yield { type: "download_progress" as const, pct: 50, downloaded: 500, total: 1000 };
         },
       },
       config: {

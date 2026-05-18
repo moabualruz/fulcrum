@@ -363,8 +363,8 @@ describe("TuiApp — inference workflow", () => {
     process.env["FULCRUM_INFERENCE_API_KEY"] = "secret";
 
     async function* pullEvents() {
-      yield { pct: 50, downloaded: 5, total: 10 };
-      yield { pct: 100, downloaded: 10, total: 10 };
+      yield { type: "download_progress" as const, pct: 50, downloaded: 5, total: 10 };
+      yield { type: "download_progress" as const, pct: 100, downloaded: 10, total: 10 };
     }
 
     const tty = new FakeTTY({ columns: 120, rows: 40 });

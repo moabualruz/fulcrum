@@ -76,7 +76,11 @@ export function createInferenceApiCaller(options: InferenceApiClientOptions) {
       },
       provider: {
         set: async (input: { url: string; key: string }) =>
-          await request<{ ok: boolean; url: string }>("/api/v1/inference/provider", { method: "PATCH", body: input }),
+          await request<{
+            ok: boolean;
+            url: string;
+            credentialRef: { kind: "env"; name: "FULCRUM_INFERENCE_API_KEY"; redacted: true };
+          }>("/api/v1/inference/provider", { method: "PATCH", body: input }),
         test: async () => await request<{ ok: boolean; latency_ms?: number; error?: string }>("/api/v1/inference/provider/test", { method: "POST" }),
       },
     },
