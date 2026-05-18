@@ -141,6 +141,12 @@ async function assertRecurrenceRoundTrip(source: FulcrumTypeOrmConnectionSource,
     await expect(controller.list({ orgId, taskId })).resolves.toEqual([]);
     await expect(controller.create({ orgId, taskId, triggerType: "schedule" }))
       .rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.create({
+      orgId,
+      taskId,
+      triggerType: "schedule",
+      cronExpression: "61 * *",
+    })).rejects.toBeInstanceOf(BadRequestException);
     const scheduled = await controller.create({
       orgId,
       taskId,
