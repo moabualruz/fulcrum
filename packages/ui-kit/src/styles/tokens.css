@@ -1,0 +1,154 @@
+:root {
+	/* DESIGN.md §1.2 row 1 */
+	--surface: oklch(0.99 0.002 270);
+	/* DESIGN.md §1.2 row 2 */
+	--surface-elevated: oklch(1 0 270);
+	/* DESIGN.md §1.2 row 3 */
+	--surface-sunken: oklch(0.97 0.003 270);
+	/* DESIGN.md §1.2 row 4 */
+	--surface-overlay: oklch(0.99 0.002 270 / 0.92);
+	/* DESIGN.md §1.2 row 5 */
+	--fg: oklch(0.18 0.01 270);
+	/* DESIGN.md §1.2 row 6 */
+	--fg-subtle: oklch(0.42 0.01 270);
+	/* DESIGN.md §1.2 row 7 */
+	--fg-muted: oklch(0.58 0.01 270);
+	/* DESIGN.md §1.2 row 8 */
+	--fg-disabled: oklch(0.72 0.01 270);
+	/* DESIGN.md §1.2 row 9 */
+	--fg-inverse: oklch(0.99 0.002 270);
+	/* DESIGN.md §1.2 row 10 */
+	--border: oklch(0.90 0.005 270);
+	/* DESIGN.md §1.2 row 11 */
+	--border-strong: oklch(0.78 0.005 270);
+	/* DESIGN.md §1.2 row 12 */
+	--border-focus: oklch(0.62 0.18 250);
+	/* DESIGN.md §1.2 row 13 */
+	--accent: oklch(0.62 0.18 250);
+	/* DESIGN.md §1.2 row 14 */
+	--accent-hover: oklch(0.56 0.20 250);
+	/* DESIGN.md §1.2 row 15 */
+	--accent-subtle: oklch(0.94 0.04 250);
+	/* DESIGN.md §1.2 row 16 */
+	--on-accent: oklch(0.99 0.002 250);
+	/* DESIGN.md §1.2 row 17 */
+	--danger: oklch(0.58 0.21 27);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--danger-subtle: oklch(0.95 0.04 27);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-danger: oklch(0.99 0.002 270);
+	/* DESIGN.md §1.2 row 18 */
+	--warn: oklch(0.78 0.16 80);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--warn-subtle: oklch(0.96 0.05 80);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-warn: oklch(0.18 0.01 270);
+	/* DESIGN.md §1.2 row 19 */
+	--success: oklch(0.64 0.16 145);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--success-subtle: oklch(0.94 0.05 145);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-success: oklch(0.99 0.002 270);
+	/* DESIGN.md §1.2 state semantic extension */
+	--info: oklch(0.66 0.14 235);
+	/* DESIGN.md §1.2 state semantic extension */
+	--info-subtle: oklch(0.94 0.04 235);
+	/* DESIGN.md §1.2 state semantic extension */
+	--on-info: oklch(0.99 0.002 270);
+	/* DESIGN.md §1.2 state semantic extension */
+	--purple: oklch(0.62 0.16 305);
+	/* DESIGN.md §1.2 state semantic extension */
+	--purple-subtle: oklch(0.94 0.04 305);
+	/* DESIGN.md §1.2 state semantic extension */
+	--on-purple: oklch(0.99 0.002 270);
+
+	/* DESIGN.md §1.3 row 1 */
+	--radius-xs: 2px;
+	/* DESIGN.md §1.3 row 2 */
+	--radius-sm: 4px;
+	/* DESIGN.md §1.3 row 3 */
+	--radius-md: 6px;
+	/* DESIGN.md §1.3 row 4 */
+	--radius-lg: 10px;
+	/* DESIGN.md §1.3 row 5 */
+	--radius-xl: 16px;
+
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-duration-instant: 0ms;
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-duration-fast: 120ms;
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-duration-base: 180ms;
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-duration-slow: 240ms;
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	/* DESIGN.md §1.6 reduced-motion contract */
+	--motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dark,
+[data-theme="dark"] {
+	/* DESIGN.md §1.2 row 1 */
+	--surface: oklch(0.14 0.005 270);
+	/* DESIGN.md §1.2 row 2 */
+	--surface-elevated: oklch(0.18 0.005 270);
+	/* DESIGN.md §1.2 row 3 */
+	--surface-sunken: oklch(0.11 0.005 270);
+	/* DESIGN.md §1.2 row 4 */
+	--surface-overlay: oklch(0.14 0.005 270 / 0.92);
+	/* DESIGN.md §1.2 row 5 */
+	--fg: oklch(0.96 0.005 270);
+	/* DESIGN.md §1.2 row 6 */
+	--fg-subtle: oklch(0.72 0.005 270);
+	/* DESIGN.md §1.2 row 7 */
+	--fg-muted: oklch(0.66 0.005 270);
+	/* DESIGN.md §1.2 row 8 */
+	--fg-disabled: oklch(0.38 0.005 270);
+	/* DESIGN.md §1.2 row 9 */
+	--fg-inverse: oklch(0.14 0.005 270);
+	/* DESIGN.md §1.2 row 10 */
+	--border: oklch(0.28 0.005 270);
+	/* DESIGN.md §1.2 row 11 */
+	--border-strong: oklch(0.42 0.005 270);
+	/* DESIGN.md §1.2 row 12 */
+	--border-focus: oklch(0.72 0.18 250);
+	/* DESIGN.md §1.2 row 13 */
+	--accent: oklch(0.72 0.18 250);
+	/* DESIGN.md §1.2 row 14 */
+	--accent-hover: oklch(0.78 0.18 250);
+	/* DESIGN.md §1.2 row 15 */
+	--accent-subtle: oklch(0.24 0.06 250);
+	/* DESIGN.md §1.2 row 16 */
+	--on-accent: oklch(0.10 0.005 250);
+	/* DESIGN.md §1.2 row 17 */
+	--danger: oklch(0.68 0.21 27);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--danger-subtle: oklch(0.26 0.07 27);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-danger: oklch(0.10 0.005 250);
+	/* DESIGN.md §1.2 row 18 */
+	--warn: oklch(0.82 0.16 80);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--warn-subtle: oklch(0.28 0.07 80);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-warn: oklch(0.14 0.005 270);
+	/* DESIGN.md §1.2 row 19 */
+	--success: oklch(0.72 0.16 145);
+	/* DESIGN.md §1.2 semantic subtle pair */
+	--success-subtle: oklch(0.26 0.07 145);
+	/* DESIGN.md §1.2 semantic on-pair */
+	--on-success: oklch(0.14 0.005 270);
+	/* DESIGN.md §1.2 state semantic extension */
+	--info: oklch(0.74 0.14 235);
+	/* DESIGN.md §1.2 state semantic extension */
+	--info-subtle: oklch(0.25 0.06 235);
+	/* DESIGN.md §1.2 state semantic extension */
+	--on-info: oklch(0.10 0.005 250);
+	/* DESIGN.md §1.2 state semantic extension */
+	--purple: oklch(0.72 0.16 305);
+	/* DESIGN.md §1.2 state semantic extension */
+	--purple-subtle: oklch(0.25 0.06 305);
+	/* DESIGN.md §1.2 state semantic extension */
+	--on-purple: oklch(0.10 0.005 250);
+}
