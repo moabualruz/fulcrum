@@ -18,10 +18,17 @@
 		Kbd,
 		Progress,
 		Skeleton,
+		Alert,
+		Banner,
+		EmptyState,
+		ToastRegion,
+		ToastStore,
 	} from "@fulcrum/ui-kit";
 
 	let progressValue = $state(42);
 	let chipRemoved = $state(false);
+	let bannerVisible = $state(true);
+	const toastStore = new ToastStore();
 
 	let agreeChecked = $state(false);
 	let alphaChecked = $state(true);
@@ -270,5 +277,105 @@
 				<Skeleton shape="circle" width="3rem" />
 			</div>
 		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="alert"
+		>
+			<h2 class="text-lg font-semibold">Alert</h2>
+			<div class="grid gap-3">
+				<Alert tone="info" title="Heads up">A new build is available for review.</Alert>
+				<Alert tone="success" title="Saved">Project draft was saved automatically.</Alert>
+				<Alert tone="warning" title="Token nearing limit">Plan budget at 88%; reduce parallel runs.</Alert>
+				<Alert tone="error" title="Run aborted">Repository token rejected. Re-authenticate to continue.</Alert>
+				<Alert tone="tip" title="Tip">You can pin frequent commands to the palette with <code>⌘K</code>.</Alert>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="banner"
+		>
+			<h2 class="text-lg font-semibold">Banner</h2>
+			{#if bannerVisible}
+				<Banner
+					tone="warning"
+					title="Read-only mode"
+					dismissible
+					ondismiss={() => (bannerVisible = false)}
+				>
+					Your workspace is paused. New runs cannot be dispatched.
+				</Banner>
+			{:else}
+				<span class="text-xs text-muted-foreground" data-design-kit-banner-dismissed
+					>banner dismissed</span
+				>
+			{/if}
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="empty-state"
+		>
+			<h2 class="text-lg font-semibold">EmptyState</h2>
+			<EmptyState
+				title="No tasks yet"
+				description="Capture an idea, accept an intake, or generate tasks from a plan."
+			>
+				{#snippet icon()}
+					<span class="text-lg font-semibold">+</span>
+				{/snippet}
+				{#snippet actions()}
+					<button
+						type="button"
+						class="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+						data-design-kit-empty-action
+					>
+						Capture task
+					</button>
+				{/snippet}
+			</EmptyState>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="toast"
+		>
+			<h2 class="text-lg font-semibold">Toast</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<button
+					type="button"
+					class="rounded-md border border-border px-3 py-1.5 text-xs"
+					data-design-kit-toast-publish="success"
+					onclick={() =>
+						toastStore.publish({
+							tone: "success",
+							title: "Task captured",
+							description: "Saved to inbox.",
+							durationMs: 0,
+						})}
+				>
+					Publish success
+				</button>
+				<button
+					type="button"
+					class="rounded-md border border-border px-3 py-1.5 text-xs"
+					data-design-kit-toast-publish="error"
+					onclick={() =>
+						toastStore.publish({
+							tone: "error",
+							title: "Build failed",
+							description: "Check the run log for details.",
+							durationMs: 0,
+						})}
+				>
+					Publish error
+				</button>
+				<span class="text-xs text-muted-foreground" data-design-kit-toast-count>
+					Active: {toastStore.items.length}
+				</span>
+			</div>
+		</article>
 	</section>
+	<ToastRegion store={toastStore} position="bottom-right" />
 </main>

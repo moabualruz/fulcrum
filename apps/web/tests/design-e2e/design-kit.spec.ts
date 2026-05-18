@@ -147,4 +147,57 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(trigger).toContainText("P1");
 		await expect(page.locator("[data-design-kit-select-value]")).toContainText("p1");
 	});
+
+	test("alert renders five tones with role and glyph", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='alert']");
+		await expect(section.locator("[data-slot='alert']")).toHaveCount(5);
+		await expect(section.locator("[data-slot='alert'][data-tone='warning']")).toHaveAttribute(
+			"role",
+			"alert",
+		);
+		await expect(section.locator("[data-slot='alert'][data-tone='info']")).toHaveAttribute(
+			"role",
+			"status",
+		);
+		await expect(section.locator("[data-slot='alert-icon']")).toHaveCount(5);
+	});
+
+	test("banner can be dismissed and announces the dismissed state", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='banner']");
+		const banner = section.locator("[data-slot='banner']");
+		await expect(banner).toBeVisible();
+		await expect(banner).toHaveAttribute("role", "alert");
+		await banner.locator("[data-slot='banner-dismiss']").click();
+		await expect(banner).toHaveCount(0);
+		await expect(section.locator("[data-design-kit-banner-dismissed]")).toBeVisible();
+	});
+
+	test("empty-state exposes title, description, icon, and an action slot", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='empty-state']");
+		const root = section.locator("[data-slot='empty-state']");
+		await expect(root).toBeVisible();
+		await expect(root).toHaveAttribute("role", "status");
+		await expect(root.locator("[data-slot='empty-state-title']")).toContainText("No tasks yet");
+		await expect(root.locator("[data-slot='empty-state-icon']")).toBeVisible();
+		await expect(section.locator("[data-design-kit-empty-action]")).toBeVisible();
+	});
+
+	test("toast publishes into the region with correct tone and dismiss control", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='toast']");
+		await section.locator("[data-design-kit-toast-publish='success']").click();
+		await section.locator("[data-design-kit-toast-publish='error']").click();
+		const region = page.locator("[data-slot='toast-region']");
+		await expect(region).toBeVisible();
+		await expect(region.locator("[data-slot='toast']")).toHaveCount(2);
+		await expect(region.locator("[data-slot='toast'][data-tone='success']")).toBeVisible();
+		await expect(region.locator("[data-slot='toast'][data-tone='error']")).toBeVisible();
+		await expect(
+			region.locator("[data-slot='toast'][data-tone='error'] [data-slot='toast-dismiss']"),
+		).toHaveAttribute("aria-label", "Dismiss notification");
+		await expect(section.locator("[data-design-kit-toast-count]")).toContainText("Active: 2");
+	});
 });
