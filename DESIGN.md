@@ -122,25 +122,27 @@ Global guards (research-06 §2, §5):
 System font stack ([impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md)):
 
 ```css
-font-sans:  Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-font-mono:  "Geist Mono", "JetBrains Mono", "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+font-sans:  "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+font-mono:  "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 ```
 
-**One family carries everything** — Inter for UI; Geist Mono for trace IDs, code blocks, status footer, JSON output.
+**One family carries everything** — Inter Variable for UI; monospace with Fira Code fallback for trace IDs, code blocks, status footer, JSON output.
 
-### 2.1 Scale (fixed rem, ratio 1.125, density bias)
+### 2.1 Scale (semantic rem tokens)
 
 | Token | Size | Line | Weight | Use |
 |---|---|---|---|---|
-| `text-xs` | 11px (0.6875rem) | 16 | 500 | Captions, badge text, status footer |
-| `text-sm` | 12px (0.75rem) | 18 | 500 | Inputs labels, table headers, tabs |
-| `text-base` | 13px (0.8125rem) | 20 | 400 | **Default body** (Linear-grade density) |
-| `text-md` | 14px (0.875rem) | 22 | 500 | Section labels, button labels |
-| `text-lg` | 16px (1rem) | 24 | 500 | Card titles |
-| `text-xl` | 18px (1.125rem) | 26 | 600 | Modal titles, page headings |
-| `text-2xl` | 22px (1.375rem) | 32 | 600 | Stage titles |
+| `type-display` | 40px (2.5rem) | 1.2 | 600 | Large marketing-free page display only |
+| `type-h1` | 32px (2rem) | 1.3 | 600 | Page title |
+| `type-h2` | 24px (1.5rem) | 1.4 | 600 | Section title |
+| `type-h3` | 20px (1.25rem) | 1.4 | 600 | Card or panel title |
+| `type-body` | 16px (1rem) | 1.5 | 400 | Default body |
+| `type-caption` | 14px (0.875rem) | 1.4 | 500 | Captions, labels, metadata, badge text |
+| `type-code` | 14px (0.875rem) | 1.6 | 400 | Trace IDs, code, JSON, shell snippets |
 
 Body line length 65–75ch in prose surfaces (doc editor). Tables, run feed, audit log: dense (120ch+ ok).
+
+Tailwind v4 token source lives in `apps/web/src/app.css`: `--text-display`, `--text-h1`, `--text-h2`, `--text-h3`, `--text-body`, `--text-caption`, `--text-code`, plus paired `--text-*--line-height` values. Use semantic `type-*` classes for hierarchy; do not introduce raw `text-lg`, `text-xl`, or `text-2xl` hierarchy classes in new UI slices. Letter spacing stays `0` per UI quality rule; hierarchy comes from size, line-height, and weight.
 
 ### 2.2 Weights
 

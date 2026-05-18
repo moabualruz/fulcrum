@@ -231,22 +231,40 @@
   <div class={cn("mx-auto flex max-w-7xl min-w-0 flex-col gap-4 px-4 py-4 lg:px-6")}>
     <header data-build-graph-header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
       <div>
-        <p data-contrast-sample class={cn("text-xs font-medium uppercase text-fg-subtle")}>Build graph</p>
-        <h1 class={cn("text-2xl font-semibold tracking-normal")}>Task dependency execution</h1>
-        <p data-contrast-sample class={cn("mt-1 max-w-2xl text-sm text-fg-subtle")}>
+        <p data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Build graph</p>
+        <h1 class={cn("type-h1")}>Task dependency execution</h1>
+        <p data-contrast-sample class={cn("type-body mt-1 max-w-2xl text-fg-subtle")}>
           Inspect execution order, run state, blockers, feedback, and source refs before dispatch.
         </p>
       </div>
-      <div data-permission-copy data-contrast-sample class={cn("rounded-md border border-border-strong bg-muted px-3 py-2 text-xs text-foreground")}>
+      <div data-permission-copy data-contrast-sample class={cn("type-caption rounded-md border border-border-strong bg-muted px-3 py-2 text-foreground")}>
         Permissions filter before results render. Unauthorized titles stay hidden.
       </div>
     </header>
+
+    <section data-type-scale-fixture class={cn("rounded-md border border-border bg-card p-3")}>
+      <div class={cn("grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+        <div class={cn("min-w-0")}>
+          <p data-type-token="caption" data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Typography reference</p>
+          <p data-type-token="display" data-contrast-sample class={cn("type-display text-foreground")}>Execution graph</p>
+          <p data-type-token="body" data-contrast-sample class={cn("type-body max-w-2xl text-fg-subtle")}>
+            Semantic type tokens keep hierarchy stable across graph panels, forms, results, and mobile states.
+          </p>
+        </div>
+        <div class={cn("min-w-0 space-y-2")}>
+          <h1 data-type-token="h1" class={cn("type-h1")}>H1 dependency title</h1>
+          <h2 data-type-token="h2" class={cn("type-h2")}>H2 execution section</h2>
+          <h3 data-type-token="h3" class={cn("type-h3")}>H3 result card title</h3>
+          <code data-type-token="code" class={cn("type-code block rounded-sm bg-muted px-2 py-1 text-foreground")}>trace:build-graph/type-scale</code>
+        </div>
+      </div>
+    </section>
 
     <section data-dependency-panel class={cn("grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]")}>
       <div class={cn("min-w-0 rounded-md border border-border bg-card")}>
         <div class={cn("flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2")}>
           <div>
-            <h2 class={cn("text-sm font-semibold")}>Dependency order</h2>
+            <h2 class={cn("type-caption text-foreground")}>Dependency order</h2>
             <p data-contrast-sample class={cn("mt-0.5 text-xs text-fg-subtle")}>Current active node: {activeTask.title}</p>
           </div>
           <span data-run-state data-contrast-sample class={cn("rounded-sm border border-border-strong bg-muted px-2 py-1 text-xs font-medium text-foreground")}>run:{runState}</span>
@@ -265,7 +283,7 @@
                   task.status === "waiting" && "border-border-strong",
                 )}><span aria-hidden="true">{STATUS_ICON[task.status]}</span>{STATUS_COPY[task.status]}</span>
               </div>
-              <h3 class={cn("mt-3 text-sm font-semibold leading-tight")}>{task.title}</h3>
+              <h3 class={cn("type-caption mt-3 text-foreground")}>{task.title}</h3>
               <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>owner:{task.owner}</p>
               <div data-dependency-edges class={cn("mt-3 flex flex-wrap gap-1")}>
                 {#if task.dependencies.length === 0}
@@ -289,7 +307,7 @@
 
       <aside data-run-feedback-panel class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div>
-          <h2 class={cn("text-sm font-semibold")}>Execution feedback</h2>
+          <h2 class={cn("type-caption text-foreground")}>Execution feedback</h2>
           <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>{blockedTasks.length} blockers visible before dispatch.</p>
         </div>
         <div data-run-actions class={cn("grid gap-2 sm:grid-cols-3")}>
@@ -306,7 +324,7 @@
     </section>
 
     <section data-search-toolbar class={cn("grid gap-3 rounded-md border border-border bg-card p-3 lg:grid-cols-[minmax(280px,1fr)_auto]")}>
-      <label class={cn("text-sm font-medium")}>
+      <label class={cn("type-caption text-foreground")}>
         Search
         <input
           data-doc-search-input
@@ -324,7 +342,7 @@
     <section data-form-field-fixture class={cn("rounded-md border border-border bg-card p-3")}>
       <div class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3")}>
         <div>
-          <h2 class={cn("text-sm font-semibold")}>Form field reference</h2>
+          <h2 class={cn("type-caption text-foreground")}>Form field reference</h2>
           <p data-contrast-sample class={cn("mt-1 max-w-2xl text-xs text-fg-subtle")}>
             Block and compact labels, every text-like input type, validation states, disabled fields, and textarea counters.
           </p>
@@ -403,7 +421,7 @@
     <div class={cn("grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_280px]")}>
       <aside data-doc-search-filters class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div class={cn("flex items-center justify-between")}>
-          <h2 class={cn("text-sm font-semibold")}>Filters</h2>
+          <h2 class={cn("type-caption text-foreground")}>Filters</h2>
           <button data-reset-filters type="button" onclick={resetFilters} class={cn("text-xs text-fg-subtle underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Reset</button>
         </div>
 
@@ -459,7 +477,7 @@
 
       <section data-doc-search-results class={cn("min-w-0 rounded-md border border-border bg-card")}>
         <div class={cn("flex items-center justify-between border-b border-border px-3 py-2")}>
-          <h2 class={cn("text-sm font-semibold")}>Results</h2>
+          <h2 class={cn("type-caption text-foreground")}>Results</h2>
           <span data-result-count data-contrast-sample class={cn("text-xs text-fg-subtle")}>{filteredResults.length} visible</span>
         </div>
 
@@ -467,7 +485,7 @@
           {#each filteredResults as result (result.id)}
             <article data-doc-result data-doc-id={result.id} class={cn("p-3")}>
               <div class={cn("flex flex-wrap items-center gap-2")}>
-                <h3 class={cn("text-md font-semibold")}>{result.title}</h3>
+                <h3 class={cn("type-caption text-foreground")}>{result.title}</h3>
                 <span data-doc-type data-contrast-sample class={cn("rounded-xs border border-border-strong px-1.5 py-0.5 text-xs text-foreground")}>{result.docType}</span>
                 <span data-doc-scope data-contrast-sample class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-foreground")}>{result.scope}</span>
               </div>
@@ -493,7 +511,7 @@
 
       <aside data-planning-context class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div>
-          <h2 class={cn("text-sm font-semibold")}>Planning context</h2>
+          <h2 class={cn("type-caption text-foreground")}>Planning context</h2>
           <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Selected source refs stay deterministic for the next planning session.</p>
         </div>
         <div data-selected-context class={cn("space-y-1 text-sm")}>

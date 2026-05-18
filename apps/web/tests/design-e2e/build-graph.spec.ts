@@ -52,6 +52,36 @@ function parseCssColor(value: string): [number, number, number] {
 }
 
 test.describe("build graph doc search", () => {
+	test("renders the documented semantic typography scale", async ({ page }) => {
+		await openBuildGraph(page);
+
+		const scale = await page.locator("[data-type-token]").evaluateAll((elements) => Object.fromEntries(elements.map((element) => {
+			const style = getComputedStyle(element);
+			return [element.getAttribute("data-type-token") ?? "", {
+				fontFamily: style.fontFamily,
+				fontSize: style.fontSize,
+				fontWeight: style.fontWeight,
+				letterSpacing: style.letterSpacing,
+				lineHeight: style.lineHeight,
+			}];
+		})));
+		const zeroTracking = expect.stringMatching(/^(0px|normal)$/);
+
+		expect(scale.display).toMatchObject({ fontSize: "40px", fontWeight: "600", letterSpacing: zeroTracking, lineHeight: "48px" });
+		expect(scale.h1).toMatchObject({ fontSize: "32px", fontWeight: "600", letterSpacing: zeroTracking, lineHeight: "41.6px" });
+		expect(scale.h2).toMatchObject({ fontSize: "24px", fontWeight: "600", letterSpacing: zeroTracking, lineHeight: "33.6px" });
+		expect(scale.h3).toMatchObject({ fontSize: "20px", fontWeight: "600", letterSpacing: zeroTracking, lineHeight: "28px" });
+		expect(scale.body).toMatchObject({ fontSize: "16px", fontWeight: "400", letterSpacing: zeroTracking, lineHeight: "24px" });
+		expect(scale.caption).toMatchObject({ fontSize: "14px", fontWeight: "500", letterSpacing: zeroTracking, lineHeight: "19.6px" });
+		expect(scale.code).toMatchObject({ fontSize: "14px", fontWeight: "400", letterSpacing: zeroTracking, lineHeight: "22.4px" });
+		expect(scale.display.fontFamily).toContain("Inter Variable");
+		expect(scale.body.fontFamily).toContain("Inter Variable");
+		expect(scale.code.fontFamily).toContain("Fira Code");
+
+		const source = readFileSync("src/routes/build-graph/+page.svelte", "utf8");
+		expect(source.match(/\btext-(?:lg|xl|2xl)\b/g) ?? []).toEqual([]);
+	});
+
 	test("keeps build graph on the documented spacing scale", async ({ page }) => {
 		await openBuildGraph(page);
 

@@ -11,6 +11,16 @@ export interface ThemeState extends ThemeSettings {
 	setMode: (mode: ThemeMode) => void;
 }
 
+export const TYPOGRAPHY_SCALE = {
+	display: { size: "2.5rem", lineHeight: "1.2", family: "sans", weight: 600 },
+	h1: { size: "2rem", lineHeight: "1.3", family: "sans", weight: 600 },
+	h2: { size: "1.5rem", lineHeight: "1.4", family: "sans", weight: 600 },
+	h3: { size: "1.25rem", lineHeight: "1.4", family: "sans", weight: 600 },
+	body: { size: "1rem", lineHeight: "1.5", family: "sans", weight: 400 },
+	caption: { size: "0.875rem", lineHeight: "1.4", family: "sans", weight: 500 },
+	code: { size: "0.875rem", lineHeight: "1.6", family: "mono", weight: 400 },
+} as const;
+
 const COOKIE_NAME = "fulcrum-theme";
 const SAFE_VAR = /^--[a-z0-9-]+$/i;
 const SAFE_VALUE = /^[^;{}<>]*$/;
