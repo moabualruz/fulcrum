@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { DataSource, In, IsNull, type EntityManager } from "typeorm";
 
 import { FulcrumJobEntity } from "@platform-core/infrastructure/database/job-queue.entities.ts";
+import { FulcrumRunEventEntity } from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
 import {
   type FulcrumAgentRun,
   FulcrumAgentRunEntity,
@@ -199,6 +200,8 @@ export class AgentRunPublicStore {
     traceId?: string | null;
     dependencyTree?: string[];
     agent?: string | null;
+    cwd?: string | null;
+    agentConfig?: Record<string, unknown> | null;
   }): Promise<AgentRunPublicRow | null> {
     const projectId = await this.projectIdForDispatch(input);
     if (!projectId) return null;
@@ -220,6 +223,22 @@ export class AgentRunPublicStore {
         taskId: saved.taskId,
         traceId: saved.traceId,
         agent: input.agent ?? null,
+        cwd: input.cwd ?? null,
+        agentConfig: input.agentConfig ?? null,
+      });
+      await this.appendRunEvent(manager, {
+        projectId,
+        runId: saved.id,
+        taskId: saved.taskId,
+        traceId: saved.traceId,
+        mutationType: "agent_run.dispatched",
+        agent: input.agent ?? null,
+        payload: {
+          agent: input.agent ?? null,
+          cwd: input.cwd ?? null,
+          agentConfig: input.agentConfig ?? null,
+          dependencyTree: saved.dependencyTree,
+        },
       });
       return toPublicRow(saved);
     });
@@ -235,6 +254,15 @@ export class AgentRunPublicStore {
         orgId: input.orgId,
         runId: run.id,
       });
+      await this.appendRunEvent(manager, {
+        projectId: run.projectId,
+        runId: run.id,
+        taskId: run.taskId,
+        traceId: run.traceId,
+        mutationType: "agent_run.cancelled",
+        agent: null,
+        payload: { status: "cancelled" },
+      });
     });
     return { ok: true };
   }
@@ -242,6 +270,8 @@ export class AgentRunPublicStore {
   async retryRun(input: { orgId: string; identifier: string }): Promise<AgentRunPublicRow | null> {
     const source = await this.loadRunEntity(input);
     if (!source) return null;
+    const existingRetry = await this.loadExistingRetry(source.id);
+    if (existingRetry) return toPublicRow(existingRetry);
     const id = randomUUID();
     return await this.dataSource.transaction(async (manager) => {
       const run = manager.getRepository(FulcrumAgentRunEntity).create({
@@ -260,6 +290,20 @@ export class AgentRunPublicStore {
         taskId: saved.taskId,
         traceId: saved.traceId,
         agent: null,
+        cwd: null,
+        agentConfig: null,
+      });
+      await this.appendRunEvent(manager, {
+        projectId: source.projectId,
+        runId: source.id,
+        taskId: source.taskId,
+        traceId: source.traceId,
+        mutationType: "agent_run.retried",
+        agent: null,
+        payload: {
+          retryRunId: saved.id,
+          status: "queued",
+        },
       });
       return toPublicRow(saved);
     });
@@ -371,6 +415,8 @@ export class AgentRunPublicStore {
       taskId: string | null;
       traceId: string;
       agent: string | null;
+      cwd: string | null;
+      agentConfig: Record<string, unknown> | null;
     },
   ): Promise<void> {
     await manager.getRepository(FulcrumJobEntity).save({
@@ -386,6 +432,8 @@ export class AgentRunPublicStore {
         taskId: input.taskId,
         traceId: input.traceId,
         agent: input.agent,
+        cwd: input.cwd,
+        agentConfig: input.agentConfig,
       },
       status: "queued",
       attempts: 0,
@@ -413,6 +461,60 @@ export class AgentRunPublicStore {
       .andWhere("payload ->> 'run_id' = :runId", { runId: input.runId })
       .andWhere("status IN (:...statuses)", { statuses: ["queued", "running"] })
       .execute();
+  }
+
+  private async appendRunEvent(
+    manager: EntityManager,
+    input: {
+      projectId: string;
+      runId: string;
+      taskId: string | null;
+      traceId: string;
+      mutationType: string;
+      agent: string | null;
+      payload: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    const sequence = await this.nextRunEventSequence(manager, input.runId);
+    await manager.getRepository(FulcrumRunEventEntity).save({
+      id: randomUUID(),
+      projectId: input.projectId,
+      runId: input.runId,
+      taskId: input.taskId,
+      traceId: input.traceId,
+      sequence,
+      domain: "system",
+      mutationType: input.mutationType,
+      targetKind: "agent_run",
+      targetId: input.runId,
+      agentId: input.agent,
+      taskLineageId: null,
+      payload: input.payload,
+    });
+  }
+
+  private async nextRunEventSequence(manager: EntityManager, runId: string): Promise<number> {
+    const row = await manager.getRepository(FulcrumRunEventEntity)
+      .createQueryBuilder("event")
+      .select("COALESCE(MAX(event.sequence), 0)", "max")
+      .where("event.run_id = :runId", { runId })
+      .getRawOne<{ max: string | number | null }>();
+    return Number(row?.max ?? 0) + 1;
+  }
+
+  private async loadExistingRetry(sourceRunId: string): Promise<FulcrumAgentRun | null> {
+    const event = await this.dataSource.getRepository(FulcrumRunEventEntity).findOne({
+      where: {
+        runId: sourceRunId,
+        mutationType: "agent_run.retried",
+      },
+      order: { sequence: "DESC" },
+    });
+    const retryRunId = typeof event?.payload?.["retryRunId"] === "string"
+      ? event.payload["retryRunId"]
+      : null;
+    if (!retryRunId) return null;
+    return await this.repository().findOne({ where: { id: retryRunId } });
   }
 }
 

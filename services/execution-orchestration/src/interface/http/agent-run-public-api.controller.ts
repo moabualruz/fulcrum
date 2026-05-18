@@ -16,7 +16,7 @@ import {
 import type { DynamicModule } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { IsArray, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
+import { IsArray, IsNumber, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
 import { AgentRunPublicStore } from "@execution-orchestration/infrastructure/database/agent-run-public-store.ts";
@@ -135,9 +135,16 @@ export class AgentRunPublicApiService {
       traceId: body.traceId,
       dependencyTree: body.dependencyTree,
       agent: body.agent,
+      cwd: body.cwd,
+      agentConfig: body.agentConfigJson,
     });
     if (!run) throw new NotFoundException({ error: "not found" });
-    return { ...run, agent: body.agent ?? null };
+    return {
+      ...run,
+      agent: body.agent ?? null,
+      cwd: body.cwd ?? null,
+      agentConfig: body.agentConfigJson ?? null,
+    };
   }
 
   async cancelRun(
@@ -331,13 +338,15 @@ IsOptional()(AgentRunIssueListQueryDto.prototype, "limit");
 IsNumber()(AgentRunIssueListQueryDto.prototype, "limit");
 IsArray()(AgentRunRefreshResponseDto.prototype, "runs");
 IsNumber()(AgentRunRefreshResponseDto.prototype, "count");
-for (const property of ["projectId", "taskId", "agent", "traceId"] as const) {
+for (const property of ["projectId", "taskId", "agent", "cwd", "traceId"] as const) {
   IsOptional()(AgentRunDispatchBodyDto.prototype, property);
   IsString()(AgentRunDispatchBodyDto.prototype, property);
   MinLength(1)(AgentRunDispatchBodyDto.prototype, property);
 }
 IsOptional()(AgentRunDispatchBodyDto.prototype, "dependencyTree");
 IsArray()(AgentRunDispatchBodyDto.prototype, "dependencyTree");
+IsOptional()(AgentRunDispatchBodyDto.prototype, "agentConfigJson");
+IsObject()(AgentRunDispatchBodyDto.prototype, "agentConfigJson");
 
 const loadStatusDescriptor = Object.getOwnPropertyDescriptor(
   AgentRunPublicApiController.prototype,
