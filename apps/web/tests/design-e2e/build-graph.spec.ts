@@ -114,6 +114,36 @@ test.describe("build graph doc search", () => {
 		await expect(page.locator("[data-result-count]")).toContainText("0 visible");
 	});
 
+	test("renders spec-backed form field variants and validation states", async ({ page }) => {
+		await openBuildGraph(page);
+
+		await expect(page.locator("[data-form-field-fixture]")).toBeVisible();
+		for (const type of ["text", "email", "password", "number", "url", "tel", "search", "date", "time", "datetime-local", "textarea"]) {
+			expect(await page.locator(`[data-form-field][data-field-type='${type}']`).count(), type).toBeGreaterThanOrEqual(1);
+		}
+
+		await expect(page.locator("[data-form-field][data-field-layout='inline']")).toBeVisible();
+		const inlineLabelWidth = await page.locator("[data-form-field][data-field-layout='inline'] > span").first().evaluate((element) => element.getBoundingClientRect().width);
+		expect(inlineLabelWidth).toBeLessThanOrEqual(200);
+
+		const errorField = page.locator("[data-form-field][data-field-state='error']");
+		await expect(errorField.locator("[data-form-control]")).toHaveAttribute("aria-invalid", "true");
+		await expect(errorField.locator("[data-field-message]")).toContainText("complete email");
+
+		const successField = page.locator("[data-form-field][data-field-state='success']");
+		await expect(successField.locator("[data-field-message]")).toContainText("✓");
+		await expect(successField.locator("[data-field-message]")).toContainText("Limit accepted");
+
+		const disabledField = page.locator("[data-form-field][data-field-state='disabled'] [data-form-control]");
+		await expect(disabledField).toBeDisabled();
+		await expect(disabledField).toHaveCSS("cursor", "not-allowed");
+
+		const textarea = page.locator("[data-form-field][data-field-type='textarea'] textarea");
+		await expect(textarea).toHaveAttribute("maxlength", "180");
+		await expect(textarea).toHaveAttribute("data-character-counter", "64/180");
+		await expect(page.locator("#review-note-counter")).toContainText("64/180 characters");
+	});
+
 	test("keeps dependency execution layout inside mobile viewport", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await openBuildGraph(page);

@@ -321,6 +321,85 @@
       </div>
     </section>
 
+    <section data-form-field-fixture class={cn("rounded-md border border-border bg-card p-3")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3")}>
+        <div>
+          <h2 class={cn("text-sm font-semibold")}>Form field reference</h2>
+          <p data-contrast-sample class={cn("mt-1 max-w-2xl text-xs text-fg-subtle")}>
+            Block and compact labels, every text-like input type, validation states, disabled fields, and textarea counters.
+          </p>
+        </div>
+        <span data-contrast-sample class={cn("rounded-sm border border-border-strong bg-muted px-2 py-1 text-xs text-foreground")}>spec-backed</span>
+      </div>
+
+      <div data-form-field-grid class={cn("mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3")}>
+        <label data-form-field data-field-type="text" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Task name
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="text" value="Rotate session keys" />
+        </label>
+
+        <label data-form-field data-field-type="email" data-field-layout="block" data-field-state="error" class={cn("min-w-0 text-xs font-medium text-destructive")}>
+          Reviewer email
+          <input data-form-control aria-invalid="true" aria-describedby="reviewer-email-error" class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-destructive bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-destructive/30")} type="email" value="ops@" />
+          <span id="reviewer-email-error" data-field-message class={cn("mt-1 block text-xs text-destructive")}>Enter a complete email address.</span>
+        </label>
+
+        <label data-form-field data-field-type="password" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Secret token
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="password" value="fulcrum-token" />
+        </label>
+
+        <label data-form-field data-field-type="number" data-field-layout="inline" data-field-state="success" class={cn("grid min-w-0 items-center gap-2 text-xs font-medium text-foreground sm:grid-cols-[minmax(92px,200px)_minmax(0,1fr)]")}>
+          <span class={cn("max-w-[200px]")}>Retry limit</span>
+          <span class={cn("min-w-0")}>
+            <input data-form-control aria-describedby="retry-limit-success" class={cn("h-9 w-full min-w-0 rounded-sm border border-success bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-success/30")} type="number" value="3" min="0" max="9" />
+            <span id="retry-limit-success" data-field-message class={cn("mt-1 flex items-center gap-1 text-xs text-success")}><span aria-hidden="true">✓</span>Limit accepted.</span>
+          </span>
+        </label>
+
+        <label data-form-field data-field-type="url" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Repository URL
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="url" value="https://github.com/moabualruz/fulcrum" />
+        </label>
+
+        <label data-form-field data-field-type="tel" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Incident phone
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="tel" value="+1 415 555 0199" />
+        </label>
+
+        <label data-form-field data-field-type="search" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Filter tasks
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="search" value="blocked auth" />
+        </label>
+
+        <label data-form-field data-field-type="date" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Due date
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="date" value="2026-05-18" />
+        </label>
+
+        <label data-form-field data-field-type="time" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Review time
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="time" value="16:30" />
+        </label>
+
+        <label data-form-field data-field-type="datetime-local" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground")}>
+          Dispatch window
+          <input data-form-control class={cn("mt-1 h-9 w-full min-w-0 rounded-sm border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")} type="datetime-local" value="2026-05-18T16:30" />
+        </label>
+
+        <label data-form-field data-field-type="text" data-field-layout="block" data-field-state="disabled" class={cn("min-w-0 text-xs font-medium text-fg-subtle")}>
+          Locked branch
+          <input data-form-control disabled class={cn("mt-1 h-9 w-full min-w-0 cursor-not-allowed rounded-sm border border-input bg-muted px-3 text-sm text-fg-disabled outline-none")} type="text" value="auth/rewrite" />
+        </label>
+
+        <label data-form-field data-field-type="textarea" data-field-layout="block" class={cn("min-w-0 text-xs font-medium text-foreground xl:col-span-2")}>
+          Review note
+          <textarea data-form-control data-character-counter="64/180" aria-describedby="review-note-counter" rows="3" maxlength="180" class={cn("mt-1 min-h-20 max-h-36 w-full min-w-0 resize-y rounded-sm border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60")}>Confirm dependency path before dispatching the blocked auth node.</textarea>
+          <span id="review-note-counter" data-field-message class={cn("mt-1 block text-xs text-fg-subtle")}>64/180 characters</span>
+        </label>
+      </div>
+    </section>
+
     <div class={cn("grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)_280px]")}>
       <aside data-doc-search-filters class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div class={cn("flex items-center justify-between")}>

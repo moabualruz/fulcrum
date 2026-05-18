@@ -222,6 +222,11 @@ States required on every variant (research / impeccable product.md):
 - Required marker `*` as a separate node, never inline in label text.
 - Help text 11 px fg-muted.
 - Validation: blur on first interaction, debounced (300 ms) on subsequent edits.
+- Field variants cover `text`, `email`, `password`, `number`, `url`, `tel`, `search`, `date`, `time`, `datetime-local`, and `textarea`. Missing native type coverage is a design-system bug.
+- Block label layout is default. Compact inline layout uses a left label track capped at 200 px, with the control taking remaining width.
+- State styling: default uses `border-input`; focus-visible uses `ring-ring`; error sets `aria-invalid=true`, `border-destructive`, danger label/message; success uses `border-success` plus check icon; disabled uses `bg-muted`, `fg-disabled`, and `cursor-not-allowed`.
+- Error/success captions live below the field and connect through `aria-describedby`. Placeholder text never replaces a visible label.
+- Textarea supports `min-height`, `max-height`, resize-y, `maxlength`, and a visible character counter below the control.
 
 ### 4.3 Tables
 
