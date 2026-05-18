@@ -6,6 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { NotFoundException, RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
+import { getEventBus, resetEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 
 import { AppModule } from "@fulcrum/server/app.module.ts";
 import {
@@ -23,6 +24,7 @@ import {
 import { WorkflowSpine1778623200001 } from "@workflow-coordination/infrastructure/database/workflow-spine.migration.ts";
 import {
   WORK_MANAGEMENT_ENTITIES,
+  WorkManagementNotificationEntity,
 } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import {
   WorkManagement1778623200003,
@@ -56,6 +58,7 @@ async function startPgliteSocket(): Promise<string> {
 }
 
 afterEach(async () => {
+  resetEventBus();
   if (socketServer) {
     await socketServer.stop();
     socketServer = undefined;
@@ -104,6 +107,22 @@ async function assertTaskCommentRoundTrip(source: FulcrumTypeOrmConnectionSource
       taskId,
       body: mentionBody(`mentioned-${source}`),
     }) as TaskCommentPublicRow;
+    await expect(controller.updateComment({
+      orgId: `workspace-comments-${source}`,
+      userId: `author-${source}`,
+      commentId: root.id,
+      body: mentionBody(`second-mentioned-${source}`),
+    })).resolves.toEqual(expect.objectContaining({
+      id: root.id,
+      authorId: `author-${source}`,
+      body: expect.objectContaining({ bodyMd: "Please check" }),
+    }));
+    await expect(controller.updateComment({
+      orgId: `workspace-comments-${source}`,
+      userId: `not-author-${source}`,
+      commentId: root.id,
+      body: { bodyMd: "Unauthorized edit" },
+    })).rejects.toBeInstanceOf(NotFoundException);
     const reply = await controller.createComment({
       orgId: `workspace-comments-${source}`,
       userId: `reply-author-${source}`,
@@ -165,6 +184,26 @@ async function assertTaskCommentRoundTrip(source: FulcrumTypeOrmConnectionSource
     })).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ taskId, userId: `author-${source}`, source: "create" }),
       expect.objectContaining({ taskId, userId: `mentioned-${source}`, source: "mention" }),
+      expect.objectContaining({ taskId, userId: `second-mentioned-${source}`, source: "mention" }),
+    ]));
+    await expect(dataSource.getRepository(WorkManagementNotificationEntity).find({
+      where: { workspaceId: `workspace-comments-${source}` },
+      order: { createdAt: "ASC", id: "ASC" },
+    })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "task.comment.mention",
+        actorId: `author-${source}`,
+        recipientId: `mentioned-${source}`,
+        taskId,
+        traceId: `trace-task-comments-${source}`,
+        payload: expect.objectContaining({ commentId: root.id, taskId }),
+      }),
+      expect.objectContaining({
+        type: "task.comment.mention",
+        actorId: `author-${source}`,
+        recipientId: `second-mentioned-${source}`,
+        taskId,
+      }),
     ]));
     await expect(controller.unsubscribe({
       orgId: `workspace-comments-${source}`,
@@ -175,10 +214,16 @@ async function assertTaskCommentRoundTrip(source: FulcrumTypeOrmConnectionSource
       orgId: `workspace-comments-${source}`,
       userId: `author-${source}`,
       taskId,
-    })).resolves.toEqual([
+    })).resolves.toEqual(expect.arrayContaining([
       expect.objectContaining({ taskId, userId: `author-${source}` }),
+      expect.objectContaining({ taskId, userId: `second-mentioned-${source}` }),
       expect.objectContaining({ taskId, userId: `reply-author-${source}` }),
-    ]);
+    ]));
+    await expect(controller.deleteComment({
+      orgId: `workspace-comments-${source}`,
+      userId: `not-author-${source}`,
+      commentId: root.id,
+    })).rejects.toBeInstanceOf(NotFoundException);
     await expect(controller.deleteComment({
       orgId: `workspace-comments-${source}`,
       userId: `author-${source}`,
@@ -206,6 +251,7 @@ describe("task comment public Nest API", () => {
     for (const method of [
       "createComment",
       "deleteComment",
+      "updateComment",
       "listComments",
       "threadedComments",
       "resolveComment",
@@ -239,6 +285,78 @@ describe("task comment public Nest API", () => {
   test("persists task comments through real PostgreSQL", async () => {
     postgres = await startTemporaryPostgres();
     await assertTaskCommentRoundTrip("postgres", postgres.url);
+  });
+
+  test("publishes comment and mention events to subscription surfaces", async () => {
+    const url = await startPgliteSocket();
+    const dataSource = createFulcrumTypeOrmDataSource(
+      buildFulcrumTypeOrmOptions({
+        source: "pglite-socket",
+        url,
+        entities: [
+          ...FULCRUM_WORKFLOW_SPINE_ENTITIES,
+          ...WORK_MANAGEMENT_ENTITIES,
+        ],
+        migrations: [
+          WorkflowSpine1778623200001,
+          WorkManagement1778623200003,
+        ],
+      }),
+    );
+
+    await dataSource.initialize();
+    try {
+      await dataSource.runMigrations();
+      await seedTask(dataSource, "pglite-socket");
+      const taskEvents: unknown[] = [];
+      const notificationEvents: unknown[] = [];
+      const unsubscribeTasks = getEventBus().subscribe("project.project-comments-pglite-socket.tasks", (event) => {
+        taskEvents.push(event.payload);
+      });
+      const unsubscribeNotifications = getEventBus().subscribe("org.workspace-comments-pglite-socket.notifications", (event) => {
+        notificationEvents.push(event.payload);
+      });
+
+      const controller = new TaskCommentPublicApiController(
+        new TaskCommentPublicApiService(
+          { featuresEnv: "public-api" },
+          new TaskCommentStore(dataSource),
+        ),
+      );
+      const root = await controller.createComment({
+        orgId: "workspace-comments-pglite-socket",
+        userId: "author-pglite-socket",
+        taskId: "task-comments-pglite-socket",
+        body: mentionBody("mentioned-pglite-socket"),
+      }) as TaskCommentPublicRow;
+
+      unsubscribeTasks();
+      unsubscribeNotifications();
+      expect(taskEvents).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: "task.comment.created",
+          projectId: "project-comments-pglite-socket",
+          taskId: "task-comments-pglite-socket",
+          commentId: root.id,
+          actorId: "author-pglite-socket",
+          traceId: "trace-task-comments-pglite-socket",
+        }),
+      ]));
+      expect(notificationEvents).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: "task.comment.created",
+          commentId: root.id,
+        }),
+        expect.objectContaining({
+          type: "notification.created",
+          notificationType: "task.comment.mention",
+          recipientId: "mentioned-pglite-socket",
+          commentId: root.id,
+        }),
+      ]));
+    } finally {
+      await dataSource.destroy();
+    }
   });
 });
 

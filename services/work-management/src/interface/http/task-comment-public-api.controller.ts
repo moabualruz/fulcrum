@@ -12,8 +12,8 @@ import { TaskCommentStore } from "@work-management/infrastructure/database/task-
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentReactionDto } from "./dto/task-comment.dto.ts";
-export { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentReactionDto };
+import { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentUpdateDto, TaskCommentReactionDto } from "./dto/task-comment.dto.ts";
+export { TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentUpdateDto, TaskCommentReactionDto };
 
 export const TASK_COMMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.taskCommentPublicApi.options");
 
@@ -34,6 +34,10 @@ export class TaskCommentPublicApiService {
   async deleteComment(input: TaskCommentIdScopeDto): Promise<{ ok: true; commentId: string }> {
     await this.requireBoolean(this.requireStore().deleteComment(input));
     return { ok: true, commentId: input.commentId };
+  }
+
+  async updateComment(input: TaskCommentUpdateDto): Promise<unknown> {
+    return await this.requireResult(this.requireStore().updateComment(input));
   }
 
   async listComments(input: TaskCommentTaskScopeDto): Promise<unknown[]> {
@@ -108,6 +112,10 @@ export class TaskCommentPublicApiController {
     return await this.comments.deleteComment(body);
   }
 
+  async updateComment(body: TaskCommentUpdateDto): Promise<unknown> {
+    return await this.comments.updateComment(body);
+  }
+
   async listComments(body: TaskCommentTaskScopeDto): Promise<unknown[]> {
     return await this.comments.listComments(body);
   }
@@ -166,7 +174,7 @@ Inject(TaskCommentStore)(TaskCommentPublicApiService, undefined, 1);
 Inject(DataSource)(TaskCommentStore, undefined, 0);
 Inject(TaskCommentPublicApiService)(TaskCommentPublicApiController, undefined, 0);
 
-for (const target of [TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentReactionDto] as const) {
+for (const target of [TaskCommentTaskScopeDto, TaskCommentIdScopeDto, TaskCommentCreateDto, TaskCommentUpdateDto, TaskCommentReactionDto] as const) {
   for (const property of ["orgId", "userId"] as const) {
     IsString()(target.prototype, property);
     MinLength(1)(target.prototype, property);
@@ -178,12 +186,13 @@ for (const target of [TaskCommentTaskScopeDto, TaskCommentCreateDto] as const) {
   MinLength(1)(target.prototype, "taskId");
 }
 
-for (const target of [TaskCommentIdScopeDto, TaskCommentReactionDto] as const) {
+for (const target of [TaskCommentIdScopeDto, TaskCommentUpdateDto, TaskCommentReactionDto] as const) {
   IsString()(target.prototype, "commentId");
   MinLength(1)(target.prototype, "commentId");
 }
 
 IsObject()(TaskCommentCreateDto.prototype, "body");
+IsObject()(TaskCommentUpdateDto.prototype, "body");
 IsOptional()(TaskCommentCreateDto.prototype, "parentCommentId");
 IsString()(TaskCommentCreateDto.prototype, "parentCommentId");
 MinLength(1)(TaskCommentCreateDto.prototype, "parentCommentId");
@@ -193,6 +202,7 @@ MinLength(1)(TaskCommentReactionDto.prototype, "emoji");
 const routeDescriptors = {
   createComment: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "createComment"),
   deleteComment: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "deleteComment"),
+  updateComment: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "updateComment"),
   listComments: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "listComments"),
   threadedComments: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "threadedComments"),
   resolveComment: Object.getOwnPropertyDescriptor(TaskCommentPublicApiController.prototype, "resolveComment"),
@@ -213,6 +223,7 @@ ApiTags("comments")(TaskCommentPublicApiController);
 
 applyPostRoute("createComment", "create", TaskCommentCreateDto, "Create task comment");
 applyPostRoute("deleteComment", "delete", TaskCommentIdScopeDto, "Delete task comment");
+applyPostRoute("updateComment", "update", TaskCommentUpdateDto, "Update task comment");
 applyPostRoute("listComments", "list", TaskCommentTaskScopeDto, "List task comments");
 applyPostRoute("threadedComments", "threaded", TaskCommentTaskScopeDto, "List threaded task comments");
 applyPostRoute("resolveComment", "resolve", TaskCommentIdScopeDto, "Resolve task comment");

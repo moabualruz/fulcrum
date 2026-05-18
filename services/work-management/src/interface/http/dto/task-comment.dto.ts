@@ -15,6 +15,10 @@ export class TaskCommentCreateDto extends TaskCommentTaskScopeDto {
   parentCommentId?: string | null;
 }
 
+export class TaskCommentUpdateDto extends TaskCommentIdScopeDto {
+  body!: Record<string, unknown>;
+}
+
 export class TaskCommentReactionDto extends TaskCommentIdScopeDto {
   emoji!: string;
 }
