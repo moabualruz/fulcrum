@@ -4,10 +4,12 @@ import {
   restartPlanningCycleFromUpdates,
   type ContinuousUpdateTrigger,
 } from "@planning-review/application/continuous-update-actions.ts";
+import { ensureProjectExists } from "$lib/server/project-api";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 
-export const load: PageServerLoad = async ({ params }) => {
-  return { projectId: params.id };
+export const load: PageServerLoad = async (event) => {
+  await ensureProjectExists(event, event.params.id);
+  return { projectId: event.params.id };
 };
 
 function fdToRecord(fd: FormData): Record<string, string | null> {
