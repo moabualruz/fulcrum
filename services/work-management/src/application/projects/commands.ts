@@ -7,7 +7,11 @@ import { appendEventOrm, ormSqlConnection } from "@platform-core/application/orm
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 import { addProjectRepo, linkProjectRepoToProject } from "@integration-hub/application/repos/commands.ts";
 import { loadTemplateSource, normalizeTemplate, type NormalizedTemplate } from "@work-management/application/templates/engine.ts";
-import type { TemplateTrustMode } from "@work-management/application/project-policy/trust.ts";
+import {
+  normalizeToolPermissionMode,
+  type TemplateTrustMode,
+  type ToolPermissionMode,
+} from "@work-management/application/project-policy/trust.ts";
 
 export async function createProject(
   em: EntityManager,
@@ -146,6 +150,33 @@ export async function updateProject(
   return { ok: true };
 }
 
+export async function updateProjectToolPermissionMode(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { id: string; permissionMode: ToolPermissionMode },
+): Promise<{ id: string; permissionMode: ToolPermissionMode }> {
+  const rows = await ormSqlConnection(em).execute<Array<{ module_policy: Record<string, unknown> | string | null }>>(
+    `SELECT module_policy FROM projects WHERE id = $1 AND org_id = $2`,
+    [input.id, ctx.orgId],
+  );
+  const current = objectValue(rows[0]?.module_policy);
+  const permissionMode = normalizeToolPermissionMode(input.permissionMode);
+  await ormSqlConnection(em).execute(
+    `UPDATE projects SET module_policy = $1::jsonb, updated_at = now() WHERE id = $2 AND org_id = $3`,
+    [JSON.stringify({ ...current, toolPermissionMode: permissionMode }), input.id, ctx.orgId],
+  );
+  await appendEventOrm(em, {
+    orgId: ctx.orgId,
+    projectId: input.id,
+    actor: ctx.userId ?? "system",
+    subjectKind: "project",
+    subjectId: input.id,
+    verb: "project.tool_permission_mode.updated",
+    payload: { permissionMode },
+  });
+  return { id: input.id, permissionMode };
+}
+
 async function loadProjectHierarchyParent(
   em: EntityManager,
   ctx: AppContext,
@@ -168,6 +199,19 @@ async function normalizeExistingDirectory(path: string): Promise<string> {
 
 function slugFromName(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+}
+
+function objectValue(value: Record<string, unknown> | string | null | undefined): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    } catch {
+      return {};
+    }
+  }
+  return value;
 }
 
 export async function deleteProject(em: EntityManager, ctx: AppContext, id: string): Promise<{ ok: true }> {

@@ -44,6 +44,10 @@ _Avoid_: Task data, payload.
 The isolation boundary an `AgentRun` executes inside: `host`, `docker`, or `podman`. Owns the workspace path and any FS/network constraints.
 _Avoid_: Container, jail.
 
+**ToolAuthorityTrace**:
+The authority snapshot attached to dispatch and audit payloads, including Project **ToolPermissionMode**, effective trust mode, whether approval is required, and policy sources. It explains why a tool call was allowed, queued for review, or operator-owned.
+_Avoid_: Permission copy, ACP setting, sandbox policy.
+
 **Workspace**:
 The on-disk working tree (`workspacePath`) the sandbox mounts and the agent edits during a run. Diffed at the end into `workspaceDiffPath`.
 _Avoid_: Checkout, sandbox dir.
@@ -89,4 +93,5 @@ _Avoid_: Using as a domain term in new APIs.
 - **"Status" vs "OrchestrationState" vs "AttemptLifecycleState"** — `AgentRun.status` is a free-form legacy string kept for back-compat; the authoritative coordinator state is **OrchestrationState** and the authoritative inner-loop state is **AttemptLifecycleState**. Do not branch on `status` in new code.
 - **"Agent" the registry entry vs "Agent" the routed target** — the `agents` context (`src/agents/`) owns the five-entry CLI registry (`claude-code`, `codex`, …). This service's `actionAgent` and `AgentProfile.name` are *instances* configured per-org against that registry. Different layer, same word; do not conflate.
 - **"Sandbox" the service folder vs "Sandbox" the isolation mode** — the entity folder `infrastructure/database/entities/sandbox/` groups `AgentProfile`, `Artifact`, `Edge` (historical "Sandcastle" grouping). The domain term **Sandbox** refers to the run's isolation mode (`host` | `docker` | `podman`). The folder name is legacy and is not the domain concept.
+- **ToolAuthorityTrace vs Sandbox** — **ToolAuthorityTrace** explains authorization. **Sandbox** explains isolation. A run can require approval even inside a strict sandbox, or run in danger mode with a visible audit trail.
 - **"Symphony"** is an implementation codename inside `infrastructure/agent-runtime/`, not a domain term. Do not surface it in public APIs, DTOs, or new docs.

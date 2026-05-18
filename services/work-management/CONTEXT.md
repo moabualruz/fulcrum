@@ -68,6 +68,10 @@ _Avoid_: Dependency (reserved for Task-to-Task), trigger, validation.
 The `Project.workflowConfig.transitions` map (`status → allowedNextStatuses[]`) plus `methodology` (`scrum | kanban | none`) and `enabledTaskTypes`, defining which Status moves are legal for the Project.
 _Avoid_: State machine, pipeline, flow, automation (Automation is event→action; WorkflowConfig is status-transition legality).
 
+**ToolPermissionMode**:
+The Project-level trust setting for agent tool execution: `review_each_tool` (default approval queue), `auto` (safe tools may run without stopping), or `danger` (operator-owned full trust). Stored in `Project.modulePolicy.toolPermissionMode` and echoed into dispatch trace/audit payloads.
+_Avoid_: ACP mode, chat permission, sandbox mode.
+
 **MetricsSnapshot**:
 The frozen `{ capacity_points, completed_points, total_tasks, completed_tasks, velocity }` written into a Sprint on close, mirrored by `MetricsCache` rows for cross-Sprint reporting.
 _Avoid_: Report, burndown, stats.
@@ -99,3 +103,4 @@ _Avoid_: Report, burndown, stats.
 - **Workflow vs Automation** — resolved: **WorkflowConfig** is the Project-level legal-transitions graph (synchronous gate). **Automation** is an event→action reaction (asynchronous post-commit). Both can shape Task state but are distinct mechanisms.
 - **Board vs SavedView vs View** — resolved: **SavedView** is the entity. **Board** is the rendering of a SavedView with `viewType: 'kanban'`. Bare "view" is too generic; use SavedView when referring to the stored object and Board only for the kanban rendering.
 - **TaskStatus vs Priority custom field** — resolved: **Status** is a first-class per-Project entity (`TaskStatus` rows) with categories. **Priority** is a seeded CustomFieldDef (not an entity), even though `Task.priority` exists as a column for dispatch ordering. Both representations are kept in sync by service code.
+- **ToolPermissionMode vs Sandbox** — resolved: **ToolPermissionMode** governs whether agent tool calls need approval. **Sandbox** belongs to execution orchestration and controls process isolation. Do not use either as a synonym for the other.

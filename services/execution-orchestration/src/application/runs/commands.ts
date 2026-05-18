@@ -41,7 +41,13 @@ export async function retryRun(em: EntityManager, ctx: AppContext, id: string): 
 export async function dispatchTaskRun(
   em: EntityManager,
   ctx: AppContext,
-  input: { taskId: string; agent: string; model?: string | null; prompt?: string | null },
+  input: {
+    taskId: string;
+    agent: string;
+    model?: string | null;
+    prompt?: string | null;
+    authority?: Record<string, unknown> | null;
+  },
 ): Promise<{ id: string; task_id: string; agent: string; status: string }> {
   if (!input.taskId?.trim()) throw new AppValidationError("Run taskId is required.");
   if (!input.agent?.trim()) throw new AppValidationError("Run agent is required.");
@@ -69,7 +75,7 @@ export async function dispatchTaskRun(
       subjectKind: "agent_run",
       subjectId: run.id,
       verb: "dispatched",
-      payload: { task_id: input.taskId, agent: input.agent },
+      payload: { task_id: input.taskId, agent: input.agent, authority: input.authority ?? null },
     });
     return { id: run.id, task_id: input.taskId, agent: input.agent, status: "queued" };
   });

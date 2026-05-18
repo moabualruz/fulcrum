@@ -1,9 +1,17 @@
 export type TemplateTrustMode = "manual" | "assisted" | "trusted" | "full-auto";
+export type ToolPermissionMode = "review_each_tool" | "auto" | "danger";
+
 const TRUST_ORDER: Record<TemplateTrustMode, number> = {
   manual: 0,
   assisted: 1,
   trusted: 2,
   "full-auto": 3,
+};
+
+const TOOL_PERMISSION_TO_TRUST_MODE: Record<ToolPermissionMode, TemplateTrustMode> = {
+  review_each_tool: "manual",
+  auto: "trusted",
+  danger: "full-auto",
 };
 
 export interface TemplateEffectPolicy {
@@ -41,6 +49,7 @@ export interface EffectiveAgentAuthorityInput {
 
 export interface EffectiveAgentAuthority {
   trustMode: TemplateTrustMode;
+  permissionMode: ToolPermissionMode;
   approvalRequired: boolean;
   reason: "most-restrictive-policy" | "run-override-requested-looser-authority";
   sources: {
@@ -49,6 +58,18 @@ export interface EffectiveAgentAuthority {
     projectPolicy: TemplateTrustMode;
     runOverride: TemplateTrustMode | null;
   };
+}
+
+export interface ToolAuthorityDecision {
+  permissionMode: ToolPermissionMode;
+  allowed: boolean;
+  approvalRequired: boolean;
+  auditRequired: boolean;
+  reason:
+    | "review-each-tool-requires-approval"
+    | "auto-allows-safe-tool"
+    | "auto-requires-approval-for-risky-tool"
+    | "danger-mode-allows-operator-owned-tool";
 }
 
 export function resolveEffectiveAgentAuthority(input: EffectiveAgentAuthorityInput): EffectiveAgentAuthority {
@@ -67,9 +88,69 @@ export function resolveEffectiveAgentAuthority(input: EffectiveAgentAuthorityInp
   const overrideLoosens = requested !== null && TRUST_ORDER[requested] > TRUST_ORDER[baseline];
   return {
     trustMode: requested === null ? baseline : mostRestrictive([baseline, requested]),
+    permissionMode: permissionModeFromTrustMode(requested === null ? baseline : mostRestrictive([baseline, requested])),
     approvalRequired: baseline === "manual" || overrideLoosens,
     reason: overrideLoosens ? "run-override-requested-looser-authority" : "most-restrictive-policy",
     sources,
+  };
+}
+
+export function normalizeToolPermissionMode(value: unknown): ToolPermissionMode {
+  if (value === "review_each_tool" || value === "auto" || value === "danger") return value;
+  if (value === "manual" || value === "assisted") return "review_each_tool";
+  if (value === "trusted") return "auto";
+  if (value === "full-auto") return "danger";
+  return "review_each_tool";
+}
+
+export function trustModeFromToolPermissionMode(mode: ToolPermissionMode): TemplateTrustMode {
+  return TOOL_PERMISSION_TO_TRUST_MODE[mode];
+}
+
+export function permissionModeFromTrustMode(mode: TemplateTrustMode): ToolPermissionMode {
+  if (mode === "full-auto") return "danger";
+  if (mode === "trusted") return "auto";
+  return "review_each_tool";
+}
+
+export function projectPolicySourceFromModulePolicy(
+  policy: Record<string, unknown> | null | undefined,
+): AuthorityPolicySource {
+  const permissionMode = normalizeToolPermissionMode(policy?.["toolPermissionMode"] ?? policy?.["trustMode"]);
+  return { trustMode: trustModeFromToolPermissionMode(permissionMode) };
+}
+
+export function evaluateToolAuthority(input: {
+  permissionMode: ToolPermissionMode;
+  safe: boolean;
+  destructive?: boolean;
+  authorityEscalation?: boolean;
+}): ToolAuthorityDecision {
+  const risky = input.destructive === true || input.authorityEscalation === true || !input.safe;
+  if (input.permissionMode === "review_each_tool") {
+    return {
+      permissionMode: input.permissionMode,
+      allowed: false,
+      approvalRequired: true,
+      auditRequired: true,
+      reason: "review-each-tool-requires-approval",
+    };
+  }
+  if (input.permissionMode === "auto") {
+    return {
+      permissionMode: input.permissionMode,
+      allowed: !risky,
+      approvalRequired: risky,
+      auditRequired: true,
+      reason: risky ? "auto-requires-approval-for-risky-tool" : "auto-allows-safe-tool",
+    };
+  }
+  return {
+    permissionMode: input.permissionMode,
+    allowed: true,
+    approvalRequired: false,
+    auditRequired: true,
+    reason: "danger-mode-allows-operator-owned-tool",
   };
 }
 

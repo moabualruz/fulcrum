@@ -115,6 +115,7 @@ export const DriftEntrySchema = z.object({
 });
 
 const AgentRunOrchestrationStateSchema = z.enum(AGENT_RUN_ORCHESTRATION_STATES);
+const ToolPermissionModeSchema = z.enum(["review_each_tool", "auto", "danger"]);
 
 function requireLegacyStore(ctx: { legacyStore?: LegacySymphonyStore }): LegacySymphonyStore {
   if (!ctx.legacyStore) {
@@ -401,6 +402,7 @@ export const orchestrationRouter = router({
         projectId: z.string().optional(),
         includeGlobal: z.boolean().optional(),
         trustMode: z.enum(["manual", "assisted", "trusted", "full-auto"]).optional(),
+        permissionMode: ToolPermissionModeSchema.optional(),
       }),
     )
     .output(
@@ -430,6 +432,7 @@ export const orchestrationRouter = router({
           }),
           authority: z.object({
             trustMode: z.enum(["manual", "assisted", "trusted", "full-auto"]),
+            permissionMode: ToolPermissionModeSchema,
             approvalRequired: z.boolean(),
             reason: z.string(),
             sources: z.record(z.string(), z.enum(["manual", "assisted", "trusted", "full-auto"]).nullable()),
@@ -452,6 +455,7 @@ export const orchestrationRouter = router({
             agentName: input.agentName,
             includeGlobal: input.includeGlobal,
             trustMode: input.trustMode,
+            permissionMode: input.permissionMode,
           });
         } catch (error) {
           if (error instanceof AppError) throw appErrorToTrpcError(error);
@@ -464,6 +468,7 @@ export const orchestrationRouter = router({
       const run = await dispatchTaskRun(manager, appCtx, {
         taskId: input.taskId,
         agent: agentName,
+        authority: trace.authority,
       });
 
       return {
