@@ -6,10 +6,13 @@ import {
   recordUatCodeReviewDecision,
   type UatCodeReviewDecision,
 } from "@planning-review/interface/project-review-reports.ts";
+import { ensureProjectExists } from "$lib/server/project-api";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async (event) => {
+  const { params, locals } = event;
   const projectId = params.id;
+  await ensureProjectExists(event, projectId);
   const { em, ctx } = await requestServiceScope(locals, projectId);
   try {
     const handoff = await buildUatCodeReviewHandoff(em, ctx, {
