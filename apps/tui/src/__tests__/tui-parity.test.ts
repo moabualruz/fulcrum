@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { access, readFile } from "node:fs/promises";
 
-import { listMissingTuiDomains } from "@platform-core/application/interface-parity/surface-domain-matrix.ts";
+import {
+  REQUIRED_SURFACE_DOMAINS,
+  listMissingTuiDomains,
+} from "@platform-core/application/interface-parity/surface-domain-matrix.ts";
 import { FakeTTY } from "../testing/fake-tty.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
 
@@ -56,6 +59,16 @@ describe("Surface TUI parity inventory", () => {
       "Routing/Skills",
       "Doctor/Settings",
     ]));
+  });
+
+  test("parity matrix names TUI action state and known TUI gaps", () => {
+    const byName = new Map(REQUIRED_SURFACE_DOMAINS.map((domain) => [domain.name, domain]));
+
+    expect(byName.get("tasks")?.state.tui).toBe("interactive");
+    expect(byName.get("runs")?.workflows[0]?.tui).toContain("Run detail transcript/log pane");
+    expect(byName.get("docs")?.state.tui).toBe("display-only");
+    expect(byName.get("reports")?.state.tui).toBe("gap");
+    expect(byName.get("review")?.gaps.map((gap) => gap.id)).toContain("review:tui-display-gap");
   });
 
   test("required domain screen modules exist for navigation targets", async () => {

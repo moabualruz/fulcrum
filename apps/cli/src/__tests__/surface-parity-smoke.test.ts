@@ -182,4 +182,21 @@ describe("Surface final cross-surface parity smoke", () => {
       }
     }
   });
+
+  test("surface parity matrix links major CLI workflows to TUI and API equivalents", () => {
+    const majorDomains = ["projects", "tasks", "docs", "repos", "artifacts", "notifications", "runs", "reports", "planning", "review", "settings"];
+
+    for (const name of majorDomains) {
+      const domain = REQUIRED_SURFACE_DOMAINS.find((candidate) => candidate.name === name);
+      expect(domain, `${name} missing from surface matrix`).toBeDefined();
+      expect(domain!.workflows.length, `${name} missing workflow mapping`).toBeGreaterThan(0);
+
+      for (const workflow of domain!.workflows) {
+        expect(workflow.cli.join("\n"), `${name}:${workflow.name} missing fulcrum CLI command`).toContain("fulcrum ");
+        expect(workflow.tui.length, `${name}:${workflow.name} missing TUI action`).toBeGreaterThan(0);
+        expect(workflow.api.join("\n"), `${name}:${workflow.name} missing public API/service route`).toMatch(/appRouter|Api|Module|public API/);
+        expect(workflow.manualScript.length, `${name}:${workflow.name} missing manual parity script`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
 });
