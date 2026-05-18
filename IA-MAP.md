@@ -151,6 +151,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
 /cross-cutting-mobile                                     internal design-e2e preview for Android status-bar, gesture-zone, bottom-nav, and landscape safe-area reserves
 /mobile-capture                                           internal design-e2e preview for mobile capture Core Web Vitals budgets, layout stability, and opt-in metric delivery
+/view-controls                                            internal design-e2e preview for view sort controls (header sort, asc/desc indicator, mobile sort menu, clear sort)
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 

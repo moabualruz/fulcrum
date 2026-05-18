@@ -755,6 +755,7 @@ Per research-05 §3.9. **Same data, two front-ends; both stream over the same RP
 | `fulcrum task list --view board` | `:board` |
 | `fulcrum task list --view timeline` | `:timeline` |
 | `fulcrum task list --view graph` | `:graph` |
+| `fulcrum task list --sort <field>:<asc|desc>` | `:list` `s` opens sort menu; field/direction shown in header |
 | `fulcrum doctor --json` | `:doctor` |
 | `fulcrum audit list --trace <id>` | `:audit` with filter prefilled |
 | `fulcrum trace show <id>` | `:trace/<id>` |

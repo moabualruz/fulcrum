@@ -234,6 +234,7 @@ Verbatim Plane spreadsheet shape (research-07 §1.3) + Linear density.
 
 - 24 px row height (cozy default), 20 px compact, 28 px comfortable.
 - Sticky header. Resizable + reorderable columns. Sort indicator on hover, persistent when active.
+- View sort controls expose every displayed sortable field as a table-header button on desktop and as a visible field/direction menu on mobile. First activation sorts ascending; repeated activation toggles descending; active field and direction stay visible in the header and `aria-sort`.
 - Row selection: checkbox left, `space` to toggle, `shift+click` for range, `cmd+a` for all visible.
 - Bulk-action bar appears as a 32 px ribbon above the table when any row selected.
 - Per-row peek: click anywhere outside selectable cells = peek-overview modal.
