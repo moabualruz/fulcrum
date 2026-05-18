@@ -52,6 +52,14 @@ _Avoid_: Handover, approval gate.
 The runtime policy controlling who may call `submit_plan` — `manual`, `user-managed`, `plan-agent`, or `all-agents`.
 _Avoid_: Plan mode (overloaded with editor "plan mode"), review mode.
 
+**PlanSourceSnapshot**:
+The hash/version record of a Document, planning Artifact, prototype, or SuccessCriterion captured when a Plan is approved, used to detect stale execution inputs later.
+_Avoid_: Cache, copy, mirror.
+
+**PlanStalenessResult**:
+The execution gate verdict comparing current source content to PlanSourceSnapshots: `fresh`, `stale`, or `accepted_stale` with a required action and changed-source summaries.
+_Avoid_: Drift check, dirty flag, outdated marker.
+
 ## Relationships
 
 - A **Plan** is wrapped by exactly one **PlanSubmission**, which yields one **PlanDecision**.
@@ -61,6 +69,7 @@ _Avoid_: Plan mode (overloaded with editor "plan mode"), review mode.
 - A **ReviewWorkbench** session holds one diff (many files) plus many **Annotation**s; it emits one feedback markdown and one or more PR-shaped submission targets.
 - A passing **FinalQaReport** produces exactly one **UatCodeReviewHandoff**; the user's choice on the handoff produces a new feedback run, an E2E regression artifact, or an approval event.
 - **WorkflowMode** gates whether a given agent's `submit_plan` call is accepted or rejected with a redirect message.
+- A **Plan** stores many **PlanSourceSnapshots** at approval time; attempting execution later produces one **PlanStalenessResult** before work continues.
 
 ## Example dialogue
 
@@ -78,3 +87,4 @@ _Avoid_: Plan mode (overloaded with editor "plan mode"), review mode.
 - **SuccessCriterion scope** — `scope: "plan"` criteria belong to the Plan as a whole; `scope: "task"` criteria belong to a single TaskDraft via `taskClientKey`. A criterion is never shared across tasks.
 - **WorkflowMode `plan-agent` vs editor "plan mode"** — `plan-agent` is the policy here (only the `plan` agent may call `submit_plan`). OpenCode's editor "plan mode" is a separate concept inside that runtime and is not owned by this service.
 - **No owned entities (yet)** — per CONTEXT-MAP, this service runs workflows over entities owned elsewhere: tasks (work-management), docs (knowledge-workspace), artifacts/audit (workflow-coordination), events (platform-core). Adding a persisted Plan or ReviewSession entity here requires a new ADR and a CONTEXT-MAP update.
+- **PlanSourceSnapshot vs ContextBundle** — a **ContextBundle** is what an agent receives before a run. A **PlanSourceSnapshot** is the approval-time hash/version guard used to decide whether that already-approved Plan can still execute.
