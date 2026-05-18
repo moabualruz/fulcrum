@@ -168,6 +168,16 @@
         "vitest": "^4.1.5",
       },
     },
+    "packages/shared-dto": {
+      "name": "@fulcrum/shared-dto",
+      "version": "0.0.1",
+      "dependencies": {
+        "zod": "4.4.2",
+      },
+      "devDependencies": {
+        "typescript": "^5.6.0",
+      },
+    },
     "packages/ui-kit": {
       "name": "@fulcrum/ui-kit",
       "version": "0.0.1",
@@ -409,6 +419,8 @@
     "@fulcrum/cli": ["@fulcrum/cli@workspace:apps/cli"],
 
     "@fulcrum/server": ["@fulcrum/server@workspace:apps/server"],
+
+    "@fulcrum/shared-dto": ["@fulcrum/shared-dto@workspace:packages/shared-dto"],
 
     "@fulcrum/tui": ["@fulcrum/tui@workspace:apps/tui"],
 
