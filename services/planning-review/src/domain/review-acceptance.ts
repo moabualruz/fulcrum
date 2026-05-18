@@ -263,6 +263,7 @@ export interface ConfiguredUatCodeReviewDecisionOutput {
 export interface RunGeneratedE2eRegressionTestsInput {
   projectId: string;
   traceId?: string;
+  taskIds?: string[];
   runner?: GeneratedE2eRegressionRunner;
   planOnly?: boolean;
 }

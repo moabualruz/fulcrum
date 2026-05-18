@@ -507,6 +507,7 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.finalQa({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-final-qa",
+      taskIds: ["task-final-qa"],
     });
 
     expect(result).toMatchObject({
@@ -526,6 +527,7 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-final-qa",
+      taskIds: ["task-final-qa"],
     });
   });
 
@@ -535,11 +537,14 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.finalQaFeedbackGate({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-feedback-gate",
+      taskIds: ["task-feedback"],
       workerId: "worker-trpc",
+      reviewerAgent: "qa-reviewer",
       feedbackAgent: "codex",
       feedbackModel: "gpt-feedback",
       maxIterations: 3,
       cwd: "/repo",
+      copyToWorktree: ["services/planning-review"],
     });
 
     expect(result).toMatchObject({
@@ -563,11 +568,14 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-feedback-gate",
+      taskIds: ["task-feedback"],
       workerId: "worker-trpc",
+      reviewerAgent: "qa-reviewer",
       feedbackAgent: "codex",
       feedbackModel: "gpt-feedback",
       maxIterations: 3,
       cwd: "/repo",
+      copyToWorktree: ["services/planning-review"],
     });
   });
 
@@ -643,6 +651,7 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.runGeneratedE2eRegressionTests({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
+      taskIds: ["task-e2e"],
       runner: "playwright",
       planOnly: true,
     });
@@ -666,6 +675,7 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
+      taskIds: ["task-e2e"],
       runner: "playwright",
       planOnly: true,
     });

@@ -187,10 +187,11 @@ export class ReportsScreen {
 
   constructor(
     private readonly opts: {
-      finalQaInput?: { projectId: string; traceId?: string };
+      finalQaInput?: { projectId: string; traceId?: string; taskIds?: string[] };
       finalQaGateInput?: {
         projectId: string;
         traceId?: string;
+        taskIds?: string[];
         workerId?: string;
         reviewerAgent?: string;
         feedbackAgent?: string;
@@ -199,9 +200,9 @@ export class ReportsScreen {
         cwd?: string;
         copyToWorktree?: string[];
       };
-      uatHandoffInput?: { projectId: string; traceId?: string };
+      uatHandoffInput?: { projectId: string; traceId?: string; taskIds?: string[] };
       autoDecisionInput?: { projectId: string; traceId?: string; taskIds?: string[] };
-      e2eRunInput?: { projectId: string; traceId?: string; runner?: "bun" | "playwright"; planOnly?: boolean };
+      e2eRunInput?: { projectId: string; traceId?: string; taskIds?: string[]; runner?: "bun" | "playwright"; planOnly?: boolean };
       reviewWorkbenchInput?: Record<string, unknown>;
       reviewSessionInput?: Record<string, unknown>;
       reviewAnnotationInput?: Record<string, unknown>;
@@ -215,9 +216,9 @@ export class ReportsScreen {
       caller: {
         reports: {
           metrics: () => Promise<Metrics>;
-          finalQa?: (input: { projectId: string; traceId?: string }) => Promise<FinalQaReport>;
+          finalQa?: (input: { projectId: string; traceId?: string; taskIds?: string[] }) => Promise<FinalQaReport>;
           finalQaFeedbackGate?: (input: NonNullable<ReportsScreen["opts"]["finalQaGateInput"]>) => Promise<FinalQaFeedbackGate>;
-          uatCodeReviewHandoff?: (input: { projectId: string; traceId?: string }) => Promise<UatCodeReviewHandoff>;
+          uatCodeReviewHandoff?: (input: { projectId: string; traceId?: string; taskIds?: string[] }) => Promise<UatCodeReviewHandoff>;
           applyConfiguredUatCodeReviewDecision?: (input: { projectId: string; traceId?: string; taskIds?: string[] }) => Promise<ConfiguredAutoDecision>;
           reviewWorkbench?: (input: Record<string, unknown>) => Promise<ReviewWorkbenchReport>;
           loadReviewWorkbenchSession?: (input: Record<string, unknown>) => Promise<ReviewWorkbenchSessionReport>;
@@ -229,7 +230,7 @@ export class ReportsScreen {
             reviewType: "uat" | "code_review";
             feedbackText?: string;
           }) => Promise<UatCodeReviewDecision>;
-          runGeneratedE2eRegressionTests?: (input: { projectId: string; traceId?: string; runner?: "bun" | "playwright"; planOnly?: boolean }) => Promise<GeneratedE2eRun>;
+          runGeneratedE2eRegressionTests?: (input: { projectId: string; traceId?: string; taskIds?: string[]; runner?: "bun" | "playwright"; planOnly?: boolean }) => Promise<GeneratedE2eRun>;
         };
       };
     },

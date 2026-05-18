@@ -45,6 +45,21 @@ describe("CLI workflow API caller", () => {
         if (String(url).includes("/workflows/review/final-qa/report")) {
           return Response.json({ status: "ready", traceId: "trace-cli" });
         }
+        if (String(url).includes("/workflows/review/final-qa/feedback-gate")) {
+          return Response.json({ status: "passed", nextAction: "prompt_uat_code_review", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/review/uat-code-review/handoff")) {
+          return Response.json({ status: "ready", nextAction: "prompt_user_for_uat_code_review", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/review/uat-code-review/decision/record")) {
+          return Response.json({ status: "approved", nextAction: "real_data_e2e_generated", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/review/uat-code-review/decision/apply-configured")) {
+          return Response.json({ status: "applied", nextAction: "real_data_e2e_generated", traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/review/generated-e2e/run")) {
+          return Response.json({ status: "planned", runner: "playwright", traceId: "trace-cli" });
+        }
         if (String(url).includes("/workflows/planning/artifact-execution/run")) {
           return Response.json({ status: "passed", traceId: "trace-cli", runner: "sandbox-agent" });
         }
@@ -89,7 +104,40 @@ describe("CLI workflow API caller", () => {
     await expect(caller.reports.finalQa({
       projectId: "project-1",
       traceId: "trace-cli",
+      taskIds: ["task-1"],
     })).resolves.toEqual({ status: "ready", traceId: "trace-cli" });
+    await expect(caller.reports.finalQaFeedbackGate({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      taskIds: ["task-1"],
+      reviewerAgent: "qa-reviewer",
+      copyToWorktree: ["services/planning-review"],
+    })).resolves.toEqual({ status: "passed", nextAction: "prompt_uat_code_review", traceId: "trace-cli" });
+    await expect(caller.reports.uatCodeReviewHandoff({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      taskIds: ["task-1"],
+    })).resolves.toEqual({ status: "ready", nextAction: "prompt_user_for_uat_code_review", traceId: "trace-cli" });
+    await expect(caller.reports.recordUatCodeReviewDecision({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      taskIds: ["task-1"],
+      decision: "approve_without_manual_review",
+      reviewType: "uat",
+      e2eRunner: "playwright",
+    })).resolves.toEqual({ status: "approved", nextAction: "real_data_e2e_generated", traceId: "trace-cli" });
+    await expect(caller.reports.applyConfiguredUatCodeReviewDecision({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      taskIds: ["task-1"],
+    })).resolves.toEqual({ status: "applied", nextAction: "real_data_e2e_generated", traceId: "trace-cli" });
+    await expect(caller.reports.runGeneratedE2eRegressionTests({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      taskIds: ["task-1"],
+      runner: "playwright",
+      planOnly: true,
+    })).resolves.toEqual({ status: "planned", runner: "playwright", traceId: "trace-cli" });
     await expect(caller.planning.runArtifactExecution({
       planId: "plan-1",
       artifactPath: "apps/web/src/routes/planning/workbench-prototype.tsx",
@@ -104,6 +152,11 @@ describe("CLI workflow API caller", () => {
       "http://127.0.0.1:4321/workflows/execution/qa-review/record",
       "http://127.0.0.1:4321/workflows/cycles/acceptance-cycle/run",
       "http://127.0.0.1:4321/workflows/review/final-qa/report",
+      "http://127.0.0.1:4321/workflows/review/final-qa/feedback-gate",
+      "http://127.0.0.1:4321/workflows/review/uat-code-review/handoff",
+      "http://127.0.0.1:4321/workflows/review/uat-code-review/decision/record",
+      "http://127.0.0.1:4321/workflows/review/uat-code-review/decision/apply-configured",
+      "http://127.0.0.1:4321/workflows/review/generated-e2e/run",
       "http://127.0.0.1:4321/workflows/planning/artifact-execution/run",
     ]);
   });
