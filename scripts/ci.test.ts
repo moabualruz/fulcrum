@@ -6,7 +6,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "bun:test";
-import { buildAllSteps, ALL_STEPS, STEPS } from "./ci.ts";
+import { buildAllSteps, ALL_STEPS, STEPS, groupedSteps } from "./ci.ts";
 import type { TieredStep } from "./ci.ts";
 
 const webPackageJson = JSON.parse(readFileSync("apps/web/package.json", "utf8")) as {
@@ -14,13 +14,13 @@ const webPackageJson = JSON.parse(readFileSync("apps/web/package.json", "utf8"))
 };
 
 describe("ci tiered pipeline — tier structure", () => {
-  it("has exactly 4 tiers: lint, unit, integration, build", () => {
+  it("has exactly 5 tiers", () => {
     const tiers = [...new Set(ALL_STEPS.map((s) => s.tier))];
-    expect(tiers).toEqual(["lint", "unit", "integration", "build"]);
+    expect(tiers).toEqual(["tier1", "tier2", "tier3", "tier4", "tier5"]);
   });
 
-  it("tiers execute in order: lint → unit → integration → build", () => {
-    const tierOrder = ["lint", "unit", "integration", "build"];
+  it("tiers execute in order: tier1 → tier2 → tier3 → tier4 → tier5", () => {
+    const tierOrder = ["tier1", "tier2", "tier3", "tier4", "tier5"];
     let lastTierIndex = -1;
     for (const step of ALL_STEPS) {
       const idx = tierOrder.indexOf(step.tier);
@@ -31,7 +31,7 @@ describe("ci tiered pipeline — tier structure", () => {
 });
 
 describe("ci tiered pipeline — lint tier", () => {
-  const lintSteps = ALL_STEPS.filter((s) => s.tier === "lint");
+  const lintSteps = ALL_STEPS.filter((s) => s.tier === "tier1");
 
   it("includes install, typecheck, architecture, license-audit, ci:codegen, ci:schemas", () => {
     const names = lintSteps.map((s) => s.name);
@@ -55,7 +55,7 @@ describe("ci tiered pipeline — lint tier", () => {
 });
 
 describe("ci tiered pipeline — unit tier", () => {
-  const unitSteps = ALL_STEPS.filter((s) => s.tier === "unit");
+  const unitSteps = ALL_STEPS.filter((s) => s.tier === "tier2");
 
   it("has a single 'unit' step running fixture-backed service tests", () => {
     expect(unitSteps).toHaveLength(1);
@@ -68,7 +68,7 @@ describe("ci tiered pipeline — unit tier", () => {
 });
 
 describe("ci tiered pipeline — integration tier", () => {
-  const integrationSteps = ALL_STEPS.filter((s) => s.tier === "integration");
+  const integrationSteps = ALL_STEPS.filter((s) => s.tier === "tier3");
 
   it("has a single 'integration' step running external and DB contract tests", () => {
     expect(integrationSteps).toHaveLength(1);
@@ -80,28 +80,61 @@ describe("ci tiered pipeline — integration tier", () => {
   });
 });
 
-describe("ci tiered pipeline — build tier", () => {
-  const buildSteps = ALL_STEPS.filter((s) => s.tier === "build");
+describe("ci tiered pipeline — design e2e tier", () => {
+  const designSteps = ALL_STEPS.filter((s) => s.tier === "tier4");
 
-  it("includes build, web:check, web:build, web:test", () => {
-    const names = buildSteps.map((s) => s.name);
-    expect(names).toContain("build");
+  it("includes web:check and design-e2e", () => {
+    const names = designSteps.map((s) => s.name);
     expect(names).toContain("web:check");
+    expect(names).toContain("design-e2e");
+  });
+
+  it("web:check sets NODE_OPTIONS for heap size", () => {
+    const step = designSteps.find((s) => s.name === "web:check");
+    expect(step).toBeDefined();
+    expect(step!.env).toMatchObject({ NODE_OPTIONS: "--max-old-space-size=12288" });
+  });
+
+  it("design-e2e runs the design Playwright project from apps/web", () => {
+    const step = designSteps.find((s) => s.name === "design-e2e");
+    expect(step).toBeDefined();
+    expect(step!.cwd).toBe("apps/web");
+    expect(step!.cmd).toEqual(["bun", "run", "test:design"]);
+  });
+});
+
+describe("ci tiered pipeline — real e2e tier", () => {
+  const realSteps = ALL_STEPS.filter((s) => s.tier === "tier5");
+
+  it("includes build, web:build, web:test, real-e2e", () => {
+    const names = realSteps.map((s) => s.name);
+    expect(names).toContain("build");
     expect(names).toContain("web:build");
     expect(names).toContain("web:test");
+    expect(names).toContain("real-e2e");
   });
 
   it("web:test runs bun run web:test from apps/web", () => {
-    const step = buildSteps.find((s) => s.name === "web:test");
+    const step = realSteps.find((s) => s.name === "web:test");
     expect(step).toBeDefined();
     expect(step!.cwd).toBe("apps/web");
     expect(step!.cmd).toEqual(["bun", "run", "web:test"]);
   });
 
-  it("web:check sets NODE_OPTIONS for heap size", () => {
-    const step = buildSteps.find((s) => s.name === "web:check");
+  it("real-e2e runs the real Playwright project from apps/web", () => {
+    const step = realSteps.find((s) => s.name === "real-e2e");
     expect(step).toBeDefined();
-    expect(step!.env).toMatchObject({ NODE_OPTIONS: "--max-old-space-size=12288" });
+    expect(step!.cwd).toBe("apps/web");
+    expect(step!.cmd).toEqual(["bun", "run", "test:e2e"]);
+  });
+});
+
+describe("ci tiered pipeline — parallel groups", () => {
+  it("groups design and real e2e tiers after unit and integration gates", () => {
+    const groups = groupedSteps(ALL_STEPS);
+    expect(groups.map((group) => group[0]!.tier)).toEqual(["tier1", "tier2", "tier3", "tier4", "tier5"]);
+    expect(groups.at(-2)!.map((step) => step.name)).toContain("design-e2e");
+    expect(groups.at(-1)!.map((step) => step.name)).toContain("real-e2e");
   });
 });
 

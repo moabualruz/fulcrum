@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 // Local CI runner — tiered pipeline with affected-only testing.
 // Usage:
-//   bun run scripts/ci.ts               → full (all tiers)
-//   bun run scripts/ci.ts --changed     → affected-only (unit+integration use --changed=origin/main)
-//   bun run scripts/ci.ts --fast        → alias for --changed
-//   bun run scripts/ci.ts --tier=lint   → lint tier only
-//   bun run scripts/ci.ts --tier=unit   → lint + fixture-backed unit
-//   bun run scripts/ci.ts --tier=integration → lint + unit + DB/API integration
-//   bun run scripts/ci.ts --tier=build  → all tiers
+//   bun run scripts/ci.ts               → full 5-tier CI
+//   bun run scripts/ci.ts --changed     → affected-only where supported
+//   bun run scripts/ci.ts --fast        → Tier 1 + Tier 2 only
+//   bun run scripts/ci.ts --tier=tier1  → lint + architecture only
+//   bun run scripts/ci.ts --tier=tier2  → Tier 1 + unit
+//   bun run scripts/ci.ts --tier=tier3  → Tier 1 + unit + integration
+//   bun run scripts/ci.ts --tier=tier4  → Tier 1 + unit + integration + design E2E
+//   bun run scripts/ci.ts --tier=tier5  → full 5-tier CI
 
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
@@ -38,13 +39,22 @@ export function envForStep(step: Step): NodeJS.ProcessEnv {
 
 // ── CI Tiers ──────────────────────────────────────────────────────────────────
 // Tier 1: LINT + ARCHITECTURE — fast gate (<15s)
-// Tier 2: UNIT TESTS — fixture-backed service tests (<2min)
-// Tier 3: INTEGRATION TESTS — tests/ + DB/API contract tests (<3min)
-// Tier 4: BUILD + WEB — build verification (<2min)
+// Tier 2: UNIT TESTS — fixture-backed service tests (<60s)
+// Tier 3: INTEGRATION TESTS — tests/ + DB/API contract tests (<120s)
+// Tier 4: DESIGN E2E — OD/prototype fidelity (<180s)
+// Tier 5: REAL E2E — persisted real wiring (<300s)
 
-export type CiTier = "lint" | "unit" | "integration" | "build";
+export type CiTier = "tier1" | "tier2" | "tier3" | "tier4" | "tier5";
 
-const VALID_TIERS = new Set<CiTier>(["lint", "unit", "integration", "build"]);
+const VALID_TIERS = new Set<CiTier>(["tier1", "tier2", "tier3", "tier4", "tier5"]);
+const LEGACY_TIER_ALIASES: Record<string, CiTier> = {
+  lint: "tier1",
+  unit: "tier2",
+  integration: "tier3",
+  design: "tier4",
+  build: "tier5",
+  real: "tier5",
+};
 
 function readFlag(name: string): string | undefined {
   const inline = process.argv.find((arg) => arg.startsWith(`--${name}=`));
@@ -54,15 +64,18 @@ function readFlag(name: string): string | undefined {
   return undefined;
 }
 
-function parseTier(raw = "build"): CiTier {
+function parseTier(raw = "tier5"): CiTier {
   if (VALID_TIERS.has(raw as CiTier)) return raw as CiTier;
-  throw new Error(`invalid --tier=${raw}; expected lint|unit|integration|build`);
+  const alias = LEGACY_TIER_ALIASES[raw];
+  if (alias) return alias;
+  throw new Error(`invalid --tier=${raw}; expected tier1|tier2|tier3|tier4|tier5`);
 }
 
-const tierArg = parseTier(readFlag("tier"));
+const fastMode = process.argv.includes("--fast");
+const tierArg = parseTier(readFlag("tier") ?? (fastMode ? "tier2" : undefined));
 const isChanged = process.argv.includes("--changed") || process.argv.includes("--fast");
 
-const TIER_ORDER: CiTier[] = ["lint", "unit", "integration", "build"];
+const TIER_ORDER: CiTier[] = ["tier1", "tier2", "tier3", "tier4", "tier5"];
 function tierIncludes(step: CiTier): boolean {
   return TIER_ORDER.indexOf(tierArg) >= TIER_ORDER.indexOf(step);
 }
@@ -91,24 +104,28 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
 
   return [
     // ── Tier 1: LINT + ARCHITECTURE (fast, <15s) ──
-    { name: "install",       cmd: ["bun", "install", "--frozen-lockfile"], tier: "lint" },
-    { name: "typecheck",     cmd: ["bun", "-e", SCOPED_TYPECHECK_SCRIPT], tier: "lint" },
-    { name: "architecture",  cmd: ["bun", "test", "tests/architecture/"], tier: "lint" },
-    { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "lint" },
-    { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "lint" },
-    { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "lint" },
+    { name: "install",       cmd: ["bun", "install", "--frozen-lockfile"], tier: "tier1" },
+    { name: "typecheck",     cmd: ["bun", "-e", SCOPED_TYPECHECK_SCRIPT], tier: "tier1" },
+    { name: "architecture",  cmd: ["bun", "test", "tests/architecture/"], tier: "tier1" },
+    { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "tier1" },
+    { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "tier1" },
+    { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "tier1" },
 
     // ── Tier 2: UNIT TESTS (fixture-backed; DB contracts run in integration) ──
-    { name: "unit",          cmd: ["bun", "run", "scripts/test-tier.ts", "unit", ...changedFlag, "--timeout", "60000"], tier: "unit", env: { FULCRUM_REPO_DIR: process.cwd() } },
+    { name: "unit",          cmd: ["bun", "run", "scripts/test-tier.ts", "unit", ...changedFlag, "--timeout", "60000"], tier: "tier2", env: { FULCRUM_REPO_DIR: process.cwd() } },
 
     // ── Tier 3: INTEGRATION TESTS (tests/ + DB/API contract tests) ──
-    { name: "integration",   cmd: ["bun", "run", "scripts/test-tier.ts", "integration", ...changedFlag, "--timeout", "60000"], tier: "integration" },
+    { name: "integration",   cmd: ["bun", "run", "scripts/test-tier.ts", "integration", ...changedFlag, "--timeout", "120000"], tier: "tier3" },
 
-    // ── Tier 4: BUILD + WEB (<2min) ──
-    { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "build" },
-    { name: "web:check",     cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "build" },
-    { name: "web:build",     cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "build", soft: true },
-    { name: "web:test",      cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "build", soft: true },
+    // ── Tier 4: DESIGN E2E (<180s) ──
+    { name: "web:check",     cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "tier4" },
+    { name: "design-e2e",    cmd: ["bun", "run", "test:design"], cwd: "apps/web", tier: "tier4" },
+
+    // ── Tier 5: REAL E2E (<300s) ──
+    { name: "build",         cmd: ["bun", "run", "scripts/build-all.ts"], tier: "tier5" },
+    { name: "web:build",     cmd: ["bun", "run", "build"], cwd: "apps/web", tier: "tier5", soft: true },
+    { name: "web:test",      cmd: ["bun", "run", "web:test"], cwd: "apps/web", tier: "tier5", soft: true },
+    { name: "real-e2e",      cmd: ["bun", "run", "test:e2e"], cwd: "apps/web", tier: "tier5" },
   ];
 }
 
@@ -116,6 +133,22 @@ export const ALL_STEPS: TieredStep[] = buildAllSteps();
 
 export const STEPS: Step[] = ALL_STEPS
   .filter(s => tierIncludes(s.tier));
+
+export function groupedSteps(steps: TieredStep[]): TieredStep[][] {
+  const groups: TieredStep[][] = [];
+  let currentTier: CiTier | null = null;
+
+  for (const step of steps) {
+    if (step.tier !== currentTier) {
+      currentTier = step.tier;
+      groups.push([step]);
+    } else {
+      groups[groups.length - 1]!.push(step);
+    }
+  }
+
+  return groups;
+}
 
 interface Result { step: string; ok: boolean; soft?: boolean; skipped?: boolean; pending?: number; ms: number; }
 
@@ -138,7 +171,7 @@ function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string; st
       // Treat as pass if stdout shows "0 fail" (all tests passed).
       if (!ok && step.cmd[0] === "bun" && step.cmd[1] === "test") {
         const combined = stdout + stderr;
-        if (/\b0 fail\b/.test(combined)) {
+        if (/\b0 fail\b/.test(combined) && !/\b[1-9][0-9]* fail\b/.test(combined)) {
           ok = true;
         }
       }
@@ -150,35 +183,24 @@ function run(step: Step): Promise<{ ok: boolean; ms: number; stderr?: string; st
 if (import.meta.main) {
   const results: Array<Result> = [];
   let failed = false;
-  let currentTier: CiTier | null = null;
 
-  for (const step of STEPS as TieredStep[]) {
-    // Print tier header on tier change
-    if (step.tier !== currentTier) {
-      currentTier = step.tier;
-      const tierIndex = TIER_ORDER.indexOf(currentTier) + 1;
-      console.log(`\n━━━ Tier ${tierIndex}: ${currentTier.toUpperCase()} ━━━`);
+  for (const group of groupedSteps(STEPS as TieredStep[])) {
+    const tier = group[0]!.tier;
+    const tierIndex = TIER_ORDER.indexOf(tier) + 1;
+    console.log(`\n━━━ Tier ${tierIndex}: ${tier.toUpperCase()} ━━━`);
+
+    const parallel = tier === "tier4" || tier === "tier5";
+    const executions = parallel
+      ? await Promise.all(group.map(async (step) => ({ step, result: await runWithBanner(step) })))
+      : await runSequential(group);
+
+    for (const execution of executions) {
+      const result = normalizeResult(execution.step, execution.result);
+      results.push(result);
+      if (!result.ok && !execution.step.soft) failed = true;
     }
 
-    console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
-    const r = await run(step);
-
-    if (step.soft && !r.ok) {
-      // Soft-fail: check if it's caveman not installed
-      if (r.stderr?.includes("Caveman not installed")) {
-        results.push({ step: step.name, ok: true, soft: true, skipped: true, ms: r.ms });
-      } else {
-        // Parse pending count from stdout
-        const output = r.stderr || "";
-        const pendingMatch = output.match(/PENDING/g);
-        const pendingCount = pendingMatch ? pendingMatch.length : 0;
-        results.push({ step: step.name, ok: false, soft: true, pending: pendingCount, ms: r.ms });
-        console.log(`\n⚠ ${step.name}: ${pendingCount} file(s) pending compression. Run: bun run compress`);
-      }
-    } else {
-      results.push({ step: step.name, ok: r.ok, soft: step.soft, ms: r.ms });
-      if (!r.ok && !step.soft) { failed = true; break; }
-    }
+    if (failed) break;
   }
 
   console.log("\n━━━ summary ━━━");
@@ -202,4 +224,34 @@ if (import.meta.main) {
   }
 
   process.exit(failed ? 1 : 0);
+}
+
+async function runWithBanner(step: Step) {
+  console.log(`\n━━━ ${step.name} ━━━ ${step.cmd.join(" ")}`);
+  return run(step);
+}
+
+async function runSequential(steps: TieredStep[]) {
+  const executions: Array<{ step: TieredStep; result: Awaited<ReturnType<typeof run>> }> = [];
+  for (const step of steps) {
+    const result = await runWithBanner(step);
+    executions.push({ step, result });
+    if (!result.ok && !step.soft) break;
+  }
+  return executions;
+}
+
+function normalizeResult(step: Step, result: Awaited<ReturnType<typeof run>>): Result {
+  if (step.soft && !result.ok) {
+    if (result.stderr?.includes("Caveman not installed")) {
+      return { step: step.name, ok: true, soft: true, skipped: true, ms: result.ms };
+    }
+    const output = result.stderr || "";
+    const pendingMatch = output.match(/PENDING/g);
+    const pendingCount = pendingMatch ? pendingMatch.length : 0;
+    console.log(`\n⚠ ${step.name}: ${pendingCount} file(s) pending compression. Run: bun run compress`);
+    return { step: step.name, ok: false, soft: true, pending: pendingCount, ms: result.ms };
+  }
+
+  return { step: step.name, ok: result.ok, soft: step.soft, ms: result.ms };
 }

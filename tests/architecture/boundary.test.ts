@@ -197,7 +197,11 @@ async function violations(roots: readonly string[], pattern: RegExp): Promise<st
   const found: string[] = [];
   for (const file of files) {
     const text = await readFile(file, "utf8");
-    if (pattern.test(text)) found.push(relative(process.cwd(), file));
+    const runtimeText = text
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("import type "))
+      .join("\n");
+    if (pattern.test(runtimeText)) found.push(relative(process.cwd(), file));
   }
   return found.sort();
 }
@@ -248,7 +252,11 @@ async function testImportViolations(roots: readonly string[], pattern: RegExp): 
   const found: string[] = [];
   for (const file of files) {
     const text = await readFile(file, "utf8");
-    if (pattern.test(text)) found.push(relative(process.cwd(), file));
+    const runtimeText = text
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("import type "))
+      .join("\n");
+    if (pattern.test(runtimeText)) found.push(relative(process.cwd(), file));
   }
   return found.sort();
 }

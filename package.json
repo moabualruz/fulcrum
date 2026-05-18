@@ -27,6 +27,12 @@
     "format": "biome format --write biome.json",
     "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
+    "ci-fast": "bun run scripts/ci.ts --tier=tier2 --changed",
+    "ci:tier1": "bun run scripts/ci.ts --tier=tier1",
+    "ci:tier2": "bun run scripts/ci.ts --tier=tier2",
+    "ci:tier3": "bun run scripts/ci.ts --tier=tier3",
+    "ci:tier4": "bun run scripts/ci.ts --tier=tier4",
+    "ci:tier5": "bun run scripts/ci.ts --tier=tier5",
     "changelog": "git-cliff -o CHANGELOG.md",
     "compress": "bun run apps/cli/src/main.ts compress",
     "release": "bun run scripts/release.ts"

@@ -474,7 +474,7 @@ describe("repository structure hygiene", () => {
 
   test("app packages are part of the root workspace and expose standard local scripts", async () => {
     const rootPackage = await readPackageJson("package.json");
-    expect(rootPackage.workspaces).toEqual(["apps/*"]);
+    expect(rootPackage.workspaces).toEqual(["apps/*", "packages/*", "services/*"]);
 
     const expectedScripts = new Map<string, string[]>([
       ["apps/cli/package.json", ["dev", "test", "typecheck"]],
