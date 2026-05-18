@@ -12,13 +12,14 @@ import {
   CustomFieldStore,
   type CustomFieldPublicRow,
   type CustomFieldType,
+  type TaskCustomFieldBulkResultRow,
   type TaskCustomFieldsPublicRow,
 } from "@work-management/infrastructure/database/custom-field-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { CustomFieldListQueryDto, CustomFieldIdParamsDto, CustomFieldCreateDto, CustomFieldUpdateDto, CustomFieldReorderDto, TaskCustomFieldSetDto, TaskCustomFieldClearDto } from "./dto/custom-field.dto.ts";
-export { CustomFieldListQueryDto, CustomFieldIdParamsDto, CustomFieldCreateDto, CustomFieldUpdateDto, CustomFieldReorderDto, TaskCustomFieldSetDto, TaskCustomFieldClearDto };
+import { CustomFieldListQueryDto, CustomFieldIdParamsDto, CustomFieldCreateDto, CustomFieldUpdateDto, CustomFieldReorderDto, TaskCustomFieldSetDto, TaskCustomFieldBulkSetDto, TaskCustomFieldClearDto } from "./dto/custom-field.dto.ts";
+export { CustomFieldListQueryDto, CustomFieldIdParamsDto, CustomFieldCreateDto, CustomFieldUpdateDto, CustomFieldReorderDto, TaskCustomFieldSetDto, TaskCustomFieldBulkSetDto, TaskCustomFieldClearDto };
 
 export const CUSTOM_FIELD_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.customFieldPublicApi.options");
 
@@ -56,6 +57,10 @@ export class CustomFieldPublicApiService {
 
   async setTaskField(input: TaskCustomFieldSetDto): Promise<TaskCustomFieldsPublicRow> {
     return await this.requireResult(this.requireStore().setTaskField(input));
+  }
+
+  async bulkSetTaskFields(input: TaskCustomFieldBulkSetDto): Promise<{ results: TaskCustomFieldBulkResultRow[] }> {
+    return await this.requireStore().bulkSetTaskFields(input);
   }
 
   async clearTaskField(input: TaskCustomFieldClearDto): Promise<TaskCustomFieldsPublicRow> {
@@ -111,6 +116,10 @@ export class CustomFieldPublicApiController {
     return await this.fields.setTaskField(body);
   }
 
+  async bulkSetTaskFields(body: TaskCustomFieldBulkSetDto): Promise<{ results: TaskCustomFieldBulkResultRow[] }> {
+    return await this.fields.bulkSetTaskFields(body);
+  }
+
   async clearTaskField(body: TaskCustomFieldClearDto): Promise<TaskCustomFieldsPublicRow> {
     return await this.fields.clearTaskField(body);
   }
@@ -143,6 +152,7 @@ for (const target of [
   CustomFieldUpdateDto,
   CustomFieldReorderDto,
   TaskCustomFieldSetDto,
+  TaskCustomFieldBulkSetDto,
   TaskCustomFieldClearDto,
 ] as const) {
   IsString()(target.prototype, "orgId");
@@ -183,6 +193,7 @@ for (const target of [TaskCustomFieldSetDto, TaskCustomFieldClearDto] as const) 
   IsString()(target.prototype, "fieldDefId");
   MinLength(1)(target.prototype, "fieldDefId");
 }
+IsArray()(TaskCustomFieldBulkSetDto.prototype, "changes");
 
 const routeDescriptors = {
   listFields: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "listFields"),
@@ -191,6 +202,7 @@ const routeDescriptors = {
   deleteField: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "deleteField"),
   reorderFields: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "reorderFields"),
   setTaskField: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "setTaskField"),
+  bulkSetTaskFields: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "bulkSetTaskFields"),
   clearTaskField: Object.getOwnPropertyDescriptor(CustomFieldPublicApiController.prototype, "clearTaskField"),
 } as const;
 
@@ -207,6 +219,7 @@ applyPatchRoute("updateField", "custom-fields/:id", CustomFieldUpdateDto, "Updat
 applyDeleteRoute("deleteField", "custom-fields/:id", CustomFieldListQueryDto, "Archive custom field");
 applyPostRoute("reorderFields", "custom-fields/reorder", CustomFieldReorderDto, "Reorder custom fields");
 applyPostRoute("setTaskField", "task-custom-fields/set", TaskCustomFieldSetDto, "Set task custom field");
+applyPostRoute("bulkSetTaskFields", "task-custom-fields/bulk-set", TaskCustomFieldBulkSetDto, "Bulk set task custom fields");
 applyPostRoute("clearTaskField", "task-custom-fields/clear", TaskCustomFieldClearDto, "Clear task custom field");
 
 Module({

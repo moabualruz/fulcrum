@@ -15,6 +15,7 @@ import {
 } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { startTemporaryPostgres, type TemporaryPostgres } from "@test-support/temporary-postgres.ts";
 import { CustomFieldStore } from "@work-management/infrastructure/database/custom-field-store.ts";
+import { FieldDependencyStore } from "@work-management/infrastructure/database/field-dependency-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { WorkManagement1778623200003 } from "@work-management/infrastructure/database/work-structure.migration.ts";
 import {
@@ -22,6 +23,10 @@ import {
   CustomFieldPublicApiModule,
   CustomFieldPublicApiService,
 } from "@work-management/interface/http/custom-field-public-api.controller.ts";
+import {
+  FieldDependencyPublicApiController,
+  FieldDependencyPublicApiService,
+} from "@work-management/interface/http/field-dependency-public-api.controller.ts";
 import {
   FULCRUM_WORKFLOW_SPINE_ENTITIES,
   FulcrumProjectEntity,
@@ -85,6 +90,12 @@ async function assertCustomFieldRoundTrip(source: FulcrumTypeOrmConnectionSource
         new CustomFieldStore(dataSource),
       ),
     );
+    const dependencyController = new FieldDependencyPublicApiController(
+      new FieldDependencyPublicApiService(
+        { featuresEnv: "public-api" },
+        new FieldDependencyStore(dataSource),
+      ),
+    );
 
     const created = await controller.createField({
       orgId: `workspace-custom-field-${source}`,
@@ -103,11 +114,32 @@ async function assertCustomFieldRoundTrip(source: FulcrumTypeOrmConnectionSource
       required: true,
       position: 0,
     });
+    await expect(controller.createField({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      projectId: `project-custom-field-${source}`,
+      name: "Broken select",
+      type: "select",
+      configJson: { options: [] },
+    })).rejects.toThrow("options");
+    const checkbox = await controller.createField({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      projectId: `project-custom-field-${source}`,
+      name: "Needs review",
+      type: "checkbox",
+      required: false,
+      configJson: {},
+    });
+    expect(checkbox).toMatchObject({ slug: "needs_review", type: "checkbox" });
     await expect(controller.listFields({
       orgId: `workspace-custom-field-${source}`,
       userId: `user-custom-field-${source}`,
       projectId: `project-custom-field-${source}`,
-    })).resolves.toEqual([expect.objectContaining({ id: created.id, name: "Severity" })]);
+    })).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: created.id, name: "Severity" }),
+      expect.objectContaining({ id: checkbox.id, name: "Needs review", type: "checkbox" }),
+    ]));
     await expect(controller.setTaskField({
       orgId: `workspace-custom-field-${source}`,
       userId: `user-custom-field-${source}`,
@@ -117,6 +149,81 @@ async function assertCustomFieldRoundTrip(source: FulcrumTypeOrmConnectionSource
     })).resolves.toEqual({
       taskId: `task-custom-field-${source}`,
       customFields: { severity: "critical" },
+    });
+    await expect(controller.setTaskField({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      taskId: `task-custom-field-${source}`,
+      fieldDefId: checkbox.id,
+      value: true,
+    })).resolves.toEqual({
+      taskId: `task-custom-field-${source}`,
+      customFields: { severity: "critical", needs_review: true },
+    });
+    const resolution = await controller.createField({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      projectId: `project-custom-field-${source}`,
+      name: "Resolution",
+      type: "text",
+      required: false,
+      configJson: {},
+    });
+    await expect(dependencyController.createRule({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      projectId: `project-custom-field-${source}`,
+      sourceFieldId: created.id,
+      sourceValue: "not-an-option",
+      targetFieldId: resolution.id,
+      action: "require",
+    })).rejects.toThrow("unknown option");
+    await expect(dependencyController.createRule({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      projectId: `project-custom-field-${source}`,
+      sourceFieldId: created.id,
+      sourceValue: "critical",
+      targetFieldId: resolution.id,
+      action: "require",
+    })).resolves.toEqual(expect.objectContaining({
+      sourceFieldId: created.id,
+      targetFieldId: resolution.id,
+      action: "require",
+    }));
+    await expect(controller.setTaskField({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      taskId: `task-secondary-custom-field-${source}`,
+      fieldDefId: created.id,
+      value: "critical",
+    })).rejects.toThrow("Required fields missing");
+    await expect(controller.bulkSetTaskFields({
+      orgId: `workspace-custom-field-${source}`,
+      userId: `user-custom-field-${source}`,
+      changes: [
+        {
+          taskId: `task-secondary-custom-field-${source}`,
+          fieldDefId: resolution.id,
+          value: "approved",
+        },
+        {
+          taskId: `task-secondary-custom-field-${source}`,
+          fieldDefId: created.id,
+          value: "critical",
+        },
+        {
+          taskId: `task-secondary-custom-field-${source}`,
+          fieldDefId: created.id,
+          value: "missing-option",
+        },
+      ],
+    })).resolves.toMatchObject({
+      results: [
+        { ok: true, taskId: `task-secondary-custom-field-${source}`, fieldDefId: resolution.id },
+        { ok: true, taskId: `task-secondary-custom-field-${source}`, fieldDefId: created.id },
+        { ok: false, taskId: `task-secondary-custom-field-${source}`, fieldDefId: created.id },
+      ],
     });
     await expect(controller.clearTaskField({
       orgId: `workspace-custom-field-${source}`,
@@ -138,7 +245,7 @@ async function assertCustomFieldRoundTrip(source: FulcrumTypeOrmConnectionSource
       userId: `user-custom-field-${source}`,
       taskId: `task-custom-field-${source}`,
       fieldDefId: created.id,
-    })).resolves.toEqual({ taskId: `task-custom-field-${source}`, customFields: {} });
+    })).resolves.toEqual({ taskId: `task-custom-field-${source}`, customFields: { needs_review: true } });
     await expect(controller.reorderFields({
       orgId: `workspace-custom-field-${source}`,
       userId: `user-custom-field-${source}`,
@@ -181,7 +288,7 @@ describe("custom field public Nest API", () => {
     );
   });
 
-  test.skip("persists custom fields through PGlite socket", async () => {
+  test("persists custom fields through PGlite socket", async () => {
     await assertCustomFieldRoundTrip("pglite-socket", await startPgliteSocket());
   });
 
@@ -223,6 +330,24 @@ async function seedCustomFieldProject(
     successCriteria: [],
     customFields: {},
     traceId: `trace-task-custom-field-${source}`,
+    deletedAt: null,
+  });
+  await dataSource.getRepository(FulcrumTaskEntity).save({
+    id: `task-secondary-custom-field-${source}`,
+    projectId: `project-custom-field-${source}`,
+    externalId: null,
+    title: "Secondary custom field task",
+    description: null,
+    descriptionText: null,
+    tiptapContent: {},
+    status: "todo",
+    priority: null,
+    points: null,
+    assigneeId: null,
+    parentTaskId: null,
+    successCriteria: [],
+    customFields: {},
+    traceId: `trace-secondary-task-custom-field-${source}`,
     deletedAt: null,
   });
 }
