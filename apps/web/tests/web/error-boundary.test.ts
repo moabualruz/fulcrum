@@ -8,6 +8,8 @@ describe("+error.svelte", () => {
 
 		expect(source).toContain("Permission denied");
 		expect(source).toContain("FORBIDDEN");
+		expect(source).toContain("Request access or switch workspace.");
+		expect(source).toContain("trace=");
 		expect(source).toContain('href="/"');
 	});
 });

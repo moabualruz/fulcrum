@@ -10,12 +10,16 @@ describe("tRPC app error mapping", () => {
   test("maps validation errors with field errors preserved on the cause", () => {
     const error = appErrorToTrpcError(new AppValidationError("Invalid project.", {
       fieldErrors: { name: ["Required"] },
+      recovery: "Add a project name, then retry.",
+      traceId: "trace-project-validation",
     }));
 
     expect(error.code).toBe("BAD_REQUEST");
     expect(error.message).toBe("Invalid project.");
     expect(error.cause).toBeInstanceOf(AppValidationError);
     expect((error.cause as AppValidationError).fieldErrors).toEqual({ name: ["Required"] });
+    expect((error.cause as AppValidationError).recovery).toBe("Add a project name, then retry.");
+    expect((error.cause as AppValidationError).traceId).toBe("trace-project-validation");
   });
 
   test("sanitizes invariant and unknown errors before exposing tRPC messages", () => {

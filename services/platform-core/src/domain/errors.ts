@@ -11,12 +11,16 @@ export interface AppErrorOptions {
   cause?: unknown;
   fieldErrors?: Record<string, string[]>;
   details?: Record<string, unknown>;
+  recovery?: string;
+  traceId?: string;
 }
 
 export class AppError extends Error {
   readonly kind: AppErrorKind;
   readonly fieldErrors?: Record<string, string[]>;
   readonly details?: Record<string, unknown>;
+  readonly recovery?: string;
+  readonly traceId: string;
 
   constructor(kind: AppErrorKind, message: string, options: AppErrorOptions = {}) {
     super(message, { cause: options.cause });
@@ -24,6 +28,8 @@ export class AppError extends Error {
     this.kind = kind;
     this.fieldErrors = options.fieldErrors;
     this.details = options.details;
+    this.recovery = options.recovery;
+    this.traceId = options.traceId ?? createDiagnosticTraceId();
   }
 }
 
@@ -71,4 +77,8 @@ export class AppExternalDependencyError extends AppError {
 
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
+}
+
+function createDiagnosticTraceId(): string {
+  return `trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

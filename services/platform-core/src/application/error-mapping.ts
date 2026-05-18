@@ -25,11 +25,23 @@ const PUBLIC_MESSAGES: Partial<Record<AppErrorKind, string>> = {
   external_dependency: "External dependency unavailable.",
 };
 
+const RECOVERY_ACTIONS: Record<AppErrorKind, string> = {
+  validation: "Fix the highlighted fields, then retry.",
+  unauthorized: "Sign in again, then retry the request.",
+  forbidden: "Request access or switch to an account with permission.",
+  not_found: "Check the identifier, then reopen the item from the latest list.",
+  conflict: "Refresh the view, review the current state, then retry.",
+  invariant: "Open the trace in error logs, then run fulcrum doctor.",
+  external_dependency: "Check provider status, then retry after the dependency recovers.",
+};
+
 export interface AppHttpErrorResponse {
   status: number;
   body: {
     error: string;
     code: AppErrorKind;
+    recovery: string;
+    traceId: string;
     fieldErrors?: Record<string, string[]>;
     details?: Record<string, unknown>;
   };
@@ -44,6 +56,10 @@ export function publicAppErrorMessage(error: AppError): string {
   return PUBLIC_MESSAGES[error.kind] ?? error.message;
 }
 
+export function appErrorRecoveryAction(error: AppError): string {
+  return error.recovery ?? RECOVERY_ACTIONS[error.kind];
+}
+
 export function appErrorToHttpResponse(error: unknown): AppHttpErrorResponse {
   const appError = toAppError(error);
   return {
@@ -51,6 +67,8 @@ export function appErrorToHttpResponse(error: unknown): AppHttpErrorResponse {
     body: {
       error: publicAppErrorMessage(appError),
       code: appError.kind,
+      recovery: appErrorRecoveryAction(appError),
+      traceId: appError.traceId,
       ...(appError.fieldErrors ? { fieldErrors: appError.fieldErrors } : {}),
       ...(appError.details ? { details: appError.details } : {}),
     },

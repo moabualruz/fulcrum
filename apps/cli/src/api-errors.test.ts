@@ -26,9 +26,18 @@ describe("CLI API error handling", () => {
   });
 
   test("formats permission and missing feature flag failures as actionable stderr-safe strings", () => {
-    expect(formatCommandError({ kind: "forbidden", message: "permission denied" })).toBe("FORBIDDEN: permission denied");
-    expect(formatCommandError({ code: "FUL_MISSING_FEATURE_FLAG", message: "Enable public-api." })).toBe(
-      "FUL_MISSING_FEATURE_FLAG: Enable public-api.",
+    expect(formatCommandError({
+      kind: "forbidden",
+      message: "permission denied",
+      recovery: "Request access.",
+      traceId: "trace-cli-denied",
+    })).toBe("FORBIDDEN: permission denied Recovery: Request access. Trace: trace-cli-denied");
+    expect(formatCommandError({
+      code: "FUL_MISSING_FEATURE_FLAG",
+      message: "Enable public-api.",
+      recovery: "Run fulcrum doctor.",
+    })).toBe(
+      "FUL_MISSING_FEATURE_FLAG: Enable public-api. Recovery: Run fulcrum doctor.",
     );
     expect(REQUIRED_RESILIENCE_STATES.filter((state) => state.surface === "cli").map((state) => state.state)).toEqual([
       "missing-api",

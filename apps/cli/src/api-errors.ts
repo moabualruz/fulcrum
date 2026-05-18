@@ -1,11 +1,15 @@
 type CodedError = {
   code: string;
   message: string;
+  recovery?: string;
+  traceId?: string;
 };
 
 type AppKindError = {
   kind: string;
   message: string;
+  recovery?: string;
+  traceId?: string;
 };
 
 const APP_KIND_TO_CODE: Record<string, string> = {
@@ -19,8 +23,8 @@ const APP_KIND_TO_CODE: Record<string, string> = {
 };
 
 export function formatApiError(error: unknown): string {
-  if (isCodedError(error)) return `${error.code}: ${error.message}`;
-  if (isAppKindError(error)) return `${appKindCode(error.kind)}: ${error.message}`;
+  if (isCodedError(error)) return appendDiagnostics(`${error.code}: ${error.message}`, error);
+  if (isAppKindError(error)) return appendDiagnostics(`${appKindCode(error.kind)}: ${error.message}`, error);
   if (error instanceof Error) return error.message;
   return String(error);
 }
@@ -58,4 +62,12 @@ function isAppKindError(error: unknown): error is AppKindError {
 
 function appKindCode(kind: string): string {
   return APP_KIND_TO_CODE[kind] ?? kind.toUpperCase();
+}
+
+function appendDiagnostics(message: string, error: CodedError | AppKindError): string {
+  const suffix = [
+    error.recovery ? `Recovery: ${error.recovery}` : null,
+    error.traceId ? `Trace: ${error.traceId}` : null,
+  ].filter(Boolean);
+  return suffix.length > 0 ? `${message} ${suffix.join(" ")}` : message;
 }

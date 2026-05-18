@@ -42,5 +42,16 @@ describe("application error taxonomy", () => {
       "invariant",
       "external_dependency",
     ]);
+    expect(errors.every((error) => error.traceId.startsWith("trace-"))).toBe(true);
+  });
+
+  test("preserves explicit recovery guidance and trace identifiers", () => {
+    const error = new AppExternalDependencyError("provider unavailable", {
+      recovery: "Check provider status, then retry.",
+      traceId: "trace-provider-down",
+    });
+
+    expect(error.recovery).toBe("Check provider status, then retry.");
+    expect(error.traceId).toBe("trace-provider-down");
   });
 });

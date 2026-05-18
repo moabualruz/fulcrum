@@ -39,6 +39,8 @@ describe("application error transport mapping", () => {
   test("preserves validation field errors in HTTP response bodies", () => {
     const response = appErrorToHttpResponse(new AppValidationError("Invalid task.", {
       fieldErrors: { title: ["Required"], status: ["Unknown status"] },
+      recovery: "Add a title and choose a supported status.",
+      traceId: "trace-test-validation",
     }));
 
     expect(response).toEqual({
@@ -46,8 +48,21 @@ describe("application error transport mapping", () => {
       body: {
         error: "Invalid task.",
         code: "validation",
+        recovery: "Add a title and choose a supported status.",
+        traceId: "trace-test-validation",
         fieldErrors: { title: ["Required"], status: ["Unknown status"] },
       },
+    });
+  });
+
+  test("adds recovery action and diagnostic trace to every HTTP error response", () => {
+    const response = appErrorToHttpResponse(new AppForbiddenError("denied", { traceId: "trace-denied" }));
+
+    expect(response.body).toMatchObject({
+      error: "denied",
+      code: "forbidden",
+      recovery: "Request access or switch to an account with permission.",
+      traceId: "trace-denied",
     });
   });
 
