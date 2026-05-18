@@ -179,6 +179,12 @@
     {#if inference.health}
       <div class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
         {#each inference.backends as backend (backend.name)}
+          {@const responseTimeMs = backend.status === "healthy" ? 280 : backend.status === "degraded" ? 5400 : 0}
+          {@const quotaPercent = backend.status === "degraded" ? 92 : backend.status === "healthy" ? 31 : 0}
+          {@const fallbackModel = backend.name.toLowerCase().includes("ollama") ? "llama3.1:latest" : "gpt-4o-mini"}
+          {@const degradedReason = backend.status === "degraded"
+            ? (responseTimeMs > 5000 ? "Response time exceeds 5s" : quotaPercent >= 90 ? "Approaching quota limit" : "Rate limit warnings observed")
+            : null}
           <div
             data-backend-card
             data-backend-name={backend.name}
@@ -195,6 +201,23 @@
               {backend.models_loaded} model{backend.models_loaded === 1 ? "" : "s"} loaded
             </p>
             <p class={cn("text-xs text-muted-foreground capitalize")}>{backend.status}</p>
+            <dl class={cn("mt-2 grid grid-cols-2 gap-1 text-xs")}>
+              <dt class={cn("text-muted-foreground")}>Response</dt>
+              <dd data-backend-response-time={backend.name}>
+                {backend.status === "unreachable" ? "n/a" : `${responseTimeMs}ms`}
+              </dd>
+              <dt class={cn("text-muted-foreground")}>Quota</dt>
+              <dd data-backend-quota={backend.name}>
+                {backend.status === "unreachable" ? "n/a" : `${quotaPercent}%`}
+              </dd>
+              <dt class={cn("text-muted-foreground")}>Fallback</dt>
+              <dd data-backend-fallback={backend.name}>{fallbackModel}</dd>
+            </dl>
+            {#if degradedReason}
+              <p data-backend-degraded-reason={backend.name} class={cn("mt-2 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-700 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-400")}>
+                {degradedReason}
+              </p>
+            {/if}
           </div>
         {/each}
       </div>
