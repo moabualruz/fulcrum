@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { EventBus, resetEventBus } from "./event-bus.ts";
-import { startNotifyBridge, topicToPGChannel } from "./database-notify-bridge.ts";
+import { emitNotify, startNotifyBridge, topicToPGChannel } from "./database-notify-bridge.ts";
 import type { SubscriptionEvent } from "./event-bus.ts";
 
 afterEach(() => resetEventBus());
@@ -81,6 +81,53 @@ describe("startNotifyBridge", () => {
 
     expect(received).toHaveLength(1);
     expect(received[0]!.payload).toEqual({ status: "running" });
+
+    await teardown();
+  });
+
+  test("emitNotify publishes the same envelope shape consumed by bridge", async () => {
+    const bus = new EventBus();
+    const client = createMockNotifyClient();
+    const received: SubscriptionEvent[] = [];
+    const topic = "org.org-1.notifications";
+    bus.subscribe(topic, (evt) => received.push(evt));
+
+    const teardown = await startNotifyBridge({
+      client: client as any,
+      eventBus: bus,
+    });
+
+    await emitNotify(client, topic, { id: "notification-1" });
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      topic,
+      payload: { id: "notification-1" },
+    });
+    expect(received[0]!.timestamp).toBeInstanceOf(Date);
+
+    await teardown();
+  });
+
+  test("bridge preserves envelope timestamps from PostgreSQL notify payloads", async () => {
+    const bus = new EventBus();
+    const client = createMockNotifyClient();
+    const received: SubscriptionEvent[] = [];
+    const topic = "agent_run.timestamped";
+    bus.subscribe(topic, (evt) => received.push(evt));
+
+    const teardown = await startNotifyBridge({
+      client: client as any,
+      eventBus: bus,
+    });
+
+    client.simulateNotify(
+      "agent_run",
+      JSON.stringify({ topic, payload: { status: "running" }, timestamp: "2026-05-18T01:00:00.000Z" }),
+    );
+
+    expect(received[0]!.payload).toEqual({ status: "running" });
+    expect(received[0]!.timestamp.toISOString()).toBe("2026-05-18T01:00:00.000Z");
 
     await teardown();
   });

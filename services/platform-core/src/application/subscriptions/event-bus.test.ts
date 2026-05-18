@@ -11,7 +11,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { EventBus, resetEventBus } from "./event-bus.ts";
+import { EventBus, resetEventBus, serializeSubscriptionEvent } from "./event-bus.ts";
 import type { SubscriptionEvent } from "./event-bus.ts";
 
 afterEach(() => resetEventBus());
@@ -54,6 +54,13 @@ describe("EventBus", () => {
     expect(bus.listenerCount("leak.test")).toBe(0);
   });
 
+  test("caps concurrent listeners per topic for backpressure", () => {
+    const bus = new EventBus({ maxListenersPerTopic: 1 });
+    bus.subscribe("capped", () => {});
+
+    expect(() => bus.subscribe("capped", () => {})).toThrow("subscription listener cap reached");
+  });
+
   test("multiple subscribers on same topic", () => {
     const bus = new EventBus();
     const a: unknown[] = [];
@@ -85,5 +92,17 @@ describe("EventBus", () => {
 
     expect(bus.listenerCount("a")).toBe(0);
     expect(bus.listenerCount("b")).toBe(0);
+  });
+
+  test("serializes a stable transport event envelope", () => {
+    expect(serializeSubscriptionEvent({
+      topic: "agent_run.1",
+      payload: { status: "running" },
+      timestamp: new Date("2026-05-18T00:00:00.000Z"),
+    })).toEqual({
+      topic: "agent_run.1",
+      payload: { status: "running" },
+      timestamp: "2026-05-18T00:00:00.000Z",
+    });
   });
 });

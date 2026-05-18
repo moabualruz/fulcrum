@@ -262,12 +262,16 @@ describe("SubscriptionBridge", () => {
     const bus = new EventEmitter();
     const bridge = new SubscriptionBridge(bus);
     const received: number[] = [];
+    const receivedAt: number[] = [];
 
     const sub = bridge.subscribe<number>("runs.onRunUpdate", (value) => {
       received.push(value);
+      receivedAt.push(Date.now());
     });
+    const sentAt = Date.now();
     bus.emit("runs.onRunUpdate", 1);
     expect(received).toEqual([1]);
+    expect(receivedAt[0]! - sentAt).toBeLessThan(200);
 
     sub.unsubscribe();
     bus.emit("runs.onRunUpdate", 2);

@@ -10,7 +10,7 @@ import type { EventBus } from "./event-bus.ts";
 
 export interface PollingSource<T = unknown> {
   /** Fetch events newer than lastSeenId. Return [] when none. */
-  poll(lastSeenId: string | null): Promise<Array<{ id: string; topic: string; data: T }>>;
+  poll(lastSeenId: string | null): Promise<Array<{ id: string; topic: string; data: T; timestamp?: Date | string }>>;
 }
 
 export interface PollingFallbackOptions {
@@ -41,7 +41,11 @@ export function startPollingFallback(opts: PollingFallbackOptions): () => void {
     try {
       const events = await source.poll(lastSeenId);
       for (const evt of events) {
-        eventBus.publish(evt.topic, evt.data);
+        eventBus.publishEvent({
+          topic: evt.topic,
+          payload: evt.data,
+          timestamp: evt.timestamp ? new Date(evt.timestamp) : new Date(),
+        });
         lastSeenId = evt.id;
       }
     } catch {

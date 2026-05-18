@@ -49,7 +49,12 @@ describe("startPollingFallback", () => {
         callCount++;
         if (callCount === 1) {
           return [
-            { id: "1", topic: "agent_run.poll1", data: { status: "running" } },
+            {
+              id: "1",
+              topic: "agent_run.poll1",
+              data: { status: "running" },
+              timestamp: "2026-05-18T02:00:00.000Z",
+            },
           ];
         }
         return [];
@@ -67,6 +72,7 @@ describe("startPollingFallback", () => {
 
     expect(received.length).toBeGreaterThanOrEqual(1);
     expect(received[0]!.payload).toEqual({ status: "running" });
+    expect(received[0]!.timestamp.toISOString()).toBe("2026-05-18T02:00:00.000Z");
 
     stop();
   });

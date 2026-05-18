@@ -13,7 +13,7 @@ import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
 
-import { getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
+import { getEventBus, serializeSubscriptionEvent } from "@platform-core/application/subscriptions/event-bus.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
 import { SubscriptionStreamQueryDto, RunUpdateStreamQueryDto } from "./dto/subscription.dto.ts";
@@ -23,11 +23,12 @@ export const SUBSCRIPTION_EVENT_STREAM_OPTIONS = Symbol.for("fulcrum.subscriptio
 
 export interface SubscriptionEventStreamOptions {
   featuresEnv?: string;
+  maxEventsPerConnection?: number;
 }
 
 interface EventStreamResponse {
   setHeader(name: string, value: string): void;
-  write(chunk: string): void;
+  write(chunk: string): void | boolean;
   end(): void;
   on?(event: "close", listener: () => void): void;
 }
@@ -60,9 +61,12 @@ export class SubscriptionEventStreamService {
     response.setHeader("Content-Type", "text/event-stream");
     response.setHeader("Cache-Control", "no-cache, no-transform");
     response.setHeader("Connection", "keep-alive");
+    response.setHeader("X-Fulcrum-Backpressure", "close-at-event-limit");
 
     await new Promise<void>((resolve) => {
       let closed = false;
+      let eventCount = 0;
+      const maxEvents = this.options?.maxEventsPerConnection ?? 10_000;
       const finish = () => {
         if (closed) return;
         closed = true;
@@ -72,8 +76,9 @@ export class SubscriptionEventStreamService {
       };
       const unsubscribe = getEventBus().subscribe(topic, (event) => {
         if (closed) return;
-        response.write(`event: message\ndata: ${JSON.stringify(event.payload)}\n\n`);
-        if (query.once === true) finish();
+        eventCount += 1;
+        response.write(`event: message\ndata: ${JSON.stringify(serializeSubscriptionEvent(event))}\n\n`);
+        if (query.once === true || eventCount >= maxEvents) finish();
       });
       response.on?.("close", finish);
     });

@@ -86,6 +86,25 @@ describe("subscription event stream Nest API", () => {
       { id: "notification-1", title: "Ready" },
     );
   });
+
+  test("closes long-lived streams at configured event limit", async () => {
+    const controller = new SubscriptionEventStreamController(
+      new SubscriptionEventStreamService({ featuresEnv: "public-api", maxEventsPerConnection: 2 }),
+    );
+    const response = new FakeEventStreamResponse();
+    const stream = controller.streamNotifications(
+      { orgId: "workspace-1", userId: "user-1" },
+      response,
+    );
+
+    getEventBus().publish("org.workspace-1.notifications", { id: "n1" });
+    getEventBus().publish("org.workspace-1.notifications", { id: "n2" });
+    await stream;
+
+    expect(response.ended).toBe(true);
+    expect(response.chunks).toHaveLength(2);
+    expect(getEventBus().listenerCount("org.workspace-1.notifications")).toBe(0);
+  });
 });
 
 async function expectStream(
@@ -98,13 +117,16 @@ async function expectStream(
   getEventBus().publish(topic, payload);
   await stream;
 
-  expect(response.headers).toMatchObject({
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive",
-  });
-  expect(response.ended).toBe(true);
-  expect(response.chunks.join("")).toContain(`data: ${JSON.stringify(payload)}`);
+    expect(response.headers).toMatchObject({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Fulcrum-Backpressure": "close-at-event-limit",
+    });
+    expect(response.ended).toBe(true);
+  const event = JSON.parse(response.chunks.join("").match(/^data: (.*)$/m)?.[1] ?? "{}");
+  expect(event).toMatchObject({ topic, payload });
+  expect(new Date(event.timestamp).toString()).not.toBe("Invalid Date");
 }
 
 class FakeEventStreamResponse {

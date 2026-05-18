@@ -20,6 +20,18 @@ export interface SubscriptionEvent<T = unknown> {
 
 export type EventHandler<T = unknown> = (event: SubscriptionEvent<T>) => void;
 
+export interface SerializedSubscriptionEvent<T = unknown> {
+  topic: string;
+  payload: T;
+  timestamp: string;
+}
+
+export interface EventBusOptions {
+  maxListenersPerTopic?: number;
+}
+
+const DEFAULT_MAX_LISTENERS_PER_TOPIC = 1_000;
+
 /**
  * Process-singleton EventBus.
  *
@@ -29,28 +41,35 @@ export type EventHandler<T = unknown> = (event: SubscriptionEvent<T>) => void;
  */
 export class EventBus {
   private readonly emitter = new EventEmitter();
+  private readonly maxListenersPerTopic: number;
 
-  constructor() {
-    // Allow many concurrent subscriptions without Node warning.
-    this.emitter.setMaxListeners(0);
+  constructor(options: EventBusOptions = {}) {
+    this.maxListenersPerTopic = options.maxListenersPerTopic ?? DEFAULT_MAX_LISTENERS_PER_TOPIC;
+    this.emitter.setMaxListeners(this.maxListenersPerTopic);
   }
 
   /**
    * Publish an event to a topic. All subscribers on that topic receive it.
    */
   publish<T>(topic: string, payload: T): void {
-    const event: SubscriptionEvent<T> = {
+    this.publishEvent({
       topic,
       payload,
       timestamp: new Date(),
-    };
-    this.emitter.emit(topic, event);
+    });
+  }
+
+  publishEvent<T>(event: SubscriptionEvent<T>): void {
+    this.emitter.emit(event.topic, event);
   }
 
   /**
    * Subscribe to a topic. Returns an unsubscribe function.
    */
   subscribe<T = unknown>(topic: string, handler: EventHandler<T>): () => void {
+    if (this.emitter.listenerCount(topic) >= this.maxListenersPerTopic) {
+      throw new Error(`subscription listener cap reached for topic: ${topic}`);
+    }
     this.emitter.on(topic, handler);
     return () => {
       this.emitter.removeListener(topic, handler);
@@ -86,4 +105,12 @@ export function getEventBus(): EventBus {
 export function resetEventBus(): void {
   _instance?.removeAllListeners();
   _instance = null;
+}
+
+export function serializeSubscriptionEvent<T>(event: SubscriptionEvent<T>): SerializedSubscriptionEvent<T> {
+  return {
+    topic: event.topic,
+    payload: event.payload,
+    timestamp: event.timestamp.toISOString(),
+  };
 }
