@@ -93,9 +93,11 @@ async function runDevCommand(args: string[]): Promise<{ code: number; output: st
 }
 
 async function collectOutput(child: Bun.Subprocess): Promise<string> {
+  const stdoutStream = child.stdout instanceof ReadableStream ? child.stdout : null;
+  const stderrStream = child.stderr instanceof ReadableStream ? child.stderr : null;
   const [stdout, stderr] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
+    new Response(stdoutStream).text(),
+    new Response(stderrStream).text(),
   ]);
   return `${stdout}\n${stderr}`.trim();
 }

@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*",
+    "services/*"
   ],
   "overrides": {
     "cookie": "^0.7.2",
@@ -20,6 +22,7 @@
     "build": "bun build --compile --minify --target=bun-darwin-arm64 --external=@nestjs/platform-socket.io --external=@grpc/grpc-js --external=@grpc/proto-loader --external=kafkajs --external=nats --external=amqplib --external=amqp-connection-manager --external=ioredis --external=mqtt apps/cli/src/main.ts --outfile=dist/fulcrum-darwin-arm64",
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
+    "typecheck": "bun run --bun tsc --noEmit",
     "lint": "bun run --bun tsc --noEmit",
     "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
