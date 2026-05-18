@@ -24,6 +24,7 @@ Usage:
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum projects <list|stats> [--json]
   fulcrum tasks <list|get|create|update|delete> [--json]
+  fulcrum relationships|comments|templates|automations|recurrence|saved_views|taskCustomFields [--json]
   fulcrum work <create|inspect|move|link|report> [--json]
   fulcrum sprints <list|get|create|update|delete|add-task|remove-task> [--json]
   fulcrum flags <list|set> [options]
@@ -325,6 +326,18 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "component": {
       const { run: runComponent } = await import("./component.ts");
       await runComponent(rest);
+      return;
+    }
+    case "relationships":
+    case "comments":
+    case "templates":
+    case "automations":
+    case "recurrence":
+    case "saved_views":
+    case "taskCustomFields":
+    case "customFieldDefs": {
+      const { runGeneratedCommand } = await import("./generated-command-runner.ts");
+      await runGeneratedCommand(cmd, rest);
       return;
     }
     case "i18n": {

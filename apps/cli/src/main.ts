@@ -47,7 +47,8 @@ Usage:
   fulcrum web
   fulcrum tui
   fulcrum inference <start|status|embed|generate|stop> [--json]
-  fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
+  fulcrum projects|tasks|sprints|relationships|comments|templates|automations|recurrence|saved_views|taskCustomFields
+  fulcrum memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
   fulcrum settings <list|get|set> [--json]
   fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
@@ -178,6 +179,14 @@ async function main() {
     case "webhooks":
     case "connectors":
     case "components":
+    case "relationships":
+    case "comments":
+    case "templates":
+    case "automations":
+    case "recurrence":
+    case "saved_views":
+    case "taskCustomFields":
+    case "customFieldDefs":
     case "completion": {
       const { run } = await import("./index.ts");
       await run([cmd, ...rest]);
