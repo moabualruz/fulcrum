@@ -60,6 +60,14 @@ _Avoid_: Cache, copy, mirror.
 The execution gate verdict comparing current source content to PlanSourceSnapshots: `fresh`, `stale`, or `accepted_stale` with a required action and changed-source summaries.
 _Avoid_: Drift check, dirty flag, outdated marker.
 
+**ManualSimulationChecklist**:
+The user-visible scenario checklist derived from SuccessCriteria after final QA, before generated E2E artifacts are accepted.
+_Avoid_: Manual test notes, vague QA checklist, smoke checklist.
+
+**ManualSimulationStep**:
+A single checklist row with setup, action, expected observation, and evidence field tied back to one SuccessCriterion.
+_Avoid_: Test step (ambiguous with automated tests), ad-hoc check.
+
 ## Relationships
 
 - A **Plan** is wrapped by exactly one **PlanSubmission**, which yields one **PlanDecision**.
@@ -70,6 +78,7 @@ _Avoid_: Drift check, dirty flag, outdated marker.
 - A passing **FinalQaReport** produces exactly one **UatCodeReviewHandoff**; the user's choice on the handoff produces a new feedback run, an E2E regression artifact, or an approval event.
 - **WorkflowMode** gates whether a given agent's `submit_plan` call is accepted or rejected with a redirect message.
 - A **Plan** stores many **PlanSourceSnapshots** at approval time; attempting execution later produces one **PlanStalenessResult** before work continues.
+- A passing **FinalQaReport** can produce a **ManualSimulationChecklist**; approved checklist steps seed generated real-data E2E artifacts.
 
 ## Example dialogue
 
@@ -88,3 +97,4 @@ _Avoid_: Drift check, dirty flag, outdated marker.
 - **WorkflowMode `plan-agent` vs editor "plan mode"** — `plan-agent` is the policy here (only the `plan` agent may call `submit_plan`). OpenCode's editor "plan mode" is a separate concept inside that runtime and is not owned by this service.
 - **No owned entities (yet)** — per CONTEXT-MAP, this service runs workflows over entities owned elsewhere: tasks (work-management), docs (knowledge-workspace), artifacts/audit (workflow-coordination), events (platform-core). Adding a persisted Plan or ReviewSession entity here requires a new ADR and a CONTEXT-MAP update.
 - **PlanSourceSnapshot vs ContextBundle** — a **ContextBundle** is what an agent receives before a run. A **PlanSourceSnapshot** is the approval-time hash/version guard used to decide whether that already-approved Plan can still execute.
+- **ManualSimulationChecklist vs generated E2E** — the checklist is human-observed workflow evidence. Generated E2E codifies approved checklist coverage; it does not replace the checklist.

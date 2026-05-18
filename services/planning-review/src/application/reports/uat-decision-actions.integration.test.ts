@@ -50,6 +50,21 @@ describe("review workbench UAT/code review decision action", () => {
       expect(generated.body).toContain("Trace trace-uat-approval");
       expect(generated.body).toContain("User can approve accepted evidence.");
       expect(generated.body).toContain("Code review can codify the accepted behavior.");
+      expect(generated.manualSimulationChecklist).toMatchObject({
+        status: "approved",
+        e2eSeed: {
+          sourceTaskIds: generated.sourceTaskIds,
+          sourceCriteria: [
+            "User can approve accepted evidence.",
+            "Code review can codify the accepted behavior.",
+          ],
+          approvedForE2e: true,
+        },
+      });
+      expect(generated.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual([
+        "User can approve accepted evidence.",
+        "Code review can codify the accepted behavior.",
+      ]);
       expect(generated.body).not.toMatch(/\b(mock|fake)\b/i);
       expect(generated.storePath).toMatch(/uat-trace-uat-approval\.spec\.ts$/);
       expect(generated.bodyPath).toMatch(/uat-trace-uat-approval\.spec\.ts$/);
@@ -74,6 +89,7 @@ describe("review workbench UAT/code review decision action", () => {
             lifecycleState: "accepted",
             generatedBy: "uat_code_review_approval",
             traceId: "trace-uat-approval",
+            manualSimulationChecklist: generated.manualSimulationChecklist,
             materializedFile: expect.objectContaining({
               storePath: generated.storePath,
               bodyPath: generated.bodyPath,
@@ -384,10 +400,12 @@ describe("review workbench UAT/code review decision action", () => {
         expect.objectContaining({
           coverageSummary: expect.objectContaining({ taskCount: 1, criterionCount: 2, artifactCount: 1 }),
           coverageCases: decision.generatedE2eTests[0]!.coverageCases,
+          manualSimulationChecklist: decision.generatedE2eTests[0]!.manualSimulationChecklist,
         }),
         expect.objectContaining({
           coverageSummary: expect.objectContaining({ taskCount: 1, criterionCount: 2, artifactCount: 1 }),
           coverageCases: decision.generatedE2eTests[1]!.coverageCases,
+          manualSimulationChecklist: decision.generatedE2eTests[1]!.manualSimulationChecklist,
         }),
       ]);
 

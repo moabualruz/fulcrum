@@ -11,6 +11,7 @@ import {
   type ReviewWorkbenchInput,
   type ReviewWorkbenchModel,
 } from "@planning-review/application/reviews/review-workbench.ts";
+import { buildManualSimulationChecklist } from "@planning-review/application/manual-simulation-checklist.ts";
 import type {
   AppendReviewWorkbenchAnnotationInput,
   LoadReviewWorkbenchSessionInput,
@@ -30,6 +31,7 @@ import type {
   GeneratedE2eRegressionRunOutput,
   GeneratedE2eRegressionRunner,
   GeneratedE2eRegressionTest,
+  ManualSimulationChecklist,
   RecordUatCodeReviewDecisionInput,
   RunGeneratedE2eRegressionTestsInput,
   UatCodeReviewAutoDecisionConfig,
@@ -1474,6 +1476,12 @@ async function generateTypeOrmE2eRegressionTests(
 
   for (const task of sourceTasks) {
     const coverageCases = buildCoverageCases(task);
+    const manualSimulationChecklist = buildManualSimulationChecklist({
+      projectId: input.projectId,
+      traceId,
+      tasks: [task],
+      approvedForE2e: true,
+    });
     const filename = `uat-${slug(traceId)}-${slug(task.title)}.spec.ts`;
     const filePath = `generated/e2e/${filename}`;
     const body = buildTypeOrmRegressionTestBody({
@@ -1481,6 +1489,7 @@ async function generateTypeOrmE2eRegressionTests(
       projectId: input.projectId,
       task,
       coverageCases,
+      manualSimulationChecklist,
       runner,
     });
     const id = reviewWorkflowId("e2e", traceId, task.taskId);
@@ -1506,6 +1515,7 @@ async function generateTypeOrmE2eRegressionTests(
       sourceTaskIds: [task.taskId],
       sourceCriteria: task.successCriteria,
       coverageCases,
+      manualSimulationChecklist,
       ciCommand: runner === "playwright"
         ? ["bun", "run", "web:e2e:generated"]
         : ["bun", "test", filePath],
@@ -1567,6 +1577,7 @@ function buildTypeOrmRegressionTestBody(input: {
   projectId: string;
   task: FinalQaTaskResult;
   coverageCases: GeneratedE2eCoverageCase[];
+  manualSimulationChecklist: ManualSimulationChecklist;
   runner: GeneratedE2eRegressionRunner;
 }): string {
   const assertion = {
@@ -1580,6 +1591,7 @@ function buildTypeOrmRegressionTestBody(input: {
       runIds: input.task.runIds,
     },
     coverageCases: input.coverageCases,
+    manualSimulationChecklist: input.manualSimulationChecklist,
   };
   const importLine = input.runner === "playwright"
     ? 'import { expect, test } from "@playwright/test";'
@@ -1592,6 +1604,8 @@ function buildTypeOrmRegressionTestBody(input: {
       "",
       `test("preserves approved UAT evidence for ${input.task.title}", async () => {`,
       "  expect(acceptedTrace.coverageCases.map((coverage) => coverage.criterion)).toEqual(acceptedTrace.task.successCriteria);",
+      '  expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
+      "  expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
       "  expect(acceptedTrace.task.artifactIds.length).toBeGreaterThan(0);",
       "  expect(acceptedTrace.task.runIds.length).toBeGreaterThan(0);",
       "});",
@@ -1606,6 +1620,8 @@ function buildTypeOrmRegressionTestBody(input: {
     `describe("Generated UAT regression: ${input.traceId}", () => {`,
     `  test("preserves approved UAT evidence for ${input.task.title}", () => {`,
     "    expect(acceptedTrace.coverageCases.map((coverage) => coverage.criterion)).toEqual(acceptedTrace.task.successCriteria);",
+    '    expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
+    "    expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
     "    expect(acceptedTrace.task.artifactIds.length).toBeGreaterThan(0);",
     "    expect(acceptedTrace.task.runIds.length).toBeGreaterThan(0);",
     "  });",

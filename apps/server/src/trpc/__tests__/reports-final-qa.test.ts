@@ -175,6 +175,27 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
       runIds: ["run-proof"],
       latestReviewEventId: "event-review",
     }],
+    manualSimulationChecklist: {
+      id: "manual-simulation:trace-trpc-approval",
+      projectId: PROJECT_ID,
+      traceId: "trace-trpc-approval",
+      status: "approved",
+      steps: [{
+        id: "task-1:manual-simulation:1",
+        taskId: "task-1",
+        taskTitle: "UAT task",
+        criterion: "UAT passes",
+        setup: "Open the workflow state for UAT task.",
+        action: "Exercise the user-visible path for success criterion 1.",
+        expectedObservation: "UAT passes",
+        evidenceField: "evidence.task-1.1",
+      }],
+      e2eSeed: {
+        sourceTaskIds: ["task-1"],
+        sourceCriteria: ["UAT passes"],
+        approvedForE2e: true,
+      },
+    },
     ciCommand: ["bun", "run", "scripts/ci-generated-e2e.ts"],
     ciEnv: {
       FULCRUM_GENERATED_E2E_RUNNER: "playwright",

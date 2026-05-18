@@ -151,6 +151,7 @@ export interface GeneratedE2eRegressionTest {
   sourceTaskIds: string[];
   sourceCriteria: string[];
   coverageCases: GeneratedE2eCoverageCase[];
+  manualSimulationChecklist: ManualSimulationChecklist;
   ciCommand: string[];
   ciEnv: Record<string, string>;
 }
@@ -163,6 +164,49 @@ export interface GeneratedE2eCoverageCase {
   artifactIds: string[];
   runIds: string[];
   latestReviewEventId: string | null;
+}
+
+export type ManualSimulationChecklistStatus = "pending" | "approved";
+export type ManualSimulationStepResultStatus = "passed" | "failed";
+
+export interface ManualSimulationChecklist {
+  id: string;
+  projectId: string;
+  traceId?: string;
+  status: ManualSimulationChecklistStatus;
+  steps: ManualSimulationStep[];
+  e2eSeed: {
+    sourceTaskIds: string[];
+    sourceCriteria: string[];
+    approvedForE2e: boolean;
+  };
+}
+
+export interface ManualSimulationStep {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  criterion: string;
+  setup: string;
+  action: string;
+  expectedObservation: string;
+  evidenceField: string;
+}
+
+export interface ManualSimulationFeedbackAnnotation {
+  id: string;
+  stepId: string;
+  taskId: string;
+  title: string;
+  body: string;
+  severity: "blocking";
+}
+
+export interface ManualSimulationStepResult {
+  stepId: string;
+  status: ManualSimulationStepResultStatus;
+  evidence: string;
+  feedbackAnnotation?: ManualSimulationFeedbackAnnotation;
 }
 
 export interface UatCodeReviewDecisionOutput {
