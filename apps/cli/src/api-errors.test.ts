@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
+import { REQUIRED_RESILIENCE_STATES } from "@platform-core/application/interface-parity/resilience-state-matrix.ts";
 import { apiErrorCode, formatApiError, formatCommandError, hasApiErrorCode } from "./api-errors.ts";
 
 describe("CLI API error handling", () => {
@@ -22,6 +23,19 @@ describe("CLI API error handling", () => {
     expect(formatCommandError(error)).toBe("UNAUTHORIZED: login required");
     expect(apiErrorCode(error)).toBe("UNAUTHORIZED");
     expect(hasApiErrorCode(error, "UNAUTHORIZED")).toBe(true);
+  });
+
+  test("formats permission and missing feature flag failures as actionable stderr-safe strings", () => {
+    expect(formatCommandError({ kind: "forbidden", message: "permission denied" })).toBe("FORBIDDEN: permission denied");
+    expect(formatCommandError({ code: "FUL_MISSING_FEATURE_FLAG", message: "Enable public-api." })).toBe(
+      "FUL_MISSING_FEATURE_FLAG: Enable public-api.",
+    );
+    expect(REQUIRED_RESILIENCE_STATES.filter((state) => state.surface === "cli").map((state) => state.state)).toEqual([
+      "missing-api",
+      "permission-denied",
+      "missing-feature-flag",
+      "empty-list",
+    ]);
   });
 
   test("formats plain errors and unknown thrown values", () => {

@@ -884,6 +884,7 @@ export class TuiApp {
     r.writeln(c.bold("  Detail / log pane"));
     if (this.domainError) {
       r.writeln(c.red(`  ${this.domainError}`));
+      r.writeln(c.dim("  Fix: check the API/service status, then retry this screen. Esc returns to navigation."));
     } else if (this.domainRows.length === 0) {
       r.writeln(c.dim(`  No ${domainTitle(screen).toLowerCase()} records.`));
     } else {

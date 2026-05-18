@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { REQUIRED_RESILIENCE_STATES } from "@platform-core/application/interface-parity/resilience-state-matrix.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
 import { FakeTTY } from "../testing/fake-tty.ts";
 
@@ -61,6 +62,57 @@ describe("TUI E2E data display", () => {
 
     expect(text).toContain("Projects");
     expect(text).toContain("projects service unavailable");
+    expect(text).toContain("Fix: check the API/service status");
+    expect(text).toContain("Esc returns to navigation");
+  });
+
+  test("resilience matrix covers empty, unavailable, partial, and subscription TUI states", () => {
+    expect(REQUIRED_RESILIENCE_STATES.filter((state) => state.surface === "tui").map((state) => state.state)).toEqual([
+      "empty-list",
+      "unavailable-sidecar",
+      "failed-subscription",
+      "partial-data",
+    ]);
+  });
+
+  test("run subscription cleanup prevents stale status updates after stop", async () => {
+    const handlers: Array<(payload: { id: string; status?: string }) => void> = [];
+    let unsubscribed = 0;
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: makeCaller({
+        agent_runs: {
+          list: async () => [{ id: "run-1", agent: "codex", status: "running", taskId: "task-1", projectId: "project-1" }],
+          get: async () => ({ id: "run-1", agent: "codex", status: "running", taskId: "task-1", projectId: "project-1" }),
+          create: async () => ({ id: "run-2", agent: "codex", status: "queued", taskId: "task-2", projectId: "project-1" }),
+          cancel: async () => ({ ok: true }),
+        },
+        runsSubscriptions: {
+          subscribe: (_topic: string, handler: (payload: { id: string; status?: string }) => void) => {
+            handlers.push(handler);
+            return {
+              unsubscribe: () => {
+                unsubscribed += 1;
+                handlers.length = 0;
+              },
+            };
+          },
+        } as never,
+      }),
+    });
+
+    await app.mount();
+    await app.navigateTo("runs");
+    expect(tty.plainText()).toContain("state:running");
+
+    app.stop();
+    for (const handler of handlers) handler({ id: "run-1", status: "failed" });
+    await app.renderForTest();
+
+    expect(unsubscribed).toBe(1);
+    expect(tty.plainText()).not.toContain("state:failed");
   });
 
   test("notification inbox loads unread items and handles read, mute, tab, and return keys", async () => {

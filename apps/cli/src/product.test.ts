@@ -226,6 +226,7 @@ describe("fulcrum product CLI", () => {
     const io = testIo();
     await runProduct(["projects", "list", "--json"], io.opts);
 
+    expect(io.out).toEqual([]);
     expect(io.exits).toEqual([1]);
     expect(io.err.join("\n")).toContain("Product API caller is not configured");
   });
