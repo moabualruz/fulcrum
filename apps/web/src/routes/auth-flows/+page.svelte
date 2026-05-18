@@ -20,15 +20,13 @@
     formPost = JSON.stringify({ url: "+page.server", method: "POST", email, password: password ? "[masked]" : "" }, null, 2);
   }
 
-  async function handleOAuthLogin(provider: Provider): Promise<void> {
+  function handleOAuthLogin(provider: Provider): void {
     oauthBusy = provider;
     oauthPost = JSON.stringify(
       { url: "/api/auth/sign-in/social", method: "POST", provider, callbackURL: "/" },
       null,
       2,
     );
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    oauthBusy = null;
   }
 
   async function handlePasskeyLogin(): Promise<void> {
