@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";
 
   type DocType = "decision" | "runbook" | "note" | "spec";
@@ -139,6 +140,13 @@
     waiting: "waiting",
   };
 
+  const STATUS_ICON: Record<DependencyStatus, string> = {
+    done: "✓",
+    running: "●",
+    blocked: "!",
+    waiting: "○",
+  };
+
   let selectedProject = $state("fulcrum");
   let selectedTask = $state("");
   let selectedRun = $state("");
@@ -149,6 +157,7 @@
   let copiedLink = $state("");
   let revealedTreeNode = $state("");
   let runState = $state<RunState>("ready");
+  let hydrated = $state(false);
   let dependencyTasks = $state<DependencyTask[]>(DEPENDENCY_TASKS);
   let runFeedback = $state([
     "Run state loaded from dependency execution API snapshot",
@@ -166,6 +175,10 @@
     && (!selectedOwner || result.owner === selectedOwner)
     && (!selectedAttachment || (selectedAttachment === "with attachments" ? result.hasAttachment : !result.hasAttachment))
   ));
+
+  onMount(() => {
+    hydrated = true;
+  });
 
   function addToPlanningContext(result: DocSearchResult): void {
     if (!planningContext.includes(result.id)) planningContext = [...planningContext, result.id];
@@ -214,17 +227,17 @@
   <title>Build graph</title>
 </svelte:head>
 
-<main data-build-graph-search class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}>
+<main data-build-graph-search data-build-graph-ready={hydrated ? "true" : "false"} class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}>
   <div class={cn("mx-auto flex max-w-7xl min-w-0 flex-col gap-4 px-4 py-5 lg:px-6")}>
     <header data-build-graph-header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
       <div>
-        <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Build graph</p>
+        <p data-contrast-sample class={cn("text-xs font-medium uppercase text-fg-subtle")}>Build graph</p>
         <h1 class={cn("text-2xl font-semibold tracking-normal")}>Task dependency execution</h1>
-        <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
+        <p data-contrast-sample class={cn("mt-1 max-w-2xl text-sm text-fg-subtle")}>
           Inspect execution order, run state, blockers, feedback, and source refs before dispatch.
         </p>
       </div>
-      <div data-permission-copy class={cn("rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground")}>
+      <div data-permission-copy data-contrast-sample class={cn("rounded-md border border-border-strong bg-muted px-3 py-2 text-xs text-foreground")}>
         Permissions filter before results render. Unauthorized titles stay hidden.
       </div>
     </header>
@@ -234,9 +247,9 @@
         <div class={cn("flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2")}>
           <div>
             <h2 class={cn("text-sm font-semibold")}>Dependency order</h2>
-            <p class={cn("mt-0.5 text-xs text-muted-foreground")}>Current active node: {activeTask.title}</p>
+            <p data-contrast-sample class={cn("mt-0.5 text-xs text-fg-subtle")}>Current active node: {activeTask.title}</p>
           </div>
-          <span data-run-state class={cn("rounded-sm border border-border bg-muted px-2 py-1 text-xs font-medium")}>run:{runState}</span>
+          <span data-run-state data-contrast-sample class={cn("rounded-sm border border-border-strong bg-muted px-2 py-1 text-xs font-medium text-foreground")}>run:{runState}</span>
         </div>
 
         <div class={cn("grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-4")}>
@@ -244,28 +257,30 @@
             <article data-dependency-node data-task-id={task.id} class={cn("min-w-0 rounded-sm border border-border bg-background p-3")}>
               <div class={cn("flex items-start justify-between gap-2")}>
                 <span data-dependency-order class={cn("grid size-7 shrink-0 place-items-center rounded-sm bg-muted text-xs font-semibold")}>{task.order}</span>
-                <span data-node-status class={cn(
-                  "rounded-sm border px-1.5 py-0.5 text-xs",
-                  task.status === "done" && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300",
-                  task.status === "running" && "border-sky-500/40 text-sky-700 dark:text-sky-300",
-                  task.status === "blocked" && "border-destructive/50 text-destructive",
-                  task.status === "waiting" && "border-border text-muted-foreground",
-                )}>{STATUS_COPY[task.status]}</span>
+                <span data-node-status data-contrast-sample class={cn(
+                  "inline-flex items-center gap-1 rounded-sm border bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground",
+                  task.status === "done" && "border-success/70",
+                  task.status === "running" && "border-primary/70",
+                  task.status === "blocked" && "border-destructive/70",
+                  task.status === "waiting" && "border-border-strong",
+                )}><span aria-hidden="true">{STATUS_ICON[task.status]}</span>{STATUS_COPY[task.status]}</span>
               </div>
               <h3 class={cn("mt-3 text-sm font-semibold leading-tight")}>{task.title}</h3>
-              <p class={cn("mt-1 text-xs text-muted-foreground")}>owner:{task.owner}</p>
+              <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>owner:{task.owner}</p>
               <div data-dependency-edges class={cn("mt-3 flex flex-wrap gap-1")}>
                 {#if task.dependencies.length === 0}
-                  <span class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>root</span>
+                  <span data-contrast-sample class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-foreground")}>root</span>
                 {:else}
                   {#each task.dependencies as dependency}
-                    <span data-dependency-chip class={cn("max-w-full break-all rounded-xs bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>{dependency}</span>
+                    <span data-dependency-chip data-contrast-sample class={cn("max-w-full break-all rounded-xs bg-muted px-1.5 py-0.5 text-xs text-foreground")}>{dependency}</span>
                   {/each}
                 {/if}
               </div>
-              <p data-node-feedback class={cn("mt-3 text-xs text-muted-foreground")}>{task.feedback}</p>
+              <p data-node-feedback data-contrast-sample class={cn("mt-3 text-xs text-fg-subtle")}>{task.feedback}</p>
               {#if task.blocker}
-                <p data-blocker-row class={cn("mt-2 rounded-sm border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive")}>{task.blocker}</p>
+                <p data-blocker-row data-contrast-sample class={cn("mt-2 rounded-sm border border-destructive/70 bg-muted px-2 py-1 text-xs font-medium text-foreground")}>
+                  <span aria-hidden="true">!</span> {task.blocker}
+                </p>
               {/if}
             </article>
           {/each}
@@ -275,16 +290,16 @@
       <aside data-run-feedback-panel class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div>
           <h2 class={cn("text-sm font-semibold")}>Execution feedback</h2>
-          <p class={cn("mt-1 text-xs text-muted-foreground")}>{blockedTasks.length} blockers visible before dispatch.</p>
+          <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>{blockedTasks.length} blockers visible before dispatch.</p>
         </div>
         <div data-run-actions class={cn("grid gap-2 sm:grid-cols-3")}>
-          <button data-action-dispatch type="button" onclick={dispatchDependencyRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Dispatch</button>
-          <button data-action-retry type="button" onclick={retryBlockedRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Retry</button>
-          <button data-action-cancel type="button" onclick={cancelDependencyRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Cancel</button>
+          <button data-action-dispatch type="button" onclick={dispatchDependencyRun} class={cn("min-w-0 rounded-sm border border-border-strong px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Dispatch</button>
+          <button data-action-retry type="button" onclick={retryBlockedRun} class={cn("min-w-0 rounded-sm border border-border-strong px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Retry</button>
+          <button data-action-cancel type="button" onclick={cancelDependencyRun} class={cn("min-w-0 rounded-sm border border-border-strong px-2 py-1.5 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Cancel</button>
         </div>
         <div class={cn("space-y-2")}>
           {#each runFeedback as feedback}
-            <p data-feedback-row class={cn("rounded-sm bg-muted px-2 py-1.5 text-xs text-muted-foreground")}>{feedback}</p>
+            <p data-feedback-row data-contrast-sample class={cn("rounded-sm bg-muted px-2 py-1.5 text-xs text-foreground")}>{feedback}</p>
           {/each}
         </div>
       </aside>
@@ -301,7 +316,7 @@
           aria-label="Search docs"
         />
       </label>
-      <div data-ranking-explanation class={cn("self-end rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground")}>
+      <div data-ranking-explanation data-contrast-sample class={cn("self-end rounded-sm bg-muted px-3 py-2 text-xs text-foreground")}>
         Ranking: title match, snippet match, backlink count, updated time.
       </div>
     </section>
@@ -310,10 +325,10 @@
       <aside data-doc-search-filters class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div class={cn("flex items-center justify-between")}>
           <h2 class={cn("text-sm font-semibold")}>Filters</h2>
-          <button data-reset-filters type="button" onclick={resetFilters} class={cn("text-xs text-muted-foreground underline-offset-2 hover:underline")}>Reset</button>
+          <button data-reset-filters type="button" onclick={resetFilters} class={cn("text-xs text-fg-subtle underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Reset</button>
         </div>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Project
           <select data-filter-project bind:value={selectedProject} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             {#each FILTERS.project as item}
@@ -322,7 +337,7 @@
           </select>
         </label>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Task
           <select data-filter-task bind:value={selectedTask} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             <option value="">Any task</option>
@@ -330,7 +345,7 @@
           </select>
         </label>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Run
           <select data-filter-run bind:value={selectedRun} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             <option value="">Any run</option>
@@ -338,7 +353,7 @@
           </select>
         </label>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Document type
           <select data-filter-doc-type bind:value={selectedDocType} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             <option value="">Any type</option>
@@ -346,7 +361,7 @@
           </select>
         </label>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Owner
           <select data-filter-owner bind:value={selectedOwner} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             <option value="">Any owner</option>
@@ -354,7 +369,7 @@
           </select>
         </label>
 
-        <label class={cn("block text-xs font-medium text-muted-foreground")}>
+        <label data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
           Attachments
           <select data-filter-attachments bind:value={selectedAttachment} class={cn("mt-1 h-8 w-full rounded-sm border border-input bg-background px-2 text-sm")}>
             <option value="">Any attachment state</option>
@@ -366,7 +381,7 @@
       <section data-doc-search-results class={cn("min-w-0 rounded-md border border-border bg-card")}>
         <div class={cn("flex items-center justify-between border-b border-border px-3 py-2")}>
           <h2 class={cn("text-sm font-semibold")}>Results</h2>
-          <span data-result-count class={cn("text-xs text-muted-foreground")}>{filteredResults.length} visible</span>
+          <span data-result-count data-contrast-sample class={cn("text-xs text-fg-subtle")}>{filteredResults.length} visible</span>
         </div>
 
         <div class={cn("divide-y divide-border")}>
@@ -374,23 +389,23 @@
             <article data-doc-result data-doc-id={result.id} class={cn("p-3")}>
               <div class={cn("flex flex-wrap items-center gap-2")}>
                 <h3 class={cn("text-md font-semibold")}>{result.title}</h3>
-                <span data-doc-type class={cn("rounded-xs border border-border px-1.5 py-0.5 text-xs text-muted-foreground")}>{result.docType}</span>
-                <span data-doc-scope class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>{result.scope}</span>
+                <span data-doc-type data-contrast-sample class={cn("rounded-xs border border-border-strong px-1.5 py-0.5 text-xs text-foreground")}>{result.docType}</span>
+                <span data-doc-scope data-contrast-sample class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-foreground")}>{result.scope}</span>
               </div>
-              <p data-doc-snippet class={cn("mt-2 text-sm text-muted-foreground")}>
+              <p data-doc-snippet data-contrast-sample class={cn("mt-2 text-sm text-fg-subtle")}>
                 <mark class={cn("bg-accent/20 text-foreground")}>Search</mark>{result.snippet.slice("Search".length)}
               </p>
-              <div class={cn("mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground")}>
+              <div class={cn("mt-2 flex flex-wrap gap-2 text-xs text-fg-subtle")}>
                 <span data-updated-at>{result.updatedAt}</span>
                 <span data-owner>owner:{result.owner}</span>
                 <span data-graph-counts>{result.graphCounts.backlinks} backlinks, {result.graphCounts.tasks} tasks, {result.graphCounts.runs} runs</span>
                 <span data-attachment-state>{result.hasAttachment ? "attachment" : "no attachment"}</span>
               </div>
               <div data-result-actions class={cn("mt-3 flex flex-wrap gap-2")}>
-                <a data-action-open href={`/docs/${result.id}`} class={cn("rounded-sm border border-border px-2 py-1 text-xs font-medium hover:bg-muted")}>Open</a>
-                <button data-action-context type="button" onclick={() => addToPlanningContext(result)} class={cn("rounded-sm border border-border px-2 py-1 text-xs font-medium hover:bg-muted")}>Add to planning context</button>
-                <button data-action-copy type="button" onclick={() => copyLink(result)} class={cn("rounded-sm border border-border px-2 py-1 text-xs font-medium hover:bg-muted")}>Copy link</button>
-                <button data-action-reveal type="button" onclick={() => revealInTree(result)} class={cn("rounded-sm border border-border px-2 py-1 text-xs font-medium hover:bg-muted")}>Reveal in tree</button>
+                <a data-action-open href={`/docs/${result.id}`} class={cn("rounded-sm border border-border-strong px-2 py-1 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Open</a>
+                <button data-action-context type="button" onclick={() => addToPlanningContext(result)} class={cn("rounded-sm border border-border-strong px-2 py-1 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Add to planning context</button>
+                <button data-action-copy type="button" onclick={() => copyLink(result)} class={cn("rounded-sm border border-border-strong px-2 py-1 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Copy link</button>
+                <button data-action-reveal type="button" onclick={() => revealInTree(result)} class={cn("rounded-sm border border-border-strong px-2 py-1 text-xs font-medium text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}>Reveal in tree</button>
               </div>
             </article>
           {/each}
@@ -400,21 +415,21 @@
       <aside data-planning-context class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
         <div>
           <h2 class={cn("text-sm font-semibold")}>Planning context</h2>
-          <p class={cn("mt-1 text-xs text-muted-foreground")}>Selected source refs stay deterministic for the next planning session.</p>
+          <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Selected source refs stay deterministic for the next planning session.</p>
         </div>
         <div data-selected-context class={cn("space-y-1 text-sm")}>
           {#if planningContext.length === 0}
-            <p class={cn("text-muted-foreground")}>No docs selected.</p>
+            <p data-contrast-sample class={cn("text-fg-subtle")}>No docs selected.</p>
           {:else}
             {#each planningContext as id}
               <div data-context-ref class={cn("rounded-sm bg-muted px-2 py-1 font-mono text-xs")}>{id}</div>
             {/each}
           {/if}
         </div>
-        <div data-tree-reveal class={cn("rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground")}>
+        <div data-tree-reveal data-contrast-sample class={cn("rounded-sm bg-muted px-2 py-1 text-xs text-foreground")}>
           Tree reveal: {revealedTreeNode || "none"}
         </div>
-        <div data-copied-link class={cn("rounded-sm bg-muted px-2 py-1 text-xs text-muted-foreground")}>
+        <div data-copied-link data-contrast-sample class={cn("rounded-sm bg-muted px-2 py-1 text-xs text-foreground")}>
           Copied link: {copiedLink || "none"}
         </div>
       </aside>

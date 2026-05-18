@@ -11,6 +11,8 @@ const realPort = Number(process.env.FULCRUM_REAL_E2E_PORT ?? process.env.FULCRUM
 const serverPort = Number(process.env.FULCRUM_SERVER_TEST_PORT ?? "3100");
 const quotedWebRoot = JSON.stringify(webRoot);
 const quotedRepoRoot = JSON.stringify(repoRoot);
+const skipDesignE2eServer = process.env.FULCRUM_SKIP_DESIGN_E2E_SERVER === "1";
+const skipRealE2eServers = process.env.FULCRUM_SKIP_REAL_E2E_SERVERS === "1";
 
 export const PLAYWRIGHT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.50-jammy";
 
@@ -19,6 +21,7 @@ process.env.FULCRUM_HOME ??= fulcrumHome;
 export default defineConfig({
 	testDir: path.join(webRoot, "tests"),
 	timeout: 30000,
+	workers: 1,
 	retries: 1,
 	expect: {
 		toHaveScreenshot: {
@@ -31,7 +34,7 @@ export default defineConfig({
 		trace: "retain-on-failure",
 	},
 	webServer: [
-		{
+		...skipDesignE2eServer ? [] : [{
 			command: `cd ${quotedWebRoot} && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
 			port: designPort,
 			env: {
@@ -40,8 +43,8 @@ export default defineConfig({
 				FULCRUM_E2E: "1",
 			},
 			reuseExistingServer: false,
-		},
-		{
+		}],
+		...skipRealE2eServers ? [] : [{
 			command: `cd ${quotedRepoRoot} && bun run apps/server/src/index.ts`,
 			port: serverPort,
 			env: {
@@ -63,7 +66,7 @@ export default defineConfig({
 				FULCRUM_E2E: "1",
 			},
 			reuseExistingServer: false,
-		},
+		}],
 	],
 	projects: [
 		{

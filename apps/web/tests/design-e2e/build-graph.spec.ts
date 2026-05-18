@@ -1,8 +1,58 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+async function openBuildGraph(page: Page): Promise<void> {
+	await page.goto("/build-graph");
+	await expect(page.locator("[data-build-graph-ready='true']")).toBeVisible();
+}
+
+function channelToLinear(value: number): number {
+	const normalized = value / 255;
+	return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance([red, green, blue]: [number, number, number]): number {
+	return (0.2126 * channelToLinear(red)) + (0.7152 * channelToLinear(green)) + (0.0722 * channelToLinear(blue));
+}
+
+function contrastRatio(foreground: [number, number, number], background: [number, number, number]): number {
+	const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+	const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+	return (lighter + 0.05) / (darker + 0.05);
+}
+
+function parseCssColor(value: string): [number, number, number] {
+	const rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+	if (rgbMatch) return [Number(rgbMatch[1]), Number(rgbMatch[2]), Number(rgbMatch[3])];
+
+	const oklchMatch = value.match(/oklch\(([\d.]+%?)\s+([\d.]+)\s+([\d.]+)/);
+	if (!oklchMatch) throw new Error(`Unsupported color format: ${value}`);
+
+	const lightness = oklchMatch[1].endsWith("%") ? Number(oklchMatch[1].slice(0, -1)) / 100 : Number(oklchMatch[1]);
+	const chroma = Number(oklchMatch[2]);
+	const hue = Number(oklchMatch[3]) * Math.PI / 180;
+	const a = Math.cos(hue) * chroma;
+	const b = Math.sin(hue) * chroma;
+	const lPrime = lightness + 0.3963377774 * a + 0.2158037573 * b;
+	const mPrime = lightness - 0.1055613458 * a - 0.0638541728 * b;
+	const sPrime = lightness - 0.0894841775 * a - 1.291485548 * b;
+	const l = lPrime ** 3;
+	const m = mPrime ** 3;
+	const s = sPrime ** 3;
+	const linear = [
+		4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+		-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+		-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+	];
+	return linear.map((channel) => {
+		const clamped = Math.min(1, Math.max(0, channel));
+		return Math.round((clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * (clamped ** (1 / 2.4)) - 0.055) * 255);
+	}) as [number, number, number];
+}
 
 test.describe("build graph doc search", () => {
 	test("shows dependency order, run state, blockers, and execution actions", async ({ page }) => {
-		await page.goto("/build-graph");
+		await openBuildGraph(page);
 
 		await expect(page.locator("[data-dependency-panel]")).toBeVisible();
 		await expect(page.locator("[data-run-state]")).toContainText("run:ready");
@@ -26,7 +76,7 @@ test.describe("build graph doc search", () => {
 	});
 
 	test("renders scoped doc search results with snippets, filters, and graph actions", async ({ page }) => {
-		await page.goto("/build-graph");
+		await openBuildGraph(page);
 
 		await expect(page.locator("[data-build-graph-search]")).toBeVisible();
 		await expect(page.locator("[data-doc-search-input]")).toHaveValue("kernel");
@@ -53,7 +103,7 @@ test.describe("build graph doc search", () => {
 	});
 
 	test("filters by owner and attachment state without leaking unrelated rows", async ({ page }) => {
-		await page.goto("/build-graph");
+		await openBuildGraph(page);
 
 		await page.locator("[data-filter-owner]").selectOption("ada");
 		await expect(page.locator("[data-result-count]")).toContainText("1 visible");
@@ -66,10 +116,42 @@ test.describe("build graph doc search", () => {
 
 	test("keeps dependency execution layout inside mobile viewport", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
-		await page.goto("/build-graph");
+		await openBuildGraph(page);
 
 		const overflow = await page.locator("[data-build-graph-search]").evaluate((element) => element.scrollWidth - element.clientWidth);
 		expect(overflow).toBeLessThanOrEqual(1);
 		await expect(page.locator("[data-run-actions]")).toBeVisible();
+	});
+
+	test("keeps build graph text, status, and focus treatments at WCAG AA contrast", async ({ page }) => {
+		await openBuildGraph(page);
+
+		const samples = await page.locator("[data-contrast-sample]").evaluateAll((elements) => elements.map((element) => {
+			function effectiveBackground(target: Element): string {
+				let current: Element | null = target;
+				while (current) {
+					const background = getComputedStyle(current).backgroundColor;
+					if (!background.endsWith(", 0)") && background !== "rgba(0, 0, 0, 0)" && background !== "transparent") return background;
+					current = current.parentElement;
+				}
+				return getComputedStyle(document.body).backgroundColor;
+			}
+
+			const style = getComputedStyle(element);
+			return {
+				text: element.textContent?.trim() ?? "",
+				color: style.color,
+				background: effectiveBackground(element),
+			};
+		}));
+
+		for (const sample of samples) {
+			expect(contrastRatio(parseCssColor(sample.color), parseCssColor(sample.background)), sample.text).toBeGreaterThanOrEqual(4.5);
+		}
+
+		await page.locator("[data-action-dispatch]").focus();
+		const focusRing = await page.locator("[data-action-dispatch]").evaluate((element) => getComputedStyle(element).boxShadow);
+		expect(focusRing).not.toBe("none");
+		await expect(page.locator("[data-node-status]").first()).toContainText(/✓|●|!|○/);
 	});
 });

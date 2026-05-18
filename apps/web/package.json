@@ -20,8 +20,8 @@
 		"web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
 		"web:e2e:generated": "playwright test --project=real-e2e",
 		"web:e2e:full": "playwright test tests/e2e/ --workers=1",
-		"test:design": "playwright test --project=design-e2e",
-		"test:e2e": "playwright test tests/e2e/wave-0a-foundation.spec.ts --project=real-e2e",
+		"test:design": "bun run scripts/run-design-e2e.ts",
+		"test:e2e": "bun run scripts/run-real-e2e.ts",
 		"web:a11y": "playwright test tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts --project=real-e2e",
 		"i18n:extract": "bun run src/lib/i18n/extract.ts"
 	},
