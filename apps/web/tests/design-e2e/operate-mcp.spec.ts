@@ -75,4 +75,36 @@ test.describe("operate-mcp server management", () => {
 		await expect(page.locator("[data-mcp-server-status='mcp_github']")).toContainText("disconnected");
 		await expect(page.locator("[data-mcp-server-tool-count='mcp_github']")).toContainText("0");
 	});
+
+	test("probe shows availability, version, tool count, and timestamp", async ({ page }) => {
+		await page.goto("/operate-mcp");
+
+		await page.locator("[data-mcp-probe='mcp_github']").click();
+		const probe = page.locator("[data-mcp-probe-result='mcp_github']");
+		await expect(probe).toBeVisible();
+		await expect(page.locator("[data-probe-outcome='mcp_github']")).toContainText("available");
+		await expect(page.locator("[data-probe-version='mcp_github']")).toContainText("1.0.0");
+		await expect(page.locator("[data-probe-tool-count='mcp_github']")).toContainText("3");
+		await expect(page.locator("[data-probe-checked-at='mcp_github']")).toContainText("checked:");
+	});
+
+	test("probe of an error-status server reports the reason instead of tools", async ({ page }) => {
+		await page.goto("/operate-mcp");
+
+		await page.locator("[data-mcp-probe='mcp_postgres']").click();
+		await expect(page.locator("[data-probe-outcome='mcp_postgres']")).toContainText("unavailable");
+		await expect(page.locator("[data-probe-reason='mcp_postgres']")).toContainText("connection refused on port 5432");
+		await expect(page.locator("[data-mcp-tools-toggle='mcp_postgres']")).toHaveCount(0);
+	});
+
+	test("expanding tools shows name, description, and schema preview", async ({ page }) => {
+		await page.goto("/operate-mcp");
+
+		await page.locator("[data-mcp-probe='mcp_filesystem']").click();
+		await page.locator("[data-mcp-tools-toggle='mcp_filesystem']").click();
+		const list = page.locator("[data-mcp-tools-list='mcp_filesystem']");
+		await expect(list).toBeVisible();
+		await expect(list.locator("[data-mcp-tool='read_file']")).toContainText("Read a file as UTF-8");
+		await expect(list.locator("[data-mcp-tool='write_file']")).toContainText("schema: { path, content }");
+	});
 });

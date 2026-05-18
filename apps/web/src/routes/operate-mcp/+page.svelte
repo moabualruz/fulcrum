@@ -4,6 +4,23 @@
   type Protocol = "http" | "stdio";
   type Status = "connected" | "disconnected" | "connecting" | "error";
 
+  interface McpTool {
+    name: string;
+    description: string;
+    inputSchemaPreview: string;
+  }
+
+  type ProbeOutcome = "available" | "unavailable";
+
+  interface ProbeResult {
+    outcome: ProbeOutcome;
+    version: string | null;
+    toolCount: number;
+    checkedAt: string;
+    reason?: string;
+    tools: McpTool[];
+  }
+
   interface McpServer {
     id: string;
     name: string;
@@ -15,6 +32,30 @@
     args?: string[];
     envKeys?: string[];
     error?: string;
+    probe?: ProbeResult;
+    probeBusy?: boolean;
+    showTools?: boolean;
+  }
+
+  const TOOL_FIXTURE: Record<string, McpTool[]> = {
+    mcp_github: [
+      { name: "create_issue", description: "Open a new GitHub issue", inputSchemaPreview: "{ owner, repo, title, body }" },
+      { name: "list_prs", description: "List pull requests", inputSchemaPreview: "{ owner, repo, state? }" },
+      { name: "comment_pr", description: "Append a comment to a PR", inputSchemaPreview: "{ owner, repo, number, body }" },
+    ],
+    mcp_filesystem: [
+      { name: "read_file", description: "Read a file as UTF-8", inputSchemaPreview: "{ path }" },
+      { name: "write_file", description: "Overwrite a file", inputSchemaPreview: "{ path, content }" },
+    ],
+    mcp_postgres: [
+      { name: "query", description: "Run a parameterized SELECT", inputSchemaPreview: "{ sql, params? }" },
+    ],
+  };
+
+  function fixtureTools(id: string): McpTool[] {
+    return TOOL_FIXTURE[id] ?? [
+      { name: "ping", description: "Probe handshake echo", inputSchemaPreview: "{}" },
+    ];
   }
 
   const INITIAL_SERVERS: McpServer[] = [
@@ -124,6 +165,50 @@
   function cancelDisconnect(): void {
     confirmDisconnect = null;
   }
+
+  function probeServer(id: string): void {
+    servers = servers.map((server) => server.id === id
+      ? { ...server, probeBusy: true }
+      : server);
+    setTimeout(() => {
+      const checkedAt = new Date().toISOString();
+      servers = servers.map((server) => {
+        if (server.id !== id) return server;
+        if (server.status === "error") {
+          return {
+            ...server,
+            probeBusy: false,
+            probe: {
+              outcome: "unavailable" as const,
+              version: null,
+              toolCount: 0,
+              checkedAt,
+              reason: server.error ?? "probe handshake failed",
+              tools: [],
+            },
+          };
+        }
+        const tools = fixtureTools(server.id);
+        return {
+          ...server,
+          probeBusy: false,
+          probe: {
+            outcome: "available" as const,
+            version: "1.0.0",
+            toolCount: tools.length,
+            checkedAt,
+            tools,
+          },
+        };
+      });
+    }, 150);
+  }
+
+  function toggleTools(id: string): void {
+    servers = servers.map((server) => server.id === id
+      ? { ...server, showTools: !server.showTools }
+      : server);
+  }
 </script>
 
 <svelte:head>
@@ -189,6 +274,13 @@
             <td class="px-4 py-2 text-right font-mono text-xs" data-mcp-server-tool-count={server.id}>{server.toolCount}</td>
             <td class="px-4 py-2 text-right">
               <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  data-mcp-probe={server.id}
+                  class="h-8 rounded-md border border-border px-2 text-xs"
+                  disabled={server.probeBusy === true}
+                  onclick={() => probeServer(server.id)}
+                >{server.probeBusy ? "Probing…" : "Probe"}</button>
                 {#if server.status === "disconnected" || server.status === "error"}
                   <button
                     type="button"
@@ -208,6 +300,50 @@
               </div>
             </td>
           </tr>
+          {#if server.probe}
+            <tr data-mcp-probe-result={server.id} class="border-b border-border last:border-0 bg-muted/20">
+              <td colspan="5" class="px-4 py-2">
+                <div class="flex flex-col gap-1 text-xs">
+                  <span class="flex flex-wrap items-center gap-3">
+                    <span data-probe-outcome={server.id} class={cn(
+                      "rounded-sm px-2 py-0.5 text-[10px] uppercase",
+                      server.probe.outcome === "available" && "bg-success/15 text-success",
+                      server.probe.outcome === "unavailable" && "bg-destructive/15 text-destructive",
+                    )}>{server.probe.outcome}</span>
+                    <span data-probe-version={server.id} class="font-mono">version: {server.probe.version ?? "unknown"}</span>
+                    <span data-probe-tool-count={server.id} class="font-mono">tools: {server.probe.toolCount}</span>
+                    <span data-probe-checked-at={server.id} class="font-mono text-muted-foreground">checked: {server.probe.checkedAt}</span>
+                    {#if server.probe.tools.length > 0}
+                      <button
+                        type="button"
+                        data-mcp-tools-toggle={server.id}
+                        class="ml-auto h-7 rounded-md border border-border px-2 text-[11px]"
+                        onclick={() => toggleTools(server.id)}
+                      >{server.showTools ? "Hide tools" : "Show tools"}</button>
+                    {/if}
+                  </span>
+                  {#if server.probe.outcome === "unavailable" && server.probe.reason}
+                    <span data-probe-reason={server.id} class="text-destructive">{server.probe.reason}</span>
+                  {/if}
+                </div>
+              </td>
+            </tr>
+          {/if}
+          {#if server.probe && server.showTools && server.probe.tools.length > 0}
+            <tr data-mcp-tools-row={server.id} class="border-b border-border last:border-0">
+              <td colspan="5" class="px-4 pb-3">
+                <ul data-mcp-tools-list={server.id} class="flex flex-col gap-1 rounded-md border border-border bg-background p-3 text-xs">
+                  {#each server.probe.tools as tool (tool.name)}
+                    <li data-mcp-tool={tool.name} class="flex flex-col">
+                      <span class="font-mono font-medium">{tool.name}</span>
+                      <span class="text-muted-foreground">{tool.description}</span>
+                      <span class="font-mono text-[10px] text-muted-foreground">schema: {tool.inputSchemaPreview}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </td>
+            </tr>
+          {/if}
         {/each}
       </tbody>
     </table>
