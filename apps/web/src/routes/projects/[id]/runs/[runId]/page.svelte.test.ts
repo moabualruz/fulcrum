@@ -28,4 +28,19 @@ describe("/projects/[id]/runs/[runId] +page.svelte source", () => {
     expect(source).toContain("event.verb");
     expect(source).toContain("event.created_at");
   });
+
+  test("renders AI Assist live session timeline controls", () => {
+    expect(source).toContain("data-ai-assist-live-session");
+    expect(source).toContain("AI Assist live session");
+    expect(source).toContain("data-live-autoscroll-toggle");
+    expect(source).toContain("data-live-session-disconnect");
+    expect(source).toContain("data-tool-call-timeline");
+    expect(source).toContain("data-tool-call-card");
+    expect(source).toContain("data-tool-args-summary");
+    expect(source).toContain("data-tool-result-status");
+    expect(source).toContain("data-tool-output-copy");
+    expect(source).toContain("data-diff-preview");
+    expect(source).toContain("data-approval-gate");
+    expect(source).toContain("navigator.clipboard.writeText");
+  });
 });

@@ -19,9 +19,103 @@
   let tab = $state<Tab>("transcript");
   let showCancel = $state(false);
   let showRetry = $state(false);
+  let autoScroll = $state(true);
+  let timelineElement = $state<HTMLDivElement | null>(null);
 
   function selectTab(next: Tab): void {
     tab = next;
+  }
+
+  type RunEventLike = {
+    id: string;
+    verb: string;
+    created_at: string | Date;
+    actor?: string;
+    payload: Record<string, unknown>;
+  };
+
+  type LiveSessionItem = {
+    id: string;
+    kind: "message" | "tool" | "diff" | "approval" | "event";
+    title: string;
+    timestamp: string;
+    summary: string;
+    argsSummary: string | null;
+    resultStatus: string | null;
+    copyText: string;
+  };
+
+  function payloadString(payload: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const value = payload[key];
+      if (typeof value === "string" && value.trim().length > 0) return value;
+      if (typeof value === "number" || typeof value === "boolean") return String(value);
+    }
+    return null;
+  }
+
+  function payloadJson(payload: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const value = payload[key];
+      if (value === undefined || value === null) continue;
+      return typeof value === "string" ? value : JSON.stringify(value);
+    }
+    return null;
+  }
+
+  function buildLiveSessionItems(events: RunEventLike[], transcript: string | null): LiveSessionItem[] {
+    const eventItems = events.map((event) => {
+      const payload = event.payload ?? {};
+      const verb = event.verb.toLowerCase();
+      const toolName = payloadString(payload, ["toolName", "tool_name", "tool", "name", "command"]);
+      const argsSummary = payloadJson(payload, ["args", "arguments", "input", "commandArgs", "command_args"]);
+      const resultStatus = payloadString(payload, ["status", "resultStatus", "result_status", "exitCode", "exit_code"]);
+      const resultSummary = payloadJson(payload, ["result", "output", "stderr", "stdout", "message", "summary"]);
+      const isTool = verb.includes("tool") || toolName !== null || argsSummary !== null;
+      const isDiff = verb.includes("diff") || payloadString(payload, ["diff", "patch", "workspaceDiff", "workspace_diff"]) !== null;
+      const isApproval = verb.includes("approval") || payloadString(payload, ["approval", "approvalStatus", "approval_status"]) !== null;
+      const kind = isApproval ? "approval" : isDiff ? "diff" : isTool ? "tool" : "event";
+      const title = kind === "tool"
+        ? toolName ?? event.verb
+        : kind === "approval"
+          ? "Approval gate"
+          : kind === "diff"
+            ? "Diff preview"
+            : event.verb;
+      const summary = resultSummary ?? payloadString(payload, ["text", "content", "description"]) ?? event.verb;
+      return {
+        id: event.id,
+        kind,
+        title,
+        timestamp: String(event.created_at),
+        summary,
+        argsSummary,
+        resultStatus,
+        copyText: JSON.stringify({ verb: event.verb, payload }, null, 2),
+      };
+    });
+
+    if (eventItems.length > 0) return eventItems;
+
+    return (transcript ?? "")
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+      .slice(-12)
+      .map((line, index) => ({
+        id: `transcript-${index}`,
+        kind: "message",
+        title: "Transcript",
+        timestamp: "live",
+        summary: line,
+        argsSummary: null,
+        resultStatus: null,
+        copyText: line,
+      }));
+  }
+
+  async function copyText(value: string): Promise<void> {
+    if (!browser || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(value);
   }
 
   // 5s polling
@@ -32,6 +126,11 @@
     }, 5000);
     return () => clearInterval(handle);
   });
+
+  $effect(() => {
+    if (!browser || !autoScroll || timelineElement === null) return;
+    timelineElement.scrollTop = timelineElement.scrollHeight;
+  });
 </script>
 
 {#await data.streamed.data}
@@ -40,6 +139,7 @@
   {@const run = payload.run}
   {@const transcript = payload.transcript}
   {@const events = payload.events}
+  {@const liveSessionItems = buildLiveSessionItems(events, transcript)}
   <header
     data-project-run-detail-header
     class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -112,6 +212,65 @@
       </form>
     </div>
   {/if}
+
+  <section data-ai-assist-live-session class={cn("mb-4 rounded-md border border-border bg-background")}>
+    <div class={cn("flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-2")}>
+      <div>
+        <h2 class={cn("text-sm font-semibold")}>AI Assist live session</h2>
+        <p class={cn("text-xs text-muted-foreground")}>Transcript, tool calls, diffs, approvals, and stream recovery.</p>
+      </div>
+      <label class={cn("inline-flex items-center gap-2 text-xs text-muted-foreground")}>
+        <input
+          type="checkbox"
+          data-live-autoscroll-toggle
+          bind:checked={autoScroll}
+          class={cn("h-4 w-4 rounded border-border")}
+        />
+        Autoscroll
+      </label>
+    </div>
+    <div data-live-session-disconnect class={cn("border-b border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground")}>
+      Stream reconnects through polling if live transport drops.
+    </div>
+    <div bind:this={timelineElement} data-tool-call-timeline class={cn("max-h-[42vh] overflow-auto p-3")}>
+      <ol class={cn("space-y-2")}>
+        {#each liveSessionItems as item (item.id)}
+          <li
+            data-live-session-item={item.kind}
+            data-tool-call-card={item.kind === "tool" ? item.id : undefined}
+            data-approval-gate={item.kind === "approval" ? item.id : undefined}
+            data-diff-preview={item.kind === "diff" ? item.id : undefined}
+            class={cn("rounded-md border border-border bg-muted/20 p-3 text-xs")}
+          >
+            <div class={cn("flex flex-wrap items-start justify-between gap-2")}>
+              <div class={cn("min-w-0")}>
+                <div class={cn("flex flex-wrap items-center gap-2")}>
+                  <span class={cn("font-semibold")}>{item.title}</span>
+                  <span class={cn("rounded bg-background px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground")}>{item.kind}</span>
+                  {#if item.resultStatus}
+                    <span data-tool-result-status class={cn("rounded bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground")}>{item.resultStatus}</span>
+                  {/if}
+                </div>
+                <span class={cn("mt-1 block font-mono text-[10px] text-muted-foreground")}>{item.timestamp}</span>
+              </div>
+              <button
+                type="button"
+                data-tool-output-copy
+                onclick={() => copyText(item.copyText)}
+                class={cn("inline-flex h-7 items-center rounded-md border border-input bg-background px-2 text-[11px] font-medium hover:bg-accent")}
+              >Copy</button>
+            </div>
+            {#if item.argsSummary}
+              <pre data-tool-args-summary class={cn("mt-2 max-h-24 overflow-auto rounded bg-background p-2 text-[11px] whitespace-pre-wrap")}>{item.argsSummary}</pre>
+            {/if}
+            <pre class={cn("mt-2 max-h-32 overflow-auto text-[11px] whitespace-pre-wrap text-muted-foreground")}>{item.summary}</pre>
+          </li>
+        {:else}
+          <li data-live-session-empty class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}>No live session events recorded.</li>
+        {/each}
+      </ol>
+    </div>
+  </section>
 
   <!-- Tabs -->
   <div data-runs-tabs role="tablist" class={cn("mb-2 flex items-center gap-2 border-b border-border")}>

@@ -76,4 +76,32 @@ describe("workflow-completeness agent workflow CLI", () => {
       },
     });
   });
+
+  test("runs watch --json streams live AI Assist run events when available", async () => {
+    const h = harness({
+      orchestration: {
+        watchRun: async function* () {
+          yield {
+            type: "tool_call",
+            runId: "run-1",
+            toolName: "Read",
+            args: { path: "apps/web/src/routes/projects/[id]/runs/[runId]/+page.svelte" },
+            resultStatus: "ok",
+          };
+          yield {
+            type: "approval",
+            runId: "run-1",
+            status: "pending",
+          };
+        },
+      },
+    });
+
+    await runPillar14Command("runs", ["watch", "run-1", "--json"], h.opts);
+
+    expect(h.out.map((line) => JSON.parse(line))).toEqual([
+      expect.objectContaining({ type: "tool_call", toolName: "Read", resultStatus: "ok" }),
+      expect.objectContaining({ type: "approval", status: "pending" }),
+    ]);
+  });
 });

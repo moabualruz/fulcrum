@@ -225,6 +225,16 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
   if (sub === "watch") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs watch: missing run id");
+    const watchRun = orchestrationCaller?.watchRun ?? runsCaller?.watch;
+    if (typeof watchRun === "function") {
+      const stream = watchRun({ runId: id, id });
+      if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+        for await (const event of stream) {
+          emitJson(event, io);
+        }
+        return;
+      }
+    }
     const getRun = orchestrationCaller?.getRun
       ? (input: { runId: string }) => orchestrationCaller.getRun(input)
       : (input: { runId: string }) => runsCaller.get({ id: input.runId });
