@@ -19,16 +19,20 @@ async function exists(path: URL): Promise<boolean> {
 }
 
 describe("Surface TUI parity inventory", () => {
-  test("Huashu gate locks dense domain nav, detail/log pane, and status footer", async () => {
-    const spec = await readFile(new URL("../../../../.planning/phases/08-surface-delivery/08-UI-SPEC.md", import.meta.url), "utf-8");
+  test("canonical specs lock dense domain nav, detail/log pane, and status footer", async () => {
+    const specs = await Promise.all([
+      readFile(new URL("../../../../DESIGN.md", import.meta.url), "utf-8"),
+      readFile(new URL("../../../../IA-MAP.md", import.meta.url), "utf-8"),
+      readFile(new URL("../../../../CLI-TUI-UX.md", import.meta.url), "utf-8"),
+    ]);
+    const spec = specs.join("\n");
     const testSource = await readFile(new URL("./tui-parity.test.ts", import.meta.url), "utf-8");
 
-    expect(spec).toContain("Huashu-Design Gate");
-    expect(spec).toContain("domain nav");
-    expect(spec).toContain("detail/log pane");
+    expect(spec).toContain("Stage nav");
+    expect(spec).toContain("Live session pane");
     expect(spec).toContain("status footer");
-    expect(spec).toMatch(/Functionality:\s*8\/10/i);
-    expect(spec).toMatch(/Visual hierarchy:\s*8\/10/i);
+    expect(spec).toContain("TUI status footer");
+    expect(spec).toContain("Feature parity with web shell is mandatory");
     expect(testSource).toContain("domain nav");
     expect(testSource).toContain("detail/log pane");
     expect(testSource).toContain("status footer");
