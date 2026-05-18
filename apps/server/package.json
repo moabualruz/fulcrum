@@ -6,6 +6,13 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "test": "bun test src",
+    "test:setup": "bun test test/setup.smoke.test.ts",
     "typecheck": "bun run --bun tsc --noEmit -p ../../tsconfig.json"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.4.5",
+    "typeorm": "0.3.29",
+    "typeorm-pglite": "0.3.4",
+    "vitest": "^4.1.5"
   }
 }
