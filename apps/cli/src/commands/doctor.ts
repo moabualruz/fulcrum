@@ -45,7 +45,13 @@ export async function run(argv: readonly string[], opts: DoctorRunOptions = {}):
       }
       case "subsystems": {
         const caller = await resolveCaller(opts);
-        return printOutput(await caller.doctor.subsystems(), commandArgs, io.print);
+        const result = await caller.doctor.subsystems();
+        if (commandArgs.includes("--json")) {
+          io.print(JSON.stringify(result));
+          return;
+        }
+        printSubsystemsTable(result, io.print);
+        return;
       }
       case "help":
       case "--help":
@@ -72,6 +78,42 @@ async function resolveCaller(opts: DoctorRunOptions): Promise<DoctorCaller> {
 
 function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
   print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
+}
+
+interface SubsystemStatusRow {
+  name: string;
+  status: "healthy" | "degraded" | "broken";
+  message: string;
+  recoveryAction: string | null;
+  checkedAt: string;
+}
+
+function statusIcon(status: SubsystemStatusRow["status"]): string {
+  switch (status) {
+    case "healthy": return "✓";
+    case "degraded": return "⚠";
+    case "broken": return "✗";
+  }
+}
+
+function printSubsystemsTable(value: unknown, print: (line: string) => void): void {
+  const rows = Array.isArray(value) ? value as SubsystemStatusRow[] : [];
+  if (rows.length === 0) {
+    print("No subsystems reported.");
+    return;
+  }
+  const nameWidth = Math.max(...rows.map((row) => row.name.length), "subsystem".length);
+  const header = `${"subsystem".padEnd(nameWidth)}  status  message`;
+  print(header);
+  print("-".repeat(header.length));
+  for (const row of rows) {
+    const icon = statusIcon(row.status);
+    print(`${row.name.padEnd(nameWidth)}  ${icon} ${row.status.padEnd(8)}  ${row.message}`);
+    if (row.recoveryAction) {
+      print(`${" ".repeat(nameWidth)}  recover: ${row.recoveryAction}`);
+    }
+    print(`${" ".repeat(nameWidth)}  checked: ${row.checkedAt}`);
+  }
 }
 
 function errorMessage(error: unknown): string {
