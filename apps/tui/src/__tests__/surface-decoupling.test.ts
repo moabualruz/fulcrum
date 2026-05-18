@@ -1,10 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
+
+const TUI_SRC_ROOT = new URL("../", import.meta.url);
 
 describe("TUI surface decoupling", () => {
   test("production TUI source does not import server router packages", async () => {
-    const files = await listTypeScriptFiles("apps/tui/src");
+    const files = await listTypeScriptFiles(TUI_SRC_ROOT);
     const serverRouterPath = ["@fulcrum", "server", "trpc"].join("/");
     const offenders: string[] = [];
 
@@ -17,16 +18,16 @@ describe("TUI surface decoupling", () => {
   });
 });
 
-async function listTypeScriptFiles(root: string): Promise<string[]> {
+async function listTypeScriptFiles(root: URL): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files: string[] = [];
 
   for (const entry of entries) {
-    const path = join(root, entry.name);
+    const path = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, root);
     if (entry.isDirectory()) {
       files.push(...await listTypeScriptFiles(path));
-    } else if (path.endsWith(".ts")) {
-      files.push(path);
+    } else if (path.pathname.endsWith(".ts")) {
+      files.push(path.pathname);
     }
   }
 

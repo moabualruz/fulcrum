@@ -63,6 +63,7 @@ import { NotificationRulesScreen } from "./screens/notification-rules.ts";
 import { AuditLogScreen } from "./screens/audit.ts";
 import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
+import { HelpOverlay, type KeyBinding } from "./widgets/HelpOverlay.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import {
@@ -357,12 +358,12 @@ type TuiScreen = Screen | DomainScreen;
 // Navigation entries
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface NavEntry {
+export interface NavEntry {
   label: string;
   screen: TuiScreen;
 }
 
-const NAV_ENTRIES: NavEntry[] = [
+export const TUI_NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Projects", screen: "projects" },
   { label: "Tasks", screen: "tasks" },
   { label: "Sprints", screen: "sprints" },
@@ -387,6 +388,12 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Activity", screen: "activity" },
   { label: "Audit", screen: "audit" },
 ];
+
+const NAV_ENTRIES = TUI_NAV_ENTRIES;
+
+export function listTuiNavigationEntries(): readonly NavEntry[] {
+  return TUI_NAV_ENTRIES;
+}
 
 function defaultPlanningInput(): PlanningBreakdownInput {
   return {
@@ -492,6 +499,7 @@ export class TuiApp {
   private currentPath: string | null = null;
   private navCursor = 0;
   private paletteOpen = false;
+  private helpOpen = false;
   private domainRows: string[] = [];
   private domainError: string | null = null;
   private taskListScreen: TaskListScreen | null = null;
@@ -644,12 +652,13 @@ export class TuiApp {
   private _renderStatusBar(): void {
     const info = this.statusInfo;
     const badge = this._formatInferenceBadge();
+    const screen = `Screen:${this._currentScreenLabel()}`;
     if (!info) {
-      this.renderer.statusBar("Fulcrum TUI", badge);
+      this.renderer.statusBar("Fulcrum TUI", `${screen}  ${badge}`);
       return;
     }
     const left = `${info.orgId}  ${info.email}`;
-    const right = `Bell:${this.bellCount}  ${badge}  q:quit  ?:help`;
+    const right = `${screen}  Bell:${this.bellCount}  ${badge}  q:quit  ?:help`;
     this.renderer.statusBar(left, right);
   }
 
@@ -724,6 +733,7 @@ export class TuiApp {
       if (this.currentPath && this.pathRouter) {
         const body = this.pathRouter.render();
         if (body) this.renderer.writeln(body);
+        this._renderHelpOverlay();
         return;
       }
 
@@ -768,6 +778,7 @@ export class TuiApp {
       if (this.domainScreen && this.currentScreen === "nav") {
         this._renderDomainScreen(this.domainScreen);
       }
+      this._renderHelpOverlay();
     } catch (error) {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
@@ -804,18 +815,47 @@ export class TuiApp {
     r.writeln(`  ${selected?.label ?? "No domain"} ready. Use Enter to open, / for command palette.`);
     r.writeln();
     r.writeln(c.bold("  Status footer"));
-    r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / commands  q quit"));
+    r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / or Ctrl+K commands  ? help  q quit"));
     this._renderCommandPalette();
   }
 
   private _renderCommandPalette(): void {
     if (!this.paletteOpen) {
-      this.renderer.writeln(c.dim(`  Command palette: /  ${COMMAND_PALETTE_ACTIONS.join(" | ")}`));
+      this.renderer.writeln(c.dim(`  Command palette: / or Ctrl+K  ${COMMAND_PALETTE_ACTIONS.join(" | ")}`));
       return;
     }
     this.renderer.writeln();
     this.renderer.writeln(c.bold("  Command palette"));
     for (const action of COMMAND_PALETTE_ACTIONS) this.renderer.writeln(`  - ${action}`);
+  }
+
+  private _renderHelpOverlay(): void {
+    if (!this.helpOpen) return;
+    const overlay = new HelpOverlay({
+      screenName: this._currentScreenLabel(),
+      bindings: this._currentHelpBindings(),
+      width: 72,
+    });
+    this.renderer.writeln();
+    for (const line of overlay.render()) this.renderer.writeln(line);
+  }
+
+  private _currentScreenLabel(): string {
+    if (this.currentPath && this.pathRouter) return this.pathRouter.current.title;
+    if (this.domainScreen) return domainTitle(this.domainScreen);
+    if (this.currentScreen === "nav") return "Launcher";
+    return screenTitle(this.currentScreen);
+  }
+
+  private _currentHelpBindings(): KeyBinding[] {
+    return [
+      { key: "j/k", action: "Move selection" },
+      { key: "Enter", action: "Open selected screen" },
+      { key: "/ Ctrl+K", action: "Toggle command palette" },
+      { key: "?", action: "Toggle help" },
+      { key: "Esc", action: "Back or close overlay" },
+      { key: "q", action: "Quit from launcher" },
+    ];
   }
 
   private _renderDomainScreen(screen: DomainScreen): void {
@@ -988,6 +1028,17 @@ export class TuiApp {
       return;
     }
 
+    if (key === "?") {
+      this.helpOpen = !this.helpOpen;
+      await this._renderCurrentScreen();
+      return;
+    }
+    if (this.helpOpen && key === "\x1b") {
+      this.helpOpen = false;
+      await this._renderCurrentScreen();
+      return;
+    }
+
     // Keybinding registry dispatch (Pillar 14). Resolves single-character
     // shortcuts to semantic TuiActions before per-screen routing.
     const tuiAction = this._resolveKeybindingAction(key);
@@ -1032,6 +1083,11 @@ export class TuiApp {
         return;
       }
       if (key === "/") {
+        this.paletteOpen = !this.paletteOpen;
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "\x0b") {
         this.paletteOpen = !this.paletteOpen;
         await this._renderCurrentScreen();
         return;
@@ -1179,7 +1235,7 @@ export class TuiApp {
       await this._renderCurrentScreen();
       return;
     }
-    if (key === "/") {
+    if (key === "/" || key === "\x0b") {
       this.paletteOpen = !this.paletteOpen;
       await this._renderCurrentScreen();
       return;
@@ -1673,6 +1729,24 @@ function domainTitle(screen: DomainScreen): string {
     skills: "Skills",
     components: "Components",
     doctor: "Doctor/Settings",
+  };
+  return titles[screen];
+}
+
+function screenTitle(screen: Screen): string {
+  const titles: Record<Screen, string> = {
+    nav: "Launcher",
+    auth: "Auth",
+    flags: "Feature Flags",
+    inference: "Inference",
+    "new-doc": "New Document",
+    inbox: "Notifications",
+    activity: "Activity",
+    "notification-rules": "Notification Rules",
+    audit: "Audit",
+    artifacts: "Artifacts",
+    "routing-rules": "Routing",
+    planning: "Planning",
   };
   return titles[screen];
 }

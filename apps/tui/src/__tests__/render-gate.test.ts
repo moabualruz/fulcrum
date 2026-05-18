@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
+const REPO_ROOT = new URL("../../../../", import.meta.url);
+
 describe("Surface OpenTUI gate", () => {
   test("package.json pins the approved OpenTUI packages", async () => {
-    const pkg = JSON.parse(await readFile("package.json", "utf8")) as {
+    const pkg = JSON.parse(await readFile(new URL("package.json", REPO_ROOT), "utf8")) as {
       dependencies?: Record<string, string>;
     };
 
@@ -15,6 +17,7 @@ describe("Surface OpenTUI gate", () => {
     const proc = Bun.spawn(["bun", "run", "apps/cli/src/main.ts", "tui", "--no-tui"], {
       stdout: "pipe",
       stderr: "pipe",
+      cwd: REPO_ROOT.pathname,
     });
 
     const [exitCode, stdout, stderr] = await Promise.all([

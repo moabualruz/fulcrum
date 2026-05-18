@@ -9,6 +9,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   TuiApp,
+  listTuiNavigationEntries,
   launchTui,
   type TuiCaller,
 } from "@fulcrum/tui/index.ts";
@@ -62,6 +63,71 @@ describe("launchTui", () => {
     tty.inject("q");
     await Bun.sleep(1);
     expect(exited).toBe(true);
+    app.stop();
+  });
+
+  it("exposes every launcher entry with a stable screen key", () => {
+    const entries = listTuiNavigationEntries();
+    const screens = entries.map((entry) => entry.screen);
+
+    expect(entries.length).toBeGreaterThan(20);
+    expect(new Set(screens).has("projects")).toBe(true);
+    expect(new Set(screens).has("tasks")).toBe(true);
+    expect(new Set(screens).has("doctor")).toBe(true);
+    expect(entries.every((entry) => entry.label.length > 0)).toBe(true);
+  });
+
+  it("renders status screen names, help overlay, and Ctrl+K palette from FakeTTY", async () => {
+    const tty = new FakeTTY();
+    const app = await launchTui({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+    });
+
+    expect(tty.plainText()).toContain("Screen:Launcher");
+
+    tty.inject("?");
+    await Bun.sleep(1);
+    expect(tty.plainText()).toContain("Launcher — Keybindings");
+    expect(tty.plainText()).toContain("Toggle command palette");
+
+    tty.inject("?");
+    await Bun.sleep(1);
+    tty.inject("\x0b");
+    await Bun.sleep(1);
+    expect(tty.plainText()).toContain("Command palette");
+    expect(tty.plainText()).toContain("Create task");
+
+    tty.inject("\r");
+    await Bun.sleep(1);
+    expect(tty.plainText()).toContain("Screen:Projects");
+
+    app.stop();
+  });
+});
+
+describe("TuiRouter route states", () => {
+  it("renders unknown route state without crashing", async () => {
+    const tty = new FakeTTY();
+    const app = new TuiApp({
+      output: tty,
+      caller: fakeCaller(),
+      routes: [
+        {
+          path: "/projects",
+          screenKey: "projects",
+          title: "Projects",
+          render: () => "Projects route",
+        },
+      ],
+    });
+    await app.mount();
+
+    await app.navigatePath("/missing");
+    expect(tty.plainText()).toContain("Unknown route: /missing");
+    expect(tty.plainText()).toContain("Screen:Not Found");
+
     app.stop();
   });
 });
