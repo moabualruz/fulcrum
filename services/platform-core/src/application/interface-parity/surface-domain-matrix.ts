@@ -53,6 +53,20 @@ export interface SurfaceDomain {
   gaps: readonly SurfaceParityGap[];
 }
 
+export type InterfaceActionKind = "create" | "read" | "update" | "delete" | "workflow";
+
+export interface InterfaceParityAction {
+  domain: SurfaceDomainName;
+  name: string;
+  kind: InterfaceActionKind;
+  webRoute: string;
+  cliCommand: string;
+  tuiAction: string;
+  apiRoute: string;
+  stateShape: readonly string[];
+  manualScript: readonly string[];
+}
+
 function domain(
   name: SurfaceDomainName,
   config: {
@@ -90,6 +104,10 @@ function domain(
     workflows: config.workflows ?? [],
     gaps: config.gaps ?? [],
   };
+}
+
+function action(config: InterfaceParityAction): InterfaceParityAction {
+  return config;
 }
 
 export const REQUIRED_SURFACE_DOMAINS = [
@@ -380,6 +398,169 @@ export const REQUIRED_SURFACE_DOMAINS = [
   }),
 ] as const satisfies readonly SurfaceDomain[];
 
+export const REQUIRED_INTERFACE_ACTIONS = [
+  action({
+    domain: "projects",
+    name: "create project",
+    kind: "create",
+    webRoute: "projects/new/+page.svelte",
+    cliCommand: "fulcrum projects create --name <name> --json",
+    tuiAction: "Projects screen create-project action",
+    apiRoute: "appRouter.projects.create",
+    stateShape: ["id", "name", "slug", "traceId"],
+    manualScript: [
+      "Create project in Web",
+      "Create project through CLI with same name in isolated fixture",
+      "Open TUI Projects and run create-project",
+      "Compare project id/slug/trace fields through API list",
+    ],
+  }),
+  action({
+    domain: "tasks",
+    name: "create task",
+    kind: "create",
+    webRoute: "projects/[id]/board/+page.svelte",
+    cliCommand: "fulcrum tasks create --title <title> --json",
+    tuiAction: "Tasks screen create-task action",
+    apiRoute: "appRouter.tasks.create",
+    stateShape: ["id", "title", "status", "assigneeId", "traceId"],
+    manualScript: [
+      "Create task in Web board",
+      "Create task through CLI",
+      "Create task through TUI Tasks",
+      "Compare task id/title/status through API list",
+    ],
+  }),
+  action({
+    domain: "tasks",
+    name: "update task status",
+    kind: "update",
+    webRoute: "projects/[id]/board/+page.svelte",
+    cliCommand: "fulcrum tasks update <id> --status <status> --json",
+    tuiAction: "TaskListScreen status action",
+    apiRoute: "appRouter.tasks.update",
+    stateShape: ["id", "status", "updatedAt", "traceId"],
+    manualScript: [
+      "Move task status in Web board",
+      "Move same task through CLI",
+      "Move same task through TUI",
+      "Compare status and trace output through API get/list",
+    ],
+  }),
+  action({
+    domain: "docs",
+    name: "create document",
+    kind: "create",
+    webRoute: "docs/new/+page.svelte",
+    cliCommand: "fulcrum docs create --title <title> --json",
+    tuiAction: "New doc screen create-document action",
+    apiRoute: "appRouter.docs.create",
+    stateShape: ["id", "title", "docType", "traceId"],
+    manualScript: [
+      "Create document in Web",
+      "Create document through CLI",
+      "Create document through TUI New Doc",
+      "Compare document id/title through API list",
+    ],
+  }),
+  action({
+    domain: "runs",
+    name: "dispatch run",
+    kind: "workflow",
+    webRoute: "runs/+page.svelte",
+    cliCommand: "fulcrum runs dispatch --json",
+    tuiAction: "Runs screen dispatch-run action",
+    apiRoute: "appRouter.agent_runs.dispatch",
+    stateShape: ["id", "agent", "status", "traceId"],
+    manualScript: [
+      "Dispatch run from Web",
+      "Dispatch run through CLI",
+      "Dispatch run through TUI Runs",
+      "Compare run id/status/log stream through API feed",
+    ],
+  }),
+  action({
+    domain: "runs",
+    name: "cancel run",
+    kind: "workflow",
+    webRoute: "runs/[id]/+page.svelte",
+    cliCommand: "fulcrum runs cancel <id> --json",
+    tuiAction: "Run detail cancel action",
+    apiRoute: "appRouter.agent_runs.cancel",
+    stateShape: ["id", "status", "cancelledAt", "traceId"],
+    manualScript: [
+      "Cancel run from Web detail",
+      "Cancel run through CLI",
+      "Cancel run through TUI detail",
+      "Compare terminal status through API get/feed",
+    ],
+  }),
+  action({
+    domain: "artifacts",
+    name: "archive artifact",
+    kind: "update",
+    webRoute: "artifacts/[id]/+page.svelte",
+    cliCommand: "fulcrum artifacts archive <id> --json",
+    tuiAction: "Artifacts screen archive action",
+    apiRoute: "appRouter.artifacts.archive",
+    stateShape: ["id", "retentionStatus", "archivedAt", "traceId"],
+    manualScript: [
+      "Archive artifact from Web",
+      "Archive artifact through CLI",
+      "Archive artifact through TUI Artifacts",
+      "Compare retention state through API list",
+    ],
+  }),
+  action({
+    domain: "search",
+    name: "query workspace",
+    kind: "read",
+    webRoute: "search/+page.svelte",
+    cliCommand: "fulcrum search query <query> --json",
+    tuiAction: "Search screen query action",
+    apiRoute: "appRouter.search.query",
+    stateShape: ["query", "results", "entityId", "traceId"],
+    manualScript: [
+      "Search for known task/doc in Web",
+      "Search same phrase through CLI",
+      "Search same phrase through TUI",
+      "Compare result ids and entity types through API query",
+    ],
+  }),
+  action({
+    domain: "notifications",
+    name: "mark notification read",
+    kind: "update",
+    webRoute: "inbox/+page.svelte",
+    cliCommand: "fulcrum notify mark-read <id> --json",
+    tuiAction: "Notifications screen mark-read action",
+    apiRoute: "appRouter.notify.markRead",
+    stateShape: ["id", "read", "sourceKind", "traceId"],
+    manualScript: [
+      "Mark notification read in Web inbox",
+      "Mark notification read through CLI",
+      "Mark notification read through TUI Notifications",
+      "Compare unread count through API list",
+    ],
+  }),
+  action({
+    domain: "settings",
+    name: "update feature flag",
+    kind: "update",
+    webRoute: "settings/flags/+page.svelte",
+    cliCommand: "fulcrum flags set <key> <value> --json",
+    tuiAction: "Feature Flags screen toggle action",
+    apiRoute: "appRouter.flags.set",
+    stateShape: ["key", "value", "enabled", "source", "traceId"],
+    manualScript: [
+      "Toggle flag in Web settings",
+      "Toggle same flag through CLI",
+      "Toggle same flag through TUI Feature Flags",
+      "Compare key/value/source through API list",
+    ],
+  }),
+] as const satisfies readonly InterfaceParityAction[];
+
 function normalized(values: readonly string[]): Set<string> {
   return new Set(values.map((value) => value.toLowerCase()));
 }
@@ -410,4 +591,17 @@ export function listMissingApiDomains(routes: readonly string[]): SurfaceDomainN
 
 export function listMissingWebRoutes(routes: readonly string[]): SurfaceDomainName[] {
   return listMissingDomains("web", routes, (domain) => domain.webRoutes);
+}
+
+export function listInterfaceActionParityGaps(actions: readonly InterfaceParityAction[] = REQUIRED_INTERFACE_ACTIONS): string[] {
+  return actions.flatMap((candidate) => {
+    const gaps: string[] = [];
+    if (!candidate.webRoute) gaps.push(`${candidate.domain}:${candidate.name}:web`);
+    if (!candidate.cliCommand.startsWith("fulcrum ")) gaps.push(`${candidate.domain}:${candidate.name}:cli`);
+    if (!candidate.tuiAction) gaps.push(`${candidate.domain}:${candidate.name}:tui`);
+    if (!candidate.apiRoute) gaps.push(`${candidate.domain}:${candidate.name}:api`);
+    if (candidate.stateShape.length === 0) gaps.push(`${candidate.domain}:${candidate.name}:state`);
+    if (candidate.manualScript.length < 4) gaps.push(`${candidate.domain}:${candidate.name}:manual`);
+    return gaps;
+  });
 }

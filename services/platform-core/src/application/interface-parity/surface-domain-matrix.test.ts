@@ -4,7 +4,9 @@ import { access } from "node:fs/promises";
 import { GENERATED_DOMAIN_COMMANDS } from "@fulcrum/cli/generated-domains.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import {
+  REQUIRED_INTERFACE_ACTIONS,
   REQUIRED_SURFACE_DOMAINS,
+  listInterfaceActionParityGaps,
   listMissingApiDomains,
   listMissingCliDomains,
   listMissingTuiDomains,
@@ -154,6 +156,28 @@ describe("surface domain parity matrix", () => {
         expect(workflow.manualScript.length, `${name}:${workflow.name} needs manual script`).toBeGreaterThanOrEqual(3);
       }
     }
+  });
+
+  test("defines Web actions with API, CLI, and TUI parity", async () => {
+    const routesRoot = new URL("../../../../../apps/web/src/routes/", import.meta.url).pathname;
+    const routeGaps: string[] = [];
+    const domains = new Set(REQUIRED_SURFACE_DOMAINS.map((domain) => domain.name));
+    const actionNames = new Set<string>();
+
+    expect(listInterfaceActionParityGaps()).toEqual([]);
+
+    for (const action of REQUIRED_INTERFACE_ACTIONS) {
+      actionNames.add(`${action.domain}:${action.name}`);
+      expect(domains.has(action.domain), `${action.domain}:${action.name} domain missing`).toBe(true);
+      expect(action.kind, `${action.domain}:${action.name} invalid kind`).toMatch(/^(create|read|update|delete|workflow)$/);
+      expect(action.apiRoute, `${action.domain}:${action.name} must point to appRouter`).toMatch(/^appRouter\./);
+      expect(action.stateShape, `${action.domain}:${action.name} must expose stable state`).toEqual(expect.arrayContaining(["traceId"]));
+      expect(action.manualScript, `${action.domain}:${action.name} must compare all surfaces`).toHaveLength(4);
+      if (!(await pathExists(`${routesRoot}${action.webRoute}`))) routeGaps.push(`${action.domain}:${action.name}:${action.webRoute}`);
+    }
+
+    expect(actionNames.size).toBe(REQUIRED_INTERFACE_ACTIONS.length);
+    expect(routeGaps).toEqual([]);
   });
 
   test("records known parity gaps as first-class matrix data", () => {
