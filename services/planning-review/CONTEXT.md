@@ -68,6 +68,14 @@ _Avoid_: Manual test notes, vague QA checklist, smoke checklist.
 A single checklist row with setup, action, expected observation, and evidence field tied back to one SuccessCriterion.
 _Avoid_: Test step (ambiguous with automated tests), ad-hoc check.
 
+**PlanningTriage**:
+The risk classification for a submitted Plan, including required review gates, evidence requirements, and the human-readable reason shown beside review work.
+_Avoid_: Hidden score, generic approval policy, ReviewRequest.
+
+**PlanningTriageOverride**:
+The named approver, reason, and timestamp recorded when a required PlanningTriage gate is waived.
+_Avoid_: Silent bypass, implicit exception.
+
 ## Relationships
 
 - A **Plan** is wrapped by exactly one **PlanSubmission**, which yields one **PlanDecision**.
@@ -79,6 +87,7 @@ _Avoid_: Test step (ambiguous with automated tests), ad-hoc check.
 - **WorkflowMode** gates whether a given agent's `submit_plan` call is accepted or rejected with a redirect message.
 - A **Plan** stores many **PlanSourceSnapshots** at approval time; attempting execution later produces one **PlanStalenessResult** before work continues.
 - A passing **FinalQaReport** can produce a **ManualSimulationChecklist**; approved checklist steps seed generated real-data E2E artifacts.
+- A **PlanSubmission** can produce one **PlanningTriage** before review work starts; high-risk triage requires code review and UAT unless a **PlanningTriageOverride** records the waiver.
 
 ## Example dialogue
 
@@ -98,3 +107,4 @@ _Avoid_: Test step (ambiguous with automated tests), ad-hoc check.
 - **No owned entities (yet)** — per CONTEXT-MAP, this service runs workflows over entities owned elsewhere: tasks (work-management), docs (knowledge-workspace), artifacts/audit (workflow-coordination), events (platform-core). Adding a persisted Plan or ReviewSession entity here requires a new ADR and a CONTEXT-MAP update.
 - **PlanSourceSnapshot vs ContextBundle** — a **ContextBundle** is what an agent receives before a run. A **PlanSourceSnapshot** is the approval-time hash/version guard used to decide whether that already-approved Plan can still execute.
 - **ManualSimulationChecklist vs generated E2E** — the checklist is human-observed workflow evidence. Generated E2E codifies approved checklist coverage; it does not replace the checklist.
+- **PlanningTriage vs PlanDecision** — PlanningTriage decides required review gates and evidence before review work. PlanDecision is the user's verdict on the Plan content. A triage override never approves a Plan by itself.
