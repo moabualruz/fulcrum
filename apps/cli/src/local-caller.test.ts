@@ -11,7 +11,9 @@ describe("CLI workflow API caller", () => {
       },
       tasks: {
         previewDependencyRun: async (_input: Record<string, unknown>) => ({ source: "local" }),
+        dispatchDependencyRun: async (_input: Record<string, unknown>) => ({ source: "local" }),
         dependencyRunLiveFeedback: async (_input: Record<string, unknown>) => ({ source: "local" }),
+        dependencyRunLiveFeedbackStream: async (_input: Record<string, unknown>) => ({ source: "local" }),
         runDependencyRunWorkerTick: async (_input: Record<string, unknown>) => ({ source: "local" }),
         recordQaReview: async (_input: Record<string, unknown>) => ({ source: "local" }),
       },
@@ -35,6 +37,21 @@ describe("CLI workflow API caller", () => {
         }
         if (String(url).includes("/workflows/execution/dependency-run/preview")) {
           return Response.json({ affectedTaskIds: ["task-1"], traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/dependency-run/dispatch")) {
+          return Response.json({ runGroupId: "trace-cli", scheduledRuns: [{ id: "run-1" }], traceId: "trace-cli" });
+        }
+        if (String(url).includes("/workflows/execution/dependency-run/live-feedback/stream")) {
+          return new Response([
+            "event: feedback",
+            "data: {\"traceId\":\"trace-cli\",\"executorStatus\":{\"active\":true}}",
+            "",
+            "event: feedback",
+            "data: {\"traceId\":\"trace-cli\",\"executorStatus\":{\"active\":false}}",
+            "",
+          ].join("\n"), {
+            headers: { "content-type": "text/event-stream" },
+          });
         }
         if (String(url).includes("/workflows/execution/dependency-run/live-feedback")) {
           return Response.json({ events: [], traceId: "trace-cli" });
@@ -77,10 +94,31 @@ describe("CLI workflow API caller", () => {
       tasks: [],
       traceId: "trace-cli",
     })).resolves.toEqual({ affectedTaskIds: ["task-1"], traceId: "trace-cli" });
+    await expect(caller.tasks.dispatchDependencyRun({
+      workspaceId: "workspace-1",
+      workspaceSlug: "workspace",
+      workspaceName: "Workspace",
+      projectId: "project-1",
+      projectSlug: "project",
+      projectName: "Project",
+      mode: "task",
+      targetTaskIds: ["task-1"],
+      traceId: "trace-cli",
+      agent: "codex",
+    })).resolves.toEqual({ runGroupId: "trace-cli", scheduledRuns: [{ id: "run-1" }], traceId: "trace-cli" });
     await expect(caller.tasks.dependencyRunLiveFeedback({
       projectId: "project-1",
       traceId: "trace-cli",
     })).resolves.toEqual({ events: [], traceId: "trace-cli" });
+    await expect(collectStreamEvents(caller.tasks.dependencyRunLiveFeedbackStream({
+      projectId: "project-1",
+      traceId: "trace-cli",
+      runGroupId: "trace-cli",
+      once: "1",
+    }))).resolves.toEqual([
+      { traceId: "trace-cli", executorStatus: { active: true } },
+      { traceId: "trace-cli", executorStatus: { active: false } },
+    ]);
     await expect(caller.tasks.runDependencyRunWorkerTick({
       projectId: "project-1",
       traceId: "trace-cli",
@@ -147,7 +185,9 @@ describe("CLI workflow API caller", () => {
     expect(calls.map((call) => call.url)).toEqual([
       "http://127.0.0.1:4321/workflows/planning/approved-plan/preview",
       "http://127.0.0.1:4321/workflows/execution/dependency-run/preview",
+      "http://127.0.0.1:4321/workflows/execution/dependency-run/dispatch",
       "http://127.0.0.1:4321/workflows/execution/dependency-run/live-feedback",
+      "http://127.0.0.1:4321/workflows/execution/dependency-run/live-feedback/stream?projectId=project-1&traceId=trace-cli&runGroupId=trace-cli&once=1",
       "http://127.0.0.1:4321/workflows/execution/dependency-run/worker-tick",
       "http://127.0.0.1:4321/workflows/execution/qa-review/record",
       "http://127.0.0.1:4321/workflows/cycles/acceptance-cycle/run",
@@ -161,3 +201,24 @@ describe("CLI workflow API caller", () => {
     ]);
   });
 });
+
+async function collectStreamEvents(stream: {
+  subscribe(observer: {
+    next(value: unknown): void;
+    error?(error: unknown): void;
+    complete?(): void;
+  }): { unsubscribe?(): void };
+}): Promise<unknown[]> {
+  return await new Promise((resolve, reject) => {
+    const events: unknown[] = [];
+    stream.subscribe({
+      next(value) {
+        events.push(value);
+      },
+      error: reject,
+      complete() {
+        resolve(events);
+      },
+    });
+  });
+}

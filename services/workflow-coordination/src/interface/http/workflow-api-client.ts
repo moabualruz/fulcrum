@@ -12,6 +12,11 @@ export interface WorkflowApiClientOptions {
 }
 
 type JsonRecord = Record<string, unknown>;
+type SubscriptionObserver = {
+  next(value: unknown): void;
+  error?(error: unknown): void;
+  complete?(): void;
+};
 
 export class WorkflowApiError extends Error {
   constructor(
@@ -25,6 +30,7 @@ export class WorkflowApiError extends Error {
 
 export function createWorkflowApiCaller(options: WorkflowApiClientOptions) {
   const request = workflowRequest(options);
+  const eventStream = workflowEventStreamRequest(options);
   return {
     planning: {
       buildFreeformDocsPlanningPrompt: async (input: JsonRecord) =>
@@ -101,6 +107,8 @@ export function createWorkflowApiCaller(options: WorkflowApiClientOptions) {
         await request("/workflows/execution/dependency-run/live-feedback", { method: "POST", body: input }),
       dependencyRunLiveFeedback: async (input: JsonRecord) =>
         await request("/workflows/execution/dependency-run/live-feedback", { method: "POST", body: input }),
+      dependencyRunLiveFeedbackStream: (input: JsonRecord) =>
+        eventStream("/workflows/execution/dependency-run/live-feedback/stream", input),
       recordDependencyRunLifecycleEvent: async (input: JsonRecord) =>
         await request("/workflows/execution/dependency-run/lifecycle-event", { method: "POST", body: input }),
       runDependencyRunWorkerTick: async (input: JsonRecord) =>
@@ -113,6 +121,88 @@ export function createWorkflowApiCaller(options: WorkflowApiClientOptions) {
         await request("/workflows/execution/qa-review/record", { method: "POST", body: input }),
     },
   };
+}
+
+function workflowEventStreamRequest(options: WorkflowApiClientOptions) {
+  const baseUrl = options.baseUrl.replace(/\/+$/, "");
+  const fetchFn = options.fetch ?? fetch;
+
+  return function eventStream(path: string, input: JsonRecord) {
+    return {
+      subscribe(observer: SubscriptionObserver) {
+        const abort = new AbortController();
+        let completed = false;
+        const complete = () => {
+          if (completed) return;
+          completed = true;
+          observer.complete?.();
+        };
+
+        void (async () => {
+          try {
+            const url = new URL(path, baseUrl);
+            for (const [key, value] of Object.entries(compact(input))) {
+              if (value === null) continue;
+              url.searchParams.set(key, String(value));
+            }
+            const response = await fetchFn(url.toString(), {
+              method: "GET",
+              credentials: "include",
+              headers: {
+                accept: "text/event-stream",
+                ...options.headers,
+              },
+              signal: abort.signal,
+            });
+            if (!response.ok) {
+              const body = await parseResponseBody(response);
+              throw new WorkflowApiError(extractErrorMessage(body, response.status), response.status);
+            }
+            if (!response.body) {
+              complete();
+              return;
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            for (;;) {
+              const chunk = await reader.read();
+              if (chunk.done) break;
+              buffer += decoder.decode(chunk.value, { stream: true });
+              buffer = emitSseBlocks(buffer, observer);
+              if (abort.signal.aborted) return;
+            }
+            buffer += decoder.decode();
+            emitSseBlocks(`${buffer}\n\n`, observer);
+            complete();
+          } catch (error) {
+            if (abort.signal.aborted) return;
+            observer.error?.(error);
+          }
+        })();
+
+        return {
+          unsubscribe() {
+            abort.abort();
+          },
+        };
+      },
+    };
+  };
+}
+
+function emitSseBlocks(buffer: string, observer: SubscriptionObserver): string {
+  const blocks = buffer.split(/\r?\n\r?\n/);
+  const rest = blocks.pop() ?? "";
+  for (const block of blocks) {
+    const data = block.split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice("data:".length).trimStart())
+      .join("\n");
+    if (!data) continue;
+    observer.next(JSON.parse(data));
+  }
+  return rest;
 }
 
 export function createWorkflowApiCallerFromEnv(
