@@ -30,7 +30,7 @@ import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
-import { renderBootSplash } from "./screens/tui-foundation.ts";
+import { FOUNDATION_KEY_BINDINGS, renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
 import type { TuiTask } from "./screens/task-types.ts";
@@ -875,14 +875,7 @@ export class TuiApp {
   }
 
   private _currentHelpBindings(): KeyBinding[] {
-    return [
-      { key: "j/k", action: "Move selection" },
-      { key: "Enter", action: "Open selected screen" },
-      { key: "/ Ctrl+K", action: "Toggle command palette" },
-      { key: "?", action: "Toggle help" },
-      { key: "Esc", action: "Back or close overlay" },
-      { key: "q", action: "Quit from launcher" },
-    ];
+    return [...FOUNDATION_KEY_BINDINGS, { key: "/ Ctrl+K", action: "Toggle command palette" }];
   }
 
   private _renderDomainScreen(screen: DomainScreen): void {

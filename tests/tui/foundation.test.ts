@@ -14,7 +14,12 @@ import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
-import { BOOT_SPLASH_SUBTITLE, BOOT_SPLASH_TITLE, renderBootSplash } from "@fulcrum/tui/screens/tui-foundation.ts";
+import {
+  BOOT_SPLASH_SUBTITLE,
+  BOOT_SPLASH_TITLE,
+  FOUNDATION_KEY_BINDINGS,
+  renderBootSplash,
+} from "@fulcrum/tui/screens/tui-foundation.ts";
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
@@ -155,6 +160,46 @@ describe("TuiApp foundation behavior", () => {
     renderBootSplash(new Renderer(tty));
 
     expect(tty.plainText()).toContain(BOOT_SPLASH_TITLE);
+  });
+
+  it("publishes foundation vim keybinding help", () => {
+    expect(FOUNDATION_KEY_BINDINGS.map((binding) => binding.key)).toEqual([
+      "j/k",
+      "Enter/Space",
+      "?",
+      "Esc",
+      "q",
+    ]);
+  });
+
+  it("handles help, open/select, escape, and q as foundation keys", async () => {
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        ...fakeCaller(),
+        projects: { list: async () => [{ id: "proj-1", name: "Roadmap" }] },
+      },
+    });
+
+    await app.mount();
+    tty.inject("?");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Launcher");
+    expect(tty.plainText()).toContain("Enter/Space");
+
+    tty.inject("\x1b");
+    await Bun.sleep(0);
+    tty.inject(" ");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Projects");
+
+    tty.inject("q");
+    await Bun.sleep(0);
+    expect(app.screen).toBe("nav");
+    expect(tty.plainText()).toContain("Domain nav");
+    app.stop();
   });
 
   it("writes telemetry per screen render", async () => {

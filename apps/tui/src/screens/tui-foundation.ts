@@ -1,7 +1,15 @@
 import { c, type Renderer } from "../renderer.ts";
+import type { KeyBinding } from "../widgets/HelpOverlay.ts";
 
 export const BOOT_SPLASH_TITLE = "Fulcrum TUI";
 export const BOOT_SPLASH_SUBTITLE = "Booting local-first agent OS";
+export const FOUNDATION_KEY_BINDINGS = [
+  { key: "j/k", action: "Move selection" },
+  { key: "Enter/Space", action: "Open selected item or toggle selection" },
+  { key: "?", action: "Show or hide help" },
+  { key: "Esc", action: "Close help, modal, pane, or return to parent" },
+  { key: "q", action: "Exit current screen; from launcher, quit" },
+] as const satisfies readonly KeyBinding[];
 
 function centered(line: string, width: number): string {
   if (width <= line.length) return line;
