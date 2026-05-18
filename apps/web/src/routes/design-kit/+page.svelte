@@ -26,6 +26,25 @@
 		Textarea,
 		Switch,
 		FormField,
+		Popover,
+		PopoverTrigger,
+		PopoverContent,
+		ContextMenu,
+		ContextMenuTrigger,
+		ContextMenuContent,
+		ContextMenuItem,
+		AlertDialog,
+		AlertDialogTrigger,
+		AlertDialogContent,
+		AlertDialogTitle,
+		AlertDialogDescription,
+		AlertDialogAction,
+		AlertDialogCancel,
+		CommandPalette,
+		CommandPaletteInput,
+		CommandPaletteList,
+		CommandPaletteItem,
+		CommandPaletteEmpty,
 	} from "@fulcrum/ui-kit";
 
 	let progressValue = $state(42);
@@ -37,6 +56,12 @@
 	let notifyEnabled = $state(true);
 	let titleValue = $state("");
 	const titleError = $derived(titleValue.trim().length > 0 ? "" : "Title is required.");
+
+	let popoverOpen = $state(false);
+	let alertDialogOpen = $state(false);
+	let alertDialogChoice = $state<"" | "confirmed" | "cancelled">("");
+	let paletteOpen = $state(false);
+	let paletteChoice = $state<string | null>(null);
 
 	let agreeChecked = $state(false);
 	let alphaChecked = $state(true);
@@ -453,6 +478,169 @@
 					/>
 				</FormField>
 			</div>
+		</article>
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="popover"
+		>
+			<h2 class="text-lg font-semibold">Popover</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<Popover bind:open={popoverOpen}>
+					<PopoverTrigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								type="button"
+								class="rounded-md border border-border px-3 py-1.5 text-sm font-medium"
+								data-design-kit-popover-trigger
+							>
+								Open popover
+							</button>
+						{/snippet}
+					</PopoverTrigger>
+					<PopoverContent data-design-kit-popover-content>
+						<div class="space-y-2">
+							<p class="text-sm font-medium">Quick note</p>
+							<p class="text-xs text-muted-foreground">
+								Popovers anchor to their trigger and dismiss on outside click.
+							</p>
+						</div>
+					</PopoverContent>
+				</Popover>
+				<span class="text-xs text-muted-foreground" data-design-kit-popover-state>
+					Open: {popoverOpen}
+				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="context-menu"
+		>
+			<h2 class="text-lg font-semibold">ContextMenu</h2>
+			<ContextMenu>
+				<ContextMenuTrigger>
+					{#snippet child({ props })}
+						<div
+							{...props}
+							class="grid h-24 cursor-context-menu place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground"
+							data-design-kit-context-trigger
+						>
+							Right-click here
+						</div>
+					{/snippet}
+				</ContextMenuTrigger>
+				<ContextMenuContent data-design-kit-context-content>
+					<ContextMenuItem data-design-kit-context-item="rename">Rename</ContextMenuItem>
+					<ContextMenuItem data-design-kit-context-item="duplicate">Duplicate</ContextMenuItem>
+					<ContextMenuItem tone="destructive" data-design-kit-context-item="delete">
+						Delete
+					</ContextMenuItem>
+				</ContextMenuContent>
+			</ContextMenu>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="alert-dialog"
+		>
+			<h2 class="text-lg font-semibold">AlertDialog</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<AlertDialog bind:open={alertDialogOpen}>
+					<AlertDialogTrigger>
+						{#snippet child({ props })}
+							<button
+								{...props}
+								type="button"
+								class="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-fg-inverse"
+								data-design-kit-alert-trigger
+							>
+								Delete artifact
+							</button>
+						{/snippet}
+					</AlertDialogTrigger>
+					<AlertDialogContent data-design-kit-alert-content>
+						<AlertDialogTitle>Delete this artifact?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Removing the artifact removes any references in run reports.
+						</AlertDialogDescription>
+						<div class="flex justify-end gap-2">
+							<AlertDialogCancel
+								onclick={() => (alertDialogChoice = "cancelled")}
+								data-design-kit-alert-cancel
+							>
+								Cancel
+							</AlertDialogCancel>
+							<AlertDialogAction
+								tone="destructive"
+								onclick={() => (alertDialogChoice = "confirmed")}
+								data-design-kit-alert-confirm
+							>
+								Delete
+							</AlertDialogAction>
+						</div>
+					</AlertDialogContent>
+				</AlertDialog>
+				<span class="text-xs text-muted-foreground" data-design-kit-alert-state>
+					Choice: {alertDialogChoice || "—"}
+				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="command-palette"
+		>
+			<h2 class="text-lg font-semibold">CommandPalette</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<button
+					type="button"
+					class="rounded-md border border-border px-3 py-1.5 text-sm"
+					data-design-kit-palette-open
+					onclick={() => (paletteOpen = true)}
+				>
+					Open palette
+				</button>
+				<span class="text-xs text-muted-foreground" data-design-kit-palette-choice>
+					Last: {paletteChoice ?? "—"}
+				</span>
+			</div>
+			<CommandPalette bind:open={paletteOpen}>
+				<CommandPaletteInput placeholder="Search actions…" data-design-kit-palette-input />
+				<CommandPaletteList>
+					<CommandPaletteItem
+						value="capture"
+						data-design-kit-palette-item="capture"
+						onSelect={() => {
+							paletteChoice = "capture";
+							paletteOpen = false;
+						}}
+					>
+						Capture task
+					</CommandPaletteItem>
+					<CommandPaletteItem
+						value="dispatch"
+						data-design-kit-palette-item="dispatch"
+						onSelect={() => {
+							paletteChoice = "dispatch";
+							paletteOpen = false;
+						}}
+					>
+						Dispatch run
+					</CommandPaletteItem>
+					<CommandPaletteItem
+						value="reset"
+						data-design-kit-palette-item="reset"
+						onSelect={() => {
+							paletteChoice = "reset";
+							paletteOpen = false;
+						}}
+					>
+						Reset workspace
+					</CommandPaletteItem>
+					<CommandPaletteEmpty>No matches.</CommandPaletteEmpty>
+				</CommandPaletteList>
+			</CommandPalette>
 		</article>
 	</section>
 	<ToastRegion store={toastStore} position="bottom-right" />

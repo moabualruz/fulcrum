@@ -235,4 +235,43 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(fields.nth(0).locator("[data-slot='form-field-description']")).toBeVisible();
 		await expect(fields.nth(1).locator("[data-slot='label'][data-optional='true']")).toBeVisible();
 	});
+
+	test("popover opens on trigger click and reports state", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='popover']");
+		await section.locator("[data-design-kit-popover-trigger]").click();
+		await expect(page.locator("[data-design-kit-popover-content]")).toBeVisible();
+		await expect(section.locator("[data-design-kit-popover-state]")).toContainText("Open: true");
+	});
+
+	test("context menu shows item list on right click", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='context-menu']");
+		await section.locator("[data-design-kit-context-trigger]").click({ button: "right" });
+		await expect(page.locator("[data-design-kit-context-content]")).toBeVisible();
+		await expect(page.locator("[data-design-kit-context-item='rename']")).toBeVisible();
+		await expect(page.locator("[data-design-kit-context-item='delete']")).toHaveAttribute(
+			"data-tone",
+			"destructive",
+		);
+	});
+
+	test("alert dialog opens and confirms a destructive action", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='alert-dialog']");
+		await section.locator("[data-design-kit-alert-trigger]").click();
+		const content = page.locator("[data-design-kit-alert-content]");
+		await expect(content).toBeVisible();
+		await content.locator("[data-design-kit-alert-confirm]").click();
+		await expect(section.locator("[data-design-kit-alert-state]")).toContainText("confirmed");
+	});
+
+	test("command palette opens and exposes searchable items", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='command-palette']");
+		await section.locator("[data-design-kit-palette-open]").click();
+		await expect(page.locator("[data-design-kit-palette-input]")).toBeVisible();
+		await expect(page.locator("[data-slot='command-palette-item']")).toHaveCount(3);
+		await expect(page.getByText("Dispatch run")).toBeVisible();
+	});
 });

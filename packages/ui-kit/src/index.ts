@@ -203,3 +203,76 @@ export type {
 	ComboboxContentProps,
 	ComboboxItemProps,
 } from "./components/combobox/index.js";
+export {
+	Popover,
+	PopoverTrigger,
+	PopoverContent,
+	Root as PopoverRoot,
+	Trigger as PopoverTriggerRoot,
+	Content as PopoverContentRoot,
+} from "./components/popover/index.js";
+export type {
+	PopoverProps,
+	PopoverTriggerProps,
+	PopoverContentProps,
+} from "./components/popover/index.js";
+export {
+	ContextMenu,
+	ContextMenuTrigger,
+	ContextMenuContent,
+	ContextMenuItem,
+	Root as ContextMenuRoot,
+	Trigger as ContextMenuTriggerRoot,
+	Content as ContextMenuContentRoot,
+	Item as ContextMenuItemRoot,
+} from "./components/context-menu/index.js";
+export type {
+	ContextMenuProps,
+	ContextMenuTriggerProps,
+	ContextMenuContentProps,
+	ContextMenuItemProps,
+} from "./components/context-menu/index.js";
+export {
+	AlertDialog,
+	AlertDialogTrigger,
+	AlertDialogContent,
+	AlertDialogTitle,
+	AlertDialogDescription,
+	AlertDialogAction,
+	AlertDialogCancel,
+	Root as AlertDialogRoot,
+	Trigger as AlertDialogTriggerRoot,
+	Content as AlertDialogContentRoot,
+	Title as AlertDialogTitleRoot,
+	Description as AlertDialogDescriptionRoot,
+	Action as AlertDialogActionRoot,
+	Cancel as AlertDialogCancelRoot,
+} from "./components/alert-dialog/index.js";
+export type {
+	AlertDialogProps,
+	AlertDialogTriggerProps,
+	AlertDialogContentProps,
+	AlertDialogTitleProps,
+	AlertDialogDescriptionProps,
+	AlertDialogActionProps,
+	AlertDialogCancelProps,
+} from "./components/alert-dialog/index.js";
+export {
+	CommandPalette,
+	CommandPaletteInput,
+	CommandPaletteList,
+	CommandPaletteItem,
+	CommandPaletteEmpty,
+	Root as CommandPaletteRoot,
+	Input as CommandPaletteInputRoot,
+	List as CommandPaletteListRoot,
+	Item as CommandPaletteItemRoot,
+	Empty as CommandPaletteEmptyRoot,
+} from "./components/command-palette/index.js";
+export type {
+	CommandPaletteProps,
+	CommandPaletteInputProps,
+	CommandPaletteListProps,
+	CommandPaletteItemProps,
+	CommandPaletteEmptyProps,
+} from "./components/command-palette/index.js";
