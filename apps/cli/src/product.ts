@@ -24,8 +24,8 @@ type ProductCaller = {
   };
   sprints?: {
     list(input?: Record<string, unknown>): Promise<unknown[]>;
-    start?(input: { id: string }): Promise<unknown>;
-    close?(input: Record<string, unknown>): Promise<unknown>;
+    start(input: { id: string }): Promise<unknown>;
+    close(input: Record<string, unknown>): Promise<unknown>;
   };
   search?: { query(input: Record<string, unknown>): Promise<unknown[]> };
   context?: { assemble?(input: Record<string, unknown>): Promise<unknown> };
@@ -389,16 +389,16 @@ async function runSprints(caller: ProductCaller, argv: readonly string[], io: Io
   const [sub, ...rest] = argv;
   switch (sub) {
     case "list":
-      return printValue(await caller.sprints?.list({ projectId: flagValue(rest, "--project") }) ?? [], rest, io.print);
+      return printValue(await requireSprints(caller).list({ projectId: requiredFlag(rest, "--project") }), rest, io.print);
     case "activate": {
       const id = firstArg(rest);
       if (!id) return usage(io, "usage: fulcrum product sprints activate <id>");
-      return printValue(await caller.sprints?.start?.({ id }) ?? { id, status: "active" }, rest, io.print);
+      return printValue(await requireSprints(caller).start({ id }), rest, io.print);
     }
     case "complete": {
       const id = firstArg(rest);
       if (!id) return usage(io, "usage: fulcrum product sprints complete <id>");
-      return printValue(await caller.sprints?.close?.({ id, unfinishedDisposition: "backlog" }) ?? { id, status: "completed" }, rest, io.print);
+      return printValue(await requireSprints(caller).close({ id, unfinishedDisposition: "backlog" }), rest, io.print);
     }
     default:
       return usage(io, `fulcrum product sprints: unknown verb '${sub ?? ""}'`);
@@ -607,9 +607,9 @@ function createProductPublicApiCaller(
   if (sprintApi) {
     caller.sprints = {
       list: async (input?: Record<string, unknown>) => await sprintApi.sprints.list(input) as unknown[],
-      start: async (input: { id: string }) => await sprintApi.sprints.update({ id: input.id, status: "active" }),
+      start: async (input: { id: string }) => await sprintApi.sprints.start({ id: input.id }),
       close: async (input: Record<string, unknown>) =>
-        await sprintApi.sprints.update({ ...input, id: String(input["id"]), status: "completed" }),
+        await sprintApi.sprints.close({ ...input, id: String(input["id"]) }),
     };
   }
 
@@ -646,6 +646,11 @@ function createProductPublicApiCaller(
 function requireTasks(caller: ProductCaller): NonNullable<ProductCaller["tasks"]> {
   if (!caller.tasks) throw new Error("tasks caller is not configured");
   return caller.tasks;
+}
+
+function requireSprints(caller: ProductCaller): NonNullable<ProductCaller["sprints"]> {
+  if (!caller.sprints) throw new Error("sprints caller is not configured");
+  return caller.sprints;
 }
 
 function requirePlanning(caller: ProductCaller): NonNullable<ProductCaller["planning"]> {

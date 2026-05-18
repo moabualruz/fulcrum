@@ -32,9 +32,9 @@ import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { SprintPublicStore } from "@work-management/infrastructure/database/sprint-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 
-import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto } from "./dto/sprint.dto.ts";
+import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintCloseBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto } from "./dto/sprint.dto.ts";
 import type { SprintStatus } from "./dto/sprint.dto.ts";
-export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto };
+export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintCloseBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto };
 export type { SprintStatus };
 
 export const SPRINT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.sprintPublicApi.options");
@@ -56,6 +56,8 @@ export interface SprintPublicApplication {
     status?: SprintStatus;
   }): Promise<unknown>;
   deleteSprint?(input: { orgId: string; id: string }): Promise<void>;
+  startSprint?(input: { orgId: string; id: string }): Promise<unknown>;
+  closeSprint?(input: { orgId: string; id: string; unfinishedDisposition?: "backlog" }): Promise<unknown>;
   addTask?(input: { orgId: string; id: string; taskId: string }): Promise<unknown>;
   removeTask?(input: { orgId: string; id: string; taskId: string }): Promise<unknown>;
 }
@@ -113,6 +115,24 @@ export class SprintPublicApiService {
     await application({ orgId: query.orgId, id: params.id });
   }
 
+  async startSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    const application = this.requireMethod("startSprint");
+    const result = await application({ orgId: body.orgId, id: params.id });
+    if (!result) throw new NotFoundException({ error: "Sprint not found." });
+    return result;
+  }
+
+  async closeSprint(params: SprintIdParamsDto, body: SprintCloseBodyDto): Promise<unknown> {
+    const application = this.requireMethod("closeSprint");
+    const result = await application({
+      orgId: body.orgId,
+      id: params.id,
+      unfinishedDisposition: body.unfinishedDisposition ?? "backlog",
+    });
+    if (!result) throw new NotFoundException({ error: "Sprint not found." });
+    return result;
+  }
+
   async addTask(params: SprintIdParamsDto, body: SprintTaskBodyDto): Promise<unknown> {
     const application = this.requireMethod("addTask");
     const result = await application({ orgId: body.orgId, id: params.id, taskId: body.taskId });
@@ -141,6 +161,8 @@ export class SprintPublicApiService {
         getSprint: (input) => this.store!.getSprint(input),
         patchSprint: (input) => this.store!.patchSprint(input),
         deleteSprint: (input) => this.store!.deleteSprint(input),
+        startSprint: (input) => this.store!.startSprint(input),
+        closeSprint: (input) => this.store!.closeSprint(input),
         addTask: (input) => this.store!.addTask(input),
         removeTask: (input) => this.store!.removeTask(input),
       };
@@ -180,6 +202,14 @@ export class SprintPublicApiController {
 
   async deleteSprint(params: SprintIdParamsDto, query: SprintRequestContextDto): Promise<void> {
     await this.sprints.deleteSprint(params, query);
+  }
+
+  async startSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    return await this.sprints.startSprint(params, body);
+  }
+
+  async closeSprint(params: SprintIdParamsDto, body: SprintCloseBodyDto): Promise<unknown> {
+    return await this.sprints.closeSprint(params, body);
   }
 
   async addTask(params: SprintIdParamsDto, body: SprintTaskBodyDto): Promise<unknown> {
@@ -225,6 +255,8 @@ for (const property of ["orgId"] as const) {
   MinLength(1)(SprintCreateBodyDto.prototype, property);
   IsString()(SprintPatchBodyDto.prototype, property);
   MinLength(1)(SprintPatchBodyDto.prototype, property);
+  IsString()(SprintCloseBodyDto.prototype, property);
+  MinLength(1)(SprintCloseBodyDto.prototype, property);
   IsString()(SprintTaskBodyDto.prototype, property);
   MinLength(1)(SprintTaskBodyDto.prototype, property);
 }
@@ -255,6 +287,8 @@ IsString()(SprintPatchBodyDto.prototype, "name");
 MinLength(1)(SprintPatchBodyDto.prototype, "name");
 IsOptional()(SprintPatchBodyDto.prototype, "status");
 IsIn(["planning", "active", "completed", "cancelled"])(SprintPatchBodyDto.prototype, "status");
+IsOptional()(SprintCloseBodyDto.prototype, "unfinishedDisposition");
+IsIn(["backlog"])(SprintCloseBodyDto.prototype, "unfinishedDisposition");
 IsString()(SprintTaskBodyDto.prototype, "taskId");
 MinLength(1)(SprintTaskBodyDto.prototype, "taskId");
 
@@ -263,6 +297,8 @@ const createSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiCo
 const getSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "getSprint");
 const patchSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "patchSprint");
 const deleteSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "deleteSprint");
+const startSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "startSprint");
+const closeSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "closeSprint");
 const addTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "addTask");
 const removeTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "removeTask");
 
@@ -272,6 +308,8 @@ if (
   !getSprintDescriptor ||
   !patchSprintDescriptor ||
   !deleteSprintDescriptor ||
+  !startSprintDescriptor ||
+  !closeSprintDescriptor ||
   !addTaskDescriptor ||
   !removeTaskDescriptor
 ) {
@@ -359,6 +397,44 @@ ApiNoContentResponse({ description: "Deleted" })(
   SprintPublicApiController.prototype,
   "deleteSprint",
   deleteSprintDescriptor,
+);
+
+Post(":id/start")(SprintPublicApiController.prototype, "startSprint", startSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "startSprint", 0);
+Body()(SprintPublicApiController.prototype, "startSprint", 1);
+ApiOperation({ summary: "Start a sprint" })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+ApiOkResponse({ description: "Started sprint" })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+
+Post(":id/close")(SprintPublicApiController.prototype, "closeSprint", closeSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "closeSprint", 0);
+Body()(SprintPublicApiController.prototype, "closeSprint", 1);
+ApiOperation({ summary: "Close a sprint" })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
+);
+ApiOkResponse({ description: "Closed sprint" })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
 );
 
 Post(":id/tasks")(SprintPublicApiController.prototype, "addTask", addTaskDescriptor);

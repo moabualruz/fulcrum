@@ -185,6 +185,12 @@ describe("fulcrum product CLI", () => {
         if (String(url).includes("/workflows/review/final-qa/report")) {
           return Response.json({ status: "ready", traceId: "trace-product" });
         }
+        if (String(url).includes("/api/v1/sprints/sprint-1/start")) {
+          return Response.json({ id: "sprint-1", status: "active" });
+        }
+        if (String(url).includes("/api/v1/sprints/sprint-1/close")) {
+          return Response.json({ closed: true, sprint: { id: "sprint-1", status: "completed" } });
+        }
         if (String(url).includes("/api/v1/tasks")) {
           return Response.json({ id: "task-1", title: "Plan task", status: "pending" });
         }
@@ -214,10 +220,34 @@ describe("fulcrum product CLI", () => {
       expect(reportIo.exits).toEqual([]);
       expect(JSON.parse(reportIo.out[0]!)).toEqual({ status: "ready", traceId: "trace-product" });
 
+      const sprintStartIo = testIo();
+      await runProduct(["sprints", "activate", "sprint-1", "--json"], {
+        ...sprintStartIo.opts,
+        env,
+        fetch: fetchFn,
+      });
+      expect(sprintStartIo.exits).toEqual([]);
+      expect(JSON.parse(sprintStartIo.out[0]!)).toMatchObject({ id: "sprint-1", status: "active" });
+
+      const sprintCloseIo = testIo();
+      await runProduct(["sprints", "complete", "sprint-1", "--json"], {
+        ...sprintCloseIo.opts,
+        env,
+        fetch: fetchFn,
+      });
+      expect(sprintCloseIo.exits).toEqual([]);
+      expect(JSON.parse(sprintCloseIo.out[0]!)).toMatchObject({ closed: true, sprint: { id: "sprint-1" } });
+
       expect(calls.map((call) => call.url)).toEqual([
         "http://127.0.0.1:3210/api/v1/projects?orgId=11111111-1111-4111-8111-111111111111",
         "http://127.0.0.1:3210/api/v1/tasks?orgId=11111111-1111-4111-8111-111111111111&userId=22222222-2222-4222-8222-222222222222",
         "http://127.0.0.1:3210/workflows/review/final-qa/report",
+        "http://127.0.0.1:3210/api/v1/sprints/sprint-1/start",
+        "http://127.0.0.1:3210/api/v1/sprints/sprint-1/close",
+      ]);
+      expect(calls.slice(-2).map((call) => JSON.parse(String(call.init.body)))).toEqual([
+        { id: "sprint-1", orgId: "11111111-1111-4111-8111-111111111111" },
+        { id: "sprint-1", unfinishedDisposition: "backlog", orgId: "11111111-1111-4111-8111-111111111111" },
       ]);
     } finally {
       if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
@@ -618,11 +648,21 @@ describe("fulcrum product CLI", () => {
   });
 
   test("product sprints/search/context use caller fixture", async () => {
+    const sprintCalls: Array<{ method: string; input: unknown }> = [];
     const caller = {
       sprints: {
-        list: async () => [{ id: "s1", name: "Sprint 1", status: "planned" }],
-        start: async ({ id }: { id: string }) => ({ id, status: "active" }),
-        close: async ({ id }: { id: string }) => ({ id, status: "completed" }),
+        list: async (input: Record<string, unknown>) => {
+          sprintCalls.push({ method: "list", input });
+          return [{ id: "s1", name: "Sprint 1", status: "planning" }];
+        },
+        start: async (input: { id: string }) => {
+          sprintCalls.push({ method: "start", input });
+          return { id: input.id, status: "active" };
+        },
+        close: async (input: Record<string, unknown>) => {
+          sprintCalls.push({ method: "close", input });
+          return { closed: true, sprint: { id: input["id"], status: "completed" } };
+        },
       },
       search: {
         query: async () => [{ source_kind: "doc", source_id: "d1", title: "kernel" }],
@@ -646,6 +686,27 @@ describe("fulcrum product CLI", () => {
       expect(io.out.length).toBe(1);
       outputs.push(io.out[0] ?? "{}");
     }
+
+    expect(sprintCalls).toEqual([
+      { method: "list", input: { projectId: "p" } },
+      { method: "start", input: { id: "s1" } },
+      { method: "close", input: { id: "s1", unfinishedDisposition: "backlog" } },
+    ]);
+    expect(JSON.parse(outputs[1]!)).toEqual({ id: "s1", status: "active" });
+    expect(JSON.parse(outputs[2]!)).toMatchObject({ closed: true, sprint: { id: "s1", status: "completed" } });
+  });
+
+  test("product sprints lifecycle refuses fake success without a sprints caller", async () => {
+    const io = testIo();
+
+    await runProduct(["sprints", "activate", "s1", "--json"], {
+      ...io.opts,
+      caller: { projects: { list: async () => [] } },
+    });
+
+    expect(io.out).toEqual([]);
+    expect(io.exits).toEqual([1]);
+    expect(io.err.join("\n")).toContain("sprints caller is not configured");
   });
 
   test("product reports final-qa, uat-handoff, decision, and e2e-run route through reports caller with project and trace", async () => {

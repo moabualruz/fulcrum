@@ -91,6 +91,37 @@ export class SprintPublicStore {
     await this.repository().remove(cycle);
   }
 
+  async startSprint(input: { orgId: string; id: string }): Promise<SprintPublicRow | null> {
+    const cycle = await this.repository().findOneBy({ id: input.id });
+    if (!cycle) return null;
+    if (cycle.status === "active") throw new Error("sprint_already_active");
+
+    const active = await this.repository().findOneBy({ projectId: cycle.projectId, status: "active" });
+    if (active) throw new Error("at_most_one_active");
+
+    cycle.status = "active";
+    const saved = await this.repository().save(cycle);
+    return toPublicRow(input.orgId, saved);
+  }
+
+  async closeSprint(input: { orgId: string; id: string; unfinishedDisposition?: "backlog" }): Promise<{
+    closed: true;
+    sprint: SprintPublicRow;
+    unfinishedDisposition: "backlog";
+  } | null> {
+    const cycle = await this.repository().findOneBy({ id: input.id });
+    if (!cycle) return null;
+    if (cycle.status !== "active") throw new Error("sprint_must_be_active");
+
+    cycle.status = "completed";
+    const saved = await this.repository().save(cycle);
+    return {
+      closed: true,
+      sprint: toPublicRow(input.orgId, saved),
+      unfinishedDisposition: input.unfinishedDisposition ?? "backlog",
+    };
+  }
+
   async addTask(input: { orgId: string; id: string; taskId: string }): Promise<SprintTaskPublicRow | null> {
     const cycle = await this.repository().findOneBy({ id: input.id });
     if (!cycle) return null;

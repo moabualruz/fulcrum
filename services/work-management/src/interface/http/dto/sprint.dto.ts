@@ -27,6 +27,11 @@ export class SprintPatchBodyDto {
   status?: SprintStatus;
 }
 
+export class SprintCloseBodyDto {
+  orgId!: string;
+  unfinishedDisposition?: "backlog";
+}
+
 export class SprintTaskParamsDto {
   id!: string;
   taskId!: string;

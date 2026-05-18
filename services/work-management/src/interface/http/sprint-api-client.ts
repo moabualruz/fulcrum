@@ -38,6 +38,16 @@ export function createSprintApiCaller(options: SprintApiClientOptions) {
           method: "DELETE",
           query: sprintContextQuery(options),
         }),
+      start: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/start`, {
+          method: "POST",
+          body: sprintBody(options, input),
+        }),
+      close: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/close`, {
+          method: "POST",
+          body: sprintBody(options, input),
+        }),
       addTask: async (input: JsonRecord & { id: string }) => {
         const { id, ...body } = input;
         return await request(`/api/v1/sprints/${encodeURIComponent(id)}/tasks`, {
