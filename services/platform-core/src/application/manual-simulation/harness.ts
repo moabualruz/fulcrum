@@ -57,6 +57,22 @@ export interface RealTerminalSmokeCase {
   evidenceKind: "terminal-log" | "screenshot";
 }
 
+export interface CrossSurfaceJourneyStep {
+  surface: "cli" | "tui" | "public-api";
+  cliCommand?: readonly string[];
+  tuiKeys?: readonly string[];
+  expectedPersistedState: readonly string[];
+  evidenceArtifacts: readonly string[];
+}
+
+export interface CrossSurfaceJourney {
+  id: string;
+  title: string;
+  projectId: string;
+  traceId: string;
+  steps: readonly CrossSurfaceJourneyStep[];
+}
+
 export interface ManualSimulationEvidence {
   schema: "fulcrum.manual-simulation.v1";
   id: string;
@@ -65,6 +81,7 @@ export interface ManualSimulationEvidence {
   cli: readonly CliSimulationResult[];
   tui: readonly TuiSimulationResult[];
   realTerminal: readonly RealTerminalSmokeCase[];
+  journeys: readonly CrossSurfaceJourney[];
   artifacts: readonly string[];
 }
 
@@ -82,6 +99,137 @@ export const DEFAULT_REAL_TERMINAL_SMOKE_CASES = [
     evidenceKind: "terminal-log",
   },
 ] as const satisfies readonly RealTerminalSmokeCase[];
+
+export const DEFAULT_CROSS_SURFACE_JOURNEYS = [
+  {
+    id: "pm-only-planning",
+    title: "PM-only project and task planning",
+    projectId: "project-e2e",
+    traceId: "trace-pm-only",
+    steps: [
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "product", "projects", "create", "--name", "Manual E2E", "--json"],
+        expectedPersistedState: ["project:project-e2e", "trace:trace-pm-only"],
+        evidenceArtifacts: ["logs/project-create.json"],
+      },
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "product", "tasks", "create", "--project", "project-e2e", "--title", "Plan release", "--json"],
+        expectedPersistedState: ["task:task-plan", "project:project-e2e", "trace:trace-pm-only"],
+        evidenceArtifacts: ["logs/task-create.json"],
+      },
+      {
+        surface: "tui",
+        tuiKeys: ["j", "Enter"],
+        expectedPersistedState: ["visible-task:task-plan", "project:project-e2e"],
+        evidenceArtifacts: ["snapshots/task-list.json"],
+      },
+    ],
+  },
+  {
+    id: "agent-run-supervision",
+    title: "Agent run dispatch, watch, and artifact capture",
+    projectId: "project-e2e",
+    traceId: "trace-agent-run",
+    steps: [
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "runs", "dispatch", "--task", "task-plan", "--agent", "codex", "--json"],
+        expectedPersistedState: ["run:run-agent", "task:task-plan", "trace:trace-agent-run"],
+        evidenceArtifacts: ["logs/run-dispatch.json"],
+      },
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "runs", "watch", "run-agent", "--json"],
+        expectedPersistedState: ["run:run-agent", "artifact:summary.md", "trace:trace-agent-run"],
+        evidenceArtifacts: ["logs/run-watch.json"],
+      },
+      {
+        surface: "tui",
+        tuiKeys: ["j", "j", "Enter"],
+        expectedPersistedState: ["visible-run:run-agent", "project:project-e2e"],
+        evidenceArtifacts: ["snapshots/run-detail.json"],
+      },
+    ],
+  },
+  {
+    id: "docs-context-handoff",
+    title: "Docs search, context assembly, and planning handoff",
+    projectId: "project-e2e",
+    traceId: "trace-docs-context",
+    steps: [
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "search", "context", "add", "--ids", "doc-architecture,task-plan", "--project", "project-e2e", "--json"],
+        expectedPersistedState: ["context:doc-architecture", "context:task-plan", "trace:trace-docs-context"],
+        evidenceArtifacts: ["logs/search-context-add.json"],
+      },
+      {
+        surface: "tui",
+        tuiKeys: ["/", "d", "Enter"],
+        expectedPersistedState: ["visible-doc:doc-architecture", "project:project-e2e"],
+        evidenceArtifacts: ["snapshots/docs-context.json"],
+      },
+      {
+        surface: "public-api",
+        expectedPersistedState: ["context.sourceRefs:doc-architecture", "context.projectId:project-e2e"],
+        evidenceArtifacts: ["api/context-read.json"],
+      },
+    ],
+  },
+  {
+    id: "review-uat-final-qa",
+    title: "Review, UAT handoff, and final QA decision",
+    projectId: "project-e2e",
+    traceId: "trace-review-uat",
+    steps: [
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "product", "reports", "uat-handoff", "--project", "project-e2e", "--trace", "trace-review-uat", "--json"],
+        expectedPersistedState: ["uat:handoff", "project:project-e2e", "trace:trace-review-uat"],
+        evidenceArtifacts: ["logs/uat-handoff.json"],
+      },
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "product", "reports", "final-qa", "--project", "project-e2e", "--trace", "trace-review-uat", "--json"],
+        expectedPersistedState: ["qa:accepted", "evidence:manual-simulation", "trace:trace-review-uat"],
+        evidenceArtifacts: ["logs/final-qa.json"],
+      },
+      {
+        surface: "tui",
+        tuiKeys: ["/", "r", "Enter"],
+        expectedPersistedState: ["visible-review:trace-review-uat", "project:project-e2e"],
+        evidenceArtifacts: ["snapshots/review-uat.json"],
+      },
+    ],
+  },
+  {
+    id: "integration-notification-loop",
+    title: "Integration event, notification, and operator acknowledgement",
+    projectId: "project-e2e",
+    traceId: "trace-integration-notify",
+    steps: [
+      {
+        surface: "cli",
+        cliCommand: ["fulcrum", "notify", "list", "--unread", "--watch", "--json"],
+        expectedPersistedState: ["notification:integration-event", "project:project-e2e", "trace:trace-integration-notify"],
+        evidenceArtifacts: ["logs/notify-watch.json"],
+      },
+      {
+        surface: "tui",
+        tuiKeys: ["/", "n", "Enter", "R"],
+        expectedPersistedState: ["notification:integration-event:read", "project:project-e2e"],
+        evidenceArtifacts: ["snapshots/notification-read.json"],
+      },
+      {
+        surface: "public-api",
+        expectedPersistedState: ["notification.read:true", "trace:trace-integration-notify"],
+        evidenceArtifacts: ["api/notification-state.json"],
+      },
+    ],
+  },
+] as const satisfies readonly CrossSurfaceJourney[];
 
 export async function createManualSimulationWorkspace(id: string): Promise<ManualSimulationWorkspace> {
   const rootDir = await mkdtemp(join(tmpdir(), `fulcrum-manual-${id}-`));
@@ -194,10 +342,12 @@ export async function writeManualSimulationEvidence(input: {
   cli?: readonly CliSimulationResult[];
   tui?: readonly TuiSimulationResult[];
   realTerminal?: readonly RealTerminalSmokeCase[];
+  journeys?: readonly CrossSurfaceJourney[];
 }): Promise<string> {
   const cli = input.cli ?? [];
   const tui = input.tui ?? [];
   const realTerminal = input.realTerminal ?? [];
+  const journeys = input.journeys ?? [];
   const evidence: ManualSimulationEvidence = {
     schema: "fulcrum.manual-simulation.v1",
     id: input.workspace.id,
@@ -206,9 +356,11 @@ export async function writeManualSimulationEvidence(input: {
     cli,
     tui,
     realTerminal,
+    journeys,
     artifacts: [
       ...cli.map((result) => result.evidencePath),
       ...tui.map((result) => result.evidencePath),
+      ...journeys.flatMap((journey) => journey.steps.flatMap((step) => step.evidenceArtifacts)),
     ],
   };
   const path = join(input.workspace.evidenceDir, "manual-simulation.json");

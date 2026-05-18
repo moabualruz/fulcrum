@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createManualSimulationWorkspace,
+  DEFAULT_CROSS_SURFACE_JOURNEYS,
   readManualSimulationEvidence,
   runCliSimulation,
   startFakeJsonApi,
@@ -101,6 +102,52 @@ describe("CLI E2E CRUD workflows with application callers", () => {
       expect(evidence.artifacts).toContain(result.evidencePath);
     } finally {
       api.stop(true);
+      await workspace.cleanup();
+    }
+  });
+
+  test("cross-surface manual journeys name CLI commands, TUI keys, state, and evidence", async () => {
+    expect(DEFAULT_CROSS_SURFACE_JOURNEYS.map((journey) => journey.id)).toEqual([
+      "pm-only-planning",
+      "agent-run-supervision",
+      "docs-context-handoff",
+      "review-uat-final-qa",
+      "integration-notification-loop",
+    ]);
+
+    for (const journey of DEFAULT_CROSS_SURFACE_JOURNEYS) {
+      expect(journey.projectId).toBeTruthy();
+      expect(journey.traceId).toBeTruthy();
+      expect(journey.steps.length).toBeGreaterThanOrEqual(2);
+      expect(journey.steps.some((step) => step.surface === "cli" && step.cliCommand?.[0] === "fulcrum")).toBe(true);
+      expect(journey.steps.some((step) => step.surface === "tui" && (step.tuiKeys?.length ?? 0) > 0)).toBe(true);
+
+      for (const step of journey.steps) {
+        expect(step.expectedPersistedState.length).toBeGreaterThan(0);
+        expect(step.evidenceArtifacts.length).toBeGreaterThan(0);
+        expect(step.expectedPersistedState.join(" ")).toMatch(new RegExp(`${journey.projectId}|${journey.traceId}`));
+      }
+    }
+  });
+
+  test("manual simulation evidence persists journey continuity across surfaces", async () => {
+    const workspace = await createManualSimulationWorkspace("cross-surface-journeys");
+    try {
+      const evidencePath = await writeManualSimulationEvidence({
+        workspace,
+        journeys: DEFAULT_CROSS_SURFACE_JOURNEYS,
+      });
+      const evidence = await readManualSimulationEvidence(evidencePath);
+
+      expect(evidence.journeys).toHaveLength(5);
+      expect(evidence.journeys.every((journey) => journey.steps.some((step) => step.surface === "cli"))).toBe(true);
+      expect(evidence.journeys.every((journey) => journey.steps.some((step) => step.surface === "tui"))).toBe(true);
+      expect(evidence.artifacts).toEqual(
+        DEFAULT_CROSS_SURFACE_JOURNEYS.flatMap((journey) =>
+          journey.steps.flatMap((step) => step.evidenceArtifacts)
+        ),
+      );
+    } finally {
       await workspace.cleanup();
     }
   });
