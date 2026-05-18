@@ -203,6 +203,8 @@ export interface AgentRunDetailRow extends ProjectRunRow {
   parent_run_id: string | null;
   transcript_path: string | null;
   workspace_diff_path: string | null;
+  token_used: number | null;
+  cost_usd: string | number | null;
 }
 
 export interface RunEventRow {
@@ -431,6 +433,8 @@ export async function getProjectRunPageData(
   const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
   const transcriptExpr = columns.has("transcript_path") ? "ar.transcript_path" : "NULL::text";
   const diffExpr = columns.has("workspace_diff_path") ? "ar.workspace_diff_path" : "NULL::text";
+  const tokenExpr = columns.has("token_used") ? "ar.token_used" : columns.has("total_tokens") ? "ar.total_tokens" : "NULL::int";
+  const costExpr = columns.has("cost_usd") ? "ar.cost_usd" : "NULL::numeric";
   const errorExpr = columns.has("last_error_kind") ? "ar.last_error_kind" : "NULL::text";
   const retryExpr = columns.has("retry_count") ? "ar.retry_count" : columns.has("attempt_count") ? "ar.attempt_count" : "0";
   const workspaceExpr = columns.has("workspace_path") ? "ar.workspace_path" : "NULL::text";
@@ -450,6 +454,8 @@ export async function getProjectRunPageData(
             ${endedExpr} AS ended_at,
             ${transcriptExpr} AS transcript_path,
             ${diffExpr} AS workspace_diff_path,
+            ${tokenExpr} AS token_used,
+            ${costExpr} AS cost_usd,
             ${errorExpr} AS last_error_kind,
             ${retryExpr} AS retry_count,
             ${workspaceExpr} AS workspace_path

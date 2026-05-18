@@ -53,6 +53,16 @@
     text: string;
   };
 
+  type AgentIdentity = {
+    provider: string;
+    model: string;
+    contextWindow: string;
+    tokenBudget: string;
+    tokensUsed: string;
+    cost: string;
+    capabilities: string[];
+  };
+
   function payloadString(payload: Record<string, unknown>, keys: string[]): string | null {
     for (const key of keys) {
       const value = payload[key];
@@ -165,6 +175,39 @@
     });
   }
 
+  function buildAgentIdentity(run: {
+    agent: string;
+    model: string | null;
+    token_used?: number | string | null;
+    cost_usd?: number | string | null;
+  }): AgentIdentity {
+    const model = run.model ?? "default";
+    const normalized = `${run.agent} ${model}`.toLowerCase();
+    const provider = normalized.includes("claude") || normalized.includes("anthropic")
+      ? "Anthropic"
+      : normalized.includes("gemini") || normalized.includes("google")
+        ? "Google"
+        : normalized.includes("gpt") || normalized.includes("codex") || normalized.includes("openai")
+          ? "OpenAI"
+          : "Custom";
+    const contextWindow = normalized.includes("gpt-5") || normalized.includes("claude") || normalized.includes("gemini")
+      ? "large"
+      : "profile default";
+    const tokenBudget = contextWindow === "large" ? "profile large-context budget" : "profile budget";
+    const cost = run.cost_usd !== null && run.cost_usd !== undefined
+      ? `$${Number(run.cost_usd).toFixed(4)}`
+      : "not recorded";
+    const tokensUsed = run.token_used !== null && run.token_used !== undefined
+      ? `${Number(run.token_used).toLocaleString()} tokens`
+      : "not recorded";
+    const capabilities = [
+      "code",
+      provider === "Google" ? "multi-modal" : "LLM",
+      normalized.includes("search") || normalized.includes("browse") ? "browser" : "repo",
+    ];
+    return { provider, model, contextWindow, tokenBudget, tokensUsed, cost, capabilities: [...new Set(capabilities)] };
+  }
+
   async function copyText(value: string): Promise<void> {
     if (!browser || !navigator.clipboard) return;
     await navigator.clipboard.writeText(value);
@@ -196,6 +239,7 @@
   {@const liveSessionItems = buildLiveSessionItems(events, transcript)}
   {@const changedFiles = diffFiles(diff)}
   {@const renderedDiffLines = diffLines(diff)}
+  {@const agentIdentity = buildAgentIdentity(run)}
   <header
     data-project-run-detail-header
     class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
@@ -214,6 +258,33 @@
     </div>
     <span class={cn("text-xs text-muted-foreground font-mono")}>{formatDuration(run.started_at, run.ended_at)}</span>
   </header>
+
+  <section data-agent-identity-pane class={cn("mb-4 grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(0,1fr)_auto]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-center gap-2")}>
+        <span data-agent-name class={cn("text-sm font-semibold")}>{run.agent}</span>
+        <span data-agent-provider class={cn("rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground")}>{agentIdentity.provider}</span>
+        <span data-agent-model class={cn("rounded bg-muted px-2 py-0.5 text-xs font-mono text-muted-foreground")}>{agentIdentity.model}</span>
+      </div>
+      <dl data-agent-run-properties class={cn("mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-4")}>
+        <div><dt>Context window</dt><dd data-agent-context-window class={cn("font-medium text-foreground")}>{agentIdentity.contextWindow}</dd></div>
+        <div><dt>Token budget</dt><dd data-agent-token-budget class={cn("font-medium text-foreground")}>{agentIdentity.tokenBudget}</dd></div>
+        <div><dt>Tokens used</dt><dd data-agent-tokens-used class={cn("font-medium text-foreground")}>{agentIdentity.tokensUsed}</dd></div>
+        <div><dt>Cost/run</dt><dd data-agent-cost class={cn("font-medium text-foreground")}>{agentIdentity.cost}</dd></div>
+      </dl>
+      <div data-agent-capabilities class={cn("mt-3 flex flex-wrap gap-1")}>
+        {#each agentIdentity.capabilities as capability}
+          <span class={cn("rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground")}>{capability}</span>
+        {/each}
+      </div>
+    </div>
+    <label data-run-replay-model-selector class={cn("flex min-w-44 flex-col gap-1 text-xs text-muted-foreground")}>
+      Replay model
+      <select class={cn("h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground")}>
+        <option value={agentIdentity.model}>{agentIdentity.model}</option>
+      </select>
+    </label>
+  </section>
 
   <!-- Run metadata -->
   <section data-run-meta class={cn("mb-4 flex flex-wrap gap-4 text-xs text-muted-foreground")}>

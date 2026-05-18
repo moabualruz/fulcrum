@@ -9,6 +9,16 @@ describe("/projects/[id]/runs/[runId] +page.svelte source", () => {
     expect(source).toContain("data-back-project-runs");
     expect(source).toContain("RunStatusBadge");
     expect(source).toContain("data-symphony-badge");
+    expect(source).toContain("data-agent-identity-pane");
+    expect(source).toContain("data-agent-name");
+    expect(source).toContain("data-agent-model");
+    expect(source).toContain("data-agent-provider");
+    expect(source).toContain("data-agent-context-window");
+    expect(source).toContain("data-agent-token-budget");
+    expect(source).toContain("data-agent-tokens-used");
+    expect(source).toContain("data-agent-cost");
+    expect(source).toContain("data-agent-capabilities");
+    expect(source).toContain("data-run-replay-model-selector");
     expect(source).toContain("data-run-meta");
     expect(source).toContain("data-runs-cancel-trigger");
     expect(source).toContain("data-runs-retry-trigger");

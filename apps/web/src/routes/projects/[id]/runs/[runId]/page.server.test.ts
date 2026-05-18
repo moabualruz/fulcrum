@@ -17,6 +17,8 @@ const mockRun = {
   started_at: "2026-05-15T10:00:00.000Z",
   ended_at: "2026-05-15T10:05:00.000Z",
   transcript_path: null,
+  token_used: 4200,
+  cost_usd: "0.0123",
   last_error_kind: null,
   retry_count: 0,
   workspace_path: "/tmp/workspace",
@@ -118,6 +120,8 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     expect(payload.run.status).toBe("succeeded");
     expect(payload.transcript).toBe("Hello world transcript");
     expect(payload.diff).toContain("diff --git");
+    expect(payload.run.token_used).toBe(4200);
+    expect(payload.run.cost_usd).toBe("0.0123");
     expect(payload.events).toHaveLength(1);
     expect(payload.events[0].verb).toBe("run.started");
     expect(calls).toEqual(["getRunPage:run-1"]);
