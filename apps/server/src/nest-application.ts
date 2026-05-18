@@ -9,6 +9,7 @@ import { AppModule } from "./app.module.ts";
 import { TrpcRouter } from "./trpc/trpc.router.ts";
 import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createGracefulShutdown } from "@platform-core/application/platform-operations/shutdown-coordinator.ts";
+import { attachRouteTaxonomyMetadata } from "./public-api/route-taxonomy.ts";
 import {
   createRuntimeReadiness,
   markRuntimeReady,
@@ -69,6 +70,7 @@ export async function createFulcrumNestApplication(
     deepScanRoutes: true,
     operationIdFactory: (controllerKey, methodKey) => `${controllerKey}_${methodKey}`,
   });
+  attachRouteTaxonomyMetadata(openApiDocument);
   SwaggerModule.setup(options.openApiPath ?? "openapi", app, openApiDocument, {
     jsonDocumentUrl: "api/v1/openapi.json",
   });

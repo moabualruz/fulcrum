@@ -18,6 +18,15 @@ import { ReportPublicApiModule } from "@work-management/interface/http/report-pu
 import { SavedViewPublicApiModule } from "@work-management/interface/http/saved-view-public-api.controller.ts";
 import { SprintPublicApiModule } from "@work-management/interface/http/sprint-public-api.controller.ts";
 import { TaskPublicApiModule } from "@work-management/interface/http/task-public-api.controller.ts";
+import {
+  assertStablePublicRouteIsVersioned,
+  attachRouteTaxonomyMetadata,
+  classifyRoutePath,
+  createRouteTaxonomyMetadata,
+  isStablePublicRoute,
+  ROUTE_NAMESPACES,
+  ROUTE_VERSIONING_POLICY,
+} from "./route-taxonomy.ts";
 
 const NEST_PUBLIC_API_DOMAINS = [
   "projects",
@@ -60,5 +69,49 @@ describe("Nest public API contract", () => {
       expect(appImports).toContain(apiModule);
     }
     expect(listMissingApiDomains([...NEST_PUBLIC_API_DOMAINS])).toEqual([]);
+  });
+
+  test("classifies route namespaces by stability and lifecycle", () => {
+    expect(classifyRoutePath("/api/v1/tasks").name).toBe("public-rest");
+    expect(classifyRoutePath("/api/v1/events/runs").name).toBe("event-stream");
+    expect(classifyRoutePath("/api/v1/webhooks/hook-1/test").name).toBe("webhook");
+    expect(classifyRoutePath("/workflows/execution/preview").name).toBe("workflow-http");
+    expect(classifyRoutePath("/api/trpc/tasks.list").name).toBe("web-trpc-bridge");
+    expect(classifyRoutePath("/trpc/tasks.list").name).toBe("internal-trpc");
+    expect(classifyRoutePath("/api/active-project").name).toBe("internal-web");
+  });
+
+  test("stable public routes use documented prefixes and keep tRPC/web internals non-public", () => {
+    for (const path of ["/api/v1/tasks", "/api/v1/webhooks", "/api/v1/events/runs", "/workflows/execution"]) {
+      expect(isStablePublicRoute(path)).toBe(true);
+      expect(() => assertStablePublicRouteIsVersioned(path)).not.toThrow();
+    }
+
+    for (const path of ["/api/trpc/tasks.list", "/trpc/tasks.list", "/api/active-project"]) {
+      expect(isStablePublicRoute(path)).toBe(false);
+    }
+
+    expect(() => assertStablePublicRouteIsVersioned("/public/tasks")).toThrow(
+      "Stable public route must use a documented versioned prefix: /public/tasks",
+    );
+  });
+
+  test("route taxonomy metadata documents deprecation policy for generated OpenAPI", () => {
+    const metadata = createRouteTaxonomyMetadata();
+    const document: Record<string, unknown> = {
+      openapi: "3.1.0",
+      info: { title: "Fulcrum API" },
+    };
+
+    attachRouteTaxonomyMetadata(document);
+
+    expect(metadata).toEqual({
+      versioning: ROUTE_VERSIONING_POLICY,
+      namespaces: ROUTE_NAMESPACES,
+    });
+    expect(document["info"]).toMatchObject({
+      "x-fulcrum-route-taxonomy": metadata,
+      "x-fulcrum-deprecation-policy": ROUTE_VERSIONING_POLICY,
+    });
   });
 });

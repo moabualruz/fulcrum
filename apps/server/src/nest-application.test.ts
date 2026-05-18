@@ -138,14 +138,18 @@ describe("Nest server application bootstrap", () => {
       deepScanRoutes: true,
       operationIdFactory: expect.any(Function),
     });
-    expect(swaggerSetup).toHaveBeenCalledWith("openapi", app, {
+    expect(swaggerSetup).toHaveBeenCalledWith("openapi", app, expect.objectContaining({
       openapi: "3.1.0",
-      config: {
+      config: expect.objectContaining({
         title: "Fulcrum API",
         description: "Agent-native project workflow API",
         version: "0.1.0",
-      },
-    }, {
+      }),
+      info: expect.objectContaining({
+        "x-fulcrum-route-taxonomy": expect.any(Object),
+        "x-fulcrum-deprecation-policy": expect.any(Object),
+      }),
+    }), {
       jsonDocumentUrl: "api/v1/openapi.json",
     });
     expect(trpcApplyMiddleware).toHaveBeenCalledWith(app);

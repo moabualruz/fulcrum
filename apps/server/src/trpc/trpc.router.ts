@@ -5,6 +5,7 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 
 import { TrpcService } from "./trpc.service.ts";
 import { createContext, type TrpcContext } from "./context.ts";
+import { TRPC_EXPRESS_MOUNT_PATH } from "../public-api/route-taxonomy.ts";
 
 import { authRouter } from "./routers/auth.ts";
 import { flagsRouter } from "./routers/flags.ts";
@@ -150,7 +151,7 @@ export class TrpcRouter implements OnModuleInit {
 
   async applyMiddleware(app: INestApplication) {
     app.use(
-      "/trpc",
+      TRPC_EXPRESS_MOUNT_PATH,
       trpcExpress.createExpressMiddleware({
         router: this._appRouter,
         createContext: ({ req, res }) => {

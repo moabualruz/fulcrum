@@ -56,6 +56,26 @@ _Avoid_: ClassValidatorPipe, ValidationPipe (when distinguishing)
 The Swagger document built via `DocumentBuilder` + `SwaggerModule.createDocument(app, config)`, served at `/openapi`; the HTTP surface's machine-readable contract.
 _Avoid_: SwaggerJson, ApiSpec, OpenApiSpec
 
+**RouteTaxonomy**:
+The code-owned namespace map in `apps/server/src/public-api/route-taxonomy.ts` that classifies `/api/v1/*`, `/workflows/*`, event streams, webhooks, tRPC bridges, and internal routes by stability, audience, transport, and lifecycle.
+_Avoid_: route list, endpoint map, URL convention
+
+**PublicRestNamespace**:
+The stable external HTTP JSON API namespace under `/api/v1/*`; breaking changes require a new versioned prefix and deprecation metadata.
+_Avoid_: REST path, public endpoint, api route
+
+**WorkflowHttpNamespace**:
+The stable workflow orchestration HTTP namespace under `/workflows/*`; clients call it through workflow API wrappers instead of duplicating prefixes.
+_Avoid_: workflow route, orchestration endpoint
+
+**WebTrpcBridge**:
+The SvelteKit-only tRPC bridge under `/api/trpc`; typed and useful to the web UI but not a stable public contract for CLI/TUI or external HTTP clients.
+_Avoid_: public tRPC API, stable REST API
+
+**InternalWebRoute**:
+A SvelteKit route handler under `/api/*` that is not `/api/v1/*` or `/api/trpc`; browser-local behavior only, not an external API.
+_Avoid_: public API, platform API
+
 **SeedService**:
 The local-development seeder invoked by `startFulcrumNestServer` when `FULCRUM_REQUIRE_AUTH` is unset; never runs in production paths.
 _Avoid_: Bootstrap data, fixture loader
@@ -74,6 +94,8 @@ _Avoid_: DbModule, OrmModule, TypeOrmRootModule
 - **AppRouter** and **HttpController**s both call the same application services injected from **ServiceModule**s — two interfaces, one application layer
 - **AppCaller** wraps **AppRouter** via `createCallerFactory` and is used by CLI/TUI in-process; the web app uses the HTTP **AppRouter** mount
 - **OpenApiDocument** is generated from **HttpController** decorators on **NestApplication** and served at `/openapi`
+- **RouteTaxonomy** metadata is attached to the **OpenApiDocument** so generated API metadata carries namespace stability and deprecation policy
+- **PublicRestNamespace** and **WorkflowHttpNamespace** are stable external HTTP contracts; **WebTrpcBridge** and **InternalWebRoute** are not
 - **SeedService** runs once during **BootstrapPhase** against the **ApplicationDatabaseModule** `DataSource` when auth is not required
 
 ## Example dialogue
@@ -87,6 +109,7 @@ _Avoid_: DbModule, OrmModule, TypeOrmRootModule
 
 - "Router" was used for both **AppRouter** (the tRPC tree) and Express routing (controller routes). Resolved: **AppRouter** = tRPC composition; Nest's HTTP routing is owned by **HttpController** decorators, never referenced as "the router".
 - "Controller" vs tRPC "procedure": **HttpController** is the HTTP interface; a tRPC procedure inside **AppRouter** is the tRPC interface. Both delegate to the same application service; neither owns business logic.
+- "`/api/*`" is ambiguous: **PublicRestNamespace** means `/api/v1/*`; **WebTrpcBridge** means `/api/trpc`; every other SvelteKit `/api/*` handler is an **InternalWebRoute** unless added to **RouteTaxonomy**.
 - "Service" is overloaded: **TrpcService** (Nest provider wrapping `initTRPC`) is distinct from an application service (business logic inside a bounded service) and from a domain service (pure-domain collaborator). Composition surface only knows **TrpcService**; application/domain services live in `services/**`.
 - "Module" means a Nest `@Module`-decorated class here (**AppModule**, **ServiceModule**, **TrpcModule**). It does not mean a TypeScript ES module or a npm workspace package.
 - "Caller" can mean either the **AppCaller** (in-process tRPC) or any client of the HTTP API. Resolved: **AppCaller** is reserved for the `createCallerFactory` result used by CLI/TUI; HTTP clients are just "HTTP clients".
