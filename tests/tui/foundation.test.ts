@@ -9,10 +9,12 @@ import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { buildCaller, TuiApp, type TuiCaller } from "@fulcrum/tui/index.ts";
 import { TuiRouter } from "@fulcrum/tui/router.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
+import { BOOT_SPLASH_SUBTITLE, BOOT_SPLASH_TITLE, renderBootSplash } from "@fulcrum/tui/screens/tui-foundation.ts";
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
@@ -130,6 +132,29 @@ describe("TuiApp foundation behavior", () => {
     await Bun.sleep(1);
     expect(exited).toBe(true);
     expect(app.isRunning).toBe(false);
+  });
+
+  it("renders boot splash before launcher nav", async () => {
+    const tty = new FakeTTY({ columns: 24, rows: 8 });
+    const app = new TuiApp({
+      output: tty,
+      caller: fakeCaller(),
+    });
+
+    await app.mount();
+
+    const text = tty.plainText();
+    expect(text).toContain(BOOT_SPLASH_TITLE);
+    expect(text).toContain(BOOT_SPLASH_SUBTITLE);
+    expect(text.indexOf(BOOT_SPLASH_SUBTITLE)).toBeLessThan(text.indexOf("Domain nav"));
+    app.stop();
+  });
+
+  it("keeps boot splash title visible on narrow terminals", () => {
+    const tty = new FakeTTY({ columns: 8, rows: 6 });
+    renderBootSplash(new Renderer(tty));
+
+    expect(tty.plainText()).toContain(BOOT_SPLASH_TITLE);
   });
 
   it("writes telemetry per screen render", async () => {

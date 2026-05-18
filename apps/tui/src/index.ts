@@ -30,6 +30,7 @@ import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
+import { renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
 import type { TuiTask } from "./screens/task-types.ts";
@@ -596,6 +597,7 @@ export class TuiApp {
    */
   async mount(): Promise<void> {
     this.running = true;
+    renderBootSplash(this.renderer);
 
     // Load status bar data
     await this._loadStatusBar();
