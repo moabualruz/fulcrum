@@ -34,6 +34,20 @@ describe("technical planning cycle", () => {
         "User can review a generated technical plan before task creation.",
         "Prototype and boilerplate artifacts are visible before approval.",
       ],
+      researchQuestions: [
+        {
+          id: "research-doc-context",
+          question: "Which source documents constrain the planning workflow?",
+          limit: "Use selected freeform docs only.",
+          conclusion: "Planning must preserve source document provenance.",
+          sourceIds: ["doc-freeform-1"],
+        },
+        {
+          id: "research-provider-missing",
+          question: "Which external planner pattern should be copied?",
+          limit: "One provider call or record an assumption.",
+        },
+      ],
       taskSeeds: [
         {
           clientKey: "T1",
@@ -56,6 +70,13 @@ describe("technical planning cycle", () => {
     expect(result.plan.markdown).toContain("# Plan a full workflow from docs to UAT");
     expect(result.plan.markdown).toContain("## Context");
     expect(result.plan.markdown).toContain("doc-freeform-1");
+    expect(result.plan.markdown).toContain("## Bounded Research");
+    expect(result.plan.markdown).toContain("[research] research-doc-context");
+    expect(result.plan.markdown).toContain("Conclusion: Planning must preserve source document provenance.");
+    expect(result.plan.markdown).toContain("[research] research-provider-missing");
+    expect(result.plan.markdown).toContain("Status: assumption_recorded");
+    expect(result.plan.markdown).toContain("## Decision Inputs");
+    expect(result.plan.markdown).toContain("research-doc-context, research-provider-missing");
     expect(result.plan.markdown).toContain("## Prototype / Boilerplate");
     expect(result.plan.markdown).toContain("[prototype] apps/web/src/routes/planning/workbench-prototype.tsx");
     expect(result.plan.markdown).toContain("[boilerplate] services/planning-review/src/application/technical-planning-cycle.ts");
@@ -113,6 +134,27 @@ describe("technical planning cycle", () => {
       },
     ]);
     expect(result.artifactPreviews[0]?.reviewChecks.join("\n")).toContain("Prototype demonstrates the intended user flow");
+    expect(result.researchArtifacts).toEqual([
+      {
+        id: "research-doc-context",
+        question: "Which source documents constrain the planning workflow?",
+        limit: "Use selected freeform docs only.",
+        conclusion: "Planning must preserve source document provenance.",
+        sourceIds: ["doc-freeform-1"],
+        status: "recorded",
+      },
+      {
+        id: "research-provider-missing",
+        question: "Which external planner pattern should be copied?",
+        limit: "One provider call or record an assumption.",
+        conclusion: "Assumption recorded because no research provider is configured for: Which external planner pattern should be copied?",
+        sourceIds: [],
+        status: "assumption_recorded",
+      },
+    ]);
+    expect(result.plan.researchArtifactIds).toEqual(["research-doc-context", "research-provider-missing"]);
+    expect(result.prompt).toContain("Persist bounded research conclusions as artifact ids");
+    expect(result.prompt).toContain("Research artifact research-doc-context");
     expect(result.breakdown.taskDrafts.map((task) => ({
       key: task.clientKey,
       title: task.input.title,
