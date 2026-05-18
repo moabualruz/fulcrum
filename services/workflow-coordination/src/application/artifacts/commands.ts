@@ -83,3 +83,67 @@ export async function deleteArtifactForWeb(
     [input.id, ctx.orgId],
   );
 }
+
+export async function archiveRunArtifactForWeb(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { runId: string; artifactId: string },
+): Promise<void> {
+  await updateRunArtifactMetadata(em, ctx, input, {
+    archived: true,
+    lifecycleState: "archived",
+  });
+}
+
+export async function linkRunArtifactToDocForWeb(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { runId: string; artifactId: string; docId: string },
+): Promise<void> {
+  if (!input.docId.trim()) throw new AppValidationError("Document id is required.");
+  await updateRunArtifactMetadata(em, ctx, input, {
+    linkedDocId: input.docId.trim(),
+    lifecycleState: "linked",
+  });
+}
+
+export async function promoteRunArtifactToMemoryForWeb(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { runId: string; artifactId: string },
+): Promise<void> {
+  await updateRunArtifactMetadata(em, ctx, input, {
+    promotedToMemory: true,
+    lifecycleState: "promoted",
+  });
+}
+
+async function updateRunArtifactMetadata(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { runId: string; artifactId: string },
+  patch: Record<string, unknown>,
+): Promise<void> {
+  if (!input.artifactId.trim()) throw new AppValidationError("Artifact id is required.");
+  const rows = await em.query(
+    `SELECT metadata_json
+       FROM artifacts
+      WHERE id = $1 AND run_id = $2 AND org_id = $3
+      LIMIT 1`,
+    [input.artifactId, input.runId, ctx.orgId],
+  ) as Array<{ metadata_json: Record<string, unknown> | null }>;
+  const current = rows[0];
+  if (!current) throw new AppValidationError(`Artifact not found: ${input.artifactId}`);
+  const metadata = {
+    ...(current.metadata_json ?? {}),
+    ...patch,
+    lifecycleChangedAt: new Date().toISOString(),
+  };
+  await em.query(
+    `UPDATE artifacts
+        SET archived = CASE WHEN $4::boolean THEN true ELSE archived END,
+            metadata_json = $5::jsonb
+      WHERE id = $1 AND run_id = $2 AND org_id = $3`,
+    [input.artifactId, input.runId, ctx.orgId, patch["archived"] === true, JSON.stringify(metadata)],
+  );
+}

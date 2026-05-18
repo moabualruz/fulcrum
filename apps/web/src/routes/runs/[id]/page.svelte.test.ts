@@ -54,7 +54,7 @@ type PageProps = {
             transcript: string | null;
             logs: { entries: Array<{ timestamp?: string; stream: string; text: string }>; cursor: string | null } | null;
             diff: string | null;
-            artifacts: Array<{ id: string; title: string; mime: string | null; size: number | null; body_path: string | null }>;
+            artifacts: Array<RunArtifact>;
             events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
             observability: Observability;
           }>
@@ -63,13 +63,32 @@ type PageProps = {
             transcript: string | null;
             logs: { entries: Array<{ timestamp?: string; stream: string; text: string }>; cursor: string | null } | null;
             diff: string | null;
-            artifacts: Array<{ id: string; title: string; mime: string | null; size: number | null; body_path: string | null }>;
+            artifacts: Array<RunArtifact>;
             events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
             observability: Observability;
           };
     };
   };
 };
+
+interface RunArtifact {
+  id: string;
+  project_id: string | null;
+  run_id: string | null;
+  task_id: string | null;
+  doc_id: string | null;
+  kind: string;
+  title: string;
+  mime: string | null;
+  size: number | null;
+  body_path: string | null;
+  archived: boolean;
+  lifecycle_state: string;
+  retention_until: string | null;
+  preview_kind: string;
+  linked_doc_id: string | null;
+  promoted_to_memory: boolean;
+}
 
 interface Observability {
   context: {
@@ -105,6 +124,7 @@ function pageData(input: {
   run: RunDetail;
   transcript: string | null;
   events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+  artifacts?: RunArtifact[];
   observability?: Partial<Observability>;
 }): PageProps["data"] {
   const observability: Observability = {
@@ -128,7 +148,7 @@ function pageData(input: {
         transcript: input.transcript,
         logs: null,
         diff: null,
-        artifacts: [],
+        artifacts: input.artifacts ?? [],
         events: input.events,
         observability,
       },
@@ -239,5 +259,45 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
       props: { data: pageData({ run: RUN, transcript: null, events }) },
     });
     expect(body).toContain("data-runs-events");
+  });
+
+  test("renders artifact pane with preview, retention, provenance, and promotion actions", () => {
+    const artifacts: RunArtifact[] = [
+      {
+        id: "artifact-diff",
+        project_id: "project-1",
+        run_id: RUN.id,
+        task_id: "task-1",
+        doc_id: "doc-existing",
+        kind: "diff",
+        title: "workspace.diff",
+        mime: "text/x-diff",
+        size: 128,
+        body_path: "runs/workspace.diff",
+        archived: false,
+        lifecycle_state: "linked",
+        retention_until: "2026-06-01T00:00:00.000Z",
+        preview_kind: "code",
+        linked_doc_id: "doc-existing",
+        promoted_to_memory: false,
+      },
+    ];
+    const { body } = render(Page, {
+      props: { data: pageData({ run: RUN, transcript: null, events: [], artifacts }) },
+    });
+    expect(body).toContain("data-runs-artifacts");
+    expect(body).toContain("workspace.diff");
+    expect(body).toContain("diff");
+    expect(body).toContain("data-runs-artifact-preview");
+    expect(body).toContain("code preview");
+    expect(body).toContain("data-runs-artifact-retention");
+    expect(body).toContain("Retains until 2026-06-01T00:00:00.000Z");
+    expect(body).toContain('href="/tasks/task-1"');
+    expect(body).toContain('href="/projects/project-1"');
+    expect(body).toContain('href="/runs/01J0RUN0000000000000000001"');
+    expect(body).toContain("data-runs-artifact-archive");
+    expect(body).toContain("data-runs-artifact-doc-link");
+    expect(body).toContain("data-runs-artifact-promote-memory");
+    expect(body).toContain("doc-existing");
   });
 });

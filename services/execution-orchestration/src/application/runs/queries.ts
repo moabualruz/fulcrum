@@ -475,6 +475,12 @@ export async function getProjectRunPageData(
     size: number | null;
     mime: string | null;
     archived: boolean;
+    lifecycle_state: string;
+    retention_until: string | null;
+    preview_kind: string;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string;
     downloadHref: string;
   }>;
@@ -566,6 +572,19 @@ export async function getProjectRunPageData(
   const artifactShaExpr = artifactCols.has("sha256") ? "a.sha256" : artifactCols.has("checksum_sha256") ? "a.checksum_sha256" : "NULL::text";
   const artifactSizeExpr = artifactCols.has("size") ? "a.size" : artifactCols.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
   const artifactArchivedExpr = artifactCols.has("archived") ? "a.archived" : "false";
+  const artifactMetadataExpr = artifactCols.has("metadata_json") ? "a.metadata_json" : "'{}'::jsonb";
+  const artifactLifecycleExpr = artifactCols.has("lifecycle_state")
+    ? "a.lifecycle_state"
+    : artifactCols.has("metadata_json")
+      ? "COALESCE(a.metadata_json ->> 'lifecycleState', 'created')"
+      : "'created'::text";
+  const artifactRetentionExpr = artifactCols.has("retention_until") ? "a.retention_until" : "NULL::timestamptz";
+  const artifactDocExpr = artifactCols.has("doc_id") ? "a.doc_id" : "NULL::text";
+  const artifactLinkedDocExpr = artifactCols.has("metadata_json") ? "COALESCE(a.metadata_json ->> 'linkedDocId', NULL)" : "NULL::text";
+  const artifactPreviewExpr = artifactCols.has("metadata_json") ? "COALESCE(a.metadata_json ->> 'previewKind', a.metadata_json ->> 'preview_kind', 'file')" : "'file'::text";
+  const artifactPromotedExpr = artifactCols.has("metadata_json")
+    ? "CASE WHEN lower(COALESCE(a.metadata_json ->> 'promotedToMemory', 'false')) IN ('true', '1', 'yes') THEN true ELSE false END"
+    : "false";
   const artifactCreatedExpr = artifactCols.has("created_at") ? "a.created_at" : "now()";
   const artifactJoins = artifactCols.has("project_id") || !artifactCols.has("task_id") ? "" : "LEFT JOIN tasks at ON at.id = a.task_id";
   const artifacts = (await conn.execute<Array<{
@@ -581,6 +600,13 @@ export async function getProjectRunPageData(
     size: number | null;
     mime: string | null;
     archived: boolean;
+    metadata_json: Record<string, unknown>;
+    lifecycle_state: string | null;
+    retention_until: string | Date | null;
+    preview_kind: string | null;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string | Date;
   }>>(
     `SELECT a.id,
@@ -595,6 +621,13 @@ export async function getProjectRunPageData(
             ${artifactSizeExpr} AS size,
             a.mime,
             ${artifactArchivedExpr} AS archived,
+            ${artifactMetadataExpr} AS metadata_json,
+            ${artifactLifecycleExpr} AS lifecycle_state,
+            ${artifactRetentionExpr} AS retention_until,
+            ${artifactPreviewExpr} AS preview_kind,
+            ${artifactDocExpr} AS doc_id,
+            ${artifactLinkedDocExpr} AS linked_doc_id,
+            ${artifactPromotedExpr} AS promoted_to_memory,
             ${artifactCreatedExpr} AS created_at
        FROM artifacts a
        ${artifactJoins}
@@ -605,6 +638,11 @@ export async function getProjectRunPageData(
     ...artifact,
     archived: Boolean(artifact.archived),
     size: artifact.size === null ? null : Number(artifact.size),
+    lifecycle_state: artifact.lifecycle_state ?? "created",
+    retention_until: nullableIsoStamp(artifact.retention_until),
+    preview_kind: artifact.preview_kind ?? "file",
+    linked_doc_id: artifact.linked_doc_id ?? artifact.doc_id,
+    promoted_to_memory: Boolean(artifact.promoted_to_memory),
     created_at: isoStamp(artifact.created_at),
     downloadHref: `/artifacts/${artifact.id}/download`,
   }));

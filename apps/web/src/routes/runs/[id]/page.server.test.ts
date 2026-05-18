@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
@@ -10,6 +11,19 @@ import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 import { closeDatabase } from "$lib/server/db";
 
 let scratch: string;
+let activeDb: TestStore | null = null;
+let activeOrgId = "";
+let activeProjectId: string | null = null;
+
+mock.module("$lib/server/application-scope", () => ({
+  requestAppScope: async (_locals: unknown, projectId: string | null = null) => {
+    if (!activeDb) throw new Error("test database not initialized");
+    return {
+      em: activeDb,
+      ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
+    };
+  },
+}));
 
 interface RunDetailPayload {
   run: {
@@ -26,7 +40,17 @@ interface RunDetailPayload {
     transcript_path: string | null;
   };
   transcript: string | null;
-  artifacts: Array<{ id: string; title: string; kind: string; downloadHref: string }>;
+  artifacts: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    downloadHref: string;
+    retention_until: string | null;
+    lifecycle_state: string;
+    preview_kind: string;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
+  }>;
   events: Array<{ id: string; created_at: string }>;
 }
 
@@ -42,6 +66,10 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  await activeDb?.close().catch(() => {});
+  activeDb = null;
+  activeOrgId = "";
+  activeProjectId = null;
   await closeDatabase();
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
@@ -58,6 +86,9 @@ async function freshDb(): Promise<{ db: TestStore; orgId: string; projectId: str
     slug: "alpha",
     name: "Alpha",
   });
+  activeDb = db;
+  activeOrgId = org.id;
+  activeProjectId = project.id;
   return { db, orgId: org.id, projectId: project.id };
 }
 
@@ -68,7 +99,7 @@ async function seedRun(
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled",
   transcriptPath: string | null = null,
 ): Promise<string> {
-  const id = makeId();
+  const id = randomUUID();
   await db.query(
     `INSERT INTO agent_runs
       (id, org_id, project_id, agent, model, prompt, status, transcript_path)
@@ -93,15 +124,19 @@ function isRedirect(e: unknown): e is RedirectError {
   );
 }
 
+function formEvent(id: string, fields: Record<string, string>) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+  return {
+    params: { id },
+    request: { formData: async () => form },
+  };
+}
+
 describe("/runs/[id] +page.server.ts", () => {
   test("load returns run + null transcript when transcript_path missing", async () => {
     const { db, orgId, projectId } = await freshDb();
-    let id: string;
-    try {
-      id = await seedRun(db, orgId, projectId, "succeeded", null);
-    } finally {
-      await db.close();
-    }
+    const id = await seedRun(db, orgId, projectId, "succeeded", null);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
     expect(result.activeProjectId).toBeNull();
@@ -116,12 +151,7 @@ describe("/runs/[id] +page.server.ts", () => {
     const { db, orgId, projectId } = await freshDb();
     const tPath = join(scratch, "transcript.txt");
     writeFileSync(tPath, "hello transcript", "utf8");
-    let id: string;
-    try {
-      id = await seedRun(db, orgId, projectId, "succeeded", tPath);
-    } finally {
-      await db.close();
-    }
+    const id = await seedRun(db, orgId, projectId, "succeeded", tPath);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
@@ -130,24 +160,20 @@ describe("/runs/[id] +page.server.ts", () => {
 
   test("load returns artifacts produced by the run through edges", async () => {
     const { db, orgId, projectId } = await freshDb();
-    let id: string;
-    let artifactId: string;
-    try {
-      id = await seedRun(db, orgId, projectId, "succeeded");
-      artifactId = makeId();
-      await db.query(
-        `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime)
-         VALUES ($1, $2, $3, $4, 'text', 'summary.txt', '/tmp/summary.txt', 'text/plain')`,
-        [artifactId, orgId, projectId, id],
-      );
-      await db.query(
-        `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
-         VALUES ($1, $2, $3, 'agent_run', $4, 'artifact', $5, 'produced')`,
-        [makeId(), orgId, projectId, id, artifactId],
-      );
-    } finally {
-      await db.close();
-    }
+    const id = await seedRun(db, orgId, projectId, "succeeded");
+    const artifactId = randomUUID();
+    await db.query(
+      `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime, metadata_json, retention_until)
+       VALUES ($1, $2, $3, $4, 'text', 'summary.txt', '/tmp/summary.txt', 'text/plain',
+               '{"previewKind":"markdown","lifecycleState":"linked","linkedDocId":"doc-1","promotedToMemory":true}'::jsonb,
+               '2026-06-01T00:00:00.000Z')`,
+      [artifactId, orgId, projectId, id],
+    );
+    await db.query(
+      `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
+       VALUES ($1, $2, $3, 'agent_run', $4, 'artifact', $5, 'produced')`,
+      [makeId(), orgId, projectId, id, artifactId],
+    );
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 11}`);
     const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
@@ -157,12 +183,42 @@ describe("/runs/[id] +page.server.ts", () => {
       title: "summary.txt",
       kind: "text",
       downloadHref: `/artifacts/${artifactId}/download`,
+      retention_until: "2026-06-01T00:00:00.000Z",
+      lifecycle_state: "linked",
+      preview_kind: "markdown",
+      linked_doc_id: "doc-1",
+      promoted_to_memory: true,
+    });
+  });
+
+  test("artifact actions archive, link docs, and promote memory metadata", async () => {
+    const { db, orgId, projectId } = await freshDb();
+    const id = await seedRun(db, orgId, projectId, "succeeded");
+    const artifactId = randomUUID();
+    await db.query(
+      `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime, metadata_json)
+       VALUES ($1, $2, $3, $4, 'report', 'handoff.md', 'runs/handoff.md', 'text/markdown', '{}'::jsonb)`,
+      [artifactId, orgId, projectId, id],
+    );
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 12}`);
+    await mod.actions.archiveArtifact(formEvent(id, { artifactId }) as Parameters<typeof mod.actions.archiveArtifact>[0]);
+    await mod.actions.linkArtifactToDoc(formEvent(id, { artifactId, docId: "doc-linked" }) as Parameters<typeof mod.actions.linkArtifactToDoc>[0]);
+    await mod.actions.promoteArtifactToMemory(formEvent(id, { artifactId }) as Parameters<typeof mod.actions.promoteArtifactToMemory>[0]);
+
+    const rows = await db.query<{ archived: boolean; metadata_json: Record<string, unknown> }>(
+      `SELECT archived, metadata_json FROM artifacts WHERE id = $1`,
+      [artifactId],
+    );
+    expect(rows[0]?.archived).toBe(true);
+    expect(rows[0]?.metadata_json).toMatchObject({
+      lifecycleState: "promoted",
+      linkedDocId: "doc-linked",
+      promotedToMemory: true,
     });
   });
 
   test("load throws 404 when run does not exist", async () => {
-    const { db } = await freshDb();
-    await db.close();
+    await freshDb();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     let caught: unknown;
     try {
@@ -180,36 +236,19 @@ describe("/runs/[id] +page.server.ts", () => {
 
   test("cancel action transitions run row to cancelled", async () => {
     const { db, orgId, projectId } = await freshDb();
-    let id: string;
-    try {
-      id = await seedRun(db, orgId, projectId, "running");
-    } finally {
-      await db.close();
-    }
+    const id = await seedRun(db, orgId, projectId, "running");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     await mod.actions.cancel({ params: { id } } as Parameters<typeof mod.actions.cancel>[0]);
-    const dbDir = join(scratch, "pglite.data");
-    const db2 = await openIsolatedStore(dbDir);
-    await migrateIsolatedStore(db2);
-    try {
-      const rows = await db2.query<{ status: string }>(
-        `SELECT status FROM agent_runs WHERE id = $1`,
-        [id],
-      );
-      expect(rows[0]?.status).toBe("cancelled");
-    } finally {
-      await db2.close();
-    }
+    const rows = await db.query<{ status: string }>(
+      `SELECT status FROM agent_runs WHERE id = $1`,
+      [id],
+    );
+    expect(rows[0]?.status).toBe("cancelled");
   });
 
   test("retry action redirects 303 to new run id", async () => {
     const { db, orgId, projectId } = await freshDb();
-    let id: string;
-    try {
-      id = await seedRun(db, orgId, projectId, "failed");
-    } finally {
-      await db.close();
-    }
+    const id = await seedRun(db, orgId, projectId, "failed");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
     let caught: unknown;
     try {

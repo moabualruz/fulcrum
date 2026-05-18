@@ -5,6 +5,11 @@ import { actionOk } from "$lib/feedback/action-result";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
 import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
+import {
+  archiveRunArtifactForWeb,
+  linkRunArtifactToDocForWeb,
+  promoteRunArtifactToMemoryForWeb,
+} from "@workflow-coordination/application/artifacts/commands.ts";
 import type { RunStatus } from "$lib/server/runs";
 
 interface AgentRunDetail {
@@ -94,7 +99,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
             filename: artifact.title,
             path: artifact.body_path,
             mime: artifact.mime,
-            lifecycleState: "created",
+            lifecycleState: artifact.lifecycle_state,
             createdAt: artifact.created_at,
           })),
           memoryCandidates: [],
@@ -131,4 +136,32 @@ export const actions: Actions = {
     const newId = result.id;
     throw redirect(303, `/runs/${newId}`);
   },
+  archiveArtifact: async ({ params, locals, request }) => {
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+    const form = await request.formData();
+    await archiveRunArtifactForWeb(em, ctx, { runId: params.id!, artifactId: requiredField(form, "artifactId") });
+    return actionOk("Artifact archived");
+  },
+  linkArtifactToDoc: async ({ params, locals, request }) => {
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+    const form = await request.formData();
+    await linkRunArtifactToDocForWeb(em, ctx, {
+      runId: params.id!,
+      artifactId: requiredField(form, "artifactId"),
+      docId: requiredField(form, "docId"),
+    });
+    return actionOk("Artifact linked to doc");
+  },
+  promoteArtifactToMemory: async ({ params, locals, request }) => {
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+    const form = await request.formData();
+    await promoteRunArtifactToMemoryForWeb(em, ctx, { runId: params.id!, artifactId: requiredField(form, "artifactId") });
+    return actionOk("Artifact promoted to memory");
+  },
 };
+
+function requiredField(form: FormData, name: string): string {
+  const value = form.get(name);
+  if (typeof value !== "string" || !value.trim()) throw error(400, `${name} is required`);
+  return value.trim();
+}

@@ -36,6 +36,12 @@ export interface ProjectRunPageData {
     size: number | null;
     mime: string | null;
     archived: boolean;
+    lifecycle_state: string;
+    retention_until: string | null;
+    preview_kind: string;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string;
     downloadHref: string;
   }>;

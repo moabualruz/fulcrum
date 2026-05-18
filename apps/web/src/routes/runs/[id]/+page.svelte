@@ -36,6 +36,19 @@
     expandedTurns = next;
   }
 
+  function artifactSizeLabel(size: number | null): string {
+    return size !== null ? `${size} bytes` : "unknown size";
+  }
+
+  function retentionLabel(artifact: { archived: boolean; retention_until: string | null }): string {
+    if (artifact.archived) return "Archived";
+    return artifact.retention_until ? `Retains until ${artifact.retention_until}` : "Retention: keep";
+  }
+
+  function sourceLabel(value: string | null): string {
+    return value ?? "none";
+  }
+
   // 2s polling while client-side (fallback when SSE not available)
   $effect(() => {
     if (!browser) return;
@@ -189,25 +202,64 @@
     {/if}
   </div>
 
-  <!-- Artifacts tab: file list with download -->
+  <!-- Artifacts tab: generated files, retention, provenance, and actions -->
   <div role="tabpanel" data-runs-tabpanel="artifacts" hidden={tab !== "artifacts"}>
     {#if artifacts.length > 0}
-      <ul data-runs-artifacts class={cn("space-y-2")}>
+      <ul data-runs-artifacts class={cn("space-y-3")}>
         {#each artifacts as artifact (artifact.id)}
-          <li class={cn("flex items-center justify-between rounded-md border border-border p-3 text-sm")}>
-            <div class={cn("flex flex-col")}>
-              <span class={cn("font-medium")}>{artifact.title}</span>
-              <span class={cn("text-xs text-muted-foreground")}>
-                {artifact.mime ?? "unknown"} · {artifact.size !== null ? `${artifact.size} bytes` : "unknown size"}
-              </span>
+          <li class={cn("grid gap-3 rounded-md border border-border p-3 text-sm md:grid-cols-[1fr_auto]")}>
+            <div class={cn("min-w-0 space-y-2")}>
+              <div class={cn("flex flex-wrap items-center gap-2")}>
+                <span class={cn("font-medium")}>{artifact.title}</span>
+                <span class={cn("rounded border border-border px-1.5 py-0.5 text-xs text-muted-foreground")}>{artifact.kind}</span>
+                <span data-runs-artifact-preview={artifact.id} class={cn("rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>{artifact.preview_kind} preview</span>
+              </div>
+              <div class={cn("flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground")}>
+                <span>{artifact.mime ?? "unknown"}</span>
+                <span>{artifactSizeLabel(artifact.size)}</span>
+                <span data-runs-artifact-retention={artifact.id}>{retentionLabel(artifact)}</span>
+                <span>Lifecycle: {artifact.lifecycle_state}</span>
+              </div>
+              <div class={cn("flex flex-wrap gap-x-3 gap-y-1 text-xs")}>
+                <a href="/runs/{artifact.run_id ?? run.id}" class={cn("text-primary hover:underline")}>Run {sourceLabel(artifact.run_id ?? run.id)}</a>
+                {#if artifact.project_id}
+                  <a href="/projects/{artifact.project_id}" class={cn("text-primary hover:underline")}>Project {artifact.project_id}</a>
+                {:else}
+                  <span class={cn("text-muted-foreground")}>Project none</span>
+                {/if}
+                {#if artifact.task_id}
+                  <a href="/tasks/{artifact.task_id}" class={cn("text-primary hover:underline")}>Task {artifact.task_id}</a>
+                {:else}
+                  <span class={cn("text-muted-foreground")}>Task none</span>
+                {/if}
+                <span class={cn("text-muted-foreground")}>Doc {sourceLabel(artifact.linked_doc_id ?? artifact.doc_id)}</span>
+                {#if artifact.promoted_to_memory}
+                  <span class={cn("text-muted-foreground")}>Memory promoted</span>
+                {/if}
+              </div>
             </div>
-            {#if artifact.body_path}
-              <a
-                href="/api/artifacts/{artifact.id}/download"
-                data-artifact-download={artifact.id}
-                class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}
-              >Download</a>
-            {/if}
+            <div class={cn("flex flex-wrap items-center gap-2 md:justify-end")}>
+              {#if artifact.body_path}
+                <a
+                  href="/api/artifacts/{artifact.id}/download"
+                  data-artifact-download={artifact.id}
+                  class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}
+                >Download</a>
+              {/if}
+              <form method="POST" action="?/archiveArtifact" use:enhance>
+                <input type="hidden" name="artifactId" value={artifact.id} />
+                <button type="submit" data-runs-artifact-archive={artifact.id} class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}>Archive</button>
+              </form>
+              <form method="POST" action="?/linkArtifactToDoc" use:enhance class={cn("flex items-center gap-1")}>
+                <input type="hidden" name="artifactId" value={artifact.id} />
+                <input name="docId" value={artifact.linked_doc_id ?? artifact.doc_id ?? ""} aria-label="Document id" data-runs-artifact-doc-link={artifact.id} class={cn("h-8 w-36 rounded-md border border-input bg-background px-2 text-xs")} />
+                <button type="submit" class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}>Link doc</button>
+              </form>
+              <form method="POST" action="?/promoteArtifactToMemory" use:enhance>
+                <input type="hidden" name="artifactId" value={artifact.id} />
+                <button type="submit" data-runs-artifact-promote-memory={artifact.id} class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}>Promote memory</button>
+              </form>
+            </div>
           </li>
         {/each}
       </ul>
