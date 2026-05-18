@@ -16,6 +16,8 @@
     connected: "Connected",
     error: "Error",
   };
+
+  const hasSavedSessions = model.resumableSessions.length > 0;
 </script>
 
 <section
@@ -30,7 +32,9 @@
       {#if model.session}
         <p data-session-title class={cn("mt-1 text-sm text-muted-foreground")}>{model.session.title}</p>
       {:else}
-        <p data-session-empty class={cn("mt-1 text-sm text-muted-foreground")}>No active session</p>
+        <p data-session-empty class={cn("mt-1 text-sm text-muted-foreground")}>
+          {hasSavedSessions ? "No active session" : "No saved sessions yet."}
+        </p>
       {/if}
     </div>
     <span data-session-status-label class={cn("rounded-md border border-border px-2 py-1 text-xs")}>
@@ -42,8 +46,20 @@
     <p data-session-error class={cn("mt-3 text-sm text-destructive")}>{model.connection.error}</p>
   {/if}
 
+  {#if !model.session && !hasSavedSessions}
+    <div data-session-empty-state class={cn("mx-auto mt-6 flex max-w-sm flex-col items-center gap-3 py-6 text-center")}>
+      <div>
+        <h3 class={cn("text-sm font-semibold")}>No saved sessions yet.</h3>
+        <p class={cn("mt-1 text-sm text-muted-foreground")}>Create a new session to Begin.</p>
+      </div>
+      <a href="#agent-connect-form" class={cn(buttonVariants({ variant: "default", size: "sm" }), "empty-create-btn")}>
+        Create Session
+      </a>
+    </div>
+  {/if}
+
   {#if model.connection.status === "idle"}
-    <form method="POST" action="?/connectBridge" data-connect-bridge class={cn("mt-4 grid gap-3 rounded-md border border-border p-3")}>
+    <form id="agent-connect-form" method="POST" action="?/connectBridge" data-connect-bridge class={cn("mt-4 grid gap-3 rounded-md border border-border p-3")}>
       <h3 class={cn("text-sm font-medium")}>Connect to agent</h3>
       <div class={cn("grid grid-cols-2 gap-2")}>
         <input name="agentName" placeholder="Agent name" required class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />

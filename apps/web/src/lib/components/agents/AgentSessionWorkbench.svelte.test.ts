@@ -45,7 +45,12 @@ describe("AgentSessionWorkbench component", () => {
 
     expect(body).toContain('data-session-status="idle"');
     expect(body).toContain("data-session-empty");
-    expect(body).toContain("No active session");
+    expect(body).toContain("data-session-empty-state");
+    expect(body).toContain("No saved sessions yet.");
+    expect(body).toContain("Create a new session to Begin.");
+    expect(body).toContain("Create Session");
+    expect(body).toContain('href="#agent-connect-form"');
+    expect(body).toContain("empty-create-btn");
     expect(body).toContain("No messages");
     expect(body).toContain("data-connect-bridge");
     expect(body).not.toContain("data-session-permission");

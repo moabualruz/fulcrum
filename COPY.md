@@ -90,6 +90,13 @@ One sentence naming the next workflow action.
 >
 > [ Start planning ]   Press `n` or hand off from a doc in Capture.
 
+**AI Assist (no saved sessions yet):**
+> No saved sessions yet.
+>
+> Create a new session to Begin.
+>
+> [ Create Session ]
+
 **Build / board (no tasks yet):**
 > No tasks in this cycle.
 >
