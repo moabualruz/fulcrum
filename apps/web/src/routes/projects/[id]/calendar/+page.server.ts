@@ -1,4 +1,4 @@
-import { fail } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { loadProjectCalendar, rescheduleProjectTask } from "@work-management/interface/project-timeline.ts";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
@@ -6,8 +6,12 @@ import { requestProjectScope } from "../../project-request-scope";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const projectId = params.id;
-  const { em, ctx } = await requestProjectScope(locals, projectId);
-  return loadProjectCalendar(em, ctx);
+  try {
+    const { em, ctx } = await requestProjectScope(locals, projectId);
+    return await loadProjectCalendar(em, ctx);
+  } catch {
+    throw error(404, "Project not found");
+  }
 };
 
 export const actions: Actions = {
