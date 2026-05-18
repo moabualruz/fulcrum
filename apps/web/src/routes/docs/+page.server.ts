@@ -69,18 +69,32 @@ export const load: PageServerLoad = ({ url, locals, fetch, request }) => {
     q,
     streamed: {
       data: (async () => {
-        const allDocs = await createDocumentApiForEvent({ url, locals, fetch, request }).docs.list();
-        let documents = (allDocs as PublicDocument[]).map((doc) => toDocRow(doc));
-        if (kind) documents = documents.filter((doc) => doc.kind === kind);
-        if (q.trim()) {
-          const needle = q.trim().toLowerCase();
-          documents = documents.filter((doc) =>
-            doc.title.toLowerCase().includes(needle) || doc.body_excerpt.toLowerCase().includes(needle)
-          );
+        try {
+          const allDocs = await createDocumentApiForEvent({ url, locals, fetch, request }).docs.list();
+          let documents = (allDocs as PublicDocument[]).map((doc) => toDocRow(doc));
+          if (kind) documents = documents.filter((doc) => doc.kind === kind);
+          if (q.trim()) {
+            const needle = q.trim().toLowerCase();
+            documents = documents.filter((doc) =>
+              doc.title.toLowerCase().includes(needle) || doc.body_excerpt.toLowerCase().includes(needle)
+            );
+          }
+          const projectTree = loadDocTree(documents, "project", activeProjectId);
+          const globalTree = loadDocTree(documents, "global", null);
+          return { documents, projectTree, globalTree, error: null };
+        } catch (error) {
+          console.error("docs:list failed", error);
+          return {
+            documents: [] as DocRow[],
+            projectTree: [] as DocTreeNode[],
+            globalTree: [] as DocTreeNode[],
+            error: {
+              message: "Documents could not load.",
+              recovery: "Retry after the local API is reachable.",
+              traceId: "docs-list",
+            },
+          };
         }
-        const projectTree = loadDocTree(documents, "project", activeProjectId);
-        const globalTree = loadDocTree(documents, "global", null);
-        return { documents, projectTree, globalTree };
       })(),
     },
   };

@@ -91,6 +91,15 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /<ws>/global-docs                                         workspace-level docs
 /<ws>/projects                                            project list (Linear-style)
 
+# Docs hub (app surface; lists project + global documents)
+/docs                                                     docs hub: project tree, global tree, kind + text filters, link to /docs/new
+/docs/new                                                 new document form
+/docs/global                                              global docs tree
+/docs/<docId>                                             document viewer
+/docs/<docId>/edit                                        document editor
+/docs/<docId>/history                                     document version history
+/docs/<docId>/planning                                    planning view tied to document
+
 # System (workspace scope)
 /<ws>/doctor                                              workspace doctor
 /<ws>/settings                                            workspace settings
@@ -128,7 +137,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 
 # Marketing (prerendered, separate /app shell)
 /                                                         landing
-/docs                                                     public docs
+/marketing/docs                                           public marketing docs (separate from app /docs hub)
 /changelog
 
 # System surfaces (internal previews + platform shells)

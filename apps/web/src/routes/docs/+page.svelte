@@ -111,7 +111,22 @@
 		>Apply</button>
 	</form>
 
-	{#if payload.documents.length === 0 && data.kind === "" && data.q === ""}
+	{#if payload.error}
+		<div
+			data-docs-error
+			role="alert"
+			class={cn("rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-sm")}
+		>
+			<p class={cn("font-medium")}>{payload.error.message}</p>
+			<p class={cn("mt-1 text-muted-foreground")}>Recovery: {payload.error.recovery}</p>
+			<p class={cn("mt-1 font-mono text-xs text-muted-foreground")}>trace: {payload.error.traceId}</p>
+			<a
+				href="/docs"
+				data-docs-error-retry
+				class={cn(buttonVariants({ variant: "outline" }), "mt-3 gap-2")}
+			>Retry</a>
+		</div>
+	{:else if payload.documents.length === 0 && data.kind === "" && data.q === ""}
 		<div
 			data-empty-docs
 			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
