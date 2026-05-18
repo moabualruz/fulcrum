@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import { BadRequestException } from "@nestjs/common";
 
 import {
   WORKFLOW_AUDIT_ENTITIES,
@@ -29,6 +30,14 @@ const AUDIT_ID = "33333333-3333-4333-8333-333333333333";
 let pglite: PGlite | undefined;
 let socketServer: PGLiteSocketServer | undefined;
 let postgres: TemporaryPostgres | undefined;
+
+class HeaderCapture {
+  readonly headers = new Map<string, string>();
+
+  setHeader(name: string, value: string): void {
+    this.headers.set(name.toLowerCase(), value);
+  }
+}
 
 async function startPgliteSocket(): Promise<string> {
   pglite = await PGlite.create();
@@ -134,6 +143,7 @@ async function assertAuditPublicApiRoundTrip(
       kind: "task",
       subjectId: "task-1",
       verb: "task.created",
+      traceId: `trace-audit-${source}`,
       since: "2026-05-13T00:00:00.000Z",
       until: "2026-05-15T00:00:00.000Z",
       limit: 25,
@@ -155,17 +165,27 @@ async function assertAuditPublicApiRoundTrip(
       total: 1,
     });
 
+    const jsonHeaders = new HeaderCapture();
     await expect(controller.exportAuditEvents({
       orgId: ORG_ID,
       projectId: "project-1",
       userId: "user-1",
       format: "json",
-    })).resolves.toEqual([
+    }, jsonHeaders)).resolves.toEqual([
       expect.objectContaining({ id: AUDIT_ID, traceId: `trace-audit-${source}` }),
     ]);
-    await expect(controller.exportAuditEvents({ orgId: ORG_ID, format: "csv" })).resolves.toContain(
+    const jobId = jsonHeaders.headers.get("x-fulcrum-audit-export-job-id");
+    expect(jobId).toEqual(expect.any(String));
+    await expect(controller.getExportStatus({ orgId: ORG_ID }, { jobId: jobId! })).resolves.toMatchObject({
+      status: "completed",
+      format: "json",
+      content: expect.stringContaining(AUDIT_ID),
+    });
+    const csvHeaders = new HeaderCapture();
+    await expect(controller.exportAuditEvents({ orgId: ORG_ID, format: "csv" }, csvHeaders)).resolves.toContain(
       "id,orgId,projectId,userId,verb,subjectKind,subjectId,payload,createdAt",
     );
+    expect(csvHeaders.headers.get("content-type")).toBe("text/csv; charset=utf-8");
 
     await expect(controller.getRetentionPolicy({ orgId: ORG_ID })).resolves.toBeNull();
     await expect(controller.setRetentionPolicy({ orgId: ORG_ID }, { retainDays: 30 })).resolves.toMatchObject({
@@ -203,6 +223,8 @@ async function assertAuditPublicApiRoundTrip(
       projectId: null,
       retainDays: 0,
     });
+    await expect(controller.setRetentionPolicy({ orgId: ORG_ID }, { retainDays: -1 }))
+      .rejects.toBeInstanceOf(BadRequestException);
   } finally {
     await dataSource.destroy();
   }

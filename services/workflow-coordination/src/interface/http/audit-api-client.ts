@@ -20,6 +20,7 @@ export interface AuditApiFilters {
   subjectKind?: string;
   subjectId?: string;
   verb?: string;
+  traceId?: string;
   since?: string | Date;
   until?: string | Date;
   dateRange?: {
@@ -138,6 +139,7 @@ function auditQuery(input: AuditApiFilters): Record<string, unknown> {
     kind: input.kind ?? input.subjectKind,
     subjectId: input.subjectId,
     verb: input.verb,
+    traceId: input.traceId,
     since: toIsoString(input.since ?? input.dateRange?.from),
     until: toIsoString(input.until ?? input.dateRange?.to),
     limit: input.limit,

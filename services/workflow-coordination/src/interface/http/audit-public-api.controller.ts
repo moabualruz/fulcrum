@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Inject,
@@ -37,6 +38,7 @@ export interface AuditPublicApplication {
     kind?: string;
     subjectId?: string;
     verb?: string;
+    traceId?: string;
     since?: string;
     until?: string;
     limit?: number;
@@ -58,7 +60,7 @@ export interface AuditPublicApplication {
   getExportStatus?(input: {
     orgId: string;
     jobId: string;
-  }): Promise<AuditExportStatusResponseDto>;
+  }): Promise<AuditExportStatusResponseDto | null>;
 }
 
 export interface AuditPublicApiOptions {
@@ -68,6 +70,12 @@ export interface AuditPublicApiOptions {
 
 export interface HeaderWritableResponse {
   setHeader(name: string, value: string): void;
+}
+
+interface AuditExportResult {
+  content: unknown[] | string;
+  format: "json" | "csv";
+  jobId?: string;
 }
 
 export class AuditPublicApiService {
@@ -80,18 +88,27 @@ export class AuditPublicApiService {
     return await this.queryApplication(query);
   }
 
-  async exportAuditEvents(query: AuditExportQueryDto): Promise<unknown[] | string> {
+  async exportAuditEvents(query: AuditExportQueryDto): Promise<AuditExportResult> {
     const format = query.format ?? "json";
     const result = await this.queryApplication({
       ...query,
-      limit: query.limit ?? 100_000,
+      limit: query.limit ?? 10_000,
       offset: query.offset ?? 0,
     });
 
-    if (format === "csv") {
-      return eventsToCsv(result.data);
-    }
-    return result.data;
+    const content = format === "csv" ? eventsToCsv(result.data) : result.data;
+    const job = this.store
+      ? await this.store.createExportJob({
+        orgId: query.orgId,
+        format,
+        content: typeof content === "string" ? content : JSON.stringify(content),
+      })
+      : null;
+    return {
+      content,
+      format,
+      jobId: job?.jobId,
+    };
   }
 
   async getExportStatus(
@@ -100,10 +117,11 @@ export class AuditPublicApiService {
   ): Promise<AuditExportStatusResponseDto> {
     const application = this.requireApplication();
     if (application.getExportStatus) {
-      return await application.getExportStatus({
+      const status = await application.getExportStatus({
         orgId: query.orgId,
         jobId: param.jobId,
       });
+      if (status) return status;
     }
     throw new NotFoundException({ error: "audit export job not found" });
   }
@@ -142,7 +160,7 @@ export class AuditPublicApiService {
     query: AuditRetentionPolicyQueryDto,
     body: AuditRetentionPolicySetBodyDto,
   ): Promise<AuditRetentionPolicyResponseDto> {
-    const retainDays = parseBoundedInteger(body.retainDays, 0, 100_000) ?? 0;
+    const retainDays = parseRequiredBoundedInteger(body.retainDays, 0, 100_000);
     const application = this.requireApplication();
     const input = {
       orgId: query.orgId,
@@ -167,6 +185,7 @@ export class AuditPublicApiService {
       kind: query.kind,
       subjectId: query.subjectId,
       verb: query.verb,
+      traceId: query.traceId,
       since: query.since,
       until: query.until,
       limit: parseBoundedInteger(query.limit, 1, 100_000),
@@ -184,6 +203,7 @@ export class AuditPublicApiService {
     if (this.store) {
       return {
         queryAuditEvents: (input) => this.store!.queryAuditEvents(input),
+        getExportStatus: (input) => this.store!.getExportStatus(input),
       };
     }
     throw new InternalServerErrorException("Audit public API application facade is not configured.");
@@ -202,11 +222,14 @@ export class AuditPublicApiController {
     response?: HeaderWritableResponse,
   ): Promise<unknown[] | string> {
     const exported = await this.audit.exportAuditEvents(query);
-    if ((query.format ?? "json") === "csv") {
+    if (exported.jobId) {
+      response?.setHeader("x-fulcrum-audit-export-job-id", exported.jobId);
+    }
+    if (exported.format === "csv") {
       response?.setHeader("content-type", "text/csv; charset=utf-8");
       response?.setHeader("content-disposition", 'attachment; filename="audit.csv"');
     }
-    return exported;
+    return exported.content;
   }
 
   async getExportStatus(
@@ -263,6 +286,18 @@ function parseBoundedInteger(
   return Math.min(Math.max(parsed, min), max);
 }
 
+function parseRequiredBoundedInteger(
+  value: number | string,
+  min: number,
+  max: number,
+): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new BadRequestException(`retainDays must be an integer from ${min} to ${max}.`);
+  }
+  return parsed;
+}
+
 function eventValue(event: unknown, key: string): unknown {
   if (!event || typeof event !== "object") return undefined;
   return (event as Record<string, unknown>)[key];
@@ -290,7 +325,7 @@ Inject(AuditPublicApiService)(AuditPublicApiController, undefined, 0);
 
 IsString()(AuditListQueryDto.prototype, "orgId");
 MinLength(1)(AuditListQueryDto.prototype, "orgId");
-for (const property of ["projectId", "userId", "kind", "subjectId", "verb", "since", "until"] as const) {
+for (const property of ["projectId", "userId", "kind", "subjectId", "verb", "traceId", "since", "until"] as const) {
   IsOptional()(AuditListQueryDto.prototype, property);
   IsString()(AuditListQueryDto.prototype, property);
   MinLength(1)(AuditListQueryDto.prototype, property);
