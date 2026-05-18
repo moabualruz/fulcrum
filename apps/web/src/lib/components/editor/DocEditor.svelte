@@ -496,15 +496,60 @@
   }
 
   :global(.callout) {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.5rem;
+    align-items: start;
     border-left: 4px solid;
     border-radius: 0.375rem;
     margin: 0.75rem 0;
     padding: 0.75rem 1rem;
+    color: oklch(0.25 0.01 270);
   }
-  :global(.callout--info) { background: #eff6ff; border-color: #3b82f6; }
-  :global(.callout--warning) { background: #fffbeb; border-color: #f59e0b; }
-  :global(.callout--tip) { background: #ecfdf5; border-color: #10b981; }
-  :global(.callout--danger) { background: #fef2f2; border-color: #ef4444; }
+  :global(.callout__icon) {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: oklch(0.99 0.005 270);
+  }
+  :global(.callout__body) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  :global(.callout__body > *:first-child) {
+    margin-top: 0;
+  }
+  :global(.callout--info) {
+    background: oklch(0.97 0.03 240);
+    border-color: oklch(0.62 0.15 240);
+  }
+  :global(.callout__icon--info) { background: oklch(0.62 0.15 240); }
+  :global(.callout--warning) {
+    background: oklch(0.97 0.05 80);
+    border-color: oklch(0.7 0.16 80);
+  }
+  :global(.callout__icon--warning) { background: oklch(0.7 0.16 80); }
+  :global(.callout--error) {
+    background: oklch(0.96 0.04 25);
+    border-color: oklch(0.62 0.2 25);
+  }
+  :global(.callout__icon--error) { background: oklch(0.62 0.2 25); }
+  :global(.callout--success) {
+    background: oklch(0.96 0.05 145);
+    border-color: oklch(0.62 0.15 145);
+  }
+  :global(.callout__icon--success) { background: oklch(0.62 0.15 145); }
+  :global(.callout--tip) {
+    background: oklch(0.97 0.04 165);
+    border-color: oklch(0.65 0.13 165);
+  }
+  :global(.callout__icon--tip) { background: oklch(0.65 0.13 165); }
 
   :global(.doc-editor__content details) {
     border: 1px solid hsl(var(--border, 214 32% 91%));
