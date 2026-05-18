@@ -117,6 +117,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 # Auth
 /auth/login
 /auth/signup
+/onboarding                                           signup verification + workspace setup
 /auth/invite/<token>
 /auth/logout
 

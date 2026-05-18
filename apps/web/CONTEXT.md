@@ -61,7 +61,7 @@ A workspace-scope route with no active Project — Dashboard, Projects list, Glo
 _Avoid_: Home, overview, global page.
 
 **OnboardingFlow**:
-The first-run boot path: workspace name → first project prompt → Capture editor with cursor on blank doc, plus the two coachmarks (first Play, first TraceBadge pulse). Not a tutorial overlay system.
+The first-run boot path: user signup → email verification → workspace name/slug reservation → first project prompt → Capture editor with cursor on blank doc, plus the two coachmarks (first Play, first TraceBadge pulse). Not a tutorial overlay system.
 _Avoid_: Tour, walkthrough, getting started, wizard.
 
 ## Relationships
@@ -75,7 +75,7 @@ _Avoid_: Tour, walkthrough, getting started, wizard.
 - The **StatusFooter**'s right-most segment also opens the **AcpDrawer** (`⌘/` from anywhere); both entry points share one drawer instance.
 - The **TraceBadge** appears in **ScopeBar**, **StatusFooter**, **AcpDrawer** header, every error inline, every audit row — same id, four surfaces.
 - A **PortfolioSurface** has no Project Scope; the **StageRail** collapses or swaps to portfolio nav when active.
-- The **OnboardingFlow** terminates at the Capture **Workbench**; subsequent sessions never re-enter it.
+- The **OnboardingFlow** starts at `/onboarding`, keeps one trace through signup and workspace setup, then terminates at the Capture **Workbench**; subsequent sessions never re-enter it.
 - Every **Workbench**, **AcpDrawer** action, and **CommandPalette** entry calls a service (tRPC client → NestJS service in `services/**`); this app holds no domain state beyond ephemeral UI state in `$lib/stores`.
 
 ## Example dialogue
