@@ -12,6 +12,7 @@ import {
 import {
   appErrorToCliExit,
   appErrorToHttpResponse,
+  toAppError,
 } from "@platform-core/application/error-mapping.ts";
 
 describe("application error transport mapping", () => {
@@ -33,5 +34,30 @@ describe("application error transport mapping", () => {
     expect(appErrorToCliExit(new AppConflictError("conflict"))).toBe(1);
     expect(appErrorToCliExit(new AppInvariantError("broken"))).toBe(1);
     expect(appErrorToCliExit(new AppExternalDependencyError("down"))).toBe(1);
+  });
+
+  test("preserves validation field errors in HTTP response bodies", () => {
+    const response = appErrorToHttpResponse(new AppValidationError("Invalid task.", {
+      fieldErrors: { title: ["Required"], status: ["Unknown status"] },
+    }));
+
+    expect(response).toEqual({
+      status: 400,
+      body: {
+        error: "Invalid task.",
+        code: "validation",
+        fieldErrors: { title: ["Required"], status: ["Unknown status"] },
+      },
+    });
+  });
+
+  test("sanitizes unknown and invariant errors before public transport mapping", () => {
+    const unknown = toAppError(new Error("database password leaked in stack"));
+    const invariant = appErrorToHttpResponse(new AppInvariantError("sql constraint user_email_key failed"));
+    const external = appErrorToHttpResponse(new AppExternalDependencyError("provider token abc123 failed"));
+
+    expect(unknown.message).toBe("Internal server error.");
+    expect(invariant.body.error).toBe("Internal server error.");
+    expect(external.body.error).toBe("External dependency unavailable.");
   });
 });

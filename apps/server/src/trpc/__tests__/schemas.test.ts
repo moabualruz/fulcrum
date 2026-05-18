@@ -13,7 +13,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 
-const SCHEMAS_DIR = join(import.meta.dir, "../../apps/server/src/trpc/schemas");
+const SCHEMAS_DIR = join(import.meta.dir, "../schemas");
 
 const schemaFiles = readdirSync(SCHEMAS_DIR).filter((f) => f.endsWith(".ts"));
 

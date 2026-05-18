@@ -20,6 +20,11 @@ const CLI_EXITS: Record<AppErrorKind, number> = {
   external_dependency: 1,
 };
 
+const PUBLIC_MESSAGES: Partial<Record<AppErrorKind, string>> = {
+  invariant: "Internal server error.",
+  external_dependency: "External dependency unavailable.",
+};
+
 export interface AppHttpErrorResponse {
   status: number;
   body: {
@@ -32,7 +37,11 @@ export interface AppHttpErrorResponse {
 
 export function toAppError(error: unknown): AppError {
   if (error instanceof AppError) return error;
-  return new AppInvariantError(error instanceof Error ? error.message : String(error), { cause: error });
+  return new AppInvariantError(PUBLIC_MESSAGES.invariant!, { cause: error });
+}
+
+export function publicAppErrorMessage(error: AppError): string {
+  return PUBLIC_MESSAGES[error.kind] ?? error.message;
 }
 
 export function appErrorToHttpResponse(error: unknown): AppHttpErrorResponse {
@@ -40,7 +49,7 @@ export function appErrorToHttpResponse(error: unknown): AppHttpErrorResponse {
   return {
     status: HTTP_STATUSES[appError.kind],
     body: {
-      error: appError.message,
+      error: publicAppErrorMessage(appError),
       code: appError.kind,
       ...(appError.fieldErrors ? { fieldErrors: appError.fieldErrors } : {}),
       ...(appError.details ? { details: appError.details } : {}),
