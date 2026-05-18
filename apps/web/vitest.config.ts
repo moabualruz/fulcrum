@@ -1,8 +1,11 @@
-import { defineConfig } from "vitest/config";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
+import { defineConfig, mergeConfig } from "vitest/config";
 
-export default defineConfig({
+import commonConfig from "../../vitest.config.ts";
+
+const webConfig = defineConfig({
+  root: new URL(".", import.meta.url).pathname,
   plugins: [tailwindcss(), svelte()],
   resolve: {
     conditions: ["browser"],
@@ -39,9 +42,11 @@ export default defineConfig({
     },
   },
   test: {
+    name: "web-node",
     environment: "happy-dom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/vitest/**/*.test.ts"],
+    exclude: ["tests/vitest/**/*.browser.test.ts"],
     coverage: {
       provider: "v8",
       include: [
@@ -61,3 +66,5 @@ export default defineConfig({
     },
   },
 });
+
+export default mergeConfig(commonConfig, webConfig);
