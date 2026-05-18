@@ -11,9 +11,8 @@ import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 import {
   WorkflowSettingsStore,
-  type WorkflowMethodology,
-  type WorkflowTransitionGraph,
 } from "@work-management/infrastructure/database/workflow-settings-store.ts";
+import type { WorkflowMethodology, WorkflowTransitionGraph } from "@work-management/domain/workflow-settings.ts";
 
 import { WorkflowDefaultRequestDto, WorkflowProjectScopeDto, WorkflowTaskTypesUpdateDto, WorkflowMethodologyUpdateDto, WorkflowTransitionsUpdateDto, WorkflowTransitionValidationDto } from "./dto/workflow-settings.dto.ts";
 export { WorkflowDefaultRequestDto, WorkflowProjectScopeDto, WorkflowTaskTypesUpdateDto, WorkflowMethodologyUpdateDto, WorkflowTransitionsUpdateDto, WorkflowTransitionValidationDto };

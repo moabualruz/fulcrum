@@ -4,9 +4,7 @@ import {
   FulcrumProjectEntity,
   type FulcrumProject,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
-
-export type WorkflowMethodology = "scrum" | "kanban" | "none";
-export type WorkflowTransitionGraph = Record<string, string[]>;
+import type { WorkflowMethodology, WorkflowTransitionGraph } from "@work-management/domain/workflow-settings.ts";
 
 export interface WorkflowProjectScope {
   orgId: string;

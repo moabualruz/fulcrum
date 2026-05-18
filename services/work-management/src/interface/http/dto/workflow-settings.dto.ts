@@ -1,7 +1,7 @@
 import type {
   WorkflowMethodology,
   WorkflowTransitionGraph,
-} from "@work-management/infrastructure/database/workflow-settings-store.ts";
+} from "@work-management/domain/workflow-settings.ts";
 
 export class WorkflowDefaultRequestDto {
   methodology!: WorkflowMethodology;
