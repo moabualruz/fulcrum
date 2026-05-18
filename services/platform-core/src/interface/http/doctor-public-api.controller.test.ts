@@ -28,10 +28,19 @@ describe("doctor public Nest API", () => {
   });
 
   test("serves the shared health-check report and subsystem list", async () => {
-    const controller = new DoctorPublicApiController(new DoctorPublicApiService());
+    const controller = new DoctorPublicApiController(new DoctorPublicApiService({
+      platformChecks: async () => [{
+        name: "platform.telemetry",
+        status: "warn",
+        message: "Telemetry opted_in is unset.",
+        recovery: "Set telemetry opt-in to true or false.",
+        checked_at: new Date().toISOString(),
+      }],
+    }));
     const report = await controller.run() as {
       version?: string;
       checks?: unknown[];
+      platformChecks?: Array<{ name?: string; severity?: string }>;
       summary?: { total?: number };
     };
     const subsystems = await controller.subsystems() as string[];
@@ -42,9 +51,15 @@ describe("doctor public Nest API", () => {
     expect(report.checks).toContainEqual(expect.objectContaining({
       name: "product-database",
       subsystem: "database",
+      severity: expect.any(String),
+    }));
+    expect(report.platformChecks).toContainEqual(expect.objectContaining({
+      name: "platform.telemetry",
+      severity: "warning",
     }));
     expect(subsystems).toContain("cli");
     expect(subsystems).toContain("database");
+    expect(subsystems).toContain("platform");
     expect([...subsystems].sort()).toEqual(subsystems);
   });
 });

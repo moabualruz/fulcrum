@@ -325,6 +325,21 @@ describe("runApiDoctorChecks integration", () => {
     expect(json.subsystem).toBe("api");
     expect(Array.isArray(json.checks)).toBe(true);
     expect(typeof json.summary.pass).toBe("number");
+    expect(json.checks.every((check: { severity?: string }) => typeof check.severity === "string")).toBe(true);
+  });
+
+  test("bounds slow API readiness checks with timeout failures", async () => {
+    const result = await runApiDoctorChecks({
+      ...buildDefaultApiDoctorConfig(),
+      publicApiEnabled: true,
+      timeoutMs: 10,
+      checkRestSurface: async () => await new Promise(() => {}),
+    });
+    const check = findCheck(result, "rest-surface");
+    expect(check.status).toBe("fail");
+    expect(check.severity).toBe("critical");
+    expect(check.message).toContain("timed out");
+    expect(check.recovery).toContain("doctor --subsystem api");
   });
 });
 

@@ -1,7 +1,7 @@
 // Doctor runner — parallel batch execution with per-check timeout and
 // exponential backoff on flaky checks.
 
-import type { DoctorCheckDef, DoctorCheckResult, CheckStatus } from "./types.ts";
+import type { CheckSeverity, CheckStatus, DoctorCheckDef, DoctorCheckResult } from "./types.ts";
 
 export interface RunnerOpts {
   /** Per-check timeout in ms (default 10_000). */
@@ -14,6 +14,13 @@ export interface RunnerOpts {
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_RETRIES = 2;
+const DEFAULT_RECOVERY = "Inspect the subsystem-specific doctor output and rerun `fulcrum doctor` after repair.";
+
+function severityForStatus(status: CheckStatus): CheckSeverity {
+  if (status === "fail") return "critical";
+  if (status === "warn") return "warning";
+  return "info";
+}
 
 async function runOneCheck(
   def: DoctorCheckDef,
@@ -31,6 +38,8 @@ async function runOneCheck(
       name: def.name,
       subsystem: def.subsystem,
       durationMs: Date.now() - t0,
+      severity: result.severity ?? severityForStatus(result.status),
+      recovery: result.recovery ?? (result.status === "ok" ? undefined : DEFAULT_RECOVERY),
       ...result,
     };
   } catch (err) {
@@ -38,7 +47,9 @@ async function runOneCheck(
       name: def.name,
       subsystem: def.subsystem,
       status: "fail" as CheckStatus,
+      severity: "critical",
       message: (err as Error).message,
+      recovery: DEFAULT_RECOVERY,
       durationMs: Date.now() - t0,
     };
   }
