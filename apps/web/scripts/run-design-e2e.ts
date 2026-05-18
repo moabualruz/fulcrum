@@ -3,10 +3,14 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 const specDir = path.join(process.cwd(), "tests/design-e2e");
-const specs = readdirSync(specDir)
-	.filter((file) => file.endsWith(".spec.ts"))
-	.sort()
-	.map((file) => path.join("tests/design-e2e", file));
+const requestedSpecs = process.argv.slice(2);
+const specs =
+	requestedSpecs.length > 0
+		? requestedSpecs
+		: readdirSync(specDir)
+				.filter((file) => file.endsWith(".spec.ts"))
+				.sort()
+				.map((file) => path.join("tests/design-e2e", file));
 
 const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "1");
 const basePort = Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE ?? String(12000 + (process.pid % 100) * 100));
