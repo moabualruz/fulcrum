@@ -25,6 +25,29 @@ async function captureRun(args: string[]): Promise<{ stdout: string; error?: Err
   }
 }
 
+async function runMain(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const proc = Bun.spawn([
+    process.execPath,
+    "run",
+    "apps/cli/src/main.ts",
+    ...args,
+  ], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      HOME: process.env["HOME"]!,
+      FULCRUM_HOME: process.env["FULCRUM_HOME"]!,
+    },
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { stdout, stderr, exitCode };
+}
+
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "fulcrum-component-source-"));
   previousHome = process.env["HOME"];
@@ -73,6 +96,36 @@ describe("component CLI source command", () => {
     expect((await captureRun(["plan", "wat", "rules.global"])).error?.message).toContain("usage:");
     expect((await captureRun(["plan", "install", "rules.global", "--agent"])).error?.message).toContain("missing value");
     expect((await captureRun(["plan", "install", "rules.global", "--agent", "nope"])).error?.message).toContain("unknown agent");
+  });
+
+  it("applies component dry-run plans without mutating lifecycle status", async () => {
+    const dryRun = await captureRun(["install", "rules.global", "--agent", "codex", "--dry-run", "--json"]);
+    const plan = JSON.parse(dryRun.stdout.slice(0, dryRun.stdout.indexOf("\nDRY RUN")));
+
+    expect(plan.target).toBe("rules.global");
+    expect(plan.actions[0]).toMatchObject({
+      componentId: "rules.global",
+      agentId: "codex",
+      change: "create-or-update",
+      target: "agent-rules-files",
+    });
+    expect(dryRun.stdout).toContain("DRY RUN rules.global:sentinel:codex:install create-or-update sentinel-block agent-rules-files");
+
+    const status = await captureRun(["status", "rules.global", "--json"]);
+    expect(JSON.parse(status.stdout)).toMatchObject({
+      componentId: "rules.global",
+      status: "not-installed",
+      ledgerExists: false,
+    });
+  });
+
+  it("routes plural components alias through main for status JSON", async () => {
+    const result = await runMain(["components", "status", "--json"]);
+    const payload = JSON.parse(result.stdout) as Array<{ componentId: string; status: string }>;
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(payload.some((row) => row.componentId === "rules.global")).toBe(true);
   });
 
   it("reports ledger-backed status including missing native roots", async () => {
