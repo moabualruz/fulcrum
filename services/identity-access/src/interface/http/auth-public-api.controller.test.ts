@@ -142,6 +142,9 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
 
     await expect(controller.whoami(scope)).resolves.toMatchObject({
       orgId: scope.orgId,
+      activeOrgId: scope.orgId,
+      sessionId: null,
+      sessionExpiresAt: null,
       userId: scope.userId,
       role: "owner",
       orgName: "Auth",
@@ -163,6 +166,8 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
       userId: "invitee@example.com",
     });
     expect(inviteeSession).toMatchObject({
+      activeOrgId: scope.orgId,
+      sessionId: null,
       email: "invitee@example.com",
       role: "member",
     });

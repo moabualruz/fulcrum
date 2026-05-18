@@ -11,8 +11,12 @@ describe("auth whoami parity", () => {
           whoami: async () => ({
             userId: "user_01",
             orgId: "org_01",
+            activeOrgId: "org_01",
+            sessionId: "session_01",
+            sessionExpiresAt: "2026-05-18T00:00:00.000Z",
             email: "admin@local",
             role: "owner",
+            orgName: "Local",
           }),
         },
       },
@@ -24,8 +28,12 @@ describe("auth whoami parity", () => {
     expect(JSON.parse(lines[0] ?? "{}")).toEqual({
       userId: "user_01",
       orgId: "org_01",
+      activeOrgId: "org_01",
+      sessionId: "session_01",
+      sessionExpiresAt: "2026-05-18T00:00:00.000Z",
       email: "admin@local",
       role: "owner",
+      orgName: "Local",
     });
   });
 

@@ -44,6 +44,10 @@ _Avoid_: Setting, toggle, config, preference.
 The resolved per-request triple `{ userId, orgId, session }` produced from the incoming **Session** and passed into application services.
 _Avoid_: Request context, principal, auth state.
 
+**SessionContext**:
+The stable API/CLI/TUI envelope derived from **AuthApplicationContext**: `userId`, active **Org**, `sessionId`, expiry, email, **Role**, **Org** name, and passkey count. It is a DTO, never a Better-Auth entity.
+_Avoid_: raw session, Better-Auth response, current user blob
+
 **Passkey**:
 A WebAuthn credential bound to a **User** for passwordless sign-in; counted on the **Session** context as `passkeyCount`.
 _Avoid_: Key, WebAuthn record, FIDO credential.
@@ -62,6 +66,7 @@ _Avoid_: Cloud mode, hosted mode, SSO toggle.
 - An **Org** has many **Verifications**; a **Verification** is unique on `(identifier, value)` and is consumed once.
 - A **FeatureFlag** resolves at most-specific scope: per-**User** beats per-**Org** beats global; env var `FULCRUM_FLAG_<FLAG>` overrides the DB row.
 - An **AuthApplicationContext** is derived from one **Session** and exposes one **User** + one **Org** to the rest of the service.
+- A **SessionContext** is the only auth envelope surfaces should render or serialize; services must not return Better-Auth entities directly.
 
 ## Example dialogue
 

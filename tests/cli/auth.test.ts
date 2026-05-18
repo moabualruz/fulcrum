@@ -9,8 +9,12 @@ const ROOT_ENTRYPOINT = join(REPO_ROOT, "apps", "cli", "src", "main.ts");
 interface WhoamiResult {
   userId: string;
   orgId: string;
+  activeOrgId?: string;
+  sessionId?: string | null;
+  sessionExpiresAt?: string | null;
   email: string | null;
   role: string | null;
+  orgName?: string;
 }
 
 function fakeAuthenticatedCaller(): {
@@ -24,8 +28,12 @@ function fakeAuthenticatedCaller(): {
       whoami: async () => ({
         userId: "user-01",
         orgId: "org-01",
+        activeOrgId: "org-01",
+        sessionId: "session-01",
+        sessionExpiresAt: "2026-05-18T00:00:00.000Z",
         email: "admin@local",
         role: "owner",
+        orgName: "Local",
       }),
       invite: async (input) => ({
         invitationId: `inv-${input.role}`,
@@ -98,8 +106,12 @@ describe("auth.run — whoami --json", () => {
     const parsed = JSON.parse(lines[0] as string);
     expect(parsed.userId).toBe("user-01");
     expect(parsed.orgId).toBe("org-01");
+    expect(parsed.activeOrgId).toBe("org-01");
+    expect(parsed.sessionId).toBe("session-01");
+    expect(parsed.sessionExpiresAt).toBe("2026-05-18T00:00:00.000Z");
     expect(parsed.email).toBe("admin@local");
     expect(parsed.role).toBe("owner");
+    expect(parsed.orgName).toBe("Local");
   });
 
   it("prints human-readable text when --json not passed", async () => {

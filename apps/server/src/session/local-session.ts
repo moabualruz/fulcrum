@@ -11,6 +11,10 @@ import { AppUnauthorizedError } from "@platform-core/domain/errors.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
+import {
+  resolveApplicationSessionContext,
+} from "@identity-access/application/auth/session-context.ts";
+import type { SessionContextDto } from "@identity-access/domain/identity.ts";
 
 export interface CliTuiSession {
   id: string;
@@ -95,9 +99,23 @@ export async function resolveCliTuiSessionFromContainer(options: {
   return resolveCliTuiSession(cliContext.em, options.userAgent);
 }
 
+export async function resolveCliTuiAuthContextFromContainer(options: {
+  container?: DiContainer | null;
+  userAgent?: string;
+} = {}): Promise<SessionContextDto | null> {
+  const cliContext = await buildCliTuiCallerContext(options.container ?? null);
+  const session = await resolveCliTuiSession(cliContext.em, options.userAgent);
+  if (!session) return null;
+  return resolveApplicationSessionContext(cliContext.em, {
+    userId: session.userId,
+    orgId: session.activeOrganizationId ?? session.orgId,
+    session: session as unknown as import("better-auth").Session,
+  });
+}
+
 export async function requireCliTuiSessionContext(
   options: LocalCallerOptions = {},
-): Promise<CliTuiCallerContext & { session: CliTuiSession; orgId: string; userId: string }> {
+): Promise<CliTuiCallerContext & { session: CliTuiSession; orgId: string; userId: string; auth: SessionContextDto }> {
   const cliContext = await buildCliTuiCallerContext(options.container ?? null);
   const session = await resolveCliTuiSession(cliContext.em, options.userAgent);
   if (!session) {
@@ -106,10 +124,16 @@ export async function requireCliTuiSessionContext(
         "No active CLI session found. Run `fulcrum init` or `fulcrum auth login` first.",
     );
   }
+  const auth = await resolveApplicationSessionContext(cliContext.em, {
+    userId: session.userId,
+    orgId: session.activeOrganizationId ?? session.orgId,
+    session: session as unknown as import("better-auth").Session,
+  });
   return {
     ...cliContext,
     session,
     orgId: session.activeOrganizationId ?? session.orgId,
     userId: session.userId,
+    auth,
   };
 }

@@ -130,7 +130,16 @@ async function runWhoami(
     const result = await caller.auth.whoami();
 
     if (jsonMode) {
-      print(JSON.stringify({ userId: result.userId, orgId: result.orgId, email: result.email, role: result.role }));
+      print(JSON.stringify({
+        userId: result.userId,
+        orgId: result.orgId,
+        activeOrgId: result.activeOrgId,
+        sessionId: result.sessionId,
+        sessionExpiresAt: result.sessionExpiresAt,
+        email: result.email,
+        role: result.role,
+        orgName: result.orgName,
+      }));
     } else {
       print(`User:  ${result.email ?? result.userId}`);
       print(`Org:   ${result.orgId}`);

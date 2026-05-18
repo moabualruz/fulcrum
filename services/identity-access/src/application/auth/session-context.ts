@@ -24,10 +24,17 @@ export async function resolveApplicationSessionContext(
   em: EntityManager | null,
   ctx: AuthApplicationContext,
 ): Promise<SessionContextDto> {
+  const session = ctx.session as AuthApplicationContext["session"] & {
+    activeOrganizationId?: string | null;
+    expiresAt?: Date | string | null;
+  };
+  const activeOrgId = session.activeOrganizationId ?? ctx.orgId;
   const base = {
     userId: ctx.userId,
-    orgId: ctx.orgId,
+    orgId: activeOrgId,
+    activeOrgId,
     sessionId: ctx.session.id,
+    sessionExpiresAt: normalizeSessionDate(session.expiresAt),
     email: null,
     role: null,
   };
@@ -37,8 +44,9 @@ export async function resolveApplicationSessionContext(
   const user = await em.findOne(User, { where: { id: ctx.userId } as never });
   if (!user) return base;
 
-  const [org, passkeyCount] = await Promise.all([
-    em.findOne(Org, { where: { id: ctx.orgId } as never }),
+  const [org, membership, passkeyCount] = await Promise.all([
+    em.findOne(Org, { where: { id: activeOrgId } as never }),
+    em.findOne(OrgMember, { where: { orgId: activeOrgId, userId: ctx.userId } as never }),
     hasEntityMetadata(em, "Account")
       ? em.count(Account, { userId: ctx.userId, providerId: "passkey" } as never)
       : Promise.resolve(0),
@@ -47,10 +55,16 @@ export async function resolveApplicationSessionContext(
   return {
     ...base,
     email: user.email,
-    role: user.role,
-    orgName: org?.name ?? ctx.orgId,
+    role: membership?.role ?? user.role ?? null,
+    orgName: org?.name ?? activeOrgId,
     passkeyCount,
   };
+}
+
+function normalizeSessionDate(value: Date | string | null | undefined): string | null {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") return value;
+  return null;
 }
 
 export async function createInvitation(

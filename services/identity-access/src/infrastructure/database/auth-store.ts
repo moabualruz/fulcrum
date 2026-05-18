@@ -16,6 +16,9 @@ import { FulcrumWorkspaceEntity } from "@workflow-coordination/infrastructure/da
 export interface AuthSessionPublicRow {
   userId: string;
   orgId: string;
+  activeOrgId: string;
+  sessionId: string | null;
+  sessionExpiresAt: string | null;
   email: string | null;
   role: OrganizationRole | null;
   orgName?: string;
@@ -47,6 +50,9 @@ export class AuthStore {
     return {
       userId: input.userId,
       orgId: input.orgId,
+      activeOrgId: input.orgId,
+      sessionId: null,
+      sessionExpiresAt: null,
       email: input.userId.includes("@") ? input.userId : null,
       role: membership?.role ?? null,
       orgName: organization?.name ?? input.orgId,

@@ -227,6 +227,9 @@ describe("auth.whoami", () => {
     const result = await caller.auth.whoami();
     expect(result.userId).toBe(TEST_OWNER_ID);
     expect(result.orgId).toBe(TEST_ORG_ID);
+    expect(result.activeOrgId).toBe(TEST_ORG_ID);
+    expect(result.sessionId).toBe(`sess-${TEST_OWNER_ID.slice(-8)}`);
+    expect(typeof result.sessionExpiresAt).toBe("string");
     expect(result.email).toBe("owner@test.local");
     expect(result.role).toBe("owner");
   });
