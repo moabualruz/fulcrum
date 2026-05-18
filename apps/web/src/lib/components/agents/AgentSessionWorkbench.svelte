@@ -40,9 +40,21 @@
   let cwdValue = $state("");
   let canUseFolderPicker = $state(false);
   let cwdPickerError = $state<string | null>(null);
+  let selectedStartMode = $state("planning");
+  let selectedRuntime = $state("");
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
   const selectedAgent = $derived(availableAgents.find((agent) => agent.name === selectedAgentName) ?? availableAgents[0] ?? null);
+  const startModes = [
+    { id: "planning", name: "Planning", description: "Explore context, constraints, and implementation sequence before edits." },
+    { id: "build", name: "Build", description: "Implement focused changes with verification gates." },
+    { id: "review", name: "Review", description: "Inspect code, surface risks, and produce actionable findings." },
+  ];
+  const runtimeChoices = [
+    { id: "", name: "Agent default", description: "Use the selected agent's configured runtime." },
+    { id: "fast", name: "Fast", description: "Prefer lower latency for small, reversible edits." },
+    { id: "deep", name: "Deep", description: "Prefer stronger reasoning for broad or risky work." },
+  ];
 
   $effect(() => {
     messageCount;
@@ -351,6 +363,50 @@
           </div>
         </fieldset>
       {/if}
+      <div data-start-pickers class={cn("grid gap-3 md:grid-cols-2")}>
+        <fieldset data-mode-picker class={cn("grid gap-2")}>
+          <legend class={cn("text-xs font-medium text-muted-foreground")}>Mode</legend>
+          <div class={cn("grid gap-2")}>
+            {#each startModes as mode}
+              <label
+                data-start-mode={mode.id}
+                data-selected={selectedStartMode === mode.id}
+                class={cn(
+                  "mode-option grid cursor-pointer gap-1 rounded-md border border-border p-3 text-sm transition hover:bg-muted/60",
+                  selectedStartMode === mode.id ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "bg-background",
+                )}
+              >
+                <span class={cn("flex items-center justify-between gap-2")}>
+                  <span class={cn("font-medium")}>{mode.name}</span>
+                  <input type="radio" name="modeId" value={mode.id} bind:group={selectedStartMode} class={cn("size-4 accent-primary")} />
+                </span>
+                <span class={cn("text-xs text-muted-foreground")}>{mode.description}</span>
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+        <fieldset data-runtime-picker class={cn("grid gap-2")}>
+          <legend class={cn("text-xs font-medium text-muted-foreground")}>Runtime</legend>
+          <div class={cn("grid gap-2")}>
+            {#each runtimeChoices as runtime}
+              <label
+                data-start-runtime={runtime.id || "default"}
+                data-selected={selectedRuntime === runtime.id}
+                class={cn(
+                  "model-option grid cursor-pointer gap-1 rounded-md border border-border p-3 text-sm transition hover:bg-muted/60",
+                  selectedRuntime === runtime.id ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "bg-background",
+                )}
+              >
+                <span class={cn("flex items-center justify-between gap-2")}>
+                  <span class={cn("font-medium")}>{runtime.name}</span>
+                  <input type="radio" name="modelId" value={runtime.id} bind:group={selectedRuntime} class={cn("size-4 accent-primary")} />
+                </span>
+                <span class={cn("text-xs text-muted-foreground")}>{runtime.description}</span>
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+      </div>
       <input type="hidden" name="transportType" value="stdio" />
       <input name="command" value={selectedAgent?.cli_path ?? ""} placeholder="Command (for stdio)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
       <input name="url" placeholder="URL (for websocket)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />

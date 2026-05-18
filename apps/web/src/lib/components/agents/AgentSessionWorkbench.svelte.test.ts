@@ -126,6 +126,15 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain('name="command"');
     expect(body).toContain('value="codex"');
     expect(body).toContain('placeholder="/path/to/repository"');
+    expect(body).toContain("data-start-pickers");
+    expect(body).toContain("data-mode-picker");
+    expect(body).toContain('data-start-mode="planning"');
+    expect(body).toContain("mode-option");
+    expect(body).toContain("Explore context, constraints");
+    expect(body).toContain("data-runtime-picker");
+    expect(body).toContain('data-start-runtime="default"');
+    expect(body).toContain("model-option");
+    expect(body).toContain("Use the selected agent");
     expect(body).not.toContain("data-agent-picker-empty");
   });
 

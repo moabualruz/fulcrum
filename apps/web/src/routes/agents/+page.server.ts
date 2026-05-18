@@ -168,6 +168,8 @@ export const actions: Actions = {
     const transportType = form.get("transportType") as string;
     const command = form.get("command") as string;
     const url = form.get("url") as string;
+    const modeId = ((form.get("modeId") as string) ?? "").trim();
+    const modelId = ((form.get("modelId") as string) ?? "").trim();
     const cwd = ((form.get("cwd") as string) ?? "").trim();
     if (!agentName) return { success: false, message: "agentName required" };
     if (!transportType) return { success: false, message: "transportType required" };
@@ -203,6 +205,8 @@ export const actions: Actions = {
     });
     setActiveSessionManager(manager);
     const session = await manager.createSession(agentName, cwd);
+    if (modeId) await manager.setMode(modeId);
+    if (modelId) await manager.setModel(modelId);
     return actionOk(`Connected to ${agentName} (session: ${session.sessionId})`);
   },
 };
