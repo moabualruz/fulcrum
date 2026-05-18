@@ -64,7 +64,22 @@
 	>New document</a>
 </header>
 
-{#if data.tree.length === 0}
+{#if data.error}
+	<section
+		data-global-docs-error
+		role="alert"
+		class={cn("rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm")}
+	>
+		<h2 class={cn("text-base font-semibold text-destructive")}>{data.error.message}</h2>
+		<p class={cn("mt-1 text-muted-foreground")}>Recovery: {data.error.recovery}</p>
+		<p class={cn("mt-1 font-mono text-xs text-muted-foreground")}>trace: {data.error.traceId}</p>
+		<a
+			href="/docs/global"
+			data-global-docs-error-retry
+			class={cn(buttonVariants({ variant: "outline" }), "mt-3 inline-flex")}
+		>Retry</a>
+	</section>
+{:else if data.tree.length === 0}
 	<div
 		data-empty-global
 		class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
