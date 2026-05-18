@@ -16,6 +16,7 @@ export {
 export {
   getActiveSessionManager,
   setActiveSessionManager,
+  reconnectActiveSession,
   resolveSessionPermission,
   updateTrafficControl,
 } from "@agent-client-protocol/application/session-manager.ts";

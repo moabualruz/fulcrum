@@ -23,6 +23,8 @@ export interface AcpSessionState {
   isLoading: boolean;
   isConnecting: boolean;
   isReconnecting: boolean;
+  reconnectAttempts: number;
+  reconnectMaxAttempts: number;
   error: string | null;
   pendingPermission: PermissionRequest | null;
   availableModes: SessionMode[];
@@ -52,6 +54,8 @@ class MutableAcpSessionState implements AcpSessionState {
   isLoading = false;
   isConnecting = false;
   isReconnecting = false;
+  reconnectAttempts = 0;
+  reconnectMaxAttempts = 3;
   error: string | null = null;
   pendingPermission: PermissionRequest | null = null;
   availableModes: SessionMode[] = [];

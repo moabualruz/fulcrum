@@ -18,9 +18,13 @@
   };
 
   const hasSavedSessions = model.resumableSessions.length > 0;
+  const reconnectAgentName = $derived(model.connection.reconnect.agentName ?? "agent");
+  const showReconnectBanner = $derived(model.connection.status === "reconnecting" || model.controls.canReconnect || model.connection.error !== null);
   let transcriptEl: HTMLDivElement | undefined = $state();
+  let reconnectFormEl: HTMLFormElement | undefined = $state();
   let autoscrollLocked = $state(false);
   let copiedMessageId = $state<string | null>(null);
+  let errorDismissed = $state(false);
   const messageCount = $derived(model.messages.length);
 
   $effect(() => {
@@ -28,6 +32,25 @@
     if (!autoscrollLocked) {
       transcriptEl?.scrollTo({ top: transcriptEl.scrollHeight });
     }
+  });
+
+  $effect(() => {
+    model.connection.error;
+    errorDismissed = false;
+  });
+
+  $effect(() => {
+    if (!model.controls.canReconnect || model.connection.reconnect.exhausted || typeof window === "undefined") return;
+    const requestReconnect = () => {
+      if (document.visibilityState === "hidden") return;
+      reconnectFormEl?.requestSubmit();
+    };
+    window.addEventListener("online", requestReconnect);
+    document.addEventListener("visibilitychange", requestReconnect);
+    return () => {
+      window.removeEventListener("online", requestReconnect);
+      document.removeEventListener("visibilitychange", requestReconnect);
+    };
   });
 
   function updateAutoscrollLock(): void {
@@ -163,8 +186,58 @@
     </span>
   </header>
 
-  {#if model.connection.error}
+  {#if model.connection.error && !errorDismissed}
     <p data-session-error class={cn("mt-3 text-sm text-destructive")}>{model.connection.error}</p>
+  {/if}
+
+  {#if showReconnectBanner}
+    <section
+      data-reconnect-banner
+      data-reconnect-exhausted={model.connection.reconnect.exhausted}
+      class={cn(
+        "manual-reconnect-btn mt-3 flex flex-col gap-3 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between",
+        model.connection.status === "reconnecting" ? "border-amber-500/50 bg-amber-500/10" : "border-border bg-muted/30",
+      )}
+    >
+      <div class={cn("min-w-0")}>
+        <div class={cn("flex items-center gap-2 font-medium")}>
+          {#if model.connection.status === "reconnecting"}
+            <span data-reconnect-spinner class={cn("h-3 w-3 animate-spin rounded-full border-2 border-amber-600 border-t-transparent")} aria-hidden="true"></span>
+            <span>Reconnecting...</span>
+          {:else if model.connection.reconnect.exhausted}
+            <span>Reconnect needed</span>
+          {:else}
+            <span>Connection interrupted</span>
+          {/if}
+        </div>
+        <p class={cn("mt-1 text-xs text-muted-foreground")}>
+          {#if model.connection.status === "reconnecting"}
+            Restoring {reconnectAgentName} without reloading this page.
+          {:else if model.connection.reconnect.exhausted}
+            Automatic retry stopped. Check the agent process, then reconnect to {reconnectAgentName}.
+          {:else}
+            AI Assist will retry when this app is active. You can reconnect to {reconnectAgentName} now.
+          {/if}
+        </p>
+      </div>
+      <div class={cn("flex flex-wrap items-center gap-2")}>
+        <form bind:this={reconnectFormEl} method="POST" action="?/reconnectSession" data-reconnect-form>
+          <button
+            type="submit"
+            data-manual-reconnect
+            disabled={!model.controls.canReconnect || model.connection.status === "reconnecting"}
+            class={cn(buttonVariants({ variant: "default", size: "sm" }), "manual-reconnect-btn")}
+          >
+            Reconnect {reconnectAgentName}
+          </button>
+        </form>
+        {#if model.connection.error && !errorDismissed}
+          <button type="button" data-dismiss-error class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "dismiss-error-btn")} onclick={() => (errorDismissed = true)}>
+            Dismiss
+          </button>
+        {/if}
+      </div>
+    </section>
   {/if}
 
   {#if !model.session && !hasSavedSessions}

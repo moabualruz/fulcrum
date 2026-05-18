@@ -2,7 +2,7 @@ import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { listAgentProfilesPageData, testProfile } from "@execution-orchestration/interface/agent-profile-pages.ts";
 import { dispatchTaskRun } from "@execution-orchestration/interface/run-actions.ts";
-import { createIdleSessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
+import { createIdleSessionWorkbenchModel, getActiveSessionManager } from "@agent-client-protocol/interface/session-workbench.ts";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
 
@@ -14,7 +14,7 @@ export const load: PageServerLoad = ({ locals }) => {
         const { em, ctx } = await requestServiceScope(locals);
         return {
           ...(await listAgentProfilesPageData(em, ctx)),
-          sessionWorkbench: createIdleSessionWorkbenchModel(),
+          sessionWorkbench: getActiveSessionManager()?.getWorkbenchModel() ?? createIdleSessionWorkbenchModel(),
         };
       })(),
     },
@@ -99,6 +99,15 @@ export const actions: Actions = {
     );
     await updateTrafficControl(em, { action, value });
     return actionOk(`Traffic ${action} updated`);
+  },
+
+  reconnectSession: async ({ locals }) => {
+    const { em } = await requestServiceScope(locals);
+    const { reconnectActiveSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await reconnectActiveSession(em);
+    return actionOk("AI Assist reconnected");
   },
 
   connectBridge: async ({ request, locals }) => {

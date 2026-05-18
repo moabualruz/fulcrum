@@ -250,6 +250,62 @@ describe("ACP ported session manager", () => {
     expect(state.currentModelId).toBe("gpt-5.4");
   });
 
+  test("reconnects active session through load-session and reports actionable failure", async () => {
+    const state = createAcpSessionState({ createId: () => "session-row-1", now: () => 3_000 });
+    const firstBridge = new FakeBridge({ agentCapabilities: { loadSession: true } }, { sessionId: "agent-session-1" });
+    const bridges: FakeBridge[] = [
+      firstBridge,
+      new FakeBridge(
+        { agentCapabilities: { loadSession: true } },
+        { sessionId: "unused" },
+        {
+          sessionId: "agent-session-1",
+          modes: { currentModeId: "review", availableModes: [{ id: "review", name: "Review" }] },
+          models: { currentModelId: "gpt-5.4", availableModels: [{ modelId: "gpt-5.4", name: "GPT-5.4" }] },
+        },
+      ),
+    ];
+    const manager = new AcpSessionManager({
+      state,
+      config: createAcpConfigState({ config }),
+      createBridge: async () => bridges.shift()!,
+    });
+    await manager.createSession("codex", "/repo");
+    firstBridge.onTransportClose?.("network down");
+
+    const session = await manager.reconnectActiveSession();
+
+    expect(session.sessionId).toBe("agent-session-1");
+    expect(state.isConnected).toBe(true);
+    expect(state.isReconnecting).toBe(false);
+    expect(state.reconnectAttempts).toBe(0);
+    expect(state.currentModeId).toBe("review");
+    expect(state.currentModelId).toBe("gpt-5.4");
+  });
+
+  test("keeps manual reconnect available after failed retry", async () => {
+    const state = createAcpSessionState({ createId: () => "session-row-1" });
+    const firstBridge = new FakeBridge({ agentCapabilities: { loadSession: true } }, { sessionId: "agent-session-1" });
+    const failingBridge = new FakeBridge({ agentCapabilities: { loadSession: true } }, { sessionId: "unused" });
+    failingBridge.loadSession = async () => {
+      throw new Error("agent unavailable");
+    };
+    const manager = new AcpSessionManager({
+      state,
+      config: createAcpConfigState({ config }),
+      createBridge: async () => (state.currentSession ? failingBridge : firstBridge),
+    });
+    await manager.createSession("codex", "/repo");
+    firstBridge.onTransportClose?.("network down");
+
+    await expect(manager.reconnectActiveSession()).rejects.toThrow("agent unavailable");
+
+    expect(state.currentSession?.agentName).toBe("codex");
+    expect(state.isConnected).toBe(false);
+    expect(state.reconnectAttempts).toBe(1);
+    expect(state.error).toBe("Reconnect failed: agent unavailable. Check the agent process and try again.");
+  });
+
   test("proxies mode/model/cancel/permission actions and handles unexpected close", async () => {
     const state = createAcpSessionState({ createId: () => "session-row-1" });
     const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });
@@ -296,7 +352,7 @@ describe("ACP ported session manager", () => {
     expect(bridge.resolvePermissionCalls).toEqual(["allow"]);
     expect(bridge.cancelPermissionCalls).toBe(1);
     expect(state.isConnected).toBe(false);
-    expect(state.error).toBe("Connection lost: network down");
+    expect(state.error).toBe("Connection lost: network down. AI Assist will try to reconnect when the app is active.");
   });
 
   test("disconnect tears down bridge and session state", async () => {

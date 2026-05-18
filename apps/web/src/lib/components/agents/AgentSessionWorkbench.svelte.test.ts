@@ -68,6 +68,7 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("Build the <strong>plan</strong>");
     expect(body).toContain("session/update");
     expect(body).not.toContain("data-session-empty");
+    expect(body).not.toContain("data-reconnect-banner");
   });
 
   test("renders idle state without enabling active controls", () => {
@@ -85,6 +86,20 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-connect-bridge");
     expect(body).not.toContain("data-session-permission");
   });
+
+  test("renders reconnect progress, manual recovery, and dismiss action", () => {
+    const model = reconnectModel();
+    const { body } = render(AgentSessionWorkbench, { props: { model } });
+
+    expect(body).toContain('data-session-status="error"');
+    expect(body).toContain("data-reconnect-banner");
+    expect(body).toContain('data-reconnect-exhausted="true"');
+    expect(body).toContain("Reconnect needed");
+    expect(body).toContain("Reconnect codex");
+    expect(body).toContain("manual-reconnect-btn");
+    expect(body).toContain("dismiss-error-btn");
+    expect(body).toContain("Check the agent process");
+  });
 });
 
 function activeModel(): SessionWorkbenchModel {
@@ -94,6 +109,7 @@ function activeModel(): SessionWorkbenchModel {
       busy: true,
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
+      reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: "codex" },
     },
     session: {
       id: "row-1",
@@ -112,6 +128,7 @@ function activeModel(): SessionWorkbenchModel {
       canChangeMode: true,
       canChangeModel: true,
       canResume: true,
+      canReconnect: false,
     },
     modes: [
       { id: "planning", name: "Planning", selected: true },
@@ -236,6 +253,7 @@ function idleModel(): SessionWorkbenchModel {
       busy: false,
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
+      reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: null },
     },
     session: null,
     controls: {
@@ -246,6 +264,7 @@ function idleModel(): SessionWorkbenchModel {
       canChangeMode: false,
       canChangeModel: false,
       canResume: false,
+      canReconnect: false,
     },
     modes: [],
     models: [],
@@ -265,4 +284,17 @@ function idleModel(): SessionWorkbenchModel {
     },
     resumableSessions: [],
   };
+}
+
+function reconnectModel(): SessionWorkbenchModel {
+  const model = activeModel();
+  model.connection.status = "error";
+  model.connection.busy = false;
+  model.connection.error = "Reconnect failed: agent unavailable. Check the agent process and try again.";
+  model.connection.reconnect = { attempts: 3, maxAttempts: 3, exhausted: true, agentName: "codex" };
+  model.controls.canPrompt = false;
+  model.controls.canCancel = false;
+  model.controls.canDisconnect = false;
+  model.controls.canReconnect = true;
+  return model;
 }

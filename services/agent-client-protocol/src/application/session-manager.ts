@@ -1,5 +1,6 @@
 import type { AcpConfigState } from "@agent-client-protocol/application/config-store.ts";
 import { applySessionNotification, type AcpSessionState } from "@agent-client-protocol/application/session-store.ts";
+import { buildSessionWorkbenchModel, type SessionWorkbenchModel } from "@agent-client-protocol/application/session-workbench.ts";
 import type {
   AgentConfig,
   AuthenticateRequest,
@@ -126,6 +127,10 @@ export class AcpSessionManager {
     }
   }
 
+  getWorkbenchModel(): SessionWorkbenchModel {
+    return buildSessionWorkbenchModel({ state: this.state });
+  }
+
   async resumeSession(savedSessionId: string): Promise<SavedSession> {
     this.state.isLoading = true;
     this.state.isConnecting = true;
@@ -179,6 +184,62 @@ export class AcpSessionManager {
     } finally {
       this.state.isLoading = false;
       this.state.isConnecting = false;
+    }
+  }
+
+  async reconnectActiveSession(): Promise<SavedSession> {
+    const session = this.state.currentSession;
+    if (!session) throw new Error("No active session to reconnect");
+    if (session.supportsLoadSession !== true) throw new Error(`Session '${session.id}' cannot be reconnected`);
+
+    this.state.isLoading = true;
+    this.state.isReconnecting = true;
+    this.state.error = null;
+    this.state.reconnectAttempts += 1;
+
+    let bridge: AcpBridgeClient | null = null;
+    try {
+      const agentConfig = this.config.getAgent(session.agentName);
+      if (!agentConfig) throw new Error(`Agent '${session.agentName}' not found in config`);
+
+      if (this.acpClient) {
+        await this.acpClient.disconnect();
+        this.acpClient = null;
+      }
+
+      bridge = await this.createBridge({ name: session.agentName, config: agentConfig });
+      this.installBridgeHandlers(bridge);
+      this.acpClient = bridge;
+
+      const initResponse = await bridge.initialize(this.initializeRequest());
+      if (!readLoadSessionCapability(initResponse)) {
+        throw new Error(`Agent '${session.agentName}' does not support loading sessions`);
+      }
+
+      const sessionResponse = await bridge.loadSession({ sessionId: session.sessionId });
+      session.sessionId = sessionResponse.sessionId;
+      session.lastUpdated = this.state.now();
+      session.supportsLoadSession = true;
+      this.state.currentSession = session;
+      this.state.isConnected = true;
+      this.state.reconnectAttempts = 0;
+      applyModes(this.state, sessionResponse);
+      applyModels(this.state, sessionResponse);
+      return session;
+    } catch (error) {
+      this.state.error = `Reconnect failed: ${error instanceof Error ? error.message : String(error)}. Check the agent process and try again.`;
+      if (bridge) {
+        try {
+          await bridge.disconnect();
+        } catch {
+          /* ignore cleanup failure */
+        }
+      }
+      this.acpClient = null;
+      throw error;
+    } finally {
+      this.state.isLoading = false;
+      this.state.isReconnecting = false;
     }
   }
 
@@ -259,7 +320,7 @@ export class AcpSessionManager {
       this.state.isConnected = false;
       this.state.isLoading = false;
       this.state.pendingPermission = null;
-      this.state.error = `Connection lost: ${reason ?? "transport closed"}`;
+      this.state.error = `Connection lost: ${reason ?? "transport closed"}. AI Assist will try to reconnect when the app is active.`;
     };
   }
 
@@ -353,6 +414,12 @@ export async function resolveSessionPermission(
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active ACP session manager");
   manager.resolvePermission(input.optionId);
+}
+
+export async function reconnectActiveSession(_em: unknown): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.reconnectActiveSession();
 }
 
 export async function updateTrafficControl(

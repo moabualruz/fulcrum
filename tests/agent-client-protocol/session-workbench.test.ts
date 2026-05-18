@@ -85,6 +85,7 @@ describe("agent session workbench model", () => {
       busy: true,
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
+      reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: "codex" },
     });
     expect(model.session).toEqual({
       id: "row-1",
@@ -103,6 +104,7 @@ describe("agent session workbench model", () => {
       canChangeMode: true,
       canChangeModel: true,
       canResume: true,
+      canReconnect: false,
     });
     expect(model.modes.map((mode) => [mode.id, mode.selected])).toEqual([
       ["planning", true],
@@ -147,7 +149,29 @@ describe("agent session workbench model", () => {
       canChangeMode: false,
       canChangeModel: false,
       canResume: false,
+      canReconnect: false,
     });
+  });
+
+  test("enables reconnect recovery for a dropped resumable session", () => {
+    const state = createAcpSessionState();
+    state.currentSession = {
+      id: "row-1",
+      agentName: "codex",
+      sessionId: "agent-session-1",
+      title: "Plan work",
+      lastUpdated: 20,
+      cwd: "/repo",
+      supportsLoadSession: true,
+    };
+    state.error = "Connection lost: network down";
+    state.reconnectAttempts = 3;
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.connection.status).toBe("error");
+    expect(model.connection.reconnect).toEqual({ attempts: 3, maxAttempts: 3, exhausted: true, agentName: "codex" });
+    expect(model.controls.canReconnect).toBe(true);
   });
 
   test("builds an idle model for surfaces before a live runtime connects", () => {
