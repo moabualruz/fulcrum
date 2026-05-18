@@ -157,6 +157,7 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
   feedbackRuns: [],
   generatedE2eTests: [{
     artifactId: "artifact-generated-e2e",
+    generationTaskId: "task-generated-e2e",
     filename: "uat-trace-trpc-approval.spec.ts",
     path: "generated/e2e/uat-trace-trpc-approval.spec.ts",
     runner: "playwright",
@@ -195,6 +196,20 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
         sourceCriteria: ["UAT passes"],
         approvedForE2e: true,
       },
+    },
+    scenarioData: {
+      traceId: "trace-trpc-approval",
+      projectId: PROJECT_ID,
+      taskId: "task-1",
+      taskTitle: "UAT task",
+      taskStatus: "done",
+      latestReviewEventId: "event-review",
+      evidenceArtifactIds: ["artifact-proof"],
+      evidenceRunIds: ["run-proof"],
+    },
+    mockPolicy: {
+      usesMocks: false,
+      impossibilityReason: null,
     },
     ciCommand: ["bun", "run", "scripts/ci-generated-e2e.ts"],
     ciEnv: {

@@ -141,6 +141,7 @@ export interface UatCodeReviewFeedbackRun {
 
 export interface GeneratedE2eRegressionTest {
   artifactId: string;
+  generationTaskId: string;
   filename: string;
   path: string;
   runner: GeneratedE2eRegressionRunner;
@@ -152,8 +153,26 @@ export interface GeneratedE2eRegressionTest {
   sourceCriteria: string[];
   coverageCases: GeneratedE2eCoverageCase[];
   manualSimulationChecklist: ManualSimulationChecklist;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
   ciCommand: string[];
   ciEnv: Record<string, string>;
+}
+
+export interface GeneratedE2eScenarioData {
+  traceId: string | null;
+  projectId: string;
+  taskId: string;
+  taskTitle: string;
+  taskStatus: string | null;
+  latestReviewEventId: string | null;
+  evidenceArtifactIds: string[];
+  evidenceRunIds: string[];
+}
+
+export interface GeneratedE2eMockPolicy {
+  usesMocks: boolean;
+  impossibilityReason: string | null;
 }
 
 export interface GeneratedE2eCoverageCase {

@@ -50,6 +50,17 @@ describe("review workbench UAT/code review decision action", () => {
       expect(generated.body).toContain("Trace trace-uat-approval");
       expect(generated.body).toContain("User can approve accepted evidence.");
       expect(generated.body).toContain("Code review can codify the accepted behavior.");
+      expect(generated.body).toContain("scenarioData");
+      expect(generated.body).toContain("mockPolicy");
+      expect(generated.generationTaskId).toBeString();
+      expect(generated.scenarioData).toMatchObject({
+        traceId: "trace-uat-approval",
+        projectId: PROJECT_ID,
+        taskTitle: "Approve UAT workflow",
+        evidenceArtifactIds: expect.arrayContaining([expect.stringMatching(/-/)]),
+        evidenceRunIds: expect.arrayContaining([expect.stringMatching(/-/)]),
+      });
+      expect(generated.mockPolicy).toEqual({ usesMocks: false, impossibilityReason: null });
       expect(generated.manualSimulationChecklist).toMatchObject({
         status: "approved",
         e2eSeed: {
@@ -69,6 +80,17 @@ describe("review workbench UAT/code review decision action", () => {
       expect(generated.storePath).toMatch(/uat-trace-uat-approval\.spec\.ts$/);
       expect(generated.bodyPath).toMatch(/uat-trace-uat-approval\.spec\.ts$/);
       expect(await readFile(generated.bodyPath, "utf8")).toBe(generated.body);
+      const generationTasks = await em.getConnection().execute<Array<{ id: string; title: string; description: string }>>(
+        `select id, title, description from tasks where id = ?`,
+        [generated.generationTaskId],
+      );
+      expect(generationTasks).toEqual([
+        expect.objectContaining({
+          id: generated.generationTaskId,
+          title: "Generate E2E regression: Approve UAT workflow",
+          description: expect.stringContaining("## Evidence artifacts"),
+        }),
+      ]);
 
       const artifacts = await em.getConnection().execute<Array<{
         filename: string;
@@ -89,6 +111,9 @@ describe("review workbench UAT/code review decision action", () => {
             lifecycleState: "accepted",
             generatedBy: "uat_code_review_approval",
             traceId: "trace-uat-approval",
+            generationTaskId: generated.generationTaskId,
+            scenarioData: generated.scenarioData,
+            mockPolicy: generated.mockPolicy,
             manualSimulationChecklist: generated.manualSimulationChecklist,
             materializedFile: expect.objectContaining({
               storePath: generated.storePath,
@@ -401,11 +426,15 @@ describe("review workbench UAT/code review decision action", () => {
           coverageSummary: expect.objectContaining({ taskCount: 1, criterionCount: 2, artifactCount: 1 }),
           coverageCases: decision.generatedE2eTests[0]!.coverageCases,
           manualSimulationChecklist: decision.generatedE2eTests[0]!.manualSimulationChecklist,
+          scenarioData: decision.generatedE2eTests[0]!.scenarioData,
+          mockPolicy: { usesMocks: false, impossibilityReason: null },
         }),
         expect.objectContaining({
           coverageSummary: expect.objectContaining({ taskCount: 1, criterionCount: 2, artifactCount: 1 }),
           coverageCases: decision.generatedE2eTests[1]!.coverageCases,
           manualSimulationChecklist: decision.generatedE2eTests[1]!.manualSimulationChecklist,
+          scenarioData: decision.generatedE2eTests[1]!.scenarioData,
+          mockPolicy: { usesMocks: false, impossibilityReason: null },
         }),
       ]);
 

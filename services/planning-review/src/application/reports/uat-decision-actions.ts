@@ -6,6 +6,7 @@ import { createStorageBackend } from "@workflow-coordination/infrastructure/arti
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { appendEventOrm } from "@platform-core/application/orm-helpers.ts";
 import { dispatchTaskRun } from "@execution-orchestration/application/runs/commands.ts";
+import { createTask } from "@work-management/application/work-item-commands.ts";
 import { buildManualSimulationChecklist } from "@planning-review/application/manual-simulation-checklist.ts";
 import { buildGeneratedE2eRunnerPlan } from "@planning-review/application/reports/generated-e2e-run-actions.ts";
 import { buildUatCodeReviewHandoff } from "@planning-review/application/reports/uat-handoff-actions.ts";
@@ -13,8 +14,10 @@ import type {
   AppContext,
   FinalQaTaskResult,
   GeneratedE2eCoverageCase,
+  GeneratedE2eMockPolicy,
   GeneratedE2eRegressionRunner,
   GeneratedE2eRegressionTest,
+  GeneratedE2eScenarioData,
   RecordUatCodeReviewDecisionInput,
   UatCodeReviewDecisionOutput,
   UatCodeReviewFeedbackRun,
@@ -183,11 +186,29 @@ async function generateRealDataE2eRegressionArtifacts(
     const sourceTaskIds = [task.taskId];
     const sourceCriteria = task.successCriteria;
     const coverageCases = buildCoverageCases(task);
+    const scenarioData = buildScenarioData(input, task);
+    const mockPolicy: GeneratedE2eMockPolicy = {
+      usesMocks: false,
+      impossibilityReason: null,
+    };
     const manualSimulationChecklist = buildManualSimulationChecklist({
       projectId: input.projectId,
       traceId: input.traceId,
       tasks: [task],
       approvedForE2e: true,
+    });
+    const generationTaskDescription = buildGenerationTaskDescription({
+      traceId: input.traceId,
+      task,
+      scenarioData,
+      mockPolicy,
+    });
+    const generationTask = await createTask(em, { ...ctx, projectId: input.projectId }, {
+      projectId: input.projectId,
+      title: `Generate E2E regression: ${task.title}`,
+      status: "todo",
+      description: generationTaskDescription,
+      descriptionText: generationTaskDescription,
     });
     const filename = splitByTask
       ? `uat-${traceSlug}-${slug(task.title)}.spec.ts`
@@ -199,6 +220,8 @@ async function generateRealDataE2eRegressionArtifacts(
       tasks: [task],
       coverageCases,
       manualSimulationChecklist,
+      scenarioData,
+      mockPolicy,
       runner,
     });
     const stored = await createStorageBackend().put({
@@ -214,7 +237,7 @@ async function generateRealDataE2eRegressionArtifacts(
     await em.query(
       `insert into agent_runs (id, org_id, task_id, agent_name, status, created_at)
         values (?, ?, ?, ?, ?, now())`,
-      [runId, ctx.orgId, task.taskId, "e2e-generator", "succeeded"],
+      [runId, ctx.orgId, generationTask.id, "e2e-generator", "succeeded"],
     );
     await em.query(
       `insert into artifacts (
@@ -227,7 +250,7 @@ async function generateRealDataE2eRegressionArtifacts(
         ctx.orgId,
         input.projectId,
         runId,
-        task.taskId,
+        generationTask.id,
         "test",
         filename,
         filename,
@@ -250,6 +273,8 @@ async function generateRealDataE2eRegressionArtifacts(
           },
           coverageCases,
           manualSimulationChecklist,
+          scenarioData,
+          mockPolicy,
           materializedFile: {
             storePath: stored.relativePath,
             bodyPath: stored.absolutePath,
@@ -260,6 +285,7 @@ async function generateRealDataE2eRegressionArtifacts(
           projectId: input.projectId,
           reviewType: input.reviewType,
           decision: input.decision,
+          generationTaskId: generationTask.id,
           sourceTaskIds,
           sourceCriteria,
           generatedTestBody: body,
@@ -268,6 +294,7 @@ async function generateRealDataE2eRegressionArtifacts(
     );
     generatedTests.push({
       artifactId,
+      generationTaskId: generationTask.id,
       filename,
       path,
       runner,
@@ -279,6 +306,8 @@ async function generateRealDataE2eRegressionArtifacts(
       sourceCriteria,
       coverageCases,
       manualSimulationChecklist,
+      scenarioData,
+      mockPolicy,
       ciCommand: runnerPlan.ciCommand,
       ciEnv: runnerPlan.ciEnv,
     });
@@ -321,6 +350,8 @@ function buildRegressionTestBody(input: {
   tasks: FinalQaTaskResult[];
   coverageCases: GeneratedE2eCoverageCase[];
   manualSimulationChecklist: ReturnType<typeof buildManualSimulationChecklist>;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
   runner: GeneratedE2eRegressionRunner;
 }): string {
   const coverage = input.coverageCases.map((coverageCase) => ({
@@ -336,7 +367,7 @@ function buildRegressionTestBody(input: {
     return [
       'import { expect, test } from "@playwright/test";',
       "",
-      `const acceptedTrace = ${JSON.stringify({ traceId: input.traceId ?? null, projectId: input.projectId, tasks: input.tasks.map((task) => ({ id: task.taskId, title: task.title, successCriteria: task.successCriteria, artifactIds: task.artifactIds, runIds: task.runIds })), coverageCases: coverage, manualSimulationChecklist: input.manualSimulationChecklist }, null, 2)} as const;`,
+      `const acceptedTrace = ${JSON.stringify({ traceId: input.traceId ?? null, projectId: input.projectId, tasks: input.tasks.map((task) => ({ id: task.taskId, title: task.title, successCriteria: task.successCriteria, artifactIds: task.artifactIds, runIds: task.runIds })), coverageCases: coverage, manualSimulationChecklist: input.manualSimulationChecklist, scenarioData: input.scenarioData, mockPolicy: input.mockPolicy }, null, 2)} as const;`,
       "",
       `test.describe("Generated UAT regression: ${input.traceId ?? input.projectId}", () => {`,
       `  test("preserves approved final-QA evidence from Trace ${input.traceId ?? "none"}", async () => {`,
@@ -345,6 +376,8 @@ function buildRegressionTestBody(input: {
       "    expect(acceptedTrace.tasks.every((task) => task.artifactIds.length > 0)).toBe(true);",
       '    expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
       "    expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
+      "    expect(acceptedTrace.scenarioData.evidenceArtifactIds).toEqual(acceptedTrace.tasks.flatMap((task) => task.artifactIds));",
+      "    expect(acceptedTrace.mockPolicy).toEqual({ usesMocks: false, impossibilityReason: null });",
       "  });",
       "  for (const coverageCase of acceptedTrace.coverageCases) {",
       '    test(`covers ${coverageCase.taskTitle}: ${coverageCase.criterion}`, async () => {',
@@ -360,7 +393,7 @@ function buildRegressionTestBody(input: {
   return [
     'import { describe, expect, test } from "bun:test";',
     "",
-    `const acceptedTrace = ${JSON.stringify({ traceId: input.traceId ?? null, projectId: input.projectId, tasks: input.tasks.map((task) => ({ id: task.taskId, title: task.title, successCriteria: task.successCriteria, artifactIds: task.artifactIds, runIds: task.runIds })), coverageCases: coverage, manualSimulationChecklist: input.manualSimulationChecklist }, null, 2)} as const;`,
+    `const acceptedTrace = ${JSON.stringify({ traceId: input.traceId ?? null, projectId: input.projectId, tasks: input.tasks.map((task) => ({ id: task.taskId, title: task.title, successCriteria: task.successCriteria, artifactIds: task.artifactIds, runIds: task.runIds })), coverageCases: coverage, manualSimulationChecklist: input.manualSimulationChecklist, scenarioData: input.scenarioData, mockPolicy: input.mockPolicy }, null, 2)} as const;`,
     "",
     `describe("Generated UAT regression: ${input.traceId ?? input.projectId}", () => {`,
     `  test("preserves approved final-QA evidence from Trace ${input.traceId ?? "none"}", () => {`,
@@ -369,6 +402,8 @@ function buildRegressionTestBody(input: {
     "    expect(acceptedTrace.tasks.every((task) => task.artifactIds.length > 0)).toBe(true);",
     '    expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
     "    expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
+    "    expect(acceptedTrace.scenarioData.evidenceArtifactIds).toEqual(acceptedTrace.tasks.flatMap((task) => task.artifactIds));",
+    "    expect(acceptedTrace.mockPolicy).toEqual({ usesMocks: false, impossibilityReason: null });",
     "  });",
     "  for (const coverageCase of acceptedTrace.coverageCases) {",
     '    test(`covers ${coverageCase.taskTitle}: ${coverageCase.criterion}`, () => {',
@@ -379,6 +414,51 @@ function buildRegressionTestBody(input: {
     "  }",
     "});",
     "",
+  ].join("\n");
+}
+
+function buildScenarioData(
+  input: RecordUatCodeReviewDecisionInput,
+  task: FinalQaTaskResult,
+): GeneratedE2eScenarioData {
+  return {
+    traceId: input.traceId ?? null,
+    projectId: input.projectId,
+    taskId: task.taskId,
+    taskTitle: task.title,
+    taskStatus: task.status,
+    latestReviewEventId: task.latestReviewEventId,
+    evidenceArtifactIds: task.artifactIds,
+    evidenceRunIds: task.runIds,
+  };
+}
+
+function buildGenerationTaskDescription(input: {
+  traceId?: string;
+  task: FinalQaTaskResult;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
+}): string {
+  return [
+    "## Scenario",
+    `Trace: ${input.traceId ?? "none"}`,
+    `Source task: ${input.task.taskId}`,
+    `User path: ${input.task.title}`,
+    "",
+    "## Fixture data",
+    `Task status: ${input.scenarioData.taskStatus ?? "unset"}`,
+    `Review event: ${input.scenarioData.latestReviewEventId ?? "none"}`,
+    "",
+    "## Evidence artifacts",
+    ...input.scenarioData.evidenceArtifactIds.map((id) => `- ${id}`),
+    "",
+    "## Evidence runs",
+    ...input.scenarioData.evidenceRunIds.map((id) => `- ${id}`),
+    "",
+    "## Mock policy",
+    input.mockPolicy.usesMocks
+      ? `Mocks require documented impossibility reason: ${input.mockPolicy.impossibilityReason ?? "missing"}`
+      : "Mocks are not used.",
   ].join("\n");
 }
 
