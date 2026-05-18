@@ -4,6 +4,7 @@ import { ValidationPipe } from "@nestjs/common";
 type FakeNestApp = {
   readonly pipes: unknown[];
   readonly shutdownHooks: unknown[];
+  shutdownHooksEnabled: boolean;
   readonly listenedPorts: number[];
   useGlobalPipes: (...pipes: unknown[]) => void;
   enableShutdownHooks: (...signals: unknown[]) => void;
@@ -17,11 +18,13 @@ function createFakeNestApp(): FakeNestApp {
   return {
     pipes: [],
     shutdownHooks: [],
+    shutdownHooksEnabled: false,
     listenedPorts: [],
     useGlobalPipes(...pipes: unknown[]) {
       this.pipes.push(...pipes);
     },
     enableShutdownHooks(...signals: unknown[]) {
+      this.shutdownHooksEnabled = true;
       this.shutdownHooks.push(...signals);
     },
     get(token: unknown) {
@@ -117,6 +120,7 @@ describe("Nest server application bootstrap", () => {
     expect(nestCreate).toHaveBeenCalledTimes(1);
     expect(app).toBe(createdApp as unknown as typeof app);
     expect(createdApp.pipes[0]).toBeInstanceOf(ValidationPipe);
+    expect(createdApp.shutdownHooksEnabled).toBe(true);
     expect(swaggerCreateDocument).toHaveBeenCalledWith(app, {
       title: "Fulcrum API",
       description: "Agent-native project workflow API",
