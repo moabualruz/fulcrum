@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir, stat } from "node:fs/promises";
 import { describe, expect, test } from "bun:test";
 
 async function fileExists(path: string): Promise<boolean> {
@@ -68,6 +68,30 @@ const PUBLIC_API_CONTROLLER_FILES = [
   "services/workflow-coordination/src/interface/http/artifact-public-api.controller.ts",
   "services/workflow-coordination/src/interface/http/audit-public-api.controller.ts",
 ] as const;
+
+const ROUTE_DECORATOR_PATTERN = /\b(Get|Post|Patch|Put|Delete|Sse)\([^)]*\)\(\s*[\w.]+\.prototype,\s*"([^"]+)"/g;
+const PROVENANCE_LABEL_PATTERN = /\b(?:phase|wave|prd)\b/i;
+
+async function listControllerFiles(directory: string, files: string[] = []): Promise<string[]> {
+  for (const entry of await readdir(directory)) {
+    const path = `${directory}/${entry}`;
+    const entryStat = await stat(path);
+    if (entryStat.isDirectory()) {
+      await listControllerFiles(path, files);
+      continue;
+    }
+    if (entry.endsWith(".controller.ts")) files.push(path);
+  }
+  return files;
+}
+
+function exportedModuleNames(source: string): string[] {
+  return [...source.matchAll(/export class (\w*Module)\b/g)].map((match) => match[1]!).sort();
+}
+
+function declaredRouteHandlers(source: string): string[] {
+  return [...source.matchAll(ROUTE_DECORATOR_PATTERN)].map((match) => match[2]!);
+}
 
 describe("server stack convergence", () => {
   test("legacy HTTP compatibility shell files and dependencies are removed", async () => {
@@ -503,5 +527,125 @@ describe("server stack convergence", () => {
     expect(source).toContain("Delete(");
     expect(source).not.toContain(LEGACY_OPENAPI_PACKAGE);
     expect(source).not.toContain(LEGACY_OPENAPI_FACTORY);
+  });
+
+  test("OpenAPI bootstrap exposes a stable JSON document for generated clients", async () => {
+    const source = await readFile("apps/server/src/nest-application.ts", "utf8");
+
+    expect(source).toContain("deepScanRoutes: true");
+    expect(source).toContain("operationIdFactory");
+    expect(source).toContain('jsonDocumentUrl: "api/v1/openapi.json"');
+  });
+
+  test("mounted public API controllers are discoverable by Swagger", async () => {
+    const appModuleSource = await readFile("apps/server/src/app.module.ts", "utf8");
+    const workflowModuleSource = await readFile(
+      "services/workflow-coordination/src/interface/http/workflow-cycle.module.ts",
+      "utf8",
+    );
+    const controllerFiles = await listControllerFiles("services");
+    const missingModuleImports: string[] = [];
+    const missingControllerRegistrations: string[] = [];
+
+    for (const file of controllerFiles) {
+      const source = await readFile(file, "utf8");
+      const modules = exportedModuleNames(source);
+      if (modules.length > 0) {
+        for (const moduleName of modules) {
+          if (!appModuleSource.includes(moduleName)) missingModuleImports.push(`${file}:${moduleName}`);
+        }
+        continue;
+      }
+
+      const controllerNames = [...source.matchAll(/export class (\w*Controller)\b/g)].map((match) => match[1]!);
+      for (const controllerName of controllerNames) {
+        if (!workflowModuleSource.includes(controllerName)) {
+          missingControllerRegistrations.push(`${file}:${controllerName}`);
+        }
+      }
+    }
+
+    expect(missingModuleImports).toEqual([]);
+    expect(missingControllerRegistrations).toEqual([]);
+  });
+
+  test("public API route handlers carry OpenAPI discoverability, auth, and error metadata", async () => {
+    const controllerFiles = await listControllerFiles("services");
+    const offenders: string[] = [];
+
+    for (const file of controllerFiles) {
+      const source = await readFile(file, "utf8");
+      if (source.includes("Controller(") && !source.includes("ApiTags(")) {
+        offenders.push(`${file}: missing ApiTags metadata`);
+      }
+      if (source.includes('Headers("authorization")')) {
+        if (!source.includes("ApiBearerAuth(")) offenders.push(`${file}: missing ApiBearerAuth metadata`);
+        if (!source.includes("ApiUnauthorizedResponse(")) offenders.push(`${file}: missing ApiUnauthorizedResponse metadata`);
+      }
+      if (source.includes("ForbiddenException") && !source.includes("ApiForbiddenResponse(")) {
+        offenders.push(`${file}: missing ApiForbiddenResponse metadata`);
+      }
+
+      if (declaredRouteHandlers(source).length > 0) {
+        if (!source.includes("ApiOperation(")) offenders.push(`${file}: missing operation summary metadata`);
+        if (!/\bApi(?:Ok|Created|Accepted|NoContent|BadRequest|Unauthorized|Forbidden|NotFound|Conflict|InternalServerError)Response\(/.test(source)) {
+          offenders.push(`${file}: missing response metadata`);
+        }
+      }
+
+      const openApiLabels = [
+        ...source.matchAll(/ApiTags\(([^)]*)\)/g),
+        ...source.matchAll(/ApiOperation\(\s*\{[^}]*summary:\s*([^,}]+)/g),
+      ].map((match) => match[1]!);
+      for (const label of openApiLabels) {
+        if (PROVENANCE_LABEL_PATTERN.test(label)) offenders.push(`${file}: provenance label ${label.trim()}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  test("each public API route handler carries per-route ApiOperation and response metadata", async () => {
+    const controllerFiles = await listControllerFiles("services");
+    const offenders: string[] = [];
+    const RESPONSE_DECORATOR = /\bApi(Ok|Created|Accepted|NoContent|BadRequest|Unauthorized|Forbidden|NotFound|Conflict|UnprocessableEntity|InternalServerError|TooManyRequests|Default)Response\b/;
+
+    for (const file of controllerFiles) {
+      const source = await readFile(file, "utf8");
+      // Collect every concrete route registration: HttpVerb(...)(ClassName.prototype, "method", ...)
+      const handlerTuples = new Map<string, { className: string; method: string }>();
+      const HANDLER_PATTERN = /\b(Get|Post|Put|Patch|Delete|Sse|All|Options|Head)\([^)]*\)\(\s*(\w+)\.prototype\s*,\s*"([^"]+)"/g;
+      for (const match of source.matchAll(HANDLER_PATTERN)) {
+        const [, , className, method] = match;
+        handlerTuples.set(`${className}::${method}`, { className: className!, method: method! });
+      }
+
+      if (handlerTuples.size === 0) continue;
+
+      // For each tuple, require an ApiOperation and a response decorator targeting that same (Class.prototype, "method").
+      for (const [key, { className, method }] of handlerTuples) {
+        const target = new RegExp(
+          `${className}\\.prototype\\s*,\\s*"${method}"`,
+          "g",
+        );
+        let hasOperation = false;
+        let hasResponse = false;
+        // Inspect every line that mentions the (Class.prototype, "method") tuple.
+        const lines = source.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]!;
+          if (!target.test(line)) continue;
+          target.lastIndex = 0;
+          // Scan upward up to ~5 lines for the decorator factory the call belongs to.
+          const block = lines.slice(Math.max(0, i - 5), i + 1).join("\n");
+          if (/\bApiOperation\s*\(/.test(block)) hasOperation = true;
+          if (RESPONSE_DECORATOR.test(block)) hasResponse = true;
+        }
+        if (!hasOperation) offenders.push(`${file}: ${key} missing ApiOperation`);
+        if (!hasResponse) offenders.push(`${file}: ${key} missing per-route response decorator`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
   });
 });

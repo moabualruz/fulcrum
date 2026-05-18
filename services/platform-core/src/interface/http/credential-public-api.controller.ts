@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { Body, Controller, Delete, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Param, Post, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -200,6 +200,7 @@ if (Object.values(routeDescriptors).some((descriptor) => !descriptor)) {
 
 Controller("api/v1/credentials")(CredentialPublicApiController);
 ApiTags("credentials")(CredentialPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to access credential metadata" })(CredentialPublicApiController);
 
 applyGetRoute("listCredentials", "", CredentialListQueryDto, "List credentials");
 applyPostRoute("setCredential", "", CredentialSetDto, "Set credential");

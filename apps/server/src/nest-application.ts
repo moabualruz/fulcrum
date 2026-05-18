@@ -48,8 +48,13 @@ export async function createFulcrumNestApplication(
     .setDescription("Agent-native project workflow API")
     .setVersion("0.1.0")
     .build();
-  const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);
-  SwaggerModule.setup(options.openApiPath ?? "openapi", app, openApiDocument);
+  const openApiDocument = SwaggerModule.createDocument(app, openApiConfig, {
+    deepScanRoutes: true,
+    operationIdFactory: (controllerKey, methodKey) => `${controllerKey}_${methodKey}`,
+  });
+  SwaggerModule.setup(options.openApiPath ?? "openapi", app, openApiDocument, {
+    jsonDocumentUrl: "api/v1/openapi.json",
+  });
 
   const trpcRouter = app.get(TrpcRouter);
   await trpcRouter.applyMiddleware(app);

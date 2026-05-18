@@ -15,7 +15,7 @@ import {
   Query,
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -173,6 +173,7 @@ if (Object.values(routeDescriptors).some((descriptor) => !descriptor)) {
 
 Controller("api/v1/data-portability")(DataPortabilityPublicApiController);
 ApiTags("data-portability")(DataPortabilityPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to export or import data" })(DataPortabilityPublicApiController);
 
 applyPostRoute("createBackup", "backup", DataPortabilityScopeDto, "Create data backup");
 applyPostRoute("restoreBackup", "backup/restore", BackupRestoreDto, "Restore data backup");

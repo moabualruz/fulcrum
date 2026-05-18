@@ -86,14 +86,17 @@ mock.module("@nestjs/core", () => ({
 
 mock.module("@nestjs/swagger", () => ({
   ApiAcceptedResponse: noopDecorator,
+  ApiBearerAuth: noopDecorator,
   ApiBody: noopDecorator,
   ApiCreatedResponse: noopDecorator,
+  ApiForbiddenResponse: noopDecorator,
   ApiNoContentResponse: noopDecorator,
   ApiOkResponse: noopDecorator,
   ApiOperation: noopDecorator,
   ApiParam: noopDecorator,
   ApiQuery: noopDecorator,
   ApiTags: noopDecorator,
+  ApiUnauthorizedResponse: noopDecorator,
   DocumentBuilder: TestDocumentBuilder,
   SwaggerModule: {
     createDocument: swaggerCreateDocument,
@@ -125,6 +128,9 @@ describe("Nest server application bootstrap", () => {
       title: "Fulcrum API",
       description: "Agent-native project workflow API",
       version: "0.1.0",
+    }, {
+      deepScanRoutes: true,
+      operationIdFactory: expect.any(Function),
     });
     expect(swaggerSetup).toHaveBeenCalledWith("openapi", app, {
       openapi: "3.1.0",
@@ -133,6 +139,8 @@ describe("Nest server application bootstrap", () => {
         description: "Agent-native project workflow API",
         version: "0.1.0",
       },
+    }, {
+      jsonDocumentUrl: "api/v1/openapi.json",
     });
     expect(trpcApplyMiddleware).toHaveBeenCalledWith(app);
   });

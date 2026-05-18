@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { Controller, Delete, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Param, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBooleanString, IsDateString, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { Type } from "class-transformer";
@@ -174,6 +174,7 @@ const clearDescriptor = routeDescriptors.clear!;
 
 Controller("api/v1/error-logs")(ErrorLogPublicApiController);
 ApiTags("error-logs")(ErrorLogPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to access error logs" })(ErrorLogPublicApiController);
 
 Get("")(ErrorLogPublicApiController.prototype, "list", listDescriptor);
 Query()(ErrorLogPublicApiController.prototype, "list", 0);

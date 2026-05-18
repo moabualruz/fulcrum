@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Post, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsEmail, IsIn, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -144,6 +144,7 @@ const acceptInviteDescriptor = routeDescriptors.acceptInvite!;
 
 Controller("api/v1/auth")(AuthPublicApiController);
 ApiTags("auth")(AuthPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to perform the auth operation" })(AuthPublicApiController);
 
 Get("whoami")(AuthPublicApiController.prototype, "whoami", whoamiDescriptor);
 Query()(AuthPublicApiController.prototype, "whoami", 0);

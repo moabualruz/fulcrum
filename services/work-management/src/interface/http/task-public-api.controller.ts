@@ -21,6 +21,7 @@ import {
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
 import {
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -671,6 +672,7 @@ if (
 
 Controller("api/v1")(TaskPublicApiController);
 ApiTags("tasks")(TaskPublicApiController);
+ApiForbiddenResponse({ description: "Task public API feature is disabled or caller lacks permission" })(TaskPublicApiController);
 
 Get("tasks")(TaskPublicApiController.prototype, "listTasks", listTasksDescriptor);
 Query()(TaskPublicApiController.prototype, "listTasks", 0);

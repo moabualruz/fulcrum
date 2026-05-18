@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { Body, Controller, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Param, Patch, Post, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsEmail, IsIn, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -158,6 +158,7 @@ const revokeDescriptor = routeDescriptors.revoke!;
 
 Controller("api/v1/invitations")(InvitationPublicApiController);
 ApiTags("invitations")(InvitationPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to perform the invitation operation" })(InvitationPublicApiController);
 
 Get("")(InvitationPublicApiController.prototype, "list", listDescriptor);
 Query()(InvitationPublicApiController.prototype, "list", 0);

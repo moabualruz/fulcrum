@@ -19,7 +19,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -459,6 +459,8 @@ if (
 
 Controller("api/v1/search")(SearchPublicApiController);
 ApiTags("search")(SearchPublicApiController);
+ApiBearerAuth()(SearchPublicApiController);
+ApiUnauthorizedResponse({ description: "Bearer token is missing or invalid" })(SearchPublicApiController);
 
 Get()(SearchPublicApiController.prototype, "search", searchDescriptor);
 Query()(SearchPublicApiController.prototype, "search", 0);

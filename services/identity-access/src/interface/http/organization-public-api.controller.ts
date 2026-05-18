@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { Body, Controller, Delete, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Param, Patch, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -170,6 +170,7 @@ if (Object.values(routeDescriptors).some((descriptor) => !descriptor)) {
 
 Controller("api/v1/organizations")(OrganizationPublicApiController);
 ApiTags("organizations")(OrganizationPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to perform the organization operation" })(OrganizationPublicApiController);
 
 applyGetRoute("getOrganization", "current", OrganizationScopeDto, "Get current organization");
 applyPatchRoute("updateOrganization", "current", OrganizationUpdateDto, "Update organization");

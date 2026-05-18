@@ -21,11 +21,13 @@ import {
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import {
@@ -621,6 +623,8 @@ if (
 
 Controller("api/v1/memory")(MemoryPublicApiController);
 ApiTags("memory")(MemoryPublicApiController);
+ApiBearerAuth()(MemoryPublicApiController);
+ApiUnauthorizedResponse({ description: "Bearer token is missing or invalid" })(MemoryPublicApiController);
 
 Get()(MemoryPublicApiController.prototype, "listMemories", listMemoriesDescriptor);
 Query()(MemoryPublicApiController.prototype, "listMemories", 0);
@@ -739,6 +743,8 @@ ApiOkResponse({ description: "Memory digest result" })(
 
 Controller("api/v1/context")(ContextPreviewPublicApiController);
 ApiTags("context")(ContextPreviewPublicApiController);
+ApiBearerAuth()(ContextPreviewPublicApiController);
+ApiUnauthorizedResponse({ description: "Bearer token is missing or invalid" })(ContextPreviewPublicApiController);
 
 Get("preview")(ContextPreviewPublicApiController.prototype, "previewContext", previewContextDescriptor);
 Query()(ContextPreviewPublicApiController.prototype, "previewContext", 0);
