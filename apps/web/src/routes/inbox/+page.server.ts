@@ -119,13 +119,13 @@ export const load: ServerLoad = async (event) => {
   if (!audit) throw new Error("Audit scope is required.");
 
   const [unreadResult, listResult, activityResult] = await Promise.all([
-    notify.unreadCount(),
-    notify.list(),
+    notify.unreadCount().catch(() => ({ count: 0 })),
+    notify.list().catch(() => []),
     audit.queryPage({
       userId: sessionEvent.locals.userId ?? undefined,
       limit: PAGE_SIZE,
       offset: (activityPage - 1) * PAGE_SIZE,
-    }),
+    }).catch(() => ({ data: [], total: 0 })),
   ]);
 
   const count = Number((unreadResult as { count?: unknown })?.count ?? 0);

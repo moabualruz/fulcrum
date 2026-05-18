@@ -29,7 +29,7 @@
   }
 </script>
 
-<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
+<header data-inbox-header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>
     Inbox
     {#if data.unreadCount > 0}
