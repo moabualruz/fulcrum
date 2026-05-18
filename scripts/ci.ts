@@ -26,6 +26,8 @@ const sandboxHome = join(tmpdir(), `fulcrum-ci-home-${process.pid}`);
 const hostHome = process.env["HOME"];
 mkdirSync(sandboxHome, { recursive: true });
 
+export const PLAYWRIGHT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.50-jammy";
+
 export const CI_ENV: NodeJS.ProcessEnv = { ...process.env, HOME: sandboxHome };
 delete CI_ENV["FULCRUM_HOME"];
 

@@ -17,11 +17,11 @@
 		"web:test": "vitest run",
 		"web:e2e": "bun run web:e2e:full",
 		"web:e2e:smoke": "playwright test tests/e2e/_smoke.spec.ts",
-		"web:e2e:generated": "playwright test --project=chromium",
+		"web:e2e:generated": "playwright test --project=real-e2e",
 		"web:e2e:full": "playwright test tests/e2e/ --workers=1",
-		"test:design": "playwright test tests/design-e2e/ --project=chromium",
-		"test:e2e": "playwright test tests/e2e/wave-0a-foundation.spec.ts --project=chromium",
-		"web:a11y": "playwright test tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts --project=chromium",
+		"test:design": "playwright test --project=design-e2e",
+		"test:e2e": "playwright test tests/e2e/wave-0a-foundation.spec.ts --project=real-e2e",
+		"web:a11y": "playwright test tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts --project=real-e2e",
 		"i18n:extract": "bun run src/lib/i18n/extract.ts"
 	},
 	"devDependencies": {

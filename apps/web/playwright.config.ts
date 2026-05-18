@@ -1,33 +1,83 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
+const webRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(webRoot, "../..");
 const tempRoot = process.env.TMPDIR ?? "/tmp/fulcrum-e2e";
 const fulcrumHome = path.join(tempRoot, `fulcrum-e2e-${process.pid}`);
-const port = Number(process.env.FULCRUM_E2E_PORT ?? "5173");
+const designPort = Number(process.env.FULCRUM_DESIGN_E2E_PORT ?? "4200");
+const realPort = Number(process.env.FULCRUM_REAL_E2E_PORT ?? process.env.FULCRUM_E2E_PORT ?? "5173");
+const serverPort = Number(process.env.FULCRUM_SERVER_TEST_PORT ?? "3100");
+const quotedWebRoot = JSON.stringify(webRoot);
+const quotedRepoRoot = JSON.stringify(repoRoot);
 
 process.env.FULCRUM_HOME ??= fulcrumHome;
 
 export default defineConfig({
-	testDir: "tests/",
+	testDir: path.join(webRoot, "tests"),
 	timeout: 30000,
 	retries: 0,
-	use: {
-		baseURL: `http://127.0.0.1:${port}`,
-	},
-	webServer: {
-		command: `bun run dev -- --host 127.0.0.1 --port ${port}`,
-		port,
-		env: {
-			FULCRUM_HOME: fulcrumHome,
-			FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
-			FULCRUM_E2E: "1",
+	expect: {
+		toHaveScreenshot: {
+			maxDiffPixelRatio: 0.01,
+			threshold: 0.2,
+			animations: "disabled",
 		},
-		reuseExistingServer: false,
 	},
+	use: {
+		trace: "retain-on-failure",
+	},
+	webServer: [
+		{
+			command: `cd ${quotedWebRoot} && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
+			port: designPort,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		},
+		{
+			command: `cd ${quotedRepoRoot} && bun run apps/server/src/index.ts`,
+			port: serverPort,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_SERVER_PORT: String(serverPort),
+				PORT: String(serverPort),
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		},
+		{
+			command: `cd ${quotedWebRoot} && bun run dev -- --host 127.0.0.1 --port ${realPort}`,
+			port: realPort,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
+				FULCRUM_API_URL: `http://127.0.0.1:${serverPort}`,
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		},
+	],
 	projects: [
 		{
-			name: "chromium",
-			use: { ...devices["Desktop Chrome"] },
+			name: "design-e2e",
+			testMatch: "design-e2e/**/*.spec.ts",
+			use: {
+				...devices["Desktop Chrome"],
+				baseURL: `http://127.0.0.1:${designPort}`,
+			},
+		},
+		{
+			name: "real-e2e",
+			testMatch: "e2e/**/*.spec.ts",
+			use: {
+				...devices["Desktop Chrome"],
+				baseURL: `http://127.0.0.1:${realPort}`,
+			},
 		},
 	],
 });
