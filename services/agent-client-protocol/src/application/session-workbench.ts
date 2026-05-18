@@ -197,6 +197,10 @@ function cloneToolCall(toolCall: ToolCallInfo): ToolCallInfo {
   return {
     ...toolCall,
     locations: toolCall.locations?.map((location) => ({ ...location })),
+    diffs: toolCall.diffs?.map((diff) => ({
+      ...diff,
+      lines: diff.lines.map((line) => ({ ...line })),
+    })),
   };
 }
 

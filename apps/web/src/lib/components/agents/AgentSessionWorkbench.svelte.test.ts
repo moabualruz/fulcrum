@@ -35,6 +35,14 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-traffic-pause");
     expect(body).toContain('data-traffic-error="true"');
     expect(body).toContain("tool/error");
+    expect(body).toContain("data-inline-diff");
+    expect(body).toContain('data-syntax-language="ts"');
+    expect(body).toContain("data-old-line");
+    expect(body).toContain("data-new-line");
+    expect(body).toContain("diff-accept-btn");
+    expect(body).toContain("diff-reject-btn");
+    expect(body).toContain("data-diff-accepted");
+    expect(body).toContain("data-diff-reject-reason");
     expect(body).toContain("Build the plan");
     expect(body).toContain("session/update");
     expect(body).not.toContain("data-session-empty");
@@ -95,8 +103,29 @@ function activeModel(): SessionWorkbenchModel {
       { id: "message-1", role: "user", content: "Build the plan", timestamp: 1 },
     ],
     toolCalls: {
-      items: [{ toolCallId: "tool-1", title: "Read brief", kind: "read", status: "in_progress" }],
-      summary: { total: 1, pending: 0, inProgress: 1, completed: 0, failed: 0 },
+      items: [
+        { toolCallId: "tool-1", title: "Read brief", kind: "read", status: "in_progress" },
+        {
+          toolCallId: "tool-diff",
+          title: "Edit src/app.ts",
+          kind: "write",
+          status: "completed",
+          diffs: [
+            {
+              id: "diff-1",
+              filePath: "src/app.ts",
+              language: "ts",
+              status: "accepted",
+              lines: [
+                { oldLine: 1, newLine: 1, kind: "context", content: "export function run() {" },
+                { oldLine: 2, newLine: null, kind: "remove", content: "return false;" },
+                { oldLine: null, newLine: 2, kind: "add", content: "return true;" },
+              ],
+            },
+          ],
+        },
+      ],
+      summary: { total: 2, pending: 0, inProgress: 1, completed: 1, failed: 0 },
     },
     permission: {
       sessionId: "agent-session-1",

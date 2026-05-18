@@ -18,6 +18,18 @@
   };
 
   const hasSavedSessions = model.resumableSessions.length > 0;
+
+  function diffLineClass(kind: string): string {
+    if (kind === "add") return "bg-emerald-500/10 text-emerald-950 dark:text-emerald-100";
+    if (kind === "remove") return "bg-rose-500/10 text-rose-950 dark:text-rose-100";
+    return "text-muted-foreground";
+  }
+
+  function diffPrefix(kind: string): string {
+    if (kind === "add") return "+";
+    if (kind === "remove") return "-";
+    return " ";
+  }
 </script>
 
 <section
@@ -195,6 +207,70 @@
         <div><dt class={cn("text-muted-foreground")}>Done</dt><dd>{model.toolCalls.summary.completed}</dd></div>
         <div><dt class={cn("text-muted-foreground")}>Failed</dt><dd>{model.toolCalls.summary.failed}</dd></div>
       </dl>
+      {#if model.toolCalls.items.length > 0}
+        <ol class={cn("space-y-3")}>
+          {#each model.toolCalls.items as toolCall}
+            <li data-session-toolcall={toolCall.toolCallId} class={cn("space-y-2 rounded-md border border-border p-2")}>
+              <div class={cn("flex flex-wrap items-center justify-between gap-2 text-xs")}>
+                <span class={cn("font-medium")}>{toolCall.title}</span>
+                <span class={cn("rounded-md border border-border px-2 py-0.5 text-muted-foreground")}>{toolCall.status}</span>
+              </div>
+              {#if toolCall.diffs?.length}
+                <div data-inline-diff-list class={cn("space-y-2")}>
+                  {#each toolCall.diffs as diff}
+                    <section
+                      data-inline-diff={diff.id}
+                      data-syntax-highlight
+                      data-syntax-language={diff.language}
+                      class={cn("overflow-hidden rounded-md border border-border")}
+                    >
+                      <header class={cn("flex flex-wrap items-center justify-between gap-2 border-b border-border px-2 py-1 text-xs")}>
+                        <div class={cn("flex min-w-0 items-center gap-2")}>
+                          <span class={cn("truncate font-medium")}>{diff.filePath}</span>
+                          <span class={cn("rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground")}>{diff.language}</span>
+                          {#if diff.status === "accepted"}
+                            <span data-diff-accepted class={cn("rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-300")}>Accepted</span>
+                          {:else if diff.status === "rejected"}
+                            <span data-diff-rejected class={cn("rounded-md bg-rose-500/10 px-1.5 py-0.5 text-rose-700 dark:text-rose-300")}>Rejected</span>
+                          {/if}
+                        </div>
+                        <div class={cn("flex items-center gap-1")}>
+                          <button type="button" class={cn(buttonVariants({ variant: "default", size: "sm" }), "diff-accept-btn h-7 px-2 text-xs")}>
+                            Accept
+                          </button>
+                          <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "diff-reject-btn h-7 px-2 text-xs")}>
+                            Reject
+                          </button>
+                        </div>
+                      </header>
+                      <div class={cn("overflow-x-auto")} data-inline-diff-scroll>
+                        <div class={cn("min-w-[32rem] font-mono text-xs leading-5")} role="table" aria-label={`Unified diff for ${diff.filePath}`}>
+                          {#each diff.lines as line}
+                            <div data-diff-row={line.kind} class={cn("grid grid-cols-[3rem_3rem_2rem_1fr]", diffLineClass(line.kind))} role="row">
+                              <span data-old-line class={cn("select-none border-r border-border px-2 text-right text-muted-foreground")} role="cell">
+                                {line.oldLine ?? ""}
+                              </span>
+                              <span data-new-line class={cn("select-none border-r border-border px-2 text-right text-muted-foreground")} role="cell">
+                                {line.newLine ?? ""}
+                              </span>
+                              <span class={cn("select-none px-2 text-muted-foreground")} role="cell">{diffPrefix(line.kind)}</span>
+                              <code class={cn("whitespace-pre px-2")} role="cell">{line.content}</code>
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
+                      <label class={cn("block border-t border-border px-2 py-1 text-xs text-muted-foreground")}>
+                        Reject reason (optional)
+                        <textarea data-diff-reject-reason class={cn("mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1 font-sans text-xs text-foreground")} placeholder="Tell agent what to change"></textarea>
+                      </label>
+                    </section>
+                  {/each}
+                </div>
+              {/if}
+            </li>
+          {/each}
+        </ol>
+      {/if}
     </div>
   </div>
 

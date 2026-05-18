@@ -66,6 +66,22 @@ export interface ToolCallInfo {
   kind: string;
   status: "pending" | "in_progress" | "completed" | "failed";
   locations?: { path: string }[];
+  diffs?: ToolCallDiff[];
+}
+
+export interface ToolCallDiffLine {
+  oldLine: number | null;
+  newLine: number | null;
+  kind: "context" | "add" | "remove";
+  content: string;
+}
+
+export interface ToolCallDiff {
+  id: string;
+  filePath: string;
+  language: string;
+  status: "pending" | "accepted" | "rejected";
+  lines: ToolCallDiffLine[];
 }
 
 export interface PermissionRequest {
