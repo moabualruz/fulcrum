@@ -1,7 +1,13 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import type { ActionData } from "./$types";
 
   type Provider = "google" | "github";
+  interface Props {
+    form: ActionData;
+  }
+
+  let { form }: Props = $props();
 
   let email = $state("");
   let password = $state("");
@@ -14,6 +20,7 @@
   let oauthPost = $state("");
 
   const saasAuthEnabled = true;
+  const serverFormPost = $derived(form?.emailPasswordPost ?? "");
 
   function submitLogin(event: SubmitEvent): void {
     event.preventDefault();
@@ -165,7 +172,7 @@
       <section data-auth-flow-contract class={cn("rounded-md border border-border bg-background p-4")}>
         <h2 class={cn("text-sm font-semibold")}>Request contract</h2>
         <div class={cn("mt-3 grid gap-3")}>
-          <pre data-email-password-post class={cn("min-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 text-xs")}>{formPost || "Submit email/password to inspect POST payload."}</pre>
+          <pre data-email-password-post class={cn("min-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 text-xs")}>{formPost || serverFormPost || "Submit email/password to inspect POST payload."}</pre>
           <pre data-oauth-post class={cn("min-h-24 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 text-xs")}>{oauthPost || "Click OAuth to inspect social sign-in payload."}</pre>
         </div>
       </section>

@@ -72,4 +72,28 @@ test.describe("artifacts route interaction coverage", () => {
     await expect(page.locator("[data-artifact-detail-error]")).toContainText("Recovery:");
     await expect(page.locator("[data-artifact-detail-error] a[href='/artifacts']")).toBeVisible();
   });
+
+  test("downloads artifact bytes with safe headers and fails closed for missing files", async ({ page, fulcrumHome }) => {
+    const project = await fulcrumHome.seedProject("artifact-download-design", "Artifact Download Design");
+    const artifactsDir = join(fulcrumHome.home, "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    const bodyPath = join(artifactsDir, "download-proof.txt");
+    writeFileSync(bodyPath, "download-proof-body");
+    const artifact = await fulcrumHome.seedArtifact({
+      projectId: project.id,
+      title: 'download "proof".txt',
+      mime: "text/plain",
+      size: 19,
+      bodyPath,
+    });
+
+    const response = await page.request.get(`/artifacts/${artifact.id}/download`);
+    expect(response.ok()).toBe(true);
+    await expect(response.text()).resolves.toBe("download-proof-body");
+    expect(response.headers()["content-type"]).toContain("text/plain");
+    expect(response.headers()["content-disposition"]).toBe('attachment; filename="download proof.txt"');
+
+    const missing = await page.request.get("/artifacts/missing-artifact-id/download");
+    expect(missing.status()).toBe(404);
+  });
 });
