@@ -22,3 +22,11 @@ export class AuthEmailVerificationRequestDto extends AuthScopeDto {
 export class AuthEmailVerificationConfirmDto {
   token!: string;
 }
+
+export class AuthSessionsQueryDto extends AuthScopeDto {
+  currentSessionId?: string;
+}
+
+export class AuthSessionRevokeDto extends AuthSessionsQueryDto {
+  sessionId!: string;
+}

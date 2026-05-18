@@ -11,6 +11,9 @@ export interface AuthRunOptions {
     auth: {
       whoami: () => Promise<any>;
       invite?: (input: { email: string; role: InviteRole }) => Promise<any>;
+      sessions?: (input?: Record<string, unknown>) => Promise<any>;
+      revokeSession?: (input: { sessionId: string; currentSessionId?: string }) => Promise<any>;
+      revokeOtherSessions?: (input?: { currentSessionId?: string }) => Promise<any>;
     };
   };
   env?: AuthApiEnvironment;
@@ -27,6 +30,9 @@ Authentication commands.
 Usage:
   fulcrum auth whoami [--json]
   fulcrum auth invite <email> [--role owner|admin|member|guest] [--json]
+  fulcrum auth sessions [--current <session-id>] [--json]
+  fulcrum auth revoke-session <session-id> [--current <session-id>] [--json]
+  fulcrum auth revoke-other-sessions [--current <session-id>] [--json]
   fulcrum auth login [--passkey | --password] [--non-interactive]
   fulcrum auth logout
 
@@ -56,6 +62,15 @@ export async function run(
     case "invite":
       return runInvite(rest, { ...opts, print, printErr, exit });
 
+    case "sessions":
+      return runSessions(rest, { ...opts, print, printErr, exit });
+
+    case "revoke-session":
+      return runRevokeSession(rest, { ...opts, print, printErr, exit });
+
+    case "revoke-other-sessions":
+      return runRevokeOtherSessions(rest, { ...opts, print, printErr, exit });
+
     case "help":
     case "--help":
     case "-h":
@@ -66,6 +81,85 @@ export async function run(
       printErr(`fulcrum auth: unknown command '${sub}'`);
       printErr(HELP);
       exit(2);
+  }
+}
+
+async function runSessions(
+  argv: readonly string[],
+  opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const jsonMode = argv.includes("--json");
+  const currentSessionId = flagValue(argv, "--current");
+  try {
+    const caller = await resolveCaller(opts);
+    if (!caller.auth.sessions) {
+      printErr("fulcrum auth sessions: auth sessions operation is not available.");
+      exit(1);
+      return;
+    }
+    const result = await caller.auth.sessions({ currentSessionId });
+    if (jsonMode) {
+      print(JSON.stringify(result));
+      return;
+    }
+    for (const session of Array.isArray(result) ? result : []) {
+      const current = session.isCurrent ? " current" : "";
+      print(`${session.id}${current}  ${session.deviceType}  ${session.browser}  ${session.ipAddress ?? "private"}  ${session.lastActiveAt}`);
+    }
+  } catch (err) {
+    printErr(`fulcrum auth sessions: ${formatCommandError(err)}`);
+    exit(1);
+  }
+}
+
+async function runRevokeSession(
+  argv: readonly string[],
+  opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const jsonMode = argv.includes("--json");
+  const sessionId = argv.find((arg) => !arg.startsWith("--"));
+  const currentSessionId = flagValue(argv, "--current");
+  if (!sessionId) {
+    printErr("fulcrum auth revoke-session: missing required argument <session-id>");
+    exit(2);
+    return;
+  }
+  try {
+    const caller = await resolveCaller(opts);
+    if (!caller.auth.revokeSession) {
+      printErr("fulcrum auth revoke-session: auth session revocation is not available.");
+      exit(1);
+      return;
+    }
+    const result = await caller.auth.revokeSession({ sessionId, currentSessionId });
+    print(jsonMode ? JSON.stringify(result) : `Revoked session: ${sessionId}`);
+  } catch (err) {
+    printErr(`fulcrum auth revoke-session: ${formatCommandError(err)}`);
+    exit(1);
+  }
+}
+
+async function runRevokeOtherSessions(
+  argv: readonly string[],
+  opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
+): Promise<void> {
+  const { print, printErr, exit } = opts;
+  const jsonMode = argv.includes("--json");
+  const currentSessionId = flagValue(argv, "--current");
+  try {
+    const caller = await resolveCaller(opts);
+    if (!caller.auth.revokeOtherSessions) {
+      printErr("fulcrum auth revoke-other-sessions: auth bulk revocation is not available.");
+      exit(1);
+      return;
+    }
+    const result = await caller.auth.revokeOtherSessions({ currentSessionId });
+    print(jsonMode ? JSON.stringify(result) : `Revoked sessions: ${result.revokedSessionIds?.length ?? 0}`);
+  } catch (err) {
+    printErr(`fulcrum auth revoke-other-sessions: ${formatCommandError(err)}`);
+    exit(1);
   }
 }
 
@@ -180,6 +274,9 @@ async function resolveCaller(opts: AuthRunOptions): Promise<{
   auth: {
     whoami: () => Promise<any>;
     invite?: (input: { email: string; role: InviteRole }) => Promise<any>;
+    sessions?: (input?: Record<string, unknown>) => Promise<any>;
+    revokeSession?: (input: { sessionId: string; currentSessionId?: string }) => Promise<any>;
+    revokeOtherSessions?: (input?: { currentSessionId?: string }) => Promise<any>;
   };
 }> {
   if (opts.caller) return opts.caller;
@@ -188,4 +285,9 @@ async function resolveCaller(opts: AuthRunOptions): Promise<{
     throw new Error("Auth API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL.");
   }
   return apiCaller;
+}
+
+function flagValue(argv: readonly string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : undefined;
 }

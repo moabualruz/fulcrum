@@ -43,6 +43,20 @@ export function createAuthApiCaller(options: AuthApiClientOptions) {
           method: "POST",
           body: input,
         }),
+      sessions: async (input: JsonRecord = {}) =>
+        await request("/api/v1/auth/sessions", {
+          query: scopedQuery(options, input),
+        }),
+      revokeSession: async (input: JsonRecord) =>
+        await request("/api/v1/auth/sessions/revoke", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      revokeOtherSessions: async (input: JsonRecord = {}) =>
+        await request("/api/v1/auth/sessions/revoke-others", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
     },
   };
 }

@@ -95,7 +95,16 @@ export interface TuiCaller {
       passkeyCount?: number;
       saasAuthEnabled?: boolean;
       authProviders?: string[];
+      sessionId?: string | null;
     }>;
+    sessions?: (input?: { currentSessionId?: string }) => Promise<Array<{
+      id: string;
+      deviceType: string;
+      browser: string;
+      ipAddress: string | null;
+      lastActiveAt: string;
+      isCurrent: boolean;
+    }>>;
   };
   flags: {
     list: () => Promise<FlagItem[]>;
@@ -1340,6 +1349,9 @@ export class TuiApp {
       let authInfo: AuthInfo;
       try {
         const whoami = await this.caller.auth.whoami();
+        const sessions = this.caller.auth.sessions
+          ? await this.caller.auth.sessions({ currentSessionId: whoami.sessionId ?? undefined })
+          : [];
         authInfo = {
           userId: whoami.userId,
           orgId: whoami.orgId,
@@ -1349,6 +1361,7 @@ export class TuiApp {
           passkeyCount: whoami.passkeyCount ?? 0,
           saasAuthEnabled: whoami.saasAuthEnabled ?? false,
           authProviders: whoami.authProviders ?? [],
+          sessions: Array.isArray(sessions) ? sessions : [],
         };
       } catch {
         authInfo = {

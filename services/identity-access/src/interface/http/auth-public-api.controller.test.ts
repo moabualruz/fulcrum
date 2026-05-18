@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
@@ -22,33 +22,36 @@ import {
   AuthEmailVerificationConfirmDto,
   AuthEmailVerificationRequestDto,
   AuthInviteDto,
+  AuthSessionRevokeDto,
+  AuthSessionsQueryDto,
   AuthPublicApiController,
   AuthPublicApiModule,
   AuthPublicApiService,
 } from "@identity-access/interface/http/auth-public-api.controller.ts";
-import { Org, User, Verification } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { Org, Session, User, Verification } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { CoreAndAuth1715788800000 } from "@platform-core/infrastructure/application-database/migrations/1715788800000-CoreAndAuth.ts";
+import {
+  WORKFLOW_AUDIT_ENTITIES,
+  WorkflowAuditEventEntity,
+} from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
+import { WorkflowAudit1778623200008 } from "@workflow-coordination/infrastructure/database/audit-log.migration.ts";
 import {
   buildFulcrumTypeOrmOptions,
   createFulcrumTypeOrmDataSource,
   type FulcrumTypeOrmConnectionSource,
 } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
-import { startTemporaryPostgres, type TemporaryPostgres } from "@test-support/temporary-postgres.ts";
+import { startTemporaryPostgres } from "@test-support/temporary-postgres.ts";
 import {
   FULCRUM_WORKFLOW_SPINE_ENTITIES,
   FulcrumWorkspaceEntity,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 import { WorkflowSpine1778623200001 } from "@workflow-coordination/infrastructure/database/workflow-spine.migration.ts";
 
-let pglite: PGlite | undefined;
-let socketServer: PGLiteSocketServer | undefined;
-let postgres: TemporaryPostgres | undefined;
-
-async function startPgliteSocket(): Promise<string> {
-  pglite = await PGlite.create();
+async function withPgliteSocket<T>(fn: (url: string) => Promise<T>): Promise<T> {
+  const pglite = await PGlite.create();
   await pglite.waitReady;
 
-  socketServer = new PGLiteSocketServer({
+  const socketServer = new PGLiteSocketServer({
     db: pglite,
     host: "127.0.0.1",
     port: 0,
@@ -57,23 +60,13 @@ async function startPgliteSocket(): Promise<string> {
   await socketServer.start();
 
   const [host, port] = socketServer.getServerConn().split(":");
-  return `postgresql://postgres:postgres@${host}:${port}/postgres`;
-}
-
-afterEach(async () => {
-  if (socketServer) {
+  try {
+    return await fn(`postgresql://postgres:postgres@${host}:${port}/postgres`);
+  } finally {
     await socketServer.stop();
-    socketServer = undefined;
-  }
-  if (pglite) {
     await pglite.close();
-    pglite = undefined;
   }
-  if (postgres) {
-    await postgres.stop();
-    postgres = undefined;
-  }
-});
+}
 
 describe("auth public Nest API", () => {
   test("is wired as a Nest controller and composed by the server app module", () => {
@@ -109,20 +102,30 @@ describe("auth public Nest API", () => {
       userId: "",
     });
     const invalidConfirm = Object.assign(new AuthEmailVerificationConfirmDto(), { token: "" });
+    const invalidSessions = Object.assign(new AuthSessionsQueryDto(), { orgId: "", userId: "" });
+    const invalidRevoke = Object.assign(new AuthSessionRevokeDto(), { orgId: "", userId: "", sessionId: "" });
 
     expect(validateSync(invalidInvite).map((error) => error.property).sort()).toEqual(["email", "orgId", "role", "userId"]);
     expect(validateSync(invalidAccept).map((error) => error.property)).toEqual(["token"]);
     expect(validateSync(invalidVerification).map((error) => error.property).sort()).toEqual(["orgId", "userId"]);
     expect(validateSync(invalidConfirm).map((error) => error.property)).toEqual(["token"]);
+    expect(validateSync(invalidSessions).map((error) => error.property).sort()).toEqual(["orgId", "userId"]);
+    expect(validateSync(invalidRevoke).map((error) => error.property).sort()).toEqual(["orgId", "sessionId", "userId"]);
   });
 
   test("runs whoami, invite, and accept-invite through PGlite socket", async () => {
-    await assertAuthRoundTrip("pglite-socket", await startPgliteSocket());
+    await withPgliteSocket(async (url) => {
+      await assertAuthRoundTrip("pglite-socket", url);
+    });
   }, 60_000);
 
   test("runs whoami, invite, and accept-invite through real PostgreSQL", async () => {
-    postgres = await startTemporaryPostgres();
-    await assertAuthRoundTrip("postgres", postgres.url);
+    const postgres = await startTemporaryPostgres();
+    try {
+      await assertAuthRoundTrip("postgres", postgres.url);
+    } finally {
+      await postgres.stop();
+    }
   });
 });
 
@@ -133,13 +136,15 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
       url,
       entities: [
         ...FULCRUM_WORKFLOW_SPINE_ENTITIES,
+        ...WORKFLOW_AUDIT_ENTITIES,
         ...FULCRUM_IDENTITY_ACCESS_ENTITIES,
         ...FULCRUM_INVITATION_ENTITIES,
         Org,
+        Session,
         User,
         Verification,
       ],
-      migrations: [CoreAndAuth1715788800000, WorkflowSpine1778623200001, IdentityAccess1778623200009, Invitation1778757000000],
+      migrations: [CoreAndAuth1715788800000, WorkflowSpine1778623200001, WorkflowAudit1778623200008, IdentityAccess1778623200009, Invitation1778757000000],
     }),
   );
 
@@ -218,6 +223,59 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
     });
     const verifiedSession = await controller.whoami(scope);
     expect(verifiedSession.emailVerified).toBe(true);
+
+    const sessions = await controller.listSessions({ ...scope, currentSessionId: "session-current" });
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        id: "session-remote",
+        deviceType: "mobile",
+        browser: "Chrome",
+        ipAddress: "203.0.113.0",
+        isCurrent: false,
+      }),
+      expect.objectContaining({
+        id: "session-current",
+        deviceType: "desktop",
+        browser: "Firefox",
+        ipAddress: "198.51.100.0",
+        isCurrent: true,
+      }),
+    ]);
+    await expect(controller.revokeSession({
+      ...scope,
+      sessionId: "session-current",
+      currentSessionId: "session-current",
+    })).rejects.toBeInstanceOf(BadRequestException);
+    const revoked = await controller.revokeSession({
+      ...scope,
+      sessionId: "session-remote",
+      currentSessionId: "session-current",
+    });
+    expect(revoked).toMatchObject({
+      revokedSessionIds: ["session-remote"],
+      audit: [expect.objectContaining({
+        action: "auth.session.revoked",
+        actorId: scope.userId,
+        sessionId: "session-remote",
+        deviceType: "mobile",
+        browser: "Chrome",
+      })],
+    });
+    await expect(dataSource.getRepository(WorkflowAuditEventEntity).findOneBy({
+      orgId: scope.orgId,
+      verb: "auth.session.revoked",
+      subjectId: "session-remote",
+    })).resolves.toMatchObject({
+      userId: scope.userId,
+      payload: expect.objectContaining({ browser: "Chrome", ipAddress: "203.0.113.0" }),
+    });
+    expect(await controller.listSessions({ ...scope, currentSessionId: "session-current" }))
+      .toEqual([expect.objectContaining({ id: "session-current", isCurrent: true })]);
+    await seedSession(dataSource, source, "session-second-remote", "Safari/17.0", "2001:db8:1111:2222:3333:4444:5555:6666");
+    const bulkRevoked = await controller.revokeOtherSessions({ ...scope, currentSessionId: "session-current" });
+    expect(bulkRevoked.revokedSessionIds).toEqual(["session-second-remote"]);
+    expect(await controller.listSessions({ ...scope, currentSessionId: "session-current" }))
+      .toEqual([expect.objectContaining({ id: "session-current", isCurrent: true })]);
   } finally {
     await dataSource.destroy();
   }
@@ -269,6 +327,44 @@ async function seedAuthOrganization(
     name: "Owner",
     role: "owner",
     emailVerified: false,
+  });
+  await dataSource.getRepository(Session).save([
+    {
+      id: "session-current",
+      orgId: `workspace-auth-${source}`,
+      userId: userIdFor(source, "owner"),
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+      ipAddress: "198.51.100.42",
+      userAgent: "Mozilla/5.0 Firefox/120.0",
+      createdAt: new Date("2026-05-18T10:00:00.000Z"),
+    },
+    {
+      id: "session-remote",
+      orgId: `workspace-auth-${source}`,
+      userId: userIdFor(source, "owner"),
+      expiresAt: new Date(Date.now() + 60 * 60_000),
+      ipAddress: "203.0.113.19",
+      userAgent: "Mozilla/5.0 Mobile Chrome/120.0",
+      createdAt: new Date("2026-05-18T11:00:00.000Z"),
+    },
+  ]);
+}
+
+async function seedSession(
+  dataSource: ReturnType<typeof createFulcrumTypeOrmDataSource>,
+  source: FulcrumTypeOrmConnectionSource,
+  id: string,
+  userAgent: string,
+  ipAddress: string,
+): Promise<void> {
+  await dataSource.getRepository(Session).save({
+    id,
+    orgId: `workspace-auth-${source}`,
+    userId: userIdFor(source, "owner"),
+    expiresAt: new Date(Date.now() + 60 * 60_000),
+    ipAddress,
+    userAgent,
+    createdAt: new Date("2026-05-18T12:00:00.000Z"),
   });
 }
 

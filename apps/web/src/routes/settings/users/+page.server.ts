@@ -1,5 +1,6 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 
+import { createAuthApiCaller } from "@identity-access/interface/http/auth-api-client.ts";
 import { createInvitationApiCaller } from "@identity-access/interface/http/invitation-api-client.ts";
 import { createOrganizationApiCaller } from "@identity-access/interface/http/organization-api-client.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
@@ -50,9 +51,20 @@ interface MemberApiRow {
 }
 
 type ScopedApiCallers = {
+  auth: ReturnType<typeof createAuthApiCaller>["auth"];
   invitations: ReturnType<typeof createInvitationApiCaller>["invitations"];
   organizations: ReturnType<typeof createOrganizationApiCaller>["orgs"];
 };
+
+export interface ManagedSessionRow {
+  id: string;
+  deviceType: string;
+  browser: string;
+  ipAddress: string | null;
+  lastActiveAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
 
 function getBaseUrl(url: URL): string {
   return process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? `${url.protocol}//${url.host}`;
@@ -78,6 +90,7 @@ function createScopedApiCallers(event: LoadEvent | ActionEvent): ScopedApiCaller
   };
 
   return {
+    auth: createAuthApiCaller(options).auth,
     invitations: createInvitationApiCaller(options).invitations,
     organizations: createOrganizationApiCaller(options).orgs,
   };
@@ -102,7 +115,7 @@ function statusFromMessage(message: string): number {
 function requireApiCallers(event: LoadEvent | ActionEvent): ScopedApiCallers {
   const callers = createScopedApiCallers(event);
   if (!callers) {
-    error(503, { message: "User management API caller is not configured." });
+    throw error(503, { message: "User management API caller is not configured." });
   }
   return callers;
 }
@@ -111,6 +124,11 @@ function actionFailure(cause: unknown, key: "inviteError" | "roleError" | "remov
   const message = errorMessage(cause);
   const status = statusFromMessage(message);
   return fail(status === 403 ? 403 : 400, { [key]: message });
+}
+
+function currentSessionId(locals: RouteLocals): string | undefined {
+  const session = locals.session as { id?: string; sessionId?: string } | null;
+  return session?.id ?? session?.sessionId;
 }
 
 function normalizeMember(row: MemberApiRow, emailState: Map<string, { email: string; emailVerified: boolean }>): MemberRow | null {
@@ -136,11 +154,12 @@ export async function load(event: LoadEvent) {
 
   try {
     const rows = await callers.organizations.members.list();
+    const sessions = await callers.auth.sessions({ currentSessionId: currentSessionId(event.locals) }) as unknown;
     const emailState = await loadEmailState(event);
     const members = Array.isArray(rows)
       ? rows.map((row) => normalizeMember(row as MemberApiRow, emailState)).filter((row): row is MemberRow => row !== null)
       : [];
-    return { members };
+    return { members, sessions: Array.isArray(sessions) ? sessions as ManagedSessionRow[] : [] };
   } catch (cause) {
     const message = errorMessage(cause);
     const status = statusFromMessage(message);
@@ -225,6 +244,38 @@ export const actions = {
     try {
       const callers = requireApiCallers(event);
       await callers.organizations.members.remove({ userId });
+      return { ok: true };
+    } catch (cause) {
+      return actionFailure(cause, "removeError");
+    }
+  },
+
+  revokeSession: async (event: ActionEvent) => {
+    if (!event.locals.session) {
+      throw redirect(302, "/auth/login");
+    }
+
+    const form = await event.request.formData();
+    const sessionId = String(form.get("sessionId") ?? "").trim();
+    if (!sessionId) return fail(400, { removeError: "sessionId is required." });
+
+    try {
+      const callers = requireApiCallers(event);
+      await callers.auth.revokeSession({ sessionId, currentSessionId: currentSessionId(event.locals) });
+      return { ok: true };
+    } catch (cause) {
+      return actionFailure(cause, "removeError");
+    }
+  },
+
+  revokeOtherSessions: async (event: ActionEvent) => {
+    if (!event.locals.session) {
+      throw redirect(302, "/auth/login");
+    }
+
+    try {
+      const callers = requireApiCallers(event);
+      await callers.auth.revokeOtherSessions({ currentSessionId: currentSessionId(event.locals) });
       return { ok: true };
     } catch (cause) {
       return actionFailure(cause, "removeError");
