@@ -4,10 +4,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import { BadRequestException, UnauthorizedException } from "@nestjs/common";
 
 import {
   KNOWLEDGE_WORKSPACE_ENTITIES,
   KnowledgeWorkspacePageEntity,
+  KnowledgeWorkspaceSearchClickEntity,
   KnowledgeWorkspaceSearchEntryEntity,
 } from "@knowledge-workspace/infrastructure/database/document.entities.ts";
 import { KnowledgeDocuments1778623200004 } from "@knowledge-workspace/infrastructure/database/document.migration.ts";
@@ -34,6 +36,8 @@ const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
 const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_PROJECT_ID = "44444444-4444-4444-8444-444444444444";
+const OUTSIDE_ORG_ID = "77777777-7777-4777-8777-777777777777";
+const OUTSIDE_PROJECT_ID = "88888888-8888-4888-8888-888888888888";
 const DOC_ID = "55555555-5555-4555-8555-555555555555";
 const PAGE_ID = "66666666-6666-4666-8666-666666666666";
 
@@ -108,6 +112,11 @@ async function assertSearchPublicApiRoundTrip(
       slug: `search-${source}`,
       name: "Search",
     });
+    await dataSource.getRepository(FulcrumWorkspaceEntity).save({
+      id: OUTSIDE_ORG_ID,
+      slug: `outside-search-${source}`,
+      name: "Outside Search",
+    });
     await dataSource.getRepository(FulcrumProjectEntity).save([
       {
         id: PROJECT_ID,
@@ -122,6 +131,13 @@ async function assertSearchPublicApiRoundTrip(
         slug: `other-search-project-${source}`,
         name: "Other Search Project",
         traceId: `trace-other-search-project-${source}`,
+      },
+      {
+        id: OUTSIDE_PROJECT_ID,
+        workspaceId: OUTSIDE_ORG_ID,
+        slug: `outside-search-project-${source}`,
+        name: "Outside Search Project",
+        traceId: `trace-outside-search-project-${source}`,
       },
     ]);
     await dataSource.getRepository(FulcrumDocumentEntity).save({
@@ -204,7 +220,7 @@ async function assertSearchPublicApiRoundTrip(
       user_id: USER_ID,
       name: "Kernel saved search",
       query_json: JSON.stringify({ q: "kernel", kind: "page" }),
-      project_id: PROJECT_ID,
+      project_id: null,
     }));
 
     await expect(controller.listSavedSearches({
@@ -231,6 +247,28 @@ async function assertSearchPublicApiRoundTrip(
       scope: "project",
       project_id: PROJECT_ID,
     }));
+    await expect(controller.createSavedSearch({
+      org_id: ORG_ID,
+      user_id: "not-the-authenticated-user",
+      name: "Spoofed saved search",
+      query_json: { q: "kernel" },
+      scope: "private",
+    }, "Bearer valid-token")).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(controller.createSavedSearch({
+      org_id: ORG_ID,
+      user_id: USER_ID,
+      name: "Outside project",
+      query_json: { q: "kernel" },
+      scope: "project",
+      project_id: OUTSIDE_PROJECT_ID,
+    }, "Bearer valid-token")).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.createSavedSearch({
+      org_id: ORG_ID,
+      user_id: USER_ID,
+      name: "Missing project",
+      query_json: { q: "kernel" },
+      scope: "project",
+    }, "Bearer valid-token")).rejects.toBeInstanceOf(BadRequestException);
 
     await expect(controller.recordClick({
       org_id: ORG_ID,
@@ -241,6 +279,25 @@ async function assertSearchPublicApiRoundTrip(
       position: 1,
       project_id: PROJECT_ID,
     }, "Bearer valid-token")).resolves.toEqual({ recorded: true });
+    await expect(dataSource.getRepository(KnowledgeWorkspaceSearchClickEntity).find()).resolves.toEqual([
+      expect.objectContaining({
+        workspaceId: ORG_ID,
+        userId: USER_ID,
+        projectId: PROJECT_ID,
+        query: "kernel",
+        resultId: PAGE_ID,
+        resultKind: "page",
+        position: 1,
+      }),
+    ]);
+    await expect(controller.recordClick({
+      org_id: ORG_ID,
+      user_id: "not-the-authenticated-user",
+      query: "kernel",
+      result_id: PAGE_ID,
+      result_kind: "page",
+      project_id: PROJECT_ID,
+    }, "Bearer valid-token")).rejects.toBeInstanceOf(UnauthorizedException);
 
     const snapshot = await controller.snapshot({
       org_id: ORG_ID,
