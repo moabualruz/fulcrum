@@ -199,6 +199,13 @@
     "packages/ui-kit": {
       "name": "@fulcrum/ui-kit",
       "version": "0.0.1",
+      "dependencies": {
+        "bits-ui": "^2.16.3",
+        "clsx": "^2.1.1",
+        "lucide-svelte": "^1.0.1",
+        "tailwind-merge": "^3.5.0",
+        "tailwind-variants": "^3.2.2",
+      },
       "devDependencies": {
         "@sveltejs/kit": "^2.59.0",
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -210,6 +217,9 @@
       "peerDependencies": {
         "svelte": "^5.55.2",
       },
+    },
+    "services/planning-review": {
+      "name": "@fulcrum/services/planning-review",
     },
   },
   "overrides": {
@@ -444,6 +454,8 @@
     "@fulcrum/cli": ["@fulcrum/cli@workspace:apps/cli"],
 
     "@fulcrum/server": ["@fulcrum/server@workspace:apps/server"],
+
+    "@fulcrum/services/planning-review": ["@fulcrum/services/planning-review@workspace:services/planning-review"],
 
     "@fulcrum/shared-dto": ["@fulcrum/shared-dto@workspace:packages/shared-dto"],
 

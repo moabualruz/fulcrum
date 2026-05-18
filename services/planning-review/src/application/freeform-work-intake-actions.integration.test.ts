@@ -51,10 +51,17 @@ describe("freeform work intake application action", () => {
       }),
     });
     expect(result.context.traceId).toBe("trace-freeform-intake");
-    expect(result.context.sourceRefs).toEqual([{ kind: "doc", id: result.document.id }]);
+    expect(result.context.sourceRefs).toEqual([
+      expect.objectContaining({
+        kind: "doc",
+        id: result.document.id,
+        sourceId: expect.stringContaining(`doc:${result.document.id}@v`),
+      }),
+    ]);
     expect(result.context.selectedDocs).toEqual([
       expect.objectContaining({
         id: result.document.id,
+        sourceId: expect.stringContaining(`doc:${result.document.id}@v`),
         breadcrumb: "Agent OS replacement brief",
         bodyMd: "Preserve knowledge documents, ACP guided planning, and task/dependency flow.",
       }),
@@ -85,7 +92,13 @@ describe("freeform work intake application action", () => {
         acpSessionId: "acp-session-1",
         modeId: "planning",
         modelId: "gpt-5.4",
-        sourceRefs: [{ kind: "doc", id: result.document.id }],
+        sourceRefs: [
+          expect.objectContaining({
+            kind: "doc",
+            id: result.document.id,
+            sourceId: expect.stringContaining(`doc:${result.document.id}@v`),
+          }),
+        ],
       }),
     }]);
   });

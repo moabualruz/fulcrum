@@ -34,16 +34,28 @@ describe("freeform docs to ACP planning context", () => {
     });
 
     expect(context.traceId).toBe("trace-ctx");
-    expect(context.sourceRefs).toEqual([{ kind: "doc", id: "child" }]);
+    expect(context.sourceRefs).toEqual([
+      expect.objectContaining({ kind: "doc", id: "child", sourceId: "doc:child@current" }),
+    ]);
     expect(context.selectedDocs).toEqual([
       expect.objectContaining({
         id: "child",
+        sourceId: "doc:child@current",
         breadcrumb: "Project Brief / Constraints",
         bodyMd: "Keep Bun and Postgres/PGlite.",
+        sections: [
+          expect.objectContaining({
+            id: "doc:child@current#section-1",
+            heading: "Document",
+            excerpt: "Keep Bun and Postgres/PGlite.",
+          }),
+        ],
       }),
     ]);
     expect(context.contextMarkdown).toContain("## Freeform Document: Project Brief / Constraints");
     expect(context.contextMarkdown).toContain("- doc_id: child");
+    expect(context.contextMarkdown).toContain("- source_id: doc:child@current");
+    expect(context.contextMarkdown).toContain("section_id: doc:child@current#section-1");
     expect(context.contextMarkdown).toContain("Keep Bun and Postgres/PGlite.");
     expect(context.contextMarkdown).not.toContain("Unselected");
   });
@@ -57,7 +69,10 @@ describe("freeform docs to ACP planning context", () => {
     });
 
     expect(context.selectedDocs.map((item) => item.id)).toEqual(["first", "later"]);
-    expect(context.sourceRefs).toEqual([{ kind: "doc", id: "first" }, { kind: "doc", id: "later" }]);
+    expect(context.sourceRefs).toEqual([
+      expect.objectContaining({ kind: "doc", id: "first", sourceId: "doc:first@current" }),
+      expect.objectContaining({ kind: "doc", id: "later", sourceId: "doc:later@current" }),
+    ]);
   });
 
   test("truncates long context without losing source metadata", () => {
@@ -75,6 +90,7 @@ describe("freeform docs to ACP planning context", () => {
 
     expect(context.selectedDocs[0]?.truncated).toBe(true);
     expect(context.contextMarkdown).toContain("- version_id: version-1");
+    expect(context.contextMarkdown).toContain("- source_id: doc:long@version-1");
     expect(context.contextMarkdown).toContain("- updated_at: 2026-05-13T10:00:00.000Z");
     expect(context.contextMarkdown).toContain("123456789012");
     expect(context.contextMarkdown).toContain("[truncated]");

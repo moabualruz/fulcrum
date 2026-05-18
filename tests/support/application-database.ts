@@ -29,6 +29,15 @@ export interface CreateTestOrmOptions {
 let _cachedDs: DataSource | null = null;
 let _cachedSeed: SeedResult | null = null;
 let _initPromise: Promise<void> | null = null;
+let _cleanupRegistered = false;
+
+function registerProcessCleanup(): void {
+  if (_cleanupRegistered) return;
+  _cleanupRegistered = true;
+  process.once("beforeExit", async () => {
+    await destroyTestOrm();
+  });
+}
 
 function buildEphemeralPgDriver() {
   let instance: PGlite | null = null;
@@ -70,6 +79,7 @@ function buildEphemeralPgDriver() {
 }
 
 async function ensureInitialized(debug: boolean): Promise<{ ds: DataSource; seed: SeedResult }> {
+  registerProcessCleanup();
   if (_cachedDs?.isInitialized && _cachedSeed) return { ds: _cachedDs, seed: _cachedSeed };
   if (!_initPromise) {
     _initPromise = (async () => {

@@ -1,0 +1,8 @@
+{
+  "name": "@fulcrum/services/planning-review",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "cd ../.. && bun test services/planning-review/src tests/planning-review"
+  }
+}

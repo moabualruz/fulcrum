@@ -156,7 +156,7 @@ function appendGuidedAcpInstructions(prompt: string, session: GuidedAcpPlanningS
   const lines = [
     prompt,
     "",
-    "## ACP guided session",
+    "## AI Assist guided session",
     `- Agent: ${session.agentName}`,
     `- CWD: ${session.cwd}`,
     `- Mode: ${session.modeId}`,
