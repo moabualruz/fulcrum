@@ -1,4 +1,6 @@
 import { expect, test } from "../e2e/fixtures";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 test.describe("artifacts route interaction coverage", () => {
   test("keeps route-specific controls and recovery visible when artifact API is unavailable", async ({ page }) => {
@@ -31,5 +33,43 @@ test.describe("artifacts route interaction coverage", () => {
     await expect(page.locator("[data-artifacts-error]").or(page.locator("[data-empty-artifacts]").or(page.locator("[data-artifacts-mobile-list]"))).first()).toBeVisible();
     const overflow = await page.locator("main").last().evaluate((element) => element.scrollWidth - element.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("exercises artifact detail controls at desktop and mobile widths", async ({ page, fulcrumHome }) => {
+    const project = await fulcrumHome.seedProject("artifact-detail-design", "Artifact Detail Design");
+    const artifactsDir = join(fulcrumHome.home, "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    const bodyPath = join(artifactsDir, "detail-preview.txt");
+    writeFileSync(bodyPath, "artifact-detail-preview");
+    const artifact = await fulcrumHome.seedArtifact({
+      projectId: project.id,
+      title: "detail-preview.txt",
+      mime: "text/plain",
+      size: 23,
+      bodyPath,
+    });
+
+    await page.goto(`/artifacts/${artifact.id}`);
+
+    await expect(page.locator("[data-artifact-detail-header]")).toContainText("detail-preview.txt");
+    await expect(page.locator("[data-artifact-detail-metadata]")).toContainText("text/plain");
+    await expect(page.locator("[data-artifact-inline-preview]")).toContainText("artifact-detail-preview");
+    await expect(page.locator("[data-artifact-download]")).toHaveAttribute("href", new RegExp(`/artifacts/${artifact.id}/download`));
+    await expect(page.locator("[data-artifact-delete]")).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator("[data-artifact-detail-header]")).toBeVisible();
+    await expect(page.locator("[data-artifact-download]")).toBeVisible();
+    await expect(page.locator("[data-artifact-delete]")).toBeVisible();
+    const overflow = await page.locator("main").last().evaluate((element) => element.scrollWidth - element.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("keeps missing artifact recovery inline", async ({ page }) => {
+    await page.goto("/artifacts/missing-artifact-id");
+
+    await expect(page.locator("[data-artifact-detail-error]")).toContainText("Artifact could not load");
+    await expect(page.locator("[data-artifact-detail-error]")).toContainText("Recovery:");
+    await expect(page.locator("[data-artifact-detail-error] a[href='/artifacts']")).toBeVisible();
   });
 });

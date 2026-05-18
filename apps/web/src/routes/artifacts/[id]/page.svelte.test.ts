@@ -53,8 +53,11 @@ describe("/artifacts/[id] +page.svelte", () => {
         },
       },
     });
+    expect(body).toContain("data-artifact-detail-header");
+    expect(body).toContain("data-artifact-detail-metadata");
     expect(body).toContain("data-artifact-inline-preview");
     expect(body).toContain("const x = 1;");
+    expect(body).toContain("data-artifact-download");
     expect(body).toContain('href="/artifacts/a1/download"');
     expect(body).toContain("data-artifact-delete");
     expect(body).toContain("29 days remaining");
