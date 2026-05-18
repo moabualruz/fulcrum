@@ -43,7 +43,13 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
   const { em, ctx } = await requestProjectScope(locals, params.id);
-  const data = await loadProjectOverview(em, ctx, params.id);
+  const data = await loadProjectOverview(em, ctx, params.id).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/invalid input syntax for type uuid|not found/i.test(message)) {
+      throw error(404, "Project not found");
+    }
+    throw err;
+  });
   if (!data) throw error(404, "Project not found");
   const form = await superValidate(
     { name: data.project.name, description: data.project.description ?? "" },
