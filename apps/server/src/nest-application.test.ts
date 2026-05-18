@@ -6,10 +6,12 @@ type FakeNestApp = {
   readonly shutdownHooks: unknown[];
   shutdownHooksEnabled: boolean;
   readonly listenedPorts: number[];
+  closeCalls: number;
   useGlobalPipes: (...pipes: unknown[]) => void;
   enableShutdownHooks: (...signals: unknown[]) => void;
   get: (token: unknown, options?: unknown) => unknown;
   listen: (port: number) => Promise<void>;
+  close: () => Promise<void>;
 };
 
 const trpcApplyMiddleware = mock(async (_app: unknown) => {});
@@ -20,6 +22,7 @@ function createFakeNestApp(): FakeNestApp {
     shutdownHooks: [],
     shutdownHooksEnabled: false,
     listenedPorts: [],
+    closeCalls: 0,
     useGlobalPipes(...pipes: unknown[]) {
       this.pipes.push(...pipes);
     },
@@ -35,6 +38,9 @@ function createFakeNestApp(): FakeNestApp {
     },
     async listen(port: number) {
       this.listenedPorts.push(port);
+    },
+    async close() {
+      this.closeCalls += 1;
     },
   };
 }
@@ -154,5 +160,35 @@ describe("Nest server application bootstrap", () => {
 
     expect(app).toBe(createdApp as unknown as typeof app);
     expect(createdApp.listenedPorts).toEqual([4321]);
+  });
+
+  test("starts with deterministic lifecycle readiness and optional runtime checks", async () => {
+    const { startFulcrumNestServerWithLifecycle } = await import("./nest-application.ts");
+    const events: string[] = [];
+
+    const handle = await startFulcrumNestServerWithLifecycle({
+      port: 4322,
+      logger: false,
+      env: { FULCRUM_FEATURES: "public-api" },
+      runtimeLog: (event) => {
+        if (event.step) events.push(event.step);
+      },
+    });
+
+    expect(handle.app).toBe(createdApps[0] as unknown as typeof handle.app);
+    expect(handle.readiness.status).toBe("ready");
+    expect(handle.readiness.completed).toEqual([
+      "config",
+      "database",
+      "migrations",
+      "nest",
+      "streams-workers",
+    ]);
+    expect(handle.readiness.components).toEqual([{
+      name: "yjs-collaboration",
+      status: "disabled",
+      detail: "feature flag real-time-collab-server disabled",
+    }]);
+    expect(events).toEqual(handle.readiness.completed);
   });
 });

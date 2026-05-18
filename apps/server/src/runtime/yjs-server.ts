@@ -60,6 +60,10 @@ export interface YjsServerHandler {
   loadDoc(docName: string): Promise<Buffer | null>;
 }
 
+export type YjsRuntimeServer = WebSocketServer & {
+  closeRuntime: () => Promise<void>;
+};
+
 // ── Default session validator ──────────────────────────────────────────────
 
 /**
@@ -260,7 +264,7 @@ export function createYjsServer(options: YjsServerOptions): YjsServerHandler {
  *   import { startYjsServer } from './yjs-server.ts';
  *   startYjsServer(em); // listens on FULCRUM_YJS_PORT (default 4444)
  */
-export function startYjsServer(em: EntityManager, port?: number): WebSocketServer {
+export function startYjsServer(em: EntityManager, port?: number): YjsRuntimeServer {
   const resolvedPort =
     port ??
     (process.env.FULCRUM_YJS_PORT ? Number(process.env.FULCRUM_YJS_PORT) : 4444);
@@ -281,5 +285,13 @@ export function startYjsServer(em: EntityManager, port?: number): WebSocketServe
     console.log(`[yjs-server] Standalone Yjs server listening on :${resolvedPort}`);
   });
 
-  return wss;
+  const closeRuntime = (): Promise<void> =>
+    new Promise((resolve, reject) => {
+      wss.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+
+  return Object.assign(wss, { closeRuntime }) as YjsRuntimeServer;
 }
