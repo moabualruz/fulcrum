@@ -320,4 +320,49 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(steps.nth(1)).toHaveAttribute("data-status", "current");
 		await expect(steps.nth(2)).toHaveAttribute("data-status", "upcoming");
 	});
+
+	test("data-table sorts on header click and reports new sort", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='data-table']");
+		await expect(section.locator("[data-design-kit-table-sort]")).toContainText("key asc");
+		await section.locator("[data-slot='data-table-sort-trigger'][data-field='priority']").click();
+		await expect(section.locator("[data-design-kit-table-sort]")).toContainText("priority asc");
+		await expect(
+			section.locator("[data-slot='data-table-header'][data-field='priority']"),
+		).toHaveAttribute("aria-sort", "ascending");
+		await section.locator("[data-slot='data-table-sort-trigger'][data-field='priority']").click();
+		await expect(section.locator("[data-design-kit-table-sort]")).toContainText("priority desc");
+	});
+
+	test("data-list renders inline label/value pairs", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='data-list']");
+		await expect(section.locator("[data-slot='data-list-label']")).toHaveCount(3);
+		await expect(section.locator("[data-slot='data-list-value']")).toHaveCount(3);
+		await expect(section.locator("[data-slot='data-list']")).toHaveAttribute(
+			"data-variant",
+			"inline",
+		);
+	});
+
+	test("tree-view expands a branch and selects a leaf", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='tree-view']");
+		await section.locator("[data-slot='tree-view-toggle'][data-id='apps']").click();
+		await expect(section.locator("[data-slot='tree-view-item'][data-id='apps-cli']")).toBeVisible();
+		await section.locator("[data-slot='tree-view-label'][data-id='apps-cli']").click();
+		await expect(
+			section.locator("[data-slot='tree-view-item'][data-id='apps-cli']"),
+		).toHaveAttribute("data-selected", "true");
+		await expect(section.locator("[data-design-kit-tree-selection]")).toContainText("apps-cli");
+	});
+
+	test("stat renders three trend variants with semantic glyphs", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='stat']");
+		await expect(section.locator("[data-slot='stat']")).toHaveCount(3);
+		await expect(section.locator("[data-slot='stat'][data-trend='up']")).toBeVisible();
+		await expect(section.locator("[data-slot='stat'][data-trend='down']")).toBeVisible();
+		await expect(section.locator("[data-slot='stat'][data-trend='flat']")).toBeVisible();
+	});
 });

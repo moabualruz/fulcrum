@@ -52,7 +52,73 @@
 		Breadcrumb,
 		Pagination,
 		Stepper,
+		DataTable,
+		DataList,
+		TreeView,
+		Stat,
 	} from "@fulcrum/ui-kit";
+	import type { SortState, TreeNode } from "@fulcrum/ui-kit";
+
+	type SampleRow = { id: string; key: string; title: string; priority: string; estimate: number };
+	const dataTableRows: SampleRow[] = [
+		{ id: "1", key: "FUL-204", title: "Wire view sorting", priority: "P1", estimate: 8 },
+		{ id: "2", key: "FUL-198", title: "Review saved filter", priority: "P3", estimate: 3 },
+		{ id: "3", key: "FUL-211", title: "Tighten mobile controls", priority: "P2", estimate: 5 },
+	];
+	const dataTableColumns = [
+		{ id: "key", label: "Key", sortable: true, width: "8rem" },
+		{ id: "title", label: "Title", sortable: true },
+		{ id: "priority", label: "Priority", sortable: true, align: "center" as const, width: "6rem" },
+		{ id: "estimate", label: "Estimate", sortable: true, align: "right" as const, width: "6rem" },
+	];
+	let dataTableSort = $state<SortState<"key" | "title" | "priority" | "estimate">>({
+		field: "key",
+		direction: "asc",
+	});
+	const sortedRows = $derived.by(() => {
+		if (!dataTableSort.field) return dataTableRows;
+		const field = dataTableSort.field;
+		const dir = dataTableSort.direction;
+		return [...dataTableRows].sort((a, b) => {
+			const av = a[field as keyof SampleRow];
+			const bv = b[field as keyof SampleRow];
+			const order =
+				typeof av === "number" && typeof bv === "number"
+					? av - bv
+					: String(av).localeCompare(String(bv));
+			return dir === "asc" ? order : -order;
+		});
+	});
+
+	const dataListItems = [
+		{ label: "Workspace", value: "Fulcrum" },
+		{ label: "Status", value: "Active", hint: "Updated 5m ago" },
+		{ label: "Owner", value: "Mo K." },
+	];
+
+	const treeNodes: TreeNode[] = [
+		{
+			id: "root",
+			label: "Fulcrum",
+			children: [
+				{
+					id: "apps",
+					label: "apps",
+					children: [
+						{ id: "apps-web", label: "web", hint: "SvelteKit" },
+						{ id: "apps-cli", label: "cli", hint: "Bun" },
+					],
+				},
+				{
+					id: "services",
+					label: "services",
+					children: [{ id: "services-agent", label: "agent-client-protocol" }],
+				},
+			],
+		},
+	];
+	let treeExpanded = $state(new Set<string>(["root"]));
+	let treeSelected = $state<string | undefined>(undefined);
 
 	let activeTab = $state<string>("overview");
 	let currentPage = $state(2);
@@ -711,6 +777,58 @@
 		>
 			<h2 class="text-lg font-semibold">Stepper</h2>
 			<Stepper steps={stepperSteps} currentStep={1} />
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="data-table"
+		>
+			<h2 class="text-lg font-semibold">DataTable</h2>
+			<DataTable
+				columns={dataTableColumns}
+				rows={sortedRows}
+				rowKey={(row) => row.id}
+				sort={dataTableSort}
+				onSort={(next) => (dataTableSort = next)}
+			/>
+			<span class="text-xs text-muted-foreground" data-design-kit-table-sort>
+				Sort: {dataTableSort.field} {dataTableSort.direction}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="data-list"
+		>
+			<h2 class="text-lg font-semibold">DataList</h2>
+			<DataList items={dataListItems} variant="inline" />
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="tree-view"
+		>
+			<h2 class="text-lg font-semibold">TreeView</h2>
+			<TreeView
+				nodes={treeNodes}
+				bind:expandedIds={treeExpanded}
+				bind:selectedId={treeSelected}
+			/>
+			<span class="text-xs text-muted-foreground" data-design-kit-tree-selection>
+				Selected: {treeSelected ?? "—"}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="stat"
+		>
+			<h2 class="text-lg font-semibold">Stat</h2>
+			<div class="grid gap-3 sm:grid-cols-3">
+				<Stat label="Active runs" value="12" delta="+3" trend="up" hint="vs last 7d" />
+				<Stat label="Backlog" value="58" delta="-4" trend="down" />
+				<Stat label="Open reviews" value="7" delta="0" trend="flat" />
+			</div>
 		</article>
 	</section>
 	<ToastRegion store={toastStore} position="bottom-right" />

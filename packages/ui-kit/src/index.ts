@@ -307,3 +307,28 @@ export {
 	Root as StepperRoot,
 } from "./components/stepper/index.js";
 export type { StepperProps, StepperStep } from "./components/stepper/index.js";
+export {
+	DataTable,
+	Root as DataTableRoot,
+} from "./components/data-table/index.js";
+export type {
+	DataTableProps,
+	DataTableColumn,
+	SortDirection,
+	SortState,
+} from "./components/data-table/index.js";
+export {
+	DataList,
+	Root as DataListRoot,
+} from "./components/data-list/index.js";
+export type { DataListProps, DataListItem } from "./components/data-list/index.js";
+export {
+	TreeView,
+	Root as TreeViewRoot,
+} from "./components/tree-view/index.js";
+export type { TreeViewProps, TreeNode } from "./components/tree-view/index.js";
+export {
+	Stat,
+	Root as StatRoot,
+} from "./components/stat/index.js";
+export type { StatProps, StatTrend } from "./components/stat/index.js";
