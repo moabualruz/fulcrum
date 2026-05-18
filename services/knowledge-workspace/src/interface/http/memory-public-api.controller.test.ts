@@ -171,7 +171,9 @@ describe("memory public Nest API", () => {
         createdAt: "2026-05-14T00:00:00.000Z",
       }),
     ]);
-    await expect(controller.createMemory({ body: "Created", tags: ["api"] }, AUTHORIZATION)).resolves.toEqual(
+    await expect(
+      controller.createMemory({ body: "Created", tags: ["api"], sourceRef: { kind: "manual" } }, AUTHORIZATION),
+    ).resolves.toEqual(
       expect.objectContaining({ body: "Created" }),
     );
     await expect(controller.searchMemories({ query: "planning", projectId: "project-1" }, AUTHORIZATION)).resolves
@@ -192,12 +194,18 @@ describe("memory public Nest API", () => {
       archived: false,
       limit: 10,
       offset: 1,
+      orgId: ORG_ID,
     });
-    expect(create).toHaveBeenCalledWith({ body: "Created", tags: ["api"] });
-    expect(search).toHaveBeenCalledWith({ query: "planning", projectId: "project-1" });
-    expect(get).toHaveBeenCalledWith({ id: MEMORY_ID });
-    expect(update).toHaveBeenCalledWith({ id: MEMORY_ID, body: "Updated" });
-    expect(remove).toHaveBeenCalledWith({ id: MEMORY_ID });
+    expect(create).toHaveBeenCalledWith({
+      body: "Created",
+      tags: ["api"],
+      sourceRef: { kind: "manual", orgId: ORG_ID },
+      orgId: ORG_ID,
+    });
+    expect(search).toHaveBeenCalledWith({ query: "planning", projectId: "project-1", orgId: ORG_ID });
+    expect(get).toHaveBeenCalledWith({ id: MEMORY_ID, orgId: ORG_ID });
+    expect(update).toHaveBeenCalledWith({ id: MEMORY_ID, body: "Updated", orgId: ORG_ID });
+    expect(remove).toHaveBeenCalledWith({ id: MEMORY_ID, orgId: ORG_ID });
   });
 
   test("preserves delete confirmation and empty patch validation", async () => {
@@ -297,13 +305,13 @@ describe("memory public Nest API", () => {
       includeGlobal: "true",
     }, AUTHORIZATION)).resolves.toEqual({
       procedure: "context.preview",
-      input: { taskId: "task-123", budget: 5000, includeGlobal: true },
+      input: { taskId: "task-123", budget: 5000, includeGlobal: true, orgId: ORG_ID },
     });
 
-    expect(promote).toHaveBeenCalledWith({ id: MEMORY_ID });
-    expect(archive).toHaveBeenCalledWith({ id: MEMORY_ID });
-    expect(restore).toHaveBeenCalledWith({ id: MEMORY_ID });
-    expect(preview).toHaveBeenCalledWith({ taskId: "task-123", budget: 5000, includeGlobal: true });
+    expect(promote).toHaveBeenCalledWith({ id: MEMORY_ID, orgId: ORG_ID });
+    expect(archive).toHaveBeenCalledWith({ id: MEMORY_ID, orgId: ORG_ID });
+    expect(restore).toHaveBeenCalledWith({ id: MEMORY_ID, orgId: ORG_ID });
+    expect(preview).toHaveBeenCalledWith({ taskId: "task-123", budget: 5000, includeGlobal: true, orgId: ORG_ID });
   });
 
   test("creates memory digest documents through TypeORM-backed ports", async () => {
@@ -338,9 +346,16 @@ describe("memory public Nest API", () => {
       body: "Digest summary",
       projectId: "project-1",
       since: "2026-05-01T00:00:00.000Z",
+      inputs: {
+        projectId: "project-1",
+        since: "2026-05-01T00:00:00.000Z",
+        memoryIds: [undefined],
+      },
+      outputs: { docId: "doc-1" },
     });
     expect(listDigestWindow).toHaveBeenCalledWith({
       projectId: "project-1",
+      orgId: ORG_ID,
       since: new Date("2026-05-01T00:00:00.000Z"),
     });
     expect(summarize).toHaveBeenCalledWith(memories);
@@ -349,6 +364,14 @@ describe("memory public Nest API", () => {
       title: "Memory digest 2026-05-01",
       docType: "memory_digest",
       bodyMd: "Digest summary",
+      frontmatter: {
+        sourceRef: {
+          kind: "memory_digest",
+          projectId: "project-1",
+          since: "2026-05-01T00:00:00.000Z",
+          memoryIds: [undefined],
+        },
+      },
     });
   });
 

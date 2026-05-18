@@ -106,16 +106,17 @@ export async function loadContextBundle(
     key: memory.key,
     body: memory.body,
     scope: memory.scope,
-  }));
+  })).sort(compareMemorySlices);
 
   const documents = (await listDocs(em, ctx, {}))
     .filter((doc) => !input.selectedProjectId || doc.projectId === input.selectedProjectId)
-    .slice(0, 50)
     .map((doc) => ({
       id: doc.id,
       title: doc.title,
       body_excerpt: doc.bodyMd.slice(0, 300),
-    }));
+    }))
+    .sort(compareDocSlices)
+    .slice(0, 50);
 
   const recentRuns = (await conn.execute<Array<{ id: string; agent: string | null; status: string | null; started_at: string | Date }>>(
     `SELECT ar.id, ar.agent_name AS agent, ar.status, ar.started_at
@@ -129,15 +130,15 @@ export async function loadContextBundle(
     agent: run.agent ?? "",
     status: run.status ?? "",
     started_at: isoStamp(run.started_at),
-  }));
+  })).sort(compareRunSlices);
 
-  const artifacts = await conn.execute<ArtifactSlice[]>(
+  const artifacts = (await conn.execute<ArtifactSlice[]>(
     `SELECT id, filename AS title, 'artifact'::text AS kind
        FROM artifacts
       WHERE task_id = $1 AND org_id = $2
       ORDER BY created_at DESC`,
     [input.selectedTaskId, ctx.orgId],
-  );
+  )).sort(compareArtifactSlices);
 
   const totalBudget = 8000;
   const allText = [
@@ -207,4 +208,22 @@ function estimateTokens(text: string): number {
 
 function isoStamp(value: string | Date): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function compareMemorySlices(left: MemorySlice, right: MemorySlice): number {
+  const leftScope = left.scope === "global" ? 0 : 1;
+  const rightScope = right.scope === "global" ? 0 : 1;
+  return leftScope - rightScope || left.key.localeCompare(right.key) || left.id.localeCompare(right.id);
+}
+
+function compareDocSlices(left: DocSlice, right: DocSlice): number {
+  return left.title.localeCompare(right.title) || left.id.localeCompare(right.id);
+}
+
+function compareRunSlices(left: RunSlice, right: RunSlice): number {
+  return right.started_at.localeCompare(left.started_at) || left.id.localeCompare(right.id);
+}
+
+function compareArtifactSlices(left: ArtifactSlice, right: ArtifactSlice): number {
+  return left.title.localeCompare(right.title) || left.id.localeCompare(right.id);
 }

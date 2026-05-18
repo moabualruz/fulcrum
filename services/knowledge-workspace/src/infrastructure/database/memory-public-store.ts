@@ -5,6 +5,7 @@ import {
   type FulcrumMemory,
   FulcrumMemoryEntity,
 } from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
+import { FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export interface MemoryPublicRow {
   id: string;
@@ -26,6 +27,7 @@ export class MemoryPublicStore {
   constructor(private readonly dataSource: DataSource) {}
 
   async list(input: {
+    orgId?: string;
     projectId?: string;
     global?: boolean;
     kind?: string;
@@ -50,11 +52,16 @@ export class MemoryPublicStore {
       take: input.limit ?? 50,
       skip: input.offset ?? 0,
     });
+    const visibleProjectIds = await this.visibleProjectIds(input.orgId, input.projectId);
     const tags = input.tags ?? [];
-    return memories.filter((memory) => tags.every((tag) => memory.tags.includes(tag))).map(toPublicRow);
+    return memories
+      .filter((memory) => this.isVisibleToOrg(memory, input.orgId, visibleProjectIds))
+      .filter((memory) => tags.every((tag) => memory.tags.includes(tag)))
+      .map(toPublicRow);
   }
 
   async create(input: {
+    orgId?: string;
     projectId?: string | null;
     global?: boolean;
     kind?: string;
@@ -63,7 +70,10 @@ export class MemoryPublicStore {
     importance?: string;
     source?: "manual";
     sourceRef?: Record<string, unknown>;
-  }): Promise<MemoryPublicRow> {
+  }): Promise<MemoryPublicRow | null> {
+    if (input.projectId && input.orgId && !(await this.projectBelongsToOrg(input.projectId, input.orgId))) {
+      return null;
+    }
     const id = randomUUID();
     const memory = await this.repository().save({
       id,
@@ -75,7 +85,7 @@ export class MemoryPublicStore {
       tags: input.tags ?? [],
       importance: input.importance ?? "medium",
       source: input.source ?? "manual",
-      sourceRef: input.sourceRef ?? {},
+      sourceRef: { ...(input.sourceRef ?? {}), ...(input.orgId ? { orgId: input.orgId } : {}) },
       archived: false,
     });
     return toPublicRow(memory);
@@ -95,10 +105,12 @@ export class MemoryPublicStore {
   }
 
   async listDigestWindow(input: {
+    orgId?: string;
     projectId: string;
     since: Date;
     limit?: number;
   }): Promise<MemoryPublicRow[]> {
+    if (input.orgId && !(await this.projectBelongsToOrg(input.projectId, input.orgId))) return [];
     const memories = await this.repository().find({
       where: {
         projectId: input.projectId,
@@ -111,19 +123,22 @@ export class MemoryPublicStore {
     return memories.map(toPublicRow);
   }
 
-  async get(input: { id: string }): Promise<MemoryPublicRow | null> {
+  async get(input: { id: string; orgId?: string }): Promise<MemoryPublicRow | null> {
     const memory = await this.repository().findOneBy({ id: input.id });
+    if (memory && !(await this.isMemoryVisibleToOrg(memory, input.orgId))) return null;
     return memory ? toPublicRow(memory) : null;
   }
 
   async update(input: {
     id: string;
+    orgId?: string;
     body?: string;
     tags?: string[];
     importance?: string;
   }): Promise<MemoryPublicRow | null> {
     const memory = await this.repository().findOneBy({ id: input.id });
     if (!memory) return null;
+    if (!(await this.isMemoryVisibleToOrg(memory, input.orgId))) return null;
 
     if (input.body !== undefined) memory.body = input.body;
     if (input.tags !== undefined) memory.tags = input.tags;
@@ -131,34 +146,38 @@ export class MemoryPublicStore {
     return toPublicRow(await this.repository().save(memory));
   }
 
-  async delete(input: { id: string }): Promise<{ deleted: true; id: string } | null> {
+  async delete(input: { id: string; orgId?: string }): Promise<{ deleted: true; id: string } | null> {
     const memory = await this.repository().findOneBy({ id: input.id });
     if (!memory) return null;
+    if (!(await this.isMemoryVisibleToOrg(memory, input.orgId))) return null;
 
     await this.repository().remove(memory);
     return { deleted: true, id: input.id };
   }
 
-  async promote(input: { id: string }): Promise<MemoryPublicRow | null> {
+  async promote(input: { id: string; orgId?: string }): Promise<MemoryPublicRow | null> {
     const memory = await this.repository().findOneBy({ id: input.id });
     if (!memory) return null;
+    if (!(await this.isMemoryVisibleToOrg(memory, input.orgId))) return null;
 
     memory.scope = "global";
     memory.archived = false;
+    memory.sourceRef = { ...memory.sourceRef, promotedFromProjectId: memory.projectId, orgId: input.orgId };
     return toPublicRow(await this.repository().save(memory));
   }
 
-  async archive(input: { id: string }): Promise<MemoryPublicRow | null> {
-    return await this.setArchived(input.id, true);
+  async archive(input: { id: string; orgId?: string }): Promise<MemoryPublicRow | null> {
+    return await this.setArchived(input.id, true, input.orgId);
   }
 
-  async restore(input: { id: string }): Promise<MemoryPublicRow | null> {
-    return await this.setArchived(input.id, false);
+  async restore(input: { id: string; orgId?: string }): Promise<MemoryPublicRow | null> {
+    return await this.setArchived(input.id, false, input.orgId);
   }
 
-  private async setArchived(id: string, archived: boolean): Promise<MemoryPublicRow | null> {
+  private async setArchived(id: string, archived: boolean, orgId?: string): Promise<MemoryPublicRow | null> {
     const memory = await this.repository().findOneBy({ id });
     if (!memory) return null;
+    if (!(await this.isMemoryVisibleToOrg(memory, orgId))) return null;
 
     memory.archived = archived;
     return toPublicRow(await this.repository().save(memory));
@@ -166,6 +185,31 @@ export class MemoryPublicStore {
 
   private repository() {
     return this.dataSource.getRepository(FulcrumMemoryEntity);
+  }
+
+  private async visibleProjectIds(orgId: string | undefined, projectId?: string): Promise<Set<string>> {
+    if (!orgId) return new Set(projectId ? [projectId] : []);
+    if (projectId) return await this.projectBelongsToOrg(projectId, orgId) ? new Set([projectId]) : new Set();
+    const projects = await this.dataSource.getRepository(FulcrumProjectEntity).findBy({ workspaceId: orgId });
+    return new Set(projects.map((project) => project.id));
+  }
+
+  private async projectBelongsToOrg(projectId: string, orgId: string): Promise<boolean> {
+    return await this.dataSource.getRepository(FulcrumProjectEntity).existsBy({
+      id: projectId,
+      workspaceId: orgId,
+    });
+  }
+
+  private async isMemoryVisibleToOrg(memory: FulcrumMemory, orgId?: string): Promise<boolean> {
+    if (!orgId) return true;
+    return this.isVisibleToOrg(memory, orgId, await this.visibleProjectIds(orgId, memory.projectId ?? undefined));
+  }
+
+  private isVisibleToOrg(memory: FulcrumMemory, orgId: string | undefined, visibleProjectIds: Set<string>): boolean {
+    if (!orgId) return true;
+    if (memory.projectId) return visibleProjectIds.has(memory.projectId);
+    return memory.sourceRef?.["orgId"] === orgId;
   }
 }
 

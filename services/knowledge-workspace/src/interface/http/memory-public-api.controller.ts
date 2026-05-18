@@ -91,12 +91,23 @@ export class MemoryPublicApiService {
   ) {}
 
   async listMemories(query: MemoryListQueryDto, authorization: string | undefined): Promise<unknown[]> {
-    const memories = await this.requireMemoryApplication(authorization).list(normalizeMemoryListQuery(query));
+    const memories = await this.requireMemoryApplication(authorization).list({
+      ...normalizeMemoryListQuery(query),
+      orgId: this.requireOrgId(authorization),
+    });
     return Array.isArray(memories) ? memories.map(toJsonDates) : [];
   }
 
   async createMemory(body: CreateMemoryBodyDto, authorization: string | undefined): Promise<unknown> {
-    const memory = await this.requireMemoryApplication(authorization).create(body);
+    const orgId = this.requireOrgId(authorization);
+    if (!isNonEmptyRecord(body.sourceRef)) {
+      throw new BadRequestException({ error: "sourceRef is required", code: "SOURCE_REF_REQUIRED" });
+    }
+    const memory = await this.requireMemoryApplication(authorization).create({
+      ...body,
+      orgId,
+      sourceRef: { ...body.sourceRef, orgId },
+    });
     if (!memory) {
       throw new InternalServerErrorException("Memory public API create facade returned no memory.");
     }
@@ -104,17 +115,21 @@ export class MemoryPublicApiService {
   }
 
   async searchMemories(query: MemorySearchQueryDto, authorization: string | undefined): Promise<unknown[]> {
+    const orgId = this.requireOrgId(authorization);
     const application = this.requireMemoryApplication(authorization);
     const search = application.search;
     if (!search) {
       throw new InternalServerErrorException("Application-backed REST memory route is required.");
     }
-    const memories = await search(normalizeMemorySearchQuery(query));
+    const memories = await search({ ...normalizeMemorySearchQuery(query), orgId });
     return Array.isArray(memories) ? memories.map(toJsonDates) : [];
   }
 
   async getMemory(params: MemoryIdParamsDto, authorization: string | undefined): Promise<unknown> {
-    const memory = await this.requireMemoryApplication(authorization).get({ id: params.id });
+    const memory = await this.requireMemoryApplication(authorization).get({
+      id: params.id,
+      orgId: this.requireOrgId(authorization),
+    });
     if (!memory) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return toJsonDates(memory);
   }
@@ -131,7 +146,11 @@ export class MemoryPublicApiService {
         details: { body: ["String must contain at least 1 character(s)"] },
       });
     }
-    const memory = await this.requireMemoryApplication(authorization).update({ id: params.id, ...body });
+    const memory = await this.requireMemoryApplication(authorization).update({
+      id: params.id,
+      orgId: this.requireOrgId(authorization),
+      ...body,
+    });
     if (!memory) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return toJsonDates(memory);
   }
@@ -144,7 +163,10 @@ export class MemoryPublicApiService {
     if (query.confirm !== "true") {
       throw new BadRequestException({ error: "DELETE requires confirm=true", code: "CONFIRM_REQUIRED" });
     }
-    const result = await this.requireMemoryApplication(authorization).delete({ id: params.id });
+    const result = await this.requireMemoryApplication(authorization).delete({
+      id: params.id,
+      orgId: this.requireOrgId(authorization),
+    });
     if (!result) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return toJsonDates(result);
   }
@@ -163,12 +185,12 @@ export class MemoryPublicApiService {
 
   async previewContext(query: ContextPreviewQueryDto, authorization: string | undefined): Promise<unknown> {
     this.requireFeatureEnabled();
-    this.requireAuthorization(authorization);
+    const orgId = this.requireOrgId(authorization);
     const context = this.options?.context;
     if (!context) {
       throw new InternalServerErrorException("Application-backed REST memory route is required.");
     }
-    return await context.preview(normalizeContextPreviewQuery(query));
+    return await context.preview({ ...normalizeContextPreviewQuery(query), orgId });
   }
 
   async digestMemories(body: MemoryDigestBodyDto, authorization: string | undefined): Promise<unknown> {
@@ -182,6 +204,7 @@ export class MemoryPublicApiService {
     const sinceDate = parseSinceDate(body.since);
     const memories = await this.requireStore().listDigestWindow({
       projectId: body.projectId,
+      orgId: this.requireOrgId(authorization),
       since: sinceDate,
     });
     if (memories.length === 0) return null;
@@ -202,6 +225,14 @@ export class MemoryPublicApiService {
       title: `Memory digest ${sinceDate.toISOString().slice(0, 10)}`,
       docType: "memory_digest",
       bodyMd: summary,
+      frontmatter: {
+        sourceRef: {
+          kind: "memory_digest",
+          projectId: body.projectId,
+          since: sinceDate.toISOString(),
+          memoryIds: memories.map((memory) => memory.id),
+        },
+      },
     });
     if (!document) {
       throw new InternalServerErrorException("Memory digest document could not be created.");
@@ -212,6 +243,12 @@ export class MemoryPublicApiService {
       body: summary,
       projectId: body.projectId,
       since: sinceDate.toISOString(),
+      inputs: {
+        projectId: body.projectId,
+        since: sinceDate.toISOString(),
+        memoryIds: memories.map((memory) => memory.id),
+      },
+      outputs: { docId: document.id },
     };
   }
 
@@ -225,7 +262,7 @@ export class MemoryPublicApiService {
     if (!actionHandler) {
       throw new InternalServerErrorException("Application-backed REST memory route is required.");
     }
-    const memory = await actionHandler({ id: params.id });
+    const memory = await actionHandler({ id: params.id, orgId: this.requireOrgId(authorization) });
     if (!memory) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return toJsonDates(memory);
   }
@@ -269,6 +306,14 @@ export class MemoryPublicApiService {
     if (!authorization?.startsWith("Bearer ")) {
       throw new UnauthorizedException({ error: "Unauthorized", code: "UNAUTHORIZED" });
     }
+  }
+
+  private requireOrgId(authorization: string | undefined): string {
+    this.requireAuthorization(authorization);
+    const token = authorization!.slice("Bearer ".length).trim();
+    const orgId = token.startsWith("test-jwt:") ? token.slice("test-jwt:".length) : token;
+    if (!orgId) throw new UnauthorizedException({ error: "Unauthorized", code: "UNAUTHORIZED" });
+    return orgId;
   }
 
   private requireStore(): MemoryPublicStore {
@@ -437,6 +482,13 @@ function compactRecord(input: Record<string, unknown>): Record<string, unknown> 
 
 function toJsonDates(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
+}
+
+function isNonEmptyRecord(value: unknown): value is Record<string, unknown> {
+  return value != null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).length > 0;
 }
 
 Inject(MEMORY_PUBLIC_API_OPTIONS)(MemoryPublicApiService, undefined, 0);
