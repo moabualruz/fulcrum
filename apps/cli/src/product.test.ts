@@ -539,6 +539,7 @@ describe("fulcrum product CLI", () => {
 
   test("product tasks run-feed --watch streams feedback events as JSON lines", async () => {
     const calls: Array<{ method: string; input: unknown }> = [];
+    let unsubscribed = 0;
     const caller = {
       tasks: {
         create: async () => ({}),
@@ -569,8 +570,17 @@ describe("fulcrum product CLI", () => {
                 events: [{ summary: "Agent run completed", output: "worker complete" }],
                 latestEvent: { summary: "Agent run completed", output: "worker complete" },
               });
+              observer.next({
+                projectId: input["projectId"],
+                traceId: input["traceId"],
+                runGroupId: input["traceId"],
+                executorStatus: { queuedTaskCount: 0, runningTaskCount: 0, succeededTaskCount: 1, failedTaskCount: 0, blockedTaskCount: 0, inReviewCount: 0, active: false },
+                runs: [{ id: "run-1", status: "duplicate-after-inactive" }],
+                events: [],
+                latestEvent: null,
+              });
               observer.complete();
-              return { unsubscribe() {} };
+              return { unsubscribe() { unsubscribed += 1; } };
             },
           };
         },
@@ -600,6 +610,8 @@ describe("fulcrum product CLI", () => {
     expect(io.out).toHaveLength(2);
     expect(JSON.parse(io.out[0]!)).toMatchObject({ traceId: "trace_cli_stream", executorStatus: { active: true } });
     expect(JSON.parse(io.out[1]!)).toMatchObject({ traceId: "trace_cli_stream", executorStatus: { active: false } });
+    expect(io.out.join("\n")).not.toContain("duplicate-after-inactive");
+    expect(unsubscribed).toBe(1);
   });
 
   test("product sprints/search/context use caller fixture", async () => {

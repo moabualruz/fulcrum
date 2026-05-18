@@ -1100,6 +1100,7 @@ async function printSubscriptionEvents(
     try {
       subscription = stream.subscribe({
         next(value) {
+          if (done) return;
           print(JSON.stringify(value));
           if (isInactiveFeedback(value)) finish();
         },
