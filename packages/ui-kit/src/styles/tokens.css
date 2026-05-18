@@ -85,6 +85,27 @@
 	--motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
 	/* DESIGN.md §1.6 reduced-motion contract */
 	--motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+	/* shadcn-svelte semantic aliases, backed by DESIGN.md tokens */
+	--background: var(--surface);
+	--foreground: var(--fg);
+	--card: var(--surface-elevated);
+	--card-foreground: var(--fg);
+	--popover: var(--surface-elevated);
+	--popover-foreground: var(--fg);
+	--primary: var(--accent);
+	--primary-foreground: var(--on-accent);
+	--secondary: var(--surface-sunken);
+	--secondary-foreground: var(--fg);
+	--muted: var(--surface-sunken);
+	--muted-foreground: var(--fg-muted);
+	--accent-foreground: var(--on-accent);
+	--destructive: var(--danger);
+	--destructive-foreground: var(--on-danger);
+	--border-color: var(--border);
+	--input: var(--border);
+	--ring: var(--border-focus);
+	--radius: var(--radius-md);
 }
 
 .dark,
