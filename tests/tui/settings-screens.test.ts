@@ -66,7 +66,7 @@ describe("ThemeSettingsScreen", () => {
 });
 
 describe("SecretsSettingsScreen", () => {
-  test("masks credentials, adds, reveals briefly, rotates, and deletes", async () => {
+  test("masks credentials, adds, reveals briefly, rotates, and confirms deletes", async () => {
     const calls: unknown[] = [];
     const credentials = [{ id: "cred-1", name: "OPENAI_API_KEY", maskedValue: "********" }];
     const screen = new SecretsSettingsScreen({
@@ -107,6 +107,23 @@ describe("SecretsSettingsScreen", () => {
 
     await screen.handleKey("R");
     await screen.handleKey("D");
+    expect(calls).toEqual([
+      ["add", { name: "GITHUB_TOKEN", value: "ghp-test" }],
+      ["reveal", { id: "cred-1" }],
+      ["rotate", { id: "cred-1" }],
+    ]);
+    const confirmOutput = renderPlain((renderer) => screen.render(renderer));
+    expect(confirmOutput).toContain("Delete credential OPENAI_API_KEY (cred-1)? Confirm? [y/N]");
+    expect(confirmOutput).not.toContain("sk-test");
+    await screen.handleKey("n");
+    expect(calls).toEqual([
+      ["add", { name: "GITHUB_TOKEN", value: "ghp-test" }],
+      ["reveal", { id: "cred-1" }],
+      ["rotate", { id: "cred-1" }],
+    ]);
+
+    await screen.handleKey("D");
+    await screen.handleKey("y");
     expect(calls).toEqual([
       ["add", { name: "GITHUB_TOKEN", value: "ghp-test" }],
       ["reveal", { id: "cred-1" }],

@@ -85,6 +85,7 @@ export class SecretsSettingsScreen {
   private rows: CredentialRow[] = [];
   private cursor = 0;
   private revealed = new Map<string, string>();
+  private awaitingDelete = false;
 
   constructor(private readonly opts: {
     caller: {
@@ -113,6 +114,10 @@ export class SecretsSettingsScreen {
       const value = this.revealed.get(row.id) ?? row.maskedValue;
       renderer.writeln(`${index === this.cursor ? ">" : " "} ${row.name}: ${value}`);
     }
+    if (this.awaitingDelete) {
+      const row = this.rows[this.cursor];
+      renderer.writeln(`  Delete credential ${row?.name ?? "(none)"} (${row?.id ?? "unknown"})? Confirm? [y/N]`);
+    }
     renderer.writeln(c.dim("  A add  Enter reveal  R rotate  D delete  Esc back"));
   }
 
@@ -126,6 +131,23 @@ export class SecretsSettingsScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.awaitingDelete) {
+      if (key === "y" || key === "Y") {
+        const row = this.rows[this.cursor];
+        if (row) {
+          await this.opts.caller.secrets.delete({ id: row.id });
+          this.revealed.delete(row.id);
+          await this.load();
+        }
+        this.awaitingDelete = false;
+        return true;
+      }
+      if (key === "n" || key === "N" || key === "\x1b" || key === "q") {
+        this.awaitingDelete = false;
+        return true;
+      }
+      return true;
+    }
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.rows.length - 1));
       return true;
@@ -146,8 +168,7 @@ export class SecretsSettingsScreen {
       return true;
     }
     if (key === "D") {
-      await this.opts.caller.secrets.delete({ id: row.id });
-      await this.load();
+      this.awaitingDelete = true;
       return true;
     }
     return false;
