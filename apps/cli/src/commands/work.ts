@@ -11,6 +11,10 @@ import {
   createTaskApiCallerFromEnv,
   type TaskApiEnvironment,
 } from "@work-management/interface/http/task-api-client.ts";
+import {
+  createWorkflowApiCallerFromEnv,
+  type WorkflowApiEnvironment,
+} from "@workflow-coordination/interface/http/workflow-api-client.ts";
 
 type WorkCaller = {
   work?: {
@@ -23,7 +27,10 @@ type WorkCaller = {
   tasks?: {
     get?(input: { id: string }): Promise<unknown>;
     update?(input: Record<string, unknown>): Promise<unknown>;
-    create(input: Record<string, unknown>): Promise<unknown>;
+    create?(input: Record<string, unknown>): Promise<unknown>;
+    previewDependencyRun?(input: Record<string, unknown>): Promise<unknown>;
+    dispatchDependencyRun?(input: Record<string, unknown>): Promise<unknown>;
+    dependencyRunLiveFeedback?(input: Record<string, unknown>): Promise<unknown>;
   };
   relationships?: {
     create(input: Record<string, unknown>): Promise<unknown>;
@@ -35,7 +42,7 @@ type WorkCaller = {
 
 export interface WorkRunOptions {
   caller?: WorkCaller;
-  env?: Record<string, string | undefined> & TaskApiEnvironment & RelationshipApiEnvironment & ReportApiEnvironment;
+  env?: Record<string, string | undefined> & TaskApiEnvironment & RelationshipApiEnvironment & ReportApiEnvironment & WorkflowApiEnvironment;
   fetch?: typeof fetch;
   print?: (line: string) => void;
   printErr?: (line: string) => void;
@@ -50,6 +57,9 @@ Usage:
   fulcrum work move <id> --status <status> [--json]
   fulcrum work link <id> --to <id> --type <type> [--json]
   fulcrum work report [--project <id>] [--json]
+  fulcrum work dependency-graph --task <id>|--tasks <id,id> [--project <id>] [--trace <id>] [--json]
+  fulcrum work dependency-run dispatch --task <id>|--tasks <id,id> --agent <agent> [--project <id>] [--trace <id>] [--model <model>] [--prompt <text>] [--json]
+  fulcrum work dependency-run feedback [--project <id>] [--trace <id>] [--run-group <id>] [--run <id>] [--task <id>] [--json]
 `;
 
 export async function run(argv: readonly string[], opts: WorkRunOptions = {}): Promise<void> {
@@ -111,6 +121,27 @@ export async function run(argv: readonly string[], opts: WorkRunOptions = {}): P
         if (!fn) throw new Error("work report unavailable");
         return printOutput(await fn(compact({ projectId: flagValue(rest, "--project") })), rest, io.print);
       }
+      case "dependency-graph": {
+        const caller = await resolveCaller(opts);
+        const fn = caller.tasks?.previewDependencyRun;
+        if (!fn) throw new Error("work dependency graph unavailable");
+        return printOutput(await fn(dependencyRunPreviewInput(rest)), rest, io.print);
+      }
+      case "dependency-run": {
+        const [sub, ...runRest] = rest;
+        const caller = await resolveCaller(opts);
+        if (sub === "dispatch") {
+          const fn = caller.tasks?.dispatchDependencyRun;
+          if (!fn) throw new Error("work dependency run dispatch unavailable");
+          return printOutput(await fn(dependencyRunDispatchInput(runRest)), runRest, io.print);
+        }
+        if (sub === "feedback") {
+          const fn = caller.tasks?.dependencyRunLiveFeedback;
+          if (!fn) throw new Error("work dependency run feedback unavailable");
+          return printOutput(await fn(dependencyRunFeedbackInput(runRest)), runRest, io.print);
+        }
+        return usage(io, "usage: fulcrum work dependency-run <dispatch|feedback>");
+      }
       case "help":
       case "--help":
       case "-h":
@@ -144,16 +175,51 @@ async function resolveCaller(opts: WorkRunOptions): Promise<WorkCaller> {
   const taskCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
   const relationshipCaller = createRelationshipApiCallerFromEnv(opts.env, opts.fetch);
   const reportCaller = createReportApiCallerFromEnv(opts.env, opts.fetch);
-  if (!taskCaller && !relationshipCaller && !reportCaller) {
+  const workflowCaller = createWorkflowApiCallerFromEnv(opts.env, opts.fetch);
+  if (!taskCaller && !relationshipCaller && !reportCaller && !workflowCaller) {
     throw new Error(
       "Work API callers are not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL plus FULCRUM_ORG_ID and FULCRUM_USER_ID.",
     );
   }
   return {
-    tasks: taskCaller?.tasks,
+    tasks: { ...(taskCaller?.tasks ?? {}), ...(workflowCaller?.tasks ?? {}) } as WorkCaller["tasks"],
     relationships: relationshipCaller?.relationships,
     reports: reportCaller?.reports,
   } as WorkCaller;
+}
+
+function dependencyRunPreviewInput(argv: readonly string[]): Record<string, unknown> {
+  const explicitTasks = csvFlag(flagValue(argv, "--tasks"));
+  const singleTask = flagValue(argv, "--task");
+  const targetTaskIds = explicitTasks ?? (singleTask ? [singleTask] : undefined);
+  if (!targetTaskIds?.length) throw new Error("missing required flag --task or --tasks");
+  const mode = flagValue(argv, "--mode") ?? (targetTaskIds.length > 1 ? "board" : "task");
+  if (mode !== "task" && mode !== "board") throw new Error("--mode must be task or board");
+  return compact({
+    mode,
+    targetTaskIds,
+    projectId: flagValue(argv, "--project"),
+    traceId: flagValue(argv, "--trace"),
+  });
+}
+
+function dependencyRunDispatchInput(argv: readonly string[]): Record<string, unknown> {
+  return compact({
+    ...dependencyRunPreviewInput(argv),
+    agent: requiredFlag(argv, "--agent"),
+    model: flagValue(argv, "--model"),
+    prompt: flagValue(argv, "--prompt"),
+  });
+}
+
+function dependencyRunFeedbackInput(argv: readonly string[]): Record<string, unknown> {
+  return compact({
+    projectId: flagValue(argv, "--project"),
+    traceId: flagValue(argv, "--trace"),
+    runGroupId: flagValue(argv, "--run-group"),
+    runId: flagValue(argv, "--run"),
+    taskId: flagValue(argv, "--task"),
+  });
 }
 
 function requiredArg(argv: readonly string[], command: string, label: string): string {
@@ -179,8 +245,18 @@ function printOutput(value: unknown, argv: readonly string[], print: (line: stri
   print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
 }
 
+function usage(io: { printErr: (line: string) => void; exit: (code: number) => void }, message: string): void {
+  io.printErr(message);
+  io.exit(2);
+}
+
 function compact(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+}
+
+function csvFlag(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  return value.split(",").map((part) => part.trim()).filter(Boolean);
 }
 
 function errorMessage(error: unknown): string {
