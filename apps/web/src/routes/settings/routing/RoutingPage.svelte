@@ -59,9 +59,16 @@
   <title>Routing Rules | Fulcrum Settings</title>
 </svelte:head>
 
-<div data-routing-settings class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
+<div data-routing-settings class="mx-auto flex min-w-0 max-w-6xl flex-col gap-6 overflow-x-hidden px-4 py-8">
   <header class="flex flex-col gap-2">
-    <h1 class="text-2xl font-semibold tracking-tight">Routing Rules</h1>
+    <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+      <h1 class="text-2xl font-semibold tracking-tight">Routing Rules</h1>
+      {#if data.projectId}
+        <span data-routing-project-scope class="w-fit rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Project scope</span>
+      {:else}
+        <span data-routing-global-scope class="w-fit rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Global scope</span>
+      {/if}
+    </div>
     <p class="text-sm text-muted-foreground">Manage deterministic task-to-agent routing rules.</p>
   </header>
 
@@ -92,7 +99,7 @@
   {/if}
 
   <!-- Tabs -->
-  <div data-routing-tabs class="flex gap-1 border-b border-border">
+  <div data-routing-tabs class="flex max-w-full gap-1 overflow-x-auto border-b border-border pb-px">
     <a
       href="?tab=rules"
       data-tab="rules"
@@ -133,8 +140,8 @@
   <!-- ==================== RULES TAB ==================== -->
   {#if activeTab === "rules"}
     <div data-routing-rules-tab>
-      <header class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
+      <header class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-wrap items-center gap-3">
           <p class="text-sm text-muted-foreground">{rules.length} rule{rules.length !== 1 ? "s" : ""}</p>
           <div class="flex items-center gap-1 rounded-md border border-border p-0.5 text-xs">
             <button
