@@ -219,6 +219,7 @@ describe("TuiApp — headless mount", () => {
       caller: fakeCaller(),
       telemetry,
       crashLog,
+      traceContext: { traceId: "tui-planning" },
       routes: [{
         path: "/broken",
         screenKey: "broken-route",
@@ -234,6 +235,8 @@ describe("TuiApp — headless mount", () => {
 
     expect(tty.plainText()).toContain("TUI error");
     expect(tty.plainText()).toContain("route render failed");
+    expect(tty.plainText()).toContain("Recovery: press r to retry, b to go back, or q to quit");
+    expect(tty.plainText()).toContain("trace=tui-planning");
     expect(crashRows).toEqual([{ message: "route render failed", screenKey: "broken-route", route: "/broken" }]);
     expect(telemetry.rows.some((row) => row.screenKey === "broken-route" && row.route === "/broken")).toBe(true);
     app.stop();

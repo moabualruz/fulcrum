@@ -810,6 +810,10 @@ export class TuiApp {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
       this.renderer.writeln(error instanceof Error ? error.message : String(error));
+      const stackLine = error instanceof Error ? error.stack?.split("\n").slice(1).find((line) => line.trim()) : undefined;
+      if (stackLine) this.renderer.writeln(stackLine.trim());
+      this.renderer.writeln("Recovery: press r to retry, b to go back, or q to quit; run fulcrum doctor if the screen fails again.");
+      if (this.traceContext.traceId) this.renderer.writeln(`trace=${this.traceContext.traceId}`);
       await this.crashLog.write(error, { screenKey, route });
     } finally {
       await this.telemetry.recordRender({
