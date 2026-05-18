@@ -332,3 +332,32 @@ export {
 	Root as StatRoot,
 } from "./components/stat/index.js";
 export type { StatProps, StatTrend } from "./components/stat/index.js";
+export {
+	ModeRow,
+	Root as ModeRowRoot,
+	WORKFLOW_MODES,
+} from "./components/mode-row/index.js";
+export type { ModeRowProps, WorkflowMode } from "./components/mode-row/index.js";
+export {
+	TraceChip,
+	Root as TraceChipRoot,
+} from "./components/trace-chip/index.js";
+export type { TraceChipProps } from "./components/trace-chip/index.js";
+export {
+	RunFeedItem,
+	Root as RunFeedItemRoot,
+} from "./components/run-feed-item/index.js";
+export type { RunFeedItemProps } from "./components/run-feed-item/index.js";
+export {
+	TaskRow,
+	Root as TaskRowRoot,
+} from "./components/task-row/index.js";
+export type { TaskRowProps } from "./components/task-row/index.js";
+export {
+	AgentIdentityCard,
+	Root as AgentIdentityCardRoot,
+} from "./components/agent-identity-card/index.js";
+export type {
+	AgentIdentityCardProps,
+	AgentCapability,
+} from "./components/agent-identity-card/index.js";

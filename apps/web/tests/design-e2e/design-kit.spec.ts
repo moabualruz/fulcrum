@@ -365,4 +365,66 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(section.locator("[data-slot='stat'][data-trend='down']")).toBeVisible();
 		await expect(section.locator("[data-slot='stat'][data-trend='flat']")).toBeVisible();
 	});
+
+	test("mode-row toggles the active workflow mode", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='mode-row']");
+		const row = section.locator("[data-slot='mode-row']");
+		await expect(row).toHaveAttribute("data-value", "play");
+		await row.locator("[data-slot='mode-row-option'][data-mode='ai-assist']").click();
+		await expect(row).toHaveAttribute("data-value", "ai-assist");
+		await expect(section.locator("[data-design-kit-mode-active]")).toContainText("ai-assist");
+	});
+
+	test("trace-chip truncates and exposes a copy control", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='trace-chip']");
+		const chips = section.locator("[data-slot='trace-chip']");
+		await expect(chips).toHaveCount(2);
+		await expect(chips.first()).toContainText("…");
+		await expect(chips.first().locator("[data-slot='trace-chip-copy']")).toBeVisible();
+		await expect(chips.last().locator("[data-slot='trace-chip-copy']")).toHaveCount(0);
+	});
+
+	test("run-feed-item renders task, agent, status, and timing metadata", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='run-feed-item']");
+		const items = section.locator("[data-slot='run-feed-item']");
+		await expect(items).toHaveCount(3);
+		await expect(items.nth(0)).toHaveAttribute("data-status", "running");
+		await expect(items.nth(0).locator("[data-slot='run-feed-item-elapsed']")).toContainText("2m");
+		await expect(items.nth(1).locator("[data-slot='status-badge']")).toHaveAttribute(
+			"data-status",
+			"waiting-input",
+		);
+	});
+
+	test("task-row selects via checkbox and reports state", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='task-row']");
+		const rows = section.locator("[data-slot='task-row']");
+		await expect(rows).toHaveCount(2);
+		await rows.nth(0).locator("[data-slot='task-row-select']").check();
+		await expect(rows.nth(0)).toHaveAttribute("data-selected", "true");
+		await expect(section.locator("[data-design-kit-task-selected]")).toContainText(
+			"Selected first row: true",
+		);
+	});
+
+	test("agent-identity-card renders provider, model, caps, and token budget", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='agent-identity-card']");
+		const cards = section.locator("[data-slot='agent-identity-card']");
+		await expect(cards).toHaveCount(2);
+		await expect(cards.first().locator("[data-slot='agent-identity-card-name']")).toContainText(
+			"Sonnet",
+		);
+		await expect(cards.first().locator("[data-slot='agent-identity-card-meta']")).toContainText(
+			"claude-sonnet-4-6",
+		);
+		await expect(cards.first().locator("[data-slot='agent-identity-card-cap']")).toHaveCount(3);
+		await expect(cards.first().locator("[data-slot='agent-identity-card-tokens']")).toContainText(
+			"87,423",
+		);
+	});
 });

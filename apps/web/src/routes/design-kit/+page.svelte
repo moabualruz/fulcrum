@@ -56,8 +56,17 @@
 		DataList,
 		TreeView,
 		Stat,
+		ModeRow,
+		TraceChip,
+		RunFeedItem,
+		TaskRow,
+		AgentIdentityCard,
 	} from "@fulcrum/ui-kit";
-	import type { SortState, TreeNode } from "@fulcrum/ui-kit";
+	import type { SortState, TreeNode, WorkflowMode } from "@fulcrum/ui-kit";
+
+	let activeMode = $state<WorkflowMode>("play");
+	let taskSelected = $state(false);
+	let copiedTrace = $state<string | null>(null);
 
 	type SampleRow = { id: string; key: string; title: string; priority: string; estimate: number };
 	const dataTableRows: SampleRow[] = [
@@ -828,6 +837,126 @@
 				<Stat label="Active runs" value="12" delta="+3" trend="up" hint="vs last 7d" />
 				<Stat label="Backlog" value="58" delta="-4" trend="down" />
 				<Stat label="Open reviews" value="7" delta="0" trend="flat" />
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="mode-row"
+		>
+			<h2 class="text-lg font-semibold">ModeRow</h2>
+			<ModeRow bind:value={activeMode} onSelect={(mode) => (activeMode = mode)} />
+			<span class="text-xs text-muted-foreground" data-design-kit-mode-active>
+				Active mode: {activeMode}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="trace-chip"
+		>
+			<h2 class="text-lg font-semibold">TraceChip</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<TraceChip
+					traceId="trace-9d8f7e6a-2c3b-4d5e-87f6-abcd12345678"
+					onCopy={(id) => (copiedTrace = id)}
+				/>
+				<TraceChip traceId="trace-shortid" short={false} copyable={false} />
+				<span class="text-xs text-muted-foreground" data-design-kit-trace-copied>
+					Copied: {copiedTrace ?? "—"}
+				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="run-feed-item"
+		>
+			<h2 class="text-lg font-semibold">RunFeedItem</h2>
+			<div class="rounded-md border border-border bg-card">
+				<RunFeedItem
+					runId="run-001"
+					taskKey="FUL-204"
+					taskTitle="Wire view sorting"
+					agentName="Sonnet 4.6"
+					status="running"
+					elapsed="2m 14s"
+					lastEvent="Applied diff to apps/web/src/routes/view-controls"
+				/>
+				<RunFeedItem
+					runId="run-002"
+					taskKey="FUL-198"
+					taskTitle="Review saved filter"
+					agentName="Opus 4.7"
+					status="waiting-input"
+					elapsed="42s"
+					lastEvent="Awaiting permission for delete"
+				/>
+				<RunFeedItem
+					runId="run-003"
+					taskKey="FUL-176"
+					taskTitle="Archive stale view"
+					agentName="Sonnet 4.6"
+					status="completed"
+					elapsed="3m 02s"
+					lastEvent="Tests green"
+				/>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="task-row"
+		>
+			<h2 class="text-lg font-semibold">TaskRow</h2>
+			<div class="rounded-md border border-border bg-card">
+				<TaskRow
+					taskKey="FUL-204"
+					title="Wire view sorting"
+					status="running"
+					priority="P1"
+					assignee="Mo K."
+					estimate={8}
+					bind:selected={taskSelected}
+				/>
+				<TaskRow
+					taskKey="FUL-176"
+					title="Archive stale view"
+					status="completed"
+					priority="P3"
+					assignee="Sam L."
+					estimate={1}
+				/>
+			</div>
+			<span class="text-xs text-muted-foreground" data-design-kit-task-selected>
+				Selected first row: {taskSelected}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="agent-identity-card"
+		>
+			<h2 class="text-lg font-semibold">AgentIdentityCard</h2>
+			<div class="grid gap-3 sm:grid-cols-2">
+				<AgentIdentityCard
+					name="Sonnet 4.6"
+					provider="Anthropic"
+					model="claude-sonnet-4-6"
+					tokenBudget={200000}
+					tokensUsed={87423}
+					capabilities={["code", "edit", "review"]}
+					costPerCall="$0.18"
+				/>
+				<AgentIdentityCard
+					name="Opus 4.7"
+					provider="Anthropic"
+					model="claude-opus-4-7"
+					tokenBudget={400000}
+					tokensUsed={42101}
+					capabilities={["code", "plan", "review", "browse"]}
+					costPerCall="$0.62"
+				/>
 			</div>
 		</article>
 	</section>
