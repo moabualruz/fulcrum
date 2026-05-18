@@ -37,6 +37,9 @@
   let abortConfirmOpen = $state(false);
   let deleteSessionId = $state<string | null>(null);
   let selectedAgentName = $state(availableAgents[0]?.name ?? "");
+  let cwdValue = $state("");
+  let canUseFolderPicker = $state(false);
+  let cwdPickerError = $state<string | null>(null);
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
   const selectedAgent = $derived(availableAgents.find((agent) => agent.name === selectedAgentName) ?? availableAgents[0] ?? null);
@@ -65,6 +68,18 @@
       window.removeEventListener("online", requestReconnect);
       document.removeEventListener("visibilitychange", requestReconnect);
     };
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined") return;
+    cwdValue = window.localStorage.getItem("fulcrum.aiAssist.cwd") ?? "";
+    const desktopWindow = window as unknown as { __TAURI__?: unknown };
+    canUseFolderPicker = "__TAURI__" in desktopWindow && desktopWindow.__TAURI__ != null;
+  });
+
+  $effect(() => {
+    if (typeof window === "undefined" || !cwdValue) return;
+    window.localStorage.setItem("fulcrum.aiAssist.cwd", cwdValue);
   });
 
   function updateAutoscrollLock(): void {
@@ -192,6 +207,20 @@
       return;
     }
     document.querySelector<HTMLFormElement>("[data-abort-session-form]")?.requestSubmit();
+  }
+
+  async function chooseWorkingDirectory(): Promise<void> {
+    cwdPickerError = null;
+    const tauri = (globalThis as unknown as { __TAURI__?: { dialog?: { open?: (options: { directory: boolean; multiple: boolean }) => Promise<string | string[] | null> } } }).__TAURI__;
+    const open = tauri?.dialog?.open;
+    if (!open) {
+      cwdPickerError = "Folder picker is available only in Fulcrum Desktop.";
+      return;
+    }
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected === "string" && selected.length > 0) {
+      cwdValue = selected;
+    }
   }
 </script>
 
@@ -325,7 +354,26 @@
       <input type="hidden" name="transportType" value="stdio" />
       <input name="command" value={selectedAgent?.cli_path ?? ""} placeholder="Command (for stdio)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
       <input name="url" placeholder="URL (for websocket)" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
-      <input name="cwd" placeholder="Working directory" class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")} />
+      <label class={cn("grid gap-1 text-xs text-muted-foreground")}>
+        Working directory
+        <div class={cn("grid gap-2 sm:grid-cols-[1fr_auto]")}>
+          <input
+            name="cwd"
+            bind:value={cwdValue}
+            required
+            placeholder="/path/to/repository"
+            class={cn("cwd-input rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground")}
+          />
+          {#if canUseFolderPicker}
+            <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "folder-picker-btn")} onclick={chooseWorkingDirectory}>
+              Choose folder
+            </button>
+          {/if}
+        </div>
+      </label>
+      {#if cwdPickerError}
+        <p data-cwd-picker-error class={cn("text-xs text-destructive")}>{cwdPickerError}</p>
+      {/if}
       <button type="submit" disabled={availableAgents.length === 0} class={cn(buttonVariants({ variant: "default", size: "sm" }), "w-fit")}>Connect</button>
     </form>
   {/if}

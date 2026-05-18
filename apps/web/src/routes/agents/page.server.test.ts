@@ -155,6 +155,46 @@ describe("/agents +page.server.ts", () => {
     expect(testedProfiles).toEqual(["codex"]);
   });
 
+  test("connectBridge rejects empty working directory", async () => {
+    const form = new FormData();
+    form.set("agentName", "codex");
+    form.set("transportType", "stdio");
+    form.set("command", "codex");
+    form.set("cwd", "");
+    const request = new Request("http://localhost/agents?/connectBridge", {
+      method: "POST",
+      body: form,
+    });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 20}`);
+
+    const result = await mod.actions.connectBridge({
+      request,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.actions.connectBridge>[0]);
+
+    expect(result).toEqual({ success: false, message: "working directory required" });
+  });
+
+  test("connectBridge rejects non-directory working directory", async () => {
+    const form = new FormData();
+    form.set("agentName", "codex");
+    form.set("transportType", "stdio");
+    form.set("command", "codex");
+    form.set("cwd", "/definitely/not/a/real/fulcrum/path");
+    const request = new Request("http://localhost/agents?/connectBridge", {
+      method: "POST",
+      body: form,
+    });
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 21}`);
+
+    const result = await mod.actions.connectBridge({
+      request,
+      locals: { activeProjectId: null },
+    } as Parameters<typeof mod.actions.connectBridge>[0]);
+
+    expect(result).toEqual({ success: false, message: "working directory must be an existing folder" });
+  });
+
   test("maskProfile: caps last 4 of auth_env value", async () => {
     const { maskProfile } = await import("../../lib/server/agents.ts");
     const row = {

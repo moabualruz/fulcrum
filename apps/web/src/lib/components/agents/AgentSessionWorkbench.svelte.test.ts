@@ -93,6 +93,10 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("No messages");
     expect(body).toContain("data-connect-bridge");
     expect(body).toContain("data-agent-picker-empty");
+    expect(body).toContain("cwd-input");
+    expect(body).toContain('name="cwd"');
+    expect(body).toContain("Working directory");
+    expect(body).not.toContain("folder-picker-btn");
     expect(body).not.toContain("data-session-permission");
   });
 
@@ -121,6 +125,7 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("very-long-agent-name-that-needs-truncation-on-mobile");
     expect(body).toContain('name="command"');
     expect(body).toContain('value="codex"');
+    expect(body).toContain('placeholder="/path/to/repository"');
     expect(body).not.toContain("data-agent-picker-empty");
   });
 

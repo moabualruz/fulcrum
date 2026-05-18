@@ -1,4 +1,5 @@
 import { redirect } from "@sveltejs/kit";
+import { existsSync, statSync } from "node:fs";
 import type { Actions, PageServerLoad } from "./$types";
 import { listAgentProfilesPageData, testProfile } from "@execution-orchestration/interface/agent-profile-pages.ts";
 import { dispatchTaskRun } from "@execution-orchestration/interface/run-actions.ts";
@@ -167,9 +168,13 @@ export const actions: Actions = {
     const transportType = form.get("transportType") as string;
     const command = form.get("command") as string;
     const url = form.get("url") as string;
-    const cwd = (form.get("cwd") as string) || process.cwd();
+    const cwd = ((form.get("cwd") as string) ?? "").trim();
     if (!agentName) return { success: false, message: "agentName required" };
     if (!transportType) return { success: false, message: "transportType required" };
+    if (!cwd) return { success: false, message: "working directory required" };
+    if (!existsSync(cwd) || !statSync(cwd).isDirectory()) {
+      return { success: false, message: "working directory must be an existing folder" };
+    }
     const { AcpSessionManager, setActiveSessionManager } = await import(
       "@agent-client-protocol/interface/session-workbench.ts"
     );
