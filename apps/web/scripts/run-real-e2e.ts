@@ -1,6 +1,29 @@
 import { spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 import path from "node:path";
 import { allocatePortBlock } from "./e2e-ports";
+import { resolveRequestedE2eSpecs } from "./e2e-specs";
+
+const requestedSpecs = process.argv.slice(2);
+const resolved = resolveRequestedE2eSpecs(requestedSpecs);
+const playwrightCli = path.join(process.cwd(), "node_modules/@playwright/test/cli.js");
+
+if (resolved.project === "design-e2e") {
+	const [designPortNumber] = await allocatePortBlock({
+		count: 1,
+		preferredBase: process.env.FULCRUM_DESIGN_E2E_PORT_BASE ? Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE) : undefined,
+	});
+	rmSync(path.join(process.cwd(), ".svelte-kit/output"), { recursive: true, force: true });
+	const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...resolved.specs], {
+		stdio: "inherit",
+		env: {
+			...process.env,
+			FULCRUM_DESIGN_E2E_PORT: String(designPortNumber),
+			FULCRUM_SKIP_REAL_E2E_SERVERS: "1",
+		},
+	});
+	process.exit(result.status ?? 1);
+}
 
 const [realPortNumber, serverPortNumber] = await allocatePortBlock({
 	count: 2,
@@ -8,11 +31,8 @@ const [realPortNumber, serverPortNumber] = await allocatePortBlock({
 });
 const realPort = String(realPortNumber);
 const serverPort = String(serverPortNumber);
-const requestedSpecs = process.argv.slice(2);
-const specs = requestedSpecs.length > 0 ? requestedSpecs : ["tests/e2e/wave-0a-foundation.spec.ts"];
-const playwrightCli = path.join(process.cwd(), "node_modules/@playwright/test/cli.js");
 
-const result = spawnSync("node", [playwrightCli, "test", "--project=real-e2e", ...specs], {
+const result = spawnSync("node", [playwrightCli, "test", "--project=real-e2e", ...resolved.specs], {
 	stdio: "inherit",
 	env: {
 		...process.env,
