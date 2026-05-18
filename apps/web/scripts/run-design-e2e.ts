@@ -1,6 +1,7 @@
 import { readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { allocatePortBlock } from "./e2e-ports";
 
 const specDir = path.join(process.cwd(), "tests/design-e2e");
 const svelteKitOutputDir = path.join(process.cwd(), ".svelte-kit/output");
@@ -29,14 +30,18 @@ const specs =
 				.map((file) => path.join("tests/design-e2e", file));
 
 const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "1");
-const basePort = Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE ?? String(12000 + (process.pid % 100) * 100));
+const chunkCount = Math.ceil(specs.length / chunkSize);
+const designPorts = await allocatePortBlock({
+	count: chunkCount,
+	preferredBase: process.env.FULCRUM_DESIGN_E2E_PORT_BASE ? Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE) : undefined,
+});
 
 for (let index = 0; index < specs.length; index += chunkSize) {
 	const chunk = specs.slice(index, index + chunkSize);
 	const chunkNumber = Math.floor(index / chunkSize) + 1;
-	const designPort = String(basePort + chunkNumber - 1);
+	const designPort = String(designPorts[chunkNumber - 1]);
 	console.log(`design-e2e chunk ${chunkNumber}: ${chunk.join(", ")}`);
-	stopDesignProcesses();
+	stopDesignProcesses(designPort);
 	rmSync(svelteKitOutputDir, { recursive: true, force: true });
 	const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
 		stdio: "inherit",
