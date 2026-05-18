@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
+import {
+  createManualSimulationWorkspace,
+  readManualSimulationEvidence,
+  runTuiSimulation,
+  writeManualSimulationEvidence,
+} from "@platform-core/application/manual-simulation/harness.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
 import { FakeTTY } from "../testing/fake-tty.ts";
 
@@ -33,6 +39,38 @@ describe("TUI E2E navigation flow", () => {
     expect(tty.plainText()).toContain("Command palette");
     expect(tty.plainText()).toContain("Create task");
     app.stop();
+  });
+
+  test("manual simulation harness scripts FakeTTY navigation and writes snapshots", async () => {
+    const workspace = await createManualSimulationWorkspace("tui-navigation");
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({ output: tty, input: tty, caller: makeCaller() });
+
+    try {
+      const result = await runTuiSimulation({
+        workspace,
+        label: "navigation-and-palette",
+        app,
+        terminal: tty,
+        keys: ["j", "\r", "\x1b", "/"],
+      });
+      const evidencePath = await writeManualSimulationEvidence({ workspace, tui: [result] });
+      const evidence = await readManualSimulationEvidence(evidencePath);
+
+      expect(result.evidencePath).toContain(workspace.snapshotsDir);
+      expect(result.snapshots.map((snapshot) => snapshot.key)).toEqual(["mount", "j", "Enter", "Escape", "/"]);
+      expect(result.snapshots.some((snapshot) => snapshot.text.includes("E2E task"))).toBe(true);
+      expect(result.snapshots.at(-1)?.text).toContain("Command palette");
+      expect(evidence).toMatchObject({
+        schema: "fulcrum.manual-simulation.v1",
+        id: "tui-navigation",
+        tempHome: workspace.homeDir,
+      });
+      expect(evidence.artifacts).toContain(result.evidencePath);
+    } finally {
+      app.stop();
+      await workspace.cleanup();
+    }
   });
 });
 

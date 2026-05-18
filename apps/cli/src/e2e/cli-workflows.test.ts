@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
+import {
+  createManualSimulationWorkspace,
+  readManualSimulationEvidence,
+  runCliSimulation,
+  startFakeJsonApi,
+  writeManualSimulationEvidence,
+} from "@platform-core/application/manual-simulation/harness.ts";
 import { run as runTasks } from "../commands/tasks.ts";
 import { run as runSprints } from "../sprints.ts";
 
@@ -59,6 +66,43 @@ describe("CLI E2E CRUD workflows with application callers", () => {
     expect(calls).toEqual(["add:sprint-1:task-1", "remove:sprint-1:task-1"]);
     expect(io.out.map((line) => JSON.parse(line))).toEqual([{ ok: true }, { ok: true }]);
     expect(io.exits).toEqual([]);
+  });
+
+  test("manual simulation harness runs CLI command with temp HOME, fake API, and evidence log", async () => {
+    const workspace = await createManualSimulationWorkspace("cli-workflow");
+    const api = startFakeJsonApi((request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/api/v1/artifacts") {
+        return Response.json([{ id: "artifact-1", filename: "manual-proof.txt" }]);
+      }
+      return Response.json([]);
+    });
+
+    try {
+      const result = await runCliSimulation({
+        workspace,
+        api,
+        argv: ["artifacts", "list", "--json"],
+      });
+      const evidencePath = await writeManualSimulationEvidence({ workspace, api, cli: [result] });
+      const evidence = await readManualSimulationEvidence(evidencePath);
+
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual([{ id: "artifact-1", filename: "manual-proof.txt" }]);
+      expect(result.stderr).toBe("");
+      expect(result.evidencePath).toContain(workspace.logsDir);
+      expect(api.requests.map((request) => `${request.method} ${request.path}`)).toEqual(["GET /api/v1/artifacts"]);
+      expect(evidence).toMatchObject({
+        schema: "fulcrum.manual-simulation.v1",
+        id: "cli-workflow",
+        tempHome: workspace.homeDir,
+        fakeApiUrl: api.url,
+      });
+      expect(evidence.artifacts).toContain(result.evidencePath);
+    } finally {
+      api.stop(true);
+      await workspace.cleanup();
+    }
   });
 });
 

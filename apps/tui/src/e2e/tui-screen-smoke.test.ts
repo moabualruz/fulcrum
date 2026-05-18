@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
+import { DEFAULT_REAL_TERMINAL_SMOKE_CASES } from "@platform-core/application/manual-simulation/harness.ts";
 
 const TUI_SRC_ROOT = new URL("../", import.meta.url);
 
@@ -59,6 +60,18 @@ describe("TUI screen application caller smoke", () => {
     expect(TUI_RUNTIME_BOUNDARY_SURFACES.map((surface) => surface.key)).toEqual(["tui telemetry"]);
     expect(TUI_RUNTIME_BOUNDARY_SURFACES.every((surface) => surface.file.startsWith(".."))).toBe(false);
     expect(TUI_RUNTIME_BOUNDARY_SURFACES.some((surface) => surface.file.includes("vendor/"))).toBe(false);
+  });
+
+  test("manual simulation harness defines selected real terminal smoke cases", () => {
+    expect(DEFAULT_REAL_TERMINAL_SMOKE_CASES.map((smoke) => smoke.name)).toEqual([
+      "launcher-opens-and-exits",
+      "help-mode-renders",
+    ]);
+    for (const smoke of DEFAULT_REAL_TERMINAL_SMOKE_CASES) {
+      expect(smoke.argv[0]).toBe("tui");
+      expect(smoke.expectedText.length).toBeGreaterThan(0);
+      expect(smoke.evidenceKind).toBe("terminal-log");
+    }
   });
 
   test.each([...TUI_RUNTIME_BOUNDARY_SURFACES])(
