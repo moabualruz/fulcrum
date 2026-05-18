@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -25,8 +26,8 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import type { z } from "zod";
 
 import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import {
@@ -35,8 +36,30 @@ import {
 } from "@work-management/infrastructure/database/project-public-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto } from "./dto/project.dto.ts";
-export { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto };
+import {
+  ProjectCreateBodyDto,
+  ProjectCreateBodySchema,
+  ProjectIdParamsDto,
+  ProjectIdParamsSchema,
+  ProjectListQueryDto,
+  ProjectListQuerySchema,
+  ProjectPatchBodyDto,
+  ProjectPatchBodySchema,
+  ProjectRequestContextDto,
+  ProjectRequestContextSchema,
+} from "./dto/project.dto.ts";
+export {
+  ProjectCreateBodyDto,
+  ProjectCreateBodySchema,
+  ProjectIdParamsDto,
+  ProjectIdParamsSchema,
+  ProjectListQueryDto,
+  ProjectListQuerySchema,
+  ProjectPatchBodyDto,
+  ProjectPatchBodySchema,
+  ProjectRequestContextDto,
+  ProjectRequestContextSchema,
+};
 
 export const PROJECT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.projectPublicApi.options");
 
@@ -47,6 +70,10 @@ export interface ProjectPublicApplication {
     kind?: ProjectPublicKind;
     name: string;
     slug?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
+    traceId?: string;
     repoPath?: string;
     template?: string;
   }): Promise<unknown>;
@@ -55,6 +82,9 @@ export interface ProjectPublicApplication {
     orgId: string;
     id: string;
     name?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
     memoryConfig?: Record<string, unknown>;
   }): Promise<unknown>;
   deleteProject?(input: { orgId: string; id: string }): Promise<void>;
@@ -73,48 +103,65 @@ export class ProjectPublicApiService {
   ) {}
 
   async listProjects(query: ProjectListQueryDto): Promise<{ data: unknown[] }> {
-    return await this.requireApplication().listProjects({ orgId: query.orgId });
+    const parsed = parseProjectInput(ProjectListQuerySchema, query);
+    return await this.requireApplication().listProjects({ orgId: parsed.orgId });
   }
 
   async createProject(body: ProjectCreateBodyDto): Promise<unknown> {
+    const parsed = parseProjectInput(ProjectCreateBodySchema, body);
     const application = this.requireMethod("createProject");
     return await application({
-      orgId: body.orgId,
-      kind: body.kind,
-      name: body.name,
-      slug: body.slug,
-      repoPath: body.repoPath,
-      template: body.template,
+      orgId: parsed.orgId,
+      kind: parsed.kind,
+      name: parsed.name,
+      slug: parsed.slug,
+      description: parsed.description,
+      status: parsed.status,
+      ownerId: parsed.ownerId,
+      traceId: parsed.traceId,
+      repoPath: parsed.repoPath,
+      template: parsed.template,
     });
   }
 
   async getProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("getProject");
-    const result = await application({ orgId: query.orgId, id: params.id });
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
   }
 
   async patchProject(params: ProjectIdParamsDto, body: ProjectPatchBodyDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedBody = parseProjectInput(ProjectPatchBodySchema, body);
     const application = this.requireMethod("patchProject");
     const result = await application({
-      orgId: body.orgId,
-      id: params.id,
-      name: body.name,
-      memoryConfig: body.memory_config,
+      orgId: parsedBody.orgId,
+      id: parsedParams.id,
+      name: parsedBody.name,
+      description: parsedBody.description,
+      status: parsedBody.status,
+      ownerId: parsedBody.ownerId,
+      memoryConfig: parsedBody.memory_config,
     });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
   }
 
   async deleteProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<void> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("deleteProject");
-    await application({ orgId: query.orgId, id: params.id });
+    await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
   }
 
   async projectStats(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("projectStats");
-    const result = await application({ orgId: query.orgId, id: params.id });
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
   }
@@ -199,36 +246,20 @@ Inject(ProjectPublicStore)(ProjectPublicApiService, undefined, 1);
 Inject(DataSource)(ProjectPublicStore, undefined, 0);
 Inject(ProjectPublicApiService)(ProjectPublicApiController, undefined, 0);
 
-for (const property of ["orgId"] as const) {
-  IsString()(ProjectListQueryDto.prototype, property);
-  MinLength(1)(ProjectListQueryDto.prototype, property);
-  IsString()(ProjectRequestContextDto.prototype, property);
-  MinLength(1)(ProjectRequestContextDto.prototype, property);
-  IsString()(ProjectCreateBodyDto.prototype, property);
-  MinLength(1)(ProjectCreateBodyDto.prototype, property);
-  IsString()(ProjectPatchBodyDto.prototype, property);
-  MinLength(1)(ProjectPatchBodyDto.prototype, property);
+function parseProjectInput<Schema extends z.ZodType>(
+  schema: Schema,
+  value: unknown,
+): z.infer<Schema> {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  throw new BadRequestException({
+    error: "Invalid project request.",
+    issues: result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+  });
 }
-
-IsString()(ProjectIdParamsDto.prototype, "id");
-MinLength(1)(ProjectIdParamsDto.prototype, "id");
-
-IsOptional()(ProjectCreateBodyDto.prototype, "kind");
-IsIn(["workspace", "project", "subproject"])(ProjectCreateBodyDto.prototype, "kind");
-IsString()(ProjectCreateBodyDto.prototype, "name");
-MinLength(1)(ProjectCreateBodyDto.prototype, "name");
-
-for (const property of ["slug", "repoPath", "template"] as const) {
-  IsOptional()(ProjectCreateBodyDto.prototype, property);
-  IsString()(ProjectCreateBodyDto.prototype, property);
-  MinLength(1)(ProjectCreateBodyDto.prototype, property);
-}
-
-IsOptional()(ProjectPatchBodyDto.prototype, "name");
-IsString()(ProjectPatchBodyDto.prototype, "name");
-MinLength(1)(ProjectPatchBodyDto.prototype, "name");
-IsOptional()(ProjectPatchBodyDto.prototype, "memory_config");
-IsObject()(ProjectPatchBodyDto.prototype, "memory_config");
 
 const listProjectsDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "listProjects");
 const createProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "createProject");

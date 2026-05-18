@@ -18,6 +18,7 @@ import {
   FulcrumWorkspaceEntity,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 import { WorkflowSpine1778623200001 } from "@workflow-coordination/infrastructure/database/workflow-spine.migration.ts";
+import { ReviewWorkflow1778623200002 } from "@planning-review/infrastructure/database/review-workflow.migration.ts";
 import {
   type FulcrumTypeOrmConnectionSource,
   buildFulcrumTypeOrmOptions,
@@ -74,14 +75,17 @@ async function assertProjectPublicApiRoundTrip(
       source,
       url,
       entities: FULCRUM_WORKFLOW_SPINE_ENTITIES,
-      migrations: [WorkflowSpine1778623200001],
+      migrations: [WorkflowSpine1778623200001, ReviewWorkflow1778623200002],
     }),
   );
 
   await dataSource.initialize();
   try {
     const migrations = await dataSource.runMigrations();
-    expect(migrations.map((migration) => migration.name)).toEqual(["WorkflowSpine1778623200001"]);
+    expect(migrations.map((migration) => migration.name)).toEqual([
+      "WorkflowSpine1778623200001",
+      "ReviewWorkflow1778623200002",
+    ]);
 
     await dataSource.getRepository(FulcrumWorkspaceEntity).save([
       { id: ORG_ID, slug: `workspace-${source}`, name: "Workspace" },
@@ -93,6 +97,9 @@ async function assertProjectPublicApiRoundTrip(
         workspaceId: ORG_ID,
         slug: `project-${source}`,
         name: "Project",
+        description: "Project description",
+        status: "active",
+        ownerId: "user-owner",
         traceId: `trace-project-${source}`,
       },
       {
@@ -100,6 +107,9 @@ async function assertProjectPublicApiRoundTrip(
         workspaceId: OTHER_ORG_ID,
         slug: `other-project-${source}`,
         name: "Other Project",
+        description: "Other project description",
+        status: "active",
+        ownerId: "user-other-owner",
         traceId: `trace-other-project-${source}`,
       },
     ]);
@@ -109,6 +119,25 @@ async function assertProjectPublicApiRoundTrip(
       taskRow("task-3", PROJECT_ID, "done", source),
       taskRow("task-4", OTHER_PROJECT_ID, "done", source),
     ]);
+    await dataSource.query(
+      `INSERT INTO fulcrum_artifacts
+        (id, project_id, trace_id, kind, title, lifecycle_state)
+       VALUES
+        ($1, $2, $3, 'report', 'Prototype artifact', 'created'),
+        ($4, $5, $6, 'report', 'Archived artifact', 'created'),
+        ($7, $8, $9, 'report', 'Other project artifact', 'created')`,
+      [
+        `artifact-${source}-1`,
+        PROJECT_ID,
+        `trace-artifact-${source}-1`,
+        `artifact-${source}-2`,
+        PROJECT_ID,
+        `trace-artifact-${source}-2`,
+        `artifact-${source}-3`,
+        OTHER_PROJECT_ID,
+        `trace-artifact-${source}-3`,
+      ],
+    );
 
     const controller = new ProjectPublicApiController(
       new ProjectPublicApiService(
@@ -137,6 +166,10 @@ async function assertProjectPublicApiRoundTrip(
       kind: "project",
       name: `New Project ${source}`,
       slug: `new-project-${source}`,
+      description: `New project description ${source}`,
+      status: "active",
+      ownerId: `owner-${source}`,
+      traceId: `trace-new-project-${source}`,
       repoPath: `/tmp/new-project-${source}`,
       template: "default",
     });
@@ -145,13 +178,24 @@ async function assertProjectPublicApiRoundTrip(
       orgId: ORG_ID,
       name: `New Project ${source}`,
       slug: `new-project-${source}`,
+      description: `New project description ${source}`,
+      status: "active",
+      ownerId: `owner-${source}`,
+      traceId: `trace-new-project-${source}`,
       kind: "project",
       repoPath: `/tmp/new-project-${source}`,
       template: "default",
     }));
 
     await expect(controller.getProject({ id: PROJECT_ID }, { orgId: ORG_ID })).resolves.toEqual(
-      expect.objectContaining({ id: PROJECT_ID, name: "Project" }),
+      expect.objectContaining({
+        id: PROJECT_ID,
+        name: "Project",
+        description: "Project description",
+        status: "active",
+        ownerId: "user-owner",
+        traceId: `trace-project-${source}`,
+      }),
     );
     await expect(controller.getProject({ id: OTHER_PROJECT_ID }, { orgId: ORG_ID })).rejects.toBeInstanceOf(
       NotFoundException,
@@ -161,6 +205,9 @@ async function assertProjectPublicApiRoundTrip(
       {
         orgId: ORG_ID,
         name: "Project revised",
+        description: "Project revised description",
+        status: "paused",
+        ownerId: "user-owner-2",
         memory_config: {
           bm25_weight: 1.7,
           recency_weight: 1.2,
@@ -171,6 +218,9 @@ async function assertProjectPublicApiRoundTrip(
     )).resolves.toEqual(expect.objectContaining({
       id: PROJECT_ID,
       name: "Project revised",
+      description: "Project revised description",
+      status: "paused",
+      ownerId: "user-owner-2",
       memory_config: {
         bm25_weight: 1.7,
         recency_weight: 1.2,
@@ -197,6 +247,7 @@ async function assertProjectPublicApiRoundTrip(
         taskCount: 3,
         doneTaskCount: 2,
         openTaskCount: 1,
+        artifactCount: 2,
       }),
     );
     await expect(controller.deleteProject({ id: PROJECT_ID }, { orgId: ORG_ID })).resolves.toBeUndefined();

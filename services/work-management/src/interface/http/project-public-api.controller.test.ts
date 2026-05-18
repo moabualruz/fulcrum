@@ -2,20 +2,24 @@ import "reflect-metadata";
 
 import { describe, expect, mock, test } from "bun:test";
 
-import { InternalServerErrorException, NotFoundException, RequestMethod } from "@nestjs/common";
+import { BadRequestException, InternalServerErrorException, NotFoundException, RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
-import { validateSync } from "class-validator";
 
 import { AppModule } from "@fulcrum/server/app.module.ts";
 import {
   ProjectCreateBodyDto,
+  ProjectCreateBodySchema,
   ProjectIdParamsDto,
+  ProjectIdParamsSchema,
   ProjectListQueryDto,
+  ProjectListQuerySchema,
   ProjectPatchBodyDto,
+  ProjectPatchBodySchema,
   ProjectPublicApiController,
   ProjectPublicApiModule,
   ProjectPublicApiService,
   ProjectRequestContextDto,
+  ProjectRequestContextSchema,
 } from "@work-management/interface/http/project-public-api.controller.ts";
 
 describe("project public Nest API", () => {
@@ -103,6 +107,10 @@ describe("project public Nest API", () => {
       kind: "project",
       name: "Project 1",
       slug: "project-1",
+      description: "Project description",
+      status: "active",
+      ownerId: "user-1",
+      traceId: "trace-project-1",
       repoPath: "/tmp/project-1",
       template: "default",
     })).resolves.toEqual(expect.objectContaining({ id: "project-1" }));
@@ -127,6 +135,10 @@ describe("project public Nest API", () => {
       kind: "project",
       name: "Project 1",
       slug: "project-1",
+      description: "Project description",
+      status: "active",
+      ownerId: "user-1",
+      traceId: "trace-project-1",
       repoPath: "/tmp/project-1",
       template: "default",
     });
@@ -135,6 +147,9 @@ describe("project public Nest API", () => {
       orgId: "org-1",
       id: "project-1",
       name: "Project 1 revised",
+      description: undefined,
+      status: undefined,
+      ownerId: undefined,
       memoryConfig: { token_budget: 8192 },
     });
     expect(projectStats).toHaveBeenCalledWith({ orgId: "org-1", id: "project-1" });
@@ -153,7 +168,7 @@ describe("project public Nest API", () => {
       .toBeInstanceOf(InternalServerErrorException);
   });
 
-  test("keeps request validation at the Nest boundary", () => {
+  test("keeps Zod request validation at the Nest boundary", async () => {
     const query = Object.assign(new ProjectListQueryDto(), { orgId: "org-1" });
     const invalidQuery = Object.assign(new ProjectListQueryDto(), { orgId: "" });
     const params = Object.assign(new ProjectIdParamsDto(), { id: "project-1" });
@@ -165,6 +180,10 @@ describe("project public Nest API", () => {
       kind: "project",
       name: "Project 1",
       slug: "project-1",
+      description: "Project description",
+      status: "active",
+      ownerId: "user-1",
+      traceId: "trace-project-1",
       repoPath: "/tmp/project-1",
       template: "default",
     });
@@ -176,15 +195,23 @@ describe("project public Nest API", () => {
     });
     const invalidPatch = Object.assign(new ProjectPatchBodyDto(), { orgId: "", name: "" });
 
-    expect(validateSync(query)).toHaveLength(0);
-    expect(validateSync(invalidQuery).map((error) => error.property)).toEqual(["orgId"]);
-    expect(validateSync(params)).toHaveLength(0);
-    expect(validateSync(invalidParams).map((error) => error.property)).toEqual(["id"]);
-    expect(validateSync(context)).toHaveLength(0);
-    expect(validateSync(invalidContext).map((error) => error.property)).toEqual(["orgId"]);
-    expect(validateSync(body)).toHaveLength(0);
-    expect(validateSync(invalidBody).map((error) => error.property)).toEqual(["orgId", "kind", "name"]);
-    expect(validateSync(patch)).toHaveLength(0);
-    expect(validateSync(invalidPatch).map((error) => error.property)).toEqual(["orgId", "name"]);
+    expect(ProjectListQuerySchema.safeParse(query).success).toBe(true);
+    expect(ProjectListQuerySchema.safeParse(invalidQuery).success).toBe(false);
+    expect(ProjectIdParamsSchema.safeParse(params).success).toBe(true);
+    expect(ProjectIdParamsSchema.safeParse(invalidParams).success).toBe(false);
+    expect(ProjectRequestContextSchema.safeParse(context).success).toBe(true);
+    expect(ProjectRequestContextSchema.safeParse(invalidContext).success).toBe(false);
+    expect(ProjectCreateBodySchema.safeParse(body).success).toBe(true);
+    expect(ProjectCreateBodySchema.safeParse(invalidBody).success).toBe(false);
+    expect(ProjectPatchBodySchema.safeParse(patch).success).toBe(true);
+    expect(ProjectPatchBodySchema.safeParse(invalidPatch).success).toBe(false);
+
+    const controller = new ProjectPublicApiController(
+      new ProjectPublicApiService({
+        featuresEnv: "public-api",
+        application: { listProjects: async () => ({ data: [] }) },
+      }),
+    );
+    await expect(controller.listProjects(invalidQuery)).rejects.toBeInstanceOf(BadRequestException);
   });
 });

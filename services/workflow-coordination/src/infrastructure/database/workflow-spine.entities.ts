@@ -13,6 +13,9 @@ export interface FulcrumProject {
   workspaceId: string;
   slug: string;
   name: string;
+  description?: string | null;
+  status?: string;
+  ownerId?: string | null;
   traceId: string;
   methodology: string;
   workflowConfig: Record<string, unknown> | null;
@@ -120,6 +123,9 @@ export const FulcrumProjectEntity = new EntitySchema<FulcrumProject>({
     workspaceId: { name: "workspace_id", type: "varchar", length: 128 },
     slug: { type: "varchar", length: 160 },
     name: { type: "varchar", length: 240 },
+    description: { type: "text", nullable: true },
+    status: { type: "varchar", length: 80, default: "active" },
+    ownerId: { name: "owner_id", type: "varchar", length: 128, nullable: true },
     traceId: { name: "trace_id", type: "varchar", length: 160 },
     methodology: { type: "varchar", length: 32, default: "kanban" },
     workflowConfig: { name: "workflow_config", type: "jsonb", nullable: true },

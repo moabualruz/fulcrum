@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ProjectPublicKind } from "@work-management/infrastructure/database/project-public-store.ts";
 
 export class ProjectListQueryDto {
@@ -17,6 +19,10 @@ export class ProjectCreateBodyDto {
   kind?: ProjectPublicKind;
   name!: string;
   slug?: string;
+  description?: string | null;
+  status?: string;
+  ownerId?: string | null;
+  traceId?: string;
   repoPath?: string;
   template?: string;
 }
@@ -24,5 +30,44 @@ export class ProjectCreateBodyDto {
 export class ProjectPatchBodyDto {
   orgId!: string;
   name?: string;
+  description?: string | null;
+  status?: string;
+  ownerId?: string | null;
   memory_config?: Record<string, unknown>;
 }
+
+const nonEmptyString = z.string().min(1);
+
+export const ProjectListQuerySchema = z.object({
+  orgId: nonEmptyString,
+});
+
+export const ProjectRequestContextSchema = z.object({
+  orgId: nonEmptyString,
+});
+
+export const ProjectIdParamsSchema = z.object({
+  id: nonEmptyString,
+});
+
+export const ProjectCreateBodySchema = z.object({
+  orgId: nonEmptyString,
+  kind: z.enum(["workspace", "project", "subproject"]).optional(),
+  name: nonEmptyString,
+  slug: nonEmptyString.optional(),
+  description: z.string().nullable().optional(),
+  status: nonEmptyString.optional(),
+  ownerId: z.string().nullable().optional(),
+  traceId: nonEmptyString.optional(),
+  repoPath: nonEmptyString.optional(),
+  template: nonEmptyString.optional(),
+});
+
+export const ProjectPatchBodySchema = z.object({
+  orgId: nonEmptyString,
+  name: nonEmptyString.optional(),
+  description: z.string().nullable().optional(),
+  status: nonEmptyString.optional(),
+  ownerId: z.string().nullable().optional(),
+  memory_config: z.record(z.string(), z.unknown()).optional(),
+});

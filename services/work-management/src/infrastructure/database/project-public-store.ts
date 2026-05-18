@@ -22,6 +22,9 @@ export interface ProjectPublicRow {
   kind: ProjectPublicKind;
   slug: string;
   name: string;
+  description: string | null;
+  status: string;
+  ownerId: string | null;
   repoPath: string | null;
   template: string | null;
   memoryConfig: Record<string, unknown> | null;
@@ -37,6 +40,7 @@ export interface ProjectPublicStats {
   taskCount: number;
   doneTaskCount: number;
   openTaskCount: number;
+  artifactCount: number;
   traceId: string;
 }
 
@@ -56,6 +60,10 @@ export class ProjectPublicStore {
     kind?: ProjectPublicKind;
     name: string;
     slug?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
+    traceId?: string;
     repoPath?: string;
     template?: string;
   }): Promise<ProjectPublicRow> {
@@ -73,6 +81,9 @@ export class ProjectPublicStore {
         kind,
         slug: workspace.slug,
         name: workspace.name,
+        description: input.description ?? null,
+        status: input.status ?? "active",
+        ownerId: input.ownerId ?? null,
         repoPath: input.repoPath ?? null,
         template: input.template ?? null,
         memoryConfig: null,
@@ -89,7 +100,10 @@ export class ProjectPublicStore {
       workspaceId: input.orgId,
       slug: input.slug ?? slugify(input.name),
       name: input.name,
-      traceId: `trace-project-${id}`,
+      description: input.description ?? null,
+      status: input.status ?? "active",
+      ownerId: input.ownerId ?? null,
+      traceId: input.traceId ?? `trace-project-${id}`,
     });
     return toPublicRow(input.orgId, project, {
       kind,
@@ -107,12 +121,18 @@ export class ProjectPublicStore {
     orgId: string;
     id: string;
     name?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
     memoryConfig?: Record<string, unknown>;
   }): Promise<ProjectPublicRow | null> {
     const project = await this.findScopedProject(input);
     if (!project) return null;
 
     if (input.name !== undefined) project.name = input.name;
+    if (input.description !== undefined) project.description = input.description;
+    if (input.status !== undefined) project.status = input.status;
+    if (input.ownerId !== undefined) project.ownerId = input.ownerId;
     if (input.memoryConfig !== undefined) {
       project.workflowConfig = {
         ...(project.workflowConfig ?? {}),
@@ -142,12 +162,14 @@ export class ProjectPublicStore {
 
     const tasks = await this.taskRepository().findBy({ projectId: project.id, deletedAt: IsNull() });
     const doneTaskCount = tasks.filter((task) => task.status === "done").length;
+    const artifactCount = await this.countProjectArtifacts(project.id);
     return {
       orgId: input.orgId,
       projectId: project.id,
       taskCount: tasks.length,
       doneTaskCount,
       openTaskCount: tasks.length - doneTaskCount,
+      artifactCount,
       traceId: project.traceId,
     };
   }
@@ -167,6 +189,18 @@ export class ProjectPublicStore {
   private taskRepository() {
     return this.dataSource.getRepository(FulcrumTaskEntity);
   }
+
+  private async countProjectArtifacts(projectId: string): Promise<number> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    const exists = await queryRunner.hasTable("fulcrum_artifacts");
+    await queryRunner.release();
+    if (!exists) return 0;
+    const rows = await this.dataSource.query<Array<{ count: string }>>(
+      "SELECT COUNT(*)::text AS count FROM fulcrum_artifacts WHERE project_id = $1 AND deleted_at IS NULL",
+      [projectId],
+    );
+    return Number(rows[0]?.count ?? 0);
+  }
 }
 
 function toPublicRow(
@@ -183,6 +217,9 @@ function toPublicRow(
     kind: overrides.kind ?? "project",
     slug: project.slug,
     name: project.name,
+    description: project.description ?? null,
+    status: project.status ?? "active",
+    ownerId: project.ownerId ?? null,
     repoPath: overrides.repoPath ?? null,
     template: overrides.template ?? null,
     memoryConfig: publicMemoryConfig,
