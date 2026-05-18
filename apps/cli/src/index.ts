@@ -47,6 +47,7 @@ Usage:
   fulcrum i18n <list|set> [--json]
   fulcrum theme <list|set> [--json]
   fulcrum telemetry <status|opt-in|opt-out|purge> [--json]
+  fulcrum offline <status|sync-now> [--json]
   fulcrum backup <create|restore|verify> [--json]
   fulcrum data <export|import> [--json]
   fulcrum secrets <set|get|rotate|init-keyring> [--json]
@@ -353,6 +354,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "telemetry": {
       const { runTelemetry } = await import("./commands/cross-cutting-platform.ts");
       await runTelemetry(rest);
+      return;
+    }
+    case "offline": {
+      const { run: runOffline } = await import("./commands/offline.ts");
+      await runOffline(rest);
       return;
     }
     case "backup": {
