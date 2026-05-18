@@ -54,6 +54,88 @@ test.describe("ui-kit form primitives reference", () => {
 		await expect(page.locator("[data-design-kit-radio-value]")).toContainText("weekly");
 	});
 
+	test("badge renders six tonal variants and two extra sizes", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='badge']");
+		const badges = section.locator("[data-slot='badge']");
+		await expect(badges).toHaveCount(8);
+		await expect(section.locator("[data-slot='badge'][data-variant='accent']")).toHaveCount(1);
+		await expect(section.locator("[data-slot='badge'][data-variant='outline']")).toHaveCount(1);
+		await expect(section.locator("[data-slot='badge'][data-size='sm']")).toBeVisible();
+		await expect(section.locator("[data-slot='badge'][data-size='lg']")).toBeVisible();
+	});
+
+	test("status-badge covers the full workflow vocabulary with ARIA + glyphs", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='status-badge']");
+		const badges = section.locator("[data-slot='status-badge']");
+		await expect(badges).toHaveCount(9);
+		const statuses = [
+			"queued",
+			"running",
+			"waiting-input",
+			"paused",
+			"completed",
+			"failed",
+			"blocked",
+			"cancelled",
+			"scheduled",
+		];
+		for (const status of statuses) {
+			const badge = section.locator(`[data-slot='status-badge'][data-status='${status}']`);
+			await expect(badge).toBeVisible();
+			await expect(badge).toHaveAttribute("role", "status");
+			await expect(badge.locator(`[data-status-glyph='${status}']`)).toBeVisible();
+		}
+	});
+
+	test("avatar exposes sized fallbacks and renders fallback for missing image", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='avatar']");
+		const avatars = section.locator("[data-slot='avatar']");
+		await expect(avatars).toHaveCount(6);
+		await expect(section.locator("[data-slot='avatar'][data-size='xs']")).toHaveCount(1);
+		await expect(section.locator("[data-slot='avatar'][data-size='md']")).toHaveCount(2);
+		await expect(section.locator("[data-slot='avatar-fallback']").nth(0)).toBeVisible();
+	});
+
+	test("chip removes itself when the remove control fires", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='chip']");
+		await expect(section.locator("[data-slot='chip']")).toHaveCount(6);
+		const removable = section.locator("[data-slot='chip'][data-removable='true']");
+		await expect(removable).toBeVisible();
+		await removable.locator("[data-slot='chip-remove']").click();
+		await expect(removable).toHaveCount(0);
+		await expect(section.locator("[data-design-kit-chip-removed]")).toBeVisible();
+	});
+
+	test("kbd renders monospace key hints", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='kbd']");
+		await expect(section.locator("[data-slot='kbd']")).toHaveCount(5);
+		await expect(section).toContainText("⌘");
+	});
+
+	test("progress updates aria-valuenow and increments via the +10 control", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='progress']");
+		const progress = section.locator("[data-design-kit-progress]");
+		await expect(progress).toHaveAttribute("aria-valuenow", "42");
+		await section.locator("[data-design-kit-progress-step]").click();
+		await expect(progress).toHaveAttribute("aria-valuenow", "52");
+		await expect(section.locator("[data-design-kit-progress-value]")).toContainText("52%");
+	});
+
+	test("skeleton renders text/rect/circle shapes with role=status", async ({ page }) => {
+		await openDesignKit(page);
+		const section = page.locator("[data-design-kit-section='skeleton']");
+		await expect(section.locator("[data-slot='skeleton'][data-shape='text']")).toBeVisible();
+		await expect(section.locator("[data-slot='skeleton'][data-shape='rect']")).toBeVisible();
+		await expect(section.locator("[data-slot='skeleton'][data-shape='circle']")).toBeVisible();
+		await expect(section.locator("[data-slot='skeleton-line']")).toHaveCount(3);
+	});
+
 	test("select opens, selects an option, and reflects the value", async ({ page }) => {
 		await openDesignKit(page);
 		const trigger = page.locator("[data-design-kit-select-trigger]");

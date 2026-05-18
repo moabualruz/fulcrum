@@ -90,3 +90,50 @@ export type {
 	SelectItemProps,
 	SelectValueProps,
 } from "./components/select/index.js";
+export {
+	Badge,
+	Root as BadgeRoot,
+	badgeVariants,
+} from "./components/badge/index.js";
+export type { BadgeProps, BadgeVariant, BadgeSize } from "./components/badge/index.js";
+export {
+	StatusBadge,
+	Root as StatusBadgeRoot,
+} from "./components/status-badge/index.js";
+export type { StatusBadgeProps, WorkflowStatus } from "./components/status-badge/index.js";
+export {
+	Avatar,
+	AvatarImage,
+	AvatarFallback,
+	Root as AvatarRoot,
+	Image as AvatarImageRoot,
+	Fallback as AvatarFallbackRoot,
+	avatarVariants,
+} from "./components/avatar/index.js";
+export type {
+	AvatarProps,
+	AvatarSize,
+	AvatarImageProps,
+	AvatarFallbackProps,
+} from "./components/avatar/index.js";
+export {
+	Chip,
+	Root as ChipRoot,
+	chipVariants,
+} from "./components/chip/index.js";
+export type { ChipProps, ChipTone } from "./components/chip/index.js";
+export {
+	Kbd,
+	Root as KbdRoot,
+} from "./components/kbd/index.js";
+export type { KbdProps } from "./components/kbd/index.js";
+export {
+	Progress,
+	Root as ProgressRoot,
+} from "./components/progress/index.js";
+export type { ProgressProps } from "./components/progress/index.js";
+export {
+	Skeleton,
+	Root as SkeletonRoot,
+} from "./components/skeleton/index.js";
+export type { SkeletonProps, SkeletonShape } from "./components/skeleton/index.js";

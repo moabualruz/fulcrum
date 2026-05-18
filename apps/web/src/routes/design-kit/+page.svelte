@@ -9,7 +9,19 @@
 		SelectContent,
 		SelectItem,
 		SelectValue,
+		Badge,
+		StatusBadge,
+		Avatar,
+		AvatarImage,
+		AvatarFallback,
+		Chip,
+		Kbd,
+		Progress,
+		Skeleton,
 	} from "@fulcrum/ui-kit";
+
+	let progressValue = $state(42);
+	let chipRemoved = $state(false);
 
 	let agreeChecked = $state(false);
 	let alphaChecked = $state(true);
@@ -137,6 +149,125 @@
 				<p class="text-xs text-muted-foreground" data-design-kit-select-value>
 					Selected: {selectValue ?? "—"}
 				</p>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="badge"
+		>
+			<h2 class="text-lg font-semibold">Badge</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<Badge variant="default">Default</Badge>
+				<Badge variant="accent">Accent</Badge>
+				<Badge variant="success">Success</Badge>
+				<Badge variant="warning">Warning</Badge>
+				<Badge variant="destructive">Destructive</Badge>
+				<Badge variant="outline">Outline</Badge>
+				<Badge variant="default" size="sm">sm</Badge>
+				<Badge variant="default" size="lg">lg</Badge>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="status-badge"
+		>
+			<h2 class="text-lg font-semibold">StatusBadge</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<StatusBadge status="queued" />
+				<StatusBadge status="running" />
+				<StatusBadge status="waiting-input" />
+				<StatusBadge status="paused" />
+				<StatusBadge status="completed" />
+				<StatusBadge status="failed" />
+				<StatusBadge status="blocked" />
+				<StatusBadge status="cancelled" />
+				<StatusBadge status="scheduled" />
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="avatar"
+		>
+			<h2 class="text-lg font-semibold">Avatar</h2>
+			<div class="flex flex-wrap items-center gap-3">
+				<Avatar size="xs"><AvatarFallback>JD</AvatarFallback></Avatar>
+				<Avatar size="sm"><AvatarFallback>SM</AvatarFallback></Avatar>
+				<Avatar size="md"><AvatarFallback>MK</AvatarFallback></Avatar>
+				<Avatar size="lg"><AvatarFallback>NC</AvatarFallback></Avatar>
+				<Avatar size="xl"><AvatarFallback>AL</AvatarFallback></Avatar>
+				<Avatar size="md">
+					<AvatarImage src="https://example.invalid/missing.png" alt="Missing" />
+					<AvatarFallback>RX</AvatarFallback>
+				</Avatar>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="chip"
+		>
+			<h2 class="text-lg font-semibold">Chip</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<Chip tone="neutral">label</Chip>
+				<Chip tone="accent">accent</Chip>
+				<Chip tone="success">success</Chip>
+				<Chip tone="warning">warning</Chip>
+				<Chip tone="destructive">danger</Chip>
+				{#if !chipRemoved}
+					<Chip tone="neutral" removable onremove={() => (chipRemoved = true)}>
+						removable
+					</Chip>
+				{:else}
+					<span class="text-xs text-muted-foreground" data-design-kit-chip-removed>chip removed</span>
+				{/if}
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="kbd"
+		>
+			<h2 class="text-lg font-semibold">Kbd</h2>
+			<div class="flex flex-wrap items-center gap-2 text-sm">
+				<span class="flex items-center gap-1">Save <Kbd>⌘</Kbd><Kbd>S</Kbd></span>
+				<span class="flex items-center gap-1">Open palette <Kbd>⌘</Kbd><Kbd>K</Kbd></span>
+				<span class="flex items-center gap-1">Esc <Kbd>esc</Kbd></span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="progress"
+		>
+			<h2 class="text-lg font-semibold">Progress</h2>
+			<div class="grid gap-3 sm:max-w-md">
+				<Progress value={progressValue} label="Indexing repositories" data-design-kit-progress />
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="rounded-md border border-border px-2 py-1 text-xs"
+						data-design-kit-progress-step
+						onclick={() => (progressValue = Math.min(100, progressValue + 10))}
+					>+10</button>
+					<span class="text-xs text-muted-foreground" data-design-kit-progress-value>
+						{progressValue}%
+					</span>
+				</div>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="skeleton"
+		>
+			<h2 class="text-lg font-semibold">Skeleton</h2>
+			<div class="grid gap-4 sm:grid-cols-3">
+				<Skeleton shape="text" lines={3} />
+				<Skeleton shape="rect" height="4rem" />
+				<Skeleton shape="circle" width="3rem" />
 			</div>
 		</article>
 	</section>
