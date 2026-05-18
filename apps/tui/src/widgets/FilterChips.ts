@@ -43,7 +43,7 @@ export class FilterChips {
     if (this._chips.length === 0) return "";
     return this._chips
       .map((chip, i) => {
-        const label = ` ${chip} `;
+        const label = `> ${chip} <`;
         return i === this._focusedIndex
           ? pc.inverse(label)
           : pc.dim("[") + chip + pc.dim("]");
