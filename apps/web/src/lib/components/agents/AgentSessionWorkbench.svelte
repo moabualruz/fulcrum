@@ -128,6 +128,17 @@
     if (kind === "remove") return "-";
     return " ";
   }
+
+  function permissionOptionClass(optionId: string, kind: string): string {
+    const normalized = `${optionId} ${kind}`.toLowerCase();
+    if (normalized.includes("deny") || normalized.includes("cancel")) {
+      return "option-deny border-rose-500/60 bg-rose-500/10 text-rose-700 hover:bg-rose-500/20 dark:text-rose-300";
+    }
+    if (normalized.includes("always")) {
+      return "option-allow-always border-emerald-500/60 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300";
+    }
+    return "option-allow-once border-emerald-500/60 bg-emerald-600 text-white hover:bg-emerald-700";
+  }
 </script>
 
 <section
@@ -373,18 +384,63 @@
   </div>
 
   {#if model.permission}
-    <div data-session-permission data-permission-dialog class={cn("mt-4 rounded-md border border-border p-3")}>
-      <h3 class={cn("text-sm font-medium")}>{model.permission.toolCall.title}</h3>
-      <div class={cn("mt-2 flex flex-wrap gap-2")}>
-        {#each model.permission.options as option}
-          <form method="POST" action="?/resolvePermission">
-            <input type="hidden" name="sessionId" value={model.permission.sessionId} />
-            <input type="hidden" name="optionId" value={option.optionId} />
-            <button type="submit" data-permission-option={option.optionId} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-              {option.name}
-            </button>
-          </form>
-        {/each}
+    <div data-session-permission data-permission-backdrop class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm")}>
+      <div
+        data-permission-dialog
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="permission-title"
+        class={cn("max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-background p-4 shadow-xl")}
+      >
+        <div class={cn("space-y-2 border-b border-border pb-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Permission required</p>
+          <h3 id="permission-title" class={cn("text-base font-semibold")}>{model.permission.toolCall.title}</h3>
+          <p class={cn("text-sm text-muted-foreground")}>
+            AI Assist is requesting approval before running this {model.permission.toolCall.kind} action.
+          </p>
+        </div>
+
+        <dl class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("grid grid-cols-[7rem_1fr] gap-2")}>
+            <dt class={cn("text-muted-foreground")}>Tool kind</dt>
+            <dd data-permission-tool-kind>{model.permission.toolCall.kind}</dd>
+          </div>
+          <div class={cn("grid grid-cols-[7rem_1fr] gap-2")}>
+            <dt class={cn("text-muted-foreground")}>Session</dt>
+            <dd class={cn("truncate")}>{model.permission.sessionId}</dd>
+          </div>
+        </dl>
+
+        {#if model.permission.toolCall.locations?.length}
+          <div data-permission-paths class={cn("mt-3 rounded-md border border-border p-2")}>
+            <h4 class={cn("text-xs font-medium text-muted-foreground")}>Affected files</h4>
+            <ul class={cn("mt-1 space-y-1 text-xs")}>
+              {#each model.permission.toolCall.locations as location}
+                <li class={cn("truncate font-mono")}>{location.path}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
+        <p data-permission-timeout-policy class={cn("mt-3 text-xs text-muted-foreground")}>
+          No timeout. This waits for your decision and closes automatically if the session ends.
+        </p>
+
+        <div class={cn("mt-4 grid gap-2 sm:grid-cols-2")}>
+          {#each model.permission.options as option}
+            <form method="POST" action="?/resolvePermission">
+              <input type="hidden" name="sessionId" value={model.permission.sessionId} />
+              <input type="hidden" name="optionId" value={option.optionId} />
+              <button
+                type="submit"
+                data-permission-option={option.optionId}
+                class={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full justify-center", permissionOptionClass(option.optionId, option.kind))}
+              >
+                {option.name}
+              </button>
+            </form>
+          {/each}
+        </div>
       </div>
     </div>
   {/if}

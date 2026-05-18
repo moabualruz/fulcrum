@@ -27,7 +27,21 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain('data-session-mode="planning" data-selected="true"');
     expect(body).toContain('data-session-model="gpt-5.5" data-selected="true"');
     expect(body).toContain("data-session-permission");
+    expect(body).toContain("data-permission-backdrop");
+    expect(body).toContain('role="dialog"');
+    expect(body).toContain('aria-modal="true"');
+    expect(body).toContain("Permission required");
+    expect(body).toContain("data-permission-tool-kind");
+    expect(body).toContain("data-permission-paths");
+    expect(body).toContain("services/planning-review/src/application/planning-workflow.ts");
+    expect(body).toContain("data-permission-timeout-policy");
     expect(body).toContain('data-permission-option="allow_once"');
+    expect(body).toContain('data-permission-option="allow_always"');
+    expect(body).toContain('data-permission-option="deny"');
+    expect(body).toContain('data-permission-option="cancel"');
+    expect(body).toContain("option-allow-once");
+    expect(body).toContain("option-allow-always");
+    expect(body).toContain("option-deny");
     expect(body).toContain("data-session-resume");
     expect(body).toContain('data-resume-session="row-2"');
     expect(body).toContain("data-traffic-filter");
@@ -143,8 +157,19 @@ function activeModel(): SessionWorkbenchModel {
     },
     permission: {
       sessionId: "agent-session-1",
-      toolCall: { toolCallId: "tool-2", title: "Write file", kind: "write", status: "pending" },
-      options: [{ optionId: "allow_once", kind: "allow", name: "Allow once" }],
+      toolCall: {
+        toolCallId: "tool-2",
+        title: "Write file",
+        kind: "write",
+        status: "pending",
+        locations: [{ path: "services/planning-review/src/application/planning-workflow.ts" }],
+      },
+      options: [
+        { optionId: "allow_once", kind: "allow", name: "Allow Once" },
+        { optionId: "allow_always", kind: "allow", name: "Allow Always" },
+        { optionId: "deny", kind: "deny", name: "Deny" },
+        { optionId: "cancel", kind: "cancel", name: "Cancel" },
+      ],
     },
     traffic: {
       entries: [
