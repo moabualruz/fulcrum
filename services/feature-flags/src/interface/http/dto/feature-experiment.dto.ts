@@ -12,3 +12,12 @@ export class FeatureExperimentParamsDto {
 export class FeatureExperimentMetricsQueryDto {
   conversionKind!: string;
 }
+
+export class FeatureExperimentAssignmentDto {
+  userId!: string;
+}
+
+export class FeatureExperimentConversionDto {
+  userId!: string;
+  conversionKind!: string;
+}

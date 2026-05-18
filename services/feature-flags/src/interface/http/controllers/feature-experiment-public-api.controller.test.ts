@@ -9,6 +9,8 @@ import { validateSync } from "class-validator";
 import { AppModule } from "@fulcrum/server/app.module.ts";
 import { ExperimentStore } from "@feature-flags/application/experiments.ts";
 import {
+  FeatureExperimentAssignmentDto,
+  FeatureExperimentConversionDto,
   FeatureExperimentCreateDto,
   FeatureExperimentMetricsQueryDto,
   FeatureExperimentParamsDto,
@@ -33,6 +35,12 @@ describe("feature experiment public Nest API", () => {
     expect(Reflect.getMetadata(METHOD_METADATA, FeatureExperimentPublicApiController.prototype.create)).toBe(
       RequestMethod.POST,
     );
+    expect(Reflect.getMetadata(METHOD_METADATA, FeatureExperimentPublicApiController.prototype.assign)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, FeatureExperimentPublicApiController.prototype.recordConversion)).toBe(
+      RequestMethod.POST,
+    );
   });
 
   test("hides routes when public API or experiment feature is off", async () => {
@@ -55,8 +63,11 @@ describe("feature experiment public Nest API", () => {
       variants: ["control", "dense"],
       rolloutPercent: 100,
     });
-    const assigned = store.assign(experiment.id, "user-1");
-    if (assigned) store.recordConversion(experiment.id, "user-1", "task.created");
+    const assigned = await controller.assign({ experimentId: experiment.id }, { userId: "user-1" });
+    await expect(controller.recordConversion(
+      { experimentId: experiment.id },
+      { userId: "user-1", conversionKind: "task.created" },
+    )).resolves.toEqual({ ok: true });
 
     await expect(controller.list()).resolves.toEqual([experiment]);
     await expect(controller.assignments({ experimentId: experiment.id })).resolves.toEqual({
@@ -76,6 +87,12 @@ describe("feature experiment public Nest API", () => {
       },
     });
     await expect(controller.assignments({ experimentId: "missing" })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.assign({ experimentId: "missing" }, { userId: "user-1" }))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(controller.recordConversion(
+      { experimentId: "missing" },
+      { userId: "user-1", conversionKind: "task.created" },
+    )).rejects.toBeInstanceOf(NotFoundException);
   });
 
   test("keeps request validation at the Nest boundary", () => {
@@ -90,6 +107,11 @@ describe("feature experiment public Nest API", () => {
       rolloutPercent: 101,
     });
     const params = Object.assign(new FeatureExperimentParamsDto(), { experimentId: "exp-1" });
+    const assignment = Object.assign(new FeatureExperimentAssignmentDto(), { userId: "user-1" });
+    const conversion = Object.assign(new FeatureExperimentConversionDto(), {
+      userId: "user-1",
+      conversionKind: "task.created",
+    });
     const metrics = Object.assign(new FeatureExperimentMetricsQueryDto(), { conversionKind: "task.created" });
 
     expect(validateSync(create)).toEqual([]);
@@ -99,6 +121,8 @@ describe("feature experiment public Nest API", () => {
       "rolloutPercent",
     ]);
     expect(validateSync(params)).toEqual([]);
+    expect(validateSync(assignment)).toEqual([]);
+    expect(validateSync(conversion)).toEqual([]);
     expect(validateSync(metrics)).toEqual([]);
   });
 });
