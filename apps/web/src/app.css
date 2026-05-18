@@ -64,6 +64,12 @@
 }
 
 :root {
+  --fulcrum-safe-area-top: max(env(safe-area-inset-top, 0px), 24px);
+  --fulcrum-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 48px);
+  --fulcrum-safe-area-left: max(env(safe-area-inset-left, 0px), 0px);
+  --fulcrum-safe-area-right: max(env(safe-area-inset-right, 0px), 0px);
+  --fulcrum-gesture-zone-bottom: max(env(safe-area-inset-bottom, 0px), 48px);
+  --fulcrum-gesture-zone-inline: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 0px);
   --surface: oklch(0.99 0.002 270);
   --surface-elevated: oklch(1 0 270);
   --surface-sunken: oklch(0.97 0.003 270);
@@ -124,6 +130,13 @@
   --sidebar-accent-foreground: var(--fg);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  :root {
+    --fulcrum-gesture-zone-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+    --fulcrum-gesture-zone-inline: max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 48px);
+  }
 }
 
 .dark,
@@ -245,6 +258,8 @@
   }
 	body {
 		@apply bg-background text-foreground;
+		padding-left: var(--fulcrum-safe-area-left);
+		padding-right: var(--fulcrum-safe-area-right);
   }
 	html {
 		@apply font-sans;

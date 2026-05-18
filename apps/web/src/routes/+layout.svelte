@@ -178,7 +178,7 @@
 				<AppSidebar activeProjectId={data.activeProjectId} />
 			</Sheet.Content>
 			<div class={cn("flex min-w-0 flex-1 flex-col")}>
-				<div class={cn("flex items-center")}>
+				<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
 					<Sheet.Trigger
 						data-mobile-sheet-trigger
 						aria-label="Open navigation menu"
@@ -198,7 +198,7 @@
 						/>
 					</div>
 				</div>
-				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
+				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(1.5rem+var(--fulcrum-gesture-zone-bottom))]")}>
 					{@render children?.()}
 				</main>
 			</div>

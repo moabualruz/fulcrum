@@ -28,6 +28,10 @@ _Avoid_: Header, topbar, navbar, toolbar.
 The 44px bottom strip mirroring the TUI footer; carries mode pill, profile, branch, run id, agent, MCP health, TraceBadge, clock, and the right-most AI Assist trigger segment.
 _Avoid_: Status bar, footer (without "Status"), bottom dock.
 
+**AndroidSafeArea**:
+The shared mobile viewport reserve that keeps shell chrome out of Android status bars, bottom gesture zones, and landscape side gesture zones.
+_Avoid_: Device padding, notch padding, spacer.
+
 **AcpDrawer**:
 The 420px right-side slide-over (Cloudflare-overlay pattern) that hosts the live AI Assist session scoped to the current Step. Mobile becomes a bottom sheet.
 _Avoid_: AI panel, chat panel, ACP panel, sidebar drawer, assistant pane.
@@ -73,6 +77,7 @@ _Avoid_: Tour, walkthrough, getting started, wizard.
 - A **ModeAffordance**'s `⊞ Drawer` button opens the **AcpDrawer** auto-scoped to the current **Step** + **Trace**.
 - The **CommandPalette** resolves **Scope**-aware actions; its result set changes when **Scope** changes.
 - The **StatusFooter**'s right-most segment also opens the **AcpDrawer** (`⌘/` from anywhere); both entry points share one drawer instance.
+- **AndroidSafeArea** reserves wrap mobile shell chrome; **StatusFooter**, mobile bottom navigation, and sheets render above gesture zones.
 - The **TraceBadge** appears in **ScopeBar**, **StatusFooter**, **AcpDrawer** header, every error inline, every audit row — same id, four surfaces.
 - A **PortfolioSurface** has no Project Scope; the **StageRail** collapses or swaps to portfolio nav when active.
 - The **OnboardingFlow** starts at `/onboarding`, keeps one trace through signup and workspace setup, then terminates at the Capture **Workbench**; subsequent sessions never re-enter it.
