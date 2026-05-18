@@ -1,6 +1,30 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("build graph doc search", () => {
+	test("shows dependency order, run state, blockers, and execution actions", async ({ page }) => {
+		await page.goto("/build-graph");
+
+		await expect(page.locator("[data-dependency-panel]")).toBeVisible();
+		await expect(page.locator("[data-run-state]")).toContainText("run:ready");
+		await expect(page.locator("[data-dependency-node]")).toHaveCount(4);
+		await expect(page.locator("[data-dependency-order]").first()).toContainText("1");
+		await expect(page.locator("[data-dependency-node][data-task-id='task-build'] [data-dependency-chip]")).toContainText([
+			"task-plan",
+			"doc-kernel-notes",
+		]);
+		await expect(page.locator("[data-dependency-node][data-task-id='task-build'] [data-blocker-row]")).toContainText("Waiting for approval");
+		await expect(page.locator("[data-feedback-row]").first()).toContainText("Run state loaded");
+
+		await page.locator("[data-action-dispatch]").click();
+		await expect(page.locator("[data-run-state]")).toContainText("run:running");
+		await expect(page.locator("[data-dependency-node][data-task-id='task-build'] [data-node-status]")).toContainText("running");
+		await expect(page.locator("[data-feedback-row]").first()).toContainText("dispatch accepted");
+
+		await page.locator("[data-action-cancel]").click();
+		await expect(page.locator("[data-run-state]")).toContainText("run:cancelled");
+		await expect(page.locator("[data-feedback-row]").first()).toContainText("cancel requested");
+	});
+
 	test("renders scoped doc search results with snippets, filters, and graph actions", async ({ page }) => {
 		await page.goto("/build-graph");
 
@@ -38,5 +62,14 @@ test.describe("build graph doc search", () => {
 
 		await page.locator("[data-filter-attachments]").selectOption("with attachments");
 		await expect(page.locator("[data-result-count]")).toContainText("0 visible");
+	});
+
+	test("keeps dependency execution layout inside mobile viewport", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto("/build-graph");
+
+		const overflow = await page.locator("[data-build-graph-search]").evaluate((element) => element.scrollWidth - element.clientWidth);
+		expect(overflow).toBeLessThanOrEqual(1);
+		await expect(page.locator("[data-run-actions]")).toBeVisible();
 	});
 });

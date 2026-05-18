@@ -2,6 +2,8 @@
   import { cn } from "$lib/utils.js";
 
   type DocType = "decision" | "runbook" | "note" | "spec";
+  type DependencyStatus = "done" | "running" | "blocked" | "waiting";
+  type RunState = "ready" | "running" | "cancelled";
 
   interface DocSearchResult {
     id: string;
@@ -20,6 +22,17 @@
       tasks: number;
       runs: number;
     };
+  }
+
+  interface DependencyTask {
+    id: string;
+    order: number;
+    title: string;
+    owner: string;
+    status: DependencyStatus;
+    dependencies: string[];
+    blocker: string;
+    feedback: string;
   }
 
   const RESULTS: DocSearchResult[] = [
@@ -76,6 +89,56 @@
     attachments: ["with attachments", "without attachments"],
   };
 
+  const DEPENDENCY_TASKS: DependencyTask[] = [
+    {
+      id: "task-discovery",
+      order: 1,
+      title: "Confirm source refs",
+      owner: "research",
+      status: "done",
+      dependencies: [],
+      blocker: "",
+      feedback: "3 source refs pinned to planning context",
+    },
+    {
+      id: "task-plan",
+      order: 2,
+      title: "Materialize task breakdown",
+      owner: "pm",
+      status: "running",
+      dependencies: ["task-discovery"],
+      blocker: "",
+      feedback: "6 subtasks generated from accepted scope",
+    },
+    {
+      id: "task-build",
+      order: 3,
+      title: "Dispatch implementation run",
+      owner: "agent-runner",
+      status: "blocked",
+      dependencies: ["task-plan", "doc-kernel-notes"],
+      blocker: "Waiting for approval on risky write action",
+      feedback: "Run paused before filesystem mutation",
+    },
+    {
+      id: "task-verify",
+      order: 4,
+      title: "Verify and report",
+      owner: "qa",
+      status: "waiting",
+      dependencies: ["task-build"],
+      blocker: "Dependency run has not completed",
+      feedback: "No verification feedback yet",
+    },
+  ];
+
+  const STATUS_COPY: Record<DependencyStatus, string> = {
+    done: "done",
+    running: "running",
+    blocked: "blocked",
+    waiting: "waiting",
+  };
+
   let selectedProject = $state("fulcrum");
   let selectedTask = $state("");
   let selectedRun = $state("");
@@ -85,6 +148,15 @@
   let planningContext = $state<string[]>([]);
   let copiedLink = $state("");
   let revealedTreeNode = $state("");
+  let runState = $state<RunState>("ready");
+  let dependencyTasks = $state<DependencyTask[]>(DEPENDENCY_TASKS);
+  let runFeedback = $state([
+    "Run state loaded from dependency execution API snapshot",
+    "Blocked node task-build explains approval gate before write",
+  ]);
+
+  const blockedTasks = $derived(dependencyTasks.filter((task) => task.blocker));
+  const activeTask = $derived(dependencyTasks.find((task) => task.status === "running") ?? dependencyTasks[0]);
 
   const filteredResults = $derived.by(() => RESULTS.filter((result) =>
     (!selectedProject || result.project === selectedProject)
@@ -115,26 +187,108 @@
     selectedOwner = "";
     selectedAttachment = "";
   }
+
+  function dispatchDependencyRun(): void {
+    runState = "running";
+    dependencyTasks = dependencyTasks.map((task) => task.id === "task-build"
+      ? { ...task, status: "running", blocker: "", feedback: "Dependency run dispatched after approval" }
+      : task);
+    runFeedback = ["dispatch accepted: run-dependency-042", ...runFeedback];
+  }
+
+  function retryBlockedRun(): void {
+    runState = "running";
+    dependencyTasks = dependencyTasks.map((task) => task.status === "blocked"
+      ? { ...task, status: "running", blocker: "", feedback: "Retry queued with original dependency order" }
+      : task);
+    runFeedback = ["retry queued for blocked dependency node", ...runFeedback];
+  }
+
+  function cancelDependencyRun(): void {
+    runState = "cancelled";
+    runFeedback = ["cancel requested: downstream waiting nodes held", ...runFeedback];
+  }
 </script>
 
 <svelte:head>
-  <title>Build graph search</title>
+  <title>Build graph</title>
 </svelte:head>
 
-<main data-build-graph-search class={cn("min-h-screen bg-background text-foreground")}>
-  <div class={cn("mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 lg:px-6")}>
+<main data-build-graph-search class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}>
+  <div class={cn("mx-auto flex max-w-7xl min-w-0 flex-col gap-4 px-4 py-5 lg:px-6")}>
     <header data-build-graph-header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
       <div>
         <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Build graph</p>
-        <h1 class={cn("text-2xl font-semibold tracking-normal")}>Doc search</h1>
+        <h1 class={cn("text-2xl font-semibold tracking-normal")}>Task dependency execution</h1>
         <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
-          Search scoped documents, inspect graph counts, and collect source refs before planning.
+          Inspect execution order, run state, blockers, feedback, and source refs before dispatch.
         </p>
       </div>
       <div data-permission-copy class={cn("rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground")}>
         Permissions filter before results render. Unauthorized titles stay hidden.
       </div>
     </header>
+
+    <section data-dependency-panel class={cn("grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]")}>
+      <div class={cn("min-w-0 rounded-md border border-border bg-card")}>
+        <div class={cn("flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2")}>
+          <div>
+            <h2 class={cn("text-sm font-semibold")}>Dependency order</h2>
+            <p class={cn("mt-0.5 text-xs text-muted-foreground")}>Current active node: {activeTask.title}</p>
+          </div>
+          <span data-run-state class={cn("rounded-sm border border-border bg-muted px-2 py-1 text-xs font-medium")}>run:{runState}</span>
+        </div>
+
+        <div class={cn("grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-4")}>
+          {#each dependencyTasks as task (task.id)}
+            <article data-dependency-node data-task-id={task.id} class={cn("min-w-0 rounded-sm border border-border bg-background p-3")}>
+              <div class={cn("flex items-start justify-between gap-2")}>
+                <span data-dependency-order class={cn("grid size-7 shrink-0 place-items-center rounded-sm bg-muted text-xs font-semibold")}>{task.order}</span>
+                <span data-node-status class={cn(
+                  "rounded-sm border px-1.5 py-0.5 text-xs",
+                  task.status === "done" && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300",
+                  task.status === "running" && "border-sky-500/40 text-sky-700 dark:text-sky-300",
+                  task.status === "blocked" && "border-destructive/50 text-destructive",
+                  task.status === "waiting" && "border-border text-muted-foreground",
+                )}>{STATUS_COPY[task.status]}</span>
+              </div>
+              <h3 class={cn("mt-3 text-sm font-semibold leading-tight")}>{task.title}</h3>
+              <p class={cn("mt-1 text-xs text-muted-foreground")}>owner:{task.owner}</p>
+              <div data-dependency-edges class={cn("mt-3 flex flex-wrap gap-1")}>
+                {#if task.dependencies.length === 0}
+                  <span class={cn("rounded-xs bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>root</span>
+                {:else}
+                  {#each task.dependencies as dependency}
+                    <span data-dependency-chip class={cn("max-w-full break-all rounded-xs bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>{dependency}</span>
+                  {/each}
+                {/if}
+              </div>
+              <p data-node-feedback class={cn("mt-3 text-xs text-muted-foreground")}>{task.feedback}</p>
+              {#if task.blocker}
+                <p data-blocker-row class={cn("mt-2 rounded-sm border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive")}>{task.blocker}</p>
+              {/if}
+            </article>
+          {/each}
+        </div>
+      </div>
+
+      <aside data-run-feedback-panel class={cn("space-y-3 rounded-md border border-border bg-card p-3")}>
+        <div>
+          <h2 class={cn("text-sm font-semibold")}>Execution feedback</h2>
+          <p class={cn("mt-1 text-xs text-muted-foreground")}>{blockedTasks.length} blockers visible before dispatch.</p>
+        </div>
+        <div data-run-actions class={cn("grid gap-2 sm:grid-cols-3")}>
+          <button data-action-dispatch type="button" onclick={dispatchDependencyRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Dispatch</button>
+          <button data-action-retry type="button" onclick={retryBlockedRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Retry</button>
+          <button data-action-cancel type="button" onclick={cancelDependencyRun} class={cn("min-w-0 rounded-sm border border-border px-2 py-1.5 text-xs font-medium hover:bg-muted")}>Cancel</button>
+        </div>
+        <div class={cn("space-y-2")}>
+          {#each runFeedback as feedback}
+            <p data-feedback-row class={cn("rounded-sm bg-muted px-2 py-1.5 text-xs text-muted-foreground")}>{feedback}</p>
+          {/each}
+        </div>
+      </aside>
+    </section>
 
     <section data-search-toolbar class={cn("grid gap-3 rounded-md border border-border bg-card p-3 lg:grid-cols-[minmax(280px,1fr)_auto]")}>
       <label class={cn("text-sm font-medium")}>
