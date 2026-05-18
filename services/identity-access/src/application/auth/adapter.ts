@@ -18,7 +18,16 @@
  */
 
 import { Injectable } from "@nestjs/common";
-import type { EntityManager } from "typeorm";
+import {
+  In,
+  LessThan,
+  LessThanOrEqual,
+  Like,
+  MoreThan,
+  MoreThanOrEqual,
+  Not,
+  type EntityManager,
+} from "typeorm";
 import type { CustomAdapter, CleanedWhere, JoinConfig } from "@better-auth/core/db/adapter";
 
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
@@ -57,34 +66,34 @@ function buildWhere(
         query[field] = value;
         break;
       case "ne":
-        query[field] = { $ne: value };
+        query[field] = Not(value);
         break;
       case "lt":
-        query[field] = { $lt: value };
+        query[field] = LessThan(value);
         break;
       case "lte":
-        query[field] = { $lte: value };
+        query[field] = LessThanOrEqual(value);
         break;
       case "gt":
-        query[field] = { $gt: value };
+        query[field] = MoreThan(value);
         break;
       case "gte":
-        query[field] = { $gte: value };
+        query[field] = MoreThanOrEqual(value);
         break;
       case "in":
-        query[field] = { $in: value as unknown[] };
+        query[field] = In(value as unknown[]);
         break;
       case "not_in":
-        query[field] = { $nin: value as unknown[] };
+        query[field] = Not(In(value as unknown[]));
         break;
       case "contains":
-        query[field] = { $like: `%${value}%` };
+        query[field] = Like(`%${value}%`);
         break;
       case "starts_with":
-        query[field] = { $like: `${value}%` };
+        query[field] = Like(`${value}%`);
         break;
       case "ends_with":
-        query[field] = { $like: `%${value}` };
+        query[field] = Like(`%${value}`);
         break;
       default:
         query[field] = value;
@@ -404,7 +413,7 @@ export class TypeOrmBetterAuthAdapter {
         query["orgId"] = DEFAULT_ORG_ID;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const user = await em.findOne(User, query as any);
+      const user = await em.findOne(User, { where: query as never });
       if (!user) return null;
       const output = this.mapUserToBetterAuth(user);
       if (join?.account) {
@@ -422,7 +431,7 @@ export class TypeOrmBetterAuthAdapter {
         delete query["token"];
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const session = await em.findOne(Session, query as any);
+      const session = await em.findOne(Session, { where: query as never });
       if (!session) return null;
       const output = this.mapSessionToBetterAuth(session);
       if (join?.user) {
@@ -435,7 +444,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "member") {
       const query = buildWhere(where, MEMBER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const member = await em.findOne(OrgMember, query as any);
+      const member = await em.findOne(OrgMember, { where: query as never });
       if (!member) return null;
       return this.mapMemberToBetterAuth(member) as unknown as T;
     }
@@ -443,7 +452,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "invitation") {
       const query = buildWhere(where, INVITATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inv = await em.findOne(Invitation, query as any);
+      const inv = await em.findOne(Invitation, { where: query as never });
       if (!inv) return null;
       return this.mapInvitationToBetterAuth(inv) as unknown as T;
     }
@@ -451,7 +460,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "account") {
       const query = buildWhere(where, ACCOUNT_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const account = await em.findOne(Account, query as any);
+      const account = await em.findOne(Account, { where: query as never });
       if (!account) return null;
       return this.mapAccountToBetterAuth(account) as unknown as T;
     }
@@ -459,7 +468,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "verification") {
       const query = buildWhere(where, VERIFICATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const verification = await em.findOne(Verification, query as any);
+      const verification = await em.findOne(Verification, { where: query as never });
       if (!verification) return null;
       return this.mapVerificationToBetterAuth(verification) as unknown as T;
     }
@@ -557,7 +566,7 @@ export class TypeOrmBetterAuthAdapter {
       const query = buildWhere(where, USER_FIELD_MAP);
       if (!query["orgId"] && query["email"]) query["orgId"] = DEFAULT_ORG_ID;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const user = await em.findOne(User, query as any);
+      const user = await em.findOne(User, { where: query as never });
       if (!user) return null;
       const mapped = this.mapUserFromBetterAuth(upd);
       Object.assign(user, mapped);
@@ -569,7 +578,7 @@ export class TypeOrmBetterAuthAdapter {
       const query = buildWhere(where, SESSION_FIELD_MAP);
       if (query["token"]) { query["id"] = query["token"]; delete query["token"]; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const session = await em.findOne(Session, query as any);
+      const session = await em.findOne(Session, { where: query as never });
       if (!session) return null;
       const mapped = this.mapSessionFromBetterAuth(upd);
       Object.assign(session, mapped);
@@ -580,7 +589,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "member") {
       const query = buildWhere(where, MEMBER_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const member = await em.findOne(OrgMember, query as any);
+      const member = await em.findOne(OrgMember, { where: query as never });
       if (!member) return null;
       const mapped = this.mapMemberFromBetterAuth(upd);
       Object.assign(member, mapped);
@@ -591,7 +600,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "invitation") {
       const query = buildWhere(where, INVITATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inv = await em.findOne(Invitation, query as any);
+      const inv = await em.findOne(Invitation, { where: query as never });
       if (!inv) return null;
       const mapped = this.mapInvitationFromBetterAuth(upd);
       Object.assign(inv, mapped);
@@ -602,7 +611,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "account") {
       const query = buildWhere(where, ACCOUNT_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const account = await em.findOne(Account, query as any);
+      const account = await em.findOne(Account, { where: query as never });
       if (!account) return null;
       const mapped = this.mapAccountFromBetterAuth(upd);
       Object.assign(account, mapped);
@@ -613,7 +622,7 @@ export class TypeOrmBetterAuthAdapter {
     if (model === "verification") {
       const query = buildWhere(where, VERIFICATION_FIELD_MAP);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const verification = await em.findOne(Verification, query as any);
+      const verification = await em.findOne(Verification, { where: query as never });
       if (!verification) return null;
       const mapped = this.mapVerificationFromBetterAuth(upd);
       Object.assign(verification, mapped);

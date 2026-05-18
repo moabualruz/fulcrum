@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { createTestOrm } from "@test-support/application-database.ts";
+import { applicationMigrations, getCoreEntities } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import {
+  buildFulcrumTypeOrmOptions,
+  createFulcrumTypeOrmDataSource,
+} from "@platform-core/infrastructure/database/typeorm-data-source.ts";
+import { startTemporaryPostgres } from "@test-support/temporary-postgres.ts";
 import {
   checkPasskeyAvailability,
   generateAuthenticationOptions,
@@ -462,6 +468,55 @@ describe("passkey WebAuthn helpers", () => {
       expect(await store4.getChallenge({ challengeId: userId, purpose: "registration" })).toBeNull();
     } finally {
       await db.close();
+    }
+  });
+
+  test("TypeOrmPasskeyStore persists passkey state on PostgreSQL", async () => {
+    const postgres = await startTemporaryPostgres();
+    const dataSource = createFulcrumTypeOrmDataSource(
+      buildFulcrumTypeOrmOptions({
+        source: "postgres",
+        url: postgres.url,
+        entities: getCoreEntities(),
+        migrations: applicationMigrations,
+      }),
+    );
+
+    try {
+      await dataSource.initialize();
+      await dataSource.runMigrations({ transaction: "none" });
+      const store = new TypeOrmPasskeyStore(dataSource.manager);
+      const userId = "postgres-passkey-user";
+      await store.saveChallenge({
+        challengeId: userId,
+        purpose: "authentication",
+        challenge: "postgres-challenge",
+        userId,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        expiresAt: new Date("2026-01-01T00:05:00.000Z"),
+      });
+      await store.saveCredential({
+        id: "postgres-credential",
+        userId,
+        publicKey: new Uint8Array([9, 8, 7]),
+        counter: 5,
+        transports: ["hybrid"],
+        userVerificationRequired: true,
+      });
+
+      expect(await store.getChallenge({ challengeId: userId, purpose: "authentication" }))
+        .toMatchObject({ challenge: "postgres-challenge", userId });
+      expect(await store.getCredentialById("postgres-credential")).toMatchObject({
+        userId,
+        counter: 5,
+        transports: ["hybrid"],
+        userVerificationRequired: true,
+      });
+      await store.updateCredentialCounter("postgres-credential", 6);
+      expect(await store.getCredentialById("postgres-credential")).toMatchObject({ counter: 6 });
+    } finally {
+      if (dataSource.isInitialized) await dataSource.destroy();
+      await postgres.stop();
     }
   });
 
