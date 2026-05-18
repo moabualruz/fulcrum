@@ -3,7 +3,7 @@ import { PGliteDriver } from "typeorm-pglite";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod/v4";
-import { fulcrumHome } from "@platform-core/application/db/database-config.ts";
+import { defaultLocalPgliteDataDir } from "@platform-core/application/db/database-config.ts";
 import { createDataSourceOptions } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
 import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
@@ -20,7 +20,7 @@ export interface TestStore {
 export type TestOrmFixture = TestOrm;
 
 export function productDbDir(): string {
-  return join(fulcrumHome(), "pglite.data");
+  return defaultLocalPgliteDataDir();
 }
 
 const STORE_MODULE_ROOT = "@platform-core/infrastructure/product-store";

@@ -141,7 +141,7 @@ describe("Nest + TypeORM persistence foundation", () => {
 
     expect(resolveFulcrumTypeOrmConnectionTarget({ FULCRUM_HOME: home })).toEqual({
       source: "pglite",
-      dataDir: join(home, "pglite.data"),
+      dataDir: join(home, "db", "main"),
     });
 
     const moduleOptions = await createFulcrumTypeOrmModuleOptions(

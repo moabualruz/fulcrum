@@ -28,7 +28,7 @@ describe("/settings/database/migrations", () => {
         backend: "pglite",
         connection: {
           type: "local-pglite",
-          dataDir: `${process.env["FULCRUM_HOME"]}/pglite.data`,
+          dataDir: `${process.env["FULCRUM_HOME"]}/db/main`,
         },
       },
       status: {

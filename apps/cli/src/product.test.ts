@@ -113,7 +113,9 @@ describe("fulcrum product CLI", () => {
 
     try {
       const firstIo = testIo();
+      const coldStartBeganAt = performance.now();
       await runProduct(["init", "--json"], firstIo.opts);
+      const coldStartMs = performance.now() - coldStartBeganAt;
       const secondIo = testIo();
       await runProduct(["init", "--json"], secondIo.opts);
 
@@ -127,7 +129,8 @@ describe("fulcrum product CLI", () => {
       expect(second.schemaApplied).toEqual(["already-initialized"]);
       expect(first.org.created).toBe(true);
       expect(second.org.created).toBe(false);
-      expect(await exists(join(fulcrumHome, "pglite.data"))).toBe(true);
+      expect(await exists(join(fulcrumHome, "db", "main"))).toBe(true);
+      expect(coldStartMs).toBeLessThan(5_000);
     } finally {
       if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
       else process.env["FULCRUM_HOME"] = prevHome;
@@ -157,7 +160,7 @@ describe("fulcrum product CLI", () => {
         engine: "pglite",
         org: { slug: "local", created: false },
       });
-      expect(await exists(join(fulcrumHome, "pglite.data"))).toBe(true);
+      expect(await exists(join(fulcrumHome, "db", "main"))).toBe(true);
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }

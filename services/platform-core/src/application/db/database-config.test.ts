@@ -9,7 +9,7 @@ describe("database configuration resolver", () => {
       config: {},
     })).toEqual({
       backend: "pglite",
-      dataDir: "/tmp/fulcrum-home/pglite.data",
+      dataDir: "/tmp/fulcrum-home/db/main",
     });
   });
 
@@ -22,7 +22,7 @@ describe("database configuration resolver", () => {
       config: {
         db: {
           backend: "pglite",
-          dataDir: "/tmp/fulcrum-home/pglite.data",
+          dataDir: "/tmp/fulcrum-home/db/main",
         },
       },
     })).toEqual({
@@ -50,7 +50,7 @@ describe("database configuration resolver", () => {
       config: {},
     })).toEqual({
       backend: "pglite",
-      dataDir: "/tmp/fulcrum-home/pglite.data",
+      dataDir: "/tmp/fulcrum-home/db/main",
     });
   });
 

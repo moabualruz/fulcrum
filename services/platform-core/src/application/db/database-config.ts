@@ -31,6 +31,10 @@ export function fulcrumHome(env: Record<string, string | undefined> = process.en
   return env["FULCRUM_HOME"] ?? join(homedir(), ".fulcrum");
 }
 
+export function defaultLocalPgliteDataDir(env: Record<string, string | undefined> = process.env): string {
+  return join(fulcrumHome(env), "db", "main");
+}
+
 function databaseUrlFromEnv(env: Record<string, string | undefined>): string | undefined {
   return env["FULCRUM_DATABASE_URL"] ?? env["DATABASE_URL"];
 }
@@ -97,7 +101,7 @@ export function resolveDatabaseConfig(input: DatabaseConfigInput = {}): Resolved
 
   return {
     backend: "pglite",
-    dataDir: cli.dataDir ?? persisted.dataDir ?? join(fulcrumHome(env), "pglite.data"),
+    dataDir: cli.dataDir ?? persisted.dataDir ?? defaultLocalPgliteDataDir(env),
   };
 }
 

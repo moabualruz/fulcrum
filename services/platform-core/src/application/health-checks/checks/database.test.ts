@@ -29,7 +29,7 @@ describe("database doctor check", () => {
 
     expect(result).toMatchObject({
       status: "warn",
-      message: `local PGlite database not initialised at ${join(home, "pglite.data")}`,
+      message: `local PGlite database not initialised at ${join(home, "db", "main")}`,
     });
   });
 

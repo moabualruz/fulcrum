@@ -44,7 +44,7 @@ describe("legacy DB doctor reports", () => {
     const report = await buildProductKernelDoctorReport();
 
     expect(report.engine).toBe("absent");
-    expect(report.dbPath).toBe(join(process.env.FULCRUM_HOME, "pglite.data"));
+    expect(report.dbPath).toBe(join(process.env.FULCRUM_HOME, "db", "main"));
     expect(report.schemaApplied).toBe(0);
     expect(report.rows).toEqual({ orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 });
     expect(report.latestEventAt).toBeNull();
@@ -52,7 +52,7 @@ describe("legacy DB doctor reports", () => {
 
   test("reads migrated pglite schema counts, latest event, and repo sync stats from real tables", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-doctor-live-home-"));
-    const dataDir = join(home, "pglite.data");
+    const dataDir = join(home, "db", "main");
     process.env.FULCRUM_HOME = home;
     delete process.env.DATABASE_URL;
 
