@@ -72,6 +72,7 @@ export class DocumentPublicApiService {
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
+      editorJson: body.editorJson,
       frontmatter: body.frontmatter,
       parentId: body.parentId,
       sortPosition: body.sortPosition,
@@ -96,6 +97,7 @@ export class DocumentPublicApiService {
       title: body.title,
       docType: body.type,
       bodyMd: body.bodyMd,
+      editorJson: body.editorJson,
       frontmatter: body.frontmatter,
       parentId: body.parentId,
       sortPosition: body.sortPosition,
@@ -598,6 +600,8 @@ IsOptional()(DocumentCreateBodyDto.prototype, "bodyMd");
 IsString()(DocumentCreateBodyDto.prototype, "bodyMd");
 IsOptional()(DocumentCreateBodyDto.prototype, "frontmatter");
 IsObject()(DocumentCreateBodyDto.prototype, "frontmatter");
+IsOptional()(DocumentCreateBodyDto.prototype, "editorJson");
+IsObject()(DocumentCreateBodyDto.prototype, "editorJson");
 IsOptional()(DocumentCreateBodyDto.prototype, "parentId");
 IsString()(DocumentCreateBodyDto.prototype, "parentId");
 IsOptional()(DocumentCreateBodyDto.prototype, "sortPosition");
@@ -612,6 +616,8 @@ IsOptional()(DocumentPatchBodyDto.prototype, "bodyMd");
 IsString()(DocumentPatchBodyDto.prototype, "bodyMd");
 IsOptional()(DocumentPatchBodyDto.prototype, "frontmatter");
 IsObject()(DocumentPatchBodyDto.prototype, "frontmatter");
+IsOptional()(DocumentPatchBodyDto.prototype, "editorJson");
+IsObject()(DocumentPatchBodyDto.prototype, "editorJson");
 IsOptional()(DocumentPatchBodyDto.prototype, "parentId");
 IsString()(DocumentPatchBodyDto.prototype, "parentId");
 IsOptional()(DocumentPatchBodyDto.prototype, "sortPosition");

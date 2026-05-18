@@ -192,17 +192,36 @@ async function assertDocumentPublicApiRoundTrip(
       title: "Planning note",
       type: "spec",
       bodyMd: "Planning context",
+      editorJson: { type: "doc", content: [{ type: "paragraph", text: "Planning context" }] },
       frontmatter: { kind: "spec", labels: ["alpha", "beta"] },
+      parentId: DOC_ID,
+      sortPosition: 2,
     });
     expect(created).toEqual(expect.objectContaining({
       id: expect.any(String),
       projectId: PROJECT_ID,
+      parentId: DOC_ID,
+      sortOrder: 2,
       title: "Planning note",
       type: "spec",
+      editorJson: { type: "doc", content: [{ type: "paragraph", text: "Planning context" }], frontmatter: { kind: "spec", labels: ["alpha", "beta"] } },
       frontmatter: { kind: "spec", labels: ["alpha", "beta"] },
     }));
 
     const createdId = (created as { id: string }).id;
+    const earlierChild = await controller.createDocument({
+      projectId: PROJECT_ID,
+      title: "Earlier child",
+      type: "note",
+      bodyMd: "Earlier context",
+      parentId: DOC_ID,
+      sortPosition: 1,
+    }) as { id: string };
+    const treeDocs = await controller.listDocuments({ orgId: ORG_ID, projectId: PROJECT_ID }) as Array<{ id: string; parentId: string | null; sortOrder: number }>;
+    expect(treeDocs.filter((doc) => doc.parentId === DOC_ID).map((doc) => ({ id: doc.id, sortOrder: doc.sortOrder }))).toEqual([
+      { id: earlierChild.id, sortOrder: 1 },
+      { id: createdId, sortOrder: 2 },
+    ]);
     await expect(searchController.search({
       q: "planning",
       org_id: ORG_ID,
@@ -226,6 +245,7 @@ async function assertDocumentPublicApiRoundTrip(
         title: "Planning note revised",
         type: "adr",
         bodyMd: "Revised",
+        editorJson: { type: "doc", content: [{ type: "paragraph", text: "Revised" }], frontmatter: { kind: "adr", labels: ["reviewed"] } },
         frontmatter: { kind: "adr", labels: ["reviewed"] },
       },
     )).resolves.toEqual(expect.objectContaining({
@@ -233,6 +253,7 @@ async function assertDocumentPublicApiRoundTrip(
       title: "Planning note revised",
       type: "adr",
       bodyMd: "Revised",
+      editorJson: { type: "doc", content: [{ type: "paragraph", text: "Revised" }], frontmatter: { kind: "adr", labels: ["reviewed"] } },
       frontmatter: { kind: "adr", labels: ["reviewed"] },
     }));
     await expect(searchController.search({
@@ -423,6 +444,7 @@ async function assertDocumentPublicApiRoundTrip(
     await expect(controller.listComments({ id: DOC_ID }, {})).resolves.toEqual([]);
 
     await expect(controller.deleteDocument({ id: createdId })).resolves.toBeUndefined();
+    await expect(controller.deleteDocument({ id: earlierChild.id })).resolves.toBeUndefined();
     await expect(searchController.search({
       q: "planning",
       org_id: ORG_ID,
