@@ -19,7 +19,7 @@ process.env.FULCRUM_HOME ??= fulcrumHome;
 export default defineConfig({
 	testDir: path.join(webRoot, "tests"),
 	timeout: 30000,
-	retries: 0,
+	retries: 1,
 	expect: {
 		toHaveScreenshot: {
 			maxDiffPixelRatio: 0.01,

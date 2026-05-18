@@ -93,7 +93,7 @@
 	</div>
 </header>
 
-<section data-doc-new-wizard class={cn("mb-4 flex max-w-5xl flex-col gap-4")}>
+<section data-doc-new-wizard class={cn("mb-4 flex min-w-0 max-w-5xl flex-col gap-4")}>
 	{#if wizardStep === "type"}
 		<div class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
 			{#each KINDS as kind (kind)}
@@ -132,7 +132,7 @@
 	method="POST"
 	data-doc-new-form
 	use:enhance
-	class={cn("flex flex-col gap-4 max-w-3xl")}
+	class={cn("flex min-w-0 max-w-3xl flex-col gap-4")}
 >
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
@@ -185,9 +185,11 @@
 		/>
 	</div>
 
-	<div class={cn("flex flex-col gap-1.5")}>
+	<div class={cn("flex min-w-0 flex-col gap-1.5")}>
 		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
-		<MarkdownEditor bind:value={bodyValue} onChange={handleBodyChange} ariaLabel="Document body" />
+		<div class={cn("min-w-0 overflow-x-auto")}>
+			<MarkdownEditor bind:value={bodyValue} onChange={handleBodyChange} ariaLabel="Document body" />
+		</div>
 		<input type="hidden" name="body" value={bodyValue} />
 		{#if bodyError}
 			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
