@@ -18,7 +18,7 @@ import { TRPCError } from "@trpc/server";
 
 import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { FeatureFlag } from "@identity-access/infrastructure/database/entities/auth/FeatureFlag.ts";
-import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
+import { FEATURE_FLAGS } from "@feature-flags/application/registry.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
 import { OrgMember } from "@identity-access/infrastructure/database/entities/auth/OrgMember.ts";
@@ -28,7 +28,7 @@ import { OrgMemberRepository } from "@identity-access/infrastructure/database/re
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
 function createMapContainer(): DiContainer {

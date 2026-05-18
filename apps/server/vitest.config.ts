@@ -16,6 +16,7 @@ const serverConfig = defineConfig({
         "../../services/execution-orchestration/src",
         import.meta.url,
       ).pathname,
+      "@feature-flags": new URL("../../services/feature-flags/src", import.meta.url).pathname,
       "@identity-access": new URL("../../services/identity-access/src", import.meta.url).pathname,
       "@integration-hub": new URL("../../services/integration-hub/src", import.meta.url).pathname,
       "@knowledge-workspace": new URL(

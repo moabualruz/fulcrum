@@ -12,7 +12,7 @@
  *   4. On failure: emit backup_upload_failed + mark doctor fail
  */
 
-import { isEnvFeatureEnabled as isFeatureEnabled } from "@platform-core/application/feature-flags/registry.ts";
+import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 import { createLocalBackup } from "./runner.ts";
 import { uploadBackup, pruneLocalBackups, makeBackupEvent, type RemoteAdapterOptions } from "./remote-adapters.ts";
 

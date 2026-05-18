@@ -19,7 +19,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import {
   FieldDependencyStore,
   type FieldDependencyAction,

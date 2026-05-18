@@ -20,7 +20,7 @@ import { Type } from "class-transformer";
 import { IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { WORKFLOW_AUDIT_ENTITIES } from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
 import { AuditPublicStore } from "@workflow-coordination/infrastructure/database/audit-public-store.ts";
 

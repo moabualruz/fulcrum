@@ -55,7 +55,7 @@ const PUBLIC_API_CONTROLLER_FILES = [
   "services/knowledge-workspace/src/interface/http/search-public-api.controller.ts",
   "services/notification-center/src/interface/http/notification-public-api.controller.ts",
   "services/platform-core/src/interface/http/error-log-public-api.controller.ts",
-  "services/platform-core/src/interface/http/feature-experiment-public-api.controller.ts",
+  "services/feature-flags/src/interface/http/controllers/feature-experiment-public-api.controller.ts",
   "services/platform-core/src/interface/http/inference-public-api.controller.ts",
   "services/platform-core/src/interface/http/skill-supply-public-api.controller.ts",
   "services/platform-core/src/interface/http/subscription-event-stream.controller.ts",
@@ -453,7 +453,7 @@ describe("server stack convergence", () => {
 
   test("feature experiment public API is implemented as a Nest controller", async () => {
     const source = await readFile(
-      "services/platform-core/src/interface/http/feature-experiment-public-api.controller.ts",
+      "services/feature-flags/src/interface/http/controllers/feature-experiment-public-api.controller.ts",
       "utf8",
     );
 

@@ -21,7 +21,7 @@ import {
   FLAG_DESCRIPTIONS,
   isEnvFeatureEnabled,
   type FeatureFlagName,
-} from "@platform-core/application/feature-flags/registry.ts";
+} from "@feature-flags/application/registry.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
 let db: TestOrm;

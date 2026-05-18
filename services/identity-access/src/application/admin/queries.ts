@@ -2,13 +2,13 @@ import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { ErrorLog } from "@platform-core/infrastructure/application-database/entities/platform/ErrorLog.ts";
-import { evaluateFeatureFlag } from "@platform-core/application/feature-flags/evaluation.ts";
+import { evaluateFeatureFlag } from "@feature-flags/application/evaluation.ts";
 import {
   FEATURE_FLAGS,
   FLAG_DESCRIPTIONS,
   FlagRegistry,
   type FeatureFlagName,
-} from "@platform-core/application/feature-flags/registry.ts";
+} from "@feature-flags/application/registry.ts";
 import type { InferenceModel } from "@platform-core/application/inference/protocol.ts";
 import { AppForbiddenError, AppInvariantError, AppValidationError } from "@platform-core/domain/errors.ts";
 

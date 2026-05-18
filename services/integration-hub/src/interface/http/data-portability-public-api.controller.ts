@@ -27,7 +27,7 @@ import {
   DataPortabilityStore,
   DataPortabilityValidationError,
 } from "@integration-hub/infrastructure/database/data-portability-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 import { DataPortabilityScopeDto, BackupRestoreDto, DataExportCreateDto, DataImportPreflightQueryDto, DataImportRunDto } from "./dto/data-portability.dto.ts";
 export { DataPortabilityScopeDto, BackupRestoreDto, DataExportCreateDto, DataImportPreflightQueryDto, DataImportRunDto };

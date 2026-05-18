@@ -28,7 +28,7 @@ import {
   setRoutingConfig,
 } from "@platform-core/application/inference/routing-config.ts";
 import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { t, publicProcedure } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import type { TRPCContext } from "@fulcrum/server/trpc/context.ts";

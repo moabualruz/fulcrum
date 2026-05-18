@@ -4,7 +4,7 @@ import {
   bucketFor,
   evaluateFeatureFlag,
   type FeatureFlagEvaluationConfig,
-} from "@platform-core/application/feature-flags/evaluation.ts";
+} from "@feature-flags/application/evaluation.ts";
 
 const baseConfig: FeatureFlagEvaluationConfig = {
   enabled: true,

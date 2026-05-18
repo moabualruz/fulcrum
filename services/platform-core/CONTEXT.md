@@ -1,16 +1,12 @@
 # Platform Core
 
-Shared platform infrastructure for the Fulcrum agent OS: tenant settings, feature-flag rollouts, the skills registry, the job queue, the domain-event outbox, encrypted credentials, inference model cache, and the schema migration ledger. Every other bounded service builds on these primitives.
+Shared platform infrastructure for the Fulcrum agent OS: tenant settings, the skills registry, the job queue, the domain-event outbox, encrypted credentials, inference model cache, and the schema migration ledger. Every other bounded service builds on these primitives.
 
 ## Language
 
 **TenantSetting**:
 A per-org key/value record holding org-scoped configuration in a jsonb value.
 _Avoid_: org config, preferences, options, kv-store entry
-
-**FeatureFlagRollout**:
-A per-org binding of a `FeatureFlag` to a rollout percent (0–100) and cohort rules.
-_Avoid_: experiment, gate, toggle assignment
 
 **ExperimentAssignment**:
 A sticky assignment of a subject (user/org) to an experiment variant produced by the evaluation engine.
@@ -66,8 +62,8 @@ _Avoid_: hook input, hook message, hook event
 
 ## Relationships
 
-- An **Org** owns many **TenantSettings**, **FeatureFlagRollouts**, **FulcrumSkills**, **Jobs**, **Credentials**, **Events**, **TelemetryEvents**, **ModelCaches**, and **DomainEventOutbox** rows.
-- A **FeatureFlag** (owned by identity-access) has zero-or-one **FeatureFlagRollout** per **Org**.
+- An **Org** owns many **TenantSettings**, **FulcrumSkills**, **Jobs**, **Credentials**, **Events**, **TelemetryEvents**, **ModelCaches**, and **DomainEventOutbox** rows.
+- Feature flag registry, evaluation, rollout policy, and experiments belong to the **feature-flags** service.
 - A **FulcrumSkill** has many **SkillVersions** and zero-or-many **SkillConflicts** keyed by `slug`.
 - A **Credential** belongs to exactly one (**Org**, **User**) pair and is uniquely named within it.
 - A **Job** belongs to one **Org**, optional `projectId`, one `queue`, and one `kind`.

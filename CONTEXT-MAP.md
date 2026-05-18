@@ -12,7 +12,8 @@ Owned domain logic + persistence. Each composes into `apps/server` as a NestJS m
 
 | Service | Path | Responsibility | Owns Entities |
 |---|---|---|---|
-| [platform-core](./services/platform-core/CONTEXT.md) | `services/platform-core/` | Shared infra: DB config, events, flags, skills, jobs, platform ops, credentials | FeatureFlag, SkillDefinition, Job, TenantSetting, SchemaMigration, Credential, PlatformEvent |
+| [platform-core](./services/platform-core/CONTEXT.md) | `services/platform-core/` | Shared infra: DB config, events, skills, jobs, platform ops, credentials | SkillDefinition, Job, TenantSetting, SchemaMigration, Credential, PlatformEvent |
+| [feature-flags](./services/feature-flags/CONTEXT.md) | `services/feature-flags/` | Feature flag registry, evaluation, rollout storage, experiments, and public flag APIs | FeatureFlag, FeatureFlagEvaluation, FeatureFlagRollout, ExperimentAssignment |
 | [identity-access](./services/identity-access/CONTEXT.md) | `services/identity-access/` | Auth, orgs, users, sessions, invitations | User, Org, OrgMember, Session, Account, Verification, Invitation, Passkey, FeatureFlag (identity-scoped) |
 | [work-management](./services/work-management/CONTEXT.md) | `services/work-management/` | Tasks, projects, sprints, custom fields, views, templates, automations | Task, Project, Sprint, Module, CustomFieldDef, SavedView, Template, Automation, Dependency |
 | [knowledge-workspace](./services/knowledge-workspace/CONTEXT.md) | `services/knowledge-workspace/` | Documents, memory, search | Document, Page, Revision, Wikilink, Backlink, Comment, MemoryEntry, SearchIndex, SavedSearch |

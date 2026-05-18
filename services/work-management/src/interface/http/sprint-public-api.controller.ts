@@ -28,7 +28,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { SprintPublicStore } from "@work-management/infrastructure/database/sprint-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 

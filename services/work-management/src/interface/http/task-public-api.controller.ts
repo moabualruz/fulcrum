@@ -32,7 +32,7 @@ import { IsArray, IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-va
 import { DataSource } from "typeorm";
 
 import { CsvValidationError } from "@work-management/application/tasks/csv.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { TaskPublicStore } from "@work-management/infrastructure/database/task-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";

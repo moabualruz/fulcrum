@@ -21,7 +21,7 @@ import {
   actions as inferenceSettingsActions,
   load as loadInferenceSettings,
 } from "@fulcrum/web/routes/settings/inference/+page.server.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import type { DiContainer } from "@platform-core/application/runtime/di-container.ts";
 
 function makeSimpleContainer(): DiContainer {

@@ -30,7 +30,7 @@ import { DataSource } from "typeorm";
 
 import { DocumentPublicStore } from "@knowledge-workspace/infrastructure/database/document-public-store.ts";
 import { KNOWLEDGE_WORKSPACE_ENTITIES } from "@knowledge-workspace/infrastructure/database/document.entities.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { DocumentListQueryDto, DocumentTemplateQueryDto, DocumentIdParamsDto, DocumentCommentIdParamsDto, DocumentAttachmentIdParamsDto, DocumentCollaborationProviderParamsDto, DocumentLinkIdParamsDto, DocumentVersionParamsDto, DocumentVersionIdParamsDto, DocumentVersionDiffQueryDto, DocumentCommentListQueryDto, DocumentCreateBodyDto, DocumentPatchBodyDto, DocumentCommentCreateBodyDto, DocumentCommentPatchBodyDto, DocumentCommentResolveBodyDto, DocumentAttachmentCreateBodyDto, DocumentCollaborationStatePatchBodyDto, DocumentLinkCreateBodyDto } from "./dto/document.dto.ts";

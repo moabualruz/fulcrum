@@ -18,7 +18,7 @@ import {
   i18nTabVisible,
   SETTINGS_KEY_LOCALE,
 } from "@fulcrum/tui/screens/i18n-screen.ts";
-import { resetFeaturesCache } from "@platform-core/application/feature-flags/index.ts";
+import { resetFeaturesCache } from "@feature-flags/application/index.ts";
 
 // Minimal in-memory SettingsService for tests.
 function makeSettings(initial: Record<string, string> = {}): {

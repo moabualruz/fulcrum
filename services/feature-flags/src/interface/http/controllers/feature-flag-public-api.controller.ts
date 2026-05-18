@@ -17,14 +17,14 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
-import { PLATFORM_FEATURE_FLAG_ENTITIES } from "@platform-core/infrastructure/database/feature-flag.entities.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { PLATFORM_FEATURE_FLAG_ENTITIES } from "@feature-flags/infrastructure/database/entities/feature-flag.entities.ts";
 import {
   FeatureFlagStore,
   type FeatureFlagPublicRow,
-} from "@platform-core/infrastructure/database/feature-flag-store.ts";
+} from "@feature-flags/infrastructure/database/repositories/feature-flag-store.ts";
 
-import { FeatureFlagListQueryDto, FeatureFlagEvaluateQueryDto, FeatureFlagSetDto, FeatureFlagOverrideDto, FeatureFlagRolloutDto } from "./dto/feature-flag.dto.ts";
+import { FeatureFlagListQueryDto, FeatureFlagEvaluateQueryDto, FeatureFlagSetDto, FeatureFlagOverrideDto, FeatureFlagRolloutDto } from "../dto/feature-flag.dto.ts";
 export { FeatureFlagListQueryDto, FeatureFlagEvaluateQueryDto, FeatureFlagSetDto, FeatureFlagOverrideDto, FeatureFlagRolloutDto };
 
 export const FEATURE_FLAG_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.featureFlagPublicApi.options");

@@ -11,7 +11,7 @@ import { Notifications1715788800005 } from "./migrations/1715788800005-Notificat
 import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
 import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
 import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
-import { PlatformFeatureFlags1778753400000 } from "@platform-core/infrastructure/database/feature-flag.migration.ts";
+import { PlatformFeatureFlags1778753400000 } from "@feature-flags/infrastructure/database/migrations/feature-flag.migration.ts";
 import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
 import { ErrorLog1778758800000 } from "@platform-core/infrastructure/database/error-log.migration.ts";
 import { Telemetry1778755200000 } from "@platform-core/infrastructure/database/telemetry.migration.ts";
@@ -146,7 +146,7 @@ import { FulcrumTelemetrySettingEntity, FulcrumTelemetryEventEntity } from "@pla
 import { FulcrumThemeSettingEntity } from "@platform-core/infrastructure/database/theme-settings.entities.ts";
 import { FulcrumCredentialEntity } from "@platform-core/infrastructure/database/credential.entities.ts";
 import { FulcrumTenantSettingEntity } from "@platform-core/infrastructure/database/tenant-setting.entities.ts";
-import { PlatformFeatureFlagEntity } from "@platform-core/infrastructure/database/feature-flag.entities.ts";
+import { PlatformFeatureFlagEntity } from "@feature-flags/infrastructure/database/entities/feature-flag.entities.ts";
 
 // EntitySchema entities — identity-access
 import { FulcrumInvitationEntity } from "@identity-access/infrastructure/database/invitation.entities.ts";

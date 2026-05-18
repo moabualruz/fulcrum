@@ -29,7 +29,7 @@ import {
   type RoutingDraftPublicRow,
   type RoutingRulePublicRow,
 } from "@execution-orchestration/infrastructure/database/routing-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { RoutingScopeQueryDto, RoutingIdParamsDto, RoutingRuleCreateDto, RoutingRuleUpdateDto, RoutingDecisionDryRunDto, RoutingDecisionTestDto, RoutingLlmGateDto, RoutingDraftUpdateDto } from "./dto/routing.dto.ts";

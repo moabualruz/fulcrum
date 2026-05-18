@@ -28,7 +28,7 @@ import {
   listRuns,
   type LegacySymphonyStore,
 } from "@platform-core/application/legacy/symphony.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { AgentRunRouteParamsDto, AgentRunListQueryDto, AgentRunIssueListQueryDto, AgentRunRefreshResponseDto, AgentRunDispatchBodyDto } from "./dto/agent-run.dto.ts";

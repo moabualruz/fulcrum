@@ -30,7 +30,7 @@ import { DataSource } from "typeorm";
 
 import { INTEGRATION_HUB_REPOSITORY_ENTITIES } from "@integration-hub/infrastructure/database/repository.entities.ts";
 import { RepositoryPublicStore } from "@integration-hub/infrastructure/database/repository-public-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 import { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto } from "./dto/repository.dto.ts";
 export { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto };

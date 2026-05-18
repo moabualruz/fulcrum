@@ -2,7 +2,6 @@ import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join } from "node:path";
 
-import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
 import { KeyringStatus, loadOrCreateMasterKey, FALLBACK_FILENAME } from "@platform-core/application/secrets/keyring.ts";
 
 export type PlatformDoctorStatus = "pass" | "warn" | "fail" | "skip";
@@ -73,6 +72,37 @@ interface PlatformDoctorOptions {
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const PLATFORM_DOCTOR_FEATURE_FLAGS = [
+  "router-llm",
+  "embeddings",
+  "memory-llm-extract",
+  "saas-auth",
+  "real-time-collab-server",
+  "external-llm-provider",
+  "public-api",
+  "outbound-webhooks",
+  "notify-email",
+  "notify-webhook",
+  "notify-slack",
+  "notify-discord",
+  "casbin-policies",
+  "pgvector",
+  "connector-linear",
+  "symphony-ssh-worker",
+  "symphony-http-api",
+  "i18n",
+  "report-llm-narration",
+  "search-click-telemetry",
+  "token-tracking",
+  "session-resume",
+  "telemetry-remote",
+  "error-reporting-remote",
+  "desktop-app",
+  "experiments",
+  "scheduled-backups",
+  "skill-marketplace",
+  "trpc-permission-local-dev-bypass",
+] as const;
 
 function fulcrumHome(): string {
   return process.env["FULCRUM_HOME"] ?? join(process.env["HOME"] ?? "", ".fulcrum");
@@ -227,7 +257,7 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     telemetryValue === null ? "Set telemetry opt-in to true or false." : "No action needed.",
   ));
 
-  const registeredFlags = options.flags?.registeredFlags ?? FEATURE_FLAGS;
+  const registeredFlags = options.flags?.registeredFlags ?? PLATFORM_DOCTOR_FEATURE_FLAGS;
   const enabled = options.flags?.enabled ?? defaultEnabledFlags();
   results.push(check(
     "platform.flags_registry",

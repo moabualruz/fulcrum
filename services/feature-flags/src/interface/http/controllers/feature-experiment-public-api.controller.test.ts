@@ -7,7 +7,7 @@ import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/
 import { validateSync } from "class-validator";
 
 import { AppModule } from "@fulcrum/server/app.module.ts";
-import { ExperimentStore } from "@platform-core/application/feature-flags/experiments.ts";
+import { ExperimentStore } from "@feature-flags/application/experiments.ts";
 import {
   FeatureExperimentCreateDto,
   FeatureExperimentMetricsQueryDto,
@@ -15,7 +15,7 @@ import {
   FeatureExperimentPublicApiController,
   FeatureExperimentPublicApiModule,
   FeatureExperimentPublicApiService,
-} from "@platform-core/interface/http/feature-experiment-public-api.controller.ts";
+} from "@feature-flags/interface/http/controllers/feature-experiment-public-api.controller.ts";
 
 describe("feature experiment public Nest API", () => {
   test("is wired as a Nest controller and composed by the server app module", () => {

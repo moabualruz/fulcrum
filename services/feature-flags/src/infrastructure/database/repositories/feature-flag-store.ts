@@ -5,18 +5,18 @@ import { DataSource } from "typeorm";
 import {
   evaluateFeatureFlag,
   normalizeRolloutPercent,
-} from "@platform-core/application/feature-flags/evaluation.ts";
+} from "@feature-flags/application/evaluation.ts";
 import {
   FEATURE_FLAGS,
   FLAG_DESCRIPTIONS,
   type FeatureFlagName,
   isRegisteredFeatureFlag,
-} from "@platform-core/application/feature-flags/registry.ts";
+} from "@feature-flags/application/registry.ts";
 import {
   PlatformFeatureFlagEntity,
   type PlatformFeatureFlag,
-} from "@platform-core/infrastructure/database/feature-flag.entities.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+} from "@feature-flags/infrastructure/database/entities/feature-flag.entities.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 export interface FeatureFlagPublicRow {
   flag: FeatureFlagName;

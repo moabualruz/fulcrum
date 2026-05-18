@@ -38,7 +38,7 @@ import {
   ConnectorStore,
   type ConnectorRunPublicRow,
 } from "@integration-hub/infrastructure/database/connector-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 import { ConnectorListQueryDto, ConnectorParamsDto, ConnectorStateBodyDto, ConnectorSyncBodyDto, ConnectorRunListQueryDto, ConnectorRunParamsDto, ConnectorRunQueryDto } from "./dto/connector.dto.ts";
 export { ConnectorListQueryDto, ConnectorParamsDto, ConnectorStateBodyDto, ConnectorSyncBodyDto, ConnectorRunListQueryDto, ConnectorRunParamsDto, ConnectorRunQueryDto };

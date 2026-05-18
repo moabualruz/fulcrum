@@ -21,7 +21,7 @@ import { IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min, MinLength }
 import { DataSource } from "typeorm";
 
 import { FulcrumArtifactEntity } from "@planning-review/infrastructure/database/review-workflow.entities.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { ArtifactPublicStore } from "@workflow-coordination/infrastructure/database/artifact-public-store.ts";
 
 import { ArtifactListQueryDto, ArtifactParamsDto, ArtifactDeleteQueryDto, ArtifactUploadRequestDto, ArtifactPublicResponseDto, ArtifactDownloadResponseDto, ArtifactDeleteResponseDto } from "./dto/artifact.dto.ts";

@@ -19,7 +19,7 @@ import { z } from "zod";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
 import { protectedProcedure, __resetCachedEnforcerForTest } from "@fulcrum/server/trpc/middleware.ts";
 import { __setTaskApplicationForTest } from "@fulcrum/server/trpc/routers/tasks.ts";

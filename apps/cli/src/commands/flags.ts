@@ -2,7 +2,7 @@ import { formatCommandError } from "../api-errors.ts";
 import {
   createFeatureExperimentApiCallerFromEnv,
   type FeatureExperimentApiEnvironment,
-} from "@platform-core/interface/http/feature-experiment-api-client.ts";
+} from "@feature-flags/interface/http/feature-experiment-api-client.ts";
 
 /**
  * fulcrum flags — feature-flag CLI subcommands.

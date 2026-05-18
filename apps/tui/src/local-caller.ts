@@ -14,7 +14,7 @@ import {
 } from "@fulcrum/server/session/local-session.ts";
 
 import { createAuthApiCallerFromEnv } from "@identity-access/interface/http/auth-api-client.ts";
-import { createFeatureExperimentApiCallerFromEnv } from "@platform-core/interface/http/feature-experiment-api-client.ts";
+import { createFeatureExperimentApiCallerFromEnv } from "@feature-flags/interface/http/feature-experiment-api-client.ts";
 import { createTaskApiCallerFromEnv } from "@work-management/interface/http/task-api-client.ts";
 import { createProjectApiCallerFromEnv } from "@work-management/interface/http/project-api-client.ts";
 import { createSprintApiCallerFromEnv } from "@work-management/interface/http/sprint-api-client.ts";

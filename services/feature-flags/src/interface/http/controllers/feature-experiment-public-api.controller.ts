@@ -21,10 +21,10 @@ import {
   type AssignmentCounts,
   type Experiment,
   type MetricsResult,
-} from "@platform-core/application/feature-flags/experiments.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+} from "@feature-flags/application/experiments.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
-import { FeatureExperimentCreateDto, FeatureExperimentParamsDto, FeatureExperimentMetricsQueryDto } from "./dto/feature-experiment.dto.ts";
+import { FeatureExperimentCreateDto, FeatureExperimentParamsDto, FeatureExperimentMetricsQueryDto } from "../dto/feature-experiment.dto.ts";
 export { FeatureExperimentCreateDto, FeatureExperimentParamsDto, FeatureExperimentMetricsQueryDto };
 
 export const FEATURE_EXPERIMENT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.featureExperimentPublicApi.options");

@@ -7,7 +7,7 @@ import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/
 import { validateSync } from "class-validator";
 
 import { AppModule } from "@fulcrum/server/app.module.ts";
-import { FeatureFlagStore, type FeatureFlagPublicRow } from "@platform-core/infrastructure/database/feature-flag-store.ts";
+import { FeatureFlagStore, type FeatureFlagPublicRow } from "@feature-flags/infrastructure/database/repositories/feature-flag-store.ts";
 import {
   FeatureFlagEvaluateQueryDto,
   FeatureFlagListQueryDto,
@@ -16,7 +16,7 @@ import {
   FeatureFlagPublicApiService,
   FeatureFlagRolloutDto,
   FeatureFlagSetDto,
-} from "@platform-core/interface/http/feature-flag-public-api.controller.ts";
+} from "@feature-flags/interface/http/controllers/feature-flag-public-api.controller.ts";
 
 describe("feature flag public Nest API", () => {
   test("is wired as a Nest controller and composed by the server app module", () => {

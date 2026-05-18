@@ -31,7 +31,7 @@ import type {
 import { INTEGRATION_HUB_WEBHOOK_ENTITIES } from "@integration-hub/infrastructure/database/webhook.entities.ts";
 import { WebhookPublicStore } from "@integration-hub/infrastructure/database/webhook-public-store.ts";
 import { AppError, AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 import { WebhookListQueryDto, WebhookParamsDto, WebhookDeliveryParamsDto, WebhookDeliveryListQueryDto, WebhookCreateBodyDto, WebhookUpdateBodyDto } from "./dto/webhook.dto.ts";
 export { WebhookListQueryDto, WebhookParamsDto, WebhookDeliveryParamsDto, WebhookDeliveryListQueryDto, WebhookCreateBodyDto, WebhookUpdateBodyDto };

@@ -20,6 +20,8 @@
     "paths": {
       "@agent-client-protocol/*": ["services/agent-client-protocol/src/*"],
       "@execution-orchestration/*": ["services/execution-orchestration/src/*"],
+      "@feature-flags/*": ["services/feature-flags/src/*"],
+      "@fulcrum/services/feature-flags/*": ["services/feature-flags/src/*"],
       "@fulcrum/cli/*": ["apps/cli/src/*"],
       "@fulcrum/tui/*": ["apps/tui/src/*"],
       "@fulcrum/server/*": ["apps/server/src/*"],

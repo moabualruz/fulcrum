@@ -23,7 +23,7 @@ import { DataSource } from "typeorm";
 
 import { NOTIFICATION_CENTER_ENTITIES } from "@notification-center/infrastructure/database/notification.entities.ts";
 import { NotificationPublicStore } from "@notification-center/infrastructure/database/notification-public-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 
 import { NotificationListQueryDto, NotificationMarkReadParamsDto, NotificationChannelParamsDto, NotificationChannelConfigBodyDto, NotificationRuleParamsDto, NotificationRuleCreateBodyDto, NotificationRulePatchBodyDto, NotificationQuietHoursSetBodyDto, NotificationMuteParamsDto, NotificationMuteBodyDto, NotificationListResponseDto, NotificationUnreadCountResponseDto, NotificationMarkAllReadResponseDto, NotificationSettingsResponseDto } from "./dto/notification.dto.ts";
 export { NotificationListQueryDto, NotificationMarkReadParamsDto, NotificationChannelParamsDto, NotificationChannelConfigBodyDto, NotificationRuleParamsDto, NotificationRuleCreateBodyDto, NotificationRulePatchBodyDto, NotificationQuietHoursSetBodyDto, NotificationMuteParamsDto, NotificationMuteBodyDto, NotificationListResponseDto, NotificationUnreadCountResponseDto, NotificationMarkAllReadResponseDto, NotificationSettingsResponseDto };

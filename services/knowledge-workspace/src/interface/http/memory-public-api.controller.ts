@@ -44,7 +44,7 @@ import { FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES } from "@execution-orchestrat
 import { DocumentPublicStore } from "@knowledge-workspace/infrastructure/database/document-public-store.ts";
 import { KNOWLEDGE_WORKSPACE_ENTITIES } from "@knowledge-workspace/infrastructure/database/document.entities.ts";
 import { MemoryPublicStore } from "@knowledge-workspace/infrastructure/database/memory-public-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { MemoryListQueryDto, CreateMemoryBodyDto, MemorySearchQueryDto, MemoryPatchBodyDto, MemoryIdParamsDto, MemoryDeleteQueryDto, MemoryDigestBodyDto, ContextPreviewQueryDto, MEMORY_KINDS, MEMORY_IMPORTANCE, MEMORY_SOURCE } from "./dto/memory.dto.ts";

@@ -28,7 +28,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { SavedViewPublicStore } from "@work-management/infrastructure/database/saved-view-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";

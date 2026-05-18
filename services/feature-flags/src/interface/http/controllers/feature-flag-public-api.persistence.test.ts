@@ -10,13 +10,13 @@ import {
   buildFulcrumTypeOrmOptions,
   createFulcrumTypeOrmDataSource,
 } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
-import { PLATFORM_FEATURE_FLAG_ENTITIES } from "@platform-core/infrastructure/database/feature-flag.entities.ts";
-import { PlatformFeatureFlags1778753400000 } from "@platform-core/infrastructure/database/feature-flag.migration.ts";
-import { FeatureFlagStore } from "@platform-core/infrastructure/database/feature-flag-store.ts";
+import { PLATFORM_FEATURE_FLAG_ENTITIES } from "@feature-flags/infrastructure/database/entities/feature-flag.entities.ts";
+import { PlatformFeatureFlags1778753400000 } from "@feature-flags/infrastructure/database/migrations/feature-flag.migration.ts";
+import { FeatureFlagStore } from "@feature-flags/infrastructure/database/repositories/feature-flag-store.ts";
 import {
   FeatureFlagPublicApiController,
   FeatureFlagPublicApiService,
-} from "@platform-core/interface/http/feature-flag-public-api.controller.ts";
+} from "@feature-flags/interface/http/controllers/feature-flag-public-api.controller.ts";
 import { startTemporaryPostgres, type TemporaryPostgres } from "@test-support/temporary-postgres.ts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";

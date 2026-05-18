@@ -7,7 +7,7 @@
  * stored via SettingsService → TUI labels re-render from paraglide catalog.
  */
 
-import { isEnabled } from "@platform-core/interface/feature-flags.ts";
+import { isEnabled } from "@feature-flags/interface/feature-flags.ts";
 import { t, SUPPORTED_LOCALES } from "../i18n-catalog.ts";
 import type { SettingsService } from "../types.ts";
 

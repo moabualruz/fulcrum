@@ -11,8 +11,8 @@ import {
 } from "@identity-access/application/admin/queries.ts";
 import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
-import { experimentStore } from "@platform-core/application/feature-flags/experiments.ts";
-import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
+import { experimentStore } from "@feature-flags/application/experiments.ts";
+import { FEATURE_FLAGS } from "@feature-flags/application/registry.ts";
 import { isFeatureEnabled } from "@fulcrum/tui/feature-flags.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
