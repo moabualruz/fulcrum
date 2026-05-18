@@ -43,7 +43,15 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("diff-reject-btn");
     expect(body).toContain("data-diff-accepted");
     expect(body).toContain("data-diff-reject-reason");
-    expect(body).toContain("Build the plan");
+    expect(body).toContain("data-session-transcript");
+    expect(body).toContain('data-autoscroll-locked="false"');
+    expect(body).toContain('data-message-role="user"');
+    expect(body).toContain("copy-btn");
+    expect(body).toContain("data-message-markdown");
+    expect(body).toContain("<strong>plan</strong>");
+    expect(body).toContain("<pre><code>bun test</code></pre>");
+    expect(body).toContain("data-message-toolcalls");
+    expect(body).toContain("Build the <strong>plan</strong>");
     expect(body).toContain("session/update");
     expect(body).not.toContain("data-session-empty");
   });
@@ -100,7 +108,13 @@ function activeModel(): SessionWorkbenchModel {
       { modelId: "gpt-5.4", name: "GPT-5.4", selected: false },
     ],
     messages: [
-      { id: "message-1", role: "user", content: "Build the plan", timestamp: 1 },
+      {
+        id: "message-1",
+        role: "user",
+        content: "Build the **plan**\n\n```sh\nbun test\n```",
+        timestamp: 1,
+        toolCalls: [{ toolCallId: "tool-1", title: "Read brief", kind: "read", status: "in_progress" }],
+      },
     ],
     toolCalls: {
       items: [

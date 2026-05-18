@@ -18,6 +18,104 @@
   };
 
   const hasSavedSessions = model.resumableSessions.length > 0;
+  let transcriptEl: HTMLDivElement | undefined = $state();
+  let autoscrollLocked = $state(false);
+  let copiedMessageId = $state<string | null>(null);
+  const messageCount = $derived(model.messages.length);
+
+  $effect(() => {
+    messageCount;
+    if (!autoscrollLocked) {
+      transcriptEl?.scrollTo({ top: transcriptEl.scrollHeight });
+    }
+  });
+
+  function updateAutoscrollLock(): void {
+    if (!transcriptEl) return;
+    const distanceFromBottom = transcriptEl.scrollHeight - transcriptEl.scrollTop - transcriptEl.clientHeight;
+    autoscrollLocked = distanceFromBottom > 48;
+  }
+
+  function resumeAutoscroll(): void {
+    autoscrollLocked = false;
+    transcriptEl?.scrollTo({ top: transcriptEl.scrollHeight, behavior: "smooth" });
+  }
+
+  async function copyMessage(messageId: string, content: string): Promise<void> {
+    await navigator.clipboard?.writeText(content);
+    copiedMessageId = messageId;
+    setTimeout(() => {
+      if (copiedMessageId === messageId) copiedMessageId = null;
+    }, 1600);
+  }
+
+  function formatMessageTime(timestamp: number): string {
+    return new Date(timestamp).toISOString();
+  }
+
+  function escapeHtml(value: string): string {
+    return value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function renderInlineMarkdown(value: string): string {
+    return escapeHtml(value)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" rel="noreferrer">$1</a>');
+  }
+
+  function renderMessageMarkdown(value: string): string {
+    const blocks: string[] = [];
+    const lines = value.split("\n");
+    let paragraph: string[] = [];
+    let code: string[] | null = null;
+
+    function flushParagraph(): void {
+      if (paragraph.length === 0) return;
+      blocks.push(`<p>${renderInlineMarkdown(paragraph.join(" "))}</p>`);
+      paragraph = [];
+    }
+
+    for (const line of lines) {
+      if (line.startsWith("```")) {
+        if (code) {
+          blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+          code = null;
+        } else {
+          flushParagraph();
+          code = [];
+        }
+        continue;
+      }
+      if (code) {
+        code.push(line);
+        continue;
+      }
+      if (!line.trim()) {
+        flushParagraph();
+        continue;
+      }
+      if (line.startsWith("- ")) {
+        flushParagraph();
+        blocks.push(`<ul><li>${renderInlineMarkdown(line.slice(2))}</li></ul>`);
+        continue;
+      }
+      if (line.startsWith("|")) {
+        flushParagraph();
+        blocks.push(`<pre><code>${escapeHtml(line)}</code></pre>`);
+        continue;
+      }
+      paragraph.push(line);
+    }
+
+    flushParagraph();
+    if (code) blocks.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+    return blocks.join("");
+  }
 
   function diffLineClass(kind: string): string {
     if (kind === "add") return "bg-emerald-500/10 text-emerald-950 dark:text-emerald-100";
@@ -313,15 +411,50 @@
   {/if}
 
   <div data-session-messages class={cn("mt-4 space-y-2")}>
-    <h3 class={cn("text-sm font-medium")}>Messages</h3>
+    <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+      <h3 class={cn("text-sm font-medium")}>Messages</h3>
+      {#if autoscrollLocked}
+        <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "autoscroll-lock-btn text-xs")} onclick={resumeAutoscroll}>
+          Resume autoscroll
+        </button>
+      {/if}
+    </div>
     {#if model.messages.length === 0}
       <p data-session-messages-empty class={cn("text-sm text-muted-foreground")}>No messages</p>
     {:else}
-      <ol class={cn("space-y-2")}>
+      <ol
+        bind:this={transcriptEl}
+        onscroll={updateAutoscrollLock}
+        data-session-transcript
+        data-autoscroll-locked={autoscrollLocked}
+        class={cn("max-h-[32rem] space-y-2 overflow-y-auto pr-1 pb-20")}
+      >
         {#each model.messages as message}
-          <li data-session-message={message.id} class={cn("rounded-md border border-border p-2 text-sm")}>
-            <span class={cn("font-medium")}>{message.role}</span>
-            <p class={cn("mt-1 whitespace-pre-wrap")}>{message.content}</p>
+          <li data-session-message={message.id} data-message-role={message.role} class={cn("message rounded-md border border-border p-2 text-sm", message.role === "user" ? "bg-muted/40" : "bg-background")}>
+            <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+              <div class={cn("flex items-center gap-2")}>
+                <span class={cn("font-medium capitalize")}>{message.role}</span>
+                <time class={cn("text-xs text-muted-foreground")} datetime={formatMessageTime(message.timestamp)}>
+                  {formatMessageTime(message.timestamp)}
+                </time>
+              </div>
+              <button type="button" class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "copy-btn h-7 px-2 text-xs")} onclick={() => copyMessage(message.id, message.content)}>
+                {copiedMessageId === message.id ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <div data-message-markdown class={cn("mt-2 max-w-none text-sm [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-2")}>
+              {@html renderMessageMarkdown(message.content)}
+            </div>
+            {#if message.toolCalls?.length}
+              <ol data-message-toolcalls class={cn("mt-2 space-y-1 border-l border-border pl-2 text-xs")}>
+                {#each message.toolCalls as toolCall}
+                  <li data-message-toolcall={toolCall.toolCallId} class={cn("flex items-center justify-between gap-2 text-muted-foreground")}>
+                    <span>{toolCall.title}</span>
+                    <span>{toolCall.status}</span>
+                  </li>
+                {/each}
+              </ol>
+            {/if}
           </li>
         {/each}
       </ol>
