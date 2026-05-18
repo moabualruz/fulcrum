@@ -23,6 +23,7 @@ Usage:
   fulcrum init [DIR]
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum projects <list|stats> [--json]
+  fulcrum capture <review|status|action> [--json]
   fulcrum tasks <list|get|create|update|delete> [--json]
   fulcrum relationships|comments|templates|automations|recurrence|saved_views|taskCustomFields [--json]
   fulcrum work <create|inspect|move|link|report> [--json]
@@ -204,6 +205,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       }
 
       await runProjects(rest);
+      return;
+    }
+    case "capture": {
+      const { run: runCapture } = await import("./commands/capture.ts");
+      await runCapture(rest);
       return;
     }
     case "tasks": {

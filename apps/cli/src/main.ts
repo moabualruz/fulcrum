@@ -58,6 +58,8 @@ Usage:
                                      Run an FTS query over the product kernel search index.
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
                                      Render the assembled Markdown context for a task.
+  fulcrum capture <review|status|action> [--json]
+                                     Review mobile captures, set status, run quick actions.
   fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
                                      Preview approved-plan docs/tasks/dependencies through shared planning API.
   fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
@@ -165,6 +167,7 @@ async function main() {
     case "inference":
     case "agents":
     case "projects":
+    case "capture":
     case "tasks":
     case "sprints":
     case "memory":

@@ -37,6 +37,9 @@ fulcrum capture text  <text>
 fulcrum capture url   <url>
 fulcrum capture file  <path>
 fulcrum capture inbox [--snooze|--accept|--decline] <id>
+fulcrum capture review <id> --note <text> [--trace <id>]
+fulcrum capture status <id> --status triage|review|approved [--trace <id>]
+fulcrum capture action <id> --action assign|block|approve|escalate [--assignee <id>] [--reason <text>] [--trace <id>]
 ```
 
 ### 1.2 Plan stage commands
