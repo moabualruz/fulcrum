@@ -51,3 +51,42 @@ export {
 	TooltipTrigger,
 	Root as TooltipRoot,
 } from "./components/tooltip/index.js";
+export {
+	Label,
+	Root as LabelRoot,
+} from "./components/label/index.js";
+export type { LabelProps } from "./components/label/index.js";
+export {
+	Checkbox,
+	Root as CheckboxRoot,
+} from "./components/checkbox/index.js";
+export type { CheckboxProps } from "./components/checkbox/index.js";
+export {
+	RadioGroup,
+	RadioGroupItem,
+	Root as RadioGroupRoot,
+	Item as RadioGroupItemRoot,
+} from "./components/radio-group/index.js";
+export type {
+	RadioGroupProps,
+	RadioGroupItemProps,
+} from "./components/radio-group/index.js";
+export {
+	Select,
+	SelectTrigger,
+	SelectContent,
+	SelectItem,
+	SelectValue,
+	Root as SelectRoot,
+	Trigger as SelectTriggerRoot,
+	Content as SelectContentRoot,
+	Item as SelectItemRoot,
+	Value as SelectValueRoot,
+} from "./components/select/index.js";
+export type {
+	SelectProps,
+	SelectTriggerProps,
+	SelectContentProps,
+	SelectItemProps,
+	SelectValueProps,
+} from "./components/select/index.js";
