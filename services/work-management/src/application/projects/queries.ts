@@ -228,7 +228,7 @@ export async function getProjectOrNull(
   const columns = await projectColumns(em);
   const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
   const rows = await ormSqlConnection(em).execute<ProjectRow[]>(
-    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id = $1 AND org_id = $2`,
+    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id::text = $1 AND org_id = $2`,
     [projectId, ctx.orgId],
   );
   return rows[0] ?? null;

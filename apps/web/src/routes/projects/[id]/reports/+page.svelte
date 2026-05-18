@@ -432,17 +432,17 @@
 	}
 </script>
 
-<div data-testid="reports-page">
+<div data-testid="reports-page" class={cn("min-w-0 overflow-x-hidden px-4 py-4 sm:px-6")}>
 <header
 	data-reports-header
-	class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}
+	class={cn("mb-4 flex min-w-0 flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between")}
 >
-	<div class={cn("flex items-baseline gap-3")}>
-		<a href="/projects/{data.project.id}" data-back-project class={cn("text-sm text-muted-foreground hover:underline")}>← {data.project.name}</a>
+	<div class={cn("flex min-w-0 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3")}>
+		<a href="/projects/{data.project.id}" data-back-project class={cn("min-w-0 break-words text-sm text-muted-foreground hover:underline")}>← {data.project.name}</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Reports</h1>
 	</div>
 
-	<div class={cn("flex items-center gap-3")}>
+	<div class={cn("flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-center")}>
 		<ReportDatePicker value={dateRange} onChange={handleDateChange} />
 
 		{#if data.reports.sprints.length > 0}
@@ -476,7 +476,7 @@
 </header>
 
 <!-- Tab navigation -->
-<nav data-report-tabs class={cn("flex gap-1 border-b border-border mb-6")} aria-label="Report tabs">
+<nav data-report-tabs class={cn("mb-6 flex max-w-full gap-1 overflow-x-auto border-b border-border pb-px")} aria-label="Report tabs">
 	{#each tabs as tab}
 		<a
 			href={`?tab=${tab}`}
@@ -500,7 +500,7 @@
 </nav>
 
 <!-- Tab content -->
-<section data-report-content class={cn("min-h-[300px]")}>
+<section data-report-content class={cn("min-h-[300px] min-w-0")}>
 	{#if activeTab === "burndown"}
 		<div data-chart-burndown data-testid="chart-burndown" class={cn("space-y-3")}>
 			<div class={cn("flex items-center justify-between")}>
