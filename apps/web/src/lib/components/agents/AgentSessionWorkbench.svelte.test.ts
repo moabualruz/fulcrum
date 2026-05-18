@@ -44,6 +44,10 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("option-deny");
     expect(body).toContain("data-session-resume");
     expect(body).toContain('data-resume-session="row-2"');
+    expect(body).toContain('data-session-item="row-2"');
+    expect(body).toContain('data-session-row-status="saved"');
+    expect(body).toContain('data-delete-session="row-2"');
+    expect(body).toContain("delete-btn");
     expect(body).toContain("data-traffic-filter");
     expect(body).toContain("data-traffic-search");
     expect(body).toContain("data-traffic-pause");
@@ -80,6 +84,7 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("data-session-empty");
     expect(body).toContain("data-session-empty-state");
     expect(body).toContain("No saved sessions yet.");
+    expect(body).toContain("data-session-list-empty");
     expect(body).toContain("Create a new session to Begin.");
     expect(body).toContain("Create Session");
     expect(body).toContain('href="#agent-connect-form"');
@@ -263,6 +268,30 @@ function activeModel(): SessionWorkbenchModel {
         supportsResume: true,
       },
     ],
+    sessions: [
+      {
+        id: "row-1",
+        sessionId: "agent-session-1",
+        title: "Plan work",
+        agentName: "codex",
+        cwd: "/repo",
+        lastUpdated: 1,
+        supportsResume: true,
+        status: "running",
+        current: true,
+      },
+      {
+        id: "row-2",
+        sessionId: "agent-session-2",
+        title: "Older work",
+        agentName: "codex",
+        cwd: "/repo",
+        lastUpdated: 0,
+        supportsResume: true,
+        status: "saved",
+        current: false,
+      },
+    ],
   };
 }
 
@@ -307,6 +336,7 @@ function idleModel(): SessionWorkbenchModel {
       summary: { total: 0, requests: 0, responses: 0, notifications: 0, errors: 0 },
     },
     resumableSessions: [],
+    sessions: [],
   };
 }
 

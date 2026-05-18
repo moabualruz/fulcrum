@@ -187,6 +187,15 @@ export class AcpSessionManager {
     }
   }
 
+  deleteSavedSession(savedSessionId: string): void {
+    const savedSession = this.state.savedSessions.find((session) => session.id === savedSessionId);
+    if (!savedSession) throw new Error(`Saved session '${savedSessionId}' not found`);
+    this.state.savedSessions = this.state.savedSessions.filter((session) => session.id !== savedSessionId);
+    if (this.state.currentSession?.id === savedSessionId) {
+      this.state.disconnectState();
+    }
+  }
+
   async reconnectActiveSession(): Promise<SavedSession> {
     const session = this.state.currentSession;
     if (!session) throw new Error("No active session to reconnect");
@@ -451,6 +460,18 @@ export async function abortActiveSession(_em: unknown): Promise<void> {
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active AI Assist session manager");
   await manager.abortSession();
+}
+
+export async function resumeSavedSession(_em: unknown, input: { savedSessionId: string }): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.resumeSession(input.savedSessionId);
+}
+
+export async function deleteSavedSession(_em: unknown, input: { savedSessionId: string }): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  manager.deleteSavedSession(input.savedSessionId);
 }
 
 export async function pauseActiveSession(_em: unknown): Promise<void> {

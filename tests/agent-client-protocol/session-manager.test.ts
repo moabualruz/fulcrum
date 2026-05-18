@@ -380,6 +380,23 @@ describe("ACP ported session manager", () => {
     expect(state.isConnected).toBe(false);
   });
 
+  test("deletes saved sessions and clears active session if needed", async () => {
+    const state = createAcpSessionState({ createId: () => "session-row-1" });
+    const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });
+    const manager = new AcpSessionManager({
+      state,
+      config: createAcpConfigState({ config }),
+      createBridge: async () => bridge,
+    });
+    await manager.createSession("codex", "/repo");
+
+    manager.deleteSavedSession("session-row-1");
+
+    expect(state.savedSessions).toEqual([]);
+    expect(state.currentSession).toBeNull();
+    expect(state.isConnected).toBe(false);
+  });
+
   test("disconnect tears down bridge and session state", async () => {
     const state = createAcpSessionState({ createId: () => "session-row-1" });
     const bridge = new FakeBridge({}, { sessionId: "agent-session-1" });

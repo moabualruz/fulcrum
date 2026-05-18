@@ -26,6 +26,7 @@
   let copiedMessageId = $state<string | null>(null);
   let errorDismissed = $state(false);
   let abortConfirmOpen = $state(false);
+  let deleteSessionId = $state<string | null>(null);
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
 
@@ -76,6 +77,15 @@
 
   function formatMessageTime(timestamp: number): string {
     return new Date(timestamp).toISOString();
+  }
+
+  function formatSessionTime(timestamp: number): string {
+    return new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(timestamp));
   }
 
   function escapeHtml(value: string): string {
@@ -574,24 +584,64 @@
     </div>
   {/if}
 
-  {#if model.resumableSessions.length > 0}
-    <div data-session-resume data-session-list class={cn("mt-4 rounded-md border border-border p-3")}>
-      <h3 class={cn("text-sm font-medium")}>Resumable sessions</h3>
-      <ol class={cn("mt-2 space-y-2")}>
-        {#each model.resumableSessions as session}
-          <li data-resumable-session={session.id} class={cn("flex flex-wrap items-center justify-between gap-2 text-sm")}>
-            <span>{session.title}</span>
-            <button
-              type="button"
-              disabled={!model.controls.canResume}
-              data-resume-session={session.id}
-              class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              Resume
-            </button>
+  <div data-session-resume data-session-list class={cn("mt-4 rounded-md border border-border p-3")}>
+    <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+      <h3 class={cn("text-sm font-medium")}>Sessions</h3>
+      <span class={cn("text-xs text-muted-foreground")}>{model.sessions.length} saved</span>
+    </div>
+    {#if model.sessions.length === 0}
+      <div data-session-list-empty class={cn("mt-3 rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground")}>
+        No saved sessions yet. Create a new session to begin.
+      </div>
+    {:else}
+      <ol class={cn("mt-3 space-y-2")}>
+        {#each model.sessions as session}
+          <li data-resumable-session={session.id} data-session-item={session.id} class={cn("session-item grid gap-3 rounded-md border border-border p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center")}>
+            <div class={cn("min-w-0")}>
+              <div class={cn("flex flex-wrap items-center gap-2")}>
+                <span title={session.title} class={cn("max-w-full truncate font-medium")}>{session.title}</span>
+                <span data-session-row-status={session.status} class={cn("rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground")}>{session.status}</span>
+              </div>
+              <p class={cn("mt-1 truncate text-xs text-muted-foreground")}>
+                {session.agentName} · {formatSessionTime(session.lastUpdated)}
+              </p>
+            </div>
+            <div class={cn("flex flex-wrap gap-2 sm:justify-end")}>
+              <form method="POST" action="?/resumeSavedSession">
+                <input type="hidden" name="savedSessionId" value={session.id} />
+                <button type="submit" data-resume-session={session.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                  Resume
+                </button>
+              </form>
+              <button type="button" data-delete-session={session.id} class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "delete-btn text-destructive")} onclick={() => (deleteSessionId = session.id)}>
+                Delete
+              </button>
+            </div>
           </li>
         {/each}
       </ol>
+    {/if}
+  </div>
+
+  {#if deleteSessionId}
+    <div data-delete-session-confirmation class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4")}>
+      <div role="dialog" aria-modal="true" aria-labelledby="delete-session-title" class={cn("w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl")}>
+        <h3 id="delete-session-title" class={cn("text-base font-semibold")}>Delete saved session?</h3>
+        <p class={cn("mt-2 text-sm text-muted-foreground")}>
+          This removes the saved AI Assist session from this list. Running agent work is not deleted from disk.
+        </p>
+        <div class={cn("mt-4 flex justify-end gap-2")}>
+          <button type="button" data-delete-session-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (deleteSessionId = null)}>
+            Keep session
+          </button>
+          <form method="POST" action="?/deleteSavedSession">
+            <input type="hidden" name="savedSessionId" value={deleteSessionId} />
+            <button type="submit" data-delete-session-confirm class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>
+              Delete session
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   {/if}
 

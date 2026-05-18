@@ -137,6 +137,30 @@ export const actions: Actions = {
     return actionOk("AI Assist resumed");
   },
 
+  resumeSavedSession: async ({ request, locals }) => {
+    const form = await request.formData();
+    const savedSessionId = form.get("savedSessionId") as string;
+    if (!savedSessionId) return { success: false, message: "savedSessionId required" };
+    const { em } = await requestServiceScope(locals);
+    const { resumeSavedSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await resumeSavedSession(em, { savedSessionId });
+    return actionOk("AI Assist session resumed");
+  },
+
+  deleteSavedSession: async ({ request, locals }) => {
+    const form = await request.formData();
+    const savedSessionId = form.get("savedSessionId") as string;
+    if (!savedSessionId) return { success: false, message: "savedSessionId required" };
+    const { em } = await requestServiceScope(locals);
+    const { deleteSavedSession } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await deleteSavedSession(em, { savedSessionId });
+    return actionOk("AI Assist session deleted");
+  },
+
   connectBridge: async ({ request, locals }) => {
     const form = await request.formData();
     const agentName = form.get("agentName") as string;

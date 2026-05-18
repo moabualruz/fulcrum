@@ -67,6 +67,7 @@ export interface SessionWorkbenchModel {
     summary: TrafficSummary;
   };
   resumableSessions: SessionWorkbenchSession[];
+  sessions: SessionWorkbenchListItem[];
 }
 
 export interface SessionWorkbenchSession {
@@ -77,6 +78,11 @@ export interface SessionWorkbenchSession {
   cwd: string;
   lastUpdated: number;
   supportsResume: boolean;
+}
+
+export interface SessionWorkbenchListItem extends SessionWorkbenchSession {
+  status: "running" | "paused" | "errored" | "saved" | "completed";
+  current: boolean;
 }
 
 export interface SessionWorkbenchMode extends SessionMode {
@@ -173,6 +179,9 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
       summary: summarizeTraffic(traffic.entries),
     },
     resumableSessions: state.resumableSessions.map(toWorkbenchSession),
+    sessions: state.savedSessions
+      .map((savedSession) => toWorkbenchListItem(state, savedSession))
+      .sort((a, b) => b.lastUpdated - a.lastUpdated),
   };
 }
 
@@ -197,6 +206,20 @@ function toWorkbenchSession(session: SavedSession): SessionWorkbenchSession {
     cwd: session.cwd,
     lastUpdated: session.lastUpdated,
     supportsResume: session.supportsLoadSession === true,
+  };
+}
+
+function toWorkbenchListItem(state: AcpSessionState, session: SavedSession): SessionWorkbenchListItem {
+  const current = state.currentSession?.id === session.id;
+  let status: SessionWorkbenchListItem["status"] = "saved";
+  if (current && state.isPaused) status = "paused";
+  else if (current && state.error) status = "errored";
+  else if (current && state.isConnected) status = "running";
+  else if (!session.supportsLoadSession) status = "completed";
+  return {
+    ...toWorkbenchSession(session),
+    status,
+    current,
   };
 }
 

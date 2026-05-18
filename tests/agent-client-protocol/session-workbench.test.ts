@@ -19,6 +19,7 @@ describe("agent session workbench model", () => {
       cwd: "/repo",
       supportsLoadSession: true,
     };
+    state.savedSessions = [state.currentSession];
     state.savedSessions = [
       state.currentSession,
       {
@@ -135,6 +136,10 @@ describe("agent session workbench model", () => {
       errors: 0,
     });
     expect(model.resumableSessions.map((session) => session.id)).toEqual(["row-1", "row-2"]);
+    expect(model.sessions.map((session) => [session.id, session.status])).toEqual([
+      ["row-1", "running"],
+      ["row-2", "saved"],
+    ]);
   });
 
   test("reports error and disconnected states without enabling session actions", () => {
@@ -192,6 +197,7 @@ describe("agent session workbench model", () => {
       cwd: "/repo",
       supportsLoadSession: true,
     };
+    state.savedSessions = [state.currentSession];
     state.isConnected = true;
     state.isPaused = true;
 
@@ -201,6 +207,38 @@ describe("agent session workbench model", () => {
     expect(model.controls.canAbort).toBe(true);
     expect(model.controls.canPauseSession).toBe(false);
     expect(model.controls.canResumeSession).toBe(true);
+    expect(model.sessions[0]?.status).toBe("paused");
+  });
+
+  test("sorts saved sessions by last updated for the session list", () => {
+    const state = createAcpSessionState();
+    state.savedSessions = [
+      {
+        id: "older",
+        agentName: "codex",
+        sessionId: "agent-session-1",
+        title: "Older work",
+        lastUpdated: 10,
+        cwd: "/repo",
+        supportsLoadSession: true,
+      },
+      {
+        id: "newer",
+        agentName: "claude",
+        sessionId: "agent-session-2",
+        title: "Newer work",
+        lastUpdated: 20,
+        cwd: "/repo",
+        supportsLoadSession: false,
+      },
+    ];
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.sessions.map((session) => [session.id, session.status])).toEqual([
+      ["newer", "completed"],
+      ["older", "saved"],
+    ]);
   });
 
   test("builds an idle model for surfaces before a live runtime connects", () => {
