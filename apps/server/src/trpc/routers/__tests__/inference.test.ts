@@ -50,8 +50,8 @@ const generateResult: GenerateResult = {
 };
 
 const progressEvents: ModelPullProgress[] = [
-  { pct: 0, downloaded: 0, total: 100 },
-  { pct: 100, downloaded: 100, total: 100 },
+  { type: "download_progress", pct: 0, downloaded: 0, total: 100 },
+  { type: "download_progress", pct: 100, downloaded: 100, total: 100 },
 ];
 
 function makeContainer(): DiContainer {
@@ -560,7 +560,15 @@ describe("inference tRPC router", () => {
       await expect(caller.inference.provider.set({
         url: "https://llm.example.test/v1",
         key: "sk-test",
-      })).resolves.toEqual({ ok: true });
+      })).resolves.toEqual({
+        ok: true,
+        url: "https://llm.example.test/v1",
+        credentialRef: {
+          kind: "env",
+          name: "FULCRUM_INFERENCE_API_KEY",
+          redacted: true,
+        },
+      });
       expect(process.env["FULCRUM_INFERENCE_URL"]).toBe("https://llm.example.test/v1");
       expect(process.env["FULCRUM_INFERENCE_API_KEY"]).toBe("sk-test");
     } finally {

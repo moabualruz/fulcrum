@@ -48,6 +48,7 @@ import {
   type InferenceFeatureKey,
   type InferenceModel,
   type ModelPullProgress,
+  ModelPullProgressSchema,
   type TokenizeResult,
 } from "@platform-core/application/inference/protocol.ts";
 import { getRoutingConfig, setRoutingConfig } from "@platform-core/application/inference/routing-config.ts";
@@ -73,6 +74,16 @@ export interface InferenceApplicationPort {
   pullModel(modelId: string, options?: { force?: boolean }): AsyncIterable<ModelPullProgress>;
   rmModel(modelId: string): Promise<{ ok: boolean }>;
   listBackends(): Promise<InferenceBackendInfo[]>;
+}
+
+export interface InferenceProviderSetResult {
+  ok: boolean;
+  url: string;
+  credentialRef: {
+    kind: "env";
+    name: "FULCRUM_INFERENCE_API_KEY";
+    redacted: true;
+  };
 }
 
 export interface InferencePublicApiOptions {
@@ -118,7 +129,7 @@ export class InferencePublicApiService {
   async pullModel(params: InferenceModelParamsDto, body: InferenceModelPullRequestDto): Promise<ModelPullProgress[]> {
     const events: ModelPullProgress[] = [];
     for await (const event of this.requireApplication().pullModel(params.modelId, { force: body.force ?? false })) {
-      events.push(event);
+      events.push(ModelPullProgressSchema.parse(event));
     }
     return events;
   }
@@ -175,11 +186,19 @@ export class InferencePublicApiService {
     return { ok: true, config: this.getConfig() };
   }
 
-  setProvider(input: InferenceProviderSetRequestDto): { ok: boolean; url: string } {
+  setProvider(input: InferenceProviderSetRequestDto): InferenceProviderSetResult {
     this.requireEnabled();
     process.env["FULCRUM_INFERENCE_URL"] = input.url;
     process.env["FULCRUM_INFERENCE_API_KEY"] = input.key;
-    return { ok: true, url: input.url };
+    return {
+      ok: true,
+      url: input.url,
+      credentialRef: {
+        kind: "env",
+        name: "FULCRUM_INFERENCE_API_KEY",
+        redacted: true,
+      },
+    };
   }
 
   async testProvider(): Promise<{ ok: boolean; latency_ms?: number; error?: string }> {
@@ -257,7 +276,7 @@ export class InferencePublicApiController {
     return this.inference.setConfig(body);
   }
 
-  async setProvider(body: InferenceProviderSetRequestDto): Promise<{ ok: boolean; url: string }> {
+  async setProvider(body: InferenceProviderSetRequestDto): Promise<InferenceProviderSetResult> {
     return this.inference.setProvider(body);
   }
 

@@ -82,8 +82,8 @@ describe("inference CLI source command", () => {
 
   it("uses caller-backed model list, pull progress, and removal paths", async () => {
     async function* progress() {
-      yield { pct: 25, downloaded: 1, total: 4 };
-      yield { pct: 100, downloaded: 4, total: 4 };
+      yield { type: "download_progress" as const, pct: 25, downloaded: 1, total: 4 };
+      yield { type: "download_progress" as const, pct: 100, downloaded: 4, total: 4 };
     }
     const caller = {
       inference: {
@@ -123,7 +123,7 @@ describe("inference CLI source command", () => {
           rm: async () => ({ ok: true }),
           pull: () => ({
             subscribe(observer: { next(value: unknown): void; complete(): void }) {
-              observer.next({ pct: 100, downloaded: 10, total: 10 });
+              observer.next({ type: "download_progress", pct: 100, downloaded: 10, total: 10 });
               observer.complete();
               return { unsubscribe: () => { unsubscribed = true; } };
             },
@@ -275,7 +275,7 @@ describe("inference CLI source command", () => {
         case "/api/v1/inference/backends/probe":
           return Response.json([]);
         case "/api/v1/inference/models/mini/pull":
-          return Response.json([{ pct: 100, downloaded: 10, total: 10 }]);
+          return Response.json([{ type: "download_progress", pct: 100, downloaded: 10, total: 10 }]);
         case "/api/v1/inference/embed":
           return Response.json({ vectors: [[0.1, 0.2]], model: "mini", cached: false, dimensions: 2 });
         case "/api/v1/inference/config":
@@ -343,8 +343,8 @@ describe("inference CLI source command", () => {
   it("uses direct client methods for non-caller model and inference operations", async () => {
     process.env["FULCRUM_FEATURES"] = "embeddings";
     async function* pullModel() {
-      yield { pct: 50, downloaded: 5, total: 10 };
-      yield { pct: 100, downloaded: 10, total: 10 };
+      yield { type: "download_progress" as const, pct: 50, downloaded: 5, total: 10 };
+      yield { type: "download_progress" as const, pct: 100, downloaded: 10, total: 10 };
     }
     const client = {
       call: async () => health,

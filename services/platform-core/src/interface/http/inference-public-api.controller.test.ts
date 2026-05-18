@@ -41,7 +41,7 @@ describe("inference public Nest API", () => {
 
   test("delegates inference operations to the application port", async () => {
     async function* progress() {
-      yield { pct: 100, downloaded: 4, total: 4 };
+      yield { type: "download_progress" as const, pct: 100, downloaded: 4, total: 4 };
     }
     const application = {
       health: mock(async () => ({ status: "ok", backends: ["embedded"], models: ["mini"] })),
@@ -74,7 +74,7 @@ describe("inference public Nest API", () => {
       { id: "mini", kind: "embed", downloaded: true, active: true },
     ]);
     await expect(controller.pullModel({ modelId: "mini" }, { force: true })).resolves.toEqual([
-      { pct: 100, downloaded: 4, total: 4 },
+      { type: "download_progress", pct: 100, downloaded: 4, total: 4 },
     ]);
     await expect(controller.removeModel({ modelId: "mini" })).resolves.toEqual({ ok: true });
     await expect(controller.listBackends()).resolves.toEqual([
@@ -104,6 +104,11 @@ describe("inference public Nest API", () => {
       await expect(controller.setProvider({ url: "https://llm.local", key: "secret" })).resolves.toEqual({
         ok: true,
         url: "https://llm.local",
+        credentialRef: {
+          kind: "env",
+          name: "FULCRUM_INFERENCE_API_KEY",
+          redacted: true,
+        },
       });
       expect(process.env["FULCRUM_INFERENCE_URL"]).toBe("https://llm.local");
       expect(process.env["FULCRUM_INFERENCE_API_KEY"]).toBe("secret");

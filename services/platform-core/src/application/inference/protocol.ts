@@ -83,7 +83,7 @@ export const InferenceModelSchema = z.preprocess((value) => {
 }));
 
 export const ModelPullProgressSchema = z.object({
-  type: z.literal("download_progress").optional(),
+  type: z.literal("download_progress").default("download_progress"),
   pct: z.number().min(0).max(100),
   downloaded: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
