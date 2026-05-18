@@ -22,6 +22,7 @@ import { DataSource } from "typeorm";
 
 import { FulcrumArtifactEntity } from "@planning-review/infrastructure/database/review-workflow.entities.ts";
 import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { WorkflowAuditEventEntity } from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
 import { ArtifactPublicStore } from "@workflow-coordination/infrastructure/database/artifact-public-store.ts";
 
 import { ArtifactListQueryDto, ArtifactParamsDto, ArtifactDeleteQueryDto, ArtifactUploadRequestDto, ArtifactPublicResponseDto, ArtifactDownloadResponseDto, ArtifactDeleteResponseDto } from "./dto/artifact.dto.ts";
@@ -147,7 +148,7 @@ export class ArtifactPublicApiModule {
   static register(options: ArtifactPublicApiOptions): NestDynamicModule {
     return {
       module: ArtifactPublicApiModule,
-      imports: [TypeOrmModule.forFeature([FulcrumArtifactEntity])],
+      imports: [TypeOrmModule.forFeature([FulcrumArtifactEntity, WorkflowAuditEventEntity])],
       controllers: [ArtifactPublicApiController],
       providers: [
         { provide: ARTIFACT_PUBLIC_API_OPTIONS, useValue: options },
@@ -415,7 +416,7 @@ ApiOkResponse({ type: ArtifactDeleteResponseDto })(
 );
 
 Module({
-  imports: [TypeOrmModule.forFeature([FulcrumArtifactEntity])],
+  imports: [TypeOrmModule.forFeature([FulcrumArtifactEntity, WorkflowAuditEventEntity])],
   controllers: [ArtifactPublicApiController],
   providers: [
     { provide: ARTIFACT_PUBLIC_API_OPTIONS, useValue: null },
