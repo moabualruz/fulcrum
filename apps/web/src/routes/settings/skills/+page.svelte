@@ -35,6 +35,27 @@
   // Local skills list for reactive updates
   let localSkills = $state<SkillItem[] | null>(null);
 
+  interface InstallLogEntry {
+    timestamp: string;
+    action: string;
+    slug: string;
+    result: "ok" | "error";
+    message?: string;
+  }
+
+  let installLog = $state<InstallLogEntry[]>([]);
+
+  function recordLog(action: string, slug: string, result: "ok" | "error", message?: string): void {
+    installLog = [
+      { timestamp: new Date().toISOString(), action, slug, result, message },
+      ...installLog,
+    ].slice(0, 20);
+  }
+
+  function dependentsOf(slug: string, skills: SkillItem[]): SkillItem[] {
+    return skills.filter((other) => other.slug !== slug && other.upstream_repo?.includes(slug));
+  }
+
   async function apiCall(body: Record<string, unknown>): Promise<Response> {
     return fetch("/api/skills", {
       method: "POST",
@@ -59,10 +80,12 @@
       if (!res.ok) {
         const err = await res.json();
         installError = (err as { error: string }).error;
+        recordLog("install", installSlug.trim(), "error", installError);
         return;
       }
       const skill = (await res.json()) as SkillItem;
       localSkills = [...(localSkills ?? []), skill];
+      recordLog("install", skill.slug, "ok");
       installSlug = "";
       installRepo = "";
     } finally {
@@ -75,6 +98,9 @@
     if (res.ok) {
       const updated = (await res.json()) as SkillItem;
       localSkills = (localSkills ?? []).map((s) => (s.slug === slug ? updated : s));
+      recordLog("upgrade", slug, "ok");
+    } else {
+      recordLog("upgrade", slug, "error", `HTTP ${res.status}`);
     }
   }
 
@@ -83,6 +109,9 @@
     if (res.ok) {
       const updated = (await res.json()) as SkillItem[];
       localSkills = updated;
+      recordLog("upgrade-all", "all", "ok");
+    } else {
+      recordLog("upgrade-all", "all", "error", `HTTP ${res.status}`);
     }
   }
 
@@ -90,6 +119,9 @@
     const res = await apiCall({ action: "uninstall", slug });
     if (res.ok || res.status === 204) {
       localSkills = (localSkills ?? []).filter((s) => s.slug !== slug);
+      recordLog("uninstall", slug, "ok");
+    } else {
+      recordLog("uninstall", slug, "error", `HTTP ${res.status}`);
     }
     confirmUninstall = null;
   }
@@ -171,6 +203,27 @@
   {/if}
 </form>
 
+{#if installLog.length > 0}
+  <section data-install-log class={cn("mb-4 rounded-md border border-border p-3")}>
+    <h2 class={cn("text-sm font-medium mb-2")}>Install log</h2>
+    <ul class={cn("space-y-1 text-xs")}>
+      {#each installLog as entry, index (entry.timestamp + index)}
+        <li
+          data-install-log-entry={index}
+          data-install-log-result={entry.result}
+          class={cn("flex items-baseline gap-2 font-mono")}
+        >
+          <span class={cn("text-muted-foreground")}>{entry.timestamp}</span>
+          <span class={cn(entry.result === "ok" ? "text-success" : "text-destructive")}>{entry.result}</span>
+          <span>{entry.action}</span>
+          <span class={cn("font-semibold")}>{entry.slug}</span>
+          {#if entry.message}<span class={cn("text-muted-foreground")}>· {entry.message}</span>{/if}
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
@@ -202,7 +255,17 @@
               data-skill-slug={skill.slug}
               class={cn("hover:bg-muted/50 border-b transition-colors")}
             >
-              <td data-slot="table-cell" class={cn("p-2 align-middle font-medium")}>{skill.slug}</td>
+              <td data-slot="table-cell" class={cn("p-2 align-middle font-medium")}>
+                <div class="flex items-center gap-2">
+                  <span>{skill.slug}</span>
+                  {#if skill.upstream_conflict || (skill.source === "upstream" && !skill.content_hash)}
+                    <span
+                      data-update-available={skill.slug}
+                      class={cn("rounded-sm border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] uppercase text-warning-foreground")}
+                    >Update available</span>
+                  {/if}
+                </div>
+              </td>
               <td data-slot="table-cell" data-skill-version class={cn("p-2 align-middle font-mono text-xs")}>{skill.version}</td>
               <td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{skill.source}</td>
               <td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{skill.content_hash ?? "—"}</td>
@@ -232,16 +295,28 @@
                     class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                   >Upgrade</button>
                   {#if confirmUninstall === skill.slug}
-                    <button
-                      data-confirm-uninstall
-                      onclick={() => void handleUninstall(skill.slug)}
-                      class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
-                    >Confirm</button>
-                    <button
-                      data-cancel-uninstall
-                      onclick={() => (confirmUninstall = null)}
-                      class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-                    >Cancel</button>
+                    {@const dependents = dependentsOf(skill.slug, skills)}
+                    <div data-uninstall-confirm={skill.slug} class="flex flex-col gap-1">
+                      {#if dependents.length > 0}
+                        <span data-uninstall-dependents={skill.slug} class={cn("text-xs text-warning-foreground")}
+                          >Dependents: {dependents.map((d) => d.slug).join(", ")}</span>
+                      {:else}
+                        <span data-uninstall-no-dependents={skill.slug} class={cn("text-xs text-muted-foreground")}
+                          >No dependents detected.</span>
+                      {/if}
+                      <div class="flex gap-1">
+                        <button
+                          data-confirm-uninstall
+                          onclick={() => void handleUninstall(skill.slug)}
+                          class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                        >Confirm</button>
+                        <button
+                          data-cancel-uninstall
+                          onclick={() => (confirmUninstall = null)}
+                          class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
+                        >Cancel</button>
+                      </div>
+                    </div>
                   {:else}
                     <button
                       data-uninstall-skill
