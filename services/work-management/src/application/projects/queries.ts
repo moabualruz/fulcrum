@@ -90,6 +90,10 @@ export interface ProjectListing {
   name: string;
   description: string | null;
   updated_at: string;
+  task_count: number;
+  open_task_count: number;
+  doc_count: number;
+  latest_activity_at: string;
 }
 
 export interface ProjectOption {
@@ -109,19 +113,42 @@ export interface BoardTaskRow {
 
 export async function listProjectRows(em: EntityManager, ctx: AppContext): Promise<ProjectListing[]> {
   const columns = await projectColumns(em);
-  const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
-  const descriptionExpr = columns.has("description") ? "description" : "NULL::text";
+  const slugExpr = columns.has("slug") ? "COALESCE(p.slug, p.id::text)" : "p.id::text";
+  const descriptionExpr = columns.has("description") ? "p.description" : "NULL::text";
   const rows = await ormSqlConnection(em).execute<Array<{
     id: string;
     slug: string | null;
     name: string;
     description: string | null;
     updated_at: string | Date;
+    task_count: number | string;
+    open_task_count: number | string;
+    doc_count: number | string;
+    latest_activity_at: string | Date;
   }>>(
-    `SELECT id, ${slugExpr} AS slug, name, ${descriptionExpr} AS description, updated_at
-       FROM projects
-      WHERE org_id = $1
-      ORDER BY created_at ASC, id ASC`,
+    `SELECT
+        p.id,
+        ${slugExpr} AS slug,
+        p.name,
+        ${descriptionExpr} AS description,
+        p.updated_at,
+        (SELECT COUNT(*) FROM tasks t WHERE t.org_id = p.org_id AND t.project_id = p.id::text) AS task_count,
+        (
+          SELECT COUNT(*)
+            FROM tasks t
+           WHERE t.org_id = p.org_id
+             AND t.project_id = p.id::text
+             AND COALESCE(t.status, '') NOT IN ('completed', 'done', 'canceled', 'cancelled')
+        ) AS open_task_count,
+        (SELECT COUNT(*) FROM documents d WHERE d.org_id = p.org_id AND d.project_id = p.id::text AND d.archived = false) AS doc_count,
+        GREATEST(
+          p.updated_at,
+          COALESCE((SELECT MAX(t.updated_at) FROM tasks t WHERE t.org_id = p.org_id AND t.project_id = p.id::text), p.updated_at),
+          COALESCE((SELECT MAX(d.updated_at) FROM documents d WHERE d.org_id = p.org_id AND d.project_id = p.id::text), p.updated_at)
+        ) AS latest_activity_at
+       FROM projects p
+      WHERE p.org_id = $1
+      ORDER BY p.created_at ASC, p.id ASC`,
     [ctx.orgId],
   );
   return rows.map((project) => ({
@@ -130,6 +157,10 @@ export async function listProjectRows(em: EntityManager, ctx: AppContext): Promi
     name: project.name,
     description: project.description ?? null,
     updated_at: isoStamp(project.updated_at),
+    task_count: Number(project.task_count),
+    open_task_count: Number(project.open_task_count),
+    doc_count: Number(project.doc_count),
+    latest_activity_at: isoStamp(project.latest_activity_at),
   }));
 }
 

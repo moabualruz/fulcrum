@@ -34,7 +34,7 @@
 	];
 
 	const { data }: { data: PageData } = $props();
-	const mode = data.mode as TokenMode;
+	let mode = $state(data.mode as TokenMode);
 </script>
 
 <svelte:head>
@@ -53,14 +53,15 @@
 			</div>
 			<div class="flex gap-2" aria-label="Token mode">
 				{#each tokenModes as tokenMode}
-					<a
-						href={`?mode=${tokenMode}`}
+					<button
+						type="button"
 						data-mode-button={tokenMode}
+						onclick={() => (mode = tokenMode)}
 						class="rounded-md border border-border px-3 py-2 text-sm font-medium text-fg transition-colors hover:bg-accent-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] data-[active=true]:bg-primary data-[active=true]:text-primary-foreground"
 						data-active={mode === tokenMode}
 					>
 						{tokenMode}
-					</a>
+					</button>
 				{/each}
 			</div>
 		</header>

@@ -16,22 +16,31 @@ const requiredTokens = [
 ];
 
 const requiredRadiusTokens = [
-	["--radius-sm", "calc(0.625rem * 0.6)"],
-	["--radius-md", "calc(0.625rem * 0.8)"],
-	["--radius-lg", "0.625rem"],
-	["--radius-xl", "calc(0.625rem * 1.4)"],
-	["--radius-2xl", "calc(0.625rem * 1.8)"],
-	["--radius-3xl", "calc(0.625rem * 2.2)"],
-	["--radius-4xl", "calc(0.625rem * 2.6)"],
+	["--radius-sm", "calc(.625rem * .6)"],
+	["--radius-md", "calc(.625rem * .8)"],
+	["--radius-lg", ".625rem"],
+	["--radius-xl", "calc(.625rem * 1.4)"],
+	["--radius-2xl", "calc(.625rem * 1.8)"],
+	["--radius-3xl", "calc(.625rem * 2.2)"],
+	["--radius-4xl", "calc(.625rem * 2.6)"],
 ] as const;
 
 const requiredShadowTokens = [
-	["--shadow-xs", "0 1px 2px oklch(0.18 0.01 270 / 0.06)"],
-	["--shadow-sm", "0 2px 4px oklch(0.18 0.01 270 / 0.08)"],
-	["--shadow-md", "0 4px 8px oklch(0.18 0.01 270 / 0.10)"],
-	["--shadow-lg", "0 8px 16px oklch(0.18 0.01 270 / 0.14)"],
-	["--shadow-xl", "0 16px 32px oklch(0.18 0.01 270 / 0.18)"],
+	["--shadow-xs", "0 1px 2px oklch(18% .01 270/.06)"],
+	["--shadow-sm", "0 2px 4px oklch(18% .01 270/.08)"],
+	["--shadow-md", "0 4px 8px oklch(18% .01 270/.1)"],
+	["--shadow-lg", "0 8px 16px oklch(18% .01 270/.14)"],
+	["--shadow-xl", "0 16px 32px oklch(18% .01 270/.18)"],
 ] as const;
+
+async function readTokenValues(page: import("@playwright/test").Page, tokens: readonly string[]) {
+	return page.evaluate((tokenNames) => {
+		const scope = document.querySelector("[data-token-scope]");
+		if (!scope) throw new Error("token scope missing");
+		const styles = getComputedStyle(scope);
+		return Object.fromEntries(tokenNames.map((token) => [token, styles.getPropertyValue(token).trim()]));
+	}, tokens);
+}
 
 test.describe("wave 0a color tokens", () => {
 	test("exposes OKLCH semantic tokens for light, dark, and high contrast modes", async ({ page }) => {
@@ -41,12 +50,7 @@ test.describe("wave 0a color tokens", () => {
 			await page.locator(`[data-mode-button='${mode}']`).click();
 			await expect(page.locator("[data-token-mode]").first()).toHaveText(mode);
 
-			const tokenValues = await page.evaluate((tokens) => {
-				const scope = document.querySelector("[data-token-scope]");
-				if (!scope) throw new Error("token scope missing");
-				const styles = getComputedStyle(scope);
-				return Object.fromEntries(tokens.map((token) => [token, styles.getPropertyValue(token).trim()]));
-			}, requiredTokens);
+			const tokenValues = await readTokenValues(page, requiredTokens);
 
 			for (const token of requiredTokens) {
 				expect(tokenValues[token], `${mode} ${token}`).toMatch(/^oklch\(/);
@@ -70,27 +74,19 @@ test.describe("wave 0a shadow scale", () => {
 	test("defines elevation tokens and adjusts shadow opacity by mode", async ({ page }) => {
 		await page.goto("/wave-0a-foundation");
 
-		const readTokens = async (tokens: readonly string[]) =>
-			page.evaluate((tokenNames) => {
-				const scope = document.querySelector("[data-token-scope]");
-				if (!scope) throw new Error("token scope missing");
-				const styles = getComputedStyle(scope);
-				return Object.fromEntries(tokenNames.map((token) => [token, styles.getPropertyValue(token).trim()]));
-			}, tokens);
-
-		const tokenValues = await readTokens(requiredShadowTokens.map(([token]) => token));
+		const tokenValues = await readTokenValues(page, requiredShadowTokens.map(([token]) => token));
 		for (const [token, value] of requiredShadowTokens) {
 			expect(tokenValues[token], token).toBe(value);
 		}
 
-		const lightColors = await readTokens(["--shadow-sm-color", "--shadow-lg-color"]);
+		const lightColors = await readTokenValues(page, ["--shadow-sm-color", "--shadow-lg-color"]);
 		await page.locator("[data-mode-button='dark']").click();
 		await expect(page.locator("[data-token-mode]").first()).toHaveText("dark");
-		const darkColors = await readTokens(["--shadow-sm-color", "--shadow-lg-color"]);
+		const darkColors = await readTokenValues(page, ["--shadow-sm-color", "--shadow-lg-color"]);
 
 		expect(darkColors["--shadow-sm-color"]).not.toBe(lightColors["--shadow-sm-color"]);
 		expect(darkColors["--shadow-lg-color"]).not.toBe(lightColors["--shadow-lg-color"]);
-		expect(darkColors["--shadow-lg-color"]).toContain("/ 0.44");
+		expect(darkColors["--shadow-lg-color"]).toContain("/.44");
 	});
 
 	test("maps floating components to correct shadows and keeps inputs and text flat", async ({ page }) => {
@@ -113,12 +109,7 @@ test.describe("wave 0a radius scale", () => {
 	test("exposes configurable Tailwind radius tokens", async ({ page }) => {
 		await page.goto("/wave-0a-foundation");
 
-		const tokenValues = await page.evaluate((tokens) => {
-			const scope = document.querySelector("[data-token-scope]");
-			if (!scope) throw new Error("token scope missing");
-			const styles = getComputedStyle(scope);
-			return Object.fromEntries(tokens.map((token) => [token, styles.getPropertyValue(token).trim()]));
-		}, requiredRadiusTokens.map(([token]) => token));
+		const tokenValues = await readTokenValues(page, requiredRadiusTokens.map(([token]) => token));
 
 		for (const [token, value] of requiredRadiusTokens) {
 			expect(tokenValues[token], token).toBe(value);

@@ -34,6 +34,10 @@ interface ProjectListing {
   name: string;
   description: string | null;
   updated_at: string;
+  task_count: number;
+  open_task_count: number;
+  doc_count: number;
+  latest_activity_at: string;
 }
 
 type PageProps = {
@@ -54,6 +58,10 @@ const SAMPLE: ProjectListing[] = [
     name: "Alpha",
     description: "first sample project",
     updated_at: "2026-04-30T12:00:00.000Z",
+    task_count: 8,
+    open_task_count: 3,
+    doc_count: 4,
+    latest_activity_at: "2026-05-01T10:00:00.000Z",
   },
   {
     id: "01J0PROJECT0000000000000002",
@@ -61,6 +69,10 @@ const SAMPLE: ProjectListing[] = [
     name: "Beta",
     description: null,
     updated_at: "2026-04-29T08:00:00.000Z",
+    task_count: 2,
+    open_task_count: 0,
+    doc_count: 1,
+    latest_activity_at: "2026-04-29T08:00:00.000Z",
   },
   {
     id: "01J0PROJECT0000000000000003",
@@ -68,6 +80,10 @@ const SAMPLE: ProjectListing[] = [
     name: "Gamma",
     description: "third sample project",
     updated_at: "2026-04-28T03:00:00.000Z",
+    task_count: 0,
+    open_task_count: 0,
+    doc_count: 0,
+    latest_activity_at: "2026-04-28T03:00:00.000Z",
   },
 ];
 
@@ -105,26 +121,34 @@ describe("/projects +page.svelte", () => {
   test("renders the empty-state marker and zero table-row bodies when no projects", () => {
     const { body } = render(Page, { props: { data: pageData([]) } });
     expect(body).toContain('data-empty-projects');
-    const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
+    expect(body).toContain('data-empty-create-project');
+    expect(body).toContain('data-empty-import-projects');
+    expect(body).toContain('data-empty-open-existing');
+    const rows = body.match(/data-project-row/g) ?? [];
     expect(rows).toHaveLength(0);
   });
 
-  test("renders three body rows for three seeded projects, each with name + slug", () => {
+  test("renders three dense project rows with names, slugs, counts, activity, and actions", () => {
     const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
-    const rows = body.match(/data-slot="table-row"[^>]*data-project-row/g) ?? [];
+    const rows = body.match(/data-project-row/g) ?? [];
     expect(rows).toHaveLength(3);
     for (const project of SAMPLE) {
       expect(body).toContain(project.name);
       expect(body).toContain(project.slug);
+      expect(body).toContain(`${project.task_count} task${project.task_count === 1 ? "" : "s"}`);
+      expect(body).toContain(`${project.doc_count} doc${project.doc_count === 1 ? "" : "s"}`);
+      expect(body).toMatch(new RegExp(`href="/projects/${project.id}"[^>]*data-project-primary-action`));
     }
   });
 
-  test("filter input is present (data-projects-filter, type=search)", () => {
+  test("search, status filter, and reset controls are present", () => {
     const { body } = render(Page, { props: { data: pageData(SAMPLE) } });
     const inputMatch = body.match(/<input\b[^>]*>/g) ?? [];
     const filterInput = inputMatch.find((m) => m.includes("data-projects-filter"));
     expect(filterInput).toBeDefined();
     expect(filterInput).toContain('type="search"');
+    expect(body).toContain("data-status-filter");
+    expect(body).toContain("data-projects-reset");
   });
 
   test("new-project CTA points to /projects/new", () => {
@@ -160,7 +184,7 @@ describe("/projects +page.svelte", () => {
     function rowSlice(haystack: string, slug: string): string {
       const start = haystack.indexOf(`data-slug="${slug}"`);
       if (start === -1) return "";
-      const end = haystack.indexOf(`data-slot="table-row"`, start + 1);
+      const end = haystack.indexOf(`data-project-row`, start + 1);
       return end === -1 ? haystack.slice(start) : haystack.slice(start, end);
     }
 
@@ -173,5 +197,12 @@ describe("/projects +page.svelte", () => {
   test("header h1 reads 'Projects'", () => {
     const { body } = render(Page, { props: { data: pageData([]) } });
     expect(body).toMatch(/<h1\b[^>]*>\s*Projects\s*<\/h1>/);
+  });
+
+  test("active project row exposes active status while other rows stay ready", () => {
+    const { body } = render(Page, { props: { data: pageData(SAMPLE, "alpha") } });
+    expect(body).toContain('data-project-status="active"');
+    expect(body).toContain('data-project-status="ready"');
+    expect(body.match(/data-project-status-badge/g)).toHaveLength(3);
   });
 });

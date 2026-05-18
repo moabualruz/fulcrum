@@ -247,10 +247,23 @@ describe("Workflow project hierarchy and setup", () => {
          VALUES (?, ?, ?, ?, 'task', ?, 'created', ?::jsonb, now())`,
         [crypto.randomUUID(), DEFAULT_ORG_ID, project.id, ctx.userId, taskA, JSON.stringify({ title: "Todo task" })],
       );
+      await em.getConnection().execute(
+        `INSERT INTO documents (id, org_id, project_id, doc_type, title, body_md, archived, updated_at)
+         VALUES (?, ?, ?, 'note', 'Read model doc', 'Body', false, now() + interval '1 day')`,
+        [crypto.randomUUID(), DEFAULT_ORG_ID, project.id],
+      );
 
       const projectCtx = { ...ctx, projectId: project.id };
-      await expect(listProjectRows(em, ctx)).resolves.toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: project.id, slug: "read-model", description: "Project read model coverage" }),
+      const projectRows = await listProjectRows(em, ctx);
+      expect(projectRows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: project.id,
+          slug: "read-model",
+          description: "Project read model coverage",
+          task_count: 2,
+          open_task_count: 1,
+          doc_count: 1,
+        }),
       ]));
       await expect(resolveProjectIdByKey(em, ctx, "read-model")).resolves.toBe(project.id);
       await expect(resolveProjectIdByKey(em, ctx, project.id)).resolves.toBe(project.id);
