@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseProductArgs, run as runProduct } from "./product.ts";
@@ -18,6 +18,43 @@ function testIo() {
       exit: (code: number) => exits.push(code),
     },
   };
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runMainProductInit(fulcrumHome: string, json = false): Promise<{
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}> {
+  const proc = Bun.spawn([
+    process.execPath,
+    "run",
+    "apps/cli/src/main.ts",
+    "product",
+    "init",
+    ...(json ? ["--json"] : []),
+  ], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      FULCRUM_HOME: fulcrumHome,
+    },
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { exitCode, stdout, stderr };
 }
 
 describe("fulcrum product CLI", () => {
@@ -67,6 +104,64 @@ describe("fulcrum product CLI", () => {
       org: expect.objectContaining({ slug: "local", name: "Local", created: true }),
     }));
   });
+
+  test("product init is idempotent and creates the PGlite data directory", async () => {
+    const prevHome = process.env["FULCRUM_HOME"];
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-product-idempotent-"));
+    const fulcrumHome = join(scratch, ".fulcrum");
+    process.env["FULCRUM_HOME"] = fulcrumHome;
+
+    try {
+      const firstIo = testIo();
+      await runProduct(["init", "--json"], firstIo.opts);
+      const secondIo = testIo();
+      await runProduct(["init", "--json"], secondIo.opts);
+
+      const first = JSON.parse(firstIo.out[0]!);
+      const second = JSON.parse(secondIo.out[0]!);
+      expect(firstIo.err).toEqual([]);
+      expect(secondIo.err).toEqual([]);
+      expect(firstIo.exits).toEqual([]);
+      expect(secondIo.exits).toEqual([]);
+      expect(first.schemaApplied).toEqual(["bootstrapped"]);
+      expect(second.schemaApplied).toEqual(["already-initialized"]);
+      expect(first.org.created).toBe(true);
+      expect(second.org.created).toBe(false);
+      expect(await exists(join(fulcrumHome, "pglite.data"))).toBe(true);
+    } finally {
+      if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
+      else process.env["FULCRUM_HOME"] = prevHome;
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("main product init --json keeps JSON on stdout and errors off stderr", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-product-main-"));
+    const fulcrumHome = join(scratch, ".fulcrum");
+
+    try {
+      const first = await runMainProductInit(fulcrumHome, true);
+      const second = await runMainProductInit(fulcrumHome, true);
+
+      expect(first.exitCode).toBe(0);
+      expect(second.exitCode).toBe(0);
+      expect(first.stderr).toBe("");
+      expect(second.stderr).toBe("");
+      expect(JSON.parse(first.stdout)).toMatchObject({
+        ok: true,
+        engine: "pglite",
+        org: { slug: "local", created: true },
+      });
+      expect(JSON.parse(second.stdout)).toMatchObject({
+        ok: true,
+        engine: "pglite",
+        org: { slug: "local", created: false },
+      });
+      expect(await exists(join(fulcrumHome, "pglite.data"))).toBe(true);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  }, 15_000);
 
   test("product commands use configured public APIs after local init", async () => {
     const prevHome = process.env["FULCRUM_HOME"];
