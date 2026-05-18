@@ -22,6 +22,8 @@ export const DEFAULT_CRON = "0 2 * * *";
 export interface TaskDeps {
   /** Remote DSN string (e.g. s3://bucket/prefix). */
   dsn: string;
+  /** Credential record reference; raw remote secrets stay outside backup DSNs. */
+  credentialRef?: string;
   /** Adapter options (injected clients for testing). */
   adapterOpts?: RemoteAdapterOptions;
   /** Optional override for stateDir (backups dir). */
@@ -42,7 +44,10 @@ export async function runScheduledBackup(deps: TaskDeps): Promise<boolean> {
   }
 
   const { archivePath } = await createLocalBackup({ stateDir: deps.stateDir });
-  const result = await uploadBackup(archivePath, deps.dsn, deps.adapterOpts ?? {});
+  const result = await uploadBackup(archivePath, deps.dsn, {
+    ...deps.adapterOpts,
+    credentialRef: deps.credentialRef ?? deps.adapterOpts?.credentialRef,
+  });
   const event = makeBackupEvent(result);
 
   if (deps.emitEvent) {

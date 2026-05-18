@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   BACKUP_FORMAT,
+  BACKUP_SCHEMA_VERSION,
   backupEntityCounts,
   createBackupDump,
   decodeBackupDump,
@@ -17,6 +18,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 const BackupOutputSchema = z.object({
   ok: z.literal(true),
   format: z.literal(BACKUP_FORMAT),
+  schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
   dump: z.string(),
   entityCounts: z.record(z.string(), z.number().int().nonnegative()),
 });
@@ -26,6 +28,7 @@ const RestoreInputSchema = z.object({ dump: z.string().min(1) });
 const RestoreOutputSchema = z.object({
   ok: z.literal(true),
   format: z.literal(BACKUP_FORMAT),
+  schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
   entityCounts: z.record(z.string(), z.number().int().nonnegative()),
 });
 
@@ -50,6 +53,7 @@ export const backupRouter = t.router({
       return {
         ok: true as const,
         format: BACKUP_FORMAT,
+        schemaVersion: BACKUP_SCHEMA_VERSION,
         dump: encodeBackupDump(dump),
         entityCounts: backupEntityCounts(dump),
       };
@@ -64,6 +68,7 @@ export const backupRouter = t.router({
       return {
         ok: true as const,
         format: BACKUP_FORMAT,
+        schemaVersion: BACKUP_SCHEMA_VERSION,
         entityCounts: backupEntityCounts(dump),
       };
     }),

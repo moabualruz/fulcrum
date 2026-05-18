@@ -76,6 +76,7 @@ describe("backup tRPC router", () => {
       expect(backup).toMatchObject({
         ok: true,
         format: "fulcrum.db-dump.v1",
+        schemaVersion: 1,
       });
       expect(backup.dump).toEqual(expect.any(String));
       expect(backup.entityCounts.tasks).toBe(1);
@@ -87,6 +88,7 @@ describe("backup tRPC router", () => {
       expect(restored).toMatchObject({
         ok: true,
         format: "fulcrum.db-dump.v1",
+        schemaVersion: 1,
       });
       expect(restored.entityCounts.tasks).toBe(1);
 

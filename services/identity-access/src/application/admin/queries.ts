@@ -20,6 +20,7 @@ export interface AdminAppContext {
 }
 
 export const BACKUP_FORMAT = "fulcrum.db-dump.v1" as const;
+export const BACKUP_SCHEMA_VERSION = 1 as const;
 
 export const DumpTableSchema = z.object({
   columns: z.array(z.string()),
@@ -29,6 +30,7 @@ export const DumpTableSchema = z.object({
 
 export const DumpSchema = z.object({
   format: z.literal(BACKUP_FORMAT),
+  schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
   createdAt: z.string(),
   tables: z.record(z.string(), DumpTableSchema),
 });
@@ -114,6 +116,7 @@ export async function createBackupDump(ctx: AdminAppContext): Promise<BackupDump
 
   return {
     format: BACKUP_FORMAT,
+    schemaVersion: BACKUP_SCHEMA_VERSION,
     createdAt: new Date().toISOString(),
     tables,
   };
