@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { listTraceLinkFields } from "@platform-core/application/interface-parity/trace-link-matrix.ts";
 import { withWorkflowApiCaller } from "./local-caller.ts";
 
 describe("CLI workflow API caller", () => {
@@ -199,6 +200,18 @@ describe("CLI workflow API caller", () => {
       "http://127.0.0.1:4321/workflows/review/generated-e2e/run",
       "http://127.0.0.1:4321/workflows/planning/artifact-execution/run",
     ]);
+
+    expect(listTraceLinkFields().map((field) => field.name)).toEqual(expect.arrayContaining([
+      "projectId",
+      "taskId",
+      "runId",
+      "traceId",
+      "runGroupId",
+      "reviewId",
+      "docId",
+      "artifactId",
+      "memoryId",
+    ]));
   });
 });
 

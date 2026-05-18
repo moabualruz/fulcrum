@@ -318,6 +318,14 @@ export interface TuiAppOptions {
 
   /** Full workflow-cycle input used when running the acceptance cycle from planning. */
   workflowCycleInput?: WorkflowAcceptanceCycleInput;
+
+  /** Cross-surface identity context rendered in the status footer. */
+  traceContext?: {
+    projectId?: string;
+    runId?: string;
+    spanId?: string;
+    traceId?: string;
+  };
 }
 
 /** Map keybinding action → semantic TuiAction handler key. */
@@ -492,6 +500,7 @@ export class TuiApp {
   private readonly technicalPlanningInput: TechnicalPlanningInput;
   private readonly planningArtifactExecutionInput: PlanningArtifactRunInput;
   private readonly workflowCycleInput?: WorkflowAcceptanceCycleInput;
+  private readonly traceContext: NonNullable<TuiAppOptions["traceContext"]>;
   private keyHandler: ((key: string) => void) | null = null;
 
   private currentScreen: Screen = "nav";
@@ -568,6 +577,12 @@ export class TuiApp {
     this.technicalPlanningInput = opts.technicalPlanningInput ?? defaultTechnicalPlanningInput();
     this.planningArtifactExecutionInput = opts.planningArtifactExecutionInput ?? defaultPlanningArtifactExecutionInput();
     this.workflowCycleInput = opts.workflowCycleInput;
+    this.traceContext = opts.traceContext ?? {
+      projectId: process.env["FULCRUM_PROJECT_ID"],
+      runId: process.env["FULCRUM_RUN_ID"],
+      spanId: process.env["FULCRUM_SPAN_ID"],
+      traceId: process.env["FULCRUM_TRACE_ID"],
+    };
   }
 
   /** Resolved theme contract (Pillar 17), if injected. */
@@ -653,13 +668,23 @@ export class TuiApp {
     const info = this.statusInfo;
     const badge = this._formatInferenceBadge();
     const screen = `Screen:${this._currentScreenLabel()}`;
+    const trace = this._formatTraceFooter();
     if (!info) {
-      this.renderer.statusBar("Fulcrum TUI", `${screen}  ${badge}`);
+      this.renderer.statusBar("Fulcrum TUI", [screen, trace, badge].filter(Boolean).join("  "));
       return;
     }
     const left = `${info.orgId}  ${info.email}`;
-    const right = `${screen}  Bell:${this.bellCount}  ${badge}  q:quit  ?:help`;
+    const right = [screen, trace, `Bell:${this.bellCount}`, badge, "q:quit", "?:help"].filter(Boolean).join("  ");
     this.renderer.statusBar(left, right);
+  }
+
+  private _formatTraceFooter(): string {
+    const segments = [];
+    if (this.traceContext.traceId) segments.push(`trace:${this.traceContext.traceId}`);
+    if (this.traceContext.runId) segments.push(`run:${this.traceContext.runId}`);
+    if (this.traceContext.spanId) segments.push(`span:${this.traceContext.spanId}`);
+    if (this.traceContext.projectId) segments.push(`project:${this.traceContext.projectId}`);
+    return segments.join(" ");
   }
 
   private async _loadBellCount(): Promise<void> {

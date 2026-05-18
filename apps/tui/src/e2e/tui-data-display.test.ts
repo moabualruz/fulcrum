@@ -13,6 +13,30 @@ describe("TUI E2E data display", () => {
     expect(text).toContain("interface Project");
   });
 
+  test("status footer renders supplied trace, run, span, and project IDs", async () => {
+    const tty = new FakeTTY({ columns: 140, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: makeCaller(),
+      traceContext: {
+        traceId: "trace-visible",
+        runId: "run-visible",
+        spanId: "span-visible",
+        projectId: "project-visible",
+      },
+    });
+
+    await app.mount();
+    const text = tty.plainText();
+
+    expect(text).toContain("trace:trace-visible");
+    expect(text).toContain("run:run-visible");
+    expect(text).toContain("span:span-visible");
+    expect(text).toContain("project:project-visible");
+    app.stop();
+  });
+
   test("runs screen renders run list data", async () => {
     const text = await renderDomain("runs", makeCaller({
       agent_runs: {
