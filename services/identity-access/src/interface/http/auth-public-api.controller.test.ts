@@ -19,11 +19,15 @@ import { IdentityAccess1778623200009 } from "@identity-access/infrastructure/dat
 import { AuthStore } from "@identity-access/infrastructure/database/auth-store.ts";
 import {
   AuthAcceptInviteDto,
+  AuthEmailVerificationConfirmDto,
+  AuthEmailVerificationRequestDto,
   AuthInviteDto,
   AuthPublicApiController,
   AuthPublicApiModule,
   AuthPublicApiService,
 } from "@identity-access/interface/http/auth-public-api.controller.ts";
+import { Org, User, Verification } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { CoreAndAuth1715788800000 } from "@platform-core/infrastructure/application-database/migrations/1715788800000-CoreAndAuth.ts";
 import {
   buildFulcrumTypeOrmOptions,
   createFulcrumTypeOrmDataSource,
@@ -100,8 +104,16 @@ describe("auth public Nest API", () => {
     });
     const invalidAccept = Object.assign(new AuthAcceptInviteDto(), { token: "" });
 
+    const invalidVerification = Object.assign(new AuthEmailVerificationRequestDto(), {
+      orgId: "",
+      userId: "",
+    });
+    const invalidConfirm = Object.assign(new AuthEmailVerificationConfirmDto(), { token: "" });
+
     expect(validateSync(invalidInvite).map((error) => error.property).sort()).toEqual(["email", "orgId", "role", "userId"]);
     expect(validateSync(invalidAccept).map((error) => error.property)).toEqual(["token"]);
+    expect(validateSync(invalidVerification).map((error) => error.property).sort()).toEqual(["orgId", "userId"]);
+    expect(validateSync(invalidConfirm).map((error) => error.property)).toEqual(["token"]);
   });
 
   test("runs whoami, invite, and accept-invite through PGlite socket", async () => {
@@ -123,8 +135,11 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
         ...FULCRUM_WORKFLOW_SPINE_ENTITIES,
         ...FULCRUM_IDENTITY_ACCESS_ENTITIES,
         ...FULCRUM_INVITATION_ENTITIES,
+        Org,
+        User,
+        Verification,
       ],
-      migrations: [WorkflowSpine1778623200001, IdentityAccess1778623200009, Invitation1778757000000],
+      migrations: [CoreAndAuth1715788800000, WorkflowSpine1778623200001, IdentityAccess1778623200009, Invitation1778757000000],
     }),
   );
 
@@ -137,7 +152,7 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
     );
     const scope = {
       orgId: `workspace-auth-${source}`,
-      userId: `owner-auth-${source}`,
+      userId: userIdFor(source, "owner"),
     };
 
     await expect(controller.whoami(scope)).resolves.toMatchObject({
@@ -174,10 +189,35 @@ async function assertAuthRoundTrip(source: FulcrumTypeOrmConnectionSource, url: 
     await expect(controller.acceptInvite({ token: invitation.token })).rejects.toBeInstanceOf(BadRequestException);
     await expect(controller.invite({
       orgId: scope.orgId,
-      userId: `admin-auth-${source}`,
+      userId: userIdFor(source, "admin"),
       email: "owner@example.com",
       role: "owner",
     })).rejects.toBeInstanceOf(ForbiddenException);
+
+    const verification = await controller.requestEmailVerification({
+      ...scope,
+      email: "owner@example.com",
+      baseUrl: "http://fulcrum.test",
+    });
+    expect(verification.email).toBe("owner@example.com");
+    expect(verification.verificationUrl).toStartWith("http://fulcrum.test/auth/verify-email?token=");
+    await expect(controller.requestEmailVerification({
+      ...scope,
+      email: "owner@example.com",
+      baseUrl: "http://fulcrum.test",
+    })).rejects.toBeInstanceOf(BadRequestException);
+
+    const token = new URL(verification.verificationUrl).searchParams.get("token");
+    expect(token).toBeTruthy();
+    const verified = await controller.verifyEmail({ token: token! });
+    expect(verified).toMatchObject({
+      orgId: scope.orgId,
+      userId: scope.userId,
+      email: "owner@example.com",
+      emailVerified: true,
+    });
+    const verifiedSession = await controller.whoami(scope);
+    expect(verifiedSession.emailVerified).toBe(true);
   } finally {
     await dataSource.destroy();
   }
@@ -212,14 +252,33 @@ async function seedAuthOrganization(
     {
       id: `membership-auth-owner-${source}`,
       orgId: `workspace-auth-${source}`,
-      userId: `owner-auth-${source}`,
+      userId: userIdFor(source, "owner"),
       role: "owner",
     },
     {
       id: `membership-auth-admin-${source}`,
       orgId: `workspace-auth-${source}`,
-      userId: `admin-auth-${source}`,
+      userId: userIdFor(source, "admin"),
       role: "admin",
     },
   ]);
+  await dataSource.getRepository(User).save({
+    id: userIdFor(source, "owner"),
+    orgId: `workspace-auth-${source}`,
+    email: "owner@example.com",
+    name: "Owner",
+    role: "owner",
+    emailVerified: false,
+  });
+}
+
+function userIdFor(source: FulcrumTypeOrmConnectionSource, role: "owner" | "admin"): string {
+  if (source === "pglite-socket") {
+    return role === "owner"
+      ? "11111111-1111-4111-8111-111111111111"
+      : "22222222-2222-4222-8222-222222222222";
+  }
+  return role === "owner"
+    ? "33333333-3333-4333-8333-333333333333"
+    : "44444444-4444-4444-8444-444444444444";
 }

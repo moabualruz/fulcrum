@@ -2,11 +2,14 @@ import { error, fail, redirect } from "@sveltejs/kit";
 
 import { createInvitationApiCaller } from "@identity-access/interface/http/invitation-api-client.ts";
 import { createOrganizationApiCaller } from "@identity-access/interface/http/organization-api-client.ts";
+import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
+import type { EntityManager } from "typeorm";
 
 interface RouteLocals {
   session: unknown;
   orgId?: string | null;
   userId?: string | null;
+  em?: EntityManager | null;
 }
 
 interface LoadEvent {
@@ -32,6 +35,8 @@ export interface MemberRow {
   orgId: string;
   role: string;
   joinedAt: string;
+  email: string | null;
+  emailVerified: boolean;
 }
 
 interface MemberApiRow {
@@ -40,6 +45,8 @@ interface MemberApiRow {
   orgId?: unknown;
   role?: unknown;
   joinedAt?: unknown;
+  email?: unknown;
+  emailVerified?: unknown;
 }
 
 type ScopedApiCallers = {
@@ -106,14 +113,17 @@ function actionFailure(cause: unknown, key: "inviteError" | "roleError" | "remov
   return fail(status === 403 ? 403 : 400, { [key]: message });
 }
 
-function normalizeMember(row: MemberApiRow): MemberRow | null {
+function normalizeMember(row: MemberApiRow, emailState: Map<string, { email: string; emailVerified: boolean }>): MemberRow | null {
   if (typeof row.userId !== "string" || typeof row.orgId !== "string") return null;
+  const state = emailState.get(row.userId) ?? emailState.get(String(row.email ?? "").toLowerCase());
   return {
     id: typeof row.id === "string" ? row.id : `${row.orgId}:${row.userId}`,
     userId: row.userId,
     orgId: row.orgId,
     role: typeof row.role === "string" ? row.role : "member",
     joinedAt: typeof row.joinedAt === "string" ? row.joinedAt : "",
+    email: state?.email ?? (typeof row.email === "string" ? row.email : null),
+    emailVerified: state?.emailVerified ?? Boolean(row.emailVerified),
   };
 }
 
@@ -126,8 +136,9 @@ export async function load(event: LoadEvent) {
 
   try {
     const rows = await callers.organizations.members.list();
+    const emailState = await loadEmailState(event);
     const members = Array.isArray(rows)
-      ? rows.map((row) => normalizeMember(row as MemberApiRow)).filter((row): row is MemberRow => row !== null)
+      ? rows.map((row) => normalizeMember(row as MemberApiRow, emailState)).filter((row): row is MemberRow => row !== null)
       : [];
     return { members };
   } catch (cause) {
@@ -139,6 +150,18 @@ export async function load(event: LoadEvent) {
     }
     error(500, { message });
   }
+}
+
+async function loadEmailState(event: LoadEvent): Promise<Map<string, { email: string; emailVerified: boolean }>> {
+  const identity = scopedIdentity(event.locals);
+  if (!identity || !event.locals.em) return new Map();
+  const rows = await event.locals.em.find(User, { where: { orgId: identity.orgId } as never });
+  const state = new Map<string, { email: string; emailVerified: boolean }>();
+  for (const row of rows) {
+    state.set(row.id, { email: row.email, emailVerified: row.emailVerified });
+    state.set(row.email.toLowerCase(), { email: row.email, emailVerified: row.emailVerified });
+  }
+  return state;
 }
 
 export const actions = {

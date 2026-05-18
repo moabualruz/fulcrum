@@ -852,6 +852,10 @@ export class TypeOrmBetterAuthAdapter {
       ...(data["id"] !== undefined && { id: data["id"] }),
       ...(data["email"] !== undefined && { email: data["email"] as string }),
       ...(data["name"] !== undefined && { name: data["name"] as string | undefined }),
+      ...(data["emailVerified"] !== undefined && { emailVerified: Boolean(data["emailVerified"]) }),
+      ...(data["emailVerifiedAt"] !== undefined && {
+        emailVerifiedAt: (data["emailVerifiedAt"] ?? null) as Date | null,
+      }),
       ...((data["image"] !== undefined || data["avatarUrl"] !== undefined) && {
         avatarUrl: (data["image"] ?? data["avatarUrl"]) as string | undefined,
       }),
@@ -875,7 +879,8 @@ export class TypeOrmBetterAuthAdapter {
       email: user.email,
       name: user.name ?? null,
       image: user.avatarUrl ?? null,
-      emailVerified: false,  // Not in our schema; Better-Auth requires this field
+      emailVerified: user.emailVerified,
+      emailVerifiedAt: user.emailVerifiedAt ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       orgId: user.orgId,

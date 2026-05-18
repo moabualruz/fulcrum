@@ -23,6 +23,18 @@
     </p>
   {/if}
 
+  {#if form?.created}
+    <div data-auth-verification-sent class="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+      <p>{form.verificationNotice ?? "Verification email sent."}</p>
+      {#if form.verificationUrl}
+        <p class="mt-1 text-xs">
+          Development link:
+          <a class="underline" href={form.verificationUrl}>Verify email</a>
+        </p>
+      {/if}
+    </div>
+  {/if}
+
   <form method="POST" class="flex flex-col gap-4">
     <div class="flex flex-col gap-1.5">
       <label for="signup-name" class="text-sm font-medium">Name</label>

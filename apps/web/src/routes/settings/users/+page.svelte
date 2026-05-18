@@ -107,6 +107,7 @@
           <thead class="border-b border-border bg-muted/50">
             <tr>
               <th class="px-4 py-2 text-left font-medium">User ID</th>
+              <th class="px-4 py-2 text-left font-medium">Email status</th>
               <th class="px-4 py-2 text-left font-medium">Role</th>
               <th class="px-4 py-2 text-left font-medium">Joined</th>
               <th class="px-4 py-2 text-left font-medium">Actions</th>
@@ -116,6 +117,14 @@
             {#each members as member (member.id)}
               <tr class="border-b border-border last:border-0">
                 <td class="px-4 py-2 font-mono text-xs text-muted-foreground">{member.userId}</td>
+                <td class="px-4 py-2">
+                  <span
+                    data-member-email-status={member.userId}
+                    class={`rounded-sm border px-2 py-1 text-xs font-medium ${member.emailVerified ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning-foreground"}`}
+                  >
+                    {member.emailVerified ? "verified" : "unverified"}
+                  </span>
+                </td>
 
                 <!-- Role change dropdown -->
                 <td class="px-4 py-2">

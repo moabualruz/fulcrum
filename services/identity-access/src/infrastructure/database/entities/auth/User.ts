@@ -30,6 +30,12 @@ export class User {
   @Column({ type: "varchar", name: "avatar_url", nullable: true })
   avatarUrl?: string;
 
+  @Column({ type: "boolean", name: "email_verified", default: false })
+  emailVerified = false;
+
+  @Column({ type: "timestamptz", name: "email_verified_at", nullable: true })
+  emailVerifiedAt?: Date | null;
+
   @Column({ type: "enum", enum: ["owner", "admin", "member", "guest"] })
   role: "owner" | "admin" | "member" | "guest" = "member";
 
