@@ -36,10 +36,13 @@ function describeDatabaseConnection(config: ResolvedDatabaseConfig): ProductDbCo
 
 export function defaultProductDbStatus(): ProductDbStatus {
   const config = resolveDatabaseConfig();
+  const runtime = resolveApplicationDatabaseRuntime();
   return {
     backend: config.backend,
     connection: describeDatabaseConnection(config),
-    runtime: resolveApplicationDatabaseRuntime(),
+    runtime: runtime.backend === "postgres"
+      ? { ...runtime, target: redactDatabaseUrl(runtime.target) }
+      : runtime,
     current: null,
     pending: [],
     pastDue: 0,

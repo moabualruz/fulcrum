@@ -82,6 +82,31 @@ async function sourceFiles(root: string): Promise<string[]> {
 }
 
 describe("persistence proof matrix", () => {
+  test("application migrations are TypeScript TypeORM modules only", async () => {
+    async function collect(root: string): Promise<string[]> {
+      const entries = await readdir(join(ROOT, root), { withFileTypes: true }).catch(() => []);
+      const files = await Promise.all(entries.map(async (entry) => {
+        const path = join(root, entry.name);
+        if (entry.isDirectory()) return collect(path);
+        if (entry.isFile() && /(?:migration|migrations)/i.test(path)) return [path];
+        return [];
+      }));
+      return files.flat();
+    }
+
+    const migrationFiles = await collect("services");
+    const sqlMigrations = migrationFiles.filter((file) => file.endsWith(".sql"));
+    const nonTypeScriptMigrations = migrationFiles.filter((file) =>
+      !file.endsWith(".ts") &&
+      !file.endsWith(".test.ts") &&
+      !file.endsWith(".json") &&
+      !file.includes("_archived-mikro-migrations/"),
+    );
+
+    expect(sqlMigrations).toEqual([]);
+    expect(nonTypeScriptMigrations).toEqual([]);
+  });
+
   test("persisted public API families declare PGlite and PostgreSQL coverage", async () => {
     const missing: string[] = [];
     const incomplete: string[] = [];

@@ -101,10 +101,11 @@ describe("fulcrum db command source behavior", () => {
       runtime: {
         backend: "postgres",
         source: "database-url",
-        target: "postgresql://fulcrum:secret@127.0.0.1:5432/fulcrum",
+        target: "postgresql://fulcrum:***@127.0.0.1:5432/fulcrum",
         migrationsTableName: "schema_migrations",
       },
     });
+    expect(result.stdout).not.toContain("secret");
   });
 
   test("reset-local-state plans refusal and confirmation against the selected Fulcrum home", async () => {
