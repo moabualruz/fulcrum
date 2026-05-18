@@ -12,6 +12,8 @@ const serverPort = Number(process.env.FULCRUM_SERVER_TEST_PORT ?? "3100");
 const quotedWebRoot = JSON.stringify(webRoot);
 const quotedRepoRoot = JSON.stringify(repoRoot);
 
+export const PLAYWRIGHT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.50-jammy";
+
 process.env.FULCRUM_HOME ??= fulcrumHome;
 
 export default defineConfig({
