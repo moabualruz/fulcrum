@@ -45,9 +45,22 @@ export async function seedE2eProject(
   name?: string,
 ): Promise<{ id: string }> {
   const id = crypto.randomUUID();
+  const displayName = name ?? slug;
   await db.query(
     `INSERT INTO projects (id, org_id, slug, name) VALUES ($1, $2, $3, $4)`,
-    [id, orgId, slug, name ?? slug],
+    [id, orgId, slug, displayName],
+  );
+  await db.query(
+    `INSERT INTO fulcrum_workspaces (id, slug, name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [orgId, orgId, orgId],
+  );
+  await db.query(
+    `INSERT INTO fulcrum_projects (id, workspace_id, slug, name, trace_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, orgId, slug, displayName, `trace-e2e-${id}`],
   );
   return { id };
 }
@@ -170,6 +183,7 @@ export async function cleanupE2eFixtures(
 
   for (const id of input.projectIds ?? []) {
     await db.query("DELETE FROM events WHERE project_id = $1", [id]);
+    await db.query("DELETE FROM fulcrum_projects WHERE id = $1", [id]);
     await db.query("DELETE FROM projects WHERE id = $1", [id]);
   }
   await deleteByIds(db, "agent_runs", input.runIds);

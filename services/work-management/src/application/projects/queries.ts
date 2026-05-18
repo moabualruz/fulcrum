@@ -243,7 +243,7 @@ export async function loadProjectOverview(
   const conn = ormSqlConnection(em);
   const rows = await conn.execute<Array<ProjectRow & { description: string | null; updated_at: Date | string }>>(
     `SELECT id, slug, name, description, updated_at FROM projects
-       WHERE id = $1 AND org_id = $2`,
+       WHERE id::text = $1 AND org_id = $2`,
     [projectId, ctx.orgId],
   );
   const row = rows[0];

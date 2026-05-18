@@ -1,11 +1,11 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { createProjectApiForEvent } from "$lib/server/project-api";
 import {
   addProjectRepo,
   linkProjectRepoToProject,
   listProjectRepoCards,
 } from "@integration-hub/interface/project-repositories.ts";
+import { loadProjectOverview } from "@work-management/interface/project-lifecycle.ts";
 
 interface ProjectHeader {
   id: string;
@@ -14,8 +14,8 @@ interface ProjectHeader {
 
 export const load: PageServerLoad = async (event) => {
   const { params, locals } = event;
-  const project = await loadProject(event, params.id);
   const { em, ctx } = await requestScopedApp(locals, params.id);
+  const project = await loadProject(em, ctx, params.id);
   const repos = await listProjectRepoCards(em, ctx);
   return { project, repos };
 };
@@ -31,10 +31,11 @@ export const actions: Actions = {
         url: String(form.get("url") ?? ""),
         name: String(form.get("name") ?? ""),
       });
-      return { ok: true };
+      return { ok: true, mode: "addRepo" };
     } catch (e) {
       return fail(400, {
         ok: false,
+        mode: "addRepo",
         message: e instanceof Error ? e.message : "invalid repo",
       });
     }
@@ -42,27 +43,28 @@ export const actions: Actions = {
   link: async ({ params, request, locals }) => {
     const form = await request.formData();
     const repoId = String(form.get("repoId") ?? "").trim();
-    if (!repoId) return fail(400, { ok: false, message: "repoId required" });
-    const { em, ctx } = await requestScopedApp(locals, params.id);
-    await linkProjectRepoToProject(em, ctx, repoId);
-    return { ok: true };
+    if (!repoId) return fail(400, { ok: false, mode: "linkRepo", message: "repoId required" });
+    try {
+      const { em, ctx } = await requestScopedApp(locals, params.id);
+      await linkProjectRepoToProject(em, ctx, repoId);
+      return { ok: true, mode: "linkRepo" };
+    } catch (e) {
+      return fail(400, {
+        ok: false,
+        mode: "linkRepo",
+        message: e instanceof Error ? e.message : "invalid repo",
+      });
+    }
   },
 };
 
-async function loadProject(event: Parameters<PageServerLoad>[0], projectId: string): Promise<ProjectHeader> {
-  try {
-    const project = await createProjectApiForEvent(event).projects.get({ id: projectId }) as ProjectHeader;
-    return {
-      id: project.id,
-      name: project.name,
-    };
-  } catch (cause) {
-    if (typeof cause === "object" && cause !== null && "status" in cause && (cause as { status?: unknown }).status === 404) {
-      throw error(404, "Project not found");
-    }
-    const message = cause instanceof Error ? cause.message : String(cause);
-    throw error(502, message);
-  }
+async function loadProject(em: Awaited<ReturnType<typeof requestScopedApp>>["em"], ctx: Awaited<ReturnType<typeof requestScopedApp>>["ctx"], projectId: string): Promise<ProjectHeader> {
+  const project = await loadProjectOverview(em, ctx, projectId);
+  if (!project) throw error(404, "Project not found");
+  return {
+    id: project.project.id,
+    name: project.project.name,
+  };
 }
 
 async function requestScopedApp(locals: App.Locals, projectId?: string) {

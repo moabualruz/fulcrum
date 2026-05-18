@@ -99,14 +99,24 @@ mock.module("@integration-hub/interface/project-repositories.ts", () => ({
   },
 }));
 
+mock.module("@work-management/interface/project-lifecycle.ts", () => ({
+  loadProjectOverview: async (_em: unknown, ctx: { projectId?: string | null }, projectId: string) => {
+    if (projectId === "missing-project") return null;
+    return {
+      project: { id: projectId, name: "Alpha" },
+      descendants: [],
+    };
+  },
+}));
+
 beforeEach(() => {
   repos.splice(0, repos.length);
 });
 
 describe("/projects/[id]/repos +page.server.ts", () => {
-  test("server route uses project API and repo interface instead of direct application imports", () => {
+  test("server route uses public service interfaces instead of direct application imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("createProjectApiForEvent");
+    expect(source).toContain("@work-management/interface/project-lifecycle");
     expect(source).toContain("@integration-hub/interface/project-repositories");
     expect(source).not.toContain("@integration-hub/application/repos");
     expect(source).not.toContain("@work-management/application/projects");
@@ -124,7 +134,7 @@ describe("/projects/[id]/repos +page.server.ts", () => {
     const result = await mod.load(eventFor("project-1", fetchProject(calls)));
     expect(result.project).toEqual({ id: "project-1", name: "Alpha" });
     expect(result.repos.map((candidate) => candidate.id)).toEqual(["repo-1", "repo-2"]);
-    expect(calls).toEqual(["GET /api/v1/projects/project-1?orgId=org-1 sid=test-session"]);
+    expect(calls).toEqual([]);
   });
 
   test("load throws 404 for nonexistent project", async () => {
@@ -142,7 +152,7 @@ describe("/projects/[id]/repos +page.server.ts", () => {
       ...eventFor("project-1"),
       request: new Request("http://localhost/projects/x/repos", { method: "POST", body: fd }),
     } as Parameters<typeof mod.actions.add>[0]);
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, mode: "addRepo" });
 
     const loadResult = await mod.load(eventFor("project-1"));
     expect(loadResult.repos).toContainEqual(expect.objectContaining({ name: "New Repo", projectId: "project-1" }));
@@ -157,7 +167,7 @@ describe("/projects/[id]/repos +page.server.ts", () => {
       ...eventFor("project-1"),
       request: new Request("http://localhost/projects/x/repos", { method: "POST", body: fd }),
     } as Parameters<typeof mod.actions.link>[0]);
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, mode: "linkRepo" });
 
     const loadResult = await mod.load(eventFor("project-1"));
     expect(loadResult.repos).toContainEqual(expect.objectContaining({ id: "repo-orphan", projectId: "project-1" }));
