@@ -30,7 +30,7 @@
   }
 </script>
 
-<header class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}>
+<header data-agents-header class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}>
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Agents</h1>
 </header>
 
