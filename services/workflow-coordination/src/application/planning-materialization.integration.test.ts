@@ -129,6 +129,8 @@ describe("Planning preview Nest materialization service", () => {
         "acp",
         "verify-end-to-end",
       ]);
+      expect(result.traceId).toBe("trace-nest-materialize");
+      expect(result.breakdown.traceId).toBe("trace-nest-materialize");
       expect(result.materialization.docs.map((doc) => doc.clientKey)).toContain("plan-doc");
       expect(result.materialization.tasks).toEqual([
         { clientKey: "docs", id: "task-plan-nest-materialize-docs" },
@@ -282,6 +284,7 @@ describe("Planning preview Nest materialization service", () => {
         {
           kind: "doc",
           id: "doc-freeform-nest",
+          sourceId: "doc:doc-freeform-nest@current",
         },
       ]);
       expect(freeform.context.traceId).toBe("trace-freeform-nest");
@@ -437,7 +440,12 @@ describe("Planning preview Nest materialization service", () => {
         selectedDocIds: ["doc-build-plan"],
         traceId: "trace-build-plan",
       });
-      expect(prompt.context.sourceRefs).toEqual([{ kind: "doc", id: "doc-build-plan" }]);
+      expect(prompt.context.sourceRefs).toEqual([{
+        kind: "doc",
+        id: "doc-build-plan",
+        sourceId: "doc:doc-build-plan@current",
+      }]);
+      expect(prompt.traceId).toBe("trace-build-plan");
       expect(prompt.prompt).toContain("Plan from persisted docs.");
       expect(prompt.prompt).toContain("Prototype the planning workbench");
 
@@ -455,6 +463,7 @@ describe("Planning preview Nest materialization service", () => {
       });
 
       expect(generated.status).toBe("ready_for_plan_review");
+      expect(generated.traceId).toBe("trace-build-plan");
       expect(generated.eventId).toBe("event-plan-build-plan-technical-planning-generated");
       expect(generated.plan.markdown).toContain("Prototype the planning workbench");
       expect(generated.breakdown.taskDrafts.map((task) => task.clientKey)).toEqual([
@@ -825,8 +834,16 @@ describe("Planning preview Nest materialization service", () => {
         ["doc-trace-continuous-nest-new-acceptance-note", "continuous_update_replan"],
       ]);
       expect(result.context.sourceRefs).toEqual([
-        { kind: "doc", id: "doc-existing-continuous" },
-        { kind: "doc", id: "doc-trace-continuous-nest-new-acceptance-note" },
+        {
+          kind: "doc",
+          id: "doc-existing-continuous",
+          sourceId: "doc:doc-existing-continuous@current",
+        },
+        {
+          kind: "doc",
+          id: "doc-trace-continuous-nest-new-acceptance-note",
+          sourceId: "doc:doc-trace-continuous-nest-new-acceptance-note@current",
+        },
       ]);
       expect(result.prompt).toContain("## Continuous update / replanning cycle");
       expect(result.prompt).toContain("Replan after the updated document page.");

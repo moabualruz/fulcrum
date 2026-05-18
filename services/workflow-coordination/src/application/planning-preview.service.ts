@@ -60,7 +60,7 @@ import {
   FulcrumWorkspaceEntity,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities";
 
-export type ApprovedPlanPreview = ApprovedPlanBreakdown;
+export type ApprovedPlanPreview = ApprovedPlanBreakdown & { traceId: string };
 
 export interface PlanningFreeformPromptInput {
   projectId: string;
@@ -71,6 +71,7 @@ export interface PlanningFreeformPromptInput {
 }
 
 export interface PlanningFreeformPromptResult {
+  traceId: string;
   context: FreeformPlanningContext;
   prompt: string;
 }
@@ -86,6 +87,7 @@ export interface PlanningTechnicalCycleInput extends PlanningFreeformPromptInput
 }
 
 export interface PlanningTechnicalCycleResult extends TechnicalPlanningCycleDraft {
+  traceId: string;
   eventId: string;
 }
 
@@ -145,7 +147,8 @@ export interface ApprovedPlanMaterializeInput extends BuildApprovedPlanBreakdown
 }
 
 export interface ApprovedPlanMaterializeResult {
-  breakdown: ApprovedPlanBreakdown;
+  traceId: string;
+  breakdown: ApprovedPlanPreview;
   materialization: ApprovedPlanMaterializationResult;
 }
 
@@ -183,6 +186,7 @@ export interface PlanningFreeformStartInput extends PlanningProjectScopeInput {
 
 export interface PlanningFreeformStartResult {
   status: "ready_for_planning";
+  traceId: string;
   document: PlanningDocumentResult;
   context: FreeformPlanningContext;
   prompt: string;
@@ -218,6 +222,7 @@ export interface PlanningGuidedAcpSession {
 
 export interface PlanningGuidedAcpStartResult {
   status: "ready_for_acp_prompt";
+  traceId: string;
   session: PlanningGuidedAcpSession;
   traffic: { entries: TrafficEntry[] };
   context: FreeformPlanningContext;
@@ -244,6 +249,7 @@ export interface PlanningGuidedAcpSessionActionInput {
 
 export interface PlanningGuidedAcpSessionActionResult {
   status: "session_action_recorded";
+  traceId: string;
   session: {
     acpSessionId: string;
     projectId: string | null;
@@ -316,7 +322,11 @@ export class PlanningPreviewService {
 
   async previewApprovedPlan(
     input: BuildApprovedPlanBreakdownInput,): Promise<ApprovedPlanPreview> {
-    return await previewApprovedPlanBreakdown(input);
+    const breakdown = await previewApprovedPlanBreakdown(input);
+    return {
+      ...breakdown,
+      traceId: input.traceId ?? planningWorkflowId("trace", input.planId),
+    };
   }
 
   async buildFreeformDocsPlanningPrompt(
@@ -338,6 +348,7 @@ export class PlanningPreviewService {
       input.maxDocChars,
     );
     return {
+      traceId,
       context,
       prompt: buildAcpPlanningPromptWithFreeformDocs({
         userPrompt: input.userPrompt,
@@ -417,6 +428,7 @@ export class PlanningPreviewService {
 
     return {
       ...draft,
+      traceId: draft.plan.traceId ?? planning.context.traceId ?? input.traceId ?? planningWorkflowId("trace", draft.plan.planId),
       prompt: planning.prompt,
       eventId,
     };
@@ -765,7 +777,7 @@ export class PlanningPreviewService {
       };
     });
 
-    return { breakdown, materialization };
+    return { traceId, breakdown, materialization };
   }
 
   async startFreeformWork(
@@ -794,6 +806,7 @@ export class PlanningPreviewService {
     const context = buildContextFromDocuments([document], [document.id], traceId, input.maxDocChars);
     return {
       status: "ready_for_planning",
+      traceId,
       document,
       context,
       prompt: buildAcpPlanningPromptWithFreeformDocs({
@@ -872,7 +885,9 @@ export class PlanningPreviewService {
     });
 
     return {
-      status: "ready_for_acp_prompt",...documents,
+      status: "ready_for_acp_prompt",
+      traceId,
+      ...documents,
     };
   }
 
@@ -924,6 +939,7 @@ export class PlanningPreviewService {
 
       return {
         status: "session_action_recorded",
+        traceId,
         session: {
           acpSessionId,
           projectId: session.projectId,
