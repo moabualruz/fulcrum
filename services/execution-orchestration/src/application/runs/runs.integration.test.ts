@@ -119,6 +119,25 @@ describe("application runs commands and queries", () => {
        VALUES (?, ?, ?, ?, 'agent_run', ?, 'failed', ?::jsonb, now())`,
       [crypto.randomUUID(), DEFAULT_ORG_ID, projectId, "system", run.id, JSON.stringify({ reason: "timeout" })],
     );
+    await em.getConnection().execute(
+      `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
+       VALUES (?, ?, ?, ?, 'agent_run', ?, 'approval.requested', ?::jsonb, now())`,
+      [
+        crypto.randomUUID(),
+        DEFAULT_ORG_ID,
+        projectId,
+        "agent",
+        run.id,
+        JSON.stringify({
+          approvalId: "appr-delete",
+          toolName: "shell",
+          riskLevel: "critical",
+          arguments: { command: "rm -rf build" },
+          context: "Deletes generated build output.",
+          timeoutAt: "2026-05-18T09:00:00.000Z",
+        }),
+      ],
+    );
 
     const projectCtx = { ...ctx(), projectId };
     const rows = await listRunRows(em, projectCtx, { agent: "codex", status: "queued", range: "24h" });
@@ -147,6 +166,14 @@ describe("application runs commands and queries", () => {
 
     const page = await getProjectRunPageData(em, projectCtx, run.id);
     expect(page.transcript).toContain("real transcript");
+    expect(page.approvalQueue).toEqual([
+      expect.objectContaining({
+        id: "appr-delete",
+        toolName: "shell",
+        riskLevel: "critical",
+        context: "Deletes generated build output.",
+      }),
+    ]);
     expect(page.artifacts).toEqual([expect.objectContaining({ id: artifactId, downloadHref: `/artifacts/${artifactId}/download` })]);
     expect(page.events).toEqual(expect.arrayContaining([expect.objectContaining({ verb: "failed" })]));
     await expect(loadRunsPageData(em, projectCtx, { projectId })).resolves.toMatchObject({

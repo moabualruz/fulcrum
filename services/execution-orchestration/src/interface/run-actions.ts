@@ -28,3 +28,17 @@ export async function retryRun(em: EntityManager, ctx: AppContext, id: string) {
   const commands = await import("@execution-orchestration/application/runs/commands.ts");
   return commands.retryRun(em, ctx, id);
 }
+
+export async function recordRunApprovalDecision(
+  em: EntityManager,
+  ctx: AppContext,
+  input: {
+    runId: string;
+    approvalId: string;
+    decision: "approve" | "deny" | "request_info";
+    note?: string | null;
+  },
+) {
+  const commands = await import("@execution-orchestration/application/runs/commands.ts");
+  return commands.recordRunApprovalDecision(em, ctx, input);
+}

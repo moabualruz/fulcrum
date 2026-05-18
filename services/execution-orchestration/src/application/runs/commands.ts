@@ -38,6 +38,32 @@ export async function retryRun(em: EntityManager, ctx: AppContext, id: string): 
   }
 }
 
+export async function recordRunApprovalDecision(
+  em: EntityManager,
+  ctx: AppContext,
+  input: {
+    runId: string;
+    approvalId: string;
+    decision: "approve" | "deny" | "request_info";
+    note?: string | null;
+  },
+): Promise<{ ok: true }> {
+  await appendEventOrm(em, {
+    orgId: ctx.orgId,
+    projectId: ctx.projectId ?? null,
+    actor: ctx.userId ?? "system",
+    subjectKind: "agent_run",
+    subjectId: input.runId,
+    verb: "approval.decision",
+    payload: {
+      approvalId: input.approvalId,
+      decision: input.decision,
+      note: input.note ?? null,
+    },
+  });
+  return { ok: true };
+}
+
 export async function dispatchTaskRun(
   em: EntityManager,
   ctx: AppContext,

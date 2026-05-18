@@ -216,6 +216,16 @@ export interface RunEventRow {
   created_at: string | Date;
 }
 
+export interface ApprovalQueueItem {
+  id: string;
+  toolName: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  argumentsSummary: string;
+  context: string;
+  timeoutAt: string | null;
+  requestedAt: string;
+}
+
 export interface RunRow {
   id: string;
   agent: string;
@@ -400,6 +410,7 @@ export async function getProjectRunPageData(
     downloadHref: string;
   }>;
   events: Array<RunEventRow & { created_at: string }>;
+  approvalQueue: ApprovalQueueItem[];
 }> {
   const conn = ormSqlConnection(em);
   const columns = await agentRunColumns(em);
@@ -524,7 +535,47 @@ export async function getProjectRunPageData(
     ...event,
     created_at: isoStamp(event.created_at),
   }));
-  return { run, transcript, artifacts, events };
+  return { run, transcript, artifacts, events, approvalQueue: buildApprovalQueue(events) };
+}
+
+function buildApprovalQueue(events: Array<RunEventRow & { created_at: string }>): ApprovalQueueItem[] {
+  const decisions = new Set(
+    events
+      .filter((event) => event.verb === "approval.decision")
+      .map((event) => stringValue(event.payload, "approvalId"))
+      .filter((value): value is string => value !== null),
+  );
+  return events
+    .filter((event) => event.verb === "approval.requested" || event.verb === "approval.required")
+    .map((event) => {
+      const approvalId = stringValue(event.payload, "approvalId") ?? event.id;
+      return {
+        id: approvalId,
+        toolName: stringValue(event.payload, "toolName") ?? stringValue(event.payload, "tool") ?? "Tool call",
+        riskLevel: riskLevelValue(event.payload["riskLevel"] ?? event.payload["risk_level"]),
+        argumentsSummary: jsonSummary(event.payload["arguments"] ?? event.payload["args"] ?? event.payload["input"]),
+        context: stringValue(event.payload, "context") ?? stringValue(event.payload, "summary") ?? "No context supplied.",
+        timeoutAt: stringValue(event.payload, "timeoutAt") ?? stringValue(event.payload, "timeout_at"),
+        requestedAt: event.created_at,
+      } satisfies ApprovalQueueItem;
+    })
+    .filter((item) => !decisions.has(item.id));
+}
+
+function stringValue(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key];
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+function jsonSummary(value: unknown): string {
+  if (value === null || value === undefined) return "{}";
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function riskLevelValue(value: unknown): ApprovalQueueItem["riskLevel"] {
+  return value === "low" || value === "medium" || value === "high" || value === "critical" ? value : "medium";
 }
 
 function isoStamp(value: string | Date): string {

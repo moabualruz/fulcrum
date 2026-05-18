@@ -139,6 +139,7 @@
   {@const run = payload.run}
   {@const transcript = payload.transcript}
   {@const events = payload.events}
+  {@const approvalQueue = payload.approvalQueue}
   {@const liveSessionItems = buildLiveSessionItems(events, transcript)}
   <header
     data-project-run-detail-header
@@ -212,6 +213,41 @@
       </form>
     </div>
   {/if}
+
+  <section data-approval-queue-pane class={cn("mb-4 rounded-md border border-border bg-background")}>
+    <div class={cn("flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-2")}>
+      <div>
+        <h2 class={cn("text-sm font-semibold")}>Approval Queue</h2>
+        <p class={cn("text-xs text-muted-foreground")}>Risky tool calls wait here with context before execution.</p>
+      </div>
+      <span data-approval-queue-count class={cn("rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium")}>{approvalQueue.length} pending</span>
+    </div>
+    <div class={cn("divide-y divide-border")}>
+      {#each approvalQueue as item (item.id)}
+        <article data-approval-queue-item={item.id} class={cn("grid gap-3 p-3 text-xs lg:grid-cols-[minmax(0,1fr)_auto]")}>
+          <div class={cn("min-w-0 space-y-2")}>
+            <div class={cn("flex flex-wrap items-center gap-2")}>
+              <span data-approval-tool-name class={cn("font-semibold")}>{item.toolName}</span>
+              <span data-approval-risk-level class={cn("rounded bg-background px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground")}>{item.riskLevel}</span>
+              {#if item.timeoutAt}
+                <span data-approval-timeout class={cn("font-mono text-[10px] text-muted-foreground")}>timeout {item.timeoutAt}</span>
+              {/if}
+            </div>
+            <p data-approval-context class={cn("text-muted-foreground")}>{item.context}</p>
+            <pre data-approval-arguments class={cn("max-h-24 overflow-auto rounded bg-muted/40 p-2 text-[11px] whitespace-pre-wrap")}>{item.argumentsSummary}</pre>
+          </div>
+          <form method="POST" action="?/approvalDecision" use:enhance class={cn("flex flex-wrap items-start gap-2 lg:justify-end")}>
+            <input type="hidden" name="approvalId" value={item.id} />
+            <button name="decision" value="approve" data-approval-approve class={cn("inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90")}>Approve</button>
+            <button name="decision" value="deny" data-approval-deny class={cn("inline-flex h-8 items-center rounded-md border border-destructive/60 bg-destructive/10 px-3 text-xs font-medium text-destructive hover:bg-destructive/20")}>Deny</button>
+            <button name="decision" value="request_info" data-approval-request-info class={cn("inline-flex h-8 items-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent")}>Request Info</button>
+          </form>
+        </article>
+      {:else}
+        <div data-approval-queue-empty class={cn("p-4 text-sm text-muted-foreground")}>No risky tool calls waiting for approval.</div>
+      {/each}
+    </div>
+  </section>
 
   <section data-ai-assist-live-session class={cn("mb-4 rounded-md border border-border bg-background")}>
     <div class={cn("flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-2")}>

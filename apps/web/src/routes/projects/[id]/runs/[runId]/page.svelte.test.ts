@@ -43,4 +43,16 @@ describe("/projects/[id]/runs/[runId] +page.svelte source", () => {
     expect(source).toContain("data-approval-gate");
     expect(source).toContain("navigator.clipboard.writeText");
   });
+
+  test("renders approval queue with decision actions", () => {
+    expect(source).toContain("data-approval-queue-pane");
+    expect(source).toContain("Approval Queue");
+    expect(source).toContain("data-approval-risk-level");
+    expect(source).toContain("data-approval-arguments");
+    expect(source).toContain("data-approval-context");
+    expect(source).toContain('action="?/approvalDecision"');
+    expect(source).toContain("data-approval-approve");
+    expect(source).toContain("data-approval-deny");
+    expect(source).toContain("data-approval-request-info");
+  });
 });

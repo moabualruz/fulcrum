@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
+import { cancelRun, recordRunApprovalDecision, retryRun } from "@execution-orchestration/interface/run-actions.ts";
 import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
@@ -63,5 +63,21 @@ export const actions: Actions = {
     const result = await retryRun(em, ctx, params.runId!);
     const newId = result.id;
     throw redirect(303, `/projects/${params.id}/runs/${newId}`);
+  },
+  approvalDecision: async ({ request, params, locals }) => {
+    const form = await request.formData();
+    const approvalId = String(form.get("approvalId") ?? "");
+    const decision = String(form.get("decision") ?? "");
+    if (decision !== "approve" && decision !== "deny" && decision !== "request_info") {
+      throw error(400, "Invalid approval decision");
+    }
+    const { em, ctx } = await requestServiceScope(locals, params.id);
+    await recordRunApprovalDecision(em, ctx, {
+      runId: params.runId!,
+      approvalId,
+      decision,
+      note: String(form.get("note") ?? "") || null,
+    });
+    return actionOk("Approval decision recorded");
   },
 };
