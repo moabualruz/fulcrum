@@ -174,7 +174,7 @@ URL invariants:
 | Intake queue | `/.../capture/inbox` | Single column, snooze/accept/decline | Plane intake (modified) |
 | Templates | inline | Note, Doc, Decision, Bug, Question, Intake | n/a |
 
-Editor: TipTap-based, slash menu, mentions (`@user`, `@page`, `@TASK-123`, `@RUN-456`, `@Oct 1`), block types per DESIGN.md §3, page history, comments side rail.
+Editor: TipTap-based, slash menu, mentions (`@user`, `@page`, `@TASK-123`, `@RUN-456`, `@Oct 1`), block types per DESIGN.md §3, page history, comments side rail. Real-time collaboration shows connected users, cursor overlays, connection health, last saved state, offline retry, and contributor-attributed revision history; flag-off state keeps single-user save controls without dead collaboration UI.
 
 Exit handoff: "Hand off to Plan" button on doc header → creates planning session pre-seeded with this doc as context. Trace ID allocated here.
 

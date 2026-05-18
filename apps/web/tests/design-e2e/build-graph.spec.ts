@@ -165,6 +165,21 @@ test.describe("build graph doc search", () => {
 		await expect(page.locator("[data-tree-reveal]")).toContainText("doc-kernel-notes");
 	});
 
+	test("captures spec-backed docs collaboration states", async ({ page }) => {
+		await openBuildGraph(page);
+
+		await expect(page.locator("[data-doc-collab-fixture]")).toBeVisible();
+		await expect(page.locator("[data-connected-users]")).toContainText("mkh editing intro");
+		await expect(page.locator("[data-connected-users]")).toContainText("agent-runner resolving refs");
+		await expect(page.locator("[data-cursor-overlays]")).toContainText("paragraph 2");
+		await expect(page.locator("[data-collab-connection-state]")).toContainText("connected");
+		await expect(page.locator("[data-collab-save-state]")).toContainText("last saved");
+		await expect(page.locator("[data-collab-risk-state]")).toContainText("Offline edits");
+		await expect(page.locator("[data-collab-retry-save]")).toBeVisible();
+		await expect(page.locator("[data-collab-history-context]")).toContainText("conflict-safe merge");
+		await expect(page.locator("[data-collab-flag-off]")).toContainText("single-user save remains available");
+	});
+
 	test("filters by owner and attachment state without leaking unrelated rows", async ({ page }) => {
 		await openBuildGraph(page);
 

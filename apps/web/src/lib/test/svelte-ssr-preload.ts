@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const webRoot = join(import.meta.dir, "../..");
+const tsTranspiler = new Bun.Transpiler({ loader: "ts", target: "bun" });
 
 plugin({
   name: "svelte-ssr-loader",
@@ -34,7 +35,8 @@ plugin({
     });
     build.onLoad({ filter: /\.svelte\.(js|ts)$/ }, (args) => {
       const source = readFileSync(args.path, "utf8");
-      const { js } = compileModule(source, {
+      const moduleSource = args.path.endsWith(".ts") ? tsTranspiler.transformSync(source) : source;
+      const { js } = compileModule(moduleSource, {
         filename: args.path,
         generate: "server",
         dev: false,

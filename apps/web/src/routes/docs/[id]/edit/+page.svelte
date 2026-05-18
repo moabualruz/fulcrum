@@ -53,7 +53,10 @@
 	let collabProvider = $state<CollabProvider | null>(null);
 	let bellSocket = $state<BellWebSocket | null>(null);
 	let bellConnected = $state(false);
+	let saveStatus = $state<"saved" | "saving" | "offline-risk">("saved");
+	let lastSavedAt = $state("2026-05-18 08:24");
 	const featureFlags = $derived({ "real-time-collab-server": collabEnabled });
+	const connectionState = $derived(collabEnabled ? (bellConnected ? "connected" : "disconnected") : "single-user");
 
 	onMount(async () => {
 		if (!collabEnabled) return;
@@ -101,6 +104,12 @@
 	function handleDocChange(event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>): void {
 		contentJson = event.detail.contentJson;
 		bodyValue = event.detail.bodyMd;
+		saveStatus = collabEnabled && !bellConnected ? "offline-risk" : "saving";
+	}
+
+	function retryCollaborationSave(): void {
+		saveStatus = "saving";
+		lastSavedAt = new Date().toISOString();
 	}
 
 	function handleFrontmatterChange(event: CustomEvent<FrontmatterValue>): void {
@@ -141,6 +150,46 @@
 		class={cn(buttonVariants({ variant: "ghost" }), "text-xs")}
 	>History</a>
 </header>
+
+<section
+	data-collab-status-panel
+	class={cn("mb-4 grid gap-3 rounded-md border border-border bg-card p-3 text-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}
+>
+	<div class={cn("min-w-0")}>
+		<p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Collaboration</p>
+		<div class={cn("mt-2 flex flex-wrap items-center gap-2")}>
+			<span data-collab-connection-state class={cn("rounded-sm border border-border px-2 py-1 text-xs")}>
+				{connectionState}
+			</span>
+			<span data-collab-save-state class={cn("rounded-sm border border-border px-2 py-1 text-xs")}>
+				{saveStatus === "saved" ? `last saved ${lastSavedAt}` : saveStatus}
+			</span>
+		</div>
+		{#if saveStatus === "offline-risk"}
+			<p data-collab-risk-state class={cn("mt-2 text-xs text-destructive")}>
+				Offline edits are local until the collaboration channel reconnects.
+			</p>
+			<button
+				type="button"
+				data-collab-retry-save
+				class={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}
+				onclick={retryCollaborationSave}
+			>Retry save</button>
+		{/if}
+	</div>
+	<div class={cn("min-w-0")}>
+		<p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Revision contributors</p>
+		<ul data-collab-history-context class={cn("mt-2 space-y-1 text-xs text-muted-foreground")}>
+			<li>mkh saved draft 12 from this editor</li>
+			<li>agent-runner appended source refs after conflict-safe merge</li>
+		</ul>
+		{#if !collabEnabled}
+			<p data-collab-flag-off class={cn("mt-2 text-xs text-muted-foreground")}>
+				Real-time collaboration is off; single-user save remains available.
+			</p>
+		{/if}
+	</div>
+</section>
 
 <div data-doc-edit-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
 	<form

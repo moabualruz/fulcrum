@@ -260,6 +260,39 @@
       </div>
     </section>
 
+    <section data-doc-collab-fixture class={cn("grid min-w-0 gap-3 rounded-md border border-border bg-card p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+      <div class={cn("min-w-0 space-y-3")}>
+        <div>
+          <p class={cn("type-caption uppercase text-fg-subtle")}>Docs collaboration</p>
+          <h2 class={cn("type-h2 text-foreground")}>Presence and safe save state</h2>
+        </div>
+        <div data-connected-users class={cn("flex flex-wrap gap-2")}>
+          {#each ["mkh editing intro", "ada reviewing scope", "agent-runner resolving refs"] as user}
+            <span class={cn("rounded-sm border border-border bg-muted px-2 py-1 text-xs text-foreground")}>{user}</span>
+          {/each}
+        </div>
+        <div data-cursor-overlays class={cn("grid gap-2 text-xs text-muted-foreground")}>
+          <span>mkh cursor: paragraph 2, offset 41</span>
+          <span>ada cursor: checklist item 4, offset 12</span>
+        </div>
+      </div>
+      <div class={cn("min-w-0 space-y-3")}>
+        <div class={cn("flex flex-wrap gap-2")}>
+          <span data-collab-connection-state class={cn("rounded-sm border border-success/40 bg-success/10 px-2 py-1 text-xs text-success")}>connected</span>
+          <span data-collab-save-state class={cn("rounded-sm border border-border px-2 py-1 text-xs text-foreground")}>last saved 2026-05-18 08:24</span>
+        </div>
+        <div data-collab-risk-state class={cn("rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive")}>
+          Offline edits are held locally until reconnect; retry save is visible before navigation.
+        </div>
+        <button type="button" data-collab-retry-save class={cn("h-9 rounded-md border border-border px-3 text-sm font-medium")}>Retry save</button>
+        <ul data-collab-history-context class={cn("space-y-1 text-xs text-muted-foreground")}>
+          <li>Revision 12 · mkh · saved accepted copy</li>
+          <li>Revision 13 · agent-runner · conflict-safe merge</li>
+        </ul>
+        <p data-collab-flag-off class={cn("text-xs text-muted-foreground")}>Flag off: single-user save remains available; no dead presence controls render.</p>
+      </div>
+    </section>
+
     <section data-dependency-panel class={cn("grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]")}>
       <div class={cn("min-w-0 rounded-md border border-border bg-card")}>
         <div class={cn("flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2")}>

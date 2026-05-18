@@ -87,5 +87,11 @@ describe("/docs/[id]/edit +page.svelte", () => {
     expect(source).toContain("FeatureGate flag=\"real-time-collab-server\"");
     expect(source).toContain("provider.onPresenceChange");
     expect(source).toContain("provider.onCursorChange");
+    expect(source).toContain("data-collab-status-panel");
+    expect(source).toContain("data-collab-connection-state");
+    expect(source).toContain("data-collab-save-state");
+    expect(source).toContain("data-collab-risk-state");
+    expect(source).toContain("data-collab-history-context");
+    expect(source).toContain("data-collab-flag-off");
   });
 });
