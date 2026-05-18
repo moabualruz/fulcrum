@@ -16,6 +16,11 @@ interface ArtifactRow {
 
 interface ArtifactsPayload {
   artifacts: ArtifactRow[];
+  error?: {
+    message: string;
+    recovery: string;
+    traceId: string;
+  } | null;
 }
 
 interface PublicArtifactRow {
@@ -53,6 +58,16 @@ function eventFor(
   } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
 
+function actionEventFor(form: FormData, fetchImpl: typeof fetch): Parameters<typeof import("./+page.server.ts").actions.bulk>[0] {
+  const url = new URL("http://localhost/artifacts");
+  return {
+    url,
+    locals: { activeProjectId: null, orgId: "org-1", userId: "user-1" },
+    fetch: fetchImpl,
+    request: new Request(url, { method: "POST", body: form, headers: { cookie: "sid=test-session" } }),
+  } as unknown as Parameters<typeof import("./+page.server.ts").actions.bulk>[0];
+}
+
 function fetchArtifacts(calls: string[] = [], seed: PublicArtifactRow[] = defaultArtifacts()): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -77,6 +92,30 @@ function fetchArtifacts(calls: string[] = [], seed: PublicArtifactRow[] = defaul
     });
     return Response.json(rows);
   }) as typeof fetch;
+}
+
+function fetchArtifactMutations(calls: string[] = []): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const headers = new Headers(init?.headers);
+    calls.push(`${method} ${url.pathname} ${headers.get("cookie") ?? ""}`);
+
+    if (url.pathname.endsWith("/archive") && method === "POST") {
+      return Response.json({ ...defaultArtifacts()[0], archived: true });
+    }
+    if (url.pathname.startsWith("/api/v1/artifacts/") && method === "DELETE") {
+      return Response.json({ ok: true, id: url.pathname.split("/").at(-1) });
+    }
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
+  }) as typeof fetch;
+}
+
+function formFor(action: string, ids: string[]): FormData {
+  const form = new FormData();
+  form.set("action", action);
+  form.set("ids", JSON.stringify(ids));
+  return form;
 }
 
 function defaultArtifacts(): PublicArtifactRow[] {
@@ -185,5 +224,36 @@ describe("/artifacts +page.server.ts load()", () => {
     const result = await mod.load(eventFor("/artifacts", fetchArtifacts([], [])));
     const payload = await streamedData<ArtifactsPayload>(result);
     expect(payload.artifacts).toEqual([]);
+  });
+
+  test("returns route-specific recovery payload when public API is unavailable", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    const result = await mod.load(eventFor("/artifacts", (async () => Response.json({ message: "not found" }, { status: 404 })) as typeof fetch));
+    const payload = await streamedData<ArtifactsPayload>(result);
+
+    expect(payload.artifacts).toEqual([]);
+    expect(payload.error).toEqual({
+      message: "Artifacts could not load.",
+      recovery: "Retry after the local API is reachable.",
+      traceId: "artifacts-list",
+    });
+  });
+
+  test("bulk action archives selected artifacts through public API", async () => {
+    const calls: string[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);
+    const result = await mod.actions.bulk(actionEventFor(formFor("archive", ["artifact-report"]), fetchArtifactMutations(calls)));
+
+    expect(result).toEqual({ ok: true, action: "archive", count: 1 });
+    expect(calls).toEqual(["POST /api/v1/artifacts/artifact-report/archive sid=test-session"]);
+  });
+
+  test("bulk action deletes selected artifacts through public API", async () => {
+    const calls: string[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 7}`);
+    const result = await mod.actions.bulk(actionEventFor(formFor("delete", ["artifact-report"]), fetchArtifactMutations(calls)));
+
+    expect(result).toEqual({ ok: true, action: "delete", count: 1 });
+    expect(calls).toEqual(["DELETE /api/v1/artifacts/artifact-report sid=test-session"]);
   });
 });

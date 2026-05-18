@@ -48,6 +48,7 @@ export default defineConfig({
 				FULCRUM_HOME: fulcrumHome,
 				FULCRUM_SERVER_PORT: String(serverPort),
 				PORT: String(serverPort),
+				FULCRUM_FEATURES: "public-api",
 				FULCRUM_E2E: "1",
 			},
 			reuseExistingServer: false,
