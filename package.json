@@ -24,6 +24,7 @@
     "test": "bun test",
     "typecheck": "bun run --bun tsc --noEmit",
     "lint": "bun run --bun tsc --noEmit",
+    "format": "biome format --write biome.json",
     "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
     "changelog": "git-cliff -o CHANGELOG.md",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
+    "@biomejs/biome": "2.4.15",
     "@nestjs/microservices": "11.1.21",
     "@nestjs/websockets": "11.1.21",
     "@playwright/test": "1.59.1",
