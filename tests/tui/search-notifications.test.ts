@@ -82,6 +82,8 @@ describe("SearchScreen", () => {
     await screen.submitQuery("notification");
     expect(searches.at(-1)).toEqual({ query: "notification", facets: ["tasks", "memories", "runs", "artifacts"], scope: "current" });
 
+    await screen.handleKey("j");
+    await screen.handleKey("k");
     await screen.handleKey("\r");
     expect(opened).toEqual([{ kind: "tasks", id: "task-1" }]);
   });
@@ -203,6 +205,7 @@ describe("NotificationsScreen", () => {
       },
       subscriptions: new SubscriptionBridge(bus),
       initialBellCount: 1,
+      onOpenEntity: (entity) => marked.push({ open: entity }),
     });
 
     await screen.load();
@@ -220,6 +223,10 @@ describe("NotificationsScreen", () => {
 
     await screen.handleKey("\t");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("[All]");
+    await screen.handleKey("j");
+    await screen.handleKey("k");
+    await screen.handleKey("\r");
+    expect(marked).toContainEqual({ open: { kind: "task", id: "task-1" } });
 
     screen.dispose();
     bus.emit("notifications.unreadCount", { count: 9 });
@@ -284,6 +291,8 @@ describe("NotificationRulesScreen", () => {
     await screen.handleKey("j");
     await screen.handleKey(" ");
     expect(calls.at(-1)).toEqual({ update: { id: "r-2", enabled: true } });
+    await screen.handleKey("k");
+    await screen.handleKey("j");
 
     await screen.handleKey("E");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Edit rule name:");
@@ -332,6 +341,8 @@ describe("ActivityFeedScreen", () => {
     expect(queries.at(-1)).toEqual({ limit: 50, offset: 0 });
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("task created human T-1");
 
+    await screen.handleKey("j");
+    await screen.handleKey("k");
     await screen.handleKey(" ");
     expect(queries.at(-1)).toEqual({ subjectKind: "task", limit: 50, offset: 0 });
     await screen.handleKey("\t");
