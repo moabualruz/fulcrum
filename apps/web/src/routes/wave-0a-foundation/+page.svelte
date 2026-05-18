@@ -15,6 +15,16 @@
 		{ token: "--success", label: "Success", foreground: "--success-foreground" },
 	];
 
+	const radiusTokens = [
+		{ token: "--radius-sm", className: "rounded-sm", label: "Small" },
+		{ token: "--radius-md", className: "rounded-md", label: "Medium" },
+		{ token: "--radius-lg", className: "rounded-lg", label: "Large" },
+		{ token: "--radius-xl", className: "rounded-xl", label: "Extra large" },
+		{ token: "--radius-2xl", className: "rounded-2xl", label: "2x large" },
+		{ token: "--radius-3xl", className: "rounded-3xl", label: "3x large" },
+		{ token: "--radius-4xl", className: "rounded-4xl", label: "4x large" },
+	];
+
 	const { data }: { data: PageData } = $props();
 	const mode = data.mode as TokenMode;
 </script>
@@ -73,6 +83,52 @@
 					</div>
 				</article>
 			{/each}
+		</section>
+
+		<section data-radius-token-grid class="grid gap-3 lg:grid-cols-7">
+			{#each radiusTokens as radius}
+				<article
+					data-radius-token={radius.token}
+					class={`${radius.className} border border-border bg-surface-elevated p-4 shadow-sm`}
+				>
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold text-fg">{radius.label}</h2>
+						<p class="font-mono text-xs text-fg-muted">{radius.token}</p>
+					</div>
+				</article>
+			{/each}
+		</section>
+
+		<section data-radius-component-contracts class="grid gap-3 md:grid-cols-3">
+			<button
+				type="button"
+				data-radius-button
+				class="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm"
+			>
+				Button
+			</button>
+
+			<article data-radius-card class="rounded-lg border border-border bg-surface-elevated p-4 shadow-sm">
+				<h2 class="text-sm font-semibold text-fg">Card</h2>
+				<p class="mt-1 text-xs text-fg-muted">Foundation surface</p>
+			</article>
+
+			<div
+				data-radius-modal
+				role="dialog"
+				aria-label="Radius modal specimen"
+				class="rounded-xl border border-border bg-surface-elevated p-4 shadow-sm"
+			>
+				<h2 class="text-sm font-semibold text-fg">Modal</h2>
+				<p class="mt-1 text-xs text-fg-muted">Overlay surface</p>
+			</div>
+
+			<article
+				data-radius-override
+				class="rounded-3xl border border-border bg-surface-elevated p-4 text-sm font-medium text-fg shadow-sm md:col-span-3"
+			>
+				Override specimen
+			</article>
 		</section>
 	</section>
 </main>
