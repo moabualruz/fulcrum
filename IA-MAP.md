@@ -150,6 +150,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /task-filters                                             internal design-e2e preview for persistent task filters, AND/OR logic, and saved filtered views
 /palette                                                  internal design-e2e preview for permission-aware CommandPalette actions and SavedView access
 /comments                                                 internal design-e2e preview for task detail side panel with inline edit, properties, comments, activity, related tasks, and runs
+/comments-block-thread                                    internal design-e2e preview for inline comment marks, margin pins, hover previews, thread sidebar, resolved state, and mark deletion
 /auth-flows                                               internal design-e2e preview for login form, OAuth provider POST payloads, passkey support detection, and recovery guidance
 /cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
 /cross-cutting-mobile                                     internal design-e2e preview for Android status-bar/gesture-zone, iOS notch/home-indicator/bottom-nav/landscape safe-area reserves, and Tailwind sm/md/lg/xl responsive breakpoint reflow
