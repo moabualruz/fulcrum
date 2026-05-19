@@ -149,7 +149,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /comments                                                 internal design-e2e preview for task detail side panel with inline edit, properties, comments, activity, related tasks, and runs
 /auth-flows                                               internal design-e2e preview for login form, OAuth provider POST payloads, passkey support detection, and recovery guidance
 /cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
-/cross-cutting-mobile                                     internal design-e2e preview for Android status-bar, gesture-zone, bottom-nav, and landscape safe-area reserves
+/cross-cutting-mobile                                     internal design-e2e preview for Android status-bar/gesture-zone and iOS notch/home-indicator/bottom-nav/landscape safe-area reserves
 /mobile-capture                                           internal design-e2e preview for mobile capture Core Web Vitals budgets, layout stability, and opt-in metric delivery
 /view-controls                                            internal design-e2e preview for view sort controls (header sort, asc/desc indicator, mobile sort menu, clear sort)
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
@@ -603,7 +603,7 @@ Mirrors web `.foot` exactly. Left-to-right: `mode pill · profile · repo:branch
 - AI Assist drawer = bottom sheet 60vh draggable.
 - Modals = bottom sheets.
 - Tap targets ≥44×44 px under `(pointer: coarse)` (research-06 §1, WCAG 2.5.5).
-- Android shell reserve: status-bar top inset ≥24 px; bottom gesture inset ≥48 px; landscape inline gesture insets ≥48 px. Bottom tab bar and mobile sheets sit above those reserves.
+- Mobile shell reserve: Android status-bar top inset ≥24 px, Android bottom gesture inset ≥48 px, Android landscape inline gesture insets ≥48 px; iOS notched-device top inset ≥47 px, iOS home-indicator bottom inset ≥34 px, and iOS landscape notch insets ≥47 px. Bottom tab bar and mobile sheets sit above those reserves.
 - Heavy authoring (multi-pane doc edit, complex board drag) gracefully degrades to "open desktop for full edit" banner; read + approve + comment + status-update remain fully mobile.
 
 ---
