@@ -158,4 +158,47 @@ test.describe("plan review workflow navigation", () => {
 		await expect(page.locator("[data-importer-dry-run-status]")).toContainText("Cancelled");
 		await expect(page.locator("[data-import-dry-run-message]")).toContainText("Import cancelled");
 	});
+
+	test("uploads CSV, detects columns, previews rows, and reports row errors", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		const csv = [
+			"Summary,Description,Status,Priority,Owner,Points",
+			"Renew contract,Enterprise renewal,In Review,High,Ada,5",
+			"Add audit export,CSV export,Todo,Medium,Grace,3",
+			"Stabilize graph tests,Reduce flakes,Blocked,High,Linus,8",
+			"Import labels,Map labels,Todo,Low,Ada,2",
+			"Review evidence,Attach proof,In Progress,Medium,Grace,5",
+			",Missing title,Todo,Low,Ada,1",
+		].join("\n");
+
+		await expect(page.locator("[data-csv-importer]")).toBeVisible();
+		await expect(page.locator("[data-csv-max-size]")).toContainText("10MB");
+		await page.locator("[data-csv-upload]").setInputFiles({
+			name: "issues.csv",
+			mimeType: "text/csv",
+			buffer: Buffer.from(csv),
+		});
+
+		await expect(page.locator("[data-csv-file-name]")).toContainText("issues.csv");
+		await expect(page.locator("[data-csv-row-count]")).toContainText("6");
+		await expect(page.locator("[data-csv-status]")).toContainText("Detected 6 columns");
+		await expect(page.locator("[data-csv-column-map='Summary']")).toContainText("Detected: title");
+		await expect(page.locator("[data-csv-column-map='Owner']")).toContainText("Detected: assignee");
+		await page.locator("[data-csv-column-target='Points']").selectOption("estimate");
+
+		await page.locator("[data-csv-preview]").click();
+		await expect(page.locator("[data-csv-status]")).toContainText("Previewing 5 sample rows");
+		await expect(page.locator("[data-csv-preview-row]")).toHaveCount(5);
+		await expect(page.locator("[data-csv-preview-title='1']")).toContainText("Renew contract");
+		await expect(page.locator("[data-csv-preview-state='1']")).toContainText("In Review");
+		await expect(page.locator("[data-csv-preview-assignee='1']")).toContainText("Ada");
+
+		await page.locator("[data-csv-import]").click();
+		await expect(page.locator("[data-csv-status]")).toContainText("Import report ready");
+		await expect(page.locator("[data-csv-progress-value]")).toContainText("100%");
+		await expect(page.locator("[data-csv-created-count]")).toContainText("5");
+		await expect(page.locator("[data-csv-skipped-count]")).toContainText("1");
+		await expect(page.locator("[data-csv-row-errors]")).toContainText("Row 6: title required");
+	});
 });

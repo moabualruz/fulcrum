@@ -54,6 +54,17 @@
     target: string;
   };
 
+  type CsvMapping = {
+    column: string;
+    target: string;
+  };
+
+  type CsvImportReport = {
+    created: number;
+    skipped: number;
+    errors: string[];
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -162,6 +173,14 @@
     { source: "grace@acme.test", target: "Grace Hopper" },
     { source: "linus@acme.test", target: "Linus Torvalds" },
   ]);
+  let csvFileName = $state("");
+  let csvUploadError = $state("");
+  let csvStatus = $state("Waiting for CSV");
+  let csvHeaders = $state<string[]>([]);
+  let csvRows = $state<Record<string, string>[]>([]);
+  let csvMappings = $state<CsvMapping[]>([]);
+  let csvProgress = $state(0);
+  let csvReport = $state<CsvImportReport | null>(null);
 
   const triggerOptions = [
     { value: "issue.created", label: "issue.created", scope: "issue" },
@@ -209,6 +228,8 @@
     { key: "JIRA-111", summary: "Persist importer checkpoint", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "3", attachments: 1 },
     { key: "JIRA-112", summary: "Link imported comments", state: "Todo", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Low", estimate: "2", attachments: 0 },
   ];
+
+  const csvTargetFields = ["title", "description", "state", "priority", "assignee", "estimate", "labels"];
 
   function openStage(stage: Stage) {
     selectedStage = stage;
@@ -378,6 +399,112 @@
     dryRunStatus = "Import queued";
     dryRunMessage = `${importIssues.length} issues queued with ${totalAttachmentCount()} attachments.`;
     importProceedState = "queued";
+  }
+
+  function parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = "";
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      const next = line[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        current += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === "," && !quoted) {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    return values;
+  }
+
+  function detectCsvTarget(column: string): string {
+    const normalized = column.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    if (/(title|summary|name)/.test(normalized)) return "title";
+    if (/(description|details|body)/.test(normalized)) return "description";
+    if (/(status|state|workflow)/.test(normalized)) return "state";
+    if (/priority/.test(normalized)) return "priority";
+    if (/(assignee|owner|assigned)/.test(normalized)) return "assignee";
+    if (/(estimate|story_points|points)/.test(normalized)) return "estimate";
+    if (/(labels|tags)/.test(normalized)) return "labels";
+    return "";
+  }
+
+  function loadCsvText(text: string): void {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const headers = parseCsvLine(lines[0] ?? "");
+    const rows = lines.slice(1).map((line) => {
+      const values = parseCsvLine(line);
+      return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    });
+    csvHeaders = headers;
+    csvRows = rows;
+    csvMappings = headers.map((column) => ({ column, target: detectCsvTarget(column) }));
+    csvStatus = `Detected ${headers.length} columns`;
+    csvProgress = 25;
+    csvReport = null;
+    csvUploadError = "";
+  }
+
+  async function handleCsvUpload(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    csvFileName = file.name;
+    csvReport = null;
+    csvProgress = 0;
+    if (file.size > 10 * 1024 * 1024) {
+      csvUploadError = "CSV file must be 10MB or less.";
+      csvStatus = "Upload blocked";
+      return;
+    }
+    const text = await file.text();
+    loadCsvText(text);
+  }
+
+  function updateCsvMapping(index: number, target: string): void {
+    csvMappings = csvMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    csvStatus = "Mapping edited";
+    csvReport = null;
+  }
+
+  function mappedCsvValue(row: Record<string, string>, target: string): string {
+    const column = csvMappings.find((mapping) => mapping.target === target)?.column;
+    return column ? row[column] ?? "" : "";
+  }
+
+  function runCsvPreview(): void {
+    if (csvRows.length === 0) {
+      csvUploadError = "Upload CSV before preview.";
+      return;
+    }
+    csvStatus = `Previewing ${Math.min(5, csvRows.length)} sample rows`;
+    csvProgress = 50;
+    csvUploadError = "";
+  }
+
+  function importCsvRows(): void {
+    if (csvRows.length === 0) {
+      csvUploadError = "Upload CSV before import.";
+      return;
+    }
+    const titleColumn = csvMappings.find((mapping) => mapping.target === "title")?.column;
+    const errors = csvRows
+      .map((row, index) => (!titleColumn || !row[titleColumn]?.trim() ? `Row ${index + 1}: title required` : ""))
+      .filter(Boolean);
+    csvReport = {
+      created: csvRows.length - errors.length,
+      skipped: errors.length,
+      errors,
+    };
+    csvProgress = 100;
+    csvStatus = "Import report ready";
   }
 </script>
 
@@ -787,6 +914,126 @@
       <section data-import-commit-state class={cn("rounded-md border border-border bg-background p-3")}>
         <h3 class={cn("text-base font-semibold")}>Commit state</h3>
         <p data-import-proceed-state class={cn("mt-2 text-sm text-muted-foreground")}>{importProceedState}</p>
+      </section>
+    </aside>
+  </section>
+
+  <section data-csv-importer class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>CSV importer</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Upload a spreadsheet export, auto-detect columns, preview rows, and import with row-level recovery.</p>
+        </div>
+        <Badge data-csv-status variant={csvUploadError ? "destructive" : csvReport ? "success" : "outline"} size="sm">{csvStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+        <label class={cn("text-sm font-medium md:col-span-3")}>
+          CSV file
+          <input data-csv-upload type="file" accept=".csv,text/csv" onchange={handleCsvUpload} class={cn("mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm")} />
+        </label>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>File</p>
+          <p data-csv-file-name class={cn("mt-1 truncate text-sm font-medium")}>{csvFileName || "none"}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Rows</p>
+          <p data-csv-row-count class={cn("mt-1 text-sm font-medium")}>{csvRows.length}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Max size</p>
+          <p data-csv-max-size class={cn("mt-1 text-sm font-medium")}>10MB</p>
+        </div>
+      </div>
+
+      {#if csvUploadError}
+        <p data-csv-upload-error role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{csvUploadError}</p>
+      {/if}
+
+      <section data-csv-column-mapping class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Column mapping</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each csvMappings as mapping, index}
+            <label data-csv-column-map={mapping.column} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_12rem]")}>
+              <span class={cn("min-w-0")}>
+                <span class={cn("block font-medium")}>{mapping.column}</span>
+                <span class={cn("block truncate text-xs text-muted-foreground")}>Detected: {mapping.target || "unmapped"}</span>
+              </span>
+              <select
+                data-csv-column-target={mapping.column}
+                value={mapping.target}
+                onchange={(event) => updateCsvMapping(index, event.currentTarget.value)}
+                class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              >
+                <option value="">Skip</option>
+                {#each csvTargetFields as field}
+                  <option value={field}>{field}</option>
+                {/each}
+              </select>
+            </label>
+          {/each}
+        </div>
+      </section>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-csv-preview type="button" variant="outline" onclick={runCsvPreview}>Preview rows</Button>
+        <Button data-csv-import type="button" onclick={importCsvRows}>Import CSV</Button>
+      </div>
+
+      <section data-csv-preview-panel class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Dry-run preview</h3>
+        <div data-csv-preview-list class={cn("mt-3 grid gap-2")}>
+          {#each csvRows.slice(0, 5) as row, index}
+            <article data-csv-preview-row={index + 1} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+              <div class={cn("min-w-0")}>
+                <p data-csv-preview-title={index + 1} class={cn("truncate font-medium")}>{mappedCsvValue(row, "title") || "Untitled issue"}</p>
+                <p data-csv-preview-description={index + 1} class={cn("truncate text-xs text-muted-foreground")}>{mappedCsvValue(row, "description") || "No description"}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>State</p>
+                <p data-csv-preview-state={index + 1} class={cn("font-medium")}>{mappedCsvValue(row, "state") || "none"}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>Assignee</p>
+                <p data-csv-preview-assignee={index + 1} class={cn("font-medium")}>{mappedCsvValue(row, "assignee") || "unassigned"}</p>
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-csv-progress-panel class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import progress</h3>
+        <div class={cn("mt-3 h-3 overflow-hidden rounded-full bg-muted")}>
+          <div data-csv-progress-bar class={cn("h-full rounded-full bg-primary transition-all")} style={`width: ${csvProgress}%`}></div>
+        </div>
+        <p data-csv-progress-value class={cn("mt-2 text-sm text-muted-foreground")}>{csvProgress}%</p>
+      </section>
+
+      <section data-csv-import-report class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import report</h3>
+        {#if csvReport}
+          <dl class={cn("mt-3 grid gap-2 text-sm")}>
+            <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+              <dt class={cn("font-medium")}>Created</dt>
+              <dd data-csv-created-count class={cn("text-muted-foreground")}>{csvReport.created}</dd>
+            </div>
+            <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+              <dt class={cn("font-medium")}>Skipped</dt>
+              <dd data-csv-skipped-count class={cn("text-muted-foreground")}>{csvReport.skipped}</dd>
+            </div>
+          </dl>
+          <ul data-csv-row-errors class={cn("mt-3 grid gap-1 text-sm text-muted-foreground")}>
+            {#each csvReport.errors as error}
+              <li>{error}</li>
+            {/each}
+          </ul>
+        {:else}
+          <p class={cn("mt-2 text-sm text-muted-foreground")}>Import report appears after running import.</p>
+        {/if}
       </section>
     </aside>
   </section>
