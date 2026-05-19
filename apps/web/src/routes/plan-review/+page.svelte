@@ -83,6 +83,15 @@
     target: string;
   };
 
+  type BillingPlan = {
+    id: string;
+    name: string;
+    seats: number;
+    projects: number;
+    automations: number;
+    price: string;
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -208,6 +217,10 @@
     { source: "grace-ops", action: "map", target: "Grace Hopper" },
     { source: "linus-build", action: "invite", target: "linus-build@github.local" },
   ]);
+  let selectedBillingPlanId = $state("pro");
+  let paymentVaulted = $state(false);
+  let billingStatus = $state("Current plan active");
+  let downgradePreview = $state("");
 
   const triggerOptions = [
     { value: "issue.created", label: "issue.created", scope: "issue" },
@@ -268,6 +281,20 @@
     { number: 42, title: "Preserve PR link on imported issue", description: "Imported issue keeps original body and linked pull request.", comments: 6, pr: "https://github.com/acme/fulcrum/pull/42" },
     { number: 43, title: "Map collaborator invites", description: "Unknown collaborators become invites before import.", comments: 3, pr: "https://github.com/acme/fulcrum/pull/43" },
     { number: 44, title: "Skip archived source issue", description: "Archived source issues stay out of the active import set.", comments: 2, pr: "" },
+  ];
+
+  const billingPlans: BillingPlan[] = [
+    { id: "starter", name: "Starter", seats: 20, projects: 5, automations: 10, price: "$0" },
+    { id: "pro", name: "Pro", seats: 50, projects: 25, automations: 100, price: "$18/seat" },
+    { id: "enterprise", name: "Enterprise", seats: 250, projects: 250, automations: 1000, price: "custom" },
+  ];
+
+  const currentBillingPlan = billingPlans[0];
+  const activeSeats = 18;
+  const invoiceHistory = [
+    { id: "INV-2026-004", date: "2026-05-01", total: "$324", status: "paid" },
+    { id: "INV-2026-003", date: "2026-04-01", total: "$306", status: "paid" },
+    { id: "INV-2026-002", date: "2026-03-01", total: "$288", status: "paid" },
   ];
 
   function openStage(stage: Stage) {
@@ -573,6 +600,31 @@
       return;
     }
     githubImportStatus = "import complete";
+  }
+
+  function selectedBillingPlan(): BillingPlan {
+    return billingPlans.find((plan) => plan.id === selectedBillingPlanId) ?? billingPlans[1];
+  }
+
+  function seatUsagePercent(): number {
+    return Math.round((activeSeats / currentBillingPlan.seats) * 100);
+  }
+
+  function selectBillingPlan(planId: string): void {
+    selectedBillingPlanId = planId;
+    const plan = billingPlans.find((item) => item.id === planId);
+    billingStatus = plan ? `Previewing ${plan.name}` : "Plan preview unavailable";
+    downgradePreview = "";
+  }
+
+  function vaultPaymentMethod(): void {
+    paymentVaulted = true;
+    billingStatus = "Payment method vaulted";
+  }
+
+  function previewDowngrade(): void {
+    downgradePreview = "Downgrade blocked: active seats exceed Starter limit and advanced automations would be disabled.";
+    billingStatus = "Downgrade dry-run ready";
   }
 </script>
 
@@ -1232,6 +1284,99 @@
             <dd data-github-pr-link-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().prLinks : 0}</dd>
           </div>
         </dl>
+      </section>
+    </aside>
+  </section>
+
+  <section data-workspace-billing class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Workspace billing</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Track seats, preview plan changes, vault payment method, and export invoices.</p>
+        </div>
+        <Badge data-billing-status variant={paymentVaulted ? "success" : "outline"} size="sm">{billingStatus}</Badge>
+      </div>
+
+      <section data-current-plan class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+          <div>
+            <h3 class={cn("text-base font-semibold")}>{currentBillingPlan.name}</h3>
+            <p data-current-plan-price class={cn("mt-1 text-sm text-muted-foreground")}>{currentBillingPlan.price}</p>
+          </div>
+          <Badge data-seat-warning variant={seatUsagePercent() >= 80 ? "warning" : "success"} size="sm">{seatUsagePercent()}% seats used</Badge>
+        </div>
+        <div class={cn("mt-3 h-3 overflow-hidden rounded-full bg-muted")}>
+          <div data-seat-usage-bar class={cn("h-full rounded-full bg-primary")} style={`width: ${seatUsagePercent()}%`}></div>
+        </div>
+        <dl class={cn("mt-3 grid gap-2 text-sm md:grid-cols-3")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Seats</dt>
+            <dd data-seat-usage class={cn("text-muted-foreground")}>{activeSeats} / {currentBillingPlan.seats}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Projects</dt>
+            <dd data-project-limit class={cn("text-muted-foreground")}>{currentBillingPlan.projects}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Automations</dt>
+            <dd data-automation-limit class={cn("text-muted-foreground")}>{currentBillingPlan.automations}</dd>
+          </div>
+        </dl>
+        {#if seatUsagePercent() >= 80}
+          <p data-overage-warning class={cn("mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground")}>Seat usage crossed 80%; upgrade before invites are blocked.</p>
+        {/if}
+      </section>
+
+      <section data-plan-upgrade class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Plan selection</h3>
+        <div class={cn("mt-3 grid gap-2 md:grid-cols-3")}>
+          {#each billingPlans as plan}
+            <button
+              type="button"
+              data-billing-plan={plan.id}
+              data-selected={selectedBillingPlanId === plan.id}
+              onclick={() => selectBillingPlan(plan.id)}
+              class={cn("rounded-md border border-border bg-muted/30 p-3 text-left text-sm", selectedBillingPlanId === plan.id && "border-primary bg-primary/5")}
+            >
+              <span class={cn("block font-medium")}>{plan.name}</span>
+              <span class={cn("mt-1 block text-muted-foreground")}>{plan.seats} seats</span>
+              <span class={cn("mt-1 block text-muted-foreground")}>{plan.price}</span>
+            </button>
+          {/each}
+        </div>
+        <div data-upgrade-preview class={cn("mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+          <p class={cn("font-medium")}>{selectedBillingPlan().name} preview</p>
+          <p class={cn("mt-1 text-muted-foreground")}>Seats: {currentBillingPlan.seats} -> {selectedBillingPlan().seats}; projects: {currentBillingPlan.projects} -> {selectedBillingPlan().projects}; automations: {currentBillingPlan.automations} -> {selectedBillingPlan().automations}</p>
+        </div>
+        <Button data-downgrade-dry-run type="button" variant="outline" class={cn("mt-3")} onclick={previewDowngrade}>Preview downgrade impact</Button>
+        {#if downgradePreview}
+          <p data-downgrade-preview class={cn("mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground")}>{downgradePreview}</p>
+        {/if}
+      </section>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-payment-method class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Payment method</h3>
+        <p data-payment-storage class={cn("mt-2 text-sm text-muted-foreground")}>{paymentVaulted ? "Vault token pm_****4242; card digits not stored in Fulcrum." : "No payment method vaulted."}</p>
+        <Button data-add-payment-method type="button" class={cn("mt-3")} onclick={vaultPaymentMethod}>Add payment method</Button>
+      </section>
+
+      <section data-invoice-history class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Invoice history</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each invoiceHistory as invoice}
+            <article data-invoice-row={invoice.id} class={cn("rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+              <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+                <p class={cn("font-medium")}>{invoice.id}</p>
+                <Badge variant="success" size="sm">{invoice.status}</Badge>
+              </div>
+              <p class={cn("mt-1 text-muted-foreground")}>{invoice.date} - {invoice.total}</p>
+              <Button data-invoice-export={invoice.id} type="button" variant="outline" size="sm" class={cn("mt-2")}>Export</Button>
+            </article>
+          {/each}
+        </div>
       </section>
     </aside>
   </section>

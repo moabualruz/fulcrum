@@ -233,4 +233,32 @@ test.describe("plan review workflow navigation", () => {
 		await expect(page.locator("[data-github-comment-count]")).toContainText("84");
 		await expect(page.locator("[data-github-pr-link-count]")).toContainText("7");
 	});
+
+	test("shows billing seat usage, upgrade preview, payment vault, and invoices", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		await expect(page.locator("[data-workspace-billing]")).toBeVisible();
+		await expect(page.locator("[data-current-plan]")).toContainText("Starter");
+		await expect(page.locator("[data-seat-usage]")).toContainText("18 / 20");
+		await expect(page.locator("[data-seat-warning]")).toContainText("90% seats used");
+		await expect(page.locator("[data-overage-warning]")).toContainText("80%");
+
+		await page.locator("[data-billing-plan='pro']").click();
+		await expect(page.locator("[data-billing-plan='pro']")).toHaveAttribute("data-selected", "true");
+		await expect(page.locator("[data-upgrade-preview]")).toContainText("Seats: 20 -> 50");
+		await expect(page.locator("[data-upgrade-preview]")).toContainText("automations: 10 -> 100");
+
+		await page.locator("[data-add-payment-method]").click();
+		await expect(page.locator("[data-billing-status]")).toContainText("Payment method vaulted");
+		await expect(page.locator("[data-payment-storage]")).toContainText("Vault token");
+		await expect(page.locator("[data-payment-storage]")).toContainText("card digits not stored");
+
+		await page.locator("[data-downgrade-dry-run]").click();
+		await expect(page.locator("[data-downgrade-preview]")).toContainText("Downgrade blocked");
+		await expect(page.locator("[data-downgrade-preview]")).toContainText("active seats");
+
+		await expect(page.locator("[data-invoice-row]")).toHaveCount(3);
+		await expect(page.locator("[data-invoice-row='INV-2026-004']")).toContainText("$324");
+		await expect(page.locator("[data-invoice-export='INV-2026-004']")).toBeVisible();
+	});
 });
