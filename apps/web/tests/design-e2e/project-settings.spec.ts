@@ -74,4 +74,21 @@ test.describe("project settings labels", () => {
 		await page.locator("[data-cycle-save]").click();
 		await expect(page.locator("[data-cycle-error]")).toContainText("placeholder");
 	});
+
+	test("workspace settings expose name, slug (locked), timezone, logo, save", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-workspace-general]")).toBeVisible();
+		await expect(page.locator("[data-workspace-name]")).toHaveValue("Fulcrum HQ");
+		await expect(page.locator("[data-workspace-slug]")).toHaveAttribute("readonly", "");
+		await expect(page.locator("[data-workspace-timezone]")).toHaveValue("UTC");
+
+		await page.locator("[data-workspace-timezone]").selectOption("Europe/London");
+		await page.locator("[data-workspace-save]").click();
+		await expect(page.locator("[data-workspace-saved]")).toContainText("Workspace settings saved");
+
+		await page.locator("[data-workspace-name]").fill("");
+		await page.locator("[data-workspace-save]").click();
+		await expect(page.locator("[data-workspace-error]")).toContainText("required");
+	});
 });

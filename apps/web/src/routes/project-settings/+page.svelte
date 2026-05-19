@@ -120,6 +120,53 @@
     cycleError = null;
     cycleSaved = true;
   }
+
+  const TIMEZONES = [
+    "UTC",
+    "America/Los_Angeles",
+    "America/New_York",
+    "Europe/London",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Singapore",
+    "Australia/Sydney",
+  ];
+
+  let workspaceName = $state("Fulcrum HQ");
+  let workspaceSlug = $state("fulcrum-hq");
+  let workspaceTimezone = $state("UTC");
+  let logoName = $state<string | null>(null);
+  let workspaceSaved = $state(false);
+  let workspaceError = $state<string | null>(null);
+
+  function onLogoChange(event: Event): void {
+    const target = event.target as HTMLInputElement | null;
+    const file = target?.files?.[0] ?? null;
+    if (!file) { logoName = null; return; }
+    if (file.size > 2 * 1024 * 1024) {
+      workspaceError = "Logo exceeds 2 MB upload limit.";
+      logoName = null;
+      if (target) target.value = "";
+      return;
+    }
+    logoName = file.name;
+    workspaceError = null;
+  }
+
+  function deleteLogo(): void {
+    logoName = null;
+  }
+
+  function saveWorkspace(event: Event): void {
+    event.preventDefault();
+    if (!workspaceName.trim()) {
+      workspaceError = "Workspace name is required.";
+      workspaceSaved = false;
+      return;
+    }
+    workspaceError = null;
+    workspaceSaved = true;
+  }
 </script>
 
 <svelte:head>
@@ -131,6 +178,87 @@
     <h1 data-project-settings-header class="text-2xl font-semibold tracking-tight">Labels</h1>
     <p class="text-sm text-muted-foreground">Manage label taxonomy with hierarchical grouping.</p>
   </header>
+
+  <section data-workspace-general class="flex flex-col gap-3 rounded-md border border-border p-4">
+    <header>
+      <h2 class="text-base font-medium">Workspace</h2>
+      <p class="text-xs text-muted-foreground">Configure workspace identity, URL slug (locked after creation), logo, and timezone.</p>
+    </header>
+    <form
+      data-workspace-form
+      class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+      onsubmit={saveWorkspace}
+    >
+      <label class="flex flex-col gap-1 text-sm">
+        Workspace name
+        <input
+          type="text"
+          data-workspace-name
+          bind:value={workspaceName}
+          aria-required="true"
+          class="h-9 rounded-md border border-input bg-background px-2"
+        />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        URL slug
+        <input
+          type="text"
+          data-workspace-slug
+          value={workspaceSlug}
+          readonly
+          class="h-9 rounded-md border border-input bg-muted px-2 font-mono"
+          aria-readonly="true"
+        />
+        <span class="text-xs text-muted-foreground">Slug is locked after workspace creation.</span>
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        Timezone
+        <select
+          data-workspace-timezone
+          bind:value={workspaceTimezone}
+          class="h-9 rounded-md border border-input bg-background px-2"
+        >
+          {#each TIMEZONES as tz (tz)}
+            <option value={tz}>{tz}</option>
+          {/each}
+        </select>
+      </label>
+      <div class="flex flex-col gap-1 text-sm">
+        Logo (max 2 MB)
+        <input
+          type="file"
+          data-workspace-logo
+          accept="image/png,image/jpeg,image/svg+xml"
+          onchange={onLogoChange}
+          class="h-9 rounded-md border border-input bg-background px-2 text-xs"
+        />
+        {#if logoName}
+          <div class="flex items-center gap-2 text-xs">
+            <span data-workspace-logo-name>{logoName}</span>
+            <button
+              type="button"
+              data-workspace-logo-delete
+              class="rounded border border-destructive/40 px-2 py-0.5 text-destructive"
+              onclick={deleteLogo}
+            >Remove</button>
+          </div>
+        {/if}
+      </div>
+      <div class="flex items-center gap-3 sm:col-span-2">
+        <button
+          type="submit"
+          data-workspace-save
+          class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >Save workspace</button>
+        {#if workspaceSaved && !workspaceError}
+          <span data-workspace-saved class="text-sm text-green-600">Workspace settings saved.</span>
+        {/if}
+        {#if workspaceError}
+          <span data-workspace-error class="text-sm text-destructive">{workspaceError}</span>
+        {/if}
+      </div>
+    </form>
+  </section>
 
   <form data-label-create-form class="flex flex-wrap items-end gap-3 rounded-md border border-border p-4" onsubmit={addLabel}>
     <label class="flex min-w-40 flex-1 flex-col gap-1 text-sm">
