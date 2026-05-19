@@ -109,6 +109,7 @@ describe("responsibility-first code naming", () => {
     // New code MUST avoid these labels.
     const RESPONSIBILITY_NAMING_RESIDUALS = [
       "apps/web/src/routes/settings/+page.svelte: /\\bplane\\b/i",
+      "tests/uat/repo-artifact-notification-automation.test.ts: /phase[- ]?\\d/i",
     ];
     expect(violations).toEqual(RESPONSIBILITY_NAMING_RESIDUALS);
   });
