@@ -39,15 +39,153 @@ Call service APIs via HTTP, tRPC, or in-process `AppCaller`. Do not own business
 
 ### Sub-context Docs
 
-Nested `CONTEXT.md` under a service's `src/application/<area>/` define area-specific vocabulary that sharpens its parent service's glossary. Listed for discoverability; do not duplicate terms upward.
+Nested `CONTEXT.md` under a service's `src/application/<area>/` define area-specific vocabulary that sharpens its parent service's glossary. Listed for discoverability; do not duplicate terms upward. **All 96 application sub-areas are covered.**
 
-| Sub-context | Path |
+#### agent-client-protocol
+
+| Area | Path |
+|---|---|
+| Transports | [`services/agent-client-protocol/src/application/transports/CONTEXT.md`](./services/agent-client-protocol/src/application/transports/CONTEXT.md) |
+
+#### execution-orchestration
+
+| Area | Path |
 |---|---|
 | Agent Catalog | [`services/execution-orchestration/src/application/agent-catalog/CONTEXT.md`](./services/execution-orchestration/src/application/agent-catalog/CONTEXT.md) |
-| Repos (intake) | [`services/integration-hub/src/application/repos/CONTEXT.md`](./services/integration-hub/src/application/repos/CONTEXT.md) |
-| Runtime Support | [`services/platform-core/src/application/runtime-support/CONTEXT.md`](./services/platform-core/src/application/runtime-support/CONTEXT.md) |
+| Agent Catalog / Profiles | [`services/execution-orchestration/src/application/agent-catalog/profiles/CONTEXT.md`](./services/execution-orchestration/src/application/agent-catalog/profiles/CONTEXT.md) |
+| Agents | [`services/execution-orchestration/src/application/agents/CONTEXT.md`](./services/execution-orchestration/src/application/agents/CONTEXT.md) |
+| Orchestration | [`services/execution-orchestration/src/application/orchestration/CONTEXT.md`](./services/execution-orchestration/src/application/orchestration/CONTEXT.md) |
+| Runs | [`services/execution-orchestration/src/application/runs/CONTEXT.md`](./services/execution-orchestration/src/application/runs/CONTEXT.md) |
+
+#### identity-access
+
+| Area | Path |
+|---|---|
+| Admin | [`services/identity-access/src/application/admin/CONTEXT.md`](./services/identity-access/src/application/admin/CONTEXT.md) |
+| Auth | [`services/identity-access/src/application/auth/CONTEXT.md`](./services/identity-access/src/application/auth/CONTEXT.md) |
+| Orgs | [`services/identity-access/src/application/orgs/CONTEXT.md`](./services/identity-access/src/application/orgs/CONTEXT.md) |
+| Permissions | [`services/identity-access/src/application/permissions/CONTEXT.md`](./services/identity-access/src/application/permissions/CONTEXT.md) |
+
+#### integration-hub
+
+| Area | Path |
+|---|---|
+| Connectors | [`services/integration-hub/src/application/connectors/CONTEXT.md`](./services/integration-hub/src/application/connectors/CONTEXT.md) |
+| Connectors / Bitbucket | [`services/integration-hub/src/application/connectors/bitbucket/CONTEXT.md`](./services/integration-hub/src/application/connectors/bitbucket/CONTEXT.md) |
+| Connectors / Github | [`services/integration-hub/src/application/connectors/github/CONTEXT.md`](./services/integration-hub/src/application/connectors/github/CONTEXT.md) |
+| Connectors / Gitlab | [`services/integration-hub/src/application/connectors/gitlab/CONTEXT.md`](./services/integration-hub/src/application/connectors/gitlab/CONTEXT.md) |
+| Data Exchange | [`services/integration-hub/src/application/data-exchange/CONTEXT.md`](./services/integration-hub/src/application/data-exchange/CONTEXT.md) |
+| External Connectors | [`services/integration-hub/src/application/external-connectors/CONTEXT.md`](./services/integration-hub/src/application/external-connectors/CONTEXT.md) |
+| Import Export | [`services/integration-hub/src/application/import-export/CONTEXT.md`](./services/integration-hub/src/application/import-export/CONTEXT.md) |
+| Importers | [`services/integration-hub/src/application/importers/CONTEXT.md`](./services/integration-hub/src/application/importers/CONTEXT.md) |
+| Importers / Field Mapping | [`services/integration-hub/src/application/importers/field-mapping/CONTEXT.md`](./services/integration-hub/src/application/importers/field-mapping/CONTEXT.md) |
+| Importers / Sources | [`services/integration-hub/src/application/importers/sources/CONTEXT.md`](./services/integration-hub/src/application/importers/sources/CONTEXT.md) |
+| Project Connectors | [`services/integration-hub/src/application/project-connectors/CONTEXT.md`](./services/integration-hub/src/application/project-connectors/CONTEXT.md) |
+| Repo Files | [`services/integration-hub/src/application/repo-files/CONTEXT.md`](./services/integration-hub/src/application/repo-files/CONTEXT.md) |
+| Repos | [`services/integration-hub/src/application/repos/CONTEXT.md`](./services/integration-hub/src/application/repos/CONTEXT.md) |
+| Repos / Workers | [`services/integration-hub/src/application/repos/workers/CONTEXT.md`](./services/integration-hub/src/application/repos/workers/CONTEXT.md) |
+| Webhooks | [`services/integration-hub/src/application/webhooks/CONTEXT.md`](./services/integration-hub/src/application/webhooks/CONTEXT.md) |
+
+#### knowledge-workspace
+
+| Area | Path |
+|---|---|
+| Collaboration | [`services/knowledge-workspace/src/application/collaboration/CONTEXT.md`](./services/knowledge-workspace/src/application/collaboration/CONTEXT.md) |
+| Context | [`services/knowledge-workspace/src/application/context/CONTEXT.md`](./services/knowledge-workspace/src/application/context/CONTEXT.md) |
+| Doc Links | [`services/knowledge-workspace/src/application/doc-links/CONTEXT.md`](./services/knowledge-workspace/src/application/doc-links/CONTEXT.md) |
+| Docs | [`services/knowledge-workspace/src/application/docs/CONTEXT.md`](./services/knowledge-workspace/src/application/docs/CONTEXT.md) |
+| Docs / Collaboration | [`services/knowledge-workspace/src/application/docs/collaboration/CONTEXT.md`](./services/knowledge-workspace/src/application/docs/collaboration/CONTEXT.md) |
+| Memory | [`services/knowledge-workspace/src/application/memory/CONTEXT.md`](./services/knowledge-workspace/src/application/memory/CONTEXT.md) |
+| Memory / Hooks | [`services/knowledge-workspace/src/application/memory/hooks/CONTEXT.md`](./services/knowledge-workspace/src/application/memory/hooks/CONTEXT.md) |
+| Memory / Retrieval | [`services/knowledge-workspace/src/application/memory/retrieval/CONTEXT.md`](./services/knowledge-workspace/src/application/memory/retrieval/CONTEXT.md) |
+| Search | [`services/knowledge-workspace/src/application/search/CONTEXT.md`](./services/knowledge-workspace/src/application/search/CONTEXT.md) |
+| Search / Indexers | [`services/knowledge-workspace/src/application/search/indexers/CONTEXT.md`](./services/knowledge-workspace/src/application/search/indexers/CONTEXT.md) |
+
+#### notification-center
+
+| Area | Path |
+|---|---|
+| Delivery Runtime | [`services/notification-center/src/application/delivery-runtime/CONTEXT.md`](./services/notification-center/src/application/delivery-runtime/CONTEXT.md) |
+| Delivery Runtime / Delivery Handlers | [`services/notification-center/src/application/delivery-runtime/delivery-handlers/CONTEXT.md`](./services/notification-center/src/application/delivery-runtime/delivery-handlers/CONTEXT.md) |
+| Notifications | [`services/notification-center/src/application/notifications/CONTEXT.md`](./services/notification-center/src/application/notifications/CONTEXT.md) |
+
+#### planning-review
+
+| Area | Path |
+|---|---|
+| Features | [`services/planning-review/src/application/features/CONTEXT.md`](./services/planning-review/src/application/features/CONTEXT.md) |
+| Reports | [`services/planning-review/src/application/reports/CONTEXT.md`](./services/planning-review/src/application/reports/CONTEXT.md) |
+| Reviews | [`services/planning-review/src/application/reviews/CONTEXT.md`](./services/planning-review/src/application/reviews/CONTEXT.md) |
+| Reviews / File Tree | [`services/planning-review/src/application/reviews/file-tree/CONTEXT.md`](./services/planning-review/src/application/reviews/file-tree/CONTEXT.md) |
+| Reviews / Shared | [`services/planning-review/src/application/reviews/shared/CONTEXT.md`](./services/planning-review/src/application/reviews/shared/CONTEXT.md) |
+
+#### platform-core
+
+| Area | Path |
+|---|---|
 | Agent Hooks | [`services/platform-core/src/application/agent-hooks/CONTEXT.md`](./services/platform-core/src/application/agent-hooks/CONTEXT.md) |
+| Backup | [`services/platform-core/src/application/backup/CONTEXT.md`](./services/platform-core/src/application/backup/CONTEXT.md) |
+| Cli Tui | [`services/platform-core/src/application/cli-tui/CONTEXT.md`](./services/platform-core/src/application/cli-tui/CONTEXT.md) |
 | Component Lifecycle | [`services/platform-core/src/application/component-lifecycle/CONTEXT.md`](./services/platform-core/src/application/component-lifecycle/CONTEXT.md) |
+| Component Lifecycle / Adapters | [`services/platform-core/src/application/component-lifecycle/adapters/CONTEXT.md`](./services/platform-core/src/application/component-lifecycle/adapters/CONTEXT.md) |
+| Coverage Tracker | [`services/platform-core/src/application/coverage-tracker/CONTEXT.md`](./services/platform-core/src/application/coverage-tracker/CONTEXT.md) |
+| Db | [`services/platform-core/src/application/db/CONTEXT.md`](./services/platform-core/src/application/db/CONTEXT.md) |
+| Error Reporting | [`services/platform-core/src/application/error-reporting/CONTEXT.md`](./services/platform-core/src/application/error-reporting/CONTEXT.md) |
+| Health Checks | [`services/platform-core/src/application/health-checks/CONTEXT.md`](./services/platform-core/src/application/health-checks/CONTEXT.md) |
+| Health Checks / Checks | [`services/platform-core/src/application/health-checks/checks/CONTEXT.md`](./services/platform-core/src/application/health-checks/checks/CONTEXT.md) |
+| Inference | [`services/platform-core/src/application/inference/CONTEXT.md`](./services/platform-core/src/application/inference/CONTEXT.md) |
+| Inference / Backends | [`services/platform-core/src/application/inference/backends/CONTEXT.md`](./services/platform-core/src/application/inference/backends/CONTEXT.md) |
+| Init | [`services/platform-core/src/application/init/CONTEXT.md`](./services/platform-core/src/application/init/CONTEXT.md) |
+| Input Bindings | [`services/platform-core/src/application/input-bindings/CONTEXT.md`](./services/platform-core/src/application/input-bindings/CONTEXT.md) |
+| Interface Parity | [`services/platform-core/src/application/interface-parity/CONTEXT.md`](./services/platform-core/src/application/interface-parity/CONTEXT.md) |
+| Jobs | [`services/platform-core/src/application/jobs/CONTEXT.md`](./services/platform-core/src/application/jobs/CONTEXT.md) |
+| Legacy | [`services/platform-core/src/application/legacy/CONTEXT.md`](./services/platform-core/src/application/legacy/CONTEXT.md) |
+| Localization | [`services/platform-core/src/application/localization/CONTEXT.md`](./services/platform-core/src/application/localization/CONTEXT.md) |
+| Localization / Locales | [`services/platform-core/src/application/localization/locales/CONTEXT.md`](./services/platform-core/src/application/localization/locales/CONTEXT.md) |
+| Manual Simulation | [`services/platform-core/src/application/manual-simulation/CONTEXT.md`](./services/platform-core/src/application/manual-simulation/CONTEXT.md) |
+| Platform Operations | [`services/platform-core/src/application/platform-operations/CONTEXT.md`](./services/platform-core/src/application/platform-operations/CONTEXT.md) |
+| Platform Primitives | [`services/platform-core/src/application/platform-primitives/CONTEXT.md`](./services/platform-core/src/application/platform-primitives/CONTEXT.md) |
+| Platform Primitives / State | [`services/platform-core/src/application/platform-primitives/state/CONTEXT.md`](./services/platform-core/src/application/platform-primitives/state/CONTEXT.md) |
+| Runtime | [`services/platform-core/src/application/runtime/CONTEXT.md`](./services/platform-core/src/application/runtime/CONTEXT.md) |
+| Runtime Support | [`services/platform-core/src/application/runtime-support/CONTEXT.md`](./services/platform-core/src/application/runtime-support/CONTEXT.md) |
+| Secrets | [`services/platform-core/src/application/secrets/CONTEXT.md`](./services/platform-core/src/application/secrets/CONTEXT.md) |
+| Settings | [`services/platform-core/src/application/settings/CONTEXT.md`](./services/platform-core/src/application/settings/CONTEXT.md) |
+| Skill Supply | [`services/platform-core/src/application/skill-supply/CONTEXT.md`](./services/platform-core/src/application/skill-supply/CONTEXT.md) |
+| Skill Supply / Marketplace | [`services/platform-core/src/application/skill-supply/marketplace/CONTEXT.md`](./services/platform-core/src/application/skill-supply/marketplace/CONTEXT.md) |
+| Skills | [`services/platform-core/src/application/skills/CONTEXT.md`](./services/platform-core/src/application/skills/CONTEXT.md) |
+| Subscriptions | [`services/platform-core/src/application/subscriptions/CONTEXT.md`](./services/platform-core/src/application/subscriptions/CONTEXT.md) |
+| Telemetry | [`services/platform-core/src/application/telemetry/CONTEXT.md`](./services/platform-core/src/application/telemetry/CONTEXT.md) |
+| Tenancy | [`services/platform-core/src/application/tenancy/CONTEXT.md`](./services/platform-core/src/application/tenancy/CONTEXT.md) |
+
+#### work-management
+
+| Area | Path |
+|---|---|
+| Automations | [`services/work-management/src/application/automations/CONTEXT.md`](./services/work-management/src/application/automations/CONTEXT.md) |
+| Comments | [`services/work-management/src/application/comments/CONTEXT.md`](./services/work-management/src/application/comments/CONTEXT.md) |
+| Custom Fields | [`services/work-management/src/application/custom-fields/CONTEXT.md`](./services/work-management/src/application/custom-fields/CONTEXT.md) |
+| Dashboard | [`services/work-management/src/application/dashboard/CONTEXT.md`](./services/work-management/src/application/dashboard/CONTEXT.md) |
+| Project Policy | [`services/work-management/src/application/project-policy/CONTEXT.md`](./services/work-management/src/application/project-policy/CONTEXT.md) |
+| Project Statuses | [`services/work-management/src/application/project-statuses/CONTEXT.md`](./services/work-management/src/application/project-statuses/CONTEXT.md) |
+| Projects | [`services/work-management/src/application/projects/CONTEXT.md`](./services/work-management/src/application/projects/CONTEXT.md) |
+| Recurrence | [`services/work-management/src/application/recurrence/CONTEXT.md`](./services/work-management/src/application/recurrence/CONTEXT.md) |
+| Relationships | [`services/work-management/src/application/relationships/CONTEXT.md`](./services/work-management/src/application/relationships/CONTEXT.md) |
+| Reports | [`services/work-management/src/application/reports/CONTEXT.md`](./services/work-management/src/application/reports/CONTEXT.md) |
+| Saved Views | [`services/work-management/src/application/saved-views/CONTEXT.md`](./services/work-management/src/application/saved-views/CONTEXT.md) |
+| Sprints | [`services/work-management/src/application/sprints/CONTEXT.md`](./services/work-management/src/application/sprints/CONTEXT.md) |
+| Tasks | [`services/work-management/src/application/tasks/CONTEXT.md`](./services/work-management/src/application/tasks/CONTEXT.md) |
+| Templates | [`services/work-management/src/application/templates/CONTEXT.md`](./services/work-management/src/application/templates/CONTEXT.md) |
+| Workflows | [`services/work-management/src/application/workflows/CONTEXT.md`](./services/work-management/src/application/workflows/CONTEXT.md) |
+
+#### workflow-coordination
+
+| Area | Path |
+|---|---|
+| Artifacts | [`services/workflow-coordination/src/application/artifacts/CONTEXT.md`](./services/workflow-coordination/src/application/artifacts/CONTEXT.md) |
+| Audit | [`services/workflow-coordination/src/application/audit/CONTEXT.md`](./services/workflow-coordination/src/application/audit/CONTEXT.md) |
+| Events | [`services/workflow-coordination/src/application/events/CONTEXT.md`](./services/workflow-coordination/src/application/events/CONTEXT.md) |
+| Testing | [`services/workflow-coordination/src/application/testing/CONTEXT.md`](./services/workflow-coordination/src/application/testing/CONTEXT.md) |
+| Trace | [`services/workflow-coordination/src/application/trace/CONTEXT.md`](./services/workflow-coordination/src/application/trace/CONTEXT.md) |
 
 ## Cross-cutting decisions
 
