@@ -647,6 +647,115 @@ describe("fulcrum product CLI", () => {
     expect(unsubscribed).toBe(1);
   });
 
+  test("product tasks run dispatches single and board batches with agent model prompt and trace", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const caller = {
+      tasks: {
+        create: async () => ({}),
+        list: async () => [],
+        update: async () => ({}),
+        dispatchDependencyRun: async (input: Record<string, unknown>) => {
+          calls.push(input);
+          return {
+            runGroupId: input["traceId"] ?? "generated-trace",
+            scheduledRuns: (input["targetTaskIds"] as string[]).map((taskId, index) => ({
+              id: `run-${index + 1}`,
+              taskId,
+              agent: input["agent"],
+              status: "queued",
+            })),
+            skippedTasks: [],
+            warnings: [],
+          };
+        },
+      },
+    };
+
+    const single = testIo();
+    await runProduct([
+      "tasks",
+      "run",
+      "--task",
+      "task-1",
+      "--agent",
+      "codex",
+      "--trace",
+      "trace-single",
+      "--json",
+    ], { ...single.opts, caller });
+
+    const batch = testIo();
+    await runProduct([
+      "tasks",
+      "run",
+      "--mode",
+      "board",
+      "--tasks",
+      "task-1,task-2",
+      "--agent",
+      "codex",
+      "--model",
+      "gpt-5.4",
+      "--prompt",
+      "Use project context",
+      "--trace",
+      "trace-board",
+      "--json",
+    ], { ...batch.opts, caller });
+
+    expect(single.exits).toEqual([]);
+    expect(batch.exits).toEqual([]);
+    expect(JSON.parse(batch.out[0]!).scheduledRuns).toHaveLength(2);
+    expect(calls).toEqual([
+      {
+        mode: "task",
+        targetTaskIds: ["task-1"],
+        traceId: "trace-single",
+        agent: "codex",
+      },
+      {
+        mode: "board",
+        targetTaskIds: ["task-1", "task-2"],
+        traceId: "trace-board",
+        agent: "codex",
+        model: "gpt-5.4",
+        prompt: "Use project context",
+      },
+    ]);
+  });
+
+  test("product tasks run fails closed for missing agent, missing task, and rejected dispatch", async () => {
+    const caller = {
+      tasks: {
+        create: async () => ({}),
+        list: async () => [],
+        update: async () => ({}),
+        dispatchDependencyRun: async (input: Record<string, unknown>) => {
+          if (input["agent"] === "missing-agent") throw new Error("agent not registered");
+          throw new Error("task not found");
+        },
+      },
+    };
+
+    const missingAgent = testIo();
+    await runProduct(["tasks", "run", "--task", "task-1"], { ...missingAgent.opts, caller });
+    expect(missingAgent.exits).toEqual([2]);
+    expect(missingAgent.err.join("\n")).toContain("missing required flag --agent");
+
+    const missingTask = testIo();
+    await runProduct(["tasks", "run", "--agent", "codex"], { ...missingTask.opts, caller });
+    expect(missingTask.exits).toEqual([2]);
+    expect(missingTask.err.join("\n")).toContain("missing required flag --task or --tasks");
+
+    const rejectedDispatch = testIo();
+    await runProduct(["tasks", "run", "--task", "task-1", "--agent", "missing-agent"], {
+      ...rejectedDispatch.opts,
+      caller,
+    });
+    expect(rejectedDispatch.exits).toEqual([1]);
+    expect(rejectedDispatch.err.join("\n")).toContain("agent not registered");
+  });
+
   test("product sprints/search/context use caller fixture", async () => {
     const sprintCalls: Array<{ method: string; input: unknown }> = [];
     const caller = {
