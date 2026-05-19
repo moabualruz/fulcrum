@@ -340,4 +340,21 @@ test.describe("build graph doc search", () => {
 		expect(focusRing).not.toBe("none");
 		await expect(page.locator("[data-node-status]").first()).toContainText(/✓|●|!|○/);
 	});
+
+	test("empty-state fixtures render with icon, headline, description, and actions", async ({ page }) => {
+		await page.goto("/build-graph");
+
+		const primary = page.locator("[data-empty-state-primary]");
+		await expect(primary).toBeVisible();
+		await expect(primary).toHaveAttribute("role", "status");
+		await expect(primary.locator("[data-empty-state-icon]")).toBeVisible();
+		await expect(primary).toContainText("No tasks linked");
+		await expect(primary).toContainText("Link a task to surface dependencies");
+		await expect(page.locator("[data-empty-state-action='primary']")).toBeVisible();
+		await expect(page.locator("[data-empty-state-action='secondary']")).toBeVisible();
+
+		const secondary = page.locator("[data-empty-state-secondary]");
+		await expect(secondary).toContainText("Filter has no matches");
+		await expect(page.locator("[data-empty-state-clear-filter]")).toBeVisible();
+	});
 });

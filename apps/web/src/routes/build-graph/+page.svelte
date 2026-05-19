@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Alert, Badge, Button } from "@fulcrum/ui-kit";
+  import { Alert, Badge, Button, EmptyState } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
   type DocType = "decision" | "runbook" | "note" | "spec";
@@ -933,4 +933,39 @@
       </aside>
     </div>
   </div>
+
+  <section data-empty-state-fixtures class={cn("mx-auto mt-6 flex w-full max-w-6xl flex-col gap-4 px-4")}>
+    <h2 class={cn("text-base font-semibold")}>Empty state patterns</h2>
+    <div class={cn("grid gap-4 sm:grid-cols-2")}>
+      <EmptyState
+        data-empty-state-primary
+        title="No tasks linked"
+        description="Link a task to surface dependencies in the build graph."
+      >
+        {#snippet icon()}
+          <span
+            data-empty-state-icon
+            aria-hidden="true"
+            class={cn("flex h-20 w-20 items-center justify-center rounded-full border border-border bg-muted text-2xl")}
+          >∅</span>
+        {/snippet}
+        {#snippet actions()}
+          <div data-empty-state-actions class={cn("flex flex-wrap items-center justify-center gap-2")}>
+            <Button data-empty-state-action="primary" variant="default">Link a task</Button>
+            <Button data-empty-state-action="secondary" variant="outline">See examples</Button>
+          </div>
+        {/snippet}
+      </EmptyState>
+
+      <EmptyState
+        data-empty-state-secondary
+        title="Filter has no matches"
+        description="Adjust the dependency filter or clear it to view all nodes."
+      >
+        {#snippet actions()}
+          <Button data-empty-state-clear-filter variant="outline">Clear filter</Button>
+        {/snippet}
+      </EmptyState>
+    </div>
+  </section>
 </main>
