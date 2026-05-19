@@ -10,6 +10,7 @@
 	import { toastFromForm } from "$lib/feedback/use-form-toast";
 	import AppSidebar from "$lib/components/app/AppSidebar.svelte";
 	import AppTopbar from "$lib/components/app/AppTopbar.svelte";
+	import TraceFooter from "$lib/components/app/TraceFooter.svelte";
 	import CommandPalette from "$lib/components/command-palette/CommandPalette.svelte";
 	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
 	import { buildProjectCommandItems } from "$lib/components/command-palette/project-command-items";
@@ -201,6 +202,7 @@
 				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(1.5rem+var(--fulcrum-gesture-zone-bottom))]")}>
 					{@render children?.()}
 				</main>
+				<TraceFooter traceId={data?.traceId ?? null} requestId={data?.requestId ?? null} />
 			</div>
 		</Sheet>
 	{:else}
@@ -221,6 +223,7 @@
 			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 				{@render children?.()}
 			</main>
+			<TraceFooter traceId={data?.traceId ?? null} requestId={data?.requestId ?? null} />
 		</div>
 	{/if}
 </div>
