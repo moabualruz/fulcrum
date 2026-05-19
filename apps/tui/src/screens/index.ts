@@ -14,5 +14,6 @@ export { RoutingRulesScreen } from "./routing-rules.ts";
 export { SkillsScreen } from "./skills.ts";
 export { PlanningBreakdownScreen } from "./planning-breakdown.ts";
 export { ReviewScreen } from "./review-screen.ts";
+export { ReviewHandoffScreen } from "./review-handoff.ts";
 export { RunsControlScreen } from "./runs-screen.ts";
 export { PlanningScreen } from "./planning-screen.ts";

@@ -25,6 +25,8 @@
 | `fulcrum doctor`      | `doctor.ts`                   |
 | `fulcrum compress`    | `compress.ts`                 |
 
+Product workflow parity commands live under `fulcrum product reports …`: `uat-handoff`, `decision`, and `e2e-run` expose the same UAT/code-review final gate as the web review route and TUI **ReviewHandoffScreen**. JSON output must include project/trace linkage, generated E2E artifact metadata, and the report service result without CLI-only state.
+
 
 ## Invariants
 

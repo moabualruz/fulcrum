@@ -64,6 +64,10 @@ _Avoid_: API client, RPC stub.
 The project-scoped `:automations` **TuiScreen** for listing, searching, creating, enabling/disabling, and deleting automation rules through the same work-management automation service used by CLI and web.
 _Avoid_: Local rules editor, TUI-only automation state, settings table.
 
+**ReviewHandoffScreen**:
+The `:review-handoff` **TuiScreen** for the final UAT/code-review gate: shows the trace id, QA status, handoff prompt, pending review sessions, approve/request-changes/start-review decisions, and generated E2E artifacts through **KernelCaller** reports services.
+_Avoid_: Web-only final gate, hidden approval action, terminal-only review state.
+
 **UnsavedQuitConfirmation**:
 The per-screen `q` guard shown only when the focused **TuiScreen** owns an unsaved draft; it renders `Unsaved edits. Quit? (y/n)` plus the exact loss hint, accepts `y` to discard/quit and `n` or Esc to stay.
 _Avoid_: Generic exit prompt, always-on quit modal, shell-level dirty flag.
@@ -81,6 +85,7 @@ _Avoid_: Generic exit prompt, always-on quit modal, shell-level dirty flag.
 - **DensityMode** applies globally across every **TuiScreen** that renders a list.
 - **ScopeChip** is local to `:mcp`, `:plugins`, `:agents`, `:routes` — it does not affect other screens.
 - **AutomationRulesScreen** mirrors `fulcrum automations …` CLI verbs and the web automation rule list; it must call **KernelCaller** services instead of owning rule persistence.
+- **ReviewHandoffScreen** mirrors `fulcrum product reports uat-handoff`, `decision`, and `e2e-run`; decisions must carry the same trace id rendered by web final-gate badges and CLI JSON envelopes.
 - **UnsavedQuitConfirmation** belongs to each dirty **TuiScreen** because draft ownership differs by screen; the shell delegates `q` first and only exits/navigates when the screen reports no unsaved draft.
 
 ## Example dialogue
