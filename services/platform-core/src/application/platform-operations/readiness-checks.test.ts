@@ -113,6 +113,31 @@ describe("platform doctor checks", () => {
     expect(backup.message).toContain("older than 7 days");
   });
 
+  test("daemon check reports running and stale pidfile/socket states", async () => {
+    const stateDir = await tempDir("daemon");
+    try {
+      const pidfile = join(stateDir, "daemon.pid");
+      const socket = join(stateDir, "daemon.sock");
+      await writeFile(pidfile, "123\n");
+      await writeFile(socket, "fulcrumd\n");
+
+      const running = await runPlatformDoctorChecks({
+        stateDir,
+        daemon: { pidfile, socket },
+      });
+      expect(running.find((check) => check.name === "platform.daemon")?.status).toBe("pass");
+
+      await rm(socket);
+      const stale = await runPlatformDoctorChecks({
+        stateDir,
+        daemon: { pidfile, socket },
+      });
+      expect(stale.find((check) => check.name === "platform.daemon")?.status).toBe("warn");
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
   test("telemetry check passes when opted_in has a value and fails when unset", async () => {
     const pass = await runPlatformDoctorChecks({ telemetry: { optedIn: false } });
     expect(pass.find((check) => check.name === "platform.telemetry")?.status).toBe("pass");

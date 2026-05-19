@@ -27,36 +27,44 @@ const TARGETS: Array<{ target: string; out: string }> = [
   { target: "bun-windows-x64",      out: "dist/fulcrum-windows-x64.exe" },
 ];
 
+const BINARIES = [
+  { entry: "apps/cli/src/main.ts", name: "fulcrum" },
+  { entry: "apps/daemon/src/index.ts", name: "fulcrumd" },
+] as const;
+
 await mkdir("dist", { recursive: true });
 
-for (const { target, out } of TARGETS) {
-  const t0 = Date.now();
-  process.stdout.write(`→ ${target} ... `);
-  const proc = Bun.spawn(
-    [
-      "bun",
-      "build",
-      "--compile",
-      "--minify",
-      `--target=${target}`,
-      "--external=@opentui/core-*",
-      ...OPTIONAL_NEST_TRANSPORT_EXTERNALS.map((pkg) => `--external=${pkg}`),
-      "apps/cli/src/main.ts",
-      "--outfile",
-      out,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-  const exit = await proc.exited;
-  const ms = Date.now() - t0;
-  if (exit === 0) {
-    const file = Bun.file(out);
-    const sz = ((await file.stat()).size / 1_000_000).toFixed(1);
-    console.log(`${sz}MB (${ms}ms)`);
-  } else {
-    const err = await new Response(proc.stderr).text();
-    console.log(`FAIL (${ms}ms)\n${err}`);
-    process.exit(1);
+for (const binary of BINARIES) {
+  for (const { target, out } of TARGETS) {
+    const outfile = out.replace("fulcrum", binary.name);
+    const t0 = Date.now();
+    process.stdout.write(`→ ${binary.name} ${target} ... `);
+    const proc = Bun.spawn(
+      [
+        "bun",
+        "build",
+        "--compile",
+        "--minify",
+        `--target=${target}`,
+        "--external=@opentui/core-*",
+        ...OPTIONAL_NEST_TRANSPORT_EXTERNALS.map((pkg) => `--external=${pkg}`),
+        binary.entry,
+        "--outfile",
+        outfile,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const exit = await proc.exited;
+    const ms = Date.now() - t0;
+    if (exit === 0) {
+      const file = Bun.file(outfile);
+      const sz = ((await file.stat()).size / 1_000_000).toFixed(1);
+      console.log(`${sz}MB (${ms}ms)`);
+    } else {
+      const err = await new Response(proc.stderr).text();
+      console.log(`FAIL (${ms}ms)\n${err}`);
+      process.exit(1);
+    }
   }
 }
 console.log("\nAll targets built. Upload dist/* to a GitHub release and update install.sh's BASE_URL.");

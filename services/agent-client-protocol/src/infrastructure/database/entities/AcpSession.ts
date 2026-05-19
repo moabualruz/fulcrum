@@ -52,6 +52,27 @@ export class AcpSession {
   @Column({ name: "permission_mode", type: "varchar", nullable: true })
   permissionMode!: string | null;
 
+  @Column({ name: "paused_at", type: "timestamptz", nullable: true })
+  pausedAt!: Date | null;
+
+  @Column({ name: "paused_reason", type: "varchar", nullable: true })
+  pausedReason!: string | null;
+
+  @Column({ name: "current_checkpoint_id", type: "varchar", length: 128, nullable: true })
+  currentCheckpointId!: string | null;
+
+  @Column({ name: "abort_reason", type: "varchar", nullable: true })
+  abortReason!: string | null;
+
+  @Column({ name: "abort_note", type: "text", nullable: true })
+  abortNote!: string | null;
+
+  @Column({ name: "artifacts_path", type: "varchar", nullable: true })
+  artifactsPath!: string | null;
+
+  @Column({ name: "checkpoint_mode_override", type: "varchar", nullable: true })
+  checkpointModeOverride!: string | null;
+
   @Column({ type: "jsonb", name: "traffic_log", default: () => "'[]'::jsonb" })
   trafficLog!: unknown[];
 

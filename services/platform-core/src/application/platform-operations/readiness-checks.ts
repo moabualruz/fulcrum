@@ -68,6 +68,10 @@ interface PlatformDoctorOptions {
     /** Status of last outbound report attempt: "ok" | "4xx" | "error" | undefined. */
     lastReportStatus?: "ok" | "4xx" | "error";
   };
+  daemon?: {
+    pidfile?: string;
+    socket?: string;
+  };
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -158,6 +162,15 @@ async function crashlogDirWritable(dir: string): Promise<boolean> {
   }
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function envBool(name: string): boolean | null {
   const value = process.env[name];
   if (value === undefined || value === "") return null;
@@ -178,6 +191,7 @@ function defaultEnabledFlags(): Set<string> {
 export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {}): Promise<PlatformDoctorCheck[]> {
   const stateDir = options.stateDir ?? defaultStateDir();
   const results: PlatformDoctorCheck[] = [];
+  const home = fulcrumHome();
 
   try {
     const settings = await (options.theme?.readSettings() ?? readThemeSettingsFromEnv());
@@ -232,6 +246,27 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     crashWritable ? "pass" : "fail",
     crashWritable ? `${crashlogDir} exists and is writable.` : `${crashlogDir} is not writable.`,
     crashWritable ? "No action needed." : "Create the crashlog directory and make it writable by the current user.",
+  ));
+
+  const daemonPidfile = options.daemon?.pidfile ?? join(home, "daemon.pid");
+  const daemonSocket = options.daemon?.socket ?? join(home, "daemon.sock");
+  const [daemonPidExists, daemonSocketExists] = await Promise.all([
+    pathExists(daemonPidfile),
+    pathExists(daemonSocket),
+  ]);
+  results.push(check(
+    "platform.daemon",
+    daemonPidExists && daemonSocketExists ? "pass" : daemonPidExists || daemonSocketExists ? "warn" : "skip",
+    daemonPidExists && daemonSocketExists
+      ? "fulcrumd pidfile and socket are present."
+      : daemonPidExists || daemonSocketExists
+        ? "fulcrumd state is stale: pidfile/socket mismatch."
+        : "fulcrumd is stopped.",
+    daemonPidExists && daemonSocketExists
+      ? "No action needed."
+      : daemonPidExists || daemonSocketExists
+        ? "Remove stale ~/.fulcrum/daemon.pid and ~/.fulcrum/daemon.sock, then restart fulcrumd."
+        : "Start fulcrumd when background AI Assist sessions are required.",
   ));
 
   const backup = options.backup ?? { policyEnabled: false, lastRunAt: null };

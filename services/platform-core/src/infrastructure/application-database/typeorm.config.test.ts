@@ -22,7 +22,7 @@ describe("application database TypeORM config", () => {
       : Object.values(options.migrations ?? {});
 
     expect(migrations).toBeArray();
-    expect(migrations).toHaveLength(29);
+    expect(migrations).toHaveLength(30);
     expect(String(migrations[0])).not.toContain("*");
   });
 

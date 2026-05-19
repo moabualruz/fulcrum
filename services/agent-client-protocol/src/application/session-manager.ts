@@ -18,6 +18,10 @@ import type {
   SavedSession,
   SessionNotification,
 } from "@agent-client-protocol/domain/protocol.ts";
+import type {
+  AcpSessionRepository,
+  CreateAcpSessionCheckpointInput,
+} from "@agent-client-protocol/infrastructure/database/repositories/AcpSessionRepository.ts";
 
 export interface AcpBridgeClient {
   pendingPermissionRequest: PermissionRequest | null;
@@ -49,6 +53,7 @@ export interface AcpSessionManagerOptions {
   state: AcpSessionState;
   config: AcpConfigState;
   createBridge: CreateAcpBridge;
+  repository?: AcpSessionRepository | null;
   appVersion?: string;
   canAccessFs?: boolean;
 }
@@ -59,6 +64,7 @@ export class AcpSessionManager {
   private readonly state: AcpSessionState;
   private readonly config: AcpConfigState;
   private readonly createBridge: CreateAcpBridge;
+  private readonly repository: AcpSessionRepository | null;
   private readonly appVersion: string;
   private readonly canAccessFs: boolean;
   private acpClient: AcpBridgeClient | null = null;
@@ -67,6 +73,7 @@ export class AcpSessionManager {
     this.state = options.state;
     this.config = options.config;
     this.createBridge = options.createBridge;
+    this.repository = options.repository ?? null;
     this.appVersion = options.appVersion ?? "0.1.0";
     this.canAccessFs = options.canAccessFs ?? false;
   }
@@ -104,6 +111,21 @@ export class AcpSessionManager {
 
       this.state.currentSession = session;
       this.state.savedSessions.push(session);
+      await this.repository?.save({
+        id: session.id,
+        orgId: null,
+        projectId: null,
+        traceId: session.id,
+        agentName,
+        cwd,
+        status: "active",
+        mode: this.state.currentModeId || "default",
+        model: this.state.currentModelId || null,
+        modeId: this.state.currentModeId || null,
+        modelId: this.state.currentModelId || null,
+        permissionMode: null,
+        trafficLog: [],
+      });
       this.state.isConnected = true;
       this.state.messages = [];
       this.state.toolCalls.clear();
@@ -163,6 +185,7 @@ export class AcpSessionManager {
       savedSession.sessionId = sessionResponse.sessionId;
       savedSession.lastUpdated = this.state.now();
       savedSession.supportsLoadSession = true;
+      await this.repository?.resume(savedSession.id);
       this.state.currentSession = savedSession;
       this.state.isConnected = true;
       this.state.messages = [];
@@ -229,6 +252,7 @@ export class AcpSessionManager {
       session.sessionId = sessionResponse.sessionId;
       session.lastUpdated = this.state.now();
       session.supportsLoadSession = true;
+      await this.repository?.resume(session.id);
       this.state.currentSession = session;
       this.state.isConnected = true;
       this.state.reconnectAttempts = 0;
@@ -291,21 +315,37 @@ export class AcpSessionManager {
       await client.cancel({ sessionId: session.sessionId });
       await client.disconnect();
     }
+    if (session) await this.repository?.abort(session.id, { reason: "user-requested" });
     this.acpClient = null;
     this.state.disconnectState();
   }
 
-  pauseSession(): void {
+  async pauseSession(reason: string | null = null): Promise<void> {
     if (!this.state.currentSession) throw new Error("No active session to pause");
     this.state.isPaused = true;
     this.state.isLoading = false;
+    await this.repository?.pause(this.state.currentSession.id, reason);
   }
 
   async resumePausedSession(): Promise<SavedSession> {
     if (!this.state.currentSession) throw new Error("No paused session to resume");
     this.state.isPaused = false;
+    await this.repository?.resume(this.state.currentSession.id);
     if (!this.state.isConnected) return this.reconnectActiveSession();
     return this.state.currentSession;
+  }
+
+  async recordCheckpoint(input: Omit<CreateAcpSessionCheckpointInput, "id" | "sessionId"> & { id?: string }): Promise<void> {
+    const session = this.requireSession();
+    await this.repository?.createCheckpoint({
+      id: input.id ?? this.state.createId(),
+      sessionId: session.id,
+      kind: input.kind,
+      ref: input.ref,
+      turnIndex: input.turnIndex,
+      messageUuid: input.messageUuid,
+      label: input.label ?? null,
+    });
   }
 
   resolvePermission(optionId: string): void {
@@ -477,7 +517,7 @@ export async function deleteSavedSession(_em: unknown, input: { savedSessionId: 
 export async function pauseActiveSession(_em: unknown): Promise<void> {
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active AI Assist session manager");
-  manager.pauseSession();
+  await manager.pauseSession();
 }
 
 export async function resumeActiveSession(_em: unknown): Promise<void> {

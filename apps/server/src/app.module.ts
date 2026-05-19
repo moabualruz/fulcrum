@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { Module } from "@nestjs/common";
 
 import { ApplicationDatabaseModule } from "@platform-core/infrastructure/database/typeorm-root.module.ts";
+import { EventBusModule } from "@platform-core/application/event-bus/index.ts";
 import { CredentialPublicApiModule } from "@platform-core/interface/http/credential-public-api.controller.ts";
 import { DoctorPublicApiModule } from "@platform-core/interface/http/doctor-public-api.controller.ts";
 import { FeatureExperimentPublicApiModule } from "@feature-flags/interface/http/controllers/feature-experiment-public-api.controller.ts";
@@ -51,6 +52,7 @@ export class AppModule {}
 Module({
   imports: [
     TrpcModule,
+    EventBusModule,
     ApplicationDatabaseModule,
     CredentialPublicApiModule,
     DoctorPublicApiModule,

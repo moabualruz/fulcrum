@@ -11,6 +11,7 @@ import { Integration1715788800004 } from "./migrations/1715788800004-Integration
 import { Notifications1715788800005 } from "./migrations/1715788800005-Notifications.ts";
 import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
 import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
+import { Migration20260519AcpSessionPauseResumeCheckpoints1778841600000 } from "./migrations/Migration20260519_acp_session_checkpoints.ts";
 import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
 import { PlatformFeatureFlags1778753400000 } from "../../../../feature-flags/src/infrastructure/database/migrations/feature-flag.migration.ts";
 import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
@@ -134,6 +135,7 @@ import { WebhookRuleConfig } from "@notification-center/infrastructure/database/
 
 // agent-client-protocol owned entities
 import { AcpSession } from "@agent-client-protocol/infrastructure/database/entities/AcpSession.ts";
+import { AcpSessionCheckpoint } from "@agent-client-protocol/infrastructure/database/entities/AcpSessionCheckpoint.ts";
 
 // workflow-coordination owned entities
 import { ArtifactRetentionPolicy } from "@workflow-coordination/infrastructure/database/entities/artifacts/ArtifactRetentionPolicy.ts";
@@ -268,6 +270,7 @@ export const applicationMigrations = [
   WorkflowAudit1778623200008,
   IdentityAccess1778623200009,
   Migration20260516AcpSessionColumns1778623200002,
+  Migration20260519AcpSessionPauseResumeCheckpoints1778841600000,
   Migration20260517NotificationTraceColumn1778760600001,
   IntegrationWebhooks1778750700000,
   IntegrationConnectors1778751600000,
@@ -394,6 +397,7 @@ export function getCoreEntities(): (Function | EntitySchema)[] {
     RoutingRule,
     // agent-client-protocol
     AcpSession,
+    AcpSessionCheckpoint,
     // integration-hub
     BitbucketIssue,
     BitbucketPullRequest,
