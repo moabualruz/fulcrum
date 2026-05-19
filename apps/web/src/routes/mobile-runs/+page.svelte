@@ -261,7 +261,7 @@
           <button
             type="button"
             data-error-open={event.id}
-            class="flex w-full flex-col items-start gap-1 text-left text-sm"
+            class="flex min-h-11 w-full flex-col items-start gap-1 text-left text-sm"
             onclick={() => openError(event.id)}
           >
             <span class="flex items-center gap-2 font-medium">
@@ -298,7 +298,7 @@
           <button
             type="button"
             data-error-detail-close
-            class="h-8 rounded-md border border-border px-2 text-sm"
+            class="min-h-11 min-w-11 rounded-md border border-border px-3 text-sm"
             onclick={closeError}
           >Close</button>
         </div>
@@ -315,7 +315,7 @@
           <button
             type="button"
             data-error-detail-copy
-            class="h-8 rounded-md border border-border px-2 text-xs"
+            class="min-h-11 min-w-11 rounded-md border border-border px-3 text-xs"
             onclick={copyStack}
           >{copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy"}</button>
         </div>

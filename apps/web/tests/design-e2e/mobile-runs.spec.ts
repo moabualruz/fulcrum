@@ -103,4 +103,23 @@ test.describe("mobile-runs error detail panel", () => {
 		await page.locator("[data-error-open='err_trace_dedupe']").click();
 		await expect(page.locator("[data-error-detail-breadcrumbs] [data-breadcrumb]")).toHaveCount(4);
 	});
+
+	test("interactive controls meet 44px touch-target floor at mobile breakpoint", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto("/mobile-runs");
+
+		await page.locator("[data-error-open='err_trace_dedupe']").click();
+		const selectors = [
+			"[data-error-open='err_trace_dedupe']",
+			"[data-error-open='err_mcp_handshake']",
+			"[data-error-detail-close]",
+			"[data-error-detail-copy]",
+		];
+		for (const selector of selectors) {
+			const box = await page.locator(selector).first().boundingBox();
+			expect(box).not.toBeNull();
+			expect(box!.height).toBeGreaterThanOrEqual(44);
+			expect(box!.width).toBeGreaterThanOrEqual(44);
+		}
+	});
 });
