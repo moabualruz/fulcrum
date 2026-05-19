@@ -118,23 +118,48 @@ async function appendServiceEvent(
     subjectId: string;
     verb: string;
     payload?: Record<string, unknown>;
+    fieldName?: string | null;
+    fromValue?: unknown;
+    toValue?: unknown;
   },
 ): Promise<void> {
   if (isSqlExecutor(db)) {
     const id = newUlid();
     await db.query(
-      `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
-       VALUES ($1, $2, $3, 'system', $4, $5, $6, $7::jsonb, now())`,
-      [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],
+      `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, field_name, from_value, to_value, created_at)
+       VALUES ($1, $2, $3, 'system', $4, $5, $6, $7::jsonb, $8, $9::jsonb, $10::jsonb, now())`,
+      [
+        id,
+        input.orgId,
+        input.projectId ?? null,
+        input.subjectKind,
+        input.subjectId,
+        input.verb,
+        JSON.stringify(input.payload ?? {}),
+        input.fieldName ?? null,
+        input.fromValue === undefined ? null : JSON.stringify(input.fromValue),
+        input.toValue === undefined ? null : JSON.stringify(input.toValue),
+      ],
     );
     return;
   }
   const em = assertEm(db);
   const id = randomUUID();
   await em.query(
-    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, created_at)
-     VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, now())`,
-    [id, input.orgId, input.projectId ?? null, input.subjectKind, input.subjectId, input.verb, JSON.stringify(input.payload ?? {})],
+    `INSERT INTO events (id, org_id, project_id, actor, subject_kind, subject_id, verb, payload, field_name, from_value, to_value, created_at)
+     VALUES (?, ?, ?, 'system', ?, ?, ?, ?::jsonb, ?, ?::jsonb, ?::jsonb, now())`,
+    [
+      id,
+      input.orgId,
+      input.projectId ?? null,
+      input.subjectKind,
+      input.subjectId,
+      input.verb,
+      JSON.stringify(input.payload ?? {}),
+      input.fieldName ?? null,
+      input.fromValue === undefined ? null : JSON.stringify(input.fromValue),
+      input.toValue === undefined ? null : JSON.stringify(input.toValue),
+    ],
   );
 }
 
@@ -285,7 +310,17 @@ export async function moveTaskStatusAction(
       subjectKind: "task",
       subjectId: input.id,
       verb: "status_changed",
-      payload: { from: input.from, to: input.to, task: input.id },
+      fieldName: "status",
+      fromValue: input.from,
+      toValue: input.to,
+      payload: {
+        causation_id: `task:${input.id}:status:${input.from}->${input.to}`,
+        before: { status: input.from },
+        after: { status: input.to },
+        from: input.from,
+        to: input.to,
+        task: input.id,
+      },
     });
     return { ok: true };
   }
@@ -305,7 +340,17 @@ export async function moveTaskStatusAction(
     subjectKind: "task",
     subjectId: input.id,
     verb: "status_changed",
-    payload: { from: input.from, to: input.to, task: input.id },
+    fieldName: "status",
+    fromValue: input.from,
+    toValue: input.to,
+    payload: {
+      causation_id: `task:${input.id}:status:${input.from}->${input.to}`,
+      before: { status: input.from },
+      after: { status: input.to },
+      from: input.from,
+      to: input.to,
+      task: input.id,
+    },
   });
   return { ok: true };
 }

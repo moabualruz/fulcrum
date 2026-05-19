@@ -33,11 +33,30 @@ async function createProject(em: TestOrm["em"]): Promise<string> {
   return id;
 }
 
-async function taskEvents(em: TestOrm["em"], taskId: string): Promise<Array<{ verb: string; payload: Record<string, unknown> }>> {
+async function taskEvents(
+  em: TestOrm["em"],
+  taskId: string,
+): Promise<Array<{
+  actor: string | null;
+  verb: string;
+  field_name: string | null;
+  from_value: unknown;
+  to_value: unknown;
+  payload: Record<string, unknown>;
+}>> {
   return await em.getConnection().execute(
-    `SELECT verb, payload FROM events WHERE subject_kind = 'task' AND subject_id = ? ORDER BY created_at ASC, id ASC`,
+    `SELECT actor, verb, field_name, from_value, to_value, payload
+     FROM events WHERE subject_kind = 'task' AND subject_id = ?
+     ORDER BY created_at ASC, id ASC`,
     [taskId],
-  ) as Array<{ verb: string; payload: Record<string, unknown> }>;
+  ) as Array<{
+    actor: string | null;
+    verb: string;
+    field_name: string | null;
+    from_value: unknown;
+    to_value: unknown;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 describe("task service actions with real persistence", () => {
@@ -107,7 +126,17 @@ describe("task service actions with real persistence", () => {
       "start_date",
       "due_date",
     ]);
-    expect(events.find((event) => event.verb === "status_changed")!.payload).toMatchObject({
+    const stateTransition = events.find((event) => event.verb === "status_changed")!;
+    expect(stateTransition).toMatchObject({
+      actor: "system",
+      field_name: "status",
+      from_value: "in_progress",
+      to_value: "blocked",
+    });
+    expect(stateTransition.payload).toMatchObject({
+      causation_id: `task:${created.id}:status:in_progress->blocked`,
+      before: { status: "in_progress" },
+      after: { status: "blocked" },
       from: "in_progress",
       to: "blocked",
       task: created.id,
@@ -255,6 +284,9 @@ describe("task service actions with real persistence", () => {
       changed: ["title", "description", "status", "priority", "start_date", "due_date"],
     });
     expect(events.find((event) => event["verb"] === "status_changed")?.["payload"]).toEqual({
+      causation_id: `task:${created.id}:status:in_progress->blocked`,
+      before: { status: "in_progress" },
+      after: { status: "blocked" },
       from: "in_progress",
       to: "blocked",
       task: created.id,

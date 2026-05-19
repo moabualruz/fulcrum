@@ -29,6 +29,10 @@ export interface EventRow {
   subject_kind: string;
   subject_id: string;
   verb: string;
+  causation_id: string | null;
+  field_name: string | null;
+  before: unknown;
+  after: unknown;
   payload: Record<string, unknown>;
   created_at: string;
 }
@@ -145,6 +149,7 @@ export async function findRetentionPolicy(
 }
 
 export function serializeEvent(event: Event): AuditEventDto {
+  const payload = event.payload ?? {};
   return {
     id: event.id,
     orgId: event.org.id,
@@ -152,7 +157,11 @@ export function serializeEvent(event: Event): AuditEventDto {
     verb: event.verb,
     subjectKind: event.subjectKind,
     subjectId: event.subjectId ?? null,
-    payload: event.payload ?? null,
+    causationId: payloadCausationId(payload),
+    fieldName: event.fieldName ?? null,
+    before: event.fromValue ?? payload["before"],
+    after: event.toValue ?? payload["after"],
+    payload,
     createdAt: event.createdAt,
   };
 }
@@ -214,6 +223,11 @@ function payloadProjectId(payload: Record<string, unknown> | null | undefined): 
   return typeof projectId === "string" ? projectId : null;
 }
 
+function payloadCausationId(payload: Record<string, unknown> | null | undefined): string | null {
+  const causationId = payload?.["causation_id"] ?? payload?.["causationId"];
+  return typeof causationId === "string" && causationId.trim() ? causationId : null;
+}
+
 function toEventRow(event: AuditEventDto): EventRow {
   return {
     id: event.id,
@@ -223,6 +237,10 @@ function toEventRow(event: AuditEventDto): EventRow {
     subject_kind: event.subjectKind,
     subject_id: event.subjectId ?? "",
     verb: event.verb,
+    causation_id: event.causationId ?? null,
+    field_name: event.fieldName ?? null,
+    before: event.before ?? null,
+    after: event.after ?? null,
     payload: event.payload ?? {},
     created_at: event.createdAt.toISOString(),
   };
@@ -238,7 +256,7 @@ function csvEscape(value: unknown): string {
 }
 
 function toCsv(rows: AuditEventDto[]): string {
-  const headers = ["id", "org_id", "user_id", "verb", "subject_kind", "subject_id", "payload", "created_at"];
+  const headers = ["id", "org_id", "user_id", "verb", "subject_kind", "subject_id", "causation_id", "field_name", "before", "after", "payload", "created_at"];
   const lines = rows.map((row) => [
     row.id,
     row.orgId,
@@ -246,6 +264,10 @@ function toCsv(rows: AuditEventDto[]): string {
     row.verb,
     row.subjectKind,
     row.subjectId ?? "",
+    row.causationId ?? "",
+    row.fieldName ?? "",
+    row.before ?? "",
+    row.after ?? "",
     row.payload ?? {},
     row.createdAt,
   ].map(csvEscape).join(","));
@@ -253,7 +275,7 @@ function toCsv(rows: AuditEventDto[]): string {
 }
 
 export function eventsToCsv(events: EventRow[]): string {
-  const headers = ["id", "org_id", "project_id", "actor", "subject_kind", "subject_id", "verb", "payload", "created_at"];
+  const headers = ["id", "org_id", "project_id", "actor", "subject_kind", "subject_id", "verb", "causation_id", "field_name", "before", "after", "payload", "created_at"];
   const lines = events.map((event) => [
     event.id,
     event.org_id,
@@ -262,6 +284,10 @@ export function eventsToCsv(events: EventRow[]): string {
     event.subject_kind,
     event.subject_id,
     event.verb,
+    event.causation_id ?? "",
+    event.field_name ?? "",
+    event.before ?? "",
+    event.after ?? "",
     event.payload,
     event.created_at,
   ].map(csvEscape).join(","));
