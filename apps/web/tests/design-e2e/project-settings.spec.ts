@@ -182,4 +182,34 @@ test.describe("project settings labels", () => {
 		await expect(page.locator("[data-feature-row='intake']")).toHaveAttribute("data-feature-enabled", "true");
 		await expect(page.locator("[data-feature-nav-item='intake']")).toBeVisible();
 	});
+
+	test("automation rules list, search, toggle, create, and delete", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-automation-rules]")).toBeVisible();
+		await expect(page.locator("[data-automation-rule]")).toHaveCount(5);
+		await expect(page.locator("[data-automation-rule='rule_auto_close']")).toContainText("auto-close stale done tasks");
+		await expect(page.locator("[data-automation-rule-trigger='rule_auto_close']")).toContainText("Status changes");
+		await expect(page.locator("[data-automation-rule-action='rule_auto_close']")).toContainText("Archive after 3 months");
+		await expect(page.locator("[data-automation-rule-enabled='rule_auto_close']")).toContainText("Enabled");
+
+		await page.locator("[data-automation-rule-toggle='rule_auto_close']").click();
+		await expect(page.locator("[data-automation-rule='rule_auto_close']")).toHaveAttribute("data-automation-rule-status", "disabled");
+		await expect(page.locator("[data-automation-rule-enabled='rule_auto_close']")).toContainText("Disabled");
+
+		await page.locator("[data-automation-rule-search]").fill("auto-close");
+		await expect(page.locator("[data-automation-rule]")).toHaveCount(1);
+		await expect(page.locator("[data-automation-rule-count]")).toContainText("1 of 5 rules");
+
+		await page.locator("[data-automation-rule-search]").fill("");
+		await page.locator("[data-automation-new-rule-name]").fill("review handoff reminder");
+		await page.locator("[data-automation-new-rule]").click();
+		await expect(page.locator("[data-automation-rule='rule_review_handoff_reminder']")).toBeVisible();
+		await expect(page.locator("[data-automation-rule-count]")).toContainText("6 of 6 rules");
+
+		await page.locator("[data-automation-rule-delete='rule_priority_escalate']").click();
+		await expect(page.locator("[data-automation-rule-delete-confirm='rule_priority_escalate']")).toBeVisible();
+		await page.locator("[data-automation-rule-delete-confirm='rule_priority_escalate']").click();
+		await expect(page.locator("[data-automation-rule='rule_priority_escalate']")).toHaveCount(0);
+	});
 });

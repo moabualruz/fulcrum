@@ -45,25 +45,26 @@
 
   // ── State ────────────────────────────────────────────────────────────────────
 
-  let rules: AutomationRule[] = [];
-  let templates: AutomationTemplate[] = [];
-  let loading = true;
-  let error = "";
-  let showAddForm = false;
-  let showTemplates = false;
-  let deletingId: string | null = null;
-  let confirmDeleteId: string | null = null;
+  let rules = $state<AutomationRule[]>([]);
+  let templates = $state<AutomationTemplate[]>([]);
+  let loading = $state(true);
+  let error = $state("");
+  let showAddForm = $state(false);
+  let showTemplates = $state(false);
+  let deletingId = $state<string | null>(null);
+  let confirmDeleteId = $state<string | null>(null);
+  let ruleSearch = $state("");
 
   // New rule form state
-  let newName = "";
-  let newTrigger: TriggerType = "status_change";
-  let newAction: ActionType = "set_status";
-  let newActionValue = "";
-  let conditionField = "";
-  let conditionOperator = "equals";
-  let conditionValue = "";
-  let useCondition = false;
-  let submitting = false;
+  let newName = $state("");
+  let newTrigger = $state<TriggerType>("status_change");
+  let newAction = $state<ActionType>("set_status");
+  let newActionValue = $state("");
+  let conditionField = $state("");
+  let conditionOperator = $state("equals");
+  let conditionValue = $state("");
+  let useCondition = $state(false);
+  let submitting = $state(false);
 
   const TRIGGER_LABELS: Record<TriggerType, string> = {
     status_change: "Status changes",
@@ -85,6 +86,18 @@
     add_comment: "Add comment",
     subscribe_watcher: "Subscribe watcher",
   };
+
+  const visibleRules = $derived(ruleSearch.trim()
+    ? rules.filter((rule) => {
+        const needle = ruleSearch.trim().toLowerCase();
+        return [
+          rule.name,
+          triggerLabel(rule.triggerType),
+          actionLabel(rule.actionType),
+          rule.enabled ? "enabled" : "disabled",
+        ].some((value) => value.toLowerCase().includes(needle));
+      })
+    : rules);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -205,28 +218,43 @@
   }
 </script>
 
-<div class={cn("flex flex-col gap-4")}>
+<div data-automation-rules data-project-id={projectId} class={cn("flex flex-col gap-4")}>
   <!-- Header -->
-  <div class={cn("flex items-center justify-between")}>
+  <div class={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between")}>
     <div>
-      <h2 class={cn("text-lg font-semibold")}>Automation Rules</h2>
-      <p class={cn("text-sm text-muted-foreground")}>Automate repetitive actions based on project events.</p>
+      <h2 class={cn("text-lg font-semibold")}>Automation rules</h2>
+      <p class={cn("text-sm text-muted-foreground")}>Project {projectId}: automate repetitive actions based on project events.</p>
     </div>
     <div class={cn("flex gap-2")}>
       <button
+        type="button"
         onclick={loadTemplates}
+        data-automation-template-button
         class={cn("text-sm px-3 py-1.5 rounded-md border border-border hover:bg-muted")}
       >
         Use Template
       </button>
       <button
+        type="button"
         onclick={() => (showAddForm = !showAddForm)}
+        data-automation-new-rule
         class={cn("text-sm px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90")}
       >
         + Add Rule
       </button>
     </div>
   </div>
+
+  <label class={cn("flex max-w-md flex-col gap-1 text-sm")}>
+    <span class={cn("text-xs font-medium text-muted-foreground")}>Search rules</span>
+    <input
+      type="search"
+      bind:value={ruleSearch}
+      data-automation-rule-search
+      placeholder="auto-close, status, disabled..."
+      class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}
+    />
+  </label>
 
   {#if error}
     <p class={cn("text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md")}>{error}</p>
@@ -342,14 +370,24 @@
       <p class={cn("text-sm")}>No automation rules yet.</p>
       <p class={cn("text-xs mt-1")}>Add a rule or use a template to get started.</p>
     </div>
+  {:else if visibleRules.length === 0}
+    <div data-automation-rules-empty class={cn("rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground")}>
+      No automation rules match "{ruleSearch}".
+    </div>
   {:else}
     <div class={cn("flex flex-col gap-2")}>
-      {#each rules as rule}
-        <div class={cn("flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors")}>
+      {#each visibleRules as rule}
+        <div
+          data-automation-rule={rule.id}
+          data-automation-rule-status={rule.enabled ? "enabled" : "disabled"}
+          class={cn("flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors")}
+        >
           <!-- Enabled toggle -->
           <button
+            type="button"
             onclick={() => toggleEnabled(rule)}
             title={rule.enabled ? "Disable rule" : "Enable rule"}
+            data-automation-rule-toggle={rule.id}
             class={cn(
               "mt-0.5 relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
               rule.enabled ? "bg-primary" : "bg-muted-foreground/30"
@@ -369,9 +407,10 @@
           <div class={cn("flex-1 min-w-0")}>
             <div class={cn("text-sm font-medium truncate")}>{rule.name}</div>
             <div class={cn("text-xs text-muted-foreground mt-0.5")}>
-              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{triggerLabel(rule.triggerType)}</span>
+              <span data-automation-rule-trigger={rule.id} class={cn("bg-muted px-1.5 py-0.5 rounded")}>{triggerLabel(rule.triggerType)}</span>
               <span class={cn("mx-1")}>→</span>
-              <span class={cn("bg-muted px-1.5 py-0.5 rounded")}>{actionLabel(rule.actionType)}</span>
+              <span data-automation-rule-action={rule.id} class={cn("bg-muted px-1.5 py-0.5 rounded")}>{actionLabel(rule.actionType)}</span>
+              <span data-automation-rule-enabled={rule.id} class={cn("ml-1 bg-muted px-1.5 py-0.5 rounded")}>{rule.enabled ? "Enabled" : "Disabled"}</span>
             </div>
             {#if rule.executionCount > 0}
               <div class={cn("text-xs text-muted-foreground mt-1")}>
@@ -385,14 +424,18 @@
             <div class={cn("flex gap-1 items-center")}>
               <span class={cn("text-xs text-destructive")}>Delete?</span>
               <button
+                type="button"
                 onclick={() => deleteRule(rule.id)}
                 disabled={deletingId === rule.id}
+                data-automation-rule-delete-confirm={rule.id}
                 class={cn("text-xs px-2 py-0.5 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50")}
               >
                 {deletingId === rule.id ? "…" : "Yes"}
               </button>
               <button
+                type="button"
                 onclick={() => (confirmDeleteId = null)}
+                data-automation-rule-delete-cancel={rule.id}
                 class={cn("text-xs px-2 py-0.5 rounded border border-border hover:bg-muted")}
               >
                 No
@@ -400,7 +443,9 @@
             </div>
           {:else}
             <button
+              type="button"
               onclick={() => (confirmDeleteId = rule.id)}
+              data-automation-rule-delete={rule.id}
               class={cn("text-xs text-muted-foreground hover:text-destructive transition-colors")}
             >
               Delete

@@ -349,6 +349,111 @@
     newModuleLead = "";
   }
 
+  type AutomationRuleStatus = "enabled" | "disabled";
+
+  interface AutomationRuleFixture {
+    id: string;
+    name: string;
+    trigger: string;
+    action: string;
+    status: AutomationRuleStatus;
+    project: string;
+    executions: number;
+  }
+
+  let automationSearch = $state("");
+  let automationRules = $state<AutomationRuleFixture[]>([
+    {
+      id: "rule_auto_close",
+      name: "auto-close stale done tasks",
+      trigger: "Status changes",
+      action: "Archive after 3 months",
+      status: "enabled",
+      project: "Authentication rewrite",
+      executions: 42,
+    },
+    {
+      id: "rule_assign_review",
+      name: "assign review owner",
+      trigger: "Label added",
+      action: "Set assignee to review captain",
+      status: "enabled",
+      project: "Authentication rewrite",
+      executions: 18,
+    },
+    {
+      id: "rule_priority_escalate",
+      name: "escalate overdue blockers",
+      trigger: "Due date passed",
+      action: "Set priority to urgent",
+      status: "disabled",
+      project: "Authentication rewrite",
+      executions: 6,
+    },
+    {
+      id: "rule_comment_notify",
+      name: "notify on customer comment",
+      trigger: "Comment added",
+      action: "Subscribe watcher",
+      status: "enabled",
+      project: "Docs workspace",
+      executions: 27,
+    },
+    {
+      id: "rule_ci_label",
+      name: "tag CI failures",
+      trigger: "Task created",
+      action: "Add label ci-failure",
+      status: "enabled",
+      project: "Runtime reliability",
+      executions: 31,
+    },
+  ]);
+  let newAutomationName = $state("");
+  let automationDeleteId = $state<string | null>(null);
+
+  const visibleAutomationRules = $derived(automationSearch.trim()
+    ? automationRules.filter((rule) => {
+        const needle = automationSearch.trim().toLowerCase();
+        return [rule.name, rule.trigger, rule.action, rule.status, rule.project]
+          .some((value) => value.toLowerCase().includes(needle));
+      })
+    : automationRules);
+
+  function toggleAutomationRule(id: string): void {
+    automationRules = automationRules.map((rule) => rule.id === id
+      ? { ...rule, status: rule.status === "enabled" ? "disabled" : "enabled" }
+      : rule);
+  }
+
+  function requestAutomationDelete(id: string): void {
+    automationDeleteId = id;
+  }
+
+  function confirmAutomationDelete(id: string): void {
+    automationRules = automationRules.filter((rule) => rule.id !== id);
+    automationDeleteId = null;
+  }
+
+  function createAutomationRule(event: Event): void {
+    event.preventDefault();
+    const name = newAutomationName.trim();
+    if (!name) return;
+    automationRules = [
+      ...automationRules,
+      {
+        id: `rule_${name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        name,
+        trigger: "Task created",
+        action: "Add label triage",
+        status: "enabled",
+        project: "Authentication rewrite",
+        executions: 0,
+      },
+    ];
+    newAutomationName = "";
+  }
+
   type FeatureFlag = "cycles" | "modules" | "views" | "pages" | "intake";
   const FEATURE_LABELS: Record<FeatureFlag, string> = {
     cycles: "Cycles",
@@ -874,6 +979,128 @@
       </ul>
     {:else}
       <p data-modules-disabled class="text-xs text-muted-foreground">Modules are disabled; enable to add new modules.</p>
+    {/if}
+  </section>
+
+  <section data-automation-rules class="space-y-4 rounded-md border border-border p-6">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="space-y-1">
+        <h2 class="text-lg font-medium">Automation rules</h2>
+        <p class="text-sm text-muted-foreground">Project-scoped rules with trigger, action, status, and execution history.</p>
+      </div>
+      <form data-automation-rule-create-form class="flex flex-col gap-2 sm:min-w-72" onsubmit={createAutomationRule}>
+        <label class="text-xs font-medium text-muted-foreground" for="new-automation-rule">Create new rule</label>
+        <div class="flex gap-2">
+          <input
+            id="new-automation-rule"
+            data-automation-new-rule-name
+            bind:value={newAutomationName}
+            placeholder="review handoff reminder"
+            class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+          />
+          <button
+            type="submit"
+            data-automation-new-rule
+            class="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+          >Create</button>
+        </div>
+      </form>
+    </header>
+
+    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+      <label class="flex flex-col gap-1 text-sm">
+        Search rules
+        <input
+          type="search"
+          data-automation-rule-search
+          bind:value={automationSearch}
+          placeholder="auto-close, disabled, status..."
+          class="h-9 rounded-md border border-input bg-background px-2"
+        />
+      </label>
+      <p data-automation-rule-count class="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+        {visibleAutomationRules.length} of {automationRules.length} rules
+      </p>
+    </div>
+
+    {#if visibleAutomationRules.length === 0}
+      <div data-automation-rules-empty class="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">
+        No automation rules match the current search.
+      </div>
+    {:else}
+      <div class="overflow-x-auto rounded-md border border-border">
+        <table data-automation-rules-table class="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr class="border-b border-border bg-muted/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <th class="px-3 py-2">Rule</th>
+              <th class="px-3 py-2">Project</th>
+              <th class="px-3 py-2">Trigger</th>
+              <th class="px-3 py-2">Action</th>
+              <th class="px-3 py-2">Status</th>
+              <th class="px-3 py-2">Runs</th>
+              <th class="px-3 py-2 text-right">Controls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each visibleAutomationRules as rule (rule.id)}
+              <tr
+                data-automation-rule={rule.id}
+                data-automation-rule-status={rule.status}
+                class="border-b border-border last:border-0"
+              >
+                <td class="px-3 py-3 font-medium">{rule.name}</td>
+                <td class="px-3 py-3 text-muted-foreground">{rule.project}</td>
+                <td data-automation-rule-trigger={rule.id} class="px-3 py-3">{rule.trigger}</td>
+                <td data-automation-rule-action={rule.id} class="px-3 py-3">{rule.action}</td>
+                <td class="px-3 py-3">
+                  <span
+                    data-automation-rule-enabled={rule.id}
+                    class={rule.status === "enabled"
+                      ? "rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                      : "rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground"}
+                  >
+                    {rule.status === "enabled" ? "Enabled" : "Disabled"}
+                  </span>
+                </td>
+                <td class="px-3 py-3 text-muted-foreground">{rule.executions}</td>
+                <td class="px-3 py-3">
+                  <div class="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      data-automation-rule-toggle={rule.id}
+                      onclick={() => toggleAutomationRule(rule.id)}
+                      class="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                    >
+                      {rule.status === "enabled" ? "Disable" : "Enable"}
+                    </button>
+                    {#if automationDeleteId === rule.id}
+                      <button
+                        type="button"
+                        data-automation-rule-delete-confirm={rule.id}
+                        onclick={() => confirmAutomationDelete(rule.id)}
+                        class="rounded-md bg-destructive px-2 py-1 text-xs text-destructive-foreground"
+                      >Confirm</button>
+                      <button
+                        type="button"
+                        data-automation-rule-delete-cancel={rule.id}
+                        onclick={() => (automationDeleteId = null)}
+                        class="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >Cancel</button>
+                    {:else}
+                      <button
+                        type="button"
+                        data-automation-rule-delete={rule.id}
+                        onclick={() => requestAutomationDelete(rule.id)}
+                        class="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                      >Delete</button>
+                    {/if}
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {/if}
   </section>
 
