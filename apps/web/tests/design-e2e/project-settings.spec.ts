@@ -166,4 +166,20 @@ test.describe("project settings labels", () => {
 		await expect(page.locator("[data-module-category-tag='mod_security_review']")).toContainText("research");
 		await expect(page.locator("[data-module-lead-tag='mod_security_review']")).toContainText("nina");
 	});
+
+	test("project feature toggles add and remove nav preview entries", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-feature-row='cycles']")).toHaveAttribute("data-feature-enabled", "true");
+		await expect(page.locator("[data-feature-nav-item='cycles']")).toBeVisible();
+		await expect(page.locator("[data-feature-nav-item='intake']")).toHaveCount(0);
+
+		await page.locator("[data-feature-toggle='cycles']").click();
+		await expect(page.locator("[data-feature-row='cycles']")).toHaveAttribute("data-feature-enabled", "false");
+		await expect(page.locator("[data-feature-nav-item='cycles']")).toHaveCount(0);
+
+		await page.locator("[data-feature-toggle='intake']").click();
+		await expect(page.locator("[data-feature-row='intake']")).toHaveAttribute("data-feature-enabled", "true");
+		await expect(page.locator("[data-feature-nav-item='intake']")).toBeVisible();
+	});
 });

@@ -348,6 +348,28 @@
     newModuleName = "";
     newModuleLead = "";
   }
+
+  type FeatureFlag = "cycles" | "modules" | "views" | "pages" | "intake";
+  const FEATURE_LABELS: Record<FeatureFlag, string> = {
+    cycles: "Cycles",
+    modules: "Modules",
+    views: "Views",
+    pages: "Pages",
+    intake: "Intake",
+  };
+  let projectFeatures = $state<Record<FeatureFlag, boolean>>({
+    cycles: true,
+    modules: true,
+    views: true,
+    pages: true,
+    intake: false,
+  });
+  function toggleFeature(flag: FeatureFlag): void {
+    projectFeatures = { ...projectFeatures, [flag]: !projectFeatures[flag] };
+  }
+  function navItemsVisible(): FeatureFlag[] {
+    return (Object.keys(projectFeatures) as FeatureFlag[]).filter((flag) => projectFeatures[flag]);
+  }
 </script>
 
 <svelte:head>
@@ -853,5 +875,42 @@
     {:else}
       <p data-modules-disabled class="text-xs text-muted-foreground">Modules are disabled; enable to add new modules.</p>
     {/if}
+  </section>
+
+  <section data-project-features class="space-y-4 rounded-md border border-border p-6">
+    <header class="space-y-1">
+      <h2 class="text-lg font-medium">Project features</h2>
+      <p class="text-sm text-muted-foreground">Toggle workflow features. Disabled features hide their nav entry across the project.</p>
+    </header>
+    <ul class="space-y-2">
+      {#each (Object.keys(projectFeatures) as FeatureFlag[]) as flag}
+        <li
+          data-feature-row={flag}
+          data-feature-enabled={projectFeatures[flag]}
+          class="flex items-center justify-between rounded-md border border-border px-4 py-3"
+        >
+          <div>
+            <p class="text-sm font-medium">{FEATURE_LABELS[flag]}</p>
+            <p class="text-xs text-muted-foreground">{projectFeatures[flag] ? "Visible in project nav." : "Hidden from project nav."}</p>
+          </div>
+          <button
+            type="button"
+            data-feature-toggle={flag}
+            onclick={() => toggleFeature(flag)}
+            class="rounded-md border border-border bg-background px-3 py-1 text-xs"
+          >
+            {projectFeatures[flag] ? "Disable" : "Enable"}
+          </button>
+        </li>
+      {/each}
+    </ul>
+    <nav data-feature-nav-preview aria-label="Project nav preview" class="rounded-md border border-border bg-muted/40 px-4 py-3">
+      <p class="text-xs uppercase tracking-wide text-muted-foreground">Nav preview</p>
+      <ul class="mt-2 flex flex-wrap gap-2">
+        {#each navItemsVisible() as flag}
+          <li data-feature-nav-item={flag} class="rounded-md border border-border bg-background px-2 py-1 text-xs">{FEATURE_LABELS[flag]}</li>
+        {/each}
+      </ul>
+    </nav>
   </section>
 </section>
