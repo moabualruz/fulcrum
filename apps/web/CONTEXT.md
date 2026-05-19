@@ -36,6 +36,10 @@ _Avoid_: Device padding, notch padding, spacer.
 The 420px right-side slide-over (Cloudflare-overlay pattern) that hosts the live AI Assist session scoped to the current Step. Mobile becomes a bottom sheet.
 _Avoid_: AI panel, chat panel, ACP panel, sidebar drawer, assistant pane.
 
+**TaskQuickCreateTray**:
+An inline Build-stage task creation surface that preserves board, backlog, table, or planning scope while showing required title, sprint, module, cycle, recurrence preview, validation, duplicate prevention, and retry state.
+_Avoid_: task create modal, hidden project scope, create dialog, cleared draft on failure.
+
 **CommandPalette**:
 The `⌘K` modeless palette that resolves Scope-aware actions (recent, stage nav, step actions, federated search, settings search, workspace/theme, help).
 _Avoid_: Quick-open, search bar, launcher, omnibar.

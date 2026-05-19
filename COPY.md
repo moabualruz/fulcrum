@@ -102,6 +102,13 @@ One sentence naming the next workflow action.
 >
 > [ Add task ]   Press `c`, or materialize an approved plan from Plan.
 
+**Build / task quick create:**
+> Title is required. Scope, sprint, module, cycle, and recurrence stay intact.
+>
+> Duplicate task blocked. Open the existing task or change the title.
+>
+> Create failed. Draft preserved; retry when the connection recovers.
+
 **Build / runs feed (no runs yet):**
 > No runs yet in this project.
 >

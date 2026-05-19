@@ -62,4 +62,48 @@ test.describe("mobile capture web vitals", () => {
 		);
 		expect(touchTargets.every((height) => height >= 40)).toBe(true);
 	});
+
+	test("quick create preserves view scope, assignments, recurrence preview, and validation state", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto("/mobile-capture");
+
+		await expect(page.locator("[data-task-quick-create]")).toBeVisible();
+		await page.locator("[data-task-create-context='Planning']").click();
+		await expect(page.locator("[data-task-quick-create-context]")).toContainText("Planning");
+		await expect(page.locator("[data-task-quick-create-scope]")).toContainText("Planning tray · Sprint 18");
+
+		await page.locator("[data-task-quick-create-submit]").click();
+		await expect(page.locator("[data-slot='field-error']")).toContainText("Title is required");
+		await expect(page.locator("[data-task-quick-create-sprint]")).toHaveValue("Sprint 18");
+
+		await page.locator("[data-task-quick-create-title]").fill("Run capture intake");
+		await page.locator("[data-task-quick-create-module]").fill("Capture");
+		await page.locator("[data-task-recurrence-toggle]").click();
+		await expect(page.locator("[data-task-recurrence-preview]")).toContainText("Weekly on Monday");
+		await expect(page.locator("[data-task-recurrence-preview]")).toContainText("Sprint 18");
+
+		await page.locator("[data-task-quick-create-submit]").click();
+		await expect(page.locator("[data-task-quick-create-success]")).toContainText("Created in Planning tray");
+		await expect(page.locator("[data-task-created-row='Run capture intake']")).toBeVisible();
+	});
+
+	test("quick create blocks duplicates and retries failed drafts without clearing context", async ({ page }) => {
+		await page.goto("/mobile-capture");
+
+		await page.locator("[data-task-create-context='Backlog']").click();
+		await page.locator("[data-task-quick-create-title]").fill("Refresh capture copy");
+		await page.locator("[data-task-quick-create-submit]").click();
+		await expect(page.locator("[data-task-quick-create-error]")).toContainText("Duplicate task blocked");
+		await expect(page.locator("[data-task-quick-create-title]")).toHaveValue("Refresh capture copy");
+		await expect(page.locator("[data-task-quick-create-context]")).toContainText("Backlog");
+
+		await page.locator("[data-task-quick-create-title]").fill("Fail offline capture");
+		await page.locator("[data-task-quick-create-submit]").click();
+		await expect(page.locator("[data-task-quick-create-error]")).toContainText("Draft preserved");
+		await expect(page.locator("[data-task-quick-create-retry]")).toBeEnabled();
+
+		await page.locator("[data-task-quick-create-retry]").click();
+		await expect(page.locator("[data-task-quick-create-success]")).toContainText("Created in Backlog triage");
+		await expect(page.locator("[data-task-created-row='retry offline capture']")).toBeVisible();
+	});
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Badge, Button, FormField, Input, Switch, Textarea } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
   type VitalName = "LCP" | "INP" | "CLS";
@@ -29,9 +30,29 @@
   let reviewNote = $state("");
   let captureStatus = $state("triage");
   let quickAction = $state("None");
+  let createContext = $state<"Board" | "Backlog" | "Table" | "Planning">("Board");
+  let taskTitle = $state("");
+  let taskSprint = $state("Sprint 18");
+  let taskModule = $state("Mobile capture");
+  let taskCycle = $state("Cycle May");
+  let recurrenceEnabled = $state(false);
+  let recurrenceCadence = $state("Weekly on Monday");
+  let createError = $state("");
+  let createSuccess = $state("");
+  let failedDraft = $state<string | null>(null);
+  let createdTasks = $state<string[]>(["Refresh capture copy", "Verify mobile safe-area"]);
 
   const allGreen = $derived(metrics.every((metric) => metric.value <= metric.budget) && longTaskCount === 0);
   const lighthouseScore = $derived(allGreen ? 96 : 74);
+  const contextScope = $derived({
+    Board: "Ready lane · PM filter",
+    Backlog: "Backlog triage · unscheduled",
+    Table: "Table view · P1 filter",
+    Planning: "Planning tray · Sprint 18",
+  }[createContext]);
+  const recurrencePreview = $derived(recurrenceEnabled
+    ? `${recurrenceCadence}; first 3 generated tasks inherit ${taskSprint}, ${taskModule}, ${taskCycle}.`
+    : "One task only. Turn recurrence on to preview generated instances.");
 
   function formatMetric(metric: VitalMetric): string {
     if (metric.unit === "score") return metric.value.toFixed(3);
@@ -72,6 +93,40 @@
 
   function submitReview(): void {
     quickAction = reviewNote.trim() ? "Review saved" : "Review needs note";
+  }
+
+  function submitQuickCreate(): void {
+    const title = taskTitle.trim();
+    createSuccess = "";
+
+    if (!title) {
+      createError = "Title is required. Scope, sprint, module, cycle, and recurrence stay intact.";
+      return;
+    }
+
+    if (createdTasks.some((task) => task.toLowerCase() === title.toLowerCase())) {
+      createError = "Duplicate task blocked. Open the existing task or change the title.";
+      return;
+    }
+
+    if (title.toLowerCase().includes("fail")) {
+      failedDraft = title;
+      createError = "Create failed. Draft preserved; retry when the connection recovers.";
+      return;
+    }
+
+    createdTasks = [title, ...createdTasks];
+    failedDraft = null;
+    createError = "";
+    createSuccess = `Created in ${contextScope}`;
+    taskTitle = "";
+  }
+
+  function retryFailedCreate(): void {
+    if (!failedDraft) return;
+    taskTitle = failedDraft.replace(/fail/gi, "retry").trim();
+    createError = "";
+    submitQuickCreate();
   }
 
   onMount(() => {
@@ -194,23 +249,110 @@
               Fixed media boxes, reserved action rows, and small interaction handlers keep mobile capture below web-vitals budgets.
             </p>
             <div class={cn("mt-4 flex flex-wrap gap-2")}>
-              <button data-capture-action type="button" onclick={measureInteraction} class={cn("h-10 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>Capture item</button>
+              <Button data-capture-action type="button" onclick={measureInteraction} size="lg">Capture item</Button>
               <span data-interaction-state class={cn("flex h-10 items-center rounded-md border border-border px-3 text-sm")}>{interactionState}</span>
             </div>
           </article>
         </div>
 
+        <section data-task-quick-create class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+          <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+            <div class={cn("min-w-0")}>
+              <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Task quick create</p>
+              <h2 class={cn("mt-1 text-base font-semibold")}>Create without leaving {createContext}</h2>
+              <p data-task-quick-create-scope class={cn("mt-1 text-sm text-muted-foreground")}>{contextScope}</p>
+            </div>
+            <Badge data-task-quick-create-context variant="accent">{createContext}</Badge>
+          </div>
+
+          <div data-task-create-contexts class={cn("mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4")}>
+            {#each ["Board", "Backlog", "Table", "Planning"] as context (context)}
+              <Button
+                data-task-create-context={context}
+                type="button"
+                variant={createContext === context ? "default" : "outline"}
+                size="sm"
+                class="min-h-10"
+                onclick={() => (createContext = context as typeof createContext)}
+              >
+                {context}
+              </Button>
+            {/each}
+          </div>
+
+          <form data-task-quick-create-form class={cn("mt-4 grid gap-3")} onsubmit={(event) => { event.preventDefault(); submitQuickCreate(); }}>
+            <FormField label="Task title" htmlFor="task-quick-create-title" required error={createError && !taskTitle.trim() ? createError : undefined}>
+              <Input
+                id="task-quick-create-title"
+                data-task-quick-create-title
+                bind:value={taskTitle}
+                aria-invalid={createError && !taskTitle.trim() ? "true" : undefined}
+                placeholder="Write the task users actually need"
+              />
+            </FormField>
+
+            <div data-task-quick-create-assignments class={cn("grid gap-2 md:grid-cols-3")}>
+              <FormField label="Sprint" htmlFor="task-quick-create-sprint">
+                <Input id="task-quick-create-sprint" data-task-quick-create-sprint bind:value={taskSprint} />
+              </FormField>
+              <FormField label="Module" htmlFor="task-quick-create-module">
+                <Input id="task-quick-create-module" data-task-quick-create-module bind:value={taskModule} />
+              </FormField>
+              <FormField label="Cycle" htmlFor="task-quick-create-cycle">
+                <Input id="task-quick-create-cycle" data-task-quick-create-cycle bind:value={taskCycle} />
+              </FormField>
+            </div>
+
+            <div data-task-recurrence-config class={cn("rounded-md border border-border/70 bg-muted/30 p-3")}>
+              <div class={cn("flex items-center justify-between gap-3")}>
+                <div class={cn("min-w-0")}>
+                  <p class={cn("text-sm font-medium")}>Recurring task</p>
+                  <p class={cn("text-xs text-muted-foreground")}>Preview generated instances before submit.</p>
+                </div>
+                <Switch data-task-recurrence-toggle bind:checked={recurrenceEnabled} aria-label="Enable recurring task" />
+              </div>
+              {#if recurrenceEnabled}
+                <FormField class="mt-3" label="Schedule" htmlFor="task-recurrence-cadence">
+                  <Input id="task-recurrence-cadence" data-task-recurrence-cadence bind:value={recurrenceCadence} />
+                </FormField>
+              {/if}
+              <p data-task-recurrence-preview class={cn("mt-3 rounded-md bg-background px-3 py-2 text-sm")}>{recurrencePreview}</p>
+            </div>
+
+            {#if createError && taskTitle.trim()}
+              <p data-task-quick-create-error role="alert" class={cn("rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{createError}</p>
+            {/if}
+            {#if createSuccess}
+              <p data-task-quick-create-success role="status" class={cn("rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success")}>{createSuccess}</p>
+            {/if}
+
+            <div class={cn("flex flex-wrap gap-2")}>
+              <Button data-task-quick-create-submit type="submit" size="lg">Create task</Button>
+              <Button data-task-quick-create-retry type="button" variant="outline" size="lg" disabled={!failedDraft} onclick={retryFailedCreate}>Retry failed create</Button>
+            </div>
+          </form>
+
+          <div data-task-created-list class={cn("mt-4 grid gap-2")}>
+            {#each createdTasks as task (task)}
+              <div data-task-created-row={task} class={cn("flex min-h-11 items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2 text-sm")}>
+                <span class={cn("min-w-0 truncate")}>{task}</span>
+                <Badge variant="outline">{taskSprint}</Badge>
+              </div>
+            {/each}
+          </div>
+        </section>
+
         <section data-mobile-review-panel class={cn("mt-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_280px]")}>
           <form data-mobile-review-form class={cn("min-w-0 rounded-md border border-border bg-background p-3")} onsubmit={(event) => { event.preventDefault(); submitReview(); }}>
-            <label class={cn("block text-xs font-medium uppercase text-muted-foreground")} for="mobile-review-note">Review note</label>
-            <textarea
+            <FormField label="Review note" htmlFor="mobile-review-note">
+            <Textarea
               id="mobile-review-note"
               data-mobile-review-note
               bind:value={reviewNote}
               rows="3"
-              class={cn("mt-2 min-h-24 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm")}
               placeholder="Summarize capture quality"
-            ></textarea>
+            ></Textarea>
+            </FormField>
             <div class={cn("mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]")}>
               <select
                 data-mobile-status-select
@@ -222,7 +364,7 @@
                 <option value="review">Ready for review</option>
                 <option value="approved">Approved</option>
               </select>
-              <button data-mobile-review-submit type="submit" class={cn("h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>Save review</button>
+              <Button data-mobile-review-submit type="submit" size="lg">Save review</Button>
             </div>
           </form>
 
@@ -230,12 +372,14 @@
             <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Quick action</p>
             <div class={cn("mt-3 grid grid-cols-2 gap-2")}>
               {#each ["Assign", "Block", "Approve", "Escalate"] as action}
-                <button
+                <Button
                   data-mobile-quick-action={action}
                   type="button"
-                  class={cn("min-h-11 rounded-md border border-input px-2 text-sm hover:bg-muted")}
+                  variant="outline"
+                  size="lg"
+                  class="min-h-11"
                   onclick={() => (quickAction = action)}
-                >{action}</button>
+                >{action}</Button>
               {/each}
             </div>
             <p class={cn("mt-3 rounded-md bg-muted px-3 py-2")}>
@@ -261,7 +405,7 @@
                   </div>
                   <span class={cn("shrink-0 rounded-full bg-muted px-2 py-1 text-xs")}>{row[1]}</span>
                 </div>
-                <button type="button" class={cn("mt-3 h-10 w-full rounded-md border border-input px-3 text-sm hover:bg-muted")}>Open</button>
+                <Button type="button" variant="outline" size="lg" class="mt-3 w-full">Open</Button>
               </article>
             {/each}
           </div>
@@ -285,7 +429,7 @@
                   <td class={cn("px-3 py-2")}>{row[0]}</td>
                   <td class={cn("px-3 py-2")}>{row[1]}</td>
                   <td class={cn("px-3 py-2")}>{row[2]}</td>
-                  <td class={cn("px-3 py-2")}><button type="button" class={cn("h-9 rounded-md border border-input px-3 hover:bg-muted")}>Open</button></td>
+                  <td class={cn("px-3 py-2")}><Button type="button" variant="outline" size="sm">Open</Button></td>
                 </tr>
               {/each}
             </tbody>

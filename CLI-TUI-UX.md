@@ -67,7 +67,7 @@ fulcrum prototype attach  <plan-id> <prototype-path>
 ### 1.3 Build stage commands
 
 ```
-fulcrum task new          --title <t> --project <id> [--parent <id>] [--depends-on <id,id>] [--cycle <id>] [--module <id>]
+fulcrum task new          --title <t> --project <id> [--parent <id>] [--depends-on <id,id>] [--cycle <id>] [--module <id>] [--recurrence <rule>]
 fulcrum task list         [--status open|in-progress|done|archived] [--assignee <id>] [--cycle <id>] [--module <id>] [--label <l>]
 fulcrum task view         <id>
 fulcrum task edit         <id> [--title <t>] [--status <s>] [--assignee <id>] [--priority <p>]

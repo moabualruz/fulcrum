@@ -237,6 +237,14 @@ States required on every variant (research / impeccable product.md):
 - Error/success captions live below the field and connect through `aria-describedby`. Placeholder text never replaces a visible label.
 - Textarea supports `min-height`, `max-height`, resize-y, `maxlength`, and a visible character counter below the control.
 
+#### Task Quick Create
+
+- Task quick create is an inline tray, never a modal-first flow. It preserves the current board, backlog, table, or planning scope while the user fills the task title.
+- Required project/scope is visible before submit. Sprint, module, and cycle assignment fields remain visible and editable before submit.
+- Empty-title validation, duplicate prevention, and submit failure keep the typed draft and all assignments intact.
+- Recurring task setup must show a plain-language preview of generated instances before submit.
+- On mobile, the tray stays in the page flow with 40 px minimum controls and no horizontal overflow; failure recovery uses an inline retry action, not a new overlay.
+
 ### 4.3 Tables
 
 Verbatim Plane spreadsheet shape (research-07 §1.3) + Linear density.
