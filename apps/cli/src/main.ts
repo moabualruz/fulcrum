@@ -162,11 +162,6 @@ async function main() {
       await run([cmd, ...rest]);
       return;
     }
-    case "session": {
-      const { runSessionCli } = await import("./session-cli.ts");
-      const result = await runSessionCli(rest);
-      process.exit(result.exitCode);
-    }
     case "auth":
     case "flags":
     case "routing":
@@ -186,6 +181,7 @@ async function main() {
     case "docs":
     case "symphony":
     case "runs":
+    case "session":
     case "notify":
     case "audit":
     case "webhooks":
