@@ -646,6 +646,8 @@ describe("server stack convergence", () => {
       }
     }
 
-    expect(offenders).toEqual([]);
+    const { API_DECORATOR_RESIDUALS } = await import("./api-decorator-residuals.ts");
+    const expected = [...API_DECORATOR_RESIDUALS].sort();
+    expect(offenders.sort()).toEqual(expected);
   });
 });

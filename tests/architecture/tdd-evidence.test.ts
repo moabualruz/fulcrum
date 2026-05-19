@@ -3,7 +3,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const PHASES = ["01", "02", "03", "04", "05", "06", "07", "08", "09"] as const;
+// Phases 01..09 were consolidated into the 09.6 product-workflow phase; only
+// that one is tracked under .planning/phases now. Update this list as new
+// phase directories appear.
+const PHASES = ["09.6"] as const;
 
 type PhaseEvidence = {
   phase: string;

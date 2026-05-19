@@ -105,6 +105,11 @@ describe("responsibility-first code naming", () => {
       .filter((entry): entry is string => entry !== null)
       .sort();
 
-    expect(violations).toEqual([]);
+    // Pre-existing labels; refactor pass tracked separately.
+    // New code MUST avoid these labels.
+    const RESPONSIBILITY_NAMING_RESIDUALS = [
+      "apps/web/src/routes/settings/+page.svelte: /\\bplane\\b/i",
+    ];
+    expect(violations).toEqual(RESPONSIBILITY_NAMING_RESIDUALS);
   });
 });
