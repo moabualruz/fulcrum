@@ -44,3 +44,55 @@ export function renderOfflineOverlay(renderer: Renderer, snapshot: ApiConnectivi
   renderer.writeln(`  ${c.bold(statusBarApiLabel(snapshot))}`);
   renderer.writeln(`  ${c.dim(offlineFooterHint(snapshot))}`);
 }
+
+export interface FooterStatusToken {
+  label: "ok" | "disconnected" | "reconnecting";
+  tone: "default" | "muted" | "danger";
+  retryHint: string;
+}
+
+export function footerStatusToken(snapshot: ApiConnectivitySnapshot): FooterStatusToken {
+  if (snapshot.state === "online") return { label: "ok", tone: "default", retryHint: "" };
+  if (snapshot.state === "reconnecting") {
+    return {
+      label: "reconnecting",
+      tone: "muted",
+      retryHint: snapshot.nextRetryInSec !== undefined
+        ? `retry in ${snapshot.nextRetryInSec}s, press r to retry now`
+        : "press r to retry now",
+    };
+  }
+  return {
+    label: "disconnected",
+    tone: "danger",
+    retryHint: snapshot.failureReason
+      ? `${snapshot.failureReason}; press r to reconnect`
+      : "press r to reconnect",
+  };
+}
+
+export interface QueuedOperation {
+  id: string;
+  description: string;
+  enqueuedAt: string;
+}
+
+export interface ConnectivityQueueState {
+  queued: QueuedOperation[];
+}
+
+export function enqueueWhileOffline(state: ConnectivityQueueState, operation: QueuedOperation, snapshot: ApiConnectivitySnapshot): ConnectivityQueueState {
+  if (snapshot.state === "online") return state;
+  if (state.queued.some((entry) => entry.id === operation.id)) return state;
+  return { queued: [...state.queued, operation] };
+}
+
+export function flushAfterReconnect(state: ConnectivityQueueState, snapshot: ApiConnectivitySnapshot): ConnectivityQueueState {
+  if (snapshot.state !== "online") return state;
+  return { queued: [] };
+}
+
+export const RECONNECT_HOTKEY = "r" as const;
+export function isReconnectHotkey(key: string): boolean {
+  return key === RECONNECT_HOTKEY;
+}

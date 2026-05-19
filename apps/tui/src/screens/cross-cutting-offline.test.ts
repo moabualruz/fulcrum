@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  RECONNECT_HOTKEY,
+  enqueueWhileOffline,
+  flushAfterReconnect,
+  footerStatusToken,
   isInteractive,
+  isReconnectHotkey,
   offlineFooterHint,
   statusBarApiLabel,
 } from "./cross-cutting-offline.ts";
@@ -33,5 +38,35 @@ describe("cross-cutting offline state", () => {
     expect(isInteractive({ state: "online", lastCheckedAt: null })).toBe(true);
     expect(isInteractive({ state: "reconnecting", lastCheckedAt: null })).toBe(false);
     expect(isInteractive({ state: "offline", lastCheckedAt: null })).toBe(false);
+  });
+
+  test("footerStatusToken returns ok / disconnected / reconnecting with retry hint", () => {
+    expect(footerStatusToken({ state: "online", lastCheckedAt: null })).toEqual({
+      label: "ok",
+      tone: "default",
+      retryHint: "",
+    });
+    expect(
+      footerStatusToken({ state: "offline", lastCheckedAt: null, failureReason: "ECONNREFUSED" }),
+    ).toMatchObject({ label: "disconnected", tone: "danger" });
+    const reconnecting = footerStatusToken({ state: "reconnecting", lastCheckedAt: null, nextRetryInSec: 4 });
+    expect(reconnecting.label).toBe("reconnecting");
+    expect(reconnecting.retryHint).toContain("retry in 4s");
+  });
+
+  test("offline ops queue while disconnected and flush on reconnect", () => {
+    const op = { id: "create-task-1", description: "Create task", enqueuedAt: "2026-05-19T01:00:00Z" };
+    const offline = { state: "offline" as const, lastCheckedAt: null };
+    const queued = enqueueWhileOffline({ queued: [] }, op, offline);
+    expect(queued.queued).toHaveLength(1);
+
+    const flushed = flushAfterReconnect(queued, { state: "online", lastCheckedAt: null });
+    expect(flushed.queued).toHaveLength(0);
+  });
+
+  test("reconnect hotkey is the literal 'r'", () => {
+    expect(RECONNECT_HOTKEY).toBe("r");
+    expect(isReconnectHotkey("r")).toBe(true);
+    expect(isReconnectHotkey("R")).toBe(false);
   });
 });
