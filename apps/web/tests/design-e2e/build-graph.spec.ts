@@ -3,8 +3,7 @@ import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 async function openBuildGraph(page: Page): Promise<void> {
-	await page.goto("/build-graph");
-	await page.waitForLoadState("networkidle");
+	await page.goto("/build-graph", { waitUntil: "domcontentloaded" });
 	await expect(page.locator("[data-build-graph-ready='true']")).toBeVisible();
 	await page.evaluate(async () => {
 		await document.fonts.ready;
@@ -355,7 +354,7 @@ test.describe("build graph doc search", () => {
 	});
 
 	test("empty-state fixtures render with icon, headline, description, and actions", async ({ page }) => {
-		await page.goto("/build-graph");
+		await openBuildGraph(page);
 
 		const primary = page.locator("[data-empty-state-primary]");
 		await expect(primary).toBeVisible();
