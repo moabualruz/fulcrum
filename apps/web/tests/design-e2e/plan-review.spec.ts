@@ -118,4 +118,44 @@ test.describe("plan review workflow navigation", () => {
 		await expect(page.locator("[data-issue-detail-field='Budget']")).toContainText("0");
 		await expect(page.locator("[data-issue-detail-field='Priority Choice']")).toContainText("Medium");
 	});
+
+	test("previews importer dry-run values before committing imported issues", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		await expect(page.locator("[data-importer-dry-run]")).toBeVisible();
+		await expect(page.locator("[data-import-total-count]")).toContainText("12");
+		await expect(page.locator("[data-import-preview-count]")).toContainText("10");
+		await expect(page.locator("[data-import-attachment-count]")).toContainText("19");
+		await expect(page.locator("[data-import-preview-issue]")).toHaveCount(10);
+
+		await expect(page.locator("[data-import-field-map='Jira Summary']")).toContainText("Renew enterprise contract");
+		await expect(page.locator("[data-import-user-map-target='ada@acme.test']")).toHaveValue("Ada Lovelace");
+		await expect(page.locator("[data-import-preview-title='JIRA-101']")).toContainText("Renew enterprise contract");
+		await expect(page.locator("[data-import-preview-values='JIRA-101']")).toContainText("title: Renew enterprise contract");
+		await expect(page.locator("[data-import-preview-assignee='JIRA-101']")).toContainText("Ada Lovelace");
+		await expect(page.locator("[data-import-preview-attachments='JIRA-101']")).toContainText("3");
+
+		await page.locator("[data-run-import-dry-run]").click();
+		await expect(page.locator("[data-importer-dry-run-status]")).toContainText("Preview ready");
+		await expect(page.locator("[data-import-dry-run-message]")).toContainText("Preview shows 10 of 12 issues");
+		await expect(page.locator("[data-import-summary-sample]")).toContainText("10 of 12");
+		await expect(page.locator("[data-import-summary-users]")).toContainText("3 mapped users");
+		await expect(page.locator("[data-import-summary-attachments]")).toContainText("19 attachments");
+
+		await page.locator("[data-back-to-import-mapping]").click();
+		await expect(page.locator("[data-importer-dry-run-status]")).toContainText("Mapping");
+		await page.locator("[data-import-field-map-target='Jira Summary']").fill("name");
+		await page.locator("[data-import-user-map-target='ada@acme.test']").fill("Ada L.");
+		await page.locator("[data-run-import-dry-run]").click();
+		await expect(page.locator("[data-import-preview-values='JIRA-101']")).toContainText("name: Renew enterprise contract");
+		await expect(page.locator("[data-import-preview-assignee='JIRA-101']")).toContainText("Ada L.");
+
+		await page.locator("[data-proceed-import]").click();
+		await expect(page.locator("[data-importer-dry-run-status]")).toContainText("Import queued");
+		await expect(page.locator("[data-import-proceed-state]")).toContainText("queued");
+
+		await page.locator("[data-cancel-import]").click();
+		await expect(page.locator("[data-importer-dry-run-status]")).toContainText("Cancelled");
+		await expect(page.locator("[data-import-dry-run-message]")).toContainText("Import cancelled");
+	});
 });

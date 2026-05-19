@@ -32,6 +32,28 @@
     options: string[];
   };
 
+  type ImportIssue = {
+    key: string;
+    summary: string;
+    state: string;
+    assignee: string;
+    reporter: string;
+    priority: string;
+    estimate: string;
+    attachments: number;
+  };
+
+  type FieldMapping = {
+    source: string;
+    target: string;
+    sample: string;
+  };
+
+  type UserMapping = {
+    source: string;
+    target: string;
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -126,6 +148,20 @@
     },
   ]);
   let createdIssue = $state<{ title: string; fields: Record<string, string> } | null>(null);
+  let dryRunStatus = $state("Mapping");
+  let dryRunMessage = $state("Map fields and users before preview.");
+  let importProceedState = $state("idle");
+  let fieldMappings = $state<FieldMapping[]>([
+    { source: "Jira Summary", target: "title", sample: "Renew enterprise contract" },
+    { source: "Jira Status", target: "state", sample: "In Review" },
+    { source: "Jira Priority", target: "priority", sample: "High" },
+    { source: "Story Points", target: "estimate", sample: "5" },
+  ]);
+  let userMappings = $state<UserMapping[]>([
+    { source: "ada@acme.test", target: "Ada Lovelace" },
+    { source: "grace@acme.test", target: "Grace Hopper" },
+    { source: "linus@acme.test", target: "Linus Torvalds" },
+  ]);
 
   const triggerOptions = [
     { value: "issue.created", label: "issue.created", scope: "issue" },
@@ -157,6 +193,21 @@
     { value: "multi-select", label: "multi-select", example: "frontend, backend" },
     { value: "user", label: "user", example: "IUserLite: ada" },
     { value: "url", label: "url", example: "https://example.com" },
+  ];
+
+  const importIssues: ImportIssue[] = [
+    { key: "JIRA-101", summary: "Renew enterprise contract", state: "In Review", assignee: "ada@acme.test", reporter: "grace@acme.test", priority: "High", estimate: "5", attachments: 3 },
+    { key: "JIRA-102", summary: "Add audit export", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "3", attachments: 1 },
+    { key: "JIRA-103", summary: "Stabilize graph tests", state: "Blocked", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "High", estimate: "8", attachments: 4 },
+    { key: "JIRA-104", summary: "Import customer labels", state: "Todo", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "Low", estimate: "2", attachments: 0 },
+    { key: "JIRA-105", summary: "Capture review evidence", state: "In Progress", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "5", attachments: 2 },
+    { key: "JIRA-106", summary: "Wire attachment manifest", state: "Todo", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Medium", estimate: "3", attachments: 2 },
+    { key: "JIRA-107", summary: "Normalize issue owners", state: "In Review", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "High", estimate: "5", attachments: 1 },
+    { key: "JIRA-108", summary: "Backfill sprint links", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Low", estimate: "2", attachments: 0 },
+    { key: "JIRA-109", summary: "Validate CSV headers", state: "Done", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Medium", estimate: "1", attachments: 3 },
+    { key: "JIRA-110", summary: "Preview duplicate detection", state: "In Progress", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "High", estimate: "8", attachments: 2 },
+    { key: "JIRA-111", summary: "Persist importer checkpoint", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "3", attachments: 1 },
+    { key: "JIRA-112", summary: "Link imported comments", state: "Todo", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Low", estimate: "2", attachments: 0 },
   ];
 
   function openStage(stage: Stage) {
@@ -277,6 +328,56 @@
       fields: Object.fromEntries(customFields.map((field) => [field.name, fieldValue(field)])),
     };
     customFieldValidation = "";
+  }
+
+  function updateFieldMapping(index: number, target: string): void {
+    fieldMappings = fieldMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    dryRunStatus = "Mapping";
+    dryRunMessage = "Mapping changed. Re-run dry-run before import.";
+    importProceedState = "idle";
+  }
+
+  function updateUserMapping(index: number, target: string): void {
+    userMappings = userMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    dryRunStatus = "Mapping";
+    dryRunMessage = "User mapping changed. Re-run dry-run before import.";
+    importProceedState = "idle";
+  }
+
+  function mappedUser(source: string): string {
+    return userMappings.find((mapping) => mapping.source === source)?.target ?? "Unmapped user";
+  }
+
+  function totalAttachmentCount(): number {
+    return importIssues.reduce((total, issue) => total + issue.attachments, 0);
+  }
+
+  function runDryRun(): void {
+    dryRunStatus = "Preview ready";
+    dryRunMessage = `Preview shows 10 of ${importIssues.length} issues exactly as they will be created.`;
+    importProceedState = "ready";
+  }
+
+  function returnToMapping(): void {
+    dryRunStatus = "Mapping";
+    dryRunMessage = "Edit mappings, then re-run dry-run.";
+    importProceedState = "idle";
+  }
+
+  function cancelImport(): void {
+    dryRunStatus = "Cancelled";
+    dryRunMessage = "Import cancelled before any issues were created.";
+    importProceedState = "idle";
+  }
+
+  function proceedImport(): void {
+    if (importProceedState !== "ready") {
+      dryRunMessage = "Run dry-run before import.";
+      return;
+    }
+    dryRunStatus = "Import queued";
+    dryRunMessage = `${importIssues.length} issues queued with ${totalAttachmentCount()} attachments.`;
+    importProceedState = "queued";
   }
 </script>
 
@@ -564,6 +665,128 @@
         {:else}
           <p class={cn("mt-2 text-sm text-muted-foreground")}>Create an issue to see custom fields on detail.</p>
         {/if}
+      </section>
+    </aside>
+  </section>
+
+  <section data-importer-dry-run class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Importer dry-run</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Preview mapped issues, users, and attachments before anything is created.</p>
+        </div>
+        <Badge data-importer-dry-run-status variant={dryRunStatus === "Preview ready" ? "success" : dryRunStatus === "Cancelled" ? "warning" : "outline"} size="sm">{dryRunStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-3")}>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Issues to create</p>
+          <p data-import-total-count class={cn("mt-1 text-2xl font-semibold")}>{importIssues.length}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Preview sample</p>
+          <p data-import-preview-count class={cn("mt-1 text-2xl font-semibold")}>{Math.min(10, importIssues.length)}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Attachments</p>
+          <p data-import-attachment-count class={cn("mt-1 text-2xl font-semibold")}>{totalAttachmentCount()}</p>
+        </div>
+      </div>
+
+      <div class={cn("mt-4 grid gap-4 lg:grid-cols-2")}>
+        <section data-import-field-mapping class={cn("min-w-0 rounded-md border border-border bg-background p-3")}>
+          <h3 class={cn("text-base font-semibold")}>Field mapping</h3>
+          <div class={cn("mt-3 grid gap-2")}>
+            {#each fieldMappings as mapping, index}
+              <label data-import-field-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+                <span class={cn("min-w-0")}>
+                  <span class={cn("block font-medium")}>{mapping.source}</span>
+                  <span class={cn("block truncate text-xs text-muted-foreground")}>Sample: {mapping.sample}</span>
+                </span>
+                <input
+                  data-import-field-map-target={mapping.source}
+                  value={mapping.target}
+                  oninput={(event) => updateFieldMapping(index, event.currentTarget.value)}
+                  class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+                />
+              </label>
+            {/each}
+          </div>
+        </section>
+
+        <section data-import-user-mapping class={cn("min-w-0 rounded-md border border-border bg-background p-3")}>
+          <h3 class={cn("text-base font-semibold")}>User mapping</h3>
+          <div class={cn("mt-3 grid gap-2")}>
+            {#each userMappings as mapping, index}
+              <label data-import-user-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+                <span class={cn("truncate font-medium")}>{mapping.source}</span>
+                <input
+                  data-import-user-map-target={mapping.source}
+                  value={mapping.target}
+                  oninput={(event) => updateUserMapping(index, event.currentTarget.value)}
+                  class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+                />
+              </label>
+            {/each}
+          </div>
+        </section>
+      </div>
+
+      <p data-import-dry-run-message class={cn("mt-4 rounded-md border border-border bg-muted/35 px-3 py-2 text-sm text-muted-foreground")}>{dryRunMessage}</p>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-run-import-dry-run type="button" onclick={runDryRun}>Run dry-run</Button>
+        <Button data-back-to-import-mapping type="button" variant="outline" onclick={returnToMapping}>Back to mapping</Button>
+        <Button data-cancel-import type="button" variant="outline" onclick={cancelImport}>Cancel</Button>
+        <Button data-proceed-import type="button" disabled={importProceedState !== "ready"} onclick={proceedImport}>Proceed to import</Button>
+      </div>
+
+      <div data-import-preview-list class={cn("mt-4 grid gap-2")}>
+        {#each importIssues.slice(0, 10) as issue}
+          <article data-import-preview-issue={issue.key} class={cn("grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(0,1fr)_9rem_9rem]")}>
+            <div class={cn("min-w-0")}>
+              <p data-import-preview-title={issue.key} class={cn("truncate text-sm font-medium")}>{issue.summary}</p>
+              <p class={cn("mt-1 text-xs text-muted-foreground")}>{issue.key} -> {issue.state}</p>
+              <p data-import-preview-values={issue.key} class={cn("mt-1 text-xs text-muted-foreground")}>
+                {fieldMappings[0]?.target}: {issue.summary}; {fieldMappings[1]?.target}: {issue.state}; {fieldMappings[2]?.target}: {issue.priority}; {fieldMappings[3]?.target}: {issue.estimate}
+              </p>
+            </div>
+            <div class={cn("text-sm")}>
+              <p class={cn("text-muted-foreground")}>Assignee</p>
+              <p data-import-preview-assignee={issue.key} class={cn("font-medium")}>{mappedUser(issue.assignee)}</p>
+            </div>
+            <div class={cn("text-sm")}>
+              <p class={cn("text-muted-foreground")}>Attachments</p>
+              <p data-import-preview-attachments={issue.key} class={cn("font-medium")}>{issue.attachments}</p>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-import-dry-run-summary class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Dry-run summary</h3>
+        <dl class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Sample shown</dt>
+            <dd data-import-summary-sample class={cn("text-muted-foreground")}>{Math.min(10, importIssues.length)} of {importIssues.length}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>User mapping</dt>
+            <dd data-import-summary-users class={cn("text-muted-foreground")}>{userMappings.length} mapped users</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Attachment count</dt>
+            <dd data-import-summary-attachments class={cn("text-muted-foreground")}>{totalAttachmentCount()} attachments</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section data-import-commit-state class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Commit state</h3>
+        <p data-import-proceed-state class={cn("mt-2 text-sm text-muted-foreground")}>{importProceedState}</p>
       </section>
     </aside>
   </section>
