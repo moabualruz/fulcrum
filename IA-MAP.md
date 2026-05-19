@@ -99,6 +99,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /docs/<docId>/edit                                        document editor
 /docs/<docId>/history                                     document version history
 /docs/<docId>/planning                                    planning view tied to document
+/ai-assist                                                OD reference route for AI Assist drawer with document planning context
 
 # System (workspace scope)
 /<ws>/doctor                                              workspace doctor
