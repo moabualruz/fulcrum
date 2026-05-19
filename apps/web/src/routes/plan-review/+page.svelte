@@ -21,6 +21,17 @@
     actionValue: string;
   };
 
+  type CustomFieldType = "text" | "number" | "date" | "select" | "multi-select" | "user" | "url";
+
+  type CustomField = {
+    id: string;
+    name: string;
+    type: CustomFieldType;
+    required: boolean;
+    defaultValue: string;
+    options: string[];
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -96,6 +107,25 @@
       actionValue: "triage-owner",
     },
   ]);
+  let customFieldName = $state("");
+  let customFieldType = $state<CustomFieldType>("text");
+  let customFieldRequired = $state(false);
+  let customFieldDefault = $state("");
+  let customFieldOptions = $state("Low, Medium, High");
+  let customFieldValidation = $state("");
+  let issueDraftTitle = $state("");
+  let customFieldInput = $state<Record<string, string>>({});
+  let customFields = $state<CustomField[]>([
+    {
+      id: "priority",
+      name: "Priority",
+      type: "select",
+      required: false,
+      defaultValue: "Medium",
+      options: ["Low", "Medium", "High"],
+    },
+  ]);
+  let createdIssue = $state<{ title: string; fields: Record<string, string> } | null>(null);
 
   const triggerOptions = [
     { value: "issue.created", label: "issue.created", scope: "issue" },
@@ -117,6 +147,16 @@
     { value: "change_state", label: "change_state" },
     { value: "assign", label: "assign" },
     { value: "add_label", label: "add_label" },
+  ];
+
+  const customFieldTypes: { value: CustomFieldType; label: string; example: string }[] = [
+    { value: "text", label: "text", example: "Client Name" },
+    { value: "number", label: "number", example: "0" },
+    { value: "date", label: "date", example: "2026-05-19" },
+    { value: "select", label: "select", example: "Low, Medium, High" },
+    { value: "multi-select", label: "multi-select", example: "frontend, backend" },
+    { value: "user", label: "user", example: "IUserLite: ada" },
+    { value: "url", label: "url", example: "https://example.com" },
   ];
 
   function openStage(stage: Stage) {
@@ -169,6 +209,74 @@
     };
     savedRules = [...savedRules, rule];
     previewText = `Saved ${buildRuleSummary()}`;
+  }
+
+  function slugify(value: string): string {
+    return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function parseOptions(): string[] {
+    return customFieldOptions.split(",").map((option) => option.trim()).filter(Boolean);
+  }
+
+  function validateDefault(type: CustomFieldType, value: string, options: string[]): string {
+    if (!value.trim()) return "";
+    if (type === "number" && Number.isNaN(Number(value))) return "Default value must be a number.";
+    if (type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Default date must use YYYY-MM-DD.";
+    if (type === "url" && !/^https?:\/\//.test(value)) return "Default URL must start with http:// or https://.";
+    if ((type === "select" || type === "multi-select") && options.length === 0) return "Select fields need at least one option.";
+    return "";
+  }
+
+  function createCustomField(): void {
+    const name = customFieldName.trim();
+    const id = slugify(name);
+    const options = customFieldType === "select" || customFieldType === "multi-select" ? parseOptions() : [];
+    const duplicate = customFields.some((field) => field.id === id || field.name.toLowerCase() === name.toLowerCase());
+    if (!name) {
+      customFieldValidation = "Field name required.";
+      return;
+    }
+    if (duplicate) {
+      customFieldValidation = "Custom field already exists.";
+      return;
+    }
+    const defaultError = validateDefault(customFieldType, customFieldDefault, options);
+    if (defaultError) {
+      customFieldValidation = defaultError;
+      return;
+    }
+    const field = { id, name, type: customFieldType, required: customFieldRequired, defaultValue: customFieldDefault.trim(), options };
+    customFields = [...customFields, field];
+    customFieldInput = { ...customFieldInput, [id]: field.defaultValue };
+    customFieldName = "";
+    customFieldDefault = "";
+    customFieldValidation = "";
+  }
+
+  function fieldValue(field: CustomField): string {
+    return customFieldInput[field.id] ?? field.defaultValue;
+  }
+
+  function updateFieldValue(fieldId: string, value: string): void {
+    customFieldInput = { ...customFieldInput, [fieldId]: value };
+  }
+
+  function createIssue(): void {
+    const missing = customFields.find((field) => field.required && !fieldValue(field).trim());
+    if (!issueDraftTitle.trim()) {
+      customFieldValidation = "Issue title required.";
+      return;
+    }
+    if (missing) {
+      customFieldValidation = `${missing.name} is required before issue creation.`;
+      return;
+    }
+    createdIssue = {
+      title: issueDraftTitle.trim(),
+      fields: Object.fromEntries(customFields.map((field) => [field.name, fieldValue(field)])),
+    };
+    customFieldValidation = "";
   }
 </script>
 
@@ -350,6 +458,112 @@
             </article>
           {/each}
         </div>
+      </section>
+    </aside>
+  </section>
+
+  <section data-custom-fields-builder class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Custom fields</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Add typed fields, set required defaults, and verify they appear on issue create and detail.</p>
+        </div>
+        <Badge data-custom-field-count variant="outline" size="sm">{customFields.length} fields</Badge>
+      </div>
+
+      <div data-field-type-picker class={cn("mt-4 grid gap-3 md:grid-cols-4")}>
+        {#each customFieldTypes as type}
+          <button
+            type="button"
+            data-custom-field-type={type.value}
+            data-selected={customFieldType === type.value}
+            onclick={() => (customFieldType = type.value)}
+            class={cn("min-w-0 rounded-md border border-border bg-background p-3 text-left", customFieldType === type.value && "border-primary bg-primary/5")}
+          >
+            <span class={cn("block text-sm font-medium")}>{type.label}</span>
+            <span class={cn("mt-1 block truncate text-xs text-muted-foreground")}>{type.example}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]")}>
+        <label class={cn("text-sm font-medium")}>
+          Field name
+          <input data-custom-field-name bind:value={customFieldName} placeholder="Client Name" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("text-sm font-medium")}>
+          Default value
+          <input data-custom-field-default bind:value={customFieldDefault} placeholder="0" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("flex items-end gap-2 text-sm font-medium")}>
+          <input data-custom-field-required type="checkbox" bind:checked={customFieldRequired} class={cn("mb-3 size-4")} />
+          <span class={cn("pb-2")}>Required</span>
+        </label>
+        <label class={cn("text-sm font-medium md:col-span-3")}>
+          Select options
+          <input data-custom-field-options bind:value={customFieldOptions} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+      </div>
+
+      {#if customFieldValidation}
+        <p data-custom-field-validation role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{customFieldValidation}</p>
+      {/if}
+
+      <Button data-create-custom-field type="button" class={cn("mt-4")} onclick={createCustomField}>Create field</Button>
+
+      <div data-custom-field-list class={cn("mt-4 grid gap-2")}>
+        {#each customFields as field}
+          <article data-custom-field={field.id} data-custom-field-type-row={field.type} data-custom-field-required-row={field.required} class={cn("grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+            <div class={cn("min-w-0")}>
+              <p class={cn("truncate text-sm font-medium")}>{field.name}</p>
+              <p data-custom-field-default-row={field.id} class={cn("text-xs text-muted-foreground")}>Default: {field.defaultValue || "none"}</p>
+            </div>
+            <Chip tone="neutral">{field.type}</Chip>
+            <Badge variant={field.required ? "warning" : "outline"} size="sm">{field.required ? "required" : "optional"}</Badge>
+          </article>
+        {/each}
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-issue-create-custom-fields class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Issue create</h3>
+        <label class={cn("mt-3 block text-sm font-medium")}>
+          Title
+          <input data-issue-title bind:value={issueDraftTitle} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each customFields as field}
+            <label data-issue-create-field={field.id} class={cn("block text-sm font-medium")}>
+              {field.name}{field.required ? " *" : ""}
+              <input
+                data-issue-field-input={field.id}
+                value={fieldValue(field)}
+                onchange={(event) => updateFieldValue(field.id, event.currentTarget.value)}
+                class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              />
+            </label>
+          {/each}
+        </div>
+        <Button data-create-issue-with-fields type="button" class={cn("mt-3")} onclick={createIssue}>Create issue</Button>
+      </section>
+
+      <section data-issue-detail-custom-fields class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Issue detail</h3>
+        {#if createdIssue}
+          <p data-created-issue-title class={cn("mt-2 text-sm font-medium")}>{createdIssue.title}</p>
+          <dl class={cn("mt-3 grid gap-2 text-sm")}>
+            {#each Object.entries(createdIssue.fields) as [name, value]}
+              <div data-issue-detail-field={name} class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+                <dt class={cn("font-medium")}>{name}</dt>
+                <dd class={cn("text-muted-foreground")}>{value || "empty"}</dd>
+              </div>
+            {/each}
+          </dl>
+        {:else}
+          <p class={cn("mt-2 text-sm text-muted-foreground")}>Create an issue to see custom fields on detail.</p>
+        {/if}
       </section>
     </aside>
   </section>

@@ -74,4 +74,48 @@ test.describe("plan review workflow navigation", () => {
 		await expect(page.locator("[data-rule-status]")).toContainText("valid");
 		await expect(page.locator("[data-rule-preview-text]")).toContainText("cycle_started");
 	});
+
+	test("creates typed custom fields and applies them to issue create and detail", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		await expect(page.locator("[data-custom-fields-builder]")).toBeVisible();
+		await expect(page.locator("[data-custom-field-type]")).toHaveCount(7);
+
+		await page.locator("[data-custom-field-type='text']").click();
+		await page.locator("[data-custom-field-name]").fill("Client Name");
+		await page.locator("[data-custom-field-required]").check();
+		await page.locator("[data-create-custom-field]").click();
+		await expect(page.locator("[data-custom-field='client-name']")).toHaveAttribute("data-custom-field-required-row", "true");
+
+		await page.locator("[data-custom-field-type='number']").click();
+		await page.locator("[data-custom-field-name]").fill("Budget");
+		await page.locator("[data-custom-field-required]").uncheck();
+		await page.locator("[data-custom-field-default]").fill("0");
+		await page.locator("[data-create-custom-field]").click();
+		await expect(page.locator("[data-custom-field='budget']")).toHaveAttribute("data-custom-field-type-row", "number");
+		await expect(page.locator("[data-custom-field-default-row='budget']")).toContainText("0");
+
+		await page.locator("[data-custom-field-type='date']").click();
+		await page.locator("[data-custom-field-name]").fill("Review Date");
+		await page.locator("[data-custom-field-default]").fill("2026-05-19");
+		await page.locator("[data-create-custom-field]").click();
+		await expect(page.locator("[data-custom-field='review-date']")).toHaveAttribute("data-custom-field-type-row", "date");
+
+		await page.locator("[data-custom-field-type='select']").click();
+		await page.locator("[data-custom-field-name]").fill("Priority Choice");
+		await page.locator("[data-custom-field-options]").fill("Low, Medium, High");
+		await page.locator("[data-custom-field-default]").fill("Medium");
+		await page.locator("[data-create-custom-field]").click();
+		await expect(page.locator("[data-custom-field='priority-choice']")).toHaveAttribute("data-custom-field-type-row", "select");
+
+		await page.locator("[data-issue-title]").fill("Renew enterprise contract");
+		await page.locator("[data-create-issue-with-fields]").click();
+		await expect(page.locator("[data-custom-field-validation]")).toContainText("Client Name is required");
+		await page.locator("[data-issue-field-input='client-name']").fill("Acme");
+		await page.locator("[data-create-issue-with-fields]").click();
+		await expect(page.locator("[data-created-issue-title]")).toContainText("Renew enterprise contract");
+		await expect(page.locator("[data-issue-detail-field='Client Name']")).toContainText("Acme");
+		await expect(page.locator("[data-issue-detail-field='Budget']")).toContainText("0");
+		await expect(page.locator("[data-issue-detail-field='Priority Choice']")).toContainText("Medium");
+	});
 });
