@@ -630,7 +630,7 @@ describe("cross-cutting CLI surfaces", () => {
 
     await runTelemetry(["status", "--json"], {
       env: {},
-      fetch: (async () => Response.json({ error: "no api configured" }, { status: 503 })) as typeof fetch,
+      fetch: (async () => Response.json({ error: "no api configured" }, { status: 503 })) as unknown as typeof fetch,
       ...h,
     });
 
