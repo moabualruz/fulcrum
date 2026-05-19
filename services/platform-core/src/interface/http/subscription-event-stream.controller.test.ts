@@ -123,6 +123,9 @@ async function expectStream(
       Connection: "keep-alive",
       "X-Fulcrum-Backpressure": "close-at-event-limit",
       "X-Fulcrum-Reconnect": "send-last-event-id",
+      "X-Fulcrum-Connection-Status": "connected",
+      "X-Fulcrum-Polling-Fallback": "disabled; interval=5000",
+      "X-Fulcrum-Recovery": "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
     });
     expect(response.ended).toBe(true);
   const event = JSON.parse(response.chunks.join("").match(/^data: (.*)$/m)?.[1] ?? "{}");

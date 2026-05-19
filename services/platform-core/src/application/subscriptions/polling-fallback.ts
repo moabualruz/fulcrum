@@ -22,9 +22,25 @@ export interface PollingFallbackOptions {
 /**
  * Check whether ws-polling-fallback feature is enabled.
  */
-export function isPollingFallbackEnabled(): boolean {
-  const features = process.env["FULCRUM_FEATURES"] ?? "";
+export function isPollingFallbackEnabled(featuresEnv = process.env["FULCRUM_FEATURES"] ?? ""): boolean {
+  const features = featuresEnv;
   return features.split(",").some((f) => f.trim() === "ws-polling-fallback");
+}
+
+export interface PollingFallbackState {
+  mode: "polling";
+  enabled: boolean;
+  intervalMs: number;
+  recovery: string;
+}
+
+export function pollingFallbackState(featuresEnv = process.env["FULCRUM_FEATURES"] ?? "", intervalMs = 5_000): PollingFallbackState {
+  return {
+    mode: "polling",
+    enabled: isPollingFallbackEnabled(featuresEnv),
+    intervalMs,
+    recovery: "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
+  };
 }
 
 /**

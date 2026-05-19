@@ -14,6 +14,7 @@ import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger"
 import { IsBoolean, IsOptional, IsString, MinLength } from "class-validator";
 
 import { formatSubscriptionServerSentEvent, getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
+import { pollingFallbackState } from "@platform-core/application/subscriptions/polling-fallback.ts";
 import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
 
 import { SubscriptionStreamQueryDto, RunUpdateStreamQueryDto } from "./dto/subscription.dto.ts";
@@ -63,6 +64,10 @@ export class SubscriptionEventStreamService {
     response.setHeader("Connection", "keep-alive");
     response.setHeader("X-Fulcrum-Backpressure", "close-at-event-limit");
     response.setHeader("X-Fulcrum-Reconnect", "send-last-event-id");
+    response.setHeader("X-Fulcrum-Connection-Status", "connected");
+    const fallback = pollingFallbackState(env);
+    response.setHeader("X-Fulcrum-Polling-Fallback", fallback.enabled ? `enabled; interval=${fallback.intervalMs}` : `disabled; interval=${fallback.intervalMs}`);
+    response.setHeader("X-Fulcrum-Recovery", fallback.recovery);
 
     await new Promise<void>((resolve) => {
       let closed = false;

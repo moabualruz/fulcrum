@@ -38,6 +38,30 @@ function makeCtx(orgId: string) {
 }
 
 describe("runsSubscriptionRouter.onRunUpdate", () => {
+  test("reports connection status and polling recovery metadata", async () => {
+    const original = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "ws-polling-fallback";
+
+    const status = await runsSubscriptionRouter
+      .createCaller(makeCtx("org1"))
+      .status({ runId: "run-abc" });
+
+    expect(status).toEqual({
+      connected: true,
+      topic: "agent_run.run-abc",
+      transport: "event-bus",
+      fallback: {
+        mode: "polling",
+        enabled: true,
+        intervalMs: 5_000,
+        recovery: "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
+      },
+    });
+
+    if (original === undefined) delete process.env["FULCRUM_FEATURES"];
+    else process.env["FULCRUM_FEATURES"] = original;
+  });
+
   test("receives events published to agent_run.<runId>", async () => {
     const bus = getEventBus();
     const runId = "run-abc";
@@ -84,6 +108,19 @@ describe("runsSubscriptionRouter.onRunUpdate", () => {
 });
 
 describe("notifySubscriptionRouter.onNewNotification", () => {
+  test("reports notification stream status for current org", async () => {
+    const status = await notifySubscriptionRouter
+      .createCaller(makeCtx("org-xyz"))
+      .status();
+
+    expect(status).toMatchObject({
+      connected: true,
+      topic: "org.org-xyz.notifications",
+      transport: "event-bus",
+      fallback: { mode: "polling", intervalMs: 5_000 },
+    });
+  });
+
   test("receives events published to org.<orgId>.notifications", async () => {
     const bus = getEventBus();
     const orgId = "org-xyz";

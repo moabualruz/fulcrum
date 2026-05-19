@@ -18,6 +18,7 @@ import {
   serializeSubscriptionEvent,
   type SerializedSubscriptionEvent,
 } from "@platform-core/application/subscriptions/event-bus.ts";
+import { pollingFallbackState } from "@platform-core/application/subscriptions/polling-fallback.ts";
 
 // --- Schemas ---
 
@@ -50,9 +51,35 @@ const OrchestrationStatePayloadSchema = z.object({
 export type OrchestrationStatePayload = z.infer<typeof OrchestrationStatePayloadSchema>;
 export type OrchestrationStateEvent = SerializedSubscriptionEvent<OrchestrationStatePayload>;
 
+const StreamStatusSchema = z.object({
+  connected: z.literal(true),
+  topic: z.string(),
+  transport: z.literal("event-bus"),
+  fallback: z.object({
+    mode: z.literal("polling"),
+    enabled: z.boolean(),
+    intervalMs: z.number().int().positive(),
+    recovery: z.string(),
+  }),
+});
+
+function streamStatus(topic: string): z.infer<typeof StreamStatusSchema> {
+  return {
+    connected: true,
+    topic,
+    transport: "event-bus",
+    fallback: pollingFallbackState(),
+  };
+}
+
 // --- Subscription procedures ---
 
 export const runsSubscriptionRouter = t.router({
+  status: permissionedProcedure({ resource: "runs", action: "onRunUpdate" })
+    .input(z.object({ runId: z.string().min(1) }))
+    .output(StreamStatusSchema)
+    .query(({ input }) => streamStatus(`agent_run.${input.runId}`)),
+
   onRunUpdate: permissionedProcedure({ resource: "runs", action: "onRunUpdate" })
     .input(z.object({ runId: z.string().min(1) }))
     .subscription(({ input }) => {
@@ -69,6 +96,10 @@ export const runsSubscriptionRouter = t.router({
 });
 
 export const notifySubscriptionRouter = t.router({
+  status: permissionedProcedure({ resource: "notify", action: "onNewNotification" })
+    .output(StreamStatusSchema)
+    .query(({ ctx }) => streamStatus(`org.${ctx.orgId}.notifications`)),
+
   onNewNotification: permissionedProcedure({ resource: "notify", action: "onNewNotification" })
     .subscription(({ ctx }) => {
       const bus = getEventBus();
@@ -84,6 +115,10 @@ export const notifySubscriptionRouter = t.router({
 });
 
 export const orchestrationSubscriptionRouter = t.router({
+  status: permissionedProcedure({ resource: "orchestration", action: "onStateChange" })
+    .output(StreamStatusSchema)
+    .query(({ ctx }) => streamStatus(`orchestration.${ctx.orgId}`)),
+
   onStateChange: permissionedProcedure({ resource: "orchestration", action: "onStateChange" })
     .subscription(({ ctx }) => {
       const bus = getEventBus();

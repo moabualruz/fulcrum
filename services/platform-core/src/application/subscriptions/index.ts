@@ -9,6 +9,7 @@ export type { EventHandler, SerializedSubscriptionEvent, SubscriptionEvent } fro
 export { startNotifyBridge, emitNotify, topicToPGChannel } from "./database-notify-bridge.ts";
 export {
   isPollingFallbackEnabled,
+  pollingFallbackState,
   startPollingFallback,
 } from "./polling-fallback.ts";
-export type { PollingSource, PollingFallbackOptions } from "./polling-fallback.ts";
+export type { PollingSource, PollingFallbackOptions, PollingFallbackState } from "./polling-fallback.ts";
