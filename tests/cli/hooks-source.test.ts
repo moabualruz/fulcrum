@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   disableHookRecipe,
   enableHookRecipe,
+  HOOK_RECIPE_CONTRACTS,
   isRecipeName,
   removeAllHookRegistrations,
   run,
@@ -88,13 +89,58 @@ describe("hooks CLI source command", () => {
     await writeFile(join(process.env["FULCRUM_HOME"]!, "hooks", "enabled", "format"), "");
 
     const json = await captureRun(["list", "--json"]);
-    const recipes = JSON.parse(json.stdout) as Array<{ name: string; enabled: boolean }>;
+    const recipes = JSON.parse(json.stdout) as Array<{
+      name: string;
+      enabled: boolean;
+      inputSource: string;
+      outputPolicy: string;
+      blocking: boolean;
+    }>;
     expect(recipes.find((recipe) => recipe.name === "format")?.enabled).toBe(true);
     expect(recipes.find((recipe) => recipe.name === "lint-gate")?.enabled).toBe(false);
+    expect(recipes.find((recipe) => recipe.name === "pm-policy")).toMatchObject({
+      inputSource: "bash-command",
+      outputPolicy: "blocking-stderr",
+      blocking: true,
+    });
+    expect(recipes.find((recipe) => recipe.name === "tool-output-router")).toMatchObject({
+      inputSource: "tool-result",
+      outputPolicy: "bounded-router",
+      blocking: false,
+    });
 
     const text = await captureRun(["list"]);
     expect(text.stdout).toContain("Available hooks");
+    expect(text.stdout).toContain("format — edit-file; silent-fail-open; nonblocking");
+    expect(text.stdout).toContain("pm-policy — bash-command; blocking-stderr; blocking");
     expect(text.stdout).toContain("1 of 8 marked enabled");
+  });
+
+  it("documents every hook subcommand contract for input source, output policy, and malformed payload handling", () => {
+    expect(Object.keys(HOOK_RECIPE_CONTRACTS).sort()).toEqual([
+      "audit-log",
+      "format",
+      "index-check",
+      "index-rebuild",
+      "lint-gate",
+      "pm-policy",
+      "test-on-edit",
+      "tool-output-router",
+    ]);
+
+    const contractNames = Object.keys(HOOK_RECIPE_CONTRACTS) as Array<keyof typeof HOOK_RECIPE_CONTRACTS>;
+    for (const name of contractNames) {
+      const contract = HOOK_RECIPE_CONTRACTS[name];
+      expect(contract.name).toBe(name);
+      expect(contract.malformedPayload).toBe("stderr-one-line-and-continue");
+      expect(contract.jsonMode).toBe("hooks-list-only");
+    }
+
+    expect(HOOK_RECIPE_CONTRACTS["lint-gate"].blocking).toBe(true);
+    expect(HOOK_RECIPE_CONTRACTS["pm-policy"].blocking).toBe(true);
+    expect(HOOK_RECIPE_CONTRACTS["format"].blocking).toBe(false);
+    expect(HOOK_RECIPE_CONTRACTS["audit-log"].outputPolicy).toBe("state-file");
+    expect(HOOK_RECIPE_CONTRACTS["index-check"].outputPolicy).toBe("stdout-advisory");
   });
 
   it("enables and disables JSON and TypeScript hook registrations for all agent surfaces", async () => {
