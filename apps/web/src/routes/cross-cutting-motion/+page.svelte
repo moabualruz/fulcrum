@@ -82,6 +82,31 @@
         </div>
       </article>
     </section>
+
+    <section data-motion-timing-scale class={cn("rounded-md border border-border bg-card p-4")}>
+      <h2 class={cn("text-lg font-semibold")}>Motion timing scale</h2>
+      <p class={cn("mt-1 text-sm text-muted-foreground")}>
+        Predictable durations and easings shared across hover, reveal, navigation, and modal transitions.
+      </p>
+      <dl class={cn("mt-3 grid gap-2 text-sm")}>
+        <div data-motion-timing="state-change" class={cn("flex items-center gap-2")}>
+          <dt class={cn("font-medium")}>State change (hover/focus/active)</dt>
+          <dd class={cn("font-mono text-xs")}>150ms ease-in-out</dd>
+        </div>
+        <div data-motion-timing="reveal" class={cn("flex items-center gap-2")}>
+          <dt class={cn("font-medium")}>Component reveal (popover/tooltip)</dt>
+          <dd class={cn("font-mono text-xs")}>200ms ease-out</dd>
+        </div>
+        <div data-motion-timing="navigation" class={cn("flex items-center gap-2")}>
+          <dt class={cn("font-medium")}>Navigation (route change)</dt>
+          <dd class={cn("font-mono text-xs")}>300ms ease-in-out</dd>
+        </div>
+        <div data-motion-timing="modal" class={cn("flex items-center gap-2")}>
+          <dt class={cn("font-medium")}>Modal appear/disappear</dt>
+          <dd class={cn("font-mono text-xs")}>300ms ease-in-out</dd>
+        </div>
+      </dl>
+    </section>
   </section>
 </main>
 

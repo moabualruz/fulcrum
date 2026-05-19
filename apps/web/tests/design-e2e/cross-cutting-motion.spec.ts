@@ -87,6 +87,16 @@ test.describe("cross-cutting reduced motion", () => {
     expect(themePage).toContain("data-animation-speed");
   });
 
+  test("motion timing scale documents 150/200/300ms tokens", async ({ page }) => {
+    await page.goto("/cross-cutting-motion");
+
+    await expect(page.locator("[data-motion-timing-scale]")).toBeVisible();
+    await expect(page.locator("[data-motion-timing='state-change']")).toContainText("150ms ease-in-out");
+    await expect(page.locator("[data-motion-timing='reveal']")).toContainText("200ms ease-out");
+    await expect(page.locator("[data-motion-timing='navigation']")).toContainText("300ms ease-in-out");
+    await expect(page.locator("[data-motion-timing='modal']")).toContainText("300ms ease-in-out");
+  });
+
   test("loading skeleton fixture renders form/list/table layouts", async ({ page }) => {
     await page.goto("/cross-cutting-motion");
 
