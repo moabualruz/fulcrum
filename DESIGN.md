@@ -488,6 +488,14 @@ Per research-02 § Web Run Feed + § Web Multi-Agent Orchestrator.
 
 Orchestrator: left rail DAG (Sugiyama via research-07 §3.2), node colour = ACP status. Click node → swap centre pane to that run's Live Session Pane. Right rail = sticky cost + SLO panel.
 
+### 9.1 Document Version Review
+
+- Document history shows a selectable version timeline with author, timestamp, and change summary for each revision.
+- Diffs use explicit Added/Removed text labels plus success/destructive tokens; color alone never carries meaning.
+- Restore is never one-click. It requires an inline confirmation and records the resulting version/audit state after confirmation.
+- Comments stay visible as a review thread, with add, resolve, empty, failed-save, and permission-denied states in the same surface.
+- Backlinks include source context, not just titles, and the planning conversion action remains visible from history/detail contexts.
+
 ---
 
 ## 10. Doctor / audit / error logs

@@ -40,6 +40,10 @@ _Avoid_: AI panel, chat panel, ACP panel, sidebar drawer, assistant pane.
 An inline Build-stage task creation surface that preserves board, backlog, table, or planning scope while showing required title, sprint, module, cycle, recurrence preview, validation, duplicate prevention, and retry state.
 _Avoid_: task create modal, hidden project scope, create dialog, cleared draft on failure.
 
+**DocVersionReview**:
+The document history surface that combines selectable revisions, labelled inline diff, restore confirmation, visible comment thread states, backlinks with source context, and planning conversion.
+_Avoid_: one-click restore, color-only diff, hidden comments icon, backlinks without source.
+
 **CommandPalette**:
 The `⌘K` modeless palette that resolves Scope-aware actions (recent, stage nav, step actions, federated search, settings search, workspace/theme, help).
 _Avoid_: Quick-open, search bar, launcher, omnibar.

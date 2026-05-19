@@ -109,6 +109,13 @@ One sentence naming the next workflow action.
 >
 > Create failed. Draft preserved; retry when the connection recovers.
 
+**Docs / version review:**
+> Restore requires confirmation. A new version will record the restore event.
+>
+> Comment save failed. Draft preserved for retry.
+>
+> Permission denied. Ask an editor to grant comment access.
+
 **Build / runs feed (no runs yet):**
 > No runs yet in this project.
 >

@@ -27,6 +27,7 @@ fulcrum doc edit      <id>                                    # opens $EDITOR, s
 fulcrum doc attach    <id> <file>
 fulcrum doc history   <id>
 fulcrum doc restore   <id> --version <n>
+fulcrum doc comment   <id> --body <text> [--resolve <comment-id>]
 fulcrum doc link      <id> --task <task-id>
 fulcrum doc search    <query> [--project <id>] [--limit <n>]
 
