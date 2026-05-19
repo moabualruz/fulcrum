@@ -35,6 +35,22 @@ test.describe("artifacts route interaction coverage", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test("surfaces upload, provenance filters, and recovery when artifact API is unavailable", async ({ page }) => {
+    const traceId = "trace-design-artifacts";
+    await page.goto(`/artifacts?trace=${traceId}`);
+
+    await expect(page.locator("[data-artifact-upload]")).toBeVisible();
+    await expect(page.locator("[data-artifact-upload-filename]")).toBeVisible();
+    await expect(page.locator("[data-artifact-upload-project]")).toBeVisible();
+    await expect(page.locator("[data-artifact-upload-trace]")).toBeVisible();
+    await expect(page.locator("[data-artifact-upload-submit]")).toBeVisible();
+    await expect(page.locator("[data-artifacts-project-filter]")).toBeVisible();
+    await expect(page.locator("[data-artifacts-run-filter]")).toBeVisible();
+    await expect(page.locator("[data-artifacts-task-filter]")).toBeVisible();
+    await expect(page.locator("[data-artifacts-trace-filter]")).toHaveValue(traceId);
+    await expect(page.locator("[data-artifacts-error]").or(page.locator("[data-empty-artifacts]")).first()).toBeVisible();
+  });
+
   test("exercises artifact detail controls at desktop and mobile widths", async ({ page, fulcrumHome }) => {
     const project = await fulcrumHome.seedProject("artifact-detail-design", "Artifact Detail Design");
     const artifactsDir = join(fulcrumHome.home, "artifacts");

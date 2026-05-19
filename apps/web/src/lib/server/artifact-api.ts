@@ -10,6 +10,10 @@ export interface PublicArtifact {
   run_id?: string | null;
   taskId?: string | null;
   task_id?: string | null;
+  traceId?: string | null;
+  trace_id?: string | null;
+  docId?: string | null;
+  doc_id?: string | null;
   kind: string;
   title?: string;
   filename?: string | null;
@@ -44,6 +48,8 @@ export function toArtifactRow(artifact: PublicArtifact) {
     project_id: artifact.projectId ?? artifact.project_id ?? null,
     run_id: artifact.runId ?? artifact.run_id ?? null,
     task_id: artifact.taskId ?? artifact.task_id ?? null,
+    trace_id: artifact.traceId ?? artifact.trace_id ?? null,
+    doc_id: artifact.docId ?? artifact.doc_id ?? null,
     kind: artifact.kind,
     title: artifact.title ?? artifact.filename ?? artifact.id,
     body_path: artifact.bodyPath ?? artifact.body_path ?? null,

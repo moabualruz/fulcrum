@@ -6,6 +6,9 @@ interface ArtifactRow {
   id: string;
   project_id: string | null;
   run_id: string | null;
+  task_id: string | null;
+  trace_id: string | null;
+  doc_id: string | null;
   kind: string;
   title: string;
   mime: string | null;
@@ -26,8 +29,10 @@ interface ArtifactsPayload {
 interface PublicArtifactRow {
   id: string;
   projectId: string | null;
+  traceId: string | null;
   runId: string | null;
   taskId: string | null;
+  docId: string | null;
   kind: string;
   title: string;
   filename: string | null;
@@ -82,11 +87,17 @@ function fetchArtifacts(calls: string[] = [], seed: PublicArtifactRow[] = defaul
     const mime = url.searchParams.get("mime");
     const kind = url.searchParams.get("kind");
     const projectId = url.searchParams.get("projectId");
+    const runId = url.searchParams.get("runId");
+    const taskId = url.searchParams.get("taskId");
+    const traceId = url.searchParams.get("traceId");
     const archived = url.searchParams.get("archived");
     const rows = seed.filter((artifact) => {
       if (mime && artifact.mime !== mime) return false;
       if (kind && artifact.kind !== kind) return false;
       if (projectId && artifact.projectId !== projectId) return false;
+      if (runId && artifact.runId !== runId) return false;
+      if (taskId && artifact.taskId !== taskId) return false;
+      if (traceId && artifact.traceId !== traceId) return false;
       if (archived === "false" && artifact.archived) return false;
       return true;
     });
@@ -100,6 +111,27 @@ function fetchArtifactMutations(calls: string[] = []): typeof fetch {
     const method = init?.method ?? "GET";
     const headers = new Headers(init?.headers);
     calls.push(`${method} ${url.pathname} ${headers.get("cookie") ?? ""}`);
+
+    if (url.pathname === "/api/v1/artifacts" && method === "POST") {
+      const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
+      return Response.json({
+        id: "artifact-uploaded",
+        projectId: body["projectId"],
+        traceId: body["traceId"],
+        runId: body["runId"] ?? null,
+        taskId: body["taskId"] ?? null,
+        docId: body["docId"] ?? null,
+        kind: body["kind"] ?? "file",
+        title: body["title"] ?? body["filename"],
+        filename: body["filename"],
+        bodyPath: body["bodyPath"] ?? null,
+        checksumSha256: null,
+        sizeBytes: body["sizeBytes"],
+        mime: body["mime"],
+        archived: false,
+        createdAt: "2026-05-15T11:00:00.000Z",
+      });
+    }
 
     if (url.pathname.endsWith("/archive") && method === "POST") {
       return Response.json({ ...defaultArtifacts()[0], archived: true });
@@ -123,8 +155,10 @@ function defaultArtifacts(): PublicArtifactRow[] {
     {
       id: "artifact-report",
       projectId: "project-1",
+      traceId: "trace-1",
       runId: "run-1",
-      taskId: null,
+      taskId: "task-1",
+      docId: null,
       kind: "file",
       title: "report.md",
       filename: "report.md",
@@ -138,8 +172,10 @@ function defaultArtifacts(): PublicArtifactRow[] {
     {
       id: "artifact-data",
       projectId: "project-1",
+      traceId: "trace-2",
       runId: null,
       taskId: null,
+      docId: "doc-1",
       kind: "report",
       title: "data.json",
       filename: "data.json",
@@ -153,8 +189,10 @@ function defaultArtifacts(): PublicArtifactRow[] {
     {
       id: "artifact-archived",
       projectId: "project-1",
+      traceId: "trace-3",
       runId: null,
       taskId: null,
+      docId: null,
       kind: "file",
       title: "old.md",
       filename: "old.md",
@@ -186,6 +224,9 @@ describe("/artifacts +page.server.ts load()", () => {
     expect(payload.artifacts[0]).toMatchObject({
       project_id: "project-1",
       run_id: "run-1",
+      task_id: "task-1",
+      trace_id: "trace-1",
+      doc_id: null,
       body_path: "artifacts/report.md",
       sha256: "sha-report",
       size: 2048,
@@ -202,14 +243,14 @@ describe("/artifacts +page.server.ts load()", () => {
     expect(payload.artifacts[0]!.mime).toBe("application/json");
   });
 
-  test("kind and project filters are passed to public API", async () => {
+  test("kind, project, run, task, and trace filters are passed to public API", async () => {
     const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load(eventFor("/artifacts?kind=report&project=project-1", fetchArtifacts(calls)));
+    const result = await mod.load(eventFor("/artifacts?kind=file&project=project-1&run=run-1&task=task-1&trace=trace-1", fetchArtifacts(calls)));
     const payload = await streamedData<ArtifactsPayload>(result);
 
-    expect(payload.artifacts.map((artifact) => artifact.id)).toEqual(["artifact-data"]);
-    expect(calls).toEqual(["GET /api/v1/artifacts?projectId=project-1&kind=report&archived=false sid=test-session"]);
+    expect(payload.artifacts.map((artifact) => artifact.id)).toEqual(["artifact-report"]);
+    expect(calls).toEqual(["GET /api/v1/artifacts?projectId=project-1&traceId=trace-1&kind=file&runId=run-1&taskId=task-1&archived=false sid=test-session"]);
   });
 
   test("archived=true includes archived results", async () => {
@@ -255,5 +296,23 @@ describe("/artifacts +page.server.ts load()", () => {
 
     expect(result).toEqual({ ok: true, action: "delete", count: 1 });
     expect(calls).toEqual(["DELETE /api/v1/artifacts/artifact-report sid=test-session"]);
+  });
+
+  test("upload action creates artifact metadata through public API", async () => {
+    const calls: string[] = [];
+    const form = new FormData();
+    form.set("filename", "uat-evidence.txt");
+    form.set("projectId", "project-1");
+    form.set("traceId", "trace-upload");
+    form.set("mime", "text/plain");
+    form.set("sizeBytes", "42");
+    form.set("runId", "run-1");
+    form.set("taskId", "task-1");
+    form.set("bodyPath", "artifacts/uat-evidence.txt");
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 8}`);
+    const result = await mod.actions.upload(actionEventFor(form, fetchArtifactMutations(calls)));
+
+    expect(result).toMatchObject({ ok: true, mode: "upload", artifact: { id: "artifact-uploaded" } });
+    expect(calls).toEqual(["POST /api/v1/artifacts sid=test-session"]);
   });
 });

@@ -6,9 +6,15 @@
 
   interface Props {
     data: PageData;
+    form?: {
+      ok?: boolean;
+      mode?: "upload" | string;
+      message?: string;
+      artifact?: { id?: string; title?: string; filename?: string };
+    };
   }
 
-  let { data }: Props = $props();
+  let { data, form }: Props = $props();
   let selected: Set<string> = $state(new Set());
   let showConfirmDelete = $state(false);
 
@@ -75,6 +81,62 @@
   </div>
 </header>
 
+<section data-artifact-upload class={cn("mb-4 rounded-md border border-border bg-card p-3")}>
+  <h2 class={cn("mb-2 text-sm font-semibold")}>Upload artifact</h2>
+  <form method="POST" action="?/upload" class={cn("grid gap-2 md:grid-cols-6")}>
+    <input
+      data-artifact-upload-filename
+      name="filename"
+      placeholder="filename"
+      required
+      class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
+    />
+    <input
+      data-artifact-upload-project
+      name="projectId"
+      placeholder="project id"
+      value={data.activeProjectId ?? data.filter.project}
+      required
+      class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
+    />
+    <input
+      data-artifact-upload-trace
+      name="traceId"
+      placeholder="trace id"
+      required
+      class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
+    />
+    <input
+      data-artifact-upload-mime
+      name="mime"
+      placeholder="text/plain"
+      value="text/plain"
+      required
+      class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
+    />
+    <input
+      data-artifact-upload-size
+      name="sizeBytes"
+      type="number"
+      min="0"
+      placeholder="bytes"
+      required
+      class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
+    />
+    <button data-artifact-upload-submit type="submit" class={cn(buttonVariants({ variant: "default" }))}>Upload</button>
+    <input name="kind" placeholder="kind" value="file" class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")} />
+    <input name="runId" placeholder="run id" class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")} />
+    <input name="taskId" placeholder="task id" class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")} />
+    <input name="docId" placeholder="doc id" class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")} />
+    <input name="bodyPath" placeholder="stored body path" class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm md:col-span-2")} />
+  </form>
+  {#if form?.mode === "upload" && form.ok}
+    <p data-artifact-upload-result class={cn("mt-2 text-sm text-muted-foreground")}>Uploaded {form.artifact?.title ?? form.artifact?.filename ?? form.artifact?.id}</p>
+  {:else if form?.mode === "upload" && !form.ok}
+    <p data-artifact-upload-error class={cn("mt-2 text-sm text-destructive")}>{form.message}</p>
+  {/if}
+</section>
+
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
@@ -113,6 +175,34 @@
         <option value={mime} selected={data.filter.mime === mime}>{mime}</option>
       {/each}
     </select>
+    <input
+      data-artifacts-project-filter
+      name="project"
+      value={data.filter.project}
+      placeholder="Project"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
+    <input
+      data-artifacts-run-filter
+      name="run"
+      value={data.filter.run}
+      placeholder="Run"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
+    <input
+      data-artifacts-task-filter
+      name="task"
+      value={data.filter.task}
+      placeholder="Task"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
+    <input
+      data-artifacts-trace-filter
+      name="trace"
+      value={data.filter.trace}
+      placeholder="Trace"
+      class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+    />
     <select
       data-artifacts-kind-filter
       name="kind"
@@ -209,7 +299,7 @@
   {:else}
     <div data-artifacts-list>
       <div class={cn("hidden overflow-x-auto md:block")}>
-      <table class={cn("w-full min-w-[860px] text-sm")}>
+      <table class={cn("w-full min-w-[1120px] text-sm")}>
         <thead>
           <tr class={cn("border-b border-border text-left")}>
             <th class={cn("pb-2 w-8")}>
@@ -224,7 +314,10 @@
             <th class={cn("pb-2 font-medium")}>Title</th>
             <th class={cn("pb-2 font-medium")}>Kind</th>
             <th class={cn("pb-2 font-medium")}>MIME</th>
+            <th class={cn("pb-2 font-medium")}>Project</th>
             <th class={cn("pb-2 font-medium")}>Run</th>
+            <th class={cn("pb-2 font-medium")}>Task</th>
+            <th class={cn("pb-2 font-medium")}>Trace</th>
             <th class={cn("pb-2 font-medium")}>Preview</th>
             <th class={cn("pb-2 font-medium")}>Retention</th>
             <th class={cn("pb-2 font-medium text-right")}>Size</th>
@@ -252,6 +345,13 @@
               </td>
               <td class={cn("py-2")}>{artifact.kind}</td>
               <td class={cn("py-2")}>{artifact.mime ?? "—"}</td>
+              <td data-artifact-project-link class={cn("py-2")}>
+                {#if artifact.project_id}
+                  <a href="/projects/{artifact.project_id}" class={cn("text-primary underline-offset-4 hover:underline")}>project</a>
+                {:else}
+                  —
+                {/if}
+              </td>
               <td class={cn("py-2")}>
                 {#if artifact.run_id}
                   <a data-artifact-run-link href="/runs/{artifact.run_id}" class={cn("text-primary underline-offset-4 hover:underline")}>run</a>
@@ -259,6 +359,14 @@
                   —
                 {/if}
               </td>
+              <td data-artifact-task-link class={cn("py-2")}>
+                {#if artifact.task_id}
+                  <a href="/tasks/{artifact.task_id}" class={cn("text-primary underline-offset-4 hover:underline")}>task</a>
+                {:else}
+                  —
+                {/if}
+              </td>
+              <td data-artifact-trace-id class={cn("py-2 font-mono text-xs")}>{artifact.trace_id ?? "—"}</td>
               <td data-artifact-preview-kind={previewLabel(artifact)} class={cn("py-2")}>{previewLabel(artifact)}</td>
               <td data-artifact-retention-status class={cn("py-2")}>{retentionLabel(artifact)}</td>
               <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "—"}</td>
@@ -293,6 +401,7 @@
               <span data-artifact-preview-kind={previewLabel(artifact)}>preview:{previewLabel(artifact)}</span>
               <span class={cn("text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "—"} bytes</span>
               <span>{artifact.created_at.slice(0, 10)}</span>
+              <span data-artifact-trace-id class={cn("text-right font-mono")}>{artifact.trace_id ?? "no trace"}</span>
               {#if artifact.run_id}
                 <a data-artifact-run-link href="/runs/{artifact.run_id}" class={cn("text-right text-primary underline-offset-4 hover:underline")}>run</a>
               {:else}

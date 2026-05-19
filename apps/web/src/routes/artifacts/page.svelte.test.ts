@@ -1,10 +1,14 @@
 import type { Component } from "svelte";
+import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, test } from "bun:test";
 
 interface ArtifactRow {
   id: string;
   project_id: string | null;
   run_id: string | null;
+  task_id?: string | null;
+  trace_id?: string | null;
+  doc_id?: string | null;
   kind: string;
   title: string;
   mime: string | null;
@@ -17,7 +21,8 @@ interface ArtifactRow {
 
 type PageProps = {
   data: {
-    filter: { kind: string; project: string; run: string; mime: string; archived: string };
+    activeProjectId?: string | null;
+    filter: { kind: string; project: string; run: string; task: string; trace: string; mime: string; archived: string };
     streamed: { data: { artifacts: ArtifactRow[] } | Promise<{ artifacts: ArtifactRow[] }> };
   };
 };
@@ -27,6 +32,9 @@ const ARTIFACTS: ArtifactRow[] = [
     id: "a1",
     project_id: "p1",
     run_id: "r1",
+    task_id: "t1",
+    trace_id: "trace-a1",
+    doc_id: null,
     kind: "image",
     title: "screen.png",
     mime: "image/png",
@@ -40,6 +48,9 @@ const ARTIFACTS: ArtifactRow[] = [
     id: "a2",
     project_id: "p1",
     run_id: "r1",
+    task_id: null,
+    trace_id: "trace-a2",
+    doc_id: "d1",
     kind: "text",
     title: "summary.txt",
     mime: "text/plain",
@@ -53,6 +64,9 @@ const ARTIFACTS: ArtifactRow[] = [
     id: "a3",
     project_id: "p1",
     run_id: "r1",
+    task_id: null,
+    trace_id: "trace-a3",
+    doc_id: null,
     kind: "text",
     title: "notes.md",
     mime: "text/markdown",
@@ -78,7 +92,8 @@ describe("/artifacts +page.svelte", () => {
     const { body } = render(Page, {
       props: {
         data: {
-          filter: { kind: "", project: "p1", run: "", mime: "", archived: "" },
+          activeProjectId: "p1",
+          filter: { kind: "", project: "p1", run: "", task: "", trace: "", mime: "", archived: "" },
           streamed: { data: { artifacts: ARTIFACTS } },
         },
       },
@@ -88,6 +103,12 @@ describe("/artifacts +page.svelte", () => {
     // Checkboxes for selection
     expect(body).toContain("data-artifact-checkbox");
     expect(body).toContain("data-select-all");
+    expect(body).toContain("data-artifact-upload");
+    expect(body).toContain("data-artifacts-run-filter");
+    expect(body).toContain("data-artifacts-task-filter");
+    expect(body).toContain("data-artifacts-trace-filter");
+    expect(body).toContain("data-artifact-trace-id");
+    expect(body).toContain("trace-a1");
     // Archived badge on a2
     expect(body).toContain("data-archived-badge");
     expect(body).toContain("Archived");
@@ -99,7 +120,8 @@ describe("/artifacts +page.svelte", () => {
     const { body } = render(Page, {
       props: {
         data: {
-          filter: { kind: "", project: "", run: "", mime: "", archived: "" },
+          activeProjectId: null,
+          filter: { kind: "", project: "", run: "", task: "", trace: "", mime: "", archived: "" },
           streamed: { data: { artifacts: ARTIFACTS } },
         },
       },
@@ -107,13 +129,24 @@ describe("/artifacts +page.svelte", () => {
     expect(body).toContain("data-artifacts-filter");
     expect(body).toContain("data-artifacts-mime-filter");
     expect(body).toContain("data-artifacts-kind-filter");
+    expect(body).toContain("data-artifacts-project-filter");
+  });
+
+  test("keeps protected destructive action controls in the artifact surface", () => {
+    const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+    expect(source).toContain("data-bulk-delete");
+    expect(source).toContain("data-confirm-delete-modal");
+    expect(source).toContain("data-confirm-delete-yes");
+    expect(source).toContain("data-confirm-delete-cancel");
+    expect(source).toContain("showConfirmDelete");
   });
 
   test("renders empty state when no artifacts", () => {
     const { body } = render(Page, {
       props: {
         data: {
-          filter: { kind: "", project: "", run: "", mime: "", archived: "" },
+          activeProjectId: null,
+          filter: { kind: "", project: "", run: "", task: "", trace: "", mime: "", archived: "" },
           streamed: { data: { artifacts: [] } },
         },
       },
