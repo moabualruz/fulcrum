@@ -171,6 +171,7 @@ describe("TuiApp foundation behavior", () => {
       "?",
       "Esc",
       "q",
+      "t",
     ]);
   });
 
@@ -217,7 +218,8 @@ describe("TuiApp foundation behavior", () => {
 
     tty.inject("j");
     await Bun.sleep(0);
-    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Tasks`);
+    // Domain nav order: Projects → Build Board → Tasks. One 'j' moves to Build Board.
+    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Build Board`);
     app.stop();
   });
 

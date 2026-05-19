@@ -101,7 +101,9 @@ describe("launchTui", () => {
 
     tty.inject("\r");
     await Bun.sleep(1);
-    expect(tty.plainText()).toContain("Screen:Projects");
+    // "Create task" command-palette action routes to the Build Board screen
+    // (where task creation lives) rather than the Projects screen.
+    expect(tty.plainText()).toContain("Screen:Build Board");
 
     app.stop();
   });

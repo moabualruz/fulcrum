@@ -257,6 +257,9 @@ describe("TuiApp — real keyboard workflows", () => {
     });
 
     await app.mount();
+    // Domain nav: Projects → Build Board → Tasks. Two 'j' presses to reach Tasks.
+    tty.inject("j");
+    await Bun.sleep(0);
     tty.inject("j");
     await Bun.sleep(0);
     tty.inject("\r");

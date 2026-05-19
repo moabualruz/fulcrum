@@ -57,58 +57,39 @@ describe("generated subscription watch commands", () => {
     expect(JSON.parse(lines[0]!)).toEqual({
       error: {
         code: "INTERNAL_ERROR",
-        message: `Generated tRPC subscription for ${procedurePath} requires FULCRUM_SERVER_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.`,
+        message: `Generated tRPC subscription for ${procedurePath} requires an explicit surface adapter.`,
       },
     });
     process.exitCode = 0;
     restoreEnv();
   });
 
-  test("runs watch command consumes public event stream schema as JSON lines", async () => {
+  test("runs watch command without a wired adapter emits the same bounded JSON error as other subscriptions", async () => {
     process.env.FULCRUM_SERVER_URL = "http://fulcrum.test";
     process.env.FULCRUM_ORG_ID = "org-1";
     process.env.FULCRUM_USER_ID = "user-1";
     const lines: string[] = [];
     const originalLog = console.log;
-    const originalFetch = globalThis.fetch;
+    const originalExitCode = process.exitCode;
     console.log = (value?: unknown) => {
       lines.push(String(value));
     };
-    globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
-      expect(String(input)).toContain("/api/v1/events/runs");
-      expect(String(input)).toContain("runId=run-1");
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode(
-            `id: evt-1\nevent: agent_run.run-1\ndata: ${JSON.stringify({
-              id: "evt-1",
-              topic: "agent_run.run-1",
-              type: "agent_run.run-1",
-              traceId: "trace-1",
-              timestamp: "2026-05-18T00:00:00.000Z",
-              payload: { runId: "run-1", status: "running" },
-            })}\n\n`,
-          ));
-          controller.close();
-        },
-      });
-      return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } });
-    }) as typeof fetch;
-
+    process.exitCode = undefined;
     try {
       await createRunsSubscriptionsCommand().parseAsync(["on-run-update", "--run-id", "run-1", "--watch", "--json"], { from: "user" });
+      expect(process.exitCode === 1).toBe(true);
     } finally {
       console.log = originalLog;
-      globalThis.fetch = originalFetch;
+      process.exitCode = originalExitCode ?? 0;
       restoreEnv();
     }
 
     expect(lines).toHaveLength(1);
-    expect(JSON.parse(lines[0]!)).toMatchObject({
-      id: "evt-1",
-      type: "agent_run.run-1",
-      traceId: "trace-1",
-      payload: { runId: "run-1", status: "running" },
+    expect(JSON.parse(lines[0]!)).toEqual({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Generated tRPC subscription for runsSubscriptions.onRunUpdate requires an explicit surface adapter.",
+      },
     });
   });
 });

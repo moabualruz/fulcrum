@@ -99,8 +99,12 @@ describe("settings/users +page.server load()", () => {
 
   it("returns members array when orgs.members.list succeeds", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/v1/organizations/members")) {
+      const target = url.toString();
+      if (target.includes("/api/v1/organizations/members")) {
         return new Response(JSON.stringify(MOCK_MEMBERS), { status: 200 });
+      }
+      if (target.includes("/api/v1/auth/")) {
+        return new Response(JSON.stringify([]), { status: 200 });
       }
       return new Response(null, { status: 404 });
     };
@@ -143,11 +147,15 @@ describe("settings/users +page.server load()", () => {
 
   it("returns empty members array when list returns empty", async () => {
     const mockFetch = async (url: string | URL | Request) => {
-      if (url.toString().includes("/api/v1/organizations/members")) {
+      const target = url.toString();
+      if (target.includes("/api/v1/organizations/members")) {
         return new Response(
           JSON.stringify({ result: { data: { json: [] } } }),
           { status: 200 },
         );
+      }
+      if (target.includes("/api/v1/auth/")) {
+        return new Response(JSON.stringify([]), { status: 200 });
       }
       return new Response(null, { status: 404 });
     };
