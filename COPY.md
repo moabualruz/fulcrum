@@ -471,6 +471,14 @@ No emoji. No `🎉`. No `❗`. Recovery action in `[ ]` brackets when one fits.
 
 Each setting has: name, current value, inline status chip (✓ inherited / ✏️ overridden / 🔒 locked), help text 11 px fg-muted.
 
+Project label settings:
+
+- Usage count: `<n> uses`
+- Archive parent with active children: `Archived <label>; <n> child label(s) moved to root.`
+- Empty archive: `No archived labels.`
+- Bulk cleanup action: `Delete selected`
+- Usage guard: `Cannot delete <label>; archive keeps <n> linked uses.`
+
 ### Inheritance chip copy
 
 - ✓ **Inherited from parent project `<name>`.** [ Override ]

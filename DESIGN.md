@@ -243,6 +243,13 @@ States required on every variant (research / impeccable product.md):
 - Required project/scope is visible before submit. Sprint, module, and cycle assignment fields remain visible and editable before submit.
 - Empty-title validation, duplicate prevention, and submit failure keep the typed draft and all assignments intact.
 - Recurring task setup must show a plain-language preview of generated instances before submit.
+
+#### Project Label Settings
+
+- Label settings show hierarchy, color, usage count, archived state, and persisted order in one scannable list.
+- Archive is the default removal action. Archiving a parent must move active children to root instead of deleting or hiding them.
+- Permanent cleanup is only a bulk archived-label action. It must show selected archived rows and block labels with linked usage.
+- Color choices must pass contrast against the settings background; color alone never carries label meaning.
 - On mobile, the tray stays in the page flow with 40 px minimum controls and no horizontal overflow; failure recovery uses an inline retry action, not a new overlay.
 
 ### 4.3 Tables

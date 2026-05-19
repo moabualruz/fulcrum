@@ -7,15 +7,22 @@ test.describe("project settings labels", () => {
 		await expect(page.locator("[data-project-settings-header]")).toContainText("Labels");
 		await expect(page.locator("[data-label-row='lbl_bug']")).toBeVisible();
 		await expect(page.locator("[data-label-children='lbl_bug'] [data-label-child='lbl_bug_p1']")).toBeVisible();
+		await expect(page.locator("[data-label-usage='lbl_bug']")).toContainText("18 uses");
+		await expect(page.locator("[data-label-color='lbl_bug']")).toHaveCSS("background-color", "oklch(0.68 0.18 30)");
 		await expect(page.locator("[data-label-archived-row='lbl_legacy']")).toBeVisible();
 	});
 
-	test("add label appends a new active row", async ({ page }) => {
+	test("add label appends a child row with selected color", async ({ page }) => {
 		await page.goto("/project-settings");
 
 		await page.locator("[data-label-name-input]").fill("research");
+		await page.locator("[data-label-parent-select]").selectOption("lbl_design");
+		await page.locator("[data-color-swatch='oklch(0.72 0.16 145)']").click();
 		await page.locator("[data-add-label]").click();
-		await expect(page.locator("[data-label-name]:has-text('research')")).toBeVisible();
+		const research = page.locator("[data-label-children='lbl_design'] [data-label-name]:has-text('research')");
+		await expect(research).toBeVisible();
+		await expect(page.locator("[data-label-children='lbl_design'] li:has-text('research') [data-label-color]")).toHaveCSS("background-color", "oklch(0.72 0.16 145)");
+		await expect(page.locator("[data-color-contrast-status='oklch(0.72 0.16 145)']")).toHaveAttribute("title", "AA ready");
 	});
 
 	test("add label with duplicate name surfaces an error", async ({ page }) => {
@@ -41,14 +48,36 @@ test.describe("project settings labels", () => {
 		await page.locator("[data-label-archive='lbl_design']").click();
 		await expect(page.locator("[data-label-row='lbl_design']")).toHaveCount(0);
 		await expect(page.locator("[data-label-archived-row='lbl_design']")).toBeVisible();
+		await expect(page.locator("[data-label-usage='lbl_design']")).toContainText("11 uses");
 		await page.locator("[data-label-restore='lbl_design']").click();
 		await expect(page.locator("[data-label-row='lbl_design']")).toBeVisible();
 	});
 
-	test("delete is gated to archived labels", async ({ page }) => {
+	test("archiving a parent moves children to root instead of deleting them", async ({ page }) => {
 		await page.goto("/project-settings");
 
-		await page.locator("[data-label-delete='lbl_legacy']").click();
+		await page.locator("[data-label-archive='lbl_bug']").click();
+		await expect(page.locator("[data-label-archive-notice]")).toContainText("1 child label moved to root");
+		await expect(page.locator("[data-label-row='lbl_bug']")).toHaveCount(0);
+		await expect(page.locator("[data-label-row='lbl_bug_p1']")).toBeVisible();
+		await expect(page.locator("[data-label-name='lbl_bug_p1']")).toHaveText("p1");
+	});
+
+	test("reorder persists active label order", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-label-list] [data-label-row]").first()).toHaveAttribute("data-label-row", "lbl_bug");
+		await page.locator("[data-label-move-up='lbl_design']").click();
+		await expect(page.locator("[data-label-list] [data-label-row]").first()).toHaveAttribute("data-label-row", "lbl_design");
+		await expect(page.locator("[data-label-order-saved]")).toContainText("Order saved");
+	});
+
+	test("bulk delete removes selected archived labels only", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-label-delete='lbl_legacy']")).toHaveCount(0);
+		await page.locator("[data-label-archived-select='lbl_legacy']").check();
+		await page.locator("[data-label-bulk-delete-archived]").click();
 		await expect(page.locator("[data-label-archived-row='lbl_legacy']")).toHaveCount(0);
 	});
 

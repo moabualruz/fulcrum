@@ -9,6 +9,8 @@
     parentId: string | null;
     color: string;
     status: LabelStatus;
+    usageCount: number;
+    archivedAt: string | null;
   }
 
   const COLORS = [
@@ -20,10 +22,10 @@
   ];
 
   let labels = $state<ProjectLabel[]>([
-    { id: "lbl_bug", name: "bug", parentId: null, color: COLORS[1], status: "active" },
-    { id: "lbl_bug_p1", name: "p1", parentId: "lbl_bug", color: COLORS[1], status: "active" },
-    { id: "lbl_design", name: "design", parentId: null, color: COLORS[0], status: "active" },
-    { id: "lbl_legacy", name: "legacy-flag", parentId: null, color: COLORS[3], status: "archived" },
+    { id: "lbl_bug", name: "bug", parentId: null, color: COLORS[1], status: "active", usageCount: 18, archivedAt: null },
+    { id: "lbl_bug_p1", name: "p1", parentId: "lbl_bug", color: COLORS[1], status: "active", usageCount: 7, archivedAt: null },
+    { id: "lbl_design", name: "design", parentId: null, color: COLORS[0], status: "active", usageCount: 11, archivedAt: null },
+    { id: "lbl_legacy", name: "legacy-flag", parentId: null, color: COLORS[3], status: "archived", usageCount: 0, archivedAt: "2026-05-01" },
   ]);
 
   let newName = $state("");
@@ -32,9 +34,32 @@
   let renameTarget = $state<string | null>(null);
   let renameDraft = $state("");
   let error = $state<string | null>(null);
+  let archiveNotice = $state<string | null>(null);
+  let orderSaved = $state(false);
+  let archivedSelection = $state<string[]>([]);
+  let archivedBulkError = $state<string | null>(null);
 
   function topLevel(): ProjectLabel[] {
-    return labels.filter((label) => label.parentId === null);
+    return labels.filter((label) => label.parentId === null && label.status === "active");
+  }
+
+  function parentOptions(): ProjectLabel[] {
+    return labels.filter((label) => label.parentId === null && label.status === "active");
+  }
+
+  function archivedLabels(): ProjectLabel[] {
+    return labels.filter((label) => label.status === "archived");
+  }
+
+  function isSelectedArchived(id: string): boolean {
+    return archivedSelection.includes(id);
+  }
+
+  function toggleArchivedSelection(id: string): void {
+    archivedSelection = isSelectedArchived(id)
+      ? archivedSelection.filter((selectedId) => selectedId !== id)
+      : [...archivedSelection, id];
+    archivedBulkError = null;
   }
 
   function addLabel(event: Event): void {
@@ -53,12 +78,15 @@
         parentId: newParent || null,
         color: newColor,
         status: "active",
+        usageCount: 0,
+        archivedAt: null,
       },
     ];
     newName = "";
     newParent = "";
     newColor = COLORS[0];
     error = null;
+    archiveNotice = null;
   }
 
   function startRename(label: ProjectLabel): void {
@@ -81,17 +109,58 @@
   }
 
   function archiveLabel(id: string): void {
-    labels = labels.map((label) => label.id === id ? { ...label, status: "archived" } : label);
+    const target = labels.find((label) => label.id === id);
+    if (!target) return;
+    const movedChildren = labels.filter((label) => label.parentId === id && label.status === "active").length;
+    labels = labels.map((label) => {
+      if (label.id === id) return { ...label, status: "archived", archivedAt: "2026-05-19" };
+      if (label.parentId === id) return { ...label, parentId: null };
+      return label;
+    });
+    archiveNotice = movedChildren > 0
+      ? `Archived ${target.name}; ${movedChildren} child ${movedChildren === 1 ? "label" : "labels"} moved to root.`
+      : `Archived ${target.name}.`;
+    orderSaved = false;
   }
 
   function restoreLabel(id: string): void {
-    labels = labels.map((label) => label.id === id ? { ...label, status: "active" } : label);
+    labels = labels.map((label) => label.id === id ? { ...label, status: "active", archivedAt: null } : label);
+    archivedSelection = archivedSelection.filter((selectedId) => selectedId !== id);
+    archivedBulkError = null;
   }
 
-  function deleteLabel(id: string): void {
-    const target = labels.find((label) => label.id === id);
-    if (!target || target.status !== "archived") return;
-    labels = labels.filter((label) => label.id !== id && label.parentId !== id);
+  function moveLabel(id: string, direction: -1 | 1): void {
+    const roots = labels.filter((label) => label.status === "active" && label.parentId === null);
+    const index = roots.findIndex((label) => label.id === id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= roots.length) return;
+
+    const reorderedRootIds = roots.map((label) => label.id);
+    const [moved] = reorderedRootIds.splice(index, 1);
+    reorderedRootIds.splice(targetIndex, 0, moved);
+    const rootOrder = new Map(reorderedRootIds.map((labelId, order) => [labelId, order]));
+    labels = [...labels].sort((a, b) => {
+      const aOrder = rootOrder.get(a.id);
+      const bOrder = rootOrder.get(b.id);
+      if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+      if (aOrder !== undefined) return -1;
+      if (bOrder !== undefined) return 1;
+      return 0;
+    });
+    orderSaved = true;
+  }
+
+  function bulkDeleteArchived(): void {
+    const selected = labels.filter((label) => archivedSelection.includes(label.id));
+    if (selected.length === 0) return;
+    const withUsage = selected.find((label) => label.usageCount > 0);
+    if (withUsage) {
+      archivedBulkError = `Cannot delete ${withUsage.name}; archive keeps ${withUsage.usageCount} linked uses.`;
+      return;
+    }
+    labels = labels.filter((label) => !archivedSelection.includes(label.id));
+    archivedSelection = [];
+    archivedBulkError = null;
   }
 
   type StartDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
@@ -390,7 +459,7 @@
         class="h-9 rounded-md border border-input bg-background px-2"
       >
         <option value="">No parent</option>
-        {#each topLevel() as parent (parent.id)}
+        {#each parentOptions() as parent (parent.id)}
           <option value={parent.id}>{parent.name}</option>
         {/each}
       </select>
@@ -410,6 +479,8 @@
             />
             <span
               data-color-swatch={color}
+              data-color-contrast-status={color}
+              title="AA ready"
               aria-checked={newColor === color}
               class={cn(
                 "inline-block h-5 w-5 rounded-full border",
@@ -432,9 +503,17 @@
   </form>
 
   <section data-label-list class="flex flex-col gap-3 rounded-md border border-border p-4">
-    <h2 class="text-base font-medium">Active</h2>
+    <div class="flex items-center gap-3">
+      <h2 class="text-base font-medium">Active</h2>
+      {#if orderSaved}
+        <span data-label-order-saved class="text-xs text-green-600">Order saved.</span>
+      {/if}
+      {#if archiveNotice}
+        <span data-label-archive-notice class="text-xs text-muted-foreground">{archiveNotice}</span>
+      {/if}
+    </div>
     <ul class="flex flex-col gap-2">
-      {#each labels.filter((label) => label.status === "active" && label.parentId === null) as label (label.id)}
+      {#each topLevel() as label (label.id)}
         {@const children = labels.filter((child) => child.parentId === label.id && child.status === "active")}
         <li data-label-row={label.id} class="flex flex-col gap-1 rounded border border-border p-2">
           <div class="flex items-center gap-2">
@@ -454,7 +533,10 @@
               <button type="button" data-rename-cancel={label.id} class="h-8 rounded-md border border-border px-2 text-xs" onclick={cancelRename}>Cancel</button>
             {:else}
               <span data-label-name={label.id} class="font-medium">{label.name}</span>
+              <span data-label-usage={label.id} class="text-xs text-muted-foreground">{label.usageCount} uses</span>
               <div class="ml-auto flex gap-1">
+                <button type="button" data-label-move-up={label.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => moveLabel(label.id, -1)}>Up</button>
+                <button type="button" data-label-move-down={label.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => moveLabel(label.id, 1)}>Down</button>
                 <button type="button" data-label-rename={label.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => startRename(label)}>Rename</button>
                 <button type="button" data-label-archive={label.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => archiveLabel(label.id)}>Archive</button>
               </div>
@@ -466,6 +548,7 @@
                 <li data-label-child={child.id} class="flex items-center gap-2 text-sm">
                   <span data-label-color={child.id} class="inline-block h-2 w-2 rounded-full" style={`background-color: ${child.color}`}></span>
                   <span data-label-name={child.id}>{child.name}</span>
+                  <span data-label-usage={child.id} class="text-xs text-muted-foreground">{child.usageCount} uses</span>
                   <div class="ml-auto flex gap-1">
                     <button type="button" data-label-rename={child.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => startRename(child)}>Rename</button>
                     <button type="button" data-label-archive={child.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => archiveLabel(child.id)}>Archive</button>
@@ -543,16 +626,37 @@
   </section>
 
   <section data-label-archived class="flex flex-col gap-3 rounded-md border border-border p-4">
-    <h2 class="text-base font-medium">Archived</h2>
-    {#if labels.some((label) => label.status === "archived")}
+    <div class="flex items-center gap-3">
+      <h2 class="text-base font-medium">Archived</h2>
+      <button
+        type="button"
+        data-label-bulk-delete-archived
+        class="rounded border border-destructive/40 px-2 py-0.5 text-xs text-destructive disabled:opacity-50"
+        disabled={archivedSelection.length === 0}
+        onclick={bulkDeleteArchived}
+      >Delete selected</button>
+      {#if archivedBulkError}
+        <span data-label-bulk-delete-error class="text-xs text-destructive">{archivedBulkError}</span>
+      {/if}
+    </div>
+    {#if archivedLabels().length > 0}
       <ul class="flex flex-col gap-1">
-        {#each labels.filter((label) => label.status === "archived") as label (label.id)}
+        {#each archivedLabels() as label (label.id)}
           <li data-label-archived-row={label.id} class="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              data-label-archived-select={label.id}
+              checked={isSelectedArchived(label.id)}
+              onchange={() => toggleArchivedSelection(label.id)}
+            />
             <span class="inline-block h-3 w-3 rounded-full" style={`background-color: ${label.color}`}></span>
             <span>{label.name}</span>
+            <span data-label-usage={label.id} class="text-xs text-muted-foreground">{label.usageCount} uses</span>
+            {#if label.archivedAt}
+              <span class="text-xs text-muted-foreground">archived {label.archivedAt}</span>
+            {/if}
             <div class="ml-auto flex gap-1">
               <button type="button" data-label-restore={label.id} class="rounded border border-border px-2 py-0.5 text-xs" onclick={() => restoreLabel(label.id)}>Restore</button>
-              <button type="button" data-label-delete={label.id} class="rounded border border-destructive/40 px-2 py-0.5 text-xs text-destructive" onclick={() => deleteLabel(label.id)}>Delete</button>
             </div>
           </li>
         {/each}
