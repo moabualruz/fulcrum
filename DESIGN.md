@@ -200,6 +200,8 @@ Five canonical content shapes used across stages:
 4. **Live session pane.** Sessions list (220 px) + transcript (flex) + workspace dock (320 px, tabs: Shell · Files · Browser · Plan · Cost). Sticky plan strip at top of transcript (research-02 § Web Live Session Pane). Used: ACP planning (Plan), agent runs (Build).
 5. **Subsystem table.** Full-width table with inline expand. Used: doctor (Operate), audit (Ship), error logs (Operate).
 
+Lists or tables that can exceed 100 rows MUST use TanStack Virtual instead of rendering the full dataset. The standard row contract is a stable or estimated 48 px row, `overscan: 10`, preserved selection state outside the rendered window, and a jump-to-row API for deep navigation. Virtualized rows must expose deterministic `data-row-index`/selection attributes in design E2E and must not render blank placeholders or shift height while scrolling.
+
 ---
 
 ## 4. Components — vocabulary

@@ -151,6 +151,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
 /cross-cutting-mobile                                     internal design-e2e preview for Android status-bar/gesture-zone, iOS notch/home-indicator/bottom-nav/landscape safe-area reserves, and Tailwind sm/md/lg/xl responsive breakpoint reflow
 /cross-cutting-motion                                     internal design-e2e preview for prefers-reduced-motion, parallax disablement, decorative autoplay pause, and animationSpeed settings override
+/cross-cutting-perf                                       internal design-e2e preview for TanStack Virtual lists over 100 rows, overscan 10, stable 48px rows, jump-to-row, and selection persistence
 /mobile-capture                                           internal design-e2e preview for mobile capture Core Web Vitals budgets, layout stability, and opt-in metric delivery
 /view-controls                                            internal design-e2e preview for view sort controls (header sort, asc/desc indicator, mobile sort menu, clear sort)
 /                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell

@@ -946,7 +946,7 @@
           <span
             data-empty-state-icon
             aria-hidden="true"
-            class={cn("flex h-20 w-20 items-center justify-center rounded-full border border-border bg-muted text-2xl")}
+            class={cn("type-h2 flex h-20 w-20 items-center justify-center rounded-full border border-border bg-muted")}
           >∅</span>
         {/snippet}
         {#snippet actions()}
