@@ -26,12 +26,14 @@ function makeCaller(overrides: {
   };
   models?: InferenceModel[];
   routingConfig?: Record<string, string>;
+  embed?: (input: { texts: string[]; model?: string }) => Promise<{ vectors: number[][]; model: string; cached: boolean; dimensions: number }>;
 } = {}): TuiCaller {
   const {
     healthStatus = "ok",
     healthExtras = {},
     models = [],
     routingConfig = {},
+    embed = async () => ({ vectors: [[0.1, 0.2, 0.3]], model: "nomic-embed", cached: false, dimensions: 3 }),
   } = overrides;
 
   return {
@@ -56,6 +58,7 @@ function makeCaller(overrides: {
         gen_hit_rate: healthExtras.gen_hit_rate ?? 0,
         cache_db_size: healthExtras.cache_db_size ?? 0,
       }),
+      embed,
       models: {
         list: async () => models,
         pull: async function* (_input: { modelId: string; force?: boolean }): AsyncGenerator<ModelPullProgress> {
@@ -116,6 +119,45 @@ describe("InferenceDashboardScreen", () => {
   test("model list shows 'No inference models' when empty", async () => {
     const { text, app } = await mountInferenceScreen({ models: [] });
     expect(text).toContain("No inference models");
+    app.stop();
+  });
+
+  test("embed probe runs through the TUI caller and renders response dimensions", async () => {
+    let observedInput: unknown;
+    const { tty, app } = await mountInferenceScreen({
+      embed: async (input) => {
+        observedInput = input;
+        return { vectors: [[0.1, 0.2, 0.3, 0.4]], model: "nomic-embed", cached: true, dimensions: 4 };
+      },
+    });
+
+    tty.clear();
+    tty.inject("e");
+    await new Promise((r) => setTimeout(r, 50));
+
+    const text = tty.plainText();
+    expect(observedInput).toEqual({ texts: ["Fulcrum inference TUI probe"], model: undefined });
+    expect(text).toContain("Embed probe");
+    expect(text).toContain("nomic-embed");
+    expect(text).toContain("Dimensions");
+    expect(text).toContain("4");
+    app.stop();
+  });
+
+  test("embed probe shows consistent error state when caller rejects", async () => {
+    const { tty, app } = await mountInferenceScreen({
+      embed: async () => {
+        throw new Error("backend unavailable");
+      },
+    });
+
+    tty.clear();
+    tty.inject("e");
+    await new Promise((r) => setTimeout(r, 50));
+
+    const text = tty.plainText();
+    expect(text).toContain("Embed probe");
+    expect(text).toContain("backend unavailable");
     app.stop();
   });
 

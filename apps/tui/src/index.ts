@@ -72,6 +72,7 @@ import {
   requireTuiSessionContext,
 } from "./local-caller.ts";
 import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
+import type { EmbedResult } from "@platform-core/application/inference/protocol.ts";
 import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
 import type { TuiTheme } from "./theme/index.ts";
 import type { SubscriptionBridge } from "./subscriptions.ts";
@@ -173,6 +174,7 @@ export interface TuiCaller {
       gen_hit_rate?: number;
       cache_db_size?: number;
     }>;
+    embed?: (input: { texts: string[]; model?: string }) => Promise<EmbedResult>;
     models?: {
       list: () => Promise<InferenceModel[]>;
       pull: (input: { modelId: string; force?: boolean }) => AsyncIterable<ModelPullProgress> | Promise<AsyncIterable<ModelPullProgress>>;
@@ -541,6 +543,8 @@ export class TuiApp {
     cache_db_size: number;
   } = { active_requests: 0, ops_last_10s: 0, embed_hit_rate: 0, gen_hit_rate: 0, cache_db_size: 0 };
   private inferenceRoutingConfig: Record<string, string> = {};
+  private inferenceEmbedResult: EmbedResult | null = null;
+  private inferenceEmbedError: string | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private bellPoll: ReturnType<typeof setInterval> | null = null;
   private bellCount = 0;
@@ -998,6 +1002,20 @@ export class TuiApp {
     }
     r.writeln();
 
+    r.writeln(c.bold("  Embed probe"));
+    if (this.inferenceEmbedError) {
+      r.writeln(`  ${c.red("failed")} ${this.inferenceEmbedError}`);
+    } else if (this.inferenceEmbedResult) {
+      const dims = this.inferenceEmbedResult.vectors[0]?.length ?? this.inferenceEmbedResult.dimensions ?? 0;
+      r.infoRow("Model", this.inferenceEmbedResult.model);
+      r.infoRow("Vectors", `${this.inferenceEmbedResult.vectors.length}`);
+      r.infoRow("Dimensions", `${dims}`);
+      r.infoRow("Cached", `${this.inferenceEmbedResult.cached}`);
+    } else {
+      r.writeln(c.dim("  Press [e] to embed a probe text through the same inference caller."));
+    }
+    r.writeln();
+
     // Per-feature backend routing
     r.writeln(c.bold("  Routing"));
     const routingEntries = Object.entries(this.inferenceRoutingConfig);
@@ -1107,6 +1125,11 @@ export class TuiApp {
       if (key === "q" || key === "\x1b") {
         this.currentScreen = "nav";
         await this._renderCurrentScreen();
+        return;
+      }
+      if (key.toLowerCase() === "e") {
+        await this.embedInferenceText("Fulcrum inference TUI probe");
+        return;
       }
       return;
     }
@@ -1583,6 +1606,25 @@ export class TuiApp {
     this.inferenceModels = this.inferenceModels.map((model) =>
       model.id === modelId ? { ...model, downloaded: true } : model
     );
+    await this._renderCurrentScreen();
+  }
+
+  async embedInferenceText(text: string, model?: string): Promise<void> {
+    const embed = this.caller.inference?.embed;
+    if (!embed) {
+      this.inferenceEmbedResult = null;
+      this.inferenceEmbedError = "inference embed caller unavailable";
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    try {
+      this.inferenceEmbedResult = await embed({ texts: [text], model });
+      this.inferenceEmbedError = null;
+    } catch (error) {
+      this.inferenceEmbedResult = null;
+      this.inferenceEmbedError = error instanceof Error ? error.message : "inference embed failed";
+    }
     await this._renderCurrentScreen();
   }
 
