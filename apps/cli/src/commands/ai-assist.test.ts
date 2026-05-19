@@ -34,4 +34,17 @@ describe("fulcrum ai assist", () => {
 
     expect(out.join("\n")).toContain("fulcrum ai start");
   });
+
+  test("keeps AI Assist command peer available for run preview dispatch", async () => {
+    const out: string[] = [];
+    await run(["start", "--task", "preview-1", "--title", "Preview run", "--route", "plan", "--json"], {
+      print: (line) => out.push(line),
+      exit: (code) => { throw new Error(`exit ${code}`); },
+    });
+
+    expect(JSON.parse(out[0] ?? "{}")).toMatchObject({
+      sessionId: "ai-preview-1-plan",
+      route: "plan",
+    });
+  });
 });

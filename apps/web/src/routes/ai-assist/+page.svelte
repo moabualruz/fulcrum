@@ -43,6 +43,13 @@
     after: "Use the selected document, attachment, and task blocker to draft a lower-risk implementation plan.",
     runAttempt: "run_attempt_8f29a4c1b3e0d5f7",
   };
+  const runPreview = {
+    prompt: "PROMPT.md · Draft implementation plan with source refs, risk list, and acceptance criteria.",
+    scope: ["services/identity-access/**", "apps/web/src/routes/auth/**", "tests/identity-access/**"],
+    tools: ["read", "rg", "bun test", "git diff"],
+    gates: ["ask before writes", "verify focused tests", "human approval before merge"],
+    cost: "$0.43 · 12,480 input / 4,312 output",
+  };
 
   const agentRows = [
     { name: "claude-code", status: "Ready", latency: "0.8s", mcp: 12, plugins: 4 },
@@ -242,6 +249,55 @@
             {#if savedNotice}
               <p class="text-xs text-muted-foreground" data-ai-assist-agent-saved>{savedNotice}</p>
             {/if}
+          </div>
+        </details>
+      </section>
+
+      <section class="grid gap-3 border-b border-border px-4 py-3" data-ai-assist-run-preview>
+        <details class="rounded-md border border-border bg-background p-3" open>
+          <summary class="cursor-pointer text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+            Preview before dispatch
+          </summary>
+          <div class="mt-3 grid gap-3 text-xs text-muted-foreground">
+            <section class="rounded-md border border-border bg-card p-3" data-ai-assist-preview-prompt>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold text-foreground">PROMPT.md</h3>
+                <Button type="button" variant="ghost" size="sm" data-ai-assist-preview-edit="prompt">Edit</Button>
+              </div>
+              <textarea class="mt-2 min-h-20 w-full rounded-md border border-input bg-background p-2 text-sm text-foreground" aria-label="Prompt preview">{runPreview.prompt}</textarea>
+            </section>
+            <section class="rounded-md border border-border bg-card p-3" data-ai-assist-preview-scope>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold text-foreground">File scope</h3>
+                <Button type="button" variant="ghost" size="sm" data-ai-assist-preview-edit="scope">Edit</Button>
+              </div>
+              <ul class="mt-2 grid gap-1 font-mono">
+                {#each runPreview.scope as item}<li>{item}</li>{/each}
+              </ul>
+            </section>
+            <section class="rounded-md border border-border bg-card p-3" data-ai-assist-preview-tools>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold text-foreground">Tools whitelist</h3>
+                <Button type="button" variant="ghost" size="sm" data-ai-assist-preview-edit="tools">Edit</Button>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                {#each runPreview.tools as tool}<Chip tone="neutral">{tool}</Chip>{/each}
+              </div>
+            </section>
+            <section class="rounded-md border border-border bg-card p-3" data-ai-assist-preview-gates>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold text-foreground">Approval gates</h3>
+                <Button type="button" variant="ghost" size="sm" data-ai-assist-preview-edit="gates">Edit</Button>
+              </div>
+              <ul class="mt-2 grid gap-1">
+                {#each runPreview.gates as gate}<li>{gate}</li>{/each}
+              </ul>
+            </section>
+            <section class="rounded-md border border-border bg-card p-3" data-ai-assist-preview-cost>
+              <h3 class="font-semibold text-foreground">Agent cost estimate</h3>
+              <p class="mt-2 font-mono">{runPreview.cost}</p>
+            </section>
+            <Button type="button" size="sm" data-ai-assist-confirm-dispatch>Confirm and dispatch</Button>
           </div>
         </details>
       </section>

@@ -40,6 +40,18 @@ describe("ai assist reference route", () => {
     expect(source).toContain("data-ai-assist-cancel-edit");
   });
 
+  test("ships inline run preview before dispatch", () => {
+    expect(source).toContain("data-ai-assist-run-preview");
+    expect(source).toContain("Preview before dispatch");
+    expect(source).toContain("data-ai-assist-preview-prompt");
+    expect(source).toContain("data-ai-assist-preview-scope");
+    expect(source).toContain("data-ai-assist-preview-tools");
+    expect(source).toContain("data-ai-assist-preview-gates");
+    expect(source).toContain("data-ai-assist-preview-cost");
+    expect(source).toContain("data-ai-assist-confirm-dispatch");
+    expect(source).toContain("Agent cost estimate");
+  });
+
   test("keeps the drawer usable on mobile without page-level overflow", () => {
     expect(source).toContain("overflow-x-hidden");
     expect(source).toContain("max-w-full");
