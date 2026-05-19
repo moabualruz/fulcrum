@@ -2,6 +2,78 @@
   import { Badge, Button, Chip, EmptyState, Input, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
+  import {
+    OptimisticStore,
+    type OptimisticEntry,
+  } from "$lib/optimistic/index.ts";
+
+  type PendingTask = { columnId: string; title: string };
+
+  const optimisticTasks = new OptimisticStore<PendingTask>();
+  let optimisticEntries = $state<ReadonlyArray<OptimisticEntry<PendingTask>>>([]);
+  optimisticTasks.subscribe((entries) => { optimisticEntries = entries; });
+
+  let optimisticSequence = 0;
+  function nextOptimisticId(): string {
+    optimisticSequence += 1;
+    return `opt-${optimisticSequence}`;
+  }
+
+  function pendingFor(columnId: string): ReadonlyArray<OptimisticEntry<PendingTask>> {
+    return optimisticEntries.filter((entry) =>
+      entry.value.columnId === columnId &&
+      (entry.status === "pending" || entry.status === "failed"),
+    );
+  }
+
+  function persistOptimisticTask(id: string, value: PendingTask): void {
+    const handle = optimisticTasks.apply(id, value);
+    void simulateMutationResult(value.title).then((result) => {
+      if (result.kind === "success") {
+        handle.confirm({ traceId: result.traceId });
+        // Confirmed entries fade out from the pending render path; in a real
+        // wiring slice the tRPC return value would seed a real task row.
+      } else {
+        handle.fail({ message: result.message, traceId: result.traceId });
+      }
+    });
+  }
+
+  function retryOptimisticTask(id: string): void {
+    const entry = optimisticEntries.find((e) => e.id === id);
+    if (!entry) return;
+    const handle = optimisticTasks.apply(id, entry.value);
+    void simulateMutationResult(entry.value.title, { forceSuccess: true }).then((result) => {
+      if (result.kind === "success") {
+        handle.confirm({ traceId: result.traceId });
+      } else {
+        handle.fail({ message: result.message, traceId: result.traceId });
+      }
+    });
+  }
+
+  function dismissOptimisticTask(id: string): void {
+    optimisticTasks.remove(id);
+  }
+
+  type SimulatedResult =
+    | { kind: "success"; traceId: string }
+    | { kind: "failure"; message: string; traceId: string };
+
+  async function simulateMutationResult(
+    title: string,
+    options: { forceSuccess?: boolean } = {},
+  ): Promise<SimulatedResult> {
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    if (!options.forceSuccess && title.toLowerCase().includes("force-fail")) {
+      return {
+        kind: "failure",
+        message: "Server rejected the mutation (HTTP 500).",
+        traceId: "tr_optimistic_5xx",
+      };
+    }
+    return { kind: "success", traceId: "tr_optimistic_ok" };
+  }
 
   type BoardTask = {
     key: string;
@@ -52,8 +124,9 @@
   function submitInlineCreate(): void {
     createDraftTouched = true;
     if (createDraftTitle.trim().length === 0) return;
-    // Persist via tRPC tasks.create in a follow-up wiring slice; for the
-    // design surface, clearing the draft confirms a successful save shape.
+    const columnId = activeCreateColumnId;
+    if (!columnId) return;
+    persistOptimisticTask(nextOptimisticId(), { columnId, title: createDraftTitle.trim() });
     activeCreateColumnId = null;
     createDraftTitle = "";
     createDraftTouched = false;
@@ -422,6 +495,48 @@
         </header>
 
         <div class={cn("flex flex-col gap-2 overflow-y-auto p-2")}>
+          {#each pendingFor(column.id) as entry (entry.id)}
+            <article
+              data-build-task-card
+              data-build-task-optimistic={entry.id}
+              data-pending={entry.status === "pending" ? "true" : undefined}
+              data-failed={entry.status === "failed" ? "true" : undefined}
+              class={cn(
+                "rounded-md border border-dashed border-border p-3",
+                entry.status === "pending" && "bg-card/40 text-muted-foreground",
+                entry.status === "failed" && "border-destructive bg-destructive/5",
+              )}
+            >
+              <h2 class={cn("text-sm font-medium leading-5")}>{entry.value.title}</h2>
+              {#if entry.status === "pending"}
+                <p class={cn("mt-2 text-[11px] text-muted-foreground")}>Saving…</p>
+              {:else if entry.status === "failed"}
+                <div data-build-task-error class={cn("mt-2 space-y-1 text-xs text-destructive")}>
+                  <p>{entry.error}</p>
+                  {#if entry.traceId}
+                    <p class={cn("font-mono text-[10px] text-muted-foreground")}>
+                      trace
+                      <span data-build-task-error-trace>{entry.traceId}</span>
+                    </p>
+                  {/if}
+                  <div class={cn("flex items-center gap-2 pt-1")}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-build-task-retry
+                      onclick={() => retryOptimisticTask(entry.id)}
+                    >Retry</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      data-build-task-dismiss
+                      onclick={() => dismissOptimisticTask(entry.id)}
+                    >Dismiss</Button>
+                  </div>
+                </div>
+              {/if}
+            </article>
+          {/each}
           {#each column.tasks as task}
             <article
               data-build-task-card

@@ -110,6 +110,37 @@ test.describe("build board design reference", () => {
 		await expect(queuedColumn.locator("[data-build-board-new-task-trigger]")).toBeVisible();
 	});
 
+	test("optimistic create renders pending ghost, surfaces inline error + Retry on simulated failure", async ({ page }) => {
+		await page.goto("/build-board");
+
+		const queuedColumn = page.locator("[data-build-column='queued']");
+
+		await queuedColumn.locator("[data-build-board-new-task-trigger]").click();
+		const input = queuedColumn.locator("[data-build-board-new-task-input]");
+		await input.fill("Persist refresh-token rotation");
+		await input.press("Enter");
+
+		const successCard = queuedColumn.locator("[data-build-task-optimistic]");
+		await expect(successCard).toHaveCount(1);
+		await expect(successCard).toContainText("Persist refresh-token rotation");
+		await expect(successCard).toHaveAttribute("data-pending", "true");
+		await expect(successCard).not.toHaveAttribute("data-failed", "true");
+		await expect(successCard).toHaveCount(0, { timeout: 5_000 });
+
+		await queuedColumn.locator("[data-build-board-new-task-trigger]").click();
+		const failInput = queuedColumn.locator("[data-build-board-new-task-input]");
+		await failInput.fill("force-fail token rotation");
+		await failInput.press("Enter");
+
+		const failedCard = queuedColumn.locator("[data-build-task-optimistic][data-failed='true']");
+		await expect(failedCard).toHaveCount(1);
+		await expect(failedCard.locator("[data-build-task-error]")).toContainText("HTTP 500");
+		await expect(failedCard.locator("[data-build-task-error-trace]")).toContainText("tr_optimistic_5xx");
+
+		await failedCard.locator("[data-build-task-retry]").click();
+		await expect(failedCard).toHaveCount(0, { timeout: 5_000 });
+	});
+
 	test("keeps the board usable on mobile without page-level overflow", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/build-board");
