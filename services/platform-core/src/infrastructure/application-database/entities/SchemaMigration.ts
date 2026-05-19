@@ -12,10 +12,10 @@ export type MigrationDirection = "up" | "down";
 
 @Entity("fulcrum_schema_migrations")
 export class SchemaMigration {
-  @PrimaryColumn({ type: "bigint" })
+  @Column({ type: "bigint" })
   version!: number;
 
-  @Column({ type: "varchar", unique: true })
+  @PrimaryColumn({ type: "varchar" })
   name!: string;
 
   @Column({ type: "timestamptz", name: "applied_at", default: () => "now()" })

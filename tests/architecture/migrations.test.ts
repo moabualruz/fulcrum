@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
 import { access, readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, test } from "bun:test";
+
+const execFileAsync = promisify(execFile);
 
 const PRODUCT_KERNEL_MIGRATION_PATTERN =
   /migrateIsolatedStore|from\s+["'][^"']*product-kernel\/db\/migrate[^"']*["']/;
@@ -70,33 +74,9 @@ async function applicationLayerProductMigrationBridgeViolations(): Promise<strin
   return found.sort();
 }
 
-async function trackedSqlFileViolations(root = process.cwd()): Promise<string[]> {
-  const ignoredSegments = new Set([
-    ".git",
-    ".claude",
-    ".scratch",
-    ".svelte-kit",
-    "dist",
-    "node_modules",
-    "target",
-  ]);
-  const files: string[] = [];
-
-  async function walk(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (ignoredSegments.has(entry.name)) continue;
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        await walk(path);
-      } else if (entry.isFile() && path.endsWith(".sql")) {
-        files.push(relative(root, path));
-      }
-    }
-  }
-
-  await walk(root);
-  return files.sort();
+async function trackedSqlFileViolations(): Promise<string[]> {
+  const { stdout } = await execFileAsync("git", ["ls-files", "*.sql"]);
+  return stdout.trim().split("\n").filter(Boolean).sort();
 }
 
 describe("interface migration authority", () => {

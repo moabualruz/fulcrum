@@ -217,8 +217,7 @@ export class MigratorService {
     const executed = await this._getExecutedMigrations();
 
     if (targetVersion === undefined) {
-      // Migrate fully up.
-      const applied = await this._dataSource.runMigrations({ transaction: "each" });
+      const applied = await this._runMigrationsRecordingFailures();
       await this._recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
       return;
     }
@@ -230,9 +229,7 @@ export class MigratorService {
     );
 
     if (isPending) {
-      // TypeORM runMigrations runs all pending — filter by name not directly supported.
-      // Run all up to latest; the TypeORM runner stops at the correct place.
-      const applied = await this._dataSource.runMigrations({ transaction: "each" });
+      const applied = await this._runMigrationsRecordingFailures();
       await this._recordResults(applied.map(m => ({ name: m.name, timestamp: 0 })), "up");
       return;
     }
@@ -405,6 +402,36 @@ export class MigratorService {
       } catch {
         // schema_migrations table may not yet exist — silently skip.
       }
+    }
+  }
+
+  private async _runMigrationsRecordingFailures(): Promise<Array<{ name: string }>> {
+    try {
+      return await this._dataSource.runMigrations({ transaction: "each" });
+    } catch (cause) {
+      await this._emitMigrationFailedEvent(cause);
+      throw cause;
+    }
+  }
+
+  private async _emitMigrationFailedEvent(cause: unknown): Promise<void> {
+    try {
+      const eventRepo = this._dataSource.getRepository(Event);
+      const WELL_KNOWN_ORG_ID = "00000000-0000-0000-0000-000000000001";
+      const org = { id: WELL_KNOWN_ORG_ID } as Org;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      const event = eventRepo.create({
+        org,
+        verb: "migration.up-failed",
+        subjectKind: "migration",
+        subjectId: "unknown",
+        payload: { error: message },
+        createdAt: new Date(),
+      });
+      await eventRepo.save(event);
+    } catch {
+      // Best-effort: if event sink itself is unreachable, swallow so the
+      // original migration failure is what surfaces to the caller.
     }
   }
 

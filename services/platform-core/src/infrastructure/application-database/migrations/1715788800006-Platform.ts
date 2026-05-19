@@ -35,8 +35,8 @@ export class Platform1715788800006 implements MigrationInterface {
     // schema_migrations (audit ledger)
     await queryRunner.query(`
       CREATE TABLE "fulcrum_schema_migrations" (
-        "version"    bigint PRIMARY KEY,
-        "name"       varchar NOT NULL UNIQUE,
+        "version"    bigint NOT NULL,
+        "name"       varchar PRIMARY KEY,
         "applied_at" timestamptz NOT NULL DEFAULT now(),
         "checksum"   varchar NOT NULL,
         "direction"  varchar NOT NULL
