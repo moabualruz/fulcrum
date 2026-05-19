@@ -100,6 +100,7 @@ Global guards (research-06 §2, §5):
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
@@ -388,9 +389,9 @@ Per research-01 §12 and research-07 §1.6 (Plane Power-K). Context-aware, state
 - **Banned:** decorative motion, page-load orchestration, gradient sweep, glow pulse > 1.5s cycle.
 - **State-change motion:** drawer slide (200 ms), modal scale-in 0.96 → 1.0 + opacity (180 ms), peek-overview lift (180 ms), tooltip fade (120 ms), toast slide-in from bottom-right (180 ms).
 - **Streaming motion:** run-feed line slide-in from top (120 ms), tool-call card expand (150 ms), permission prompt slide-in inline (200 ms).
-- **`prefers-reduced-motion: reduce`** collapses every motion to opacity-only 80 ms (research-06 §2).
+- **`prefers-reduced-motion: reduce`** collapses every animation and transition to an effectively instant, single-iteration state; parallax and decorative autoplay are disabled (research-06 §2).
 
-> **Reduced-motion guarantee.** Every animated/transitioned property MUST inherit `@media (prefers-reduced-motion: reduce)` overrides. Implementation: `* { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }` inside the media query. `scroll-behavior: auto;` on `html` when reduced motion is preferred.
+> **Reduced-motion guarantee.** Every animated/transitioned property MUST inherit `@media (prefers-reduced-motion: reduce)` overrides. Implementation: `* { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: 0ms !important; }` inside the media query. `scroll-behavior: auto;` on `html` when reduced motion is preferred. Parallax layers use `data-parallax-layer` and are forced to `transform: none`; decorative autoplay loops use `data-autoplay-loop` and are paused.
 
 ---
 
