@@ -18,6 +18,20 @@ test.describe("build board design reference", () => {
 
 		await expect(page.locator("[data-build-board-empty-reference] [data-slot='empty-state']")).toBeVisible();
 		await expect(page.locator("[data-build-board-empty-reference]")).toContainText("No tasks on the board");
+		await expect(page.locator("[data-build-board-empty-reference]")).toContainText("Create project");
+
+		await expect(page.locator("[data-project-setup-flow]")).toBeVisible();
+		await expect(page.locator("[data-project-setup-flow]")).toContainText("Create a workflow container");
+		await expect(page.locator("[data-project-name-field] input")).toHaveAttribute("aria-invalid", "true");
+		await expect(page.locator("[data-project-validation]")).toContainText("Project name is required.");
+		await expect(page.locator("[data-project-repo-field] input")).toHaveValue("github.com/acme/auth-service");
+		await expect(page.locator("[data-project-template]")).toHaveCount(3);
+		await expect(page.locator("[data-project-template-panel]")).toContainText("Agent workflow");
+		await expect(page.locator("[data-project-next-actions] a")).toHaveText([
+			"Open overview",
+			"Open board",
+			"Open settings",
+		]);
 
 		const columns = page.locator("[data-build-column]");
 		await expect(columns).toHaveCount(4);
@@ -39,6 +53,8 @@ test.describe("build board design reference", () => {
 		await page.goto("/build-board");
 
 		await expect(page.locator("[data-build-board-new-task]")).toBeVisible();
+		await expect(page.locator("[data-project-setup-flow]")).toBeVisible();
+		await expect(page.locator("[data-project-template]")).toHaveCount(3);
 		await expect(page.locator("[data-build-board-scroll]")).toBeVisible();
 		const pageOverflow = await page
 			.locator("[data-build-board]")

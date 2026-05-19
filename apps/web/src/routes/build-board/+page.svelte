@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Badge, Button, Chip, EmptyState, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
+  import { Badge, Button, Chip, EmptyState, Input, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
@@ -124,6 +124,12 @@
   const layoutLabels = ["Board", "List", "Timeline", "Calendar", "Graph"];
   const activeFilters = ["sprint:24w13", "module:auth"];
   const availableFilters = ["label:db", "label:telemetry", "@mine", "agent:any"];
+  const projectTemplates = [
+    { name: "Agent workflow", detail: "Plan, build, review, and ship stages with AI Assist ready." },
+    { name: "Repository maintenance", detail: "Issue intake, dependency graph, CI runs, and release checks." },
+    { name: "Blank workflow", detail: "Start empty while keeping project, repo, and stage setup visible." },
+  ];
+  const setupActions = ["Open overview", "Open board", "Open settings"];
 </script>
 
 <svelte:head>
@@ -172,6 +178,58 @@
     <span data-build-board-summary class={cn("whitespace-nowrap text-muted-foreground")}>6 tasks · 1 sprint · 1 module</span>
   </div>
 
+  <section data-project-setup-flow class={cn("grid gap-4 border-b border-border bg-background px-4 py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]")}>
+    <div class={cn("space-y-3")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>New project path</p>
+          <h2 class={cn("text-lg font-semibold")}>Create a workflow container</h2>
+          <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
+            Capture the project name, repository, and template before the first board opens.
+          </p>
+        </div>
+        <Button size="sm" data-project-create-action>Create project</Button>
+      </div>
+
+      <div class={cn("grid gap-3 sm:grid-cols-2")}>
+        <label class={cn("space-y-1 text-sm font-medium")} data-project-name-field>
+          <span>Project name</span>
+          <Input aria-invalid="true" value="" placeholder="Authentication rewrite" />
+          <span data-project-validation class={cn("block text-xs text-destructive")}>Project name is required.</span>
+        </label>
+        <label class={cn("space-y-1 text-sm font-medium")} data-project-repo-field>
+          <span>Repository</span>
+          <Input value="github.com/acme/auth-service" placeholder="owner/repo or local path" />
+          <span class={cn("block text-xs text-muted-foreground")}>Linked repo unlocks files, commits, runs, and dependency graph actions.</span>
+        </label>
+      </div>
+    </div>
+
+    <aside data-project-template-panel class={cn("rounded-md border border-border bg-muted/35 p-3")}>
+      <div class={cn("mb-3 flex items-center gap-2")}>
+        <StatusBadge status="running" />
+        <span class={cn("text-sm font-semibold")}>Apply template</span>
+      </div>
+      <div class={cn("grid gap-2")}>
+        {#each projectTemplates as template}
+          <button
+            type="button"
+            data-project-template
+            class={cn("rounded-md border border-border bg-background p-3 text-left text-sm hover:border-border-strong")}
+          >
+            <span class={cn("block font-medium")}>{template.name}</span>
+            <span class={cn("mt-1 block text-xs text-muted-foreground")}>{template.detail}</span>
+          </button>
+        {/each}
+      </div>
+      <div data-project-next-actions class={cn("mt-3 flex flex-wrap gap-2")}>
+        {#each setupActions as action}
+          <a href="/projects/auth-rewrite" class={cn("rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground")}>{action}</a>
+        {/each}
+      </div>
+    </aside>
+  </section>
+
   <div data-build-board-empty-reference class={cn("border-b border-border bg-background px-4 py-4")}>
     <EmptyState
       title="No tasks on the board"
@@ -180,8 +238,8 @@
       {#snippet icon()}
         <span aria-hidden="true">▦</span>
       {/snippet}
-      {#snippet action()}
-        <a href="/projects/new" class={cn("text-sm font-medium text-primary hover:underline")}>New task</a>
+      {#snippet actions()}
+        <a href="/projects/new" class={cn("text-sm font-medium text-primary hover:underline")}>Create project</a>
       {/snippet}
     </EmptyState>
   </div>
