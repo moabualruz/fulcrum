@@ -28,4 +28,27 @@ test.describe("search breadcrumb navigation", () => {
 		await expect(current.locator("a")).toHaveCount(0);
 		await expect(current.locator("[aria-current='page']")).toContainText("Search");
 	});
+
+	test("exposes federated search kinds, fast actions, and useful no-result recovery", async ({ page }) => {
+		await page.goto("/search?q=missing-trace");
+
+		await expect(page.locator("[data-search-fast-actions]")).toContainText("Open command palette");
+		await expect(page.locator("[data-search-command-action='open-palette']")).toHaveAttribute("href", "/palette");
+		await expect(page.locator("[data-kind-checkbox='doc']")).toBeVisible();
+		await expect(page.locator("[data-kind-checkbox='task']")).toBeVisible();
+		await expect(page.locator("[data-kind-checkbox='run']")).toBeVisible();
+		await expect(page.locator("[data-kind-checkbox='artifact']")).toBeVisible();
+		await expect(page.locator("[data-search-empty]")).toContainText("trace ID");
+		await expect(page.locator("[data-search-empty-action='palette']")).toHaveAttribute("href", "/palette");
+	});
+
+	test("keeps search controls usable on mobile without horizontal overflow", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		await page.goto("/search?q=missing-trace");
+
+		await expect(page.locator("[data-search-form]")).toBeVisible();
+		await expect(page.locator("[data-facet-panel]")).toBeVisible();
+		const overflow = await page.locator("#main-content").evaluate((element) => element.scrollWidth - element.clientWidth);
+		expect(overflow).toBeLessThanOrEqual(1);
+	});
 });
