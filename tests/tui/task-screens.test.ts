@@ -91,6 +91,61 @@ describe("TaskListScreen", () => {
     expect(doneRows).toContain("Task 1  [done]");
     expect(doneRows).toContain("Task 4  [done]");
   });
+
+  test("creates inline with preserved list scope, recurrence preview, duplicate guard, and retry state", async () => {
+    const creates: unknown[] = [];
+    let shouldFail = true;
+    const screen = new TaskListScreen({
+      caller: {
+        tasks: {
+          list: async () => tasks.slice(0, 3),
+          create: async (input) => {
+            creates.push(input);
+            if (shouldFail) throw new Error("network unavailable");
+            return { id: "task-new", title: input.title, status: input.status, labels: [] };
+          },
+        },
+      },
+      createScope: {
+        source: "planning",
+        projectId: "project-1",
+        sprintId: "sprint-1",
+        moduleId: "module-1",
+        cycleId: "cycle-1",
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("c");
+    screen.updateCreateDraft({ title: "Weekly sync", recurrence: "weekly" });
+    const draft = renderPlain((renderer) => screen.render(renderer));
+    expect(draft).toContain("Task 1");
+    expect(draft).toContain("Scope: planning  project=project-1  sprint=sprint-1  module=module-1  cycle=cycle-1");
+    expect(draft).toContain("weekly preview: 2026-05-19, 2026-05-26, 2026-06-02");
+
+    await screen.submitCreate({ title: "Task 1" });
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Duplicate task title in project-1");
+    expect(creates).toEqual([]);
+
+    await screen.submitCreate({ title: "Weekly sync" });
+    const failed = renderPlain((renderer) => screen.render(renderer));
+    expect(failed).toContain("network unavailable");
+    expect(failed).toContain("Retry: fulcrum task new --title 'Weekly sync' --project project-1 --sprint sprint-1 --module module-1 --cycle cycle-1 --recurrence weekly");
+
+    shouldFail = false;
+    await screen.submitCreate();
+    expect(creates.at(-1)).toEqual({
+      source: "planning",
+      projectId: "project-1",
+      sprintId: "sprint-1",
+      moduleId: "module-1",
+      cycleId: "cycle-1",
+      title: "Weekly sync",
+      status: "todo",
+      recurrence: "weekly",
+    });
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Weekly sync");
+  });
 });
 
 describe("TaskBoardScreen", () => {
@@ -133,6 +188,53 @@ describe("TaskBoardScreen", () => {
     await screen.submitCreate("Inline task");
     expect(created).toEqual(["Inline task"]);
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Inline task");
+  });
+
+  test("shows board create scope and preserves failed draft for retry", async () => {
+    const creates: unknown[] = [];
+    const screen = new TaskBoardScreen({
+      caller: {
+        tasks: {
+          list: async () => tasks.slice(0, 2),
+          update: async (input) => ({ ...tasks[0]!, status: input.status }),
+          create: async (input) => {
+            creates.push(input);
+            throw new Error("write failed");
+          },
+        },
+      },
+      createScope: {
+        source: "board",
+        projectId: "project-1",
+        sprintId: "sprint-1",
+        moduleId: "module-1",
+        cycleId: "cycle-1",
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("c");
+    screen.updateCreateDraft({ title: "Board sync", recurrence: "daily" });
+    const draft = renderPlain((renderer) => screen.render(renderer));
+    expect(draft).toContain("Task 1");
+    expect(draft).toContain("Scope: board  project=project-1  sprint=sprint-1  module=module-1  cycle=cycle-1");
+    expect(draft).toContain("daily preview: 2026-05-19, 2026-05-20, 2026-05-21");
+
+    await screen.submitCreate();
+    const failed = renderPlain((renderer) => screen.render(renderer));
+    expect(creates).toEqual([{
+      source: "board",
+      projectId: "project-1",
+      sprintId: "sprint-1",
+      moduleId: "module-1",
+      cycleId: "cycle-1",
+      title: "Board sync",
+      status: "todo",
+      recurrence: "daily",
+    }]);
+    expect(failed).toContain("write failed");
+    expect(failed).toContain("Title: Board sync");
+    expect(failed).toContain("Retry: fulcrum task new --title 'Board sync' --project project-1 --sprint sprint-1 --module module-1 --cycle cycle-1 --recurrence daily");
   });
 });
 

@@ -1,6 +1,14 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { TuiTask } from "./task-types.ts";
+import {
+  formatCreateScope,
+  recurrencePreview,
+  retryCommand,
+  type TaskCreateDraft,
+  type TaskCreateInput,
+  type TaskCreateScope,
+} from "./task-board.ts";
 import type {
   DependencyRunMode,
   DependencyRunPreview,
@@ -29,6 +37,7 @@ export interface TaskListScreenOptions {
   caller: {
     tasks: {
       list: () => Promise<TuiTask[]>;
+      create?: (input: TaskCreateInput) => Promise<TuiTask>;
       bulk?: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
       previewDependencyRun?: (input: {
         mode: DependencyRunMode;
@@ -57,9 +66,10 @@ export interface TaskListScreenOptions {
   subscriptions?: SubscriptionBridge;
   viewportRows?: number;
   qaReviewInput?: Omit<RecordTaskQaReviewInput, "taskId">;
+  createScope?: TaskCreateScope;
 }
 
-type Overlay = "none" | "bulk";
+type Overlay = "none" | "bulk" | "create";
 const DEPENDENCY_RUN_FEEDBACK_EVENT = "tasks.dependencyRunLiveFeedbackStream";
 type DependencyRunLiveFeedbackSubscription = {
   subscribe(observer: {
@@ -84,6 +94,8 @@ export class TaskListScreen {
   private qaReview: TaskQaReviewOutput | null = null;
   private workbench: ManualTaskWorkbenchOutput | null = null;
   private feedbackSubscription: TuiSubscription | null = null;
+  private createDraft: TaskCreateDraft = { title: "" };
+  private createError: string | null = null;
 
   constructor(private readonly opts: TaskListScreenOptions) {}
 
@@ -114,12 +126,26 @@ export class TaskListScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  / search  Esc clear  j/k navigate  Space select  V manual view  R run preview  D dispatch run  F run feedback  Q qa review  B bulk  q back"));
+    renderer.writeln(c.dim("  / search  Esc clear  j/k navigate  Space select  c create  V manual view  R run preview  D dispatch run  F run feedback  Q qa review  B bulk  q back"));
 
     if (this.overlay === "bulk") {
       renderer.writeln();
       renderer.writeln(c.bold("  Bulk update"));
       renderer.writeln(c.dim(`  ${this.selected.size} selected`));
+    }
+
+    if (this.overlay === "create") {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Create task"));
+      renderer.writeln(`  Scope: ${formatCreateScope(this.opts.createScope, "list")}`);
+      renderer.writeln(`  Filters kept: ${this.filterChips.join(" ") || "none"}`);
+      renderer.writeln(`  Title: ${this.createDraft.title || c.dim("(empty)")}`);
+      renderer.writeln(`  Recurrence: ${this.createDraft.recurrence ? recurrencePreview(this.createDraft.recurrence).summary : c.dim("(none)")}`);
+      if (this.createError) {
+        renderer.writeln(c.red(`  ${this.createError}`));
+        renderer.writeln(c.dim(`  Retry: ${retryCommand(this.createDraft, this.opts.createScope)}`));
+      }
+      renderer.writeln(c.dim("  Inline create keeps list context visible; submit keeps draft on error."));
     }
 
     if (this.runPreview) {
@@ -251,6 +277,11 @@ export class TaskListScreen {
       return true;
     }
 
+    if (key === "c") {
+      this.overlay = "create";
+      return true;
+    }
+
     if (key === "R" || key === "r") {
       const preview = this.opts.caller.tasks.previewDependencyRun;
       if (!preview) return false;
@@ -330,6 +361,43 @@ export class TaskListScreen {
     this.overlay = "none";
   }
 
+  updateCreateDraft(input: Partial<TaskCreateDraft>): void {
+    this.overlay = "create";
+    this.createDraft = { ...this.createDraft, ...input };
+    this.createError = null;
+  }
+
+  async submitCreate(input: Partial<TaskCreateDraft> = {}): Promise<void> {
+    const create = this.opts.caller.tasks.create;
+    if (!create) return;
+    this.updateCreateDraft(input);
+    const title = this.createDraft.title.trim();
+    if (!title) {
+      this.createError = "Title required";
+      return;
+    }
+    if (this.hasDuplicateTitle(title)) {
+      this.createError = `Duplicate task title in ${this.opts.createScope?.projectId ?? "current scope"}`;
+      return;
+    }
+    try {
+      const task = await create({
+        ...this.compactCreateScope(),
+        title,
+        status: "todo",
+        ...(this.createDraft.recurrence ? { recurrence: this.createDraft.recurrence.trim() } : {}),
+      });
+      this.tasks = [...this.tasks, task];
+      this.overlay = "none";
+      this.createDraft = { title: "" };
+      this.createError = null;
+      this.cursor = this.filteredTasks.findIndex((row) => row.id === task.id);
+      this.clampCursor();
+    } catch (error) {
+      this.createError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   get visibleTasks(): readonly TuiTask[] {
     const rows = this.opts.viewportRows ?? 20;
     return this.filteredTasks.slice(this.scrollTop, this.scrollTop + rows);
@@ -374,6 +442,22 @@ export class TaskListScreen {
     if (selected.length > 0) return selected;
     const task = this.filteredTasks[this.cursor];
     return task ? [task.id] : [];
+  }
+
+  private hasDuplicateTitle(title: string): boolean {
+    const normalized = title.trim().toLowerCase();
+    return this.tasks.some((task) => task.title.trim().toLowerCase() === normalized);
+  }
+
+  private compactCreateScope(): TaskCreateScope {
+    const scope = this.opts.createScope;
+    return {
+      ...(scope?.source ? { source: scope.source } : {}),
+      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+      ...(scope?.sprintId ? { sprintId: scope.sprintId } : {}),
+      ...(scope?.moduleId ? { moduleId: scope.moduleId } : {}),
+      ...(scope?.cycleId ? { cycleId: scope.cycleId } : {}),
+    };
   }
 
   private clampCursor(): void {

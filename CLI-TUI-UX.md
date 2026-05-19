@@ -107,6 +107,8 @@ fulcrum context diff      --task <id> --against <run-id>
 
 `fulcrum task new` mirrors the quick-create tray: human output shows project, sprint, module, and cycle scope before submission; JSON output includes recurrence preview and generated-instance summary when `--recurrence` is present. Validation and duplicate-title failures preserve entered fields and emit a retry command.
 
+TUI task create uses the same contract without a modal overlay: `:board` and `:tasks` keep the current rows visible, render project/sprint/module/cycle scope inline, preview recurrence dates before submit, block duplicate titles in scope, and keep the entered draft plus retry command after validation or submit failure.
+
 ### 1.4 Review stage commands
 
 ```

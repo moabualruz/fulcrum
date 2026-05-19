@@ -7,18 +7,38 @@ export interface TaskBoardScreenOptions {
     tasks: {
       list: () => Promise<TuiTask[]>;
       update: (input: { id: string; status: string }) => Promise<TuiTask>;
-      create: (input: { title: string; status: string }) => Promise<TuiTask>;
+      create: (input: TaskCreateInput) => Promise<TuiTask>;
     };
   };
   onOpenTask?: (id: string) => void;
+  createScope?: TaskCreateScope;
 }
 
-type Overlay = "none" | "create";
+export interface TaskCreateScope {
+  source?: "board" | "list" | "planning";
+  projectId?: string;
+  sprintId?: string;
+  moduleId?: string;
+  cycleId?: string;
+}
+
+export interface TaskCreateInput extends TaskCreateScope {
+  title: string;
+  status: string;
+  recurrence?: string;
+}
+
+export interface TaskCreateDraft {
+  title: string;
+  recurrence?: string;
+}
 
 export class TaskBoardScreen {
   private tasks: TuiTask[] = [];
   private cursor = 0;
-  private overlay: Overlay = "none";
+  private createActive = false;
+  private createDraft: TaskCreateDraft = { title: "" };
+  private createError: string | null = null;
 
   constructor(private readonly opts: TaskBoardScreenOptions) {}
 
@@ -49,10 +69,17 @@ export class TaskBoardScreen {
 
     renderer.writeln(c.dim("  h/l move  Enter detail  c create  q back"));
 
-    if (this.overlay === "create") {
+    if (this.createActive) {
       renderer.writeln();
       renderer.writeln(c.bold("  Create task"));
-      renderer.writeln(c.dim("  Enter title to create."));
+      renderer.writeln(`  Scope: ${formatCreateScope(this.opts.createScope, "board")}`);
+      renderer.writeln(`  Title: ${this.createDraft.title || c.dim("(empty)")}`);
+      renderer.writeln(`  Recurrence: ${this.createDraft.recurrence ? recurrencePreview(this.createDraft.recurrence).summary : c.dim("(none)")}`);
+      if (this.createError) {
+        renderer.writeln(c.red(`  ${this.createError}`));
+        renderer.writeln(c.dim(`  Retry: ${retryCommand(this.createDraft, this.opts.createScope)}`));
+      }
+      renderer.writeln(c.dim("  Enter title, recurrence optional, submit keeps draft on error."));
     }
   }
 
@@ -77,20 +104,46 @@ export class TaskBoardScreen {
     }
 
     if (key === "c") {
-      this.overlay = "create";
+      this.createActive = true;
       return true;
     }
 
     return false;
   }
 
-  async submitCreate(title: string): Promise<void> {
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    const task = await this.opts.caller.tasks.create({ title: trimmed, status: "todo" });
-    this.tasks = [...this.tasks, task];
-    this.cursor = this.tasks.length - 1;
-    this.overlay = "none";
+  updateCreateDraft(input: Partial<TaskCreateDraft>): void {
+    this.createActive = true;
+    this.createDraft = { ...this.createDraft, ...input };
+    this.createError = null;
+  }
+
+  async submitCreate(input: string | Partial<TaskCreateDraft> = {}): Promise<void> {
+    const draft = typeof input === "string" ? { title: input } : input;
+    this.updateCreateDraft(draft);
+    const title = this.createDraft.title.trim();
+    if (!title) {
+      this.createError = "Title required";
+      return;
+    }
+    if (this.hasDuplicateTitle(title)) {
+      this.createError = `Duplicate task title in ${this.opts.createScope?.projectId ?? "current scope"}`;
+      return;
+    }
+    try {
+      const task = await this.opts.caller.tasks.create({
+        ...compactScope(this.opts.createScope),
+        title,
+        status: "todo",
+        ...(this.createDraft.recurrence ? { recurrence: this.createDraft.recurrence.trim() } : {}),
+      });
+      this.tasks = [...this.tasks, task];
+      this.cursor = this.tasks.length - 1;
+      this.createActive = false;
+      this.createDraft = { title: "" };
+      this.createError = null;
+    } catch (error) {
+      this.createError = error instanceof Error ? error.message : String(error);
+    }
   }
 
   private get currentTask(): TuiTask | undefined {
@@ -112,5 +165,60 @@ export class TaskBoardScreen {
   private clampCursor(): void {
     this.cursor = Math.min(this.cursor, Math.max(0, this.tasks.length - 1));
   }
+
+  private hasDuplicateTitle(title: string): boolean {
+    const normalized = title.trim().toLowerCase();
+    return this.tasks.some((task) => task.title.trim().toLowerCase() === normalized);
+  }
 }
 
+export function formatCreateScope(scope: TaskCreateScope | undefined, fallback: TaskCreateScope["source"]): string {
+  const source = scope?.source ?? fallback;
+  return [
+    source,
+    `project=${scope?.projectId ?? "none"}`,
+    `sprint=${scope?.sprintId ?? "none"}`,
+    `module=${scope?.moduleId ?? "none"}`,
+    `cycle=${scope?.cycleId ?? "none"}`,
+  ].join("  ");
+}
+
+export function recurrencePreview(rule: string): { rule: string; summary: string; instances: string[] } {
+  const normalized = rule.trim();
+  const today = new Date("2026-05-19T00:00:00.000Z");
+  const lower = normalized.toLowerCase();
+  const stepDays = lower.includes("daily") ? 1 : lower.includes("monthly") ? 30 : 7;
+  const label = stepDays === 1 ? "daily" : stepDays === 30 ? "monthly" : "weekly";
+  const instances = [0, 1, 2].map((offset) => {
+    const date = new Date(today);
+    date.setUTCDate(today.getUTCDate() + offset * stepDays);
+    return date.toISOString().slice(0, 10);
+  });
+  return { rule: normalized, summary: `${label} preview: ${instances.join(", ")}`, instances };
+}
+
+export function retryCommand(draft: TaskCreateDraft, scope: TaskCreateScope | undefined): string {
+  const args = ["fulcrum task new"];
+  if (draft.title) args.push(`--title ${quoteArg(draft.title)}`);
+  if (scope?.projectId) args.push(`--project ${quoteArg(scope.projectId)}`);
+  if (scope?.sprintId) args.push(`--sprint ${quoteArg(scope.sprintId)}`);
+  if (scope?.moduleId) args.push(`--module ${quoteArg(scope.moduleId)}`);
+  if (scope?.cycleId) args.push(`--cycle ${quoteArg(scope.cycleId)}`);
+  if (draft.recurrence) args.push(`--recurrence ${quoteArg(draft.recurrence)}`);
+  return args.join(" ");
+}
+
+function compactScope(scope: TaskCreateScope | undefined): TaskCreateScope {
+  return {
+    ...(scope?.source ? { source: scope.source } : {}),
+    ...(scope?.projectId ? { projectId: scope.projectId } : {}),
+    ...(scope?.sprintId ? { sprintId: scope.sprintId } : {}),
+    ...(scope?.moduleId ? { moduleId: scope.moduleId } : {}),
+    ...(scope?.cycleId ? { cycleId: scope.cycleId } : {}),
+  };
+}
+
+function quoteArg(value: string): string {
+  if (/^[A-Za-z0-9._:/-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
