@@ -60,6 +60,10 @@ _Avoid_: Agent filter, scope dropdown.
 The in-process tRPC caller (`local-caller.ts`) the TUI uses to invoke services — replaces HTTP in the TUI runtime so screens stream the same envelope as the CLI without socket overhead.
 _Avoid_: API client, RPC stub.
 
+**AutomationRulesScreen**:
+The project-scoped `:automations` **TuiScreen** for listing, searching, creating, enabling/disabling, and deleting automation rules through the same work-management automation service used by CLI and web.
+_Avoid_: Local rules editor, TUI-only automation state, settings table.
+
 ## Relationships
 
 - A **TuiScreen** is identified by its `:` address (`:board`, `:run/<id>`); every CLI verb has a matching screen and vice versa (CLI↔TUI parity).
@@ -72,6 +76,7 @@ _Avoid_: API client, RPC stub.
 - **StatusBadge** vocabulary is shared with the web shell — same 8 states, same glyphs.
 - **DensityMode** applies globally across every **TuiScreen** that renders a list.
 - **ScopeChip** is local to `:mcp`, `:plugins`, `:agents`, `:routes` — it does not affect other screens.
+- **AutomationRulesScreen** mirrors `fulcrum automations …` CLI verbs and the web automation rule list; it must call **KernelCaller** services instead of owning rule persistence.
 
 ## Example dialogue
 

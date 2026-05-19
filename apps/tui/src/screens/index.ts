@@ -9,6 +9,7 @@ export { ConnectorsScreen } from "./connectors.ts";
 export { WebhooksScreen } from "./webhooks.ts";
 export { ArtifactsScreen } from "./artifacts.ts";
 export { NotificationsScreen } from "./notifications.ts";
+export { AutomationRulesScreen } from "./automation-rules.ts";
 export { RoutingRulesScreen } from "./routing-rules.ts";
 export { SkillsScreen } from "./skills.ts";
 export { PlanningBreakdownScreen } from "./planning-breakdown.ts";
