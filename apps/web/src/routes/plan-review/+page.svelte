@@ -65,6 +65,24 @@
     errors: string[];
   };
 
+  type GitHubRepo = {
+    id: string;
+    name: string;
+    issues: number;
+    activeIssues: number;
+    archivedIssues: number;
+    labels: number;
+    collaborators: number;
+    comments: number;
+    prLinks: number;
+  };
+
+  type GitHubUserMap = {
+    source: string;
+    action: "map" | "invite";
+    target: string;
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -181,6 +199,15 @@
   let csvMappings = $state<CsvMapping[]>([]);
   let csvProgress = $state(0);
   let csvReport = $state<CsvImportReport | null>(null);
+  let githubConnected = $state(false);
+  let githubStatus = $state("OAuth required");
+  let selectedGitHubRepoId = $state("");
+  let githubImportStatus = $state("idle");
+  let githubUserMaps = $state<GitHubUserMap[]>([
+    { source: "ada-dev", action: "map", target: "Ada Lovelace" },
+    { source: "grace-ops", action: "map", target: "Grace Hopper" },
+    { source: "linus-build", action: "invite", target: "linus-build@github.local" },
+  ]);
 
   const triggerOptions = [
     { value: "issue.created", label: "issue.created", scope: "issue" },
@@ -230,6 +257,18 @@
   ];
 
   const csvTargetFields = ["title", "description", "state", "priority", "assignee", "estimate", "labels"];
+
+  const githubRepos: GitHubRepo[] = [
+    { id: "acme-fulcrum", name: "acme/fulcrum", issues: 30, activeIssues: 28, archivedIssues: 2, labels: 12, collaborators: 10, comments: 84, prLinks: 7 },
+    { id: "acme-runtime", name: "acme/runtime", issues: 18, activeIssues: 17, archivedIssues: 1, labels: 8, collaborators: 6, comments: 41, prLinks: 4 },
+    { id: "acme-docs", name: "acme/docs", issues: 9, activeIssues: 9, archivedIssues: 0, labels: 5, collaborators: 4, comments: 15, prLinks: 2 },
+  ];
+
+  const githubPreviewIssues = [
+    { number: 42, title: "Preserve PR link on imported issue", description: "Imported issue keeps original body and linked pull request.", comments: 6, pr: "https://github.com/acme/fulcrum/pull/42" },
+    { number: 43, title: "Map collaborator invites", description: "Unknown collaborators become invites before import.", comments: 3, pr: "https://github.com/acme/fulcrum/pull/43" },
+    { number: 44, title: "Skip archived source issue", description: "Archived source issues stay out of the active import set.", comments: 2, pr: "" },
+  ];
 
   function openStage(stage: Stage) {
     selectedStage = stage;
@@ -505,6 +544,35 @@
     };
     csvProgress = 100;
     csvStatus = "Import report ready";
+  }
+
+  function connectGitHub(): void {
+    githubConnected = true;
+    selectedGitHubRepoId = githubRepos[0]?.id ?? "";
+    githubStatus = "OAuth connected";
+    githubImportStatus = "repo selected";
+  }
+
+  function selectedGitHubRepo(): GitHubRepo {
+    return githubRepos.find((repo) => repo.id === selectedGitHubRepoId) ?? githubRepos[0];
+  }
+
+  function selectGitHubRepo(id: string): void {
+    selectedGitHubRepoId = id;
+    githubImportStatus = "preview ready";
+  }
+
+  function updateGitHubUserMap(index: number, action: "map" | "invite"): void {
+    githubUserMaps = githubUserMaps.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, action } : mapping));
+    githubImportStatus = "user mapping edited";
+  }
+
+  function importGitHubIssues(): void {
+    if (!githubConnected) {
+      githubStatus = "OAuth required";
+      return;
+    }
+    githubImportStatus = "import complete";
   }
 </script>
 
@@ -1034,6 +1102,136 @@
         {:else}
           <p class={cn("mt-2 text-sm text-muted-foreground")}>Import report appears after running import.</p>
         {/if}
+      </section>
+    </aside>
+  </section>
+
+  <section data-github-importer class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>GitHub importer</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Connect with OAuth, choose a repo, preview issue scope, map collaborators, and preserve PR links.</p>
+        </div>
+        <Badge data-github-oauth-status variant={githubConnected ? "success" : "warning"} size="sm">{githubStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-github-connect type="button" onclick={connectGitHub}>Connect GitHub</Button>
+        <Badge data-github-token-storage variant="outline" size="sm">Token encrypted, never shown</Badge>
+      </div>
+
+      <section data-github-repo-picker class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Repo picker</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each githubRepos as repo}
+            <button
+              type="button"
+              data-github-repo-option={repo.id}
+              data-selected={selectedGitHubRepoId === repo.id}
+              onclick={() => selectGitHubRepo(repo.id)}
+              class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-left text-sm md:grid-cols-[minmax(0,1fr)_7rem]", selectedGitHubRepoId === repo.id && "border-primary bg-primary/5")}
+            >
+              <span class={cn("min-w-0")}>
+                <span class={cn("block truncate font-medium")}>{repo.name}</span>
+                <span class={cn("block text-xs text-muted-foreground")}>{repo.activeIssues} active, {repo.archivedIssues} archived skipped</span>
+              </span>
+              <span class={cn("text-muted-foreground")}>{repo.collaborators} people</span>
+            </button>
+          {/each}
+        </div>
+      </section>
+
+      <section data-github-preview class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import preview</h3>
+        <div class={cn("mt-3 grid gap-3 md:grid-cols-4")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Issues</p>
+            <p data-github-preview-issue-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().issues}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Labels</p>
+            <p data-github-preview-label-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().labels}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Collaborators</p>
+            <p data-github-preview-collaborator-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().collaborators}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Archived skipped</p>
+            <p data-github-preview-archived-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().archivedIssues}</p>
+          </div>
+        </div>
+
+        <div data-github-preview-issues class={cn("mt-3 grid gap-2")}>
+          {#each githubPreviewIssues as issue}
+            <article data-github-preview-issue={issue.number} class={cn("grid gap-3 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_7rem_8rem]")}>
+              <div class={cn("min-w-0")}>
+                <p data-github-preview-title={issue.number} class={cn("truncate font-medium")}>#{issue.number} {issue.title}</p>
+                <p data-github-preview-description={issue.number} class={cn("truncate text-xs text-muted-foreground")}>{issue.description}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>Comments</p>
+                <p data-github-preview-comments={issue.number} class={cn("font-medium")}>{issue.comments}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>PR link</p>
+                {#if issue.pr}
+                  <a data-github-preview-pr={issue.number} class={cn("truncate text-primary underline-offset-2 hover:underline")} href={issue.pr}>preserved</a>
+                {:else}
+                  <span data-github-preview-pr={issue.number} class={cn("text-muted-foreground")}>none</span>
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+
+      <section data-github-user-mapping class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Collaborator mapping</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each githubUserMaps as mapping, index}
+            <label data-github-user-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)]")}>
+              <span class={cn("truncate font-medium")}>{mapping.source}</span>
+              <select
+                data-github-user-map-action={mapping.source}
+                value={mapping.action}
+                onchange={(event) => updateGitHubUserMap(index, event.currentTarget.value as "map" | "invite")}
+                class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              >
+                <option value="map">Map</option>
+                <option value="invite">Invite</option>
+              </select>
+              <span data-github-user-map-target={mapping.source} class={cn("truncate text-muted-foreground")}>{mapping.target}</span>
+            </label>
+          {/each}
+        </div>
+      </section>
+
+      <Button data-github-import type="button" class={cn("mt-4")} onclick={importGitHubIssues}>Import GitHub issues</Button>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-github-import-report class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import report</h3>
+        <dl class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Status</dt>
+            <dd data-github-import-status class={cn("text-muted-foreground")}>{githubImportStatus}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Created</dt>
+            <dd data-github-created-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().activeIssues : 0}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Comments</dt>
+            <dd data-github-comment-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().comments : 0}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>PR links</dt>
+            <dd data-github-pr-link-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().prLinks : 0}</dd>
+          </div>
+        </dl>
       </section>
     </aside>
   </section>

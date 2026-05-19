@@ -201,4 +201,36 @@ test.describe("plan review workflow navigation", () => {
 		await expect(page.locator("[data-csv-skipped-count]")).toContainText("1");
 		await expect(page.locator("[data-csv-row-errors]")).toContainText("Row 6: title required");
 	});
+
+	test("connects GitHub, selects repo, maps collaborators, and preserves PR links", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		await expect(page.locator("[data-github-importer]")).toBeVisible();
+		await expect(page.locator("[data-github-oauth-status]")).toContainText("OAuth required");
+		await expect(page.locator("[data-github-token-storage]")).toContainText("Token encrypted");
+		await page.locator("[data-github-connect]").click();
+		await expect(page.locator("[data-github-oauth-status]")).toContainText("OAuth connected");
+
+		await page.locator("[data-github-repo-option='acme-fulcrum']").click();
+		await expect(page.locator("[data-github-repo-option='acme-fulcrum']")).toHaveAttribute("data-selected", "true");
+		await expect(page.locator("[data-github-preview-issue-count]")).toContainText("30");
+		await expect(page.locator("[data-github-preview-label-count]")).toContainText("12");
+		await expect(page.locator("[data-github-preview-collaborator-count]")).toContainText("10");
+		await expect(page.locator("[data-github-preview-archived-count]")).toContainText("2");
+
+		await expect(page.locator("[data-github-preview-title='42']")).toContainText("Preserve PR link");
+		await expect(page.locator("[data-github-preview-description='42']")).toContainText("original body");
+		await expect(page.locator("[data-github-preview-comments='42']")).toContainText("6");
+		await expect(page.locator("[data-github-preview-pr='42']")).toHaveAttribute("href", "https://github.com/acme/fulcrum/pull/42");
+
+		await expect(page.locator("[data-github-user-map='ada-dev']")).toContainText("Ada Lovelace");
+		await page.locator("[data-github-user-map-action='linus-build']").selectOption("map");
+		await expect(page.locator("[data-github-import-status]")).toContainText("user mapping edited");
+
+		await page.locator("[data-github-import]").click();
+		await expect(page.locator("[data-github-import-status]")).toContainText("import complete");
+		await expect(page.locator("[data-github-created-count]")).toContainText("28");
+		await expect(page.locator("[data-github-comment-count]")).toContainText("84");
+		await expect(page.locator("[data-github-pr-link-count]")).toContainText("7");
+	});
 });
