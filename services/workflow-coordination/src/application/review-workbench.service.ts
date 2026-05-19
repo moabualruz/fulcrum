@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { Inject, Injectable } from "@nestjs/common";
@@ -769,7 +769,8 @@ export class ReviewWorkbenchService {
       if (rows.length === 0) {
         throw new Error("No accepted generated UAT E2E regression tests were found.");
       }
-      const testFiles = await materializeTypeOrmGeneratedE2eTests(input.projectId, traceId, rows);
+      const runId = reviewWorkflowId("run", traceId, "generated-e2e", runner);
+      const testFiles = await materializeTypeOrmGeneratedE2eTests(input.projectId, traceId, runId, rows);
       const plan = buildTypeOrmGeneratedE2eRunnerPlan(runner, testFiles);
       let stdout = "";
       let stderr = "";
@@ -785,7 +786,6 @@ export class ReviewWorkbenchService {
         status = exitCode === 0 ? "passed" : "failed";
       }
 
-      const runId = reviewWorkflowId("run", traceId, "generated-e2e", runner);
       await manager.getRepository(FulcrumAgentRunEntity).save({
         id: runId,
         projectId: input.projectId,
@@ -794,6 +794,15 @@ export class ReviewWorkbenchService {
         status,
         dependencyTree: rows.map((row) => row.id),
       });
+      const specArtifacts = await persistTypeOrmGeneratedE2eSpecArtifacts(
+        manager,
+        input.projectId,
+        traceId,
+        runId,
+        runner,
+        rows,
+        testFiles,
+      );
       const eventId = reviewWorkflowId("event", traceId, "generated-e2e-regression-run-completed", runner);
       await manager.getRepository(FulcrumRunEventEntity).save({
         id: eventId,
@@ -819,16 +828,19 @@ export class ReviewWorkbenchService {
           exitCode,
           ciCommand: plan.ciCommand,
           ciEnv: plan.ciEnv,
+          generatedSpecArtifactIds: specArtifacts.map((artifact) => artifact.id),
         },
       });
 
       return {
         projectId: input.projectId,...(input.traceId ? { traceId } : {}),
+        runId,
         runner,
         status,
         command: plan.command,...(plan.cwd ? { cwd: plan.cwd } : {}),
         testFiles,
         artifactIds: rows.map((row) => row.id),
+        generatedSpecArtifactIds: specArtifacts.map((artifact) => artifact.id),
         stdout,
         stderr,
         exitCode,
@@ -954,8 +966,9 @@ async function loadTypeOrmGeneratedE2eTests(
 async function materializeTypeOrmGeneratedE2eTests(
   projectId: string,
   traceId: string,
+  runId: string,
   rows: FulcrumGeneratedE2ETest[],): Promise<string[]> {
-  const directory = join(tmpdir(), "fulcrum-generated-e2e", slug(projectId), slug(traceId));
+  const directory = join(tmpdir(), "fulcrum-generated-e2e", slug(projectId), slug(traceId), slug(runId));
   await mkdir(directory, { recursive: true });
   const testFiles: string[] = [];
   for (const row of rows) {
@@ -964,6 +977,51 @@ async function materializeTypeOrmGeneratedE2eTests(
     testFiles.push(filePath);
   }
   return testFiles;
+}
+
+async function persistTypeOrmGeneratedE2eSpecArtifacts(
+  manager: EntityManager,
+  projectId: string,
+  traceId: string,
+  runId: string,
+  runner: GeneratedE2eRegressionRunner,
+  rows: FulcrumGeneratedE2ETest[],
+  testFiles: string[],
+): Promise<Array<{ id: string }>> {
+  const artifacts: Array<{ id: string }> = [];
+  for (const [index, filePath] of testFiles.entries()) {
+    const row = rows[index];
+    if (!row) continue;
+    const fileStat = await stat(filePath);
+    const artifact = {
+      id: reviewWorkflowId("artifact", traceId, runId, "generated-e2e-spec", String(index + 1)),
+      projectId,
+      traceId,
+      runId,
+      taskId: null,
+      docId: null,
+      kind: "generated-e2e-spec",
+      title: `Generated E2E spec ${index + 1}`,
+      filename: basename(filePath),
+      bodyPath: filePath,
+      checksumSha256: null,
+      mime: "text/typescript",
+      sizeBytes: String(fileStat.size),
+      lifecycleState: "created",
+      metadataJson: {
+        previewKind: "playwright-spec",
+        runner,
+        sourceGeneratedE2eTestId: row.id,
+        sourceArtifactIds: rows.map((source) => source.id),
+      },
+      archived: false,
+      archivedAt: null,
+      deletedAt: null,
+    };
+    await manager.getRepository(FulcrumArtifactEntity).save(artifact);
+    artifacts.push({ id: artifact.id });
+  }
+  return artifacts;
 }
 
 function safeGeneratedE2eFilename(value: string): string {

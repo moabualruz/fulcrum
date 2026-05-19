@@ -584,11 +584,13 @@ describe("Review workbench Nest controller", () => {
     const e2eRun: GeneratedE2eRegressionRun = {
       projectId: "project-review-api",
       traceId: "trace-review-api",
+      runId: "run-review-api-generated-e2e",
       runner: "bun",
       status: "planned",
       command: ["bun", "test", "/tmp/generated.spec.ts"],
       testFiles: ["/tmp/generated.spec.ts"],
       artifactIds: ["e2e-review-api"],
+      generatedSpecArtifactIds: ["artifact-review-api-generated-e2e-spec"],
       stdout: "",
       stderr: "",
       exitCode: null,

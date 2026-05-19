@@ -293,12 +293,14 @@ export type GeneratedE2eRegressionRunStatus = "passed" | "failed" | "planned";
 export interface GeneratedE2eRegressionRunOutput {
   projectId: string;
   traceId?: string;
+  runId: string;
   runner: GeneratedE2eRegressionRunner;
   status: GeneratedE2eRegressionRunStatus;
   command: string[];
   cwd?: string;
   testFiles: string[];
   artifactIds: string[];
+  generatedSpecArtifactIds: string[];
   stdout: string;
   stderr: string;
   exitCode: number | null;

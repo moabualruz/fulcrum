@@ -151,11 +151,32 @@ describe("review workbench UAT/code review decision action", () => {
         projectId: PROJECT_ID,
         traceId: "trace-uat-approval",
         status: "passed",
-        command: ["bun", "test", generated.bodyPath],
-        testFiles: [generated.bodyPath],
       });
+      expect(run.runId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(run.generatedSpecArtifactIds).toHaveLength(1);
+      expect(run.testFiles).toHaveLength(1);
+      expect(run.testFiles[0]).toContain(run.runId);
+      expect(run.command).toEqual(["bun", "test", run.testFiles[0]!]);
       expect(`${run.stdout}\n${run.stderr}`).toContain("pass");
       expect(run.eventId).toBeString();
+
+      const runDetail = await em.getConnection().execute<Array<{ status: string }>>(
+        `select status from agent_runs where id = ? and org_id = ?`,
+        [run.runId, ORG_ID],
+      );
+      expect(runDetail[0]?.status).toBe("succeeded");
+      const linkedArtifacts = await em.getConnection().execute<Array<{ id: string; run_id: string; body_path: string; metadata_json: Record<string, unknown> }>>(
+        `select id, run_id, body_path, metadata_json from artifacts where run_id = ? order by id asc`,
+        [run.runId],
+      );
+      expect(linkedArtifacts).toEqual([
+        expect.objectContaining({
+          id: run.generatedSpecArtifactIds[0],
+          run_id: run.runId,
+          metadata_json: expect.objectContaining({ previewKind: "playwright-spec" }),
+        }),
+      ]);
+      expect(linkedArtifacts[0]?.body_path).toContain(run.runId);
     } finally {
       if (originalArtifactStore === undefined) delete process.env.FULCRUM_ARTIFACT_STORE;
       else process.env.FULCRUM_ARTIFACT_STORE = originalArtifactStore;
@@ -337,13 +358,17 @@ describe("review workbench UAT/code review decision action", () => {
         runner: "playwright",
         status: "planned",
         cwd: "apps/web",
-        command: ["bun", "run", "web:e2e:generated", "--", generated.bodyPath],
-        testFiles: [generated.bodyPath],
         ciCommand: ["bun", "run", "scripts/ci-generated-e2e.ts"],
-        ciEnv: {
-          FULCRUM_GENERATED_E2E_RUNNER: "playwright",
-          FULCRUM_GENERATED_E2E_FILES: generated.bodyPath,
-        },
+      });
+      expect(plannedRun.runId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(plannedRun.generatedSpecArtifactIds).toHaveLength(1);
+      expect(plannedRun.testFiles).toHaveLength(1);
+      const plannedRunSpec = plannedRun.testFiles[0]!;
+      expect(plannedRunSpec).toContain(plannedRun.runId);
+      expect(plannedRun.command).toEqual(["bun", "run", "web:e2e:generated", "--", plannedRunSpec]);
+      expect(plannedRun.ciEnv).toEqual({
+        FULCRUM_GENERATED_E2E_RUNNER: "playwright",
+        FULCRUM_GENERATED_E2E_FILES: plannedRunSpec,
       });
     } finally {
       if (originalArtifactStore === undefined) delete process.env.FULCRUM_ARTIFACT_STORE;
@@ -446,9 +471,12 @@ describe("review workbench UAT/code review decision action", () => {
         projectId: PROJECT_ID,
         traceId: "trace-uat-coverage",
         status: "passed",
-        command: ["bun", "test", ...decision.generatedE2eTests.map((test) => test.bodyPath)],
-        testFiles: decision.generatedE2eTests.map((test) => test.bodyPath),
       });
+      expect(run.runId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(run.generatedSpecArtifactIds).toHaveLength(2);
+      expect(run.testFiles).toHaveLength(2);
+      expect(run.testFiles.every((file) => file.includes(run.runId))).toBe(true);
+      expect(run.command).toEqual(["bun", "test", ...run.testFiles]);
     } finally {
       if (originalArtifactStore === undefined) delete process.env.FULCRUM_ARTIFACT_STORE;
       else process.env.FULCRUM_ARTIFACT_STORE = originalArtifactStore;
