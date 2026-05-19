@@ -91,4 +91,30 @@ test.describe("project settings labels", () => {
 		await page.locator("[data-workspace-save]").click();
 		await expect(page.locator("[data-workspace-error]")).toContainText("required");
 	});
+
+	test("estimate scale preview reflects selection and rejects empty custom values", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-estimate-preview]")).toContainText("1, 2, 3, 5, 8, 13, 21");
+		await page.locator("[data-estimate-scale]").selectOption("xs-xl");
+		await expect(page.locator("[data-estimate-preview]")).toContainText("1, 2, 3, 5, 8");
+		await page.locator("[data-estimate-scale]").selectOption("custom");
+		await page.locator("[data-estimate-custom]").fill("abc");
+		await page.locator("[data-estimate-save]").click();
+		await expect(page.locator("[data-estimate-error]")).toContainText("at least one estimate");
+		await page.locator("[data-estimate-custom]").fill("1, 3, 7");
+		await page.locator("[data-estimate-save]").click();
+		await expect(page.locator("[data-estimate-saved]")).toContainText("Estimate scale saved");
+	});
+
+	test("bulk estimate applies the chosen value to selected tasks and totals update", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-estimate-total]")).toContainText("Total points: 8");
+		await page.locator("[data-plan-task-select='FUL-202']").check();
+		await page.locator("[data-bulk-estimate]").selectOption("5");
+		await page.locator("[data-bulk-apply]").click();
+		await expect(page.locator("[data-plan-task-estimate='FUL-202']")).toHaveValue("5");
+		await expect(page.locator("[data-estimate-total]")).toContainText("Total points: 13");
+	});
 });

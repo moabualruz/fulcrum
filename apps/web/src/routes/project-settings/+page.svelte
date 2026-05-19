@@ -167,6 +167,77 @@
     workspaceError = null;
     workspaceSaved = true;
   }
+
+  type EstimateScale = "xs-xl" | "fibonacci" | "linear" | "custom";
+
+  interface EstimateSetting {
+    scale: EstimateScale;
+    customValues: number[];
+  }
+
+  const SCALE_VALUES: Record<EstimateScale, number[]> = {
+    "xs-xl": [1, 2, 3, 5, 8],
+    fibonacci: [1, 2, 3, 5, 8, 13, 21],
+    linear: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    custom: [],
+  };
+
+  let estimateScale = $state<EstimateScale>("fibonacci");
+  let customScaleRaw = $state("1,2,4,8,16");
+  let estimateSaved = $state(false);
+  let estimateError = $state<string | null>(null);
+
+  interface PlanTask {
+    id: string;
+    title: string;
+    estimate: number | null;
+    selected: boolean;
+  }
+
+  let planTasks = $state<PlanTask[]>([
+    { id: "FUL-201", title: "Wire skill probe API", estimate: 3, selected: false },
+    { id: "FUL-202", title: "Refactor outbox flush", estimate: null, selected: false },
+    { id: "FUL-203", title: "Onboard mobile capture", estimate: 5, selected: false },
+  ]);
+
+  let bulkEstimate = $state<number | "">("");
+
+  function effectiveScale(): number[] {
+    if (estimateScale !== "custom") return SCALE_VALUES[estimateScale];
+    return customScaleRaw
+      .split(",")
+      .map((piece) => Number.parseInt(piece.trim(), 10))
+      .filter((value) => Number.isFinite(value) && value > 0);
+  }
+
+  function saveEstimate(event: Event): void {
+    event.preventDefault();
+    const values = effectiveScale();
+    if (values.length === 0) {
+      estimateError = "Provide at least one estimate value.";
+      estimateSaved = false;
+      return;
+    }
+    estimateError = null;
+    estimateSaved = true;
+  }
+
+  function setTaskEstimate(id: string, value: number | null): void {
+    planTasks = planTasks.map((task) => task.id === id ? { ...task, estimate: value } : task);
+  }
+
+  function toggleTaskSelection(id: string): void {
+    planTasks = planTasks.map((task) => task.id === id ? { ...task, selected: !task.selected } : task);
+  }
+
+  function bulkApply(): void {
+    if (bulkEstimate === "") return;
+    planTasks = planTasks.map((task) => task.selected ? { ...task, estimate: Number(bulkEstimate) } : task);
+  }
+
+  function totalPoints(): number {
+    return planTasks.reduce((acc, task) => acc + (task.estimate ?? 0), 0);
+  }
 </script>
 
 <svelte:head>
@@ -448,5 +519,102 @@
     {:else}
       <p class="text-xs text-muted-foreground">No archived labels.</p>
     {/if}
+  </section>
+
+  <section data-estimates-settings class="flex flex-col gap-3 rounded-md border border-border p-4">
+    <header>
+      <h2 class="text-base font-medium">Estimates</h2>
+      <p class="text-xs text-muted-foreground">Pick the estimation scale used across views, board cards, and reports.</p>
+    </header>
+    <form data-estimate-form class="flex flex-col gap-3" onsubmit={saveEstimate}>
+      <label class="flex flex-col gap-1 text-sm">
+        Scale
+        <select
+          data-estimate-scale
+          bind:value={estimateScale}
+          class="h-9 rounded-md border border-input bg-background px-2"
+        >
+          <option value="xs-xl">XS–XL (1, 2, 3, 5, 8)</option>
+          <option value="fibonacci">Fibonacci (1, 2, 3, 5, 8, 13, 21)</option>
+          <option value="linear">Linear 1–10</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      {#if estimateScale === "custom"}
+        <label class="flex flex-col gap-1 text-sm">
+          Custom values (comma-separated positive integers)
+          <input
+            type="text"
+            data-estimate-custom
+            bind:value={customScaleRaw}
+            class="h-9 rounded-md border border-input bg-background px-2 font-mono"
+          />
+        </label>
+      {/if}
+      <p data-estimate-preview class="text-xs text-muted-foreground">Preview: [{effectiveScale().join(", ")}]</p>
+      <div class="flex items-center gap-3">
+        <button
+          type="submit"
+          data-estimate-save
+          class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >Save estimate scale</button>
+        {#if estimateSaved && !estimateError}
+          <span data-estimate-saved class="text-sm text-green-600">Estimate scale saved.</span>
+        {/if}
+        {#if estimateError}
+          <span data-estimate-error class="text-sm text-destructive">{estimateError}</span>
+        {/if}
+      </div>
+    </form>
+
+    <div class="mt-4 flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Apply to plan tasks</h3>
+      <p data-estimate-total class="text-xs text-muted-foreground">Total points: {totalPoints()}</p>
+      <div class="flex items-end gap-2">
+        <label class="flex flex-col gap-1 text-xs">
+          Bulk estimate
+          <select
+            data-bulk-estimate
+            bind:value={bulkEstimate}
+            class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="">—</option>
+            {#each effectiveScale() as value (value)}
+              <option value={value}>{value}</option>
+            {/each}
+          </select>
+        </label>
+        <button
+          type="button"
+          data-bulk-apply
+          class="h-9 rounded-md border border-border px-3 text-sm"
+          onclick={bulkApply}
+        >Apply to selected</button>
+      </div>
+      <ul class="flex flex-col gap-1">
+        {#each planTasks as task (task.id)}
+          <li data-plan-task-row={task.id} class="flex items-center gap-2 rounded border border-border px-2 py-1 text-sm">
+            <input
+              type="checkbox"
+              data-plan-task-select={task.id}
+              checked={task.selected}
+              onchange={() => toggleTaskSelection(task.id)}
+            />
+            <span class="flex-1">{task.id}: {task.title}</span>
+            <select
+              data-plan-task-estimate={task.id}
+              value={task.estimate ?? ""}
+              onchange={(event) => setTaskEstimate(task.id, (event.target as HTMLSelectElement).value === "" ? null : Number((event.target as HTMLSelectElement).value))}
+              class="h-8 rounded border border-border bg-background px-1 text-xs"
+            >
+              <option value="">—</option>
+              {#each effectiveScale() as value (value)}
+                <option value={value}>{value}</option>
+              {/each}
+            </select>
+          </li>
+        {/each}
+      </ul>
+    </div>
   </section>
 </section>
