@@ -63,9 +63,44 @@ test.describe("code review loop", () => {
 
 		await expect(page.locator("[data-qa-feedback-gate]")).toBeVisible();
 		await expect(page.locator("[data-run-status='qa-feedback-17']")).toHaveText("running");
-		await expect(page.locator("[data-run-status='implementation-feedback-18']")).toHaveText("pending");
+		await expect(page.locator("[data-run-status='implementation-feedback-18']")).toHaveText("failed");
 		await expect(page.locator("[data-latest-verdict='qa-feedback-17']")).toContainText("REVISE");
 		await expect(page.locator("[data-latest-verdict='review-feedback-19']")).toContainText("APPROVE");
+	});
+
+	test("links annotation feedback to independent agent job logs and summaries", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await expect(page.locator("[data-agent-job-panel]")).toBeVisible();
+		await expect(page.locator("[data-agent-job-for-annotation]")).toHaveText(
+			"apps/web/src/routes/runs/[id]/+page.svelte:85-85",
+		);
+		await expect(page.locator("[data-agent-job-tab='qa-feedback-17']")).toBeVisible();
+		await expect(page.locator("[data-agent-job-tab='review-feedback-19']")).toBeVisible();
+		await expect(page.locator("[data-agent-job-summary]")).toContainText("artifact proof");
+		await expect(page.locator("[data-agent-job-result]")).toContainText("Still running");
+		await expect(page.locator("[data-agent-job-log]")).toHaveCount(3);
+
+		await page.locator("[data-annotation-text]").fill("Keep this text stable while logs stream.");
+		await page.locator("[data-append-job-log]").click();
+		await expect(page.locator("[data-agent-job-log]")).toHaveCount(4);
+		await expect(page.locator("[data-annotation-text]")).toHaveValue("Keep this text stable while logs stream.");
+	});
+
+	test("offers retry or blocked action when a feedback job fails", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await page.locator("[data-annotate-line='142']").click();
+		await expect(page.locator("[data-agent-job-tab='implementation-feedback-18']")).toBeVisible();
+		await expect(page.locator("[data-agent-job-status]")).toHaveText("failed");
+		await expect(page.locator("[data-agent-job-result]")).toContainText("Failed:");
+
+		await page.locator("[data-retry-job]").click();
+		await expect(page.locator("[data-agent-job-status]")).toHaveText("pending");
+		await expect(page.locator("[data-agent-job-result]")).toContainText("Retry queued");
+
+		await page.locator("[data-mark-job-blocked]").click();
+		await expect(page.locator("[data-job-blocker-record]")).toContainText("implementation-feedback-18");
 	});
 
 	test("keeps UAT disabled while retryable QA feedback exists then unlocks after exhaustion", async ({ page }) => {

@@ -14,9 +14,15 @@
   interface FeedbackRun {
     id: string;
     agent: string;
-    status: "pending" | "running" | "completed";
+    status: "pending" | "running" | "completed" | "failed";
     latestVerdict: "REVISE" | "APPROVE" | "UNAVAILABLE";
     attempt: number;
+    annotationRange: string;
+    summary: string;
+    resultSummary: string;
+    logs: string[];
+    retryable: boolean;
+    blocked: boolean;
   }
 
   const DIFF_SOURCES: Array<{
@@ -94,13 +100,33 @@
       status: "running",
       latestVerdict: "REVISE",
       attempt: 2,
+      annotationRange: "apps/web/src/routes/runs/[id]/+page.svelte:85-85",
+      summary: "Checks whether artifact proof remains visible after the copy change.",
+      resultSummary: "Still running: validated DOM anchor, waiting on final screenshot evidence.",
+      logs: [
+        "09:41 queued screenshot comparison for runs/[id]",
+        "09:42 located data-live-state proof anchor",
+        "09:43 waiting on final QA verdict",
+      ],
+      retryable: false,
+      blocked: false,
     },
     {
       id: "implementation-feedback-18",
       agent: "codex",
-      status: "pending",
-      latestVerdict: "UNAVAILABLE",
+      status: "failed",
+      latestVerdict: "REVISE",
       attempt: 3,
+      annotationRange: "services/planning-review/src/application/reviews/review-workbench.ts:142-142",
+      summary: "Implements retry guidance for follow-up scheduling.",
+      resultSummary: "Failed: branch changed while the run was applying the review-workbench patch.",
+      logs: [
+        "09:44 loaded annotation range review-workbench.ts:142",
+        "09:45 patch rejected: surrounding context changed",
+        "09:45 needs retry or blocked owner decision",
+      ],
+      retryable: true,
+      blocked: false,
     },
     {
       id: "review-feedback-19",
@@ -108,12 +134,24 @@
       status: "completed",
       latestVerdict: "APPROVE",
       attempt: 3,
+      annotationRange: "apps/web/src/routes/runs/[id]/+page.svelte:85-85",
+      summary: "Confirms the updated proof line satisfies the original feedback.",
+      resultSummary: "Completed: annotation mapped back to line 85 and verdict approved.",
+      logs: [
+        "09:36 reviewed original annotation payload",
+        "09:38 compared result summary against line 85",
+        "09:39 emitted APPROVE verdict",
+      ],
+      retryable: false,
+      blocked: false,
     },
   ];
 
+  let feedbackRuns = $state<FeedbackRun[]>(FEEDBACK_RUNS);
   let selectedSource = $state<DiffSource>("unstaged");
   let destination = $state<Destination>("local-agent");
   let selectedLine = $state(DIFF_LINES[1]);
+  let selectedJobId = $state(FEEDBACK_RUNS[0].id);
   let annotationText = $state("Preserve this line as the artifact proof anchor before approval.");
   let feedbackSent = $state(false);
   let approved = $state(false);
@@ -125,6 +163,10 @@
 
   const source = $derived(DIFF_SOURCES.find((item) => item.id === selectedSource) ?? DIFF_SOURCES[0]);
   const annotationRange = $derived(`${selectedLine.file}:${selectedLine.line}-${selectedLine.line}`);
+  const annotationJobs = $derived(feedbackRuns.filter((run) => run.annotationRange === annotationRange));
+  const selectedJob = $derived(
+    feedbackRuns.find((run) => run.id === selectedJobId) ?? annotationJobs[0] ?? feedbackRuns[0],
+  );
   const exportPayload = $derived({
     destination,
     source: selectedSource,
@@ -143,6 +185,7 @@
 
   function selectLine(line: DiffLine): void {
     selectedLine = line;
+    selectedJobId = feedbackRuns.find((run) => run.annotationRange === `${line.file}:${line.line}-${line.line}`)?.id ?? selectedJobId;
     feedbackSent = false;
     approved = false;
   }
@@ -164,6 +207,38 @@
   function recordExhaustion(): void {
     if (!uatUnlocked) return;
     exhaustionRecorded = true;
+  }
+
+  function appendJobLog(): void {
+    feedbackRuns = feedbackRuns.map((run) => run.id === selectedJob.id
+      ? { ...run, logs: [...run.logs, `09:46 streamed update ${run.logs.length + 1} without resetting annotation text`] }
+      : run);
+  }
+
+  function retryJob(): void {
+    feedbackRuns = feedbackRuns.map((run) => run.id === selectedJob.id
+      ? {
+        ...run,
+        status: "pending",
+        attempt: run.attempt + 1,
+        retryable: false,
+        resultSummary: "Retry queued from review workbench.",
+        logs: [...run.logs, "09:46 retry queued by reviewer"],
+      }
+      : run);
+  }
+
+  function markJobBlocked(): void {
+    feedbackRuns = feedbackRuns.map((run) => run.id === selectedJob.id
+      ? {
+        ...run,
+        status: "failed",
+        blocked: true,
+        retryable: false,
+        resultSummary: "Blocked: reviewer marked this feedback run for owner follow-up.",
+        logs: [...run.logs, "09:46 blocked state recorded with owner follow-up"],
+      }
+      : run);
   }
 </script>
 
@@ -313,7 +388,7 @@
       </div>
 
       <div data-feedback-runs class="grid gap-2 md:grid-cols-3">
-        {#each FEEDBACK_RUNS as run (run.id)}
+        {#each feedbackRuns as run (run.id)}
           <article class="min-w-0 rounded-md border border-border p-3">
             <div class="flex items-center justify-between gap-2">
               <span class="truncate text-sm font-medium">{run.agent}</span>
@@ -324,6 +399,66 @@
           </article>
         {/each}
       </div>
+
+      <section data-agent-job-panel class="grid gap-3 rounded-md border border-border p-3 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div class="min-w-0 space-y-2">
+          <div>
+            <h3 class="text-sm font-semibold">Agent job log</h3>
+            <p class="break-all text-xs text-muted-foreground">Linked to {annotationRange}</p>
+          </div>
+          <div data-agent-job-links class="grid gap-2">
+            {#each annotationJobs as run (run.id)}
+              <button
+                type="button"
+                data-agent-job-tab={run.id}
+                data-selected={selectedJob.id === run.id}
+                onclick={() => selectedJobId = run.id}
+                class="rounded-md border border-border px-2 py-2 text-left text-xs hover:bg-accent data-[selected=true]:border-primary data-[selected=true]:bg-primary/10"
+              >
+                <span class="block font-medium">{run.agent}</span>
+                <span class="mt-1 block text-muted-foreground">{run.status} · attempt {run.attempt}</span>
+              </button>
+            {:else}
+              <p data-agent-job-empty class="rounded-md border border-dashed border-border p-2 text-xs text-muted-foreground">
+                No agent jobs linked to this annotation yet.
+              </p>
+            {/each}
+          </div>
+        </div>
+
+        <div data-agent-job-detail class="min-w-0 space-y-3">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p data-agent-job-for-annotation class="break-all text-xs text-muted-foreground">{selectedJob.annotationRange}</p>
+              <h3 class="text-sm font-semibold">{selectedJob.agent} · {selectedJob.id}</h3>
+            </div>
+            <span data-agent-job-status class="rounded-md bg-muted px-2 py-1 text-xs">{selectedJob.status}</span>
+          </div>
+          <p data-agent-job-summary class="text-sm">{selectedJob.summary}</p>
+          <p data-agent-job-result class="rounded-md bg-muted p-2 text-xs">{selectedJob.resultSummary}</p>
+          <div data-job-log-stream class="max-h-44 overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
+            {#each selectedJob.logs as line, index (`${selectedJob.id}-${index}-${line}`)}
+              <p data-agent-job-log>{line}</p>
+            {/each}
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" data-append-job-log onclick={appendJobLog} class="rounded-md border border-border px-3 py-2 text-xs font-medium">
+              Stream log
+            </button>
+            <button type="button" data-retry-job disabled={!selectedJob.retryable} onclick={retryJob} class="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50">
+              Retry job
+            </button>
+            <button type="button" data-mark-job-blocked disabled={selectedJob.blocked} onclick={markJobBlocked} class="rounded-md border border-border px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50">
+              Mark blocked
+            </button>
+          </div>
+          {#if selectedJob.blocked}
+            <p data-job-blocker-record class="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs">
+              Blocked owner follow-up required for {selectedJob.id}.
+            </p>
+          {/if}
+        </div>
+      </section>
 
       {#if gateState === "retryable"}
         <p data-gate-explanation class="rounded-md border border-amber-600/30 bg-amber-600/10 p-3 text-sm text-amber-900">
