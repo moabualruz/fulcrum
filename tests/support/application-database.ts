@@ -129,6 +129,24 @@ async function truncateAllTables(ds: DataSource): Promise<void> {
 
 export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<TestOrm> {
   const { ds } = await ensureInitialized(opts.debug ?? false);
+
+  // Defense in depth: if the singleton DataSource somehow lost its schema
+  // (e.g. another file destroyed its PGlite handle), re-run migrations to
+  // restore tables before truncate+seed.
+  try {
+    await ds.query(`SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`, ["tenant_settings"]);
+    const hasTenantSettings = await ds.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`,
+      ["tenant_settings"],
+    );
+    if (!Array.isArray(hasTenantSettings) || hasTenantSettings.length === 0) {
+      await ds.runMigrations({ transaction: "none" });
+    }
+  } catch {
+    await destroyTestOrm();
+    return createTestOrm(opts);
+  }
+
   await truncateAllTables(ds);
   const seed = await new SeedService(ds.manager).run();
   const em = ds.manager as EntityManager & Record<string, unknown>;
