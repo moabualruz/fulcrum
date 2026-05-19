@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { Skeleton } from "@fulcrum/ui-kit";
 </script>
 
 <main data-cross-cutting-motion class={cn("min-h-screen bg-background p-6 text-foreground")}>
@@ -50,6 +51,36 @@
       <a class={cn("mt-3 inline-flex rounded-md border border-border px-3 py-2 text-sm")} href="/settings/theme">
         Open theme settings
       </a>
+    </section>
+
+    <section data-loading-skeletons class={cn("flex flex-col gap-4 rounded-md border border-border bg-card p-4")}>
+      <h2 class={cn("text-lg font-semibold")}>Loading skeleton fixtures</h2>
+      <p class={cn("text-sm text-muted-foreground")}>Skeletons match the dimensions of their loaded counterpart and respect prefers-reduced-motion.</p>
+
+      <article data-skeleton-form class={cn("flex flex-col gap-2 rounded-md border border-border p-3")}>
+        <h3 class={cn("text-sm font-medium")}>Form skeleton</h3>
+        <Skeleton class="h-4 w-24" />
+        <Skeleton class="h-9 w-full" />
+        <Skeleton class="h-9 w-32" />
+      </article>
+
+      <article data-skeleton-list class={cn("flex flex-col gap-2 rounded-md border border-border p-3")}>
+        <h3 class={cn("text-sm font-medium")}>List skeleton (5 rows)</h3>
+        <div class={cn("flex flex-col gap-2")}>
+          {#each Array.from({ length: 5 }, (_, index) => index) as index (index)}
+            <Skeleton data-skeleton-list-item={index} class="h-6 w-full" />
+          {/each}
+        </div>
+      </article>
+
+      <article data-skeleton-table class={cn("flex flex-col gap-2 rounded-md border border-border p-3")}>
+        <h3 class={cn("text-sm font-medium")}>Table skeleton (3 cols × 4 rows)</h3>
+        <div class={cn("grid grid-cols-3 gap-2")}>
+          {#each Array.from({ length: 12 }, (_, index) => index) as index (index)}
+            <Skeleton data-skeleton-table-cell={index} class="h-5" />
+          {/each}
+        </div>
+      </article>
     </section>
   </section>
 </main>

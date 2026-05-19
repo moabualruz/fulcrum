@@ -86,4 +86,14 @@ test.describe("cross-cutting reduced motion", () => {
     expect(themeSettings).toContain('"off"');
     expect(themePage).toContain("data-animation-speed");
   });
+
+  test("loading skeleton fixture renders form/list/table layouts", async ({ page }) => {
+    await page.goto("/cross-cutting-motion");
+
+    await expect(page.locator("[data-loading-skeletons]")).toBeVisible();
+    await expect(page.locator("[data-skeleton-form]")).toBeVisible();
+    await expect(page.locator("[data-skeleton-list-item='0']")).toBeVisible();
+    await expect(page.locator("[data-skeleton-list-item='4']")).toBeVisible();
+    await expect(page.locator("[data-skeleton-table-cell]")).toHaveCount(12);
+  });
 });
