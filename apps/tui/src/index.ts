@@ -344,12 +344,15 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
   "doc.create": "CreateItem",
 };
 
+import { TOGGLE_THEME_COMMAND } from "./screens/tui-foundation.ts";
+
 const COMMAND_PALETTE_ACTIONS = [
   "Create task",
   "Create doc",
   "Search",
   "Dispatch run",
   "Settings",
+  TOGGLE_THEME_COMMAND,
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────

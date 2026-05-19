@@ -10,7 +10,16 @@ export const FOUNDATION_KEY_BINDINGS = [
   { key: "?", action: "Show or hide help" },
   { key: "Esc", action: "Close help, modal, pane, or return to parent" },
   { key: "q", action: "Exit current screen; from launcher, quit" },
+  { key: "t", action: "Toggle dark/light theme" },
 ] as const satisfies readonly KeyBinding[];
+
+export const TOGGLE_THEME_COMMAND = "Toggle dark mode" as const;
+
+export type FoundationThemePreset = "dark" | "light";
+
+export function nextThemePreset(current: FoundationThemePreset | string | undefined | null): FoundationThemePreset {
+  return current === "dark" ? "light" : "dark";
+}
 
 function centered(line: string, width: number): string {
   if (width <= line.length) return line;
