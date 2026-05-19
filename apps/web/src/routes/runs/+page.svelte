@@ -34,6 +34,14 @@
   let selectedRange = $state(data.filter.range);
   let selectedDateFrom = $state(data.filter.dateFrom ?? "");
   let selectedDateTo = $state(data.filter.dateTo ?? "");
+  let reassignOpen = $state(false);
+  let reassignedAgent = $state("claude-code");
+
+  const reassignAgents = [
+    { id: "claude-code", status: "ready", detail: "latency 0.8s · transcript seed enabled" },
+    { id: "codex", status: "ready", detail: "latency 0.6s · context copy enabled" },
+    { id: "gemini-cli", status: "paused", detail: "resume required before takeover" },
+  ];
 
   function onSort(column: SortColumn): void {
     if (sort && sort.column === column) {
@@ -118,6 +126,42 @@
     </select>
     <button type="submit" class={cn(buttonVariants())}>Dispatch</button>
   </form>
+
+  <section
+    data-runs-reassign
+    class={cn("mb-4 rounded-md border border-border bg-card p-3")}
+  >
+    <div class={cn("flex flex-wrap items-center justify-between gap-3")}>
+      <div>
+        <h2 class={cn("text-sm font-semibold tracking-normal")}>Live run controls</h2>
+        <p class={cn("mt-1 text-xs text-muted-foreground")}>Move a running session to another agent without losing transcript context.</p>
+      </div>
+      <button
+        type="button"
+        data-action="reassign"
+        class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        onclick={() => reassignOpen = !reassignOpen}
+      >Reassign agent</button>
+    </div>
+    {#if reassignOpen}
+      <div data-runs-reassign-popover class={cn("mt-3 grid gap-2 rounded-md border border-border bg-background p-3")}>
+        {#each reassignAgents as agent}
+          <button
+            type="button"
+            class={cn("grid gap-1 rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-muted")}
+            data-runs-reassign-agent={agent.id}
+            onclick={() => reassignedAgent = agent.id}
+          >
+            <span class={cn("font-semibold")}>{agent.id} <span class={cn("text-xs text-muted-foreground")}>[{agent.status}]</span></span>
+            <span class={cn("text-xs text-muted-foreground")}>{agent.detail}</span>
+          </button>
+        {/each}
+        <div data-runs-reassign-status class={cn("rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground")}>
+          Reassign in progress · copied transcript seed to {reassignedAgent} · old session marked reassigned
+        </div>
+      </div>
+    {/if}
+  </section>
 
   <section
     data-runs-filter

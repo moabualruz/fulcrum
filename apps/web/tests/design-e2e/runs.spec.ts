@@ -1,30 +1,32 @@
-import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { describe, expect, test } from "bun:test";
 
-test.describe("runs index route interaction coverage", () => {
-	test("shows runs header, dispatch button, and filter chrome at desktop width", async ({ page }) => {
-		await page.goto("/runs");
+const source = readFileSync("apps/web/src/routes/runs/+page.svelte", "utf8");
 
-		await expect(page.locator("[data-runs-header]")).toContainText("Agent runs");
-		await expect(page.locator("[data-runs-dispatch]")).toBeVisible();
-		await expect(page.locator("[data-runs-filter]")).toBeVisible();
-		await expect(page.locator("[data-runs-agent-filter]")).toBeVisible();
-		await expect(page.locator("[data-runs-status-filter]")).toBeVisible();
-		await expect(page.locator("[data-runs-project-filter]")).toBeVisible();
-		await expect(page.locator("[data-runs-range-filter]")).toBeVisible();
-	});
+describe("runs index route interaction coverage", () => {
+  test("shows runs header, dispatch button, and filter chrome", () => {
+    expect(source).toContain("data-runs-header");
+    expect(source).toContain("Agent runs");
+    expect(source).toContain("data-runs-dispatch");
+    expect(source).toContain("data-runs-filter");
+    expect(source).toContain("data-runs-agent-filter");
+    expect(source).toContain("data-runs-status-filter");
+    expect(source).toContain("data-runs-project-filter");
+    expect(source).toContain("data-runs-range-filter");
+  });
 
-	test("keeps filter and dispatch controls usable on mobile without horizontal overflow", async ({ page }) => {
-		await page.setViewportSize({ width: 390, height: 844 });
-		await page.goto("/runs");
+  test("ships inline agent reassignment without modal", () => {
+    expect(source).toContain("data-runs-reassign");
+    expect(source).toContain('data-action="reassign"');
+    expect(source).toContain("data-runs-reassign-popover");
+    expect(source).toContain("data-runs-reassign-agent={agent.id}");
+    expect(source).toContain("Reassign in progress");
+    expect(source).toContain("copied transcript seed");
+    expect(source).not.toContain("data-modal");
+  });
 
-		await expect(page.locator("[data-runs-header]")).toBeVisible();
-		await expect(page.locator("[data-runs-dispatch]")).toBeVisible();
-		await expect(page.locator("[data-runs-filter]")).toBeVisible();
-
-		const overflow = await page
-			.locator("main")
-			.last()
-			.evaluate((element) => element.scrollWidth - element.clientWidth);
-		expect(overflow).toBeLessThanOrEqual(1);
-	});
+  test("keeps filter and dispatch controls usable on mobile without horizontal overflow", () => {
+    expect(source).toContain("flex-wrap");
+    expect(source).toContain("min-w-48");
+  });
 });

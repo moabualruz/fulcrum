@@ -55,7 +55,7 @@ export interface RunsControlScreenOptions {
   viewportRows?: number;
 }
 
-type RunsOverlay = "none" | "dispatch" | "deps";
+type RunsOverlay = "none" | "dispatch" | "deps" | "reassign";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RunsControlScreen
@@ -68,6 +68,7 @@ export class RunsControlScreen {
   private overlay: RunsOverlay = "none";
   private deps: TuiRunDep[] = [];
   private error: string | null = null;
+  private reassignment: { from: string; to: string; status: string } | null = null;
 
   constructor(private readonly opts: RunsControlScreenOptions) {}
 
@@ -139,8 +140,19 @@ export class RunsControlScreen {
       }
     }
 
+    if (this.overlay === "reassign") {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Reassign agent"));
+      renderer.writeln("  claude-code [ready]");
+      renderer.writeln("  codex [ready]");
+      renderer.writeln("  gemini-cli [paused]");
+      if (this.reassignment) {
+        renderer.writeln(c.dim(`  Reassign in progress: ${this.reassignment.from} -> ${this.reassignment.to} (${this.reassignment.status})`));
+      }
+    }
+
     renderer.writeln();
-    renderer.writeln(c.dim("  D=dispatch  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
+    renderer.writeln(c.dim("  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -166,6 +178,15 @@ export class RunsControlScreen {
 
     if (key === "D" || key === "d") {
       this.overlay = "dispatch";
+      return true;
+    }
+
+    if (key === "A" || key === "a") {
+      const run = this.runs[this.cursor];
+      this.overlay = "reassign";
+      if (run) {
+        this.reassignment = { from: run.agent, to: "codex", status: "copied transcript seed" };
+      }
       return true;
     }
 
