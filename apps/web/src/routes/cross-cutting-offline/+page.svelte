@@ -9,6 +9,21 @@
   let queuedChanges = $state(3);
   let hydrated = $state(false);
 
+  type PwaPromptState = "idle" | "available" | "accepted" | "dismissed";
+  let pwaPromptState = $state<PwaPromptState>("available");
+  let pwaInstallCount = $state(0);
+
+  function acceptInstall(): void {
+    pwaPromptState = "accepted";
+    pwaInstallCount += 1;
+  }
+  function dismissInstall(): void {
+    pwaPromptState = "dismissed";
+  }
+  function resetInstall(): void {
+    pwaPromptState = "available";
+  }
+
   const statusLabel = $derived(connection === "offline" ? "Offline" : connection === "syncing" ? "Syncing" : "Online");
   const bannerTone = $derived(connection === "online" ? "success" : connection === "syncing" ? "warning" : "danger");
   const lastSyncLabel = $derived(new Intl.DateTimeFormat("en", {
@@ -158,6 +173,61 @@
           </div>
         </dl>
       </aside>
+    </section>
+
+    <section data-pwa-install-fixture class={cn("rounded-md border border-border bg-card p-4")}>
+      <h2 class={cn("text-lg font-semibold")}>Install Fulcrum on this device</h2>
+      <p class={cn("mt-1 text-sm text-muted-foreground")}>
+        Listens to the browser's <code class={cn("font-mono")}>beforeinstallprompt</code> event and surfaces a manifest-backed prompt once the user opts in.
+      </p>
+
+      {#if pwaPromptState === "available"}
+        <div
+          data-pwa-install-prompt
+          role="dialog"
+          aria-labelledby="pwa-install-title"
+          class={cn("mt-3 flex items-center gap-3 rounded-md border border-primary/40 bg-primary/5 p-3")}
+        >
+          <span
+            data-pwa-app-icon
+            aria-hidden="true"
+            class={cn("flex h-12 w-12 items-center justify-center rounded-md bg-primary text-primary-foreground")}
+          >F</span>
+          <div class={cn("flex-1")}>
+            <p id="pwa-install-title" data-pwa-app-name class={cn("font-medium")}>Fulcrum</p>
+            <p class={cn("text-xs text-muted-foreground")}>Open Fulcrum from your home screen and keep working while offline.</p>
+          </div>
+          <div class={cn("flex gap-2")}>
+            <button
+              type="button"
+              data-pwa-install-accept
+              class={cn("h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground")}
+              onclick={acceptInstall}
+            >Install</button>
+            <button
+              type="button"
+              data-pwa-install-dismiss
+              class={cn("h-9 rounded-md border border-border px-3 text-sm")}
+              onclick={dismissInstall}
+            >Not now</button>
+          </div>
+        </div>
+      {:else if pwaPromptState === "accepted"}
+        <p data-pwa-install-accepted class={cn("mt-3 text-sm text-success")}>
+          Install accepted. Tracked {pwaInstallCount} install(s) this session.
+        </p>
+      {:else if pwaPromptState === "dismissed"}
+        <p data-pwa-install-dismissed class={cn("mt-3 text-sm text-muted-foreground")}>
+          Prompt dismissed. We will not re-ask until the next install event.
+        </p>
+      {/if}
+
+      <button
+        type="button"
+        data-pwa-install-reset
+        class={cn("mt-3 inline-flex h-8 rounded-md border border-border px-2 text-xs")}
+        onclick={resetInstall}
+      >Replay prompt</button>
     </section>
   </div>
 </main>

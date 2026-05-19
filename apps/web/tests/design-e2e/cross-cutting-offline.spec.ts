@@ -42,4 +42,21 @@ test.describe("offline reconnect banner", () => {
 		const overflow = await page.locator("[data-offline-page]").evaluate((element) => element.scrollWidth - element.clientWidth);
 		expect(overflow).toBeLessThanOrEqual(1);
 	});
+
+	test("PWA install prompt shows app icon, name, Install, and Not now controls", async ({ page }) => {
+		await page.goto("/cross-cutting-offline");
+
+		const prompt = page.locator("[data-pwa-install-prompt]");
+		await expect(prompt).toBeVisible();
+		await expect(prompt).toHaveAttribute("role", "dialog");
+		await expect(page.locator("[data-pwa-app-icon]")).toBeVisible();
+		await expect(page.locator("[data-pwa-app-name]")).toContainText("Fulcrum");
+
+		await page.locator("[data-pwa-install-dismiss]").click();
+		await expect(page.locator("[data-pwa-install-dismissed]")).toBeVisible();
+
+		await page.locator("[data-pwa-install-reset]").click();
+		await page.locator("[data-pwa-install-accept]").click();
+		await expect(page.locator("[data-pwa-install-accepted]")).toContainText("Tracked 1 install");
+	});
 });
