@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import pg from "pg";
+import { assertPgliteLockRecoverable } from "@platform-core/application/db/pglite-lock-recovery.ts";
 
 export type SqlValue = string | number | boolean | null | Uint8Array;
 
@@ -12,6 +13,7 @@ export interface SqlExecutor {
 
 export async function openLocalSqlStore(dataDir: string): Promise<SqlExecutor> {
   await mkdir(dataDir, { recursive: true });
+  await assertPgliteLockRecoverable(dataDir);
   const { PGlite } = await import("@electric-sql/pglite");
   const { vector } = await import("@electric-sql/pglite/vector");
   const db = new PGlite(dataDir, { extensions: { vector } });

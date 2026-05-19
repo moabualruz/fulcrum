@@ -1,6 +1,7 @@
 import { DataSource, EntitySchema, type DataSourceOptions } from "typeorm";
 import { PGliteDriver } from "typeorm-pglite";
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
+import { assertPgliteLockRecoverable } from "@platform-core/application/db/pglite-lock-recovery.ts";
 import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { CoreAndAuth1715788800000 } from "./migrations/1715788800000-CoreAndAuth.ts";
 import { WorkManagement1715788800001 } from "./migrations/1715788800001-WorkManagement.ts";
@@ -515,6 +516,7 @@ export async function initDataSource(
   if (config.backend === "pglite") {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(config.dataDir, { recursive: true });
+    await assertPgliteLockRecoverable(config.dataDir);
   }
   defaultDataSource = new DataSource({
     ...createDataSourceOptions(),
