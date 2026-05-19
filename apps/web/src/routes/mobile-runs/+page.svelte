@@ -2,6 +2,7 @@
   import { cn } from "$lib/utils.js";
 
   type Severity = "error" | "warn" | "info";
+  type ProviderTestStatus = "idle" | "connected" | "failed";
 
   interface RelatedEvent {
     kind: "task" | "run" | "session" | "tool";
@@ -26,6 +27,24 @@
     related: RelatedEvent[];
     sourceHref: string;
   }
+
+  interface ProviderConfig {
+    id: string;
+    name: string;
+    baseUrl: string;
+    timeoutMs: number;
+    version: string;
+    quotaRemaining: number;
+  }
+
+  const PROVIDER: ProviderConfig = {
+    id: "claude",
+    name: "Claude",
+    baseUrl: "https://api.anthropic.com",
+    timeoutMs: 5000,
+    version: "2026-05 provider schema",
+    quotaRemaining: 8241,
+  };
 
   const ERRORS: ErrorEvent[] = [
     {
@@ -78,7 +97,15 @@
 
   let activeId = $state<string | null>(null);
   let copyState = $state<string | null>(null);
+  let providerApiKey = $state("sk-fulcrum-valid-demo");
+  let providerBaseUrl = $state(PROVIDER.baseUrl);
+  let providerTimeoutMs = $state(PROVIDER.timeoutMs);
+  let providerTestStatus = $state<ProviderTestStatus>("idle");
+  let providerLatencyMs = $state<number | null>(null);
+  let providerError = $state("");
+  let providerSaved = $state(false);
   const active = $derived(ERRORS.find((event) => event.id === activeId) ?? null);
+  const canSaveProvider = $derived(providerTestStatus === "connected");
 
   function openError(id: string): void {
     activeId = id;
@@ -99,6 +126,26 @@
       copyState = "failed";
     }
   }
+
+  function testProvider(): void {
+    providerSaved = false;
+    const trimmedKey = providerApiKey.trim();
+    if (trimmedKey.length < 12 || trimmedKey.toLowerCase().includes("invalid")) {
+      providerTestStatus = "failed";
+      providerLatencyMs = 91;
+      providerError = "Provider rejected credentials before quota check.";
+      return;
+    }
+
+    providerTestStatus = "connected";
+    providerLatencyMs = 184;
+    providerError = "";
+  }
+
+  function saveProvider(): void {
+    if (!canSaveProvider) return;
+    providerSaved = true;
+  }
 </script>
 
 <svelte:head>
@@ -112,6 +159,94 @@
       Tap a failed event to inspect its stack, breadcrumbs, and related run/session/task/tool context.
     </p>
   </header>
+
+  <section data-provider-config-panel class="rounded-md border border-border bg-card p-4">
+    <div class="flex flex-col gap-1 border-b border-border pb-3">
+      <p class="text-xs font-medium uppercase text-muted-foreground">Inference provider</p>
+      <h2 class="text-lg font-semibold">{PROVIDER.name} connection</h2>
+      <p class="text-sm text-muted-foreground">Validate credentials before saving. Keys stay masked in the form and are persisted only after a successful test.</p>
+    </div>
+
+    <div class="mt-4 grid gap-3 md:grid-cols-2">
+      <label data-provider-name class="flex flex-col gap-1 text-sm font-medium">
+        Provider
+        <input class="h-11 rounded-md border border-input bg-background px-3 text-sm" value={PROVIDER.name} readonly aria-label="Provider name" />
+      </label>
+
+      <label data-provider-api-key class="flex flex-col gap-1 text-sm font-medium">
+        API key
+        <input
+          bind:value={providerApiKey}
+          class="h-11 rounded-md border border-input bg-background px-3 text-sm"
+          type="password"
+          autocomplete="off"
+          aria-label="Provider API key"
+        />
+      </label>
+
+      <label data-provider-base-url class="flex flex-col gap-1 text-sm font-medium">
+        Base URL
+        <input
+          bind:value={providerBaseUrl}
+          class="h-11 rounded-md border border-input bg-background px-3 text-sm"
+          type="url"
+          aria-label="Provider base URL"
+        />
+      </label>
+
+      <label data-provider-timeout class="flex flex-col gap-1 text-sm font-medium">
+        Timeout (ms)
+        <input
+          bind:value={providerTimeoutMs}
+          class="h-11 rounded-md border border-input bg-background px-3 text-sm"
+          type="number"
+          min="1000"
+          step="500"
+          aria-label="Provider timeout"
+        />
+      </label>
+    </div>
+
+    <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <button
+        type="button"
+        data-provider-test
+        class="min-h-11 rounded-md border border-border px-4 text-sm font-medium"
+        onclick={testProvider}
+      >Test provider</button>
+      <button
+        type="button"
+        data-provider-save
+        class="min-h-11 rounded-md border border-border px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!canSaveProvider}
+        onclick={saveProvider}
+      >Save credentials</button>
+    </div>
+
+    <div data-provider-test-result data-provider-status={providerTestStatus} class="mt-4 rounded-md border border-border bg-background p-3 text-sm">
+      {#if providerTestStatus === "idle"}
+        <p class="text-muted-foreground">No test run yet. Save remains disabled until credentials pass validation.</p>
+      {:else if providerTestStatus === "connected"}
+        <p class="font-medium text-success">connected</p>
+        <dl class="mt-2 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+          <div><dt>Latency</dt><dd data-provider-latency class="font-mono text-foreground">{providerLatencyMs}ms</dd></div>
+          <div><dt>Version</dt><dd data-provider-version class="font-mono text-foreground">{PROVIDER.version}</dd></div>
+          <div><dt>Quota</dt><dd data-provider-quota class="font-mono text-foreground">{PROVIDER.quotaRemaining} requests</dd></div>
+        </dl>
+      {:else}
+        <p class="font-medium text-destructive">failed</p>
+        <p data-provider-error class="mt-1 text-xs text-muted-foreground">{providerError}</p>
+        <p data-provider-latency class="mt-1 font-mono text-xs text-foreground">{providerLatencyMs}ms</p>
+      {/if}
+    </div>
+
+    <p data-provider-storage-note class="mt-3 text-xs text-muted-foreground">
+      Storage target: OS credential store when available; encrypted Fulcrum credentials file fallback.
+    </p>
+    <p data-provider-save-state class="mt-2 text-xs text-muted-foreground">
+      {providerSaved ? "Credentials saved after validation." : "Credentials not saved."}
+    </p>
+  </section>
 
   <div class="flex flex-col gap-3">
     <ul data-error-list class="flex flex-col gap-2 rounded-md border border-border">
@@ -149,11 +284,12 @@
   </div>
 
   {#if active}
-    <aside
+    <div
       data-error-detail={active.id}
       role="dialog"
       aria-modal="true"
       aria-labelledby="error-detail-title"
+      tabindex="-1"
       class="rounded-md border border-border bg-background p-4"
     >
       <header class="flex flex-col gap-1 border-b border-border pb-3">
@@ -221,6 +357,6 @@
           class="text-primary underline"
         >Open source event</a>
       </footer>
-    </aside>
+    </div>
   {/if}
 </section>
