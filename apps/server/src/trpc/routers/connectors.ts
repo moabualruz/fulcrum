@@ -8,6 +8,7 @@ export const connectorsRouter = t.router({
   get: getProcedure("connectors"),
   enable: mutationProcedure("connectors", "enable"),
   disable: idMutationProcedure("connectors", "disable"),
+  delete: idMutationProcedure("connectors", "delete"),
   sync: mutationProcedure("connectors", "sync"),
   runs: t.router({
     list: listProcedure("connectors"),
