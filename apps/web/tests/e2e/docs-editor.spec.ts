@@ -1,18 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures.ts";
 
 test.describe("Docs Editor Workflow", () => {
   test("doc tree sidebar shows page hierarchy", async ({ page }) => {
     await page.goto("/docs");
-    await expect(page.locator("[data-doc-tree]")).toBeVisible();
+    await expect(page.locator("[data-doc-tree]").first()).toBeVisible();
   });
 
-  test("creates a new document from sidebar", async ({ page }) => {
+  test("creates a new document from sidebar", async ({ page, fulcrumHome }) => {
+    await fulcrumHome.seedProject("docs-e2e-create", "Docs E2E Create");
+    await page.request.post("/api/active-project", { data: { slug: "docs-e2e-create" } });
     await page.goto("/docs");
     await page.locator("[data-new-doc]").click();
     await page.locator("[data-doc-title]").fill("E2E Test Doc");
     await page.locator("[data-doc-kind]").selectOption("note");
     await page.locator("[data-doc-save]").click();
-    await expect(page).toHaveURL(/\/docs\//);
+    await expect(page).toHaveURL(/\/docs\/(?!new$)[^/]+$/);
+    await expect(page.locator("[data-doc-title]")).toContainText("E2E Test Doc");
   });
 
   test("tiptap editor renders with toolbar and content area", async ({ page }) => {
@@ -56,9 +59,15 @@ test.describe("Docs Editor Workflow", () => {
     }
   });
 
-  test("frontmatter form toggles between form and YAML modes", async ({ page }) => {
-    await page.goto("/docs/new");
-    await page.locator("[data-doc-title]").fill("FM Test");
+  test("frontmatter form toggles between form and YAML modes", async ({ page, fulcrumHome }) => {
+    const project = await fulcrumHome.seedProject("docs-e2e-frontmatter", "Docs E2E Frontmatter");
+    const doc = await fulcrumHome.seedDoc({
+      projectId: project.id,
+      title: "FM Test",
+      body: "# FM Test",
+      kind: "note",
+    });
+    await page.goto(`/docs/${doc.id}/edit`);
     await expect(page.locator("[data-frontmatter-panel]")).toBeVisible();
     await page.locator("[data-frontmatter-toggle-yaml]").click();
     await expect(page.locator("[data-frontmatter-panel]")).toContainText("YAML");

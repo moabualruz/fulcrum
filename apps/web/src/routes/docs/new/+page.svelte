@@ -110,7 +110,8 @@
 				</button>
 			{/each}
 		</div>
-	{:else if wizardStep === "template"}
+	{/if}
+	{#if wizardStep === "type" || wizardStep === "template"}
 		<div data-template-picker class={cn("border-border flex flex-col gap-3 rounded-md border p-4")}>
 			<div class={cn("flex items-center justify-between gap-3")}>
 				<div>
@@ -199,6 +200,7 @@
 	<div class={cn("flex items-center gap-2 pt-2")}>
 		<button
 			type="submit"
+			data-doc-save
 			data-doc-submit
 			class={cn(buttonVariants({ variant: "default" }))}
 		>Create document</button>

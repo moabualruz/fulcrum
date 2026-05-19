@@ -43,7 +43,8 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 
 export const load = async (event: LoadEvent) => {
   const { params } = event;
-  const serverUrl = process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"];
+  const serverUrl =
+    process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? process.env["FULCRUM_API_URL"];
 
   let publicDoc: PublicDocument;
   if (serverUrl && event.url && event.request) {

@@ -71,7 +71,8 @@ export const load = (event: LoadEvent) => ({
   streamed: {
     data: (async () => {
       const { params } = event;
-      const serverUrl = process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"];
+      const serverUrl =
+        process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"] ?? process.env["FULCRUM_API_URL"];
 
       if (serverUrl && event.url && event.request) {
         // HTTP path: delegate to document API via HTTP (production mode).

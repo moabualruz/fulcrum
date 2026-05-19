@@ -13,9 +13,13 @@ type JsonRecord = Record<string, unknown>;
 
 async function controller(): Promise<RoutingPublicApiController> {
   const db = await initDatabase();
+  const featuresEnv =
+    process.env["FULCRUM_E2E"] === "1"
+      ? [process.env["FULCRUM_FEATURES"], "public-api"].filter(Boolean).join(",")
+      : process.env["FULCRUM_FEATURES"];
   return new RoutingPublicApiController(
     new RoutingPublicApiService(
-      { featuresEnv: process.env["FULCRUM_FEATURES"] },
+      { featuresEnv },
       new RoutingPublicStore(db.orm),
     ),
   );

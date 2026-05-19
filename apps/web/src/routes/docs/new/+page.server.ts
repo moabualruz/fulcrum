@@ -1,4 +1,5 @@
 import { fail, redirect } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
 import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import type { Actions, PageServerLoad } from "./$types";
@@ -6,6 +7,7 @@ import { DocumentFormSchema } from "$lib/server/documents.schema";
 import { parseLabels } from "$lib/markdown/labels";
 import { TEMPLATE_BODY_MAP } from "@knowledge-workspace/interface/document-pages.ts";
 import { createDocumentApiForEvent } from "$lib/server/document-api";
+import { createProjectApiForEvent } from "$lib/server/project-api";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 
@@ -23,11 +25,10 @@ export const actions: Actions = {
     const form = await superValidate(request, valibot(DocumentFormSchema));
     if (!form.valid) return fail(400, { form });
 
-    const projectId = form.data.projectId ?? readActiveProjectId(locals);
-    if (!projectId) return fail(400, { form, message: "Project is required." });
+    const projectId = await resolveProjectId(event, form.data.projectId ?? readActiveProjectId(locals));
 
     const created = await createDocumentApiForEvent(event).docs.create({
-      projectId,
+      ...(projectId ? { projectId } : {}),
       title: form.data.title,
       type: form.data.kind,
       bodyMd: form.data.body,
@@ -43,6 +44,18 @@ export const actions: Actions = {
   },
 };
 
+async function resolveProjectId(event: RequestEvent, candidate: string | null | undefined): Promise<string | null> {
+  if (!candidate) return null;
+  if (isUuid(candidate)) return candidate;
+  const projects = await createProjectApiForEvent(event).projects.list();
+  const rows = Array.isArray((projects as { data?: unknown }).data) ? (projects as { data: unknown[] }).data : [];
+  const match = rows.find((row) => {
+    const project = row as { id?: unknown; slug?: unknown };
+    return project.id === candidate || project.slug === candidate;
+  }) as { id?: unknown } | undefined;
+  return typeof match?.id === "string" ? match.id : candidate;
+}
+
 function readActiveProjectId(locals: App.Locals): string | null {
   const candidate = locals as App.Locals & { activeProjectId?: unknown; projectId?: unknown };
   if (typeof candidate.activeProjectId === "string" && candidate.activeProjectId.length > 0) {
@@ -50,4 +63,8 @@ function readActiveProjectId(locals: App.Locals): string | null {
   }
   if (typeof candidate.projectId === "string" && candidate.projectId.length > 0) return candidate.projectId;
   return null;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

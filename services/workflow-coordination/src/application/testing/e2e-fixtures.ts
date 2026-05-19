@@ -100,6 +100,14 @@ export async function seedE2eArtifact(
 ): Promise<{ id: string; runId: string }> {
   const id = crypto.randomUUID();
   const runId = crypto.randomUUID();
+  const traceId = `trace-e2e-${id}`;
+  const kind = input.kind ?? "file";
+  const title = input.title;
+  const bodyPath = input.bodyPath ?? input.title;
+  const sha256 = input.sha256 ?? null;
+  const size = input.size ?? null;
+  const mime = input.mime ?? "application/octet-stream";
+  const archived = input.archived ?? false;
   await db.query(
     `INSERT INTO agent_runs (id, org_id, agent_name, status) VALUES ($1, $2, $3, $4)`,
     [runId, orgId, "e2e-fixture", "succeeded"],
@@ -116,19 +124,48 @@ export async function seedE2eArtifact(
       input.projectId ?? null,
       runId,
       input.taskId ?? null,
-      input.kind ?? "file",
-      input.title,
-      input.bodyPath ?? input.title,
-      input.sha256 ?? null,
-      input.size ?? null,
-      input.bodyPath ?? input.title,
-      input.title,
-      input.mime ?? "application/octet-stream",
-      input.size ?? null,
-      input.sha256 ?? null,
-      input.archived ?? false,
+      kind,
+      title,
+      bodyPath,
+      sha256,
+      size,
+      bodyPath,
+      title,
+      mime,
+      size,
+      sha256,
+      archived,
     ],
   );
+  if (input.projectId) {
+    await db.query(
+      `INSERT INTO fulcrum_artifacts (
+         id, project_id, trace_id, run_id, task_id, doc_id, kind, title, filename,
+         body_path, checksum_sha256, mime, size_bytes, lifecycle_state, metadata_json,
+         archived, archived_at, deleted_at
+       )
+       VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL)
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        id,
+        input.projectId,
+        traceId,
+        runId,
+        input.taskId ?? null,
+        kind,
+        title,
+        title,
+        bodyPath,
+        sha256,
+        mime,
+        size ?? 0,
+        archived ? "archived" : "created",
+        JSON.stringify({ lifecycleState: archived ? "archived" : "created" }),
+        archived,
+        archived ? new Date().toISOString() : null,
+      ],
+    );
+  }
   return { id, runId };
 }
 
@@ -158,15 +195,61 @@ export async function seedE2eSearchKindsOrm(
   input: { common: string; kinds: readonly string[] },
 ): Promise<{ sourceIds: string[] }> {
   const sourceIds: string[] = [];
+  const projectId = crypto.randomUUID();
+  const projectSlug = `search-e2e-${projectId}`;
+  await em.query(
+    `INSERT INTO fulcrum_workspaces (id, slug, name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO NOTHING`,
+    [orgId, orgId, orgId],
+  );
+  await em.query(
+    `INSERT INTO fulcrum_projects (id, workspace_id, slug, name, trace_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO NOTHING`,
+    [projectId, orgId, projectSlug, "Search E2E", `trace-e2e-${projectId}`],
+  );
   for (const kind of input.kinds) {
     const sourceId = `${kind}-e2e-${crypto.randomUUID()}`;
+    const documentId = `doc-${sourceId}`;
+    const title = `${input.common} ${kind} title`;
+    const body = `${input.common} ${kind} body`;
+    const traceId = `trace-e2e-${sourceId}`;
     await indexSearchDocumentOrm(em, {
       orgId,
       sourceKind: kind,
       sourceId,
-      title: `${input.common} ${kind} title`,
-      body: `${input.common} ${kind} body`,
+      title,
+      body,
     });
+    await em.query(
+      `INSERT INTO fulcrum_documents (id, project_id, parent_id, title, body_md, source_type, trace_id)
+       VALUES ($1, $2, NULL, $3, $4, $5, $6)
+       ON CONFLICT (id) DO NOTHING`,
+      [documentId, projectId, title, body, kind, traceId],
+    );
+    await em.query(
+      `INSERT INTO fulcrum_doc_pages (
+         id, project_id, document_id, parent_page_id, title, slug, icon, position,
+         body_md, editor_json, yjs_state, trace_id
+       )
+       VALUES ($1, $2, $3, NULL, $4, $5, NULL, $6, $7, '{}'::jsonb, NULL, $8)
+       ON CONFLICT (id) DO NOTHING`,
+      [sourceId, projectId, documentId, title, sourceId, sourceId, body, traceId],
+    );
+    await em.query(
+      `INSERT INTO fulcrum_doc_search_entries (
+         id, page_id, project_id, source_kind, title, search_text, excerpt, trace_id
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (page_id) DO UPDATE SET
+         source_kind = EXCLUDED.source_kind,
+         title = EXCLUDED.title,
+         search_text = EXCLUDED.search_text,
+         excerpt = EXCLUDED.excerpt,
+         updated_at = now()`,
+      [`entry-${sourceId}`, sourceId, projectId, kind, title, body, body, traceId],
+    );
     sourceIds.push(sourceId);
   }
   return { sourceIds };
@@ -176,6 +259,7 @@ export async function cleanupE2eFixtures(
   db: ProductDb,
   input: E2eCleanupInput,
 ): Promise<void> {
+  await deleteByIds(db, "fulcrum_artifacts", input.artifactIds);
   await deleteByIds(db, "artifacts", input.artifactIds);
   await deleteByIds(db, "documents", input.docIds);
   await deleteByIds(db, "tasks", input.taskIds);
@@ -193,6 +277,14 @@ async function deleteSearchDocuments(
   db: ProductDb,
   ids: readonly string[] | undefined,
 ): Promise<void> {
+  const projectIds = new Set<string>();
+  for (const id of ids ?? []) {
+    const rows = await db.query<{ project_id: string }>(
+      `SELECT DISTINCT project_id FROM fulcrum_doc_search_entries WHERE page_id = $1`,
+      [id],
+    );
+    for (const row of rows) projectIds.add(row.project_id);
+  }
   const columns = await db.query<{ column_name: string }>(
     `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
     ["search_documents"],
@@ -200,6 +292,10 @@ async function deleteSearchDocuments(
   const columnNames = new Set(columns.map((row) => row.column_name));
   const idColumn = columnNames.has("source_id") ? "source_id" : "entity_id";
   await deleteByIds(db, "search_documents", ids, idColumn);
+  await deleteByIds(db, "fulcrum_doc_search_entries", ids, "page_id");
+  await deleteByIds(db, "fulcrum_doc_pages", ids);
+  await deleteByIds(db, "fulcrum_documents", (ids ?? []).map((id) => `doc-${id}`));
+  await deleteByIds(db, "fulcrum_projects", [...projectIds]);
 }
 
 async function deleteByIds(

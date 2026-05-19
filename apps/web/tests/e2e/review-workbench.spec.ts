@@ -1,13 +1,18 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type FulcrumHome } from "./fixtures.ts";
+
+async function finalQaPath(fulcrumHome: FulcrumHome): Promise<string> {
+  const project = await fulcrumHome.seedProject(`review-workbench-${crypto.randomUUID()}`, "Review Workbench");
+  return `/projects/${project.id}/reports?tab=final-qa`;
+}
 
 test.describe("Review Workbench Workflow", () => {
-  test("review page shows file tree sidebar", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("review page shows file tree sidebar", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     await expect(page.locator("[data-final-qa-panel]")).toBeVisible();
   });
 
-  test("review workbench renders diff pane for selected file", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("review workbench renders diff pane for selected file", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const buildBtn = page.locator("[data-review-workbench-build]");
     if (await buildBtn.isVisible()) {
       await buildBtn.click();
@@ -16,8 +21,8 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("annotation sidebar shows grouped annotations by file", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("annotation sidebar shows grouped annotations by file", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const buildBtn = page.locator("[data-review-workbench-build]");
     if (await buildBtn.isVisible()) {
       await buildBtn.click();
@@ -25,8 +30,8 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("search dock finds matches in diff lines", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("search dock finds matches in diff lines", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const searchInput = page.locator("[data-review-search]");
     if (await searchInput.isVisible()) {
       await searchInput.fill("function");
@@ -34,20 +39,20 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("final QA run button triggers report generation", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("final QA run button triggers report generation", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const runBtn = page.locator('button:has-text("Run Final QA")');
     await expect(runBtn).toBeVisible();
   });
 
-  test("UAT decision form submits approval", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("UAT decision form submits approval", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const approveBtn = page.locator('button:has-text("Approve UAT")');
     await expect(approveBtn).toBeVisible();
   });
 
-  test("review session saves and loads state", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("review session saves and loads state", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const saveBtn = page.locator("[data-review-session-save]");
     if (await saveBtn.isVisible()) {
       await saveBtn.click();
@@ -55,8 +60,8 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("annotation sidebar items are clickable with line references", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("annotation sidebar items are clickable with line references", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const buildBtn = page.locator("[data-review-workbench-build]");
     if (await buildBtn.isVisible()) {
       await buildBtn.click();
@@ -67,8 +72,8 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("AI review panel has input and ask button", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("AI review panel has input and ask button", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const buildBtn = page.locator("[data-review-workbench-build]");
     if (await buildBtn.isVisible()) {
       await buildBtn.click();
@@ -82,8 +87,8 @@ test.describe("Review Workbench Workflow", () => {
     }
   });
 
-  test("diff lines support multi-line selection via shift-click", async ({ page }) => {
-    await page.goto("/projects/test-project/reports?tab=final-qa");
+  test("diff lines support multi-line selection via shift-click", async ({ page, fulcrumHome }) => {
+    await page.goto(await finalQaPath(fulcrumHome));
     const buildBtn = page.locator("[data-review-workbench-build]");
     if (await buildBtn.isVisible()) {
       await buildBtn.click();
