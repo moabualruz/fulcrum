@@ -43,10 +43,7 @@ export async function initDatabase(): Promise<WebDatabaseHandle> {
 
   _initPromise = (async () => {
     const dataSource = await initDataSource();
-
-    if (!(await hasExistingSchema(dataSource.manager))) {
-      await dataSource.runMigrations({ transaction: "each" });
-    }
+    await dataSource.runMigrations({ transaction: "each" });
 
     const db = createOrmDb(dataSource, dataSource.manager, async () => {
       await dataSource.destroy();
@@ -174,15 +171,6 @@ function createOrmDb(
     em,
     orm,
   };
-}
-
-async function hasExistingSchema(em: EntityManager): Promise<boolean> {
-  try {
-    await sqlAccess(em).execute("SELECT 1 FROM orgs LIMIT 1");
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function ensureDefaultOrg(db: WebDatabaseHandle): Promise<void> {

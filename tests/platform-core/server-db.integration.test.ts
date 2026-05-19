@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { MigrationInterface, QueryRunner } from "typeorm";
 
 import {
   __resetDatabaseForTest,
@@ -13,7 +14,7 @@ import {
   openDatabase,
 } from "../../apps/web/src/lib/server/db.ts";
 import { DEFAULT_ORG_ID, DEFAULT_ORG_NAME } from "@platform-core/infrastructure/application-database/seed.ts";
-import { __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import { applicationMigrations, __resetDataSourceForTest } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 let previousHome: string | undefined;
 
@@ -87,4 +88,46 @@ describe("web server database singleton with real PGlite state", () => {
     expect(second).not.toBe(first);
     await expect(second.query("SELECT id FROM singleton_marker")).rejects.toThrow();
   });
+
+  test("warm start keeps data, applies pending migrations, and completes under two seconds", async () => {
+    await useTempHome();
+
+    const cold = await initDatabase();
+    const warmProjectId = "00000000-0000-0000-0000-00000000a001";
+    await cold.query("INSERT INTO projects (id, org_id, name) VALUES ($1, $2, $3)", [
+      warmProjectId,
+      DEFAULT_ORG_ID,
+      "Warm Project",
+    ]);
+    await closeDatabase();
+    __resetDatabaseForTest();
+    __resetDataSourceForTest();
+
+    class WarmStartProbe9999999999999 implements MigrationInterface {
+      name = "WarmStartProbe9999999999999";
+
+      async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query("CREATE TABLE IF NOT EXISTS warm_start_probe (id text PRIMARY KEY)");
+      }
+
+      async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query("DROP TABLE IF EXISTS warm_start_probe");
+      }
+    }
+
+    applicationMigrations.push(WarmStartProbe9999999999999);
+    try {
+      const startedAt = performance.now();
+      const warm = await initDatabase();
+      const elapsedMs = performance.now() - startedAt;
+
+      expect(elapsedMs).toBeLessThan(2_000);
+      expect(await warm.query<{ id: string }>("SELECT id FROM projects WHERE id = $1", [warmProjectId])).toEqual([
+        { id: warmProjectId },
+      ]);
+      expect(await warm.query<{ id: string }>("SELECT id FROM warm_start_probe")).toEqual([]);
+    } finally {
+      applicationMigrations.pop();
+    }
+  }, 10_000);
 });
