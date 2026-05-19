@@ -28,31 +28,45 @@ test.describe("task filters", () => {
 		await expect(page.locator("[data-filtered-task]")).toHaveCount(1);
 		await expect(page.locator("[data-filtered-task]").first()).toContainText("FUL-127");
 
+		await page.locator("[data-testid='save-view']").click();
+		await expect(page.locator("[data-save-view-modal]")).toBeVisible();
+		await expect(page.locator("[data-save-view-preview]")).toContainText("9 active filters");
 		await page.locator("[data-saved-view-name]").fill("Critical bug view");
-		await page.locator("[data-save-view]").click();
+		await page.locator("[data-confirm-save-view]").click();
 		await expect(page.locator("[data-saved-view='view-critical-bug-view']")).toBeVisible();
+		await expect(page.locator("[data-view-filter-count='view-critical-bug-view']")).toContainText("9 filters");
 
 		await page.locator("[data-clear-filters]").click();
 		await expect(page.locator("[data-filter-count-badge]")).toContainText("0 filters");
 		await expect(page.locator("[data-filtered-task]")).toHaveCount(4);
 
-		await page.locator("[data-saved-view='view-critical-bug-view']").click();
+		await page.locator("[data-apply-view='view-critical-bug-view']").click();
 		await expect(page.locator("[data-filter-count-badge]")).toContainText("9 filters");
 		await expect(page.locator("[data-filtered-task]")).toHaveCount(1);
 	});
 
-	test("edit and delete actions update or remove saved views", async ({ page }) => {
+	test("opens save modal, blocks empty views, and edits or deletes saved tabs", async ({ page }) => {
 		await page.goto("/task-filters");
 
+		await expect(page.locator("[data-view-scope]")).toContainText("project filter combination");
 		await page.locator("[data-clear-filters]").click();
-		await page.locator("[data-filter-state]").selectOption("In Progress");
-		await page.locator("[data-saved-view-name]").fill("Active sprint");
 		await page.locator("[data-save-view]").click();
-		await expect(page.locator("[data-saved-view='view-active-sprint']")).toBeVisible();
+		await expect(page.locator("[data-save-view-modal]")).toHaveAttribute("role", "dialog");
+		await expect(page.locator("[data-empty-view-warning]")).toContainText("Add at least one filter");
+		await expect(page.locator("[data-confirm-save-view]")).toBeDisabled();
+		await page.locator("[data-close-save-view]").click();
+
+		await page.locator("[data-filter-state]").selectOption("In Progress");
+		await page.locator("[data-save-view]").click();
+		await page.locator("[data-saved-view-name]").fill("Active sprint");
+		await page.locator("[data-confirm-save-view]").click();
+		await expect(page.locator("[data-saved-view='view-active-sprint']")).toContainText("Active sprint");
 
 		await page.locator("[data-edit-view='view-active-sprint']").click();
-		await expect(page.locator("[data-saved-view-name]")).toHaveValue("Active sprint");
-		await expect(page.locator("[data-save-view]")).toContainText("Update view");
+		await expect(page.locator("[data-save-view-modal]")).toContainText("Edit saved view");
+		await page.locator("[data-saved-view-name]").fill("Blocked review");
+		await page.locator("[data-confirm-save-view]").click();
+		await expect(page.locator("[data-saved-view='view-active-sprint']")).toContainText("Blocked review");
 
 		await page.locator("[data-delete-view='view-active-sprint']").click();
 		await expect(page.locator("[data-saved-view='view-active-sprint']")).toHaveCount(0);

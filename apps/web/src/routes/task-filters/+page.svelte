@@ -127,6 +127,7 @@
   let viewName = $state("Sprint triage");
   let activeViewId = $state("default");
   let editingViewId = $state<string | null>(null);
+  let saveDialogOpen = $state(false);
   let savedViews = $state<SavedFilterView[]>([
     {
       id: "default",
@@ -149,6 +150,9 @@
   ));
   const activeFilterCount = $derived(countActiveFilters(filters));
   const filteredTasks = $derived(TASKS.filter((task) => matchesFilters(task, filters, logic)));
+  const dialogTitle = $derived(editingViewId ? "Edit saved view" : "Save filtered view");
+  const dialogMode = $derived(editingViewId ? "Update view" : "Create view");
+  const canPersistView = $derived(viewName.trim().length > 0 && activeFilterCount > 0);
 
   function updateFilter<K extends keyof FilterState>(key: K, value: FilterState[K]): void {
     filters = { ...filters, [key]: value };
@@ -167,17 +171,30 @@
     activeViewId = "";
   }
 
-  function saveCurrentView(): void {
-    const id = `view-${viewName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "filtered"}`;
+  function openSaveDialog(): void {
+    editingViewId = null;
+    viewName = "Sprint triage";
+    saveDialogOpen = true;
+  }
+
+  function closeSaveDialog(): void {
+    saveDialogOpen = false;
+    editingViewId = null;
+  }
+
+  function persistCurrentView(): void {
+    if (!canPersistView) return;
+    const trimmedName = viewName.trim();
+    const id = editingViewId ?? `view-${trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "filtered"}`;
     const next = {
       id,
-      name: viewName || "Filtered view",
+      name: trimmedName,
       filters: cloneFilters(filters),
       logic,
     };
     savedViews = [...savedViews.filter((view) => view.id !== id), next];
     activeViewId = id;
-    editingViewId = null;
+    closeSaveDialog();
   }
 
   function applyView(view: SavedFilterView): void {
@@ -190,12 +207,13 @@
     applyView(view);
     viewName = view.name;
     editingViewId = view.id;
+    saveDialogOpen = true;
   }
 
   function deleteView(id: string): void {
     savedViews = savedViews.filter((view) => view.id !== id);
     if (activeViewId === id) activeViewId = "";
-    if (editingViewId === id) editingViewId = null;
+    if (editingViewId === id) closeSaveDialog();
   }
 
   function cloneFilters(value: FilterState): FilterState {
@@ -339,39 +357,41 @@
 
       <section class={cn("min-w-0 space-y-4")}>
         <div data-save-filtered-view class={cn("rounded-md border border-border bg-card p-3")}>
-          <div class={cn("flex flex-wrap items-end gap-3")}>
-            <label class={cn("min-w-56 flex-1 text-xs font-medium text-muted-foreground")}>
-              View name
-              <input data-saved-view-name bind:value={viewName} type="text" class={cn("mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm")} />
-            </label>
-            <button data-save-view type="button" onclick={saveCurrentView} class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>
-              {editingViewId ? "Update view" : "Save view"}
-            </button>
+          <div class={cn("flex flex-wrap items-center justify-between gap-3")}>
+            <div>
+              <h2 class={cn("text-sm font-semibold")}>Project saved views</h2>
+              <p data-view-scope class={cn("mt-1 text-xs text-muted-foreground")}>Saved views persist the current project filter combination, logic, and active chips.</p>
+            </div>
+            <button data-save-view data-testid="save-view" type="button" onclick={openSaveDialog} class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>Save view</button>
           </div>
           <div data-saved-filtered-views class={cn("mt-3 flex flex-wrap gap-2")}>
             {#each savedViews as view (view.id)}
-              <div data-saved-view-row={view.id} class={cn("inline-flex items-center gap-1 rounded-full border px-1 py-0.5", activeViewId === view.id ? "border-primary" : "border-border")}>
+              <div
+                data-saved-view={view.id}
+                class={cn("flex items-center gap-1 rounded-full border p-1 text-xs", activeViewId === view.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background")}
+              >
                 <button
                   type="button"
-                  data-saved-view={view.id}
+                  data-apply-view={view.id}
                   aria-pressed={activeViewId === view.id}
                   onclick={() => applyView(view)}
-                  class={cn("rounded-full px-2 py-0.5 text-xs", activeViewId === view.id ? "bg-primary text-primary-foreground" : "bg-background")}
+                  class={cn("rounded-full px-2 py-1 font-medium")}
                 >{view.name}</button>
+                <span data-view-filter-count={view.id} class={cn("rounded-full bg-background/80 px-2 py-0.5 text-[11px]", activeViewId === view.id ? "text-foreground" : "text-muted-foreground")}>{countActiveFilters(view.filters)} filters</span>
                 <button
                   type="button"
                   data-edit-view={view.id}
                   onclick={() => editView(view)}
-                  class={cn("rounded-full px-1 text-[10px] text-muted-foreground hover:text-foreground")}
+                  class={cn("rounded-full px-2 py-1 underline-offset-2 hover:underline")}
                   aria-label={`Edit ${view.name}`}
                 >Edit</button>
                 <button
                   type="button"
                   data-delete-view={view.id}
                   onclick={() => deleteView(view.id)}
-                  class={cn("rounded-full px-1 text-[10px] text-destructive hover:text-destructive/80")}
+                  class={cn("rounded-full px-2 py-1 underline-offset-2 hover:underline")}
                   aria-label={`Delete ${view.name}`}
-                >×</button>
+                >Delete</button>
               </div>
             {/each}
           </div>
@@ -417,4 +437,48 @@
       </section>
     </div>
   </div>
+
+  {#if saveDialogOpen}
+    <div data-save-view-modal role="dialog" aria-modal="true" aria-labelledby="save-view-title" tabindex="-1" class={cn("fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4 py-6")}>
+      <section class={cn("w-full max-w-lg rounded-lg border border-border bg-card p-4 shadow-lg")}>
+        <header class={cn("flex items-start justify-between gap-3 border-b border-border pb-3")}>
+          <div>
+            <h2 id="save-view-title" class={cn("text-lg font-semibold")}>{dialogTitle}</h2>
+            <p class={cn("mt-1 text-sm text-muted-foreground")}>Capture current filters for one-click reuse in this project.</p>
+          </div>
+          <button data-close-save-view type="button" onclick={closeSaveDialog} class={cn("h-8 rounded-md border border-border px-3 text-xs font-medium")}>Close</button>
+        </header>
+
+        <label class={cn("mt-4 block text-xs font-medium text-muted-foreground")}>
+          View name
+          <input data-saved-view-name bind:value={viewName} type="text" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+
+        <div data-save-view-preview class={cn("mt-4 rounded-md border border-border bg-background p-3 text-xs")}>
+          <p class={cn("font-medium")}>{activeFilterCount} active filters · {logic.toUpperCase()} logic · {filteredTasks.length} matching tasks</p>
+          <div class={cn("mt-2 flex flex-wrap gap-2 text-muted-foreground")}>
+            {#if filters.state}<span>State: {filters.state}</span>{/if}
+            {#if filters.assignee}<span>Assignee: {filters.assignee}</span>{/if}
+            {#each filters.labels as label}<span>Label: {label}</span>{/each}
+            {#if filters.priority}<span>Priority: {filters.priority}</span>{/if}
+            {#if filters.dueDate}<span>Due: {filters.dueDate}</span>{/if}
+            {#if filters.cycle}<span>Cycle: {filters.cycle}</span>{/if}
+            {#if filters.module}<span>Module: {filters.module}</span>{/if}
+            {#if filters.severity}<span>Severity: {filters.severity}</span>{/if}
+            {#if filters.customer}<span>Customer: {filters.customer}</span>{/if}
+            {#if activeFilterCount === 0}<span>No filters selected.</span>{/if}
+          </div>
+        </div>
+
+        {#if activeFilterCount === 0}
+          <p data-empty-view-warning class={cn("mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive")}>Add at least one filter before saving a view.</p>
+        {/if}
+
+        <footer class={cn("mt-4 flex flex-wrap justify-end gap-2")}>
+          <button type="button" onclick={closeSaveDialog} class={cn("h-9 rounded-md border border-border px-4 text-sm font-medium")}>Cancel</button>
+          <button data-confirm-save-view type="button" disabled={!canPersistView} onclick={persistCurrentView} class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50")}>{dialogMode}</button>
+        </footer>
+      </section>
+    </div>
+  {/if}
 </main>
