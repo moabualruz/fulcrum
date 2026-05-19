@@ -41,6 +41,23 @@ test.describe("task filters", () => {
 		await expect(page.locator("[data-filtered-task]")).toHaveCount(1);
 	});
 
+	test("edit and delete actions update or remove saved views", async ({ page }) => {
+		await page.goto("/task-filters");
+
+		await page.locator("[data-clear-filters]").click();
+		await page.locator("[data-filter-state]").selectOption("In Progress");
+		await page.locator("[data-saved-view-name]").fill("Active sprint");
+		await page.locator("[data-save-view]").click();
+		await expect(page.locator("[data-saved-view='view-active-sprint']")).toBeVisible();
+
+		await page.locator("[data-edit-view='view-active-sprint']").click();
+		await expect(page.locator("[data-saved-view-name]")).toHaveValue("Active sprint");
+		await expect(page.locator("[data-save-view]")).toContainText("Update view");
+
+		await page.locator("[data-delete-view='view-active-sprint']").click();
+		await expect(page.locator("[data-saved-view='view-active-sprint']")).toHaveCount(0);
+	});
+
 	test("supports OR logic and mobile filter panel without horizontal overflow", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/task-filters");

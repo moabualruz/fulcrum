@@ -126,6 +126,7 @@
   let labelSearch = $state("");
   let viewName = $state("Sprint triage");
   let activeViewId = $state("default");
+  let editingViewId = $state<string | null>(null);
   let savedViews = $state<SavedFilterView[]>([
     {
       id: "default",
@@ -176,12 +177,25 @@
     };
     savedViews = [...savedViews.filter((view) => view.id !== id), next];
     activeViewId = id;
+    editingViewId = null;
   }
 
   function applyView(view: SavedFilterView): void {
     filters = cloneFilters(view.filters);
     logic = view.logic;
     activeViewId = view.id;
+  }
+
+  function editView(view: SavedFilterView): void {
+    applyView(view);
+    viewName = view.name;
+    editingViewId = view.id;
+  }
+
+  function deleteView(id: string): void {
+    savedViews = savedViews.filter((view) => view.id !== id);
+    if (activeViewId === id) activeViewId = "";
+    if (editingViewId === id) editingViewId = null;
   }
 
   function cloneFilters(value: FilterState): FilterState {
@@ -330,17 +344,35 @@
               View name
               <input data-saved-view-name bind:value={viewName} type="text" class={cn("mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-sm")} />
             </label>
-            <button data-save-view type="button" onclick={saveCurrentView} class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>Save view</button>
+            <button data-save-view type="button" onclick={saveCurrentView} class={cn("h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90")}>
+              {editingViewId ? "Update view" : "Save view"}
+            </button>
           </div>
           <div data-saved-filtered-views class={cn("mt-3 flex flex-wrap gap-2")}>
             {#each savedViews as view (view.id)}
-              <button
-                type="button"
-                data-saved-view={view.id}
-                aria-pressed={activeViewId === view.id}
-                onclick={() => applyView(view)}
-                class={cn("rounded-full border px-3 py-1 text-xs", activeViewId === view.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background")}
-              >{view.name}</button>
+              <div data-saved-view-row={view.id} class={cn("inline-flex items-center gap-1 rounded-full border px-1 py-0.5", activeViewId === view.id ? "border-primary" : "border-border")}>
+                <button
+                  type="button"
+                  data-saved-view={view.id}
+                  aria-pressed={activeViewId === view.id}
+                  onclick={() => applyView(view)}
+                  class={cn("rounded-full px-2 py-0.5 text-xs", activeViewId === view.id ? "bg-primary text-primary-foreground" : "bg-background")}
+                >{view.name}</button>
+                <button
+                  type="button"
+                  data-edit-view={view.id}
+                  onclick={() => editView(view)}
+                  class={cn("rounded-full px-1 text-[10px] text-muted-foreground hover:text-foreground")}
+                  aria-label={`Edit ${view.name}`}
+                >Edit</button>
+                <button
+                  type="button"
+                  data-delete-view={view.id}
+                  onclick={() => deleteView(view.id)}
+                  class={cn("rounded-full px-1 text-[10px] text-destructive hover:text-destructive/80")}
+                  aria-label={`Delete ${view.name}`}
+                >×</button>
+              </div>
             {/each}
           </div>
         </div>
