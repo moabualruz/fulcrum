@@ -44,7 +44,7 @@ const specs =
 				.sort()
 				.map((file) => path.join("tests/design-e2e", file));
 
-const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? String(specs.length || 1));
+const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "10");
 const chunkCount = Math.ceil(specs.length / chunkSize);
 const designPorts = await allocatePortBlock({
 	count: chunkCount,

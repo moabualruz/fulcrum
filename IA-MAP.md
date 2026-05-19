@@ -101,6 +101,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /docs/<docId>/planning                                    planning view tied to document
 /ai-assist                                                OD reference route for AI Assist drawer with document planning context
 /plan-session                                             internal design-e2e preview for persistent AI Assist planning sessions, traffic stream inspection, source/session/trace links, reload resume, and missing-ID recovery
+/settings/ai-assist                                      AI Assist checkpoint mode, retention, event transport, and resolution precedence
 
 # System (workspace scope)
 /<ws>/doctor                                              workspace doctor

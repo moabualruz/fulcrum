@@ -1,9 +1,9 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 
-type SettingsTab = "theme" | "secrets" | "errors" | "backup" | "telemetry" | "flags" | "data";
+type SettingsTab = "theme" | "secrets" | "errors" | "backup" | "telemetry" | "flags" | "data" | "aiAssist";
 
-const TABS: SettingsTab[] = ["theme", "secrets", "errors", "backup", "telemetry", "flags", "data"];
+const TABS: SettingsTab[] = ["theme", "secrets", "errors", "backup", "telemetry", "flags", "data", "aiAssist"];
 
 export class SettingsTabs {
   private index = 0;
@@ -466,6 +466,51 @@ export class DataSettingsScreen {
     if (!this.importPath) return;
     const result = await this.opts.caller.data.import({ path: this.importPath });
     this.imported = result.imported;
+  }
+}
+
+export interface AiAssistSettingsState {
+  checkpointMode: string;
+  retentionCount: number;
+  retentionDays: number;
+  eventsTransport: string;
+  sourceSummary?: string;
+}
+
+export class AiAssistSettingsScreen {
+  private state: AiAssistSettingsState | null = null;
+
+  constructor(private readonly opts: {
+    caller: {
+      aiAssist: {
+        get: () => Promise<AiAssistSettingsState>;
+        set: (input: Partial<AiAssistSettingsState>) => Promise<AiAssistSettingsState>;
+      };
+    };
+  }) {}
+
+  async load(): Promise<void> {
+    this.state = await this.opts.caller.aiAssist.get();
+  }
+
+  render(renderer: Renderer): void {
+    renderer.writeln(c.bold("Settings > AI Assist"));
+    renderer.separator();
+    const state = this.state;
+    if (!state) {
+      renderer.writeln("  AI Assist settings not loaded");
+      return;
+    }
+    renderer.infoRow("Checkpoint mode", state.checkpointMode);
+    renderer.infoRow("Retention count", String(state.retentionCount));
+    renderer.infoRow("Retention days", String(state.retentionDays));
+    renderer.infoRow("Events transport", state.eventsTransport);
+    renderer.infoRow("Resolution", state.sourceSummary ?? "session > user > org > built-in");
+    renderer.writeln(c.dim("  :settings ai-assist  Enter edit  Tab tabs  Esc back"));
+  }
+
+  async set(input: Partial<AiAssistSettingsState>): Promise<void> {
+    this.state = await this.opts.caller.aiAssist.set(input);
   }
 }
 

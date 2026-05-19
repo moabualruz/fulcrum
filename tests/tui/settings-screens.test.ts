@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Renderer } from "@fulcrum/tui/renderer.ts";
 import {
+  AiAssistSettingsScreen,
   BackupSettingsScreen,
   DataSettingsScreen,
   ErrorsSettingsScreen,
@@ -22,20 +23,59 @@ function renderPlain(render: (renderer: Renderer) => void): string {
 }
 
 describe("SettingsTabs", () => {
-  test("cycles seven settings tabs and exits to parent on Escape", async () => {
+  test("cycles eight settings tabs and exits to parent on Escape", async () => {
     let exited = false;
     const tabs = new SettingsTabs({ onExit: () => { exited = true; } });
 
     expect(tabs.current).toBe("theme");
-    for (const expected of ["secrets", "errors", "backup", "telemetry", "flags", "data", "theme"] satisfies SettingsTabName[]) {
+    for (const expected of ["secrets", "errors", "backup", "telemetry", "flags", "data", "aiAssist", "theme"] satisfies SettingsTabName[]) {
       await tabs.handleKey("\t");
       expect(tabs.current).toBe(expected);
     }
 
     await tabs.handleKey("\x1b[Z");
-    expect(tabs.current).toBe("data");
+    expect(tabs.current).toBe("aiAssist");
     await tabs.handleKey("\x1b");
     expect(exited).toBe(true);
+  });
+});
+
+describe("AiAssistSettingsScreen", () => {
+  test("renders AI Assist resolution and saves setting edits", async () => {
+    const calls: unknown[] = [];
+    const screen = new AiAssistSettingsScreen({
+      caller: {
+        aiAssist: {
+          get: async () => ({
+            checkpointMode: "auto",
+            retentionCount: 20,
+            retentionDays: 30,
+            eventsTransport: "memory",
+            sourceSummary: "session > user > org > built-in",
+          }),
+          set: async (input) => {
+            calls.push(input);
+            return {
+              checkpointMode: input.checkpointMode ?? "auto",
+              retentionCount: input.retentionCount ?? 20,
+              retentionDays: input.retentionDays ?? 30,
+              eventsTransport: input.eventsTransport ?? "memory",
+              sourceSummary: "user",
+            };
+          },
+        },
+      },
+    });
+
+    await screen.load();
+    const initial = renderPlain((renderer) => screen.render(renderer));
+    expect(initial).toContain("Settings > AI Assist");
+    expect(initial).toContain("Checkpoint mode");
+    expect(initial).toContain(":settings ai-assist");
+
+    await screen.set({ checkpointMode: "git", eventsTransport: "db-outbox" });
+    expect(calls).toEqual([{ checkpointMode: "git", eventsTransport: "db-outbox" }]);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("db-outbox");
   });
 });
 

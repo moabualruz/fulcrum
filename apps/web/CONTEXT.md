@@ -56,6 +56,10 @@ _Avoid_: cancel reason, stop note without enum.
 The visible count of prompts waiting while AI Assist is paused; resume drains the queue through live session state.
 _Avoid_: hidden backlog, pending chat count.
 
+**AiAssistSettingsRoute**:
+The `/settings/ai-assist` route that edits checkpoint mode, checkpoint retention, and event transport while showing session > user > org > built-in resolution.
+_Avoid_: ACP settings page, hidden preference editor, protocol config.
+
 **TaskQuickCreateTray**:
 An inline Build-stage task creation surface that preserves board, backlog, table, or planning scope while showing required title, sprint, module, cycle, recurrence preview, validation, duplicate prevention, and retry state.
 _Avoid_: task create modal, hidden project scope, create dialog, cleared draft on failure.
