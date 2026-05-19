@@ -70,6 +70,46 @@ test.describe("build board design reference", () => {
 		await expect(page.locator("[data-task-key='AUTH-42'] [data-slot='mode-row-option']")).toHaveCount(3);
 	});
 
+	test("inline new-task row appears, validates required title, and cancels with Escape", async ({ page }) => {
+		await page.goto("/build-board");
+
+		const queuedColumn = page.locator("[data-build-column='queued']");
+		const trigger = queuedColumn.locator("[data-build-board-new-task-trigger]");
+		await expect(trigger).toBeVisible();
+		await expect(trigger).toContainText("New task");
+
+		await trigger.click();
+
+		const row = queuedColumn.locator("[data-build-board-new-task-row]");
+		await expect(row).toBeVisible();
+
+		const input = row.locator("[data-build-board-new-task-input]");
+		await expect(input).toBeFocused();
+		await expect(input).not.toHaveAttribute("aria-invalid", "true");
+		await expect(row.locator("[data-build-board-new-task-error]")).toHaveCount(0);
+
+		await input.press("Enter");
+		await expect(input).toHaveAttribute("aria-invalid", "true");
+		await expect(row.locator("[data-build-board-new-task-error]")).toContainText("Title is required.");
+
+		await input.fill("Persist refresh-token rotation");
+		await expect(input).not.toHaveAttribute("aria-invalid", "true");
+		await expect(row.locator("[data-build-board-new-task-error]")).toHaveCount(0);
+
+		await input.press("Escape");
+		await expect(row).toHaveCount(0);
+		await expect(trigger).toBeVisible();
+
+		await trigger.click();
+		const inputAgain = queuedColumn.locator("[data-build-board-new-task-input]");
+		await expect(inputAgain).toBeFocused();
+		await inputAgain.fill("Persist refresh-token rotation");
+		await inputAgain.press("Enter");
+
+		await expect(queuedColumn.locator("[data-build-board-new-task-row]")).toHaveCount(0);
+		await expect(queuedColumn.locator("[data-build-board-new-task-trigger]")).toBeVisible();
+	});
+
 	test("keeps the board usable on mobile without page-level overflow", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/build-board");

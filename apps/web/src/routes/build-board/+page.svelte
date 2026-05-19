@@ -21,6 +21,44 @@
     tasks: BoardTask[];
   };
 
+  let activeCreateColumnId = $state<string | null>(null);
+  let createDraftTitle = $state("");
+  let createDraftTouched = $state(false);
+
+  function openInlineCreate(columnId: string): void {
+    activeCreateColumnId = columnId;
+    createDraftTitle = "";
+    createDraftTouched = false;
+  }
+
+  function cancelInlineCreate(): void {
+    activeCreateColumnId = null;
+    createDraftTitle = "";
+    createDraftTouched = false;
+  }
+
+  function handleCreateKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelInlineCreate();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitInlineCreate();
+    }
+  }
+
+  function submitInlineCreate(): void {
+    createDraftTouched = true;
+    if (createDraftTitle.trim().length === 0) return;
+    // Persist via tRPC tasks.create in a follow-up wiring slice; for the
+    // design surface, clearing the draft confirms a successful save shape.
+    activeCreateColumnId = null;
+    createDraftTitle = "";
+    createDraftTouched = false;
+  }
+
   const columns: BoardColumn[] = [
     {
       id: "queued",
@@ -374,7 +412,13 @@
           <StatusBadge status={column.status} />
           <span data-build-column-count class={cn("rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground")}>{column.tasks.length}</span>
           <span class={cn("flex-1")}></span>
-          <Button size="icon" variant="ghost" aria-label={`Add task to ${column.title}`} data-build-column-add>+</Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`Add task to ${column.title}`}
+            data-build-column-add
+            onclick={() => openInlineCreate(column.id)}
+          >+</Button>
         </header>
 
         <div class={cn("flex flex-col gap-2 overflow-y-auto p-2")}>
@@ -405,6 +449,44 @@
               </div>
             </article>
           {/each}
+          {#if activeCreateColumnId === column.id}
+            <div
+              data-build-board-new-task-row
+              data-build-board-new-task-column={column.id}
+              class={cn("rounded-md border border-border bg-card p-3 shadow-xs")}
+            >
+              <label class={cn("block space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground")}>
+                <span>New task title</span>
+                <Input
+                  data-build-board-new-task-input
+                  autofocus
+                  aria-invalid={createDraftTouched && createDraftTitle.trim().length === 0 ? "true" : undefined}
+                  placeholder="Task title"
+                  bind:value={createDraftTitle}
+                  onkeydown={handleCreateKeydown}
+                  oninput={() => { createDraftTouched = true; }}
+                />
+              </label>
+              {#if createDraftTouched && createDraftTitle.trim().length === 0}
+                <p data-build-board-new-task-error class={cn("mt-1 text-xs text-destructive")}>Title is required.</p>
+              {/if}
+              <p class={cn("mt-2 text-[11px] text-muted-foreground")}>
+                <Kbd>Enter</Kbd> save · <Kbd>Esc</Kbd> cancel
+              </p>
+            </div>
+          {:else}
+            <button
+              type="button"
+              data-build-board-new-task-trigger
+              data-build-board-new-task-column={column.id}
+              class={cn(
+                "flex items-center gap-2 rounded-md border border-dashed border-border bg-transparent p-2 text-left text-xs text-muted-foreground hover:border-border-strong hover:text-foreground",
+              )}
+              onclick={() => openInlineCreate(column.id)}
+            >
+              <span>+ New task</span>
+            </button>
+          {/if}
         </div>
       </section>
     {/each}
