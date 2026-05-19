@@ -37,3 +37,34 @@ export function renderBootSplash(renderer: Renderer): void {
 export function formatFocusedRowLabel(label: string, selected: boolean): string {
   return selected ? `${SELECTED_ROW_FOCUS_MARKER} ${c.bold(label)}` : `  ${label}`;
 }
+
+export interface TuiErrorFrame {
+  message: string;
+  stackExcerpt: string;
+  recoveryHint: string;
+}
+
+export function formatTuiErrorFrame(error: unknown, hint?: string): TuiErrorFrame {
+  let message = "Unknown TUI error";
+  let stackExcerpt = "";
+  if (error instanceof Error) {
+    if (error.message) message = error.message;
+    stackExcerpt = (error.stack ?? "").split("\n").find((line) => line.trim().startsWith("at "))?.trim() ?? "";
+  } else if (typeof error === "string" && error.trim()) {
+    message = error.trim();
+  }
+  return {
+    message,
+    stackExcerpt,
+    recoveryHint: hint ?? "Press q to exit, then restart with 'fulcrum tui' or 'fulcrum doctor probe api'.",
+  };
+}
+
+export function renderTuiErrorFrame(renderer: Renderer, frame: TuiErrorFrame): void {
+  renderer.writeln();
+  renderer.writeln(`  ${c.bold(`TUI error: ${frame.message}`)}`);
+  if (frame.stackExcerpt) {
+    renderer.writeln(`  ${c.dim(frame.stackExcerpt)}`);
+  }
+  renderer.writeln(`  ${c.dim(frame.recoveryHint)}`);
+}

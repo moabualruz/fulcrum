@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   FOUNDATION_KEY_BINDINGS,
   TOGGLE_THEME_COMMAND,
+  formatTuiErrorFrame,
   nextThemePreset,
 } from "./tui-foundation.ts";
 
@@ -22,5 +23,22 @@ describe("tui-foundation theme toggle", () => {
     expect(nextThemePreset("light")).toBe("dark");
     expect(nextThemePreset(null)).toBe("dark");
     expect(nextThemePreset(undefined)).toBe("dark");
+  });
+});
+
+describe("formatTuiErrorFrame", () => {
+  test("extracts message, single stack excerpt, and default recovery hint", () => {
+    const error = new Error("disconnected from API");
+    error.stack = "Error: disconnected from API\n    at TuiAppRouter.dispatch (tui-app.ts:42:3)\n    at handler (router.ts:10:5)";
+    const frame = formatTuiErrorFrame(error);
+    expect(frame.message).toBe("disconnected from API");
+    expect(frame.stackExcerpt).toContain("at TuiAppRouter.dispatch");
+    expect(frame.recoveryHint).toContain("restart");
+  });
+
+  test("falls back to Unknown TUI error for non-Error inputs and honors custom hint", () => {
+    const frame = formatTuiErrorFrame(null, "Reconnect to the API");
+    expect(frame.message).toBe("Unknown TUI error");
+    expect(frame.recoveryHint).toBe("Reconnect to the API");
   });
 });
