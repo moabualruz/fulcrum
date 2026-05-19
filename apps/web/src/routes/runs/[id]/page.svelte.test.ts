@@ -55,7 +55,7 @@ type PageProps = {
             logs: { entries: Array<{ timestamp?: string; stream: string; text: string }>; cursor: string | null } | null;
             diff: string | null;
             artifacts: Array<RunArtifact>;
-            events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+            events: Array<{ id: string; verb: string; created_at: string; payload: Record<string, unknown> }>;
             observability: Observability;
           }>
         | {
@@ -64,7 +64,7 @@ type PageProps = {
             logs: { entries: Array<{ timestamp?: string; stream: string; text: string }>; cursor: string | null } | null;
             diff: string | null;
             artifacts: Array<RunArtifact>;
-            events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+            events: Array<{ id: string; verb: string; created_at: string; payload: Record<string, unknown> }>;
             observability: Observability;
           };
     };
@@ -149,7 +149,10 @@ function pageData(input: {
         logs: null,
         diff: null,
         artifacts: input.artifacts ?? [],
-        events: input.events,
+        events: input.events.map((event) => ({
+          ...event,
+          payload: event.payload && typeof event.payload === "object" ? event.payload as Record<string, unknown> : {},
+        })),
         observability,
       },
     },
@@ -175,7 +178,7 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
       logs: null;
       diff: null;
       artifacts: [];
-      events: Array<{ id: string; verb: string; created_at: string; payload: unknown }>;
+      events: Array<{ id: string; verb: string; created_at: string; payload: Record<string, unknown> }>;
       observability: Observability;
     }>(() => {});
     const { body } = render(Page, {
@@ -222,6 +225,64 @@ describe("/runs/[id] +page.svelte (SSR)", () => {
     });
     expect(body).toContain("data-runs-cancel-trigger");
     expect(body).toContain("data-runs-retry-trigger");
+  });
+
+  test("renders live workflow summary, stream recovery, tool timeline, and diff pane", () => {
+    const events = [
+      {
+        id: "e-tool",
+        verb: "tool.completed",
+        created_at: "2026-04-30T10:00:01Z",
+        payload: { toolName: "apply_patch", args: { file: "apps/web/src/routes/runs/[id]/+page.svelte" }, status: "0", summary: "patched" },
+      },
+      {
+        id: "e-diff",
+        verb: "workspace.diff",
+        created_at: "2026-04-30T10:00:02Z",
+        payload: { diff: "diff --git a/a.ts b/a.ts" },
+      },
+    ];
+    const { body } = render(Page, {
+      props: {
+        data: {
+          activeProjectId: null,
+          streamed: {
+            data: {
+              run: { ...RUN, project_id: "project-1" },
+              transcript: null,
+              logs: null,
+              diff: "diff --git a/apps/web/src/routes/runs/[id]/+page.svelte b/apps/web/src/routes/runs/[id]/+page.svelte\n@@ -1 +1 @@\n-old\n+new",
+              artifacts: [],
+              events,
+              observability: {
+                context: {
+                  sourceRefs: [{ kind: "task", id: "task-1", reason: "selected-task", scope: "project" }],
+                  warnings: [],
+                  scope: { projectId: "project-1", taskId: "task-1", includeGlobal: false },
+                },
+                artifacts: [],
+                memoryCandidates: [],
+                followUpTasks: [],
+                audit: [],
+                recovery: { retryable: true, retryCount: 0, nextRetryAt: null, lastErrorKind: null },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(body).toContain("data-run-workflow-summary");
+    expect(body).toContain("data-run-live-state");
+    expect(body).toContain('href="/projects/project-1/runs"');
+    expect(body).toContain("data-ai-assist-live-session");
+    expect(body).toContain("data-live-session-disconnect");
+    expect(body).toContain("data-tool-call-timeline");
+    expect(body).toContain("data-tool-call-card");
+    expect(body).toContain("apply_patch");
+    expect(body).toContain("data-diff-preview");
+    expect(body).toContain("data-live-file-diff-pane");
+    expect(body).toContain("data-file-scope-validation");
+    expect(body).toContain("data-live-unified-diff");
   });
 
   test("payload tab renders the run JSON", () => {
