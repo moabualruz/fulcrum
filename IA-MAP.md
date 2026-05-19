@@ -501,6 +501,8 @@ fulcrum trace    <show <id>>
 fulcrum ai       [--step <id>] [--agent <id>]   # opens inline AI Assist session;
                                                 # --agent overrides the default route
                                                 # for the step's action kind
+                 start --task <id> --title <title> [--agent <id>] [--route plan|build|review]
+                                                # starts task-scoped AI Assist with assembled context
 
 # Multi-CLI agent management (no cap on configured agents)
 fulcrum agent    <list|view|add|edit|remove|enable|disable|set-default|reload>

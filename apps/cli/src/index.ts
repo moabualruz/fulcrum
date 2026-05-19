@@ -39,6 +39,7 @@ Usage:
   fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch> [--json]
   fulcrum notify list [--unread] [--json|--watch]
   fulcrum settings <list|get|set> [--json]
+  fulcrum ai start --task <id> --title <title> [--json]
   fulcrum memory <list|get|add|delete|search|promote> [--json]
   fulcrum search query <query> [--json]
   fulcrum artifacts <list|show|upload|accept|reject|download|archive|unarchive|delete> [--json]
@@ -350,6 +351,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "settings": {
       const { run: runSettings } = await import("./settings.ts");
       await runSettings(rest);
+      return;
+    }
+    case "ai": {
+      const { run: runAi } = await import("./commands/ai.ts");
+      await runAi(rest);
       return;
     }
     case "components":

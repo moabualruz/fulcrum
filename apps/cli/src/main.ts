@@ -54,6 +54,7 @@ Usage:
   fulcrum projects|tasks|sprints|relationships|comments|templates|automations|recurrence|saved_views|taskCustomFields
   fulcrum memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
   fulcrum settings <list|get|set> [--json]
+  fulcrum ai start --task <id> --title <title> [--json]
   fulcrum completion --shell <bash|zsh|fish|powershell>
   fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
   fulcrum product projects list [--json]
@@ -182,6 +183,7 @@ async function main() {
     case "symphony":
     case "runs":
     case "session":
+    case "ai":
     case "notify":
     case "audit":
     case "webhooks":

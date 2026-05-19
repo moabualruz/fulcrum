@@ -10,6 +10,7 @@ import {
 import {
   loadDependencyRunLiveFeedbackForTasks,
 } from "@execution-orchestration/interface/dependency-run-live-feedback.ts";
+import { startTaskAiAssistSession } from "@agent-client-protocol/application/task-ai-assist-session.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
 import { requestServiceScope } from "$lib/server/request-service-scope";
 import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
@@ -190,6 +191,31 @@ export const actions: Actions = {
       return { ok: true, mode: "runFeedback", feedback };
     } catch (err) {
       return fail(400, { ok: false, mode: "runFeedback", message: (err as Error).message });
+    }
+  },
+
+  startAiAssistSession: async ({ request, params, locals }) => {
+    const fd = await request.formData();
+    const raw = fdToRecord(fd);
+    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, params.id);
+    try {
+      const task = await getWorkItem(em, ctx, params.id);
+      return {
+        ok: true,
+        mode: "startAiAssistSession",
+        session: startTaskAiAssistSession({
+          task,
+          agent: raw["agent"],
+          route: raw["route"],
+          workspacePath: raw["workspacePath"],
+        }),
+      };
+    } catch (err) {
+      return fail(400, {
+        ok: false,
+        mode: "startAiAssistSession",
+        message: (err as Error).message,
+      });
     }
   },
 

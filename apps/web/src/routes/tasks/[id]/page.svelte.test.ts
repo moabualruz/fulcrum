@@ -21,4 +21,20 @@ describe("/tasks/[id] +page.svelte source", () => {
     expect(source).toContain("form.dispatch.scheduledRuns");
     expect(source).toContain("form.dispatch.skippedTasks");
   });
+
+  test("renders task-scoped AI Assist drawer controls", () => {
+    expect(source).toContain("data-task-ai-assist-open");
+    expect(source).toContain("Start AI Assist");
+    expect(source).toContain("data-ai-assist-drawer");
+    expect(source).toContain("data-ai-assist-agent-picker");
+    expect(source).toContain("data-ai-assist-route-selector");
+    expect(source).toContain("data-ai-assist-workspace-path");
+    expect(source).toContain("data-ai-assist-context-bundle");
+    expect(source).toContain("data-context-doc");
+    expect(source).toContain("data-context-memory");
+    expect(source).toContain("data-context-repo");
+    expect(source).toContain('action="?/startAiAssistSession"');
+    expect(source).toContain("data-ai-assist-session-created");
+    expect(source).not.toContain(">ACP<");
+  });
 });

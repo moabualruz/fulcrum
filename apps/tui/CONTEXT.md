@@ -28,6 +28,10 @@ _Avoid_: Stage shortcut, g-prefix, go-key.
 The TUI-native inline `:ai` screen — the terminal-side equivalent of the web AI Assist drawer; it is a screen swap, not an overlay, with thread + composer + agent picker, auto-scoped to active step + project + trace.
 _Avoid_: AI drawer, ACP panel, chat overlay, slide-over.
 
+**AiAssistTaskStartScreen**:
+The `:ai start <task-id>` TuiScreen for task-scoped AI Assist dispatch; shows task title, agent, route, workspace path, context bundle summary, and returned session id.
+_Avoid_: task drawer, ACP start modal, chat popup.
+
 **AiAssistSettingsScreen**:
 The `:settings ai-assist` settings screen for checkpoint mode, checkpoint retention, event transport, and session > user > org > built-in resolution.
 _Avoid_: ACP settings panel, protocol config.
