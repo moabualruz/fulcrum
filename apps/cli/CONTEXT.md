@@ -10,6 +10,7 @@
 - **Mirror** — full-package copy into a non-native agent's directory tree when no first-party installer exists.
 - **Parity report** — per-package, per-agent count of source vs installed surfaces, missing targets, unsupported primitives, and source-only leaks.
 - **Disabled config** — native agent config that registers an MCP server in a not-enabled state. Codex/Gemini/OpenCode support; Claude/Pi report `disabledConfigUnsupported`.
+- **Session command** — `fulcrum session ...` controls persisted AI Assist sessions: list, pause, resume, abort, checkpoint, restore, checkpoints, watch. User-facing copy says session, not ACP.
 
 ## Public surface
 
@@ -22,6 +23,7 @@
 | `fulcrum hooks`       | `hooks.ts`                    |
 | `fulcrum mcp`         | `mcp-cmd.ts` + `mcp.ts`       |
 | `fulcrum skills`      | `skills.ts` + `upstream-skills.ts` |
+| `fulcrum session`     | `commands/session.ts`        |
 | `fulcrum doctor`      | `doctor.ts`                   |
 | `fulcrum compress`    | `compress.ts`                 |
 

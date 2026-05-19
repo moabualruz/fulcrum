@@ -36,6 +36,7 @@ Usage:
   fulcrum symphony runs list --state ready [--json]
   fulcrum agents <list|profile|test> [--json]
   fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs> [--json]
+  fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch> [--json]
   fulcrum notify list [--unread] [--json|--watch]
   fulcrum settings <list|get|set> [--json]
   fulcrum memory <list|get|add|delete|search|promote> [--json]
@@ -323,6 +324,27 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       }
 
       await runPillar14Command(cmd, rest);
+      return;
+    }
+    case "session": {
+      const { createLocalSessionCommandHost, runSessionCommand } = await import("./commands/session.ts");
+      const { host, cleanup } = await createLocalSessionCommandHost();
+      const controller = new AbortController();
+      const stop = () => controller.abort();
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+      try {
+        const result = await runSessionCommand(rest, host, {
+          stdout: process.stdout,
+          stderr: process.stderr,
+          signal: controller.signal,
+        });
+        if (result.exitCode !== 0) process.exit(result.exitCode);
+      } finally {
+        process.off("SIGINT", stop);
+        process.off("SIGTERM", stop);
+        await cleanup();
+      }
       return;
     }
     case "settings": {
