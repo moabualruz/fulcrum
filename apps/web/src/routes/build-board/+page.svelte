@@ -130,6 +130,45 @@
     { name: "Blank workflow", detail: "Start empty while keeping project, repo, and stage setup visible." },
   ];
   const setupActions = ["Open overview", "Open board", "Open settings"];
+  const integrationCards = [
+    { name: "Slack", state: "Connected", detail: "#build-alerts - issue.created, run.failed", action: "Refresh OAuth", tone: "success" },
+    { name: "GitHub", state: "Needs review", detail: "acme/auth-service - pull_request, check_suite", action: "Review scopes", tone: "warning" },
+    { name: "Jira", state: "Disconnected", detail: "Map Fulcrum tasks to Jira issues.", action: "Connect Jira", tone: "neutral" },
+  ] as const;
+  const webhookEvents = ["issue.created", "task.updated", "run.failed", "artifact.accepted"];
+  const integrationLogs = [
+    { time: "12:40:18", service: "webhook", status: "200", message: "issue.created delivered in 183 ms" },
+    { time: "12:38:04", service: "github", status: "401", message: "token scope missing repo:status" },
+    { time: "12:35:51", service: "slack", status: "200", message: "run.failed posted to #build-alerts" },
+    { time: "12:30:12", service: "webhook", status: "500", message: "receiver timeout after 3 retries" },
+  ];
+  let webhookUrl = $state("https://hooks.fulcrum.local/w/auth-rewrite/whsec_****0f9a");
+  let webhookVersion = $state(1);
+  let webhookTestStatus = $state("Not tested");
+  let oneTimeToken = $state("flcm_live_4y5c...shown-once");
+  let tokenCopied = $state(false);
+  let tokenRevoked = $state(false);
+
+  function rotateWebhook() {
+    webhookVersion += 1;
+    webhookUrl = `https://hooks.fulcrum.local/w/auth-rewrite/whsec_****${String(webhookVersion).padStart(4, "0")}`;
+    webhookTestStatus = "Rotated; dry-run required";
+  }
+
+  function testWebhook() {
+    webhookTestStatus = "Dry-run sent: issue.created - 202 Accepted";
+  }
+
+  function copyToken() {
+    tokenCopied = true;
+    oneTimeToken = "Copied; hidden after first reveal";
+  }
+
+  function revokeToken() {
+    tokenRevoked = true;
+    tokenCopied = false;
+    oneTimeToken = "Revoked instantly";
+  }
 </script>
 
 <svelte:head>
@@ -226,6 +265,90 @@
         {#each setupActions as action}
           <a href="/projects/auth-rewrite" class={cn("rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground")}>{action}</a>
         {/each}
+      </div>
+    </aside>
+  </section>
+
+  <section data-workspace-integrations class={cn("grid min-w-0 gap-4 border-b border-border bg-background px-4 py-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(22rem,1.05fr)]")}>
+    <div class={cn("min-w-0 space-y-3")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Workspace settings</p>
+          <h2 class={cn("text-lg font-semibold")}>Integrations and webhooks</h2>
+          <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
+            Connect services, dry-run payloads, rotate secrets, and audit the latest delivery calls.
+          </p>
+        </div>
+        <Button size="sm" variant="outline" data-integration-audit-link>Open audit log</Button>
+      </div>
+
+      <div data-integration-oauth-grid class={cn("grid gap-2 md:grid-cols-3")}>
+        {#each integrationCards as integration}
+          <article data-integration-card={integration.name.toLowerCase()} class={cn("rounded-md border border-border bg-card p-3")}>
+            <div class={cn("mb-2 flex items-start justify-between gap-2")}>
+              <div>
+                <h3 class={cn("text-sm font-semibold")}>{integration.name}</h3>
+                <p class={cn("mt-1 text-xs text-muted-foreground")}>{integration.detail}</p>
+              </div>
+              <Badge variant={integration.tone === "neutral" ? "outline" : integration.tone} size="sm">{integration.state}</Badge>
+            </div>
+            <Button size="sm" variant="outline" data-integration-oauth-action={integration.name.toLowerCase()}>{integration.action}</Button>
+          </article>
+        {/each}
+      </div>
+
+      <div data-api-token-panel class={cn("rounded-md border border-border bg-muted/35 p-3")}>
+        <div class={cn("flex flex-wrap items-center gap-2")}>
+          <h3 class={cn("text-sm font-semibold")}>API token</h3>
+          <Badge variant={tokenRevoked ? "destructive" : "success"} size="sm">{tokenRevoked ? "Revoked" : "Active"}</Badge>
+          <span class={cn("flex-1")}></span>
+          <Button size="sm" variant="outline" data-api-token-copy disabled={tokenRevoked} onclick={copyToken}>Copy once</Button>
+          <Button size="sm" variant="destructive" data-api-token-revoke disabled={tokenRevoked} onclick={revokeToken}>Revoke now</Button>
+        </div>
+        <p data-api-token-value class={cn("mt-2 font-mono text-xs text-muted-foreground")}>{oneTimeToken}</p>
+        {#if tokenCopied}
+          <p data-api-token-copy-state class={cn("mt-2 text-xs text-muted-foreground")}>Copied to clipboard; secret will not appear in logs.</p>
+        {/if}
+      </div>
+    </div>
+
+    <aside data-webhook-panel class={cn("min-w-0 space-y-3 rounded-md border border-border bg-muted/35 p-3")}>
+      <div class={cn("flex flex-wrap items-center gap-2")}>
+        <h3 class={cn("text-sm font-semibold")}>Webhook endpoint</h3>
+        <Badge variant="success" size="sm">Signing enabled</Badge>
+        <span class={cn("flex-1")}></span>
+        <Button size="sm" variant="outline" data-webhook-rotate onclick={rotateWebhook}>Rotate URL</Button>
+        <Button size="sm" data-webhook-test onclick={testWebhook}>Send dry-run</Button>
+      </div>
+      <p data-webhook-url class={cn("break-all rounded-md border border-border bg-background px-3 py-2 font-mono text-xs")}>{webhookUrl}</p>
+      <div data-webhook-events class={cn("flex flex-wrap gap-2")}>
+        {#each webhookEvents as event}
+          <Chip tone="accent">{event}</Chip>
+        {/each}
+      </div>
+      <p data-webhook-test-status class={cn("text-xs text-muted-foreground")}>{webhookTestStatus}</p>
+      <div data-integration-log class={cn("min-w-0 overflow-x-auto")}>
+        <table class={cn("w-full min-w-[34rem] text-xs")}>
+          <caption class={cn("mb-2 text-left font-medium text-muted-foreground")}>Last 100 integration calls</caption>
+          <thead>
+            <tr class={cn("border-b border-border text-left")}>
+              <th class={cn("py-1 pr-3 font-medium")}>Time</th>
+              <th class={cn("py-1 pr-3 font-medium")}>Service</th>
+              <th class={cn("py-1 pr-3 font-medium")}>Status</th>
+              <th class={cn("py-1 font-medium")}>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each integrationLogs as log}
+              <tr data-integration-log-row class={cn("border-b border-border/50 last:border-0")}>
+                <td class={cn("py-1 pr-3 font-mono")}>{log.time}</td>
+                <td class={cn("py-1 pr-3")}>{log.service}</td>
+                <td class={cn("py-1 pr-3 font-mono", log.status.startsWith("2") ? "text-green-700" : "text-destructive")}>{log.status}</td>
+                <td class={cn("py-1")}>{log.message}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       </div>
     </aside>
   </section>

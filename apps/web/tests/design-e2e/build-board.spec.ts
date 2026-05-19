@@ -33,6 +33,28 @@ test.describe("build board design reference", () => {
 			"Open settings",
 		]);
 
+		await expect(page.locator("[data-workspace-integrations]")).toContainText("Integrations and webhooks");
+		await expect(page.locator("[data-integration-card]")).toHaveCount(3);
+		await expect(page.locator("[data-integration-card='slack']")).toContainText("Connected");
+		await expect(page.locator("[data-integration-card='github']")).toContainText("Needs review");
+		await expect(page.locator("[data-integration-card='jira']")).toContainText("Connect Jira");
+		await expect(page.locator("[data-webhook-url]")).toContainText("whsec_");
+		await expect(page.locator("[data-webhook-events]")).toContainText("issue.created");
+		await expect(page.locator("[data-webhook-events]")).toContainText("artifact.accepted");
+		await expect(page.locator("[data-integration-log-row]")).toHaveCount(4);
+		await expect(page.locator("[data-integration-log]")).toContainText("401");
+		await expect(page.locator("[data-integration-log]")).toContainText("receiver timeout");
+
+		await page.locator("[data-webhook-test]").click();
+		await expect(page.locator("[data-webhook-test-status]")).toContainText("Dry-run sent");
+		await page.locator("[data-webhook-rotate]").click();
+		await expect(page.locator("[data-webhook-test-status]")).toContainText("dry-run required");
+		await page.locator("[data-api-token-copy]").click();
+		await expect(page.locator("[data-api-token-copy-state]")).toContainText("Copied to clipboard");
+		await page.locator("[data-api-token-revoke]").click();
+		await expect(page.locator("[data-api-token-panel]")).toContainText("Revoked");
+		await expect(page.locator("[data-api-token-copy]")).toBeDisabled();
+
 		const columns = page.locator("[data-build-column]");
 		await expect(columns).toHaveCount(4);
 		await expect(page.locator("[data-build-column='queued'] [data-build-column-header] [data-slot='status-badge']")).toContainText("Queued");
@@ -54,6 +76,8 @@ test.describe("build board design reference", () => {
 
 		await expect(page.locator("[data-build-board-new-task]")).toBeVisible();
 		await expect(page.locator("[data-project-setup-flow]")).toBeVisible();
+		await expect(page.locator("[data-workspace-integrations]")).toBeVisible();
+		await expect(page.locator("[data-webhook-panel]")).toBeVisible();
 		await expect(page.locator("[data-project-template]")).toHaveCount(3);
 		await expect(page.locator("[data-build-board-scroll]")).toBeVisible();
 		const pageOverflow = await page
