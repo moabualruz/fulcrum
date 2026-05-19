@@ -1,6 +1,25 @@
 <script lang="ts">
   import { Badge, Button, Chip, Kbd, ModeRow, StatusBadge, TraceChip } from "@fulcrum/ui-kit";
 
+  type AgentId = "claude-code" | "codex" | "gemini-cli" | "opencode" | "pi-cli";
+  type RouteRole = "executor" | "validator" | "planner";
+
+  const agentOptions: Array<{ id: AgentId; label: string; provider: string; client: string; tokens: number; source: "global" | "project" | "task" }> = [
+    { id: "claude-code", label: "Claude Code Opus", provider: "Anthropic", client: "claude-code", tokens: 12480, source: "project" },
+    { id: "codex", label: "Codex High", provider: "OpenAI", client: "codex", tokens: 10820, source: "task" },
+    { id: "gemini-cli", label: "Gemini Pro", provider: "Google", client: "gemini-cli", tokens: 9340, source: "global" },
+    { id: "opencode", label: "OpenCode Local", provider: "local", client: "opencode", tokens: 7680, source: "global" },
+    { id: "pi-cli", label: "Pi Review", provider: "local", client: "pi-cli", tokens: 7120, source: "global" },
+  ];
+
+  const routeLabels: Record<RouteRole, string> = {
+    executor: "Executor",
+    validator: "Validator",
+    planner: "Planner",
+  };
+
+  const storageKey = "fulcrum.ai-assist.agent-routes";
+
   const sources = [
     { kind: "Document", title: "Authentication rewrite brief", ref: "doc_auth_rewrite", detail: "Revision rev_142 · 4 source links" },
     { kind: "Attachment", title: "security-review.pdf", ref: "att_sec_review", detail: "2.4 MB · downloadable" },
@@ -27,6 +46,36 @@
   ];
 
   let selectedMode = $state<"play" | "discuss" | "ai-assist" | "trace">("ai-assist");
+  let agentRoutes = $state<Record<RouteRole, AgentId>>({
+    executor: "claude-code",
+    validator: "codex",
+    planner: "gemini-cli",
+  });
+  let savedNotice = $state("");
+
+  function optionFor(agentId: AgentId) {
+    return agentOptions.find((agent) => agent.id === agentId) ?? agentOptions[0]!;
+  }
+
+  function tokenEstimate(): number {
+    return Object.values(agentRoutes).reduce((sum, agentId) => sum + optionFor(agentId).tokens, 0);
+  }
+
+  function persistAgentRoutes() {
+    localStorage.setItem(storageKey, JSON.stringify(agentRoutes));
+    savedNotice = "Agent overrides saved";
+  }
+
+  $effect(() => {
+    const saved = localStorage.getItem(storageKey);
+    if (!saved) return;
+    try {
+      agentRoutes = { ...agentRoutes, ...JSON.parse(saved) };
+      savedNotice = "Saved agent overrides loaded";
+    } catch {
+      savedNotice = "";
+    }
+  });
 </script>
 
 <svelte:head>
@@ -150,6 +199,46 @@
             <Button variant="outline" size="sm" class="justify-start text-left">{suggestion}</Button>
           {/each}
         </div>
+      </section>
+
+      <section class="grid gap-3 border-b border-border px-4 py-3" data-ai-assist-agent-routes>
+        <details class="rounded-md border border-border bg-background p-3" open>
+          <summary class="cursor-pointer text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+            Agent routing
+          </summary>
+          <div class="mt-3 grid gap-3">
+            {#each Object.keys(routeLabels) as role}
+              {@const routeRole = role as RouteRole}
+              {@const selected = optionFor(agentRoutes[routeRole])}
+              <label class="grid gap-1 text-xs font-semibold text-muted-foreground">
+                <span class="flex flex-wrap items-center gap-2">
+                  {routeLabels[routeRole]}
+                  <Chip tone={selected.source === "task" ? "success" : "neutral"}>{selected.source}</Chip>
+                  <span class="font-mono text-[10px]">{selected.tokens.toLocaleString()} tokens</span>
+                </span>
+                <select
+                  class="h-9 rounded-md border border-input bg-card px-2 text-sm text-foreground"
+                  aria-label={`${routeLabels[routeRole]} agent`}
+                  data-ai-assist-agent-route={routeRole}
+                  bind:value={agentRoutes[routeRole]}
+                >
+                  {#each agentOptions as agent}
+                    <option value={agent.id}>{agent.provider} / {agent.label} ({agent.client})</option>
+                  {/each}
+                </select>
+              </label>
+            {/each}
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2">
+              <span class="font-mono text-[11px] text-muted-foreground" data-ai-assist-token-estimate>
+                estimate {tokenEstimate().toLocaleString()} tokens
+              </span>
+              <Button type="button" variant="outline" size="sm" data-ai-assist-save-agents onclick={persistAgentRoutes}>Change agent</Button>
+            </div>
+            {#if savedNotice}
+              <p class="text-xs text-muted-foreground" data-ai-assist-agent-saved>{savedNotice}</p>
+            {/if}
+          </div>
+        </details>
       </section>
 
       <section class="grid gap-2 border-b border-border px-4 py-3" data-ai-assist-agent-registry>
