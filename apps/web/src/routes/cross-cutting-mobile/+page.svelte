@@ -89,4 +89,25 @@
       <button class={cn("h-11 rounded-md bg-muted text-sm")}>AI Assist</button>
     </nav>
   </section>
+
+  <section
+    data-breakpoint-ladder
+    class={cn("mx-auto mt-8 grid w-full max-w-6xl gap-3 px-4 pb-8 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5")}
+  >
+    <header class={cn("xs:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5")}>
+      <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Breakpoint ladder</p>
+      <h2 class={cn("mt-1 text-lg font-semibold")}>Mobile-first responsive shell</h2>
+      <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
+        Unprefixed styles cover phone portrait; xs, sm, md, lg, and xl add columns without changing the mobile query threshold.
+      </p>
+    </header>
+    {#each ["base", "xs", "sm", "md", "lg", "xl"] as step}
+      <article data-breakpoint-card={step} class={cn("min-h-24 rounded-md border border-border bg-background p-3 text-sm")}>
+        <p class={cn("font-medium")}>{step}</p>
+        <p class={cn("mt-1 text-muted-foreground")}>
+          {step === "base" ? "320 px phone portrait baseline" : `${step} breakpoint reflow`}
+        </p>
+      </article>
+    {/each}
+  </section>
 </main>

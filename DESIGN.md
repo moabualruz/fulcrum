@@ -79,7 +79,7 @@ Row height baseline = 24 px (research-01 §13). Tables 28 px comfortable / 24 px
 
 ### 1.5 Breakpoints
 
-From research-06 §6 plus Fulcrum-specific `xs`:
+From research-06 §6 plus Fulcrum-specific `xs`. Tailwind v4 breakpoints are declared in `apps/web/src/app.css` under `@theme` as `--breakpoint-*` tokens; `MOBILE_QUERY` derives from the `md` threshold and stays `(max-width: 767px)`.
 
 | Name | Min width | Use |
 |---|---|---|
@@ -542,7 +542,7 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 8. **AI Assist** reachable in one keystroke from anywhere (`⌘/` web, `⌘/` TUI, `fulcrum ai` CLI). Entry point lives as the **right-most segment of the status footer** (web), the **right-most tab** of the bottom tab bar (mobile), and the **right-most segment of the terminal footer** (TUI). Never decorative; always accent-tinted left-border so it reads as the primary AI affordance.
 9. **Multi-CLI agent registry** is global to the workspace, scope-aware in the UI. Every Play / Discuss / Send invocation goes through an agent picker showing the default-routed agent first plus all other configured agents (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`, custom). Users can configure unlimited agents. MCP servers and plugins are **per agent** until cross-agent install is supported — the Operate → MCP and Operate → Plugins surfaces show a scope chip per agent, never a global list.
 10. **Top-right system icons** in the scope bar have defined behavior: `search` opens ⌘K palette · `bell` opens the Notifications popover (tabbed, with mark-all-read) · `settings` opens the Display popover (theme / density / mode / motion / sidebar) · `?` opens the keyboard cheatsheet overlay · avatar opens the Account popover (workspace switcher, account, API keys, CLI agents, MCP, plugins, sign out). Each icon has a labelled tooltip and `aria-expanded` state. They are never used as decorative chrome.
-11. **Viewport ladder.** 320 / 768 / 1024 / 1440 / 1920. Top-level shells wrap in `<main class="shell" style="container-type: inline-size;">`. `@container (max-width: 1023px)` collapses sidebar + repositions stage-rail to bottom. `@container (max-width: 767px)` shrinks scope-bar + status-footer typography. Mobile-specific surfaces (`mobile-*.html`) skip the container query and use viewport-px directly.
+11. **Viewport ladder.** 320 / 640 / 768 / 1024 / 1280 / 1440 / 1920. Top-level shells wrap in `<main class="shell" style="container-type: inline-size;">`. Tailwind `sm`/`md`/`lg`/`xl` utilities use 640/768/1024/1280 px; `@container (max-width: 1023px)` collapses sidebar + repositions stage-rail to bottom. `@container (max-width: 767px)` shrinks scope-bar + status-footer typography and matches `MOBILE_QUERY`. Mobile-specific surfaces (`mobile-*.html`) skip the container query and use viewport-px directly.
 12. **Mobile safe areas.** Web shell uses `viewport-fit=cover` and shared safe-area tokens. Portrait Android reserves at least 24 px above chrome for the status bar and at least 48 px below bottom navigation for the gesture zone. Portrait iOS reserves at least 47 px above chrome for notched devices and at least 34 px below bottom navigation for the home indicator when browser `env(safe-area-inset-*)` values are unavailable. Landscape mobile reserves 48 px Android inline gesture margins and 47 px iOS notch margins on both inline edges, with a 16 px bottom affordance. Design E2E validates this via `/cross-cutting-mobile`; production routes must not lower these reserves to match incomplete mockups.
 
 ---

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  BREAKPOINTS,
   browserDriver,
   isMobileViewport,
   MOBILE_QUERY,
@@ -8,6 +9,17 @@ import {
 } from "./media-query.ts";
 
 describe("media-query helper", () => {
+  test("breakpoints match the canonical Tailwind viewport ladder", () => {
+    expect(BREAKPOINTS).toEqual({
+      xs: 480,
+      sm: 640,
+      md: 768,
+      lg: 1024,
+      xl: 1280,
+      "2xl": 1536,
+    });
+  });
+
   test("MOBILE_QUERY is the canonical (max-width: 767px)", () => {
     expect(MOBILE_QUERY).toBe("(max-width: 767px)");
   });

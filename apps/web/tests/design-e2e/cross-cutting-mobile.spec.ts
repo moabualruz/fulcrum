@@ -101,4 +101,47 @@ test.describe("cross-cutting mobile safe areas", () => {
     expect(layout).toContain("var(--fulcrum-safe-area-top)");
     expect(layout).toContain("var(--fulcrum-gesture-zone-bottom)");
   });
+
+  test("documents Tailwind v4 breakpoints in the CSS theme and keeps mobile query aligned", async () => {
+    const appCss = readFileSync("src/app.css", "utf8");
+    const mediaQuery = readFileSync("src/lib/util/media-query.ts", "utf8");
+
+    for (const [name, rem] of Object.entries({
+      xs: "30rem",
+      sm: "40rem",
+      md: "48rem",
+      lg: "64rem",
+      xl: "80rem",
+      "2xl": "96rem",
+    })) {
+      expect(appCss).toContain(`--breakpoint-${name}: ${rem};`);
+    }
+
+    expect(mediaQuery).toContain("md: 768");
+    expect(mediaQuery).toContain("BREAKPOINTS.md - 1");
+    expect(mediaQuery).toContain("MOBILE_QUERY");
+  });
+
+  test("reflows breakpoint fixture at sm, md, lg, and xl viewports", async ({ page }) => {
+    const cases = [
+      { width: 640, columns: 2 },
+      { width: 768, columns: 3 },
+      { width: 1024, columns: 4 },
+      { width: 1280, columns: 5 },
+    ];
+
+    for (const item of cases) {
+      await page.setViewportSize({ width: item.width, height: 900 });
+      await page.goto("/cross-cutting-mobile");
+
+      const ladder = page.locator("[data-breakpoint-ladder]");
+      await expect(ladder).toBeVisible();
+
+      const columns = await ladder.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+      expect(columns).toBe(item.columns);
+
+      const overflow = await page.locator("[data-cross-cutting-mobile]").evaluate((element) => element.scrollWidth - element.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+    }
+  });
 });
