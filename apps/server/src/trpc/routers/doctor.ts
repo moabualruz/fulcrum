@@ -17,6 +17,7 @@ const SubsystemStatusSchema = z.object({
   status: z.enum(DOCTOR_STATUS_VALUES),
   message: z.string(),
   recoveryAction: z.string().nullable(),
+  runnableCommand: z.string().nullable(),
   checkedAt: z.string(),
 });
 
@@ -69,7 +70,8 @@ export function probeSubsystem(name: string): {
       name,
       status: "broken",
       message: `Unknown subsystem: ${name}`,
-      recoveryAction: null,
+      recoveryAction: `Register subsystem '${name}' or remove the probe call`,
+      runnableCommand: `fulcrum doctor subsystems --json`,
       checkedAt: new Date().toISOString(),
     };
     return { available: false, reason: fallback.message, probeDurationMs, version: null, status: fallback };
@@ -92,6 +94,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: `Bun ${typeof Bun !== "undefined" ? Bun.version : "n/a"}, Node ${process.versions.node}`,
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -103,6 +106,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
         status: "healthy" as const,
         message: `Settings root present at ${fulcrumHome}`,
         recoveryAction: null,
+        runnableCommand: null,
         checkedAt,
       };
     } catch {
@@ -111,6 +115,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
         status: "degraded" as const,
         message: `Settings root missing at ${fulcrumHome}`,
         recoveryAction: `mkdir -p ${fulcrumHome}`,
+        runnableCommand: `mkdir -p ${fulcrumHome}`,
         checkedAt,
       };
     }
@@ -123,6 +128,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: free < memory * 0.05 ? "degraded" : "healthy",
     message: `${Math.round(free / 1024 / 1024)} MiB free of ${Math.round(memory / 1024 / 1024)} MiB`,
     recoveryAction: free < memory * 0.05 ? "Close memory-heavy processes" : null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -131,6 +137,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "Doctor router answered request",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -139,6 +146,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "Workflow database adapter reachable",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -147,6 +155,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "PGlite embedded runtime available",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -155,6 +164,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "Execution orchestration runtime registered",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -163,6 +173,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "Audit log writer registered",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
@@ -171,6 +182,7 @@ export function collectSubsystemStatuses(now: Date = new Date()): DoctorSubsyste
     status: "healthy",
     message: "Memory engine registered",
     recoveryAction: null,
+    runnableCommand: null,
     checkedAt,
   };
 
