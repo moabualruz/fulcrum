@@ -17,3 +17,4 @@ export { ReviewScreen } from "./review-screen.ts";
 export { ReviewHandoffScreen } from "./review-handoff.ts";
 export { RunsControlScreen } from "./runs-screen.ts";
 export { PlanningScreen } from "./planning-screen.ts";
+export { PlanReviewScreen } from "./plan-review.ts";
