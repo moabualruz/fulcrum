@@ -232,4 +232,21 @@ describe("doctor CLI source command", () => {
     expect(Array.isArray(parsed.checks)).toBe(true);
     expect(parsed.summary).toBeDefined();
   });
+
+  test("runs pglite rebuild fix and returns verified JSON", async () => {
+    const output = await captureRun(["--run-fix", "pglite-rebuild", "--json"]);
+    const parsed = JSON.parse(output) as {
+      action: string;
+      dbPath: string;
+      quarantinedPath: string | null;
+      verified: boolean;
+      schemaApplied: number;
+    };
+
+    expect(parsed.action).toBe("pglite-rebuild");
+    expect(parsed.dbPath).toBe(join(process.env["FULCRUM_HOME"]!, "db", "main"));
+    expect(parsed.quarantinedPath).toBeNull();
+    expect(parsed.verified).toBe(true);
+    expect(parsed.schemaApplied).toBeGreaterThan(0);
+  });
 });

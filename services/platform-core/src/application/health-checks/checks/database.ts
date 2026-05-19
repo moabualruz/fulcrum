@@ -11,7 +11,7 @@ export const checks: DoctorCheckDef[] = [
         return {
           status: "fail",
           message: `${report.engine} database unavailable at ${report.dbPath}: ${report.error}`,
-          recovery: "Check FULCRUM_HOME, FULCRUM_DATABASE_URL, DATABASE_URL, and database reachability.",
+          recovery: report.recoveryCommand ?? "Check FULCRUM_HOME, FULCRUM_DATABASE_URL, DATABASE_URL, and database reachability.",
         };
       }
       if (report.engine === "absent") {

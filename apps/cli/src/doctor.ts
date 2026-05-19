@@ -19,6 +19,7 @@ import {
   buildMemoryEngineDoctorReport,
   buildProductKernelDoctorReport,
   buildReposDoctorReport,
+  rebuildLocalPgliteDatabase,
   type MemoryDoctorReport,
   type ProductKernelDoctorReport,
   type ReposDoctorReport,
@@ -830,8 +831,10 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       `  rows: orgs=${pk.rows.orgs} projects=${pk.rows.projects} documents=${pk.rows.documents} tasks=${pk.rows.tasks} agent_runs=${pk.rows.agentRuns}`,
     );
     if (pk.latestEventAt) console.log(`  latest event: ${pk.latestEventAt}`);
-  } else if (pk.error) {
+  }
+  if (pk.error) {
     console.log(`  error: ${pk.error}`);
+    if (pk.recoveryCommand) console.log(`  recovery: ${pk.recoveryCommand}`);
   }
   console.log();
 
@@ -909,8 +912,29 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
+  const runFixIdx = args.indexOf("--run-fix");
+  const runFix = runFixIdx >= 0 ? args[runFixIdx + 1] : undefined;
   const subsystemIdx = args.indexOf("--subsystem");
   const subsystem = subsystemIdx >= 0 ? args[subsystemIdx + 1] : undefined;
+
+  if (runFix) {
+    if (runFix !== "pglite-rebuild") {
+      console.error(`fulcrum doctor: unknown fix '${runFix}'`);
+      process.exit(2);
+      return;
+    }
+    const result = await rebuildLocalPgliteDatabase();
+    if (isJsonOutput) {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log("pglite-rebuild");
+      console.log(`  db: ${result.dbPath}`);
+      console.log(`  quarantined: ${result.quarantinedPath ?? "none"}`);
+      console.log(`  verified: ${result.verified}`);
+      console.log(`  migrations applied: ${result.schemaApplied}`);
+    }
+    return;
+  }
 
   // When --subsystem is given, delegate entirely to the modular orchestrator.
   if (subsystem) {
