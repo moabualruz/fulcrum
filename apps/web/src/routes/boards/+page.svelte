@@ -29,8 +29,8 @@
   const { data }: Props = $props();
 
   type ViewMode = "board" | "list" | "spreadsheet" | "gantt" | "calendar";
-  let viewMode = $state<ViewMode>(
-    (page.url.searchParams.get("view") as ViewMode) || "board"
+  const viewMode = $derived(
+    (page.url.searchParams.getAll("view").at(-1) as ViewMode | undefined) || "board"
   );
 
   let resolvedTasks = $state<BoardTask[]>([]);
@@ -135,27 +135,33 @@
 
 <header data-board-header class="mb-3 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">Board</h1>
-  <nav data-view-switcher class={cn("flex items-center gap-1 rounded-md border border-border p-0.5")} aria-label="View mode">
-    {#each [
-      { id: "board", label: "Board", icon: "▦" },
-      { id: "list", label: "List", icon: "☰" },
-      { id: "spreadsheet", label: "Table", icon: "▤" },
-      { id: "gantt", label: "Gantt", icon: "▬" },
-      { id: "calendar", label: "Calendar", icon: "📅" },
-    ] as view (view.id)}
-      <button
-        type="button"
-        data-view={view.id}
-        class={cn(
-          "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-          viewMode === view.id
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        onclick={() => { viewMode = view.id as ViewMode; }}
-        aria-pressed={viewMode === view.id}
-      >{view.icon} {view.label}</button>
-    {/each}
+  <nav aria-label="View mode">
+    <form method="GET" action="/boards" data-view-switcher class={cn("flex items-center gap-1 rounded-md border border-border p-0.5")}>
+      {#if data.project}
+        <input type="hidden" name="project" value={data.project} />
+      {/if}
+      {#each [
+        { id: "board", label: "Board", icon: "▦" },
+        { id: "list", label: "List", icon: "☰" },
+        { id: "spreadsheet", label: "Table", icon: "▤" },
+        { id: "gantt", label: "Gantt", icon: "▬" },
+        { id: "calendar", label: "Calendar", icon: "📅" },
+      ] as view (view.id)}
+        <button
+          type="submit"
+          name="view"
+          value={view.id}
+          data-view={view.id}
+          class={cn(
+            "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+            viewMode === view.id
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          )}
+          aria-pressed={viewMode === view.id}
+        >{view.icon} {view.label}</button>
+      {/each}
+    </form>
   </nav>
 </header>
 

@@ -62,7 +62,7 @@
 </script>
 
 <section
-  data-board-column
+  data-board-column={status}
   data-testid="kanban-column"
   data-status={status}
   class={cn("flex min-w-[16rem] flex-col gap-2 rounded-md border border-border bg-muted/30 p-2")}
@@ -94,14 +94,22 @@
     </ul>
   {/if}
 
-  <form data-board-column-add class="mt-1" onsubmit={submitNew}>
+  <form data-board-column-add class="mt-1 flex gap-2" onsubmit={submitNew}>
     <input
       data-board-column-input
       type="text"
       bind:value={draft}
       placeholder="+ Add task"
-      class="w-full rounded border border-border bg-background px-2 py-1 text-xs"
+      class="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
       aria-label={`Add task to ${label}`}
     />
+    <button
+      type="submit"
+      data-board-column-submit
+      class="rounded border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+      aria-label={`Add task to ${label}`}
+    >
+      Add
+    </button>
   </form>
 </section>
