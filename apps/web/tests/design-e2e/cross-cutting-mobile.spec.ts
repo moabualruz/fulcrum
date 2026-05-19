@@ -102,6 +102,26 @@ test.describe("cross-cutting mobile safe areas", () => {
     expect(layout).toContain("var(--fulcrum-gesture-zone-bottom)");
   });
 
+  test("treats /api/v1/openapi.json as a JSON contract endpoint, not blank visual chrome", async ({ request }) => {
+    const response = await request.get("/api/v1/openapi.json");
+    expect(response.headers()["content-type"]).toContain("application/json");
+
+    const body = await response.json();
+    if (response.status() === 200) {
+      expect(body.openapi).toBe("3.1.0");
+      expect(body.info.title).toBe("Fulcrum API");
+      expect(Object.keys(body.paths)).toEqual(expect.arrayContaining(["/tasks", "/docs", "/projects"]));
+    } else {
+      expect(response.status()).toBe(404);
+      expect(body.error).toContain("Public API");
+    }
+
+    const settingsApi = readFileSync("src/routes/settings/api/+page.svelte", "utf8");
+    const openApiRoute = readFileSync("src/routes/api/v1/openapi.json/+server.ts", "utf8");
+    expect(settingsApi).toContain('href="/api/v1/openapi.json"');
+    expect(openApiRoute).toContain("_buildOpenApiSpec");
+  });
+
   test("documents Tailwind v4 breakpoints in the CSS theme and keeps mobile query aligned", async () => {
     const appCss = readFileSync("src/app.css", "utf8");
     const mediaQuery = readFileSync("src/lib/util/media-query.ts", "utf8");

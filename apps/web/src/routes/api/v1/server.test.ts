@@ -64,4 +64,32 @@ describe("/api/v1 — isPublicApiEnabled() and buildOpenApiSpec()", () => {
     } as unknown as Parameters<typeof mod.GET>[0]);
     expect(response.status).toBe(200);
   });
+
+  test("GET /api/v1/openapi.json returns JSON error when public-api OFF", async () => {
+    delete process.env["FULCRUM_FEATURES"];
+    const mod = await import(`./openapi.json/+server.ts?t=${Date.now()}`);
+    const response = await mod.GET({
+      url: new URL("http://localhost/api/v1/openapi.json"),
+      request: new Request("http://localhost/api/v1/openapi.json"),
+    } as unknown as Parameters<typeof mod.GET>[0]);
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const body = await response.json();
+    expect(body.error).toContain("Public API");
+  });
+
+  test("GET /api/v1/openapi.json returns OpenAPI JSON when public-api ON", async () => {
+    process.env["FULCRUM_FEATURES"] = "public-api";
+    const mod = await import(`./openapi.json/+server.ts?t=${Date.now()}`);
+    const response = await mod.GET({
+      url: new URL("http://localhost/api/v1/openapi.json"),
+      request: new Request("http://localhost/api/v1/openapi.json"),
+    } as unknown as Parameters<typeof mod.GET>[0]);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    const spec = await response.json();
+    expect(spec.openapi).toBe("3.1.0");
+    expect(spec.servers[0].url).toBe("http://localhost/api/v1");
+    expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(["/tasks", "/docs", "/projects"]));
+  });
 });
