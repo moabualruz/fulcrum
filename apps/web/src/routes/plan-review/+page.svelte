@@ -12,6 +12,15 @@
     evidence: string;
   };
 
+  type Rule = {
+    id: string;
+    trigger: string;
+    field: string;
+    value: string;
+    action: string;
+    actionValue: string;
+  };
+
   const stages: Stage[] = [
     {
       id: "docs",
@@ -70,9 +79,96 @@
   ];
 
   let selectedStage = $state<Stage>(stages[1]);
+  let triggerType = $state("state_changed");
+  let conditionField = $state("state");
+  let conditionValue = $state("Done");
+  let actionType = $state("archive");
+  let actionValue = $state("");
+  let ruleValidation = $state("");
+  let previewText = $state("Sample issue AUTH-42 would be archived when state changes to Done.");
+  let savedRules = $state<Rule[]>([
+    {
+      id: "rule-existing-review",
+      trigger: "issue.created",
+      field: "priority",
+      value: "urgent",
+      action: "assign",
+      actionValue: "triage-owner",
+    },
+  ]);
+
+  const triggerOptions = [
+    { value: "issue.created", label: "issue.created", scope: "issue" },
+    { value: "state_changed", label: "state_changed", scope: "issue" },
+    { value: "cycle_started", label: "cycle_started", scope: "cycle" },
+    { value: "cycle_ended", label: "cycle_ended", scope: "cycle" },
+  ];
+
+  const fieldOptions = [
+    { value: "state", label: "state", scope: "issue" },
+    { value: "priority", label: "priority", scope: "issue" },
+    { value: "assignee", label: "assignee", scope: "issue" },
+    { value: "cycle", label: "cycle", scope: "cycle" },
+  ];
+
+  const actionOptions = [
+    { value: "archive", label: "archive" },
+    { value: "close_state", label: "close_state" },
+    { value: "change_state", label: "change_state" },
+    { value: "assign", label: "assign" },
+    { value: "add_label", label: "add_label" },
+  ];
 
   function openStage(stage: Stage) {
     selectedStage = stage;
+  }
+
+  function currentFieldScope(): string {
+    return fieldOptions.find((field) => field.value === conditionField)?.scope ?? "issue";
+  }
+
+  function currentTriggerScope(): string {
+    return triggerOptions.find((trigger) => trigger.value === triggerType)?.scope ?? "issue";
+  }
+
+  function validateRule(): string {
+    if (!conditionField || !conditionValue.trim()) return "Condition requires field and value.";
+    if (!actionType) return "Action required.";
+    if (currentTriggerScope() === "cycle" && currentFieldScope() === "issue") {
+      return "Cycle triggers cannot validate issue fields.";
+    }
+    return "";
+  }
+
+  function buildRuleSummary(): string {
+    const actionSuffix = actionValue.trim() ? ` ${actionValue.trim()}` : "";
+    return `When ${triggerType} and ${conditionField} = ${conditionValue.trim()}, ${actionType}${actionSuffix}.`;
+  }
+
+  function previewRule(): void {
+    const error = validateRule();
+    ruleValidation = error;
+    if (error) {
+      previewText = "Preview blocked until validation passes.";
+      return;
+    }
+    previewText = `Sample issue AUTH-42: ${buildRuleSummary()}`;
+  }
+
+  function saveRule(): void {
+    const error = validateRule();
+    ruleValidation = error;
+    if (error) return;
+    const rule = {
+      id: `rule-${savedRules.length + 1}`,
+      trigger: triggerType,
+      field: conditionField,
+      value: conditionValue.trim(),
+      action: actionType,
+      actionValue: actionValue.trim(),
+    };
+    savedRules = [...savedRules, rule];
+    previewText = `Saved ${buildRuleSummary()}`;
   }
 </script>
 
@@ -174,6 +270,86 @@
             </li>
           {/each}
         </ul>
+      </section>
+    </aside>
+  </section>
+
+  <section data-automation-rule-builder class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_22rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Automation rule builder</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Create trigger, condition, and action rules with validation before save.</p>
+        </div>
+        <Badge data-rule-status variant={ruleValidation ? "destructive" : "success"} size="sm">{ruleValidation ? "invalid" : "valid"}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-3")}>
+        <label class={cn("text-sm font-medium")}>
+          Trigger
+          <select data-rule-trigger bind:value={triggerType} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each triggerOptions as trigger}
+              <option value={trigger.value}>{trigger.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Condition field
+          <select data-rule-condition-field bind:value={conditionField} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each fieldOptions as field}
+              <option value={field.value}>{field.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Condition value
+          <input data-rule-condition-value bind:value={conditionValue} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Action
+          <select data-rule-action bind:value={actionType} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each actionOptions as action}
+              <option value={action.value}>{action.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium md:col-span-2")}>
+          Action value
+          <input data-rule-action-value bind:value={actionValue} placeholder="assignee, label, or target state" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+      </div>
+
+      {#if ruleValidation}
+        <p data-rule-validation role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{ruleValidation}</p>
+      {/if}
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-preview-rule type="button" variant="outline" onclick={previewRule}>Preview rule</Button>
+        <Button data-save-rule type="button" onclick={saveRule}>Save rule</Button>
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-rule-preview class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Preview</h3>
+        <p data-rule-preview-text class={cn("mt-2 text-sm text-muted-foreground")}>{previewText}</p>
+      </section>
+
+      <section data-saved-rules class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Saved rules</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each savedRules as rule}
+            <article data-saved-rule={rule.id} class={cn("rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+              <p data-saved-rule-trigger={rule.id} class={cn("font-medium")}>{rule.trigger}</p>
+              <p data-saved-rule-condition={rule.id} class={cn("text-muted-foreground")}>{rule.field} = {rule.value}</p>
+              <p data-saved-rule-action={rule.id} class={cn("text-muted-foreground")}>{rule.action}{rule.actionValue ? ` ${rule.actionValue}` : ""}</p>
+            </article>
+          {/each}
+        </div>
       </section>
     </aside>
   </section>

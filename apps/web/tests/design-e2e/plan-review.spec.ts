@@ -45,4 +45,33 @@ test.describe("plan review workflow navigation", () => {
 			.evaluate((element) => element.scrollWidth - element.clientWidth);
 		expect(routeOverflow).toBeLessThanOrEqual(1);
 	});
+
+	test("builds, validates, previews, and saves automation rules", async ({ page }) => {
+		await page.goto("/plan-review");
+
+		await expect(page.locator("[data-automation-rule-builder]")).toBeVisible();
+		await page.locator("[data-rule-trigger]").selectOption("state_changed");
+		await page.locator("[data-rule-condition-field]").selectOption("state");
+		await page.locator("[data-rule-condition-value]").fill("Done");
+		await page.locator("[data-rule-action]").selectOption("archive");
+		await page.locator("[data-preview-rule]").click();
+		await expect(page.locator("[data-rule-preview-text]")).toContainText("AUTH-42");
+		await expect(page.locator("[data-rule-preview-text]")).toContainText("state_changed");
+		await page.locator("[data-save-rule]").click();
+		await expect(page.locator("[data-saved-rule='rule-2']")).toBeVisible();
+		await expect(page.locator("[data-saved-rule-action='rule-2']")).toContainText("archive");
+
+		await page.locator("[data-rule-trigger]").selectOption("cycle_started");
+		await page.locator("[data-rule-condition-field]").selectOption("state");
+		await page.locator("[data-preview-rule]").click();
+		await expect(page.locator("[data-rule-validation]")).toContainText("Cycle triggers cannot validate issue fields");
+		await expect(page.locator("[data-rule-preview-text]")).toContainText("Preview blocked");
+
+		await page.locator("[data-rule-condition-field]").selectOption("cycle");
+		await page.locator("[data-rule-condition-value]").fill("May sprint");
+		await page.locator("[data-rule-action]").selectOption("close_state");
+		await page.locator("[data-preview-rule]").click();
+		await expect(page.locator("[data-rule-status]")).toContainText("valid");
+		await expect(page.locator("[data-rule-preview-text]")).toContainText("cycle_started");
+	});
 });
