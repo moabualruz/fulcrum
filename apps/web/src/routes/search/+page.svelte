@@ -1,6 +1,20 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { Breadcrumb, type BreadcrumbItem } from "@fulcrum/ui-kit";
   import type { SavedSearch, SearchHit } from "./+page.server.ts";
+
+  const PROJECT_CONTEXT = {
+    id: "proj-fulcrum",
+    name: "Fulcrum",
+    color: "oklch(0.72 0.16 250)",
+    icon: "F",
+  };
+
+  const breadcrumb: BreadcrumbItem[] = [
+    { label: "Workspace", href: "/" },
+    { label: PROJECT_CONTEXT.name, href: `/projects/${PROJECT_CONTEXT.id}` },
+    { label: "Search", current: true },
+  ];
 
   interface Props {
     data: {
@@ -82,8 +96,20 @@
   }
 </script>
 
-<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
-  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Search</h1>
+<header class={cn("mb-4 flex flex-col gap-2 border-b border-border pb-4")}>
+  <div data-breadcrumb-row class={cn("flex items-center gap-2")}>
+    <span
+      data-project-icon
+      data-project-id={PROJECT_CONTEXT.id}
+      class={cn("inline-flex h-6 w-6 items-center justify-center rounded text-xs font-semibold text-white")}
+      style="background-color: {PROJECT_CONTEXT.color}"
+      aria-label={`${PROJECT_CONTEXT.name} project icon`}
+    >{PROJECT_CONTEXT.icon}</span>
+    <Breadcrumb data-search-breadcrumb items={breadcrumb} />
+  </div>
+  <div class={cn("flex items-center justify-between gap-4")}>
+    <h1 class={cn("text-2xl font-semibold tracking-tight")}>Search</h1>
+  </div>
 </header>
 
 <form data-search-form method="GET" class={cn("mb-4 flex flex-wrap items-center gap-2")}>
