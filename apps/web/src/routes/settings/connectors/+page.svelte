@@ -20,6 +20,12 @@
     <p class="text-sm text-muted-foreground">Connect Fulcrum to external knowledge sources.</p>
   </header>
 
+  {#if data.loadError}
+    <p data-connector-route-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      {data.loadError}
+    </p>
+  {/if}
+
   <div class="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
     {#each data.connectors as connector (connector.name)}
       {@const label = connector.name === "confluence" ? "Confluence"

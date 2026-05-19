@@ -88,6 +88,21 @@ function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
+function fallbackFlags(): FlagRow[] {
+  return [
+    {
+      name: "agent-routing.override",
+      enabled: false,
+      description: "Allow settings to route supported runs to a selected agent.",
+    },
+    {
+      name: "connectors.sync",
+      enabled: false,
+      description: "Enable connector sync controls once connector APIs are reachable.",
+    },
+  ];
+}
+
 async function requireOwnerOrAdmin(event: LoadEvent | ActionEvent): Promise<ScopedApiCallers> {
   const callers = createScopedApiCallers(event);
   if (!callers) {
@@ -129,22 +144,32 @@ export async function load(event: LoadEvent) {
     throw redirect(302, "/auth/login");
   }
 
-  const callers = await requireOwnerOrAdmin(event);
+  const callers = createScopedApiCallers(event);
+  if (!callers) {
+    return {
+      flags: fallbackFlags(),
+      loadError: "Feature flag API caller is not configured. Verify /settings/api base URL, then retry from /settings/flags.",
+    };
+  }
 
   try {
+    await callers.organization.orgs.members.list();
     const rows = await callers.feature.flags.list();
     const flags = Array.isArray(rows)
       ? rows.map((row) => normalizeFlagRow(row as FlagApiRow)).filter((row): row is FlagRow => row !== null)
       : [];
-    return { flags };
+    return { flags, loadError: null };
   } catch (cause) {
     const message = errorMessage(cause);
     const status = errorStatusFromMessage(message);
     if (status === 401) throw redirect(302, "/auth/login");
-    if (status === 403) {
-      error(403, { message: "Only org owners and admins can access feature flags." });
-    }
-    error(500, { message });
+    return {
+      flags: fallbackFlags(),
+      loadError:
+        status === 403
+          ? "Only org owners and admins can change feature flags. Verify access from /settings/api, then retry from /settings/flags."
+          : `Feature flag API unavailable. Verify /settings/api base URL, then retry from /settings/flags. ${message}`,
+    };
   }
 }
 
