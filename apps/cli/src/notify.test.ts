@@ -151,6 +151,31 @@ describe("fulcrum notify CLI", () => {
     expect(JSON.parse(screen.out.join("\n"))).toHaveLength(1);
   });
 
+  test("notify rules update forwards readable rule changes", async () => {
+    const screen = io();
+    await runNotify([
+      "rules",
+      "update",
+      "rule-1",
+      "--name",
+      "Review blockers",
+      "--pattern",
+      "{\"kind\":\"blocker\"}",
+      "--channels",
+      "in-app,email",
+      "--disable",
+      "--json",
+    ], { ...screen.opts, caller: caller() });
+
+    expect(JSON.parse(screen.out.join("\n"))).toEqual({
+      id: "rule-1",
+      name: "Review blockers",
+      eventPattern: { kind: "blocker" },
+      channels: ["in-app", "email"],
+      enabled: false,
+    });
+  });
+
   test("notify channels config + list with secret masking", async () => {
     const c = caller();
     let screen = io();

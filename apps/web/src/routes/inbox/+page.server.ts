@@ -27,6 +27,15 @@ export interface NotificationRow {
   read: boolean;
   readAt: string | null;
   createdAt: string;
+  evidenceHref: string;
+  evidenceLabel: string;
+}
+
+export interface NotificationRuleRow {
+  id: string;
+  name: string;
+  enabled: boolean;
+  channels: string[];
 }
 
 export interface ActivityRow {
@@ -43,6 +52,7 @@ export interface ActivityRow {
 
 export interface InboxData {
   notifications: NotificationRow[];
+  notificationRules: NotificationRuleRow[];
   unreadCount: number;
   activity: ActivityRow[];
   activityPage: number;
@@ -73,6 +83,8 @@ function auditApi(event: SessionEvent) {
 }
 
 function normalizeNotification(row: Record<string, unknown>): NotificationRow {
+  const entityKind = String(row["entityKind"] ?? "event");
+  const entityId = String(row["entityId"] ?? row["eventId"] ?? "");
   return {
     id: String(row["id"]),
     orgId: String(row["orgId"]),
@@ -81,11 +93,22 @@ function normalizeNotification(row: Record<string, unknown>): NotificationRow {
     eventId: String(row["eventId"]),
     title: String(row["title"] ?? ""),
     body: String(row["body"] ?? ""),
-    entityKind: String(row["entityKind"] ?? "event"),
-    entityId: String(row["entityId"] ?? row["eventId"] ?? ""),
+    entityKind,
+    entityId,
     read: row["read"] === true,
     readAt: row["readAt"] ? String(row["readAt"]) : null,
     createdAt: String(row["createdAt"]),
+    evidenceHref: `/search?q=${encodeURIComponent(`${entityKind}:${entityId}`)}`,
+    evidenceLabel: `${entityKind}:${entityId}`,
+  };
+}
+
+function normalizeNotificationRule(row: Record<string, unknown>): NotificationRuleRow {
+  return {
+    id: String(row["id"]),
+    name: String(row["name"] ?? "Unnamed rule"),
+    enabled: row["enabled"] !== false,
+    channels: Array.isArray(row["channels"]) ? row["channels"].map(String) : [],
   };
 }
 
@@ -127,6 +150,7 @@ export const load: ServerLoad = async (event) => {
       offset: (activityPage - 1) * PAGE_SIZE,
     }).catch(() => ({ data: [], total: 0 })),
   ]);
+  const rulesResult = await notify.rules.list().catch(() => []);
 
   const count = Number((unreadResult as { count?: unknown })?.count ?? 0);
   const items = Array.isArray(listResult)
@@ -139,6 +163,9 @@ export const load: ServerLoad = async (event) => {
 
   return {
     notifications: items.map(normalizeNotification),
+    notificationRules: Array.isArray(rulesResult)
+      ? (rulesResult as Record<string, unknown>[]).map(normalizeNotificationRule)
+      : [],
     unreadCount: Math.max(0, count),
     activity: activityItems.map(normalizeActivity),
     activityPage,
@@ -154,5 +181,16 @@ export const actions: Actions = {
     if (!notify) throw new Error("Notification scope is required.");
     await notify.markAllRead();
     return { markedRead: true };
+  },
+  markRead: async (event) => {
+    const actionEvent = event as ActionEvent;
+    if (!actionEvent.locals.session) throw redirect(302, "/auth/login");
+    const notify = notificationApi(actionEvent);
+    if (!notify) throw new Error("Notification scope is required.");
+    const form = await actionEvent.request.formData();
+    const id = String(form.get("id") ?? "");
+    if (!id) return { markedRead: false };
+    await notify.markRead({ id });
+    return { markedRead: true, id };
   },
 };

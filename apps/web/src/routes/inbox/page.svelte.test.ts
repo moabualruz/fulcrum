@@ -1,6 +1,6 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
-import type { NotificationRow, ActivityRow } from "./+page.server.ts";
+import type { NotificationRow, NotificationRuleRow, ActivityRow } from "./+page.server.ts";
 
 mock.module("$app/state", () => ({
   page: {
@@ -24,8 +24,9 @@ mock.module("$app/environment", () => ({ browser: false, dev: false, building: f
 
 type PageProps = {
   data: {
-    notifications: NotificationRow[];
-    unreadCount: number;
+      notifications: NotificationRow[];
+      notificationRules: NotificationRuleRow[];
+      unreadCount: number;
     activity: ActivityRow[];
     activityPage: number;
     activityTotal: number;
@@ -45,6 +46,8 @@ const UNREAD_NOTIFICATION: NotificationRow = {
   read: false,
   readAt: null,
   createdAt: "2026-04-30T10:00:00.000Z",
+  evidenceHref: "/search?q=task%3Atask-1",
+  evidenceLabel: "task:task-1",
 };
 
 const READ_NOTIFICATION: NotificationRow = {
@@ -66,6 +69,13 @@ const ACTIVITY: ActivityRow = {
   created_at: "2026-04-30T09:00:00.000Z",
 };
 
+const RULE: NotificationRuleRow = {
+  id: "rule-1",
+  name: "Review blockers",
+  enabled: true,
+  channels: ["in-app", "email"],
+};
+
 describe("/inbox +page.svelte", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
@@ -79,7 +89,7 @@ describe("/inbox +page.svelte", () => {
   test("renders heading with Inbox", () => {
     const { body } = render(Page, {
       props: {
-        data: { notifications: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
+        data: { notifications: [], notificationRules: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
       },
     });
     expect(body).toMatch(/<h1\b[^>]*>[\s\S]*Inbox[\s\S]*<\/h1>/);
@@ -90,6 +100,7 @@ describe("/inbox +page.svelte", () => {
       props: {
         data: {
           notifications: [UNREAD_NOTIFICATION],
+          notificationRules: [],
           unreadCount: 1,
           activity: [],
           activityPage: 1,
@@ -105,6 +116,7 @@ describe("/inbox +page.svelte", () => {
       props: {
         data: {
           notifications: [READ_NOTIFICATION],
+          notificationRules: [],
           unreadCount: 0,
           activity: [],
           activityPage: 1,
@@ -120,6 +132,7 @@ describe("/inbox +page.svelte", () => {
       props: {
         data: {
           notifications: [UNREAD_NOTIFICATION],
+          notificationRules: [],
           unreadCount: 1,
           activity: [],
           activityPage: 1,
@@ -133,7 +146,7 @@ describe("/inbox +page.svelte", () => {
   test("renders tab bar with For you and My activity", () => {
     const { body } = render(Page, {
       props: {
-        data: { notifications: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
+        data: { notifications: [], notificationRules: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
       },
     });
     expect(body).toContain("data-inbox-tabs");
@@ -146,6 +159,7 @@ describe("/inbox +page.svelte", () => {
       props: {
         data: {
           notifications: [UNREAD_NOTIFICATION],
+          notificationRules: [RULE],
           unreadCount: 1,
           activity: [],
           activityPage: 1,
@@ -157,12 +171,17 @@ describe("/inbox +page.svelte", () => {
     expect(body).toContain("system");
     expect(body).toContain("data-notification-verb");
     expect(body).toContain("created");
+    expect(body).toContain("data-notification-evidence");
+    expect(body).toContain("data-notification-read-state");
+    expect(body).toContain("data-mark-read");
+    expect(body).toContain("data-notification-rules-summary");
+    expect(body).toContain("Review blockers");
   });
 
   test("renders empty state when no notifications", () => {
     const { body } = render(Page, {
       props: {
-        data: { notifications: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
+        data: { notifications: [], notificationRules: [], unreadCount: 0, activity: [], activityPage: 1, activityTotal: 0 },
       },
     });
     expect(body).toContain("data-inbox-empty");
