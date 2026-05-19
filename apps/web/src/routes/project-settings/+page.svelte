@@ -238,6 +238,47 @@
   function totalPoints(): number {
     return planTasks.reduce((acc, task) => acc + (task.estimate ?? 0), 0);
   }
+
+  type ModuleCategory = "feature" | "bug" | "research" | "ops";
+
+  interface ProjectModule {
+    id: string;
+    name: string;
+    category: ModuleCategory;
+    lead: string;
+    completed: number;
+    total: number;
+  }
+
+  let modulesEnabled = $state(true);
+  let modules = $state<ProjectModule[]>([
+    { id: "mod_payments", name: "Payments rollout", category: "feature", lead: "maya", completed: 8, total: 12 },
+    { id: "mod_dx", name: "Dev experience", category: "ops", lead: "kieran", completed: 3, total: 5 },
+  ]);
+  let newModuleName = $state("");
+  let newModuleCategory = $state<ModuleCategory>("feature");
+  let newModuleLead = $state("");
+  let moduleError = $state<string | null>(null);
+
+  function addModule(event: Event): void {
+    event.preventDefault();
+    if (!modulesEnabled) { moduleError = "Enable modules first."; return; }
+    if (!newModuleName.trim()) { moduleError = "Module name is required."; return; }
+    moduleError = null;
+    modules = [
+      ...modules,
+      {
+        id: `mod_${newModuleName.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+        name: newModuleName.trim(),
+        category: newModuleCategory,
+        lead: newModuleLead.trim() || "unassigned",
+        completed: 0,
+        total: 0,
+      },
+    ];
+    newModuleName = "";
+    newModuleLead = "";
+  }
 </script>
 
 <svelte:head>
@@ -616,5 +657,97 @@
         {/each}
       </ul>
     </div>
+  </section>
+
+  <section data-modules-settings class="flex flex-col gap-3 rounded-md border border-border p-4">
+    <header class="flex items-center justify-between">
+      <div>
+        <h2 class="text-base font-medium">Modules</h2>
+        <p class="text-xs text-muted-foreground">Thematic grouping outside the cycle cadence (separate from sprints).</p>
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          data-modules-enable
+          bind:checked={modulesEnabled}
+        />
+        Enable modules
+      </label>
+    </header>
+
+    <form data-module-form class="flex flex-wrap items-end gap-3" onsubmit={addModule}>
+      <label class="flex flex-1 flex-col gap-1 text-sm">
+        Name
+        <input
+          type="text"
+          data-module-name
+          bind:value={newModuleName}
+          class="h-9 rounded-md border border-input bg-background px-2"
+          disabled={!modulesEnabled}
+        />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        Category
+        <select
+          data-module-category
+          bind:value={newModuleCategory}
+          class="h-9 rounded-md border border-input bg-background px-2"
+          disabled={!modulesEnabled}
+        >
+          <option value="feature">Feature</option>
+          <option value="bug">Bug</option>
+          <option value="research">Research</option>
+          <option value="ops">Ops</option>
+        </select>
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        Lead
+        <input
+          type="text"
+          data-module-lead
+          bind:value={newModuleLead}
+          placeholder="unassigned"
+          class="h-9 rounded-md border border-input bg-background px-2"
+          disabled={!modulesEnabled}
+        />
+      </label>
+      <button
+        type="submit"
+        data-module-add
+        class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        disabled={!modulesEnabled}
+      >Add module</button>
+      {#if moduleError}
+        <span data-module-error class="basis-full text-sm text-destructive">{moduleError}</span>
+      {/if}
+    </form>
+
+    {#if modulesEnabled}
+      <ul data-module-list class="flex flex-col gap-2 text-sm">
+        {#each modules as module (module.id)}
+          <li data-module-row={module.id} class="flex flex-col gap-1 rounded border border-border p-2">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">{module.name}</span>
+              <span data-module-category-tag={module.id} class="rounded-sm border border-border bg-muted px-2 py-0.5 text-[10px] uppercase">
+                {module.category}
+              </span>
+              <span data-module-lead-tag={module.id} class="text-xs text-muted-foreground">lead: {module.lead}</span>
+            </div>
+            <div data-module-progress={module.id} class="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{module.completed}/{module.total || "—"}</span>
+              <div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  data-module-progress-bar={module.id}
+                  class="h-full bg-primary"
+                  style="width: {module.total > 0 ? Math.round((module.completed / module.total) * 100) : 0}%"
+                ></div>
+              </div>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p data-modules-disabled class="text-xs text-muted-foreground">Modules are disabled; enable to add new modules.</p>
+    {/if}
   </section>
 </section>

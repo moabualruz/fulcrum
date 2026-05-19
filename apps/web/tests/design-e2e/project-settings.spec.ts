@@ -117,4 +117,24 @@ test.describe("project settings labels", () => {
 		await expect(page.locator("[data-plan-task-estimate='FUL-202']")).toHaveValue("5");
 		await expect(page.locator("[data-estimate-total]")).toContainText("Total points: 13");
 	});
+
+	test("modules section toggles availability and adds new entries with category and lead", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-module-row='mod_payments']")).toBeVisible();
+		await expect(page.locator("[data-module-category-tag='mod_payments']")).toContainText("feature");
+
+		await page.locator("[data-modules-enable]").uncheck();
+		await expect(page.locator("[data-modules-disabled]")).toBeVisible();
+		await expect(page.locator("[data-module-add]")).toBeDisabled();
+
+		await page.locator("[data-modules-enable]").check();
+		await page.locator("[data-module-name]").fill("Security review");
+		await page.locator("[data-module-category]").selectOption("research");
+		await page.locator("[data-module-lead]").fill("nina");
+		await page.locator("[data-module-add]").click();
+		await expect(page.locator("[data-module-row='mod_security_review']")).toBeVisible();
+		await expect(page.locator("[data-module-category-tag='mod_security_review']")).toContainText("research");
+		await expect(page.locator("[data-module-lead-tag='mod_security_review']")).toContainText("nina");
+	});
 });
