@@ -13,12 +13,16 @@ import type {
 } from "@platform-core/application/inference/protocol.ts";
 
 export type {
+  ClassifyResult,
+  EmbedResult,
   FeatureBackendMap,
   GenerateOptions,
+  GenerateResult,
   HealthResult,
   InferenceBackendInfo,
   InferenceModel,
   ModelPullProgress,
+  TokenizeResult,
 } from "@platform-core/application/inference/protocol.ts";
 
 export interface InferenceApiEnvironment {

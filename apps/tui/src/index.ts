@@ -72,8 +72,7 @@ import {
   createTuiHttpCaller,
   requireTuiSessionContext,
 } from "./local-caller.ts";
-import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
-import type { EmbedResult } from "@platform-core/application/inference/protocol.ts";
+import type { InferenceModel, ModelPullProgress, EmbedResult } from "@platform-core/interface/http/inference-api-client.ts";
 import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
 import type { TuiTheme } from "./theme/index.ts";
 import type { SubscriptionBridge } from "./subscriptions.ts";
