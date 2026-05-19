@@ -45,13 +45,28 @@ import {
 
 const NAME = z.string().min(1).max(255);
 
-const SetInput = z.object({ name: NAME, value: z.string().min(1) });
+const SetInput = z.object({
+  name: NAME,
+  value: z.string().min(1),
+  confirm: z.string().optional().describe("Required confirmation token for setting a credential; must match credential name."),
+});
 const GetInput = z.object({ name: NAME, userId: z.string().uuid().optional() });
+const ArchiveInput = z.object({
+  name: NAME,
+  userId: z.string().uuid().optional(),
+  confirm: z.string().optional().describe("Required confirmation token for archival; must match credential name."),
+});
+const RemoveInput = z.object({
+  name: NAME,
+  userId: z.string().uuid().optional(),
+  confirm: z.string().optional().describe("Required confirmation token for removal; must match credential name."),
+});
 const NameInput = z.object({ name: NAME, userId: z.string().uuid().optional() });
 const RotateInput = z.object({
   name: NAME,
   newValue: z.string().min(1),
   userId: z.string().uuid().optional(),
+  confirm: z.string().optional().describe("Required confirmation token for rotation; must match credential name."),
 });
 const ListInput = z
   .object({ includeArchived: z.boolean().optional() })
@@ -313,7 +328,7 @@ export const credentialsRouter = t.router({
     }),
 
   archive: permissionedProcedure({ resource: "credentials", action: "archive" })
-    .input(NameInput)
+    .input(ArchiveInput)
     .output(OkOutput)
     .mutation(async ({ ctx, input }) => {
       const targetUserId = input.userId ?? ctx.userId;
@@ -332,7 +347,7 @@ export const credentialsRouter = t.router({
     }),
 
   remove: permissionedProcedure({ resource: "credentials", action: "remove" })
-    .input(NameInput)
+    .input(RemoveInput)
     .output(OkOutput)
     .mutation(async ({ ctx, input }) => {
       const targetUserId = input.userId ?? ctx.userId;

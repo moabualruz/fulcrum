@@ -105,7 +105,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     connectors)
-      local verbs='disable enable get list runs get runs list sync'
+      local verbs='delete disable enable get list runs get runs list sync'
       local flags='--json'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -319,7 +319,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     notifySubscriptions)
-      local verbs='on-new-notification'
+      local verbs='on-new-notification status'
       local flags='--json --watch'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -328,7 +328,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     orchestrationSubscriptions)
-      local verbs='on-state-change'
+      local verbs='on-state-change status'
       local flags='--json --watch'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )
@@ -460,7 +460,7 @@ _fulcrum() {
       COMPREPLY=( $(compgen -W "$verbs $flags" -- "$cur") )
       ;;
     runsSubscriptions)
-      local verbs='on-run-update'
+      local verbs='on-run-update status'
       local flags='--json --watch'
       if [[ "$cur" == --* ]]; then
         COMPREPLY=( $(compgen -W "$flags" -- "$cur") )

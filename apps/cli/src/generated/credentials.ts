@@ -105,7 +105,7 @@ export function createCredentialsCommand(): Command {
   const setCommand = command.command("set");
   setCommand.description("credentials set");
   setCommand.option("--json", "Emit JSON output");
-  setCommand.option("--confirm <string>", "Required confirmation token for secret change; must match credential name.");
+  setCommand.option("--confirm <string>", "Required confirmation token for setting a credential; must match credential name.");
   setCommand.option("--name <string>", "name");
   setCommand.option("--value <string>", "value");
   setCommand.action(async (options) => {

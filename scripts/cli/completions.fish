@@ -68,6 +68,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -a 'watchers' -d
 complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'comments'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'comments')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'connectors' -d 'fulcrum connectors'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'delete' -d 'connectors delete'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'disable' -d 'connectors disable'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'enable' -d 'connectors enable'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'connectors'" -a 'get' -d 'connectors get'
@@ -235,10 +236,12 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'notify'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notify'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'notify')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'notifySubscriptions' -d 'fulcrum notifySubscriptions'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notifySubscriptions'" -a 'on-new-notification' -d 'notifySubscriptions on-new-notification'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'notifySubscriptions'" -a 'status' -d 'notifySubscriptions status'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notifySubscriptions'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'notifySubscriptions'" -l watch -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'orchestrationSubscriptions' -d 'fulcrum orchestrationSubscriptions'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orchestrationSubscriptions'" -a 'on-state-change' -d 'orchestrationSubscriptions on-state-change'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'orchestrationSubscriptions'" -a 'status' -d 'orchestrationSubscriptions status'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orchestrationSubscriptions'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'orchestrationSubscriptions'" -l watch -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'orgs' -d 'fulcrum orgs'
@@ -347,6 +350,7 @@ complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'routing'; and __fish_prev_arg_in get delete update" -a "(__fulcrum_dynamic_ids 'routing')"
 complete -c fulcrum -n "__fish_use_subcommand" -a 'runsSubscriptions' -d 'fulcrum runsSubscriptions'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -a 'on-run-update' -d 'runsSubscriptions on-run-update'
+complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -a 'status' -d 'runsSubscriptions status'
 complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -l json -d option
 complete -c fulcrum -n "__fish_seen_subcommand_from 'runsSubscriptions'" -l watch -d option
 complete -c fulcrum -n "__fish_use_subcommand" -a 'saved_views' -d 'fulcrum saved_views'

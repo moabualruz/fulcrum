@@ -62,7 +62,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     connectors)
-      local -a values=('disable:fulcrum connectors disable' 'enable:fulcrum connectors enable' 'get:fulcrum connectors get' 'list:fulcrum connectors list' 'runs get:fulcrum connectors runs get' 'runs list:fulcrum connectors runs list' 'sync:fulcrum connectors sync' '--json:option')
+      local -a values=('delete:fulcrum connectors delete' 'disable:fulcrum connectors disable' 'enable:fulcrum connectors enable' 'get:fulcrum connectors get' 'list:fulcrum connectors list' 'runs get:fulcrum connectors runs get' 'runs list:fulcrum connectors runs list' 'sync:fulcrum connectors sync' '--json:option')
       if [[ $words[CURRENT-1] == (get|delete|update) ]]; then
         _values 'ids' $(_fulcrum_dynamic_ids 'connectors')
         return
@@ -186,11 +186,11 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     notifySubscriptions)
-      local -a values=('on-new-notification:fulcrum notifySubscriptions on-new-notification' '--json:option' '--watch:option')
+      local -a values=('on-new-notification:fulcrum notifySubscriptions on-new-notification' 'status:fulcrum notifySubscriptions status' '--json:option' '--watch:option')
       _describe 'command or option' values
       ;;
     orchestrationSubscriptions)
-      local -a values=('on-state-change:fulcrum orchestrationSubscriptions on-state-change' '--json:option' '--watch:option')
+      local -a values=('on-state-change:fulcrum orchestrationSubscriptions on-state-change' 'status:fulcrum orchestrationSubscriptions status' '--json:option' '--watch:option')
       _describe 'command or option' values
       ;;
     orgs)
@@ -262,7 +262,7 @@ _fulcrum() {
       _describe 'command or option' values
       ;;
     runsSubscriptions)
-      local -a values=('on-run-update:fulcrum runsSubscriptions on-run-update' '--json:option' '--watch:option')
+      local -a values=('on-run-update:fulcrum runsSubscriptions on-run-update' 'status:fulcrum runsSubscriptions status' '--json:option' '--watch:option')
       _describe 'command or option' values
       ;;
     saved_views)

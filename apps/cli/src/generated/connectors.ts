@@ -4,6 +4,24 @@ export function createConnectorsCommand(): Command {
   const command = new Command("connectors");
   command.description("Generated connectors commands.");
 
+  const deleteCommand = command.command("delete");
+  deleteCommand.description("connectors delete");
+  deleteCommand.option("--json", "Emit JSON output");
+  deleteCommand.option("--id <string>", "id");
+  deleteCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for connectors.delete requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const disableCommand = command.command("disable");
   disableCommand.description("connectors disable");
   disableCommand.option("--json", "Emit JSON output");

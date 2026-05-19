@@ -43,9 +43,9 @@ export function createArtifactsCommand(): Command {
   const deleteCommand = command.command("delete");
   deleteCommand.description("artifacts delete");
   deleteCommand.option("--json", "Emit JSON output");
+  deleteCommand.option("--confirm <string>", "Required confirmation token for hard delete; must match artifact identifier.");
   deleteCommand.option("--hard", "Hard-delete: remove from disk + DB row.");
   deleteCommand.option("--id <string>", "Artifact identifier.");
-  deleteCommand.option("--confirm <string>", "Required confirmation token for hard delete; must match artifact identifier.");
   deleteCommand.action(async (options) => {
     try {
       throw new Error("Generated tRPC invocation for artifacts.delete requires an explicit surface adapter.");

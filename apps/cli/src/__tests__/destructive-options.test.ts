@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { createArtifactsCommand } from "./artifacts.ts";
-import { createCredentialsCommand } from "./credentials.ts";
+import { createArtifactsCommand } from "../generated/artifacts.ts";
+import { createCredentialsCommand } from "../generated/credentials.ts";
 
 function normalizeHelp(help: string): string {
   return help.replace(/\s+/g, " ");
