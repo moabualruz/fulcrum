@@ -114,6 +114,7 @@ export const TRPC_ACTIONS = {
   previewApprovedPlanBreakdown: "previewApprovedPlanBreakdown",
   previewDependencyRun: "previewDependencyRun",
   preflight: "preflight",
+  probe: "probe",
   promote: "promote",
   pull: "pull",
   purge: "purge",
