@@ -32,6 +32,7 @@ import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { FOUNDATION_KEY_BINDINGS, formatFocusedRowLabel, renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { TaskBoardScreen, type TaskCreateInput } from "./screens/task-board.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
 import type { TuiTask } from "./screens/task-types.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
@@ -122,7 +123,7 @@ export interface TuiCaller {
       labels?: string[] | null;
     }>>;
     update?: (input: { id: string; status: string }) => Promise<unknown>;
-    create?: (input: { title: string; status: string }) => Promise<unknown>;
+    create?: (input: TaskCreateInput) => Promise<unknown>;
     bulk?: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
     previewDependencyRun?: (input: {
       mode: "task" | "board";
@@ -364,6 +365,7 @@ const COMMAND_PALETTE_ACTIONS = [
 type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning";
 type DomainScreen =
   | "projects"
+  | "build-board"
   | "tasks"
   | "sprints"
   | "docs"
@@ -388,6 +390,7 @@ export interface NavEntry {
 
 export const TUI_NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Projects", screen: "projects" },
+  { label: "Build Board", screen: "build-board" },
   { label: "Tasks", screen: "tasks" },
   { label: "Sprints", screen: "sprints" },
   { label: "Docs", screen: "docs" },
@@ -526,6 +529,10 @@ export class TuiApp {
   private helpOpen = false;
   private domainRows: string[] = [];
   private domainError: string | null = null;
+  private paletteCursor = 0;
+  private paletteFeedback: string | null = null;
+  private selectedNavAction: string | null = null;
+  private taskBoardScreen: TaskBoardScreen | null = null;
   private taskListScreen: TaskListScreen | null = null;
   private statusInfo: { email: string; orgId: string } | null = null;
   private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
@@ -860,7 +867,19 @@ export class TuiApp {
     r.writeln();
     r.writeln(c.bold("  Detail / log pane"));
     const selected = NAV_ENTRIES[this.navCursor];
-    r.writeln(`  ${selected?.label ?? "No domain"} ready. Use Enter to open, / for command palette.`);
+    if (selected) {
+      const detail = NAV_DETAILS[selected.screen] ?? {
+        summary: `${selected.label} workflow cockpit.`,
+        action: "Enter opens selected screen.",
+        status: "ready",
+      };
+      r.writeln(`  Selected: ${selected.label}  screen:${selected.screen}  status:${detail.status}`);
+      r.writeln(`  ${detail.summary}`);
+      r.writeln(`  ${detail.action}`);
+      if (this.selectedNavAction) r.writeln(c.dim(`  Last action: ${this.selectedNavAction}`));
+    } else {
+      r.writeln("  No domain selected.");
+    }
     r.writeln();
     r.writeln(c.bold("  Status footer"));
     r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / or Ctrl+K commands  ? help  q quit"));
@@ -874,7 +893,11 @@ export class TuiApp {
     }
     this.renderer.writeln();
     this.renderer.writeln(c.bold("  Command palette"));
-    for (const action of COMMAND_PALETTE_ACTIONS) this.renderer.writeln(`  - ${action}`);
+    for (let i = 0; i < COMMAND_PALETTE_ACTIONS.length; i++) {
+      const action = COMMAND_PALETTE_ACTIONS[i]!;
+      this.renderer.writeln(formatFocusedRowLabel(action, i === this.paletteCursor));
+    }
+    if (this.paletteFeedback) this.renderer.writeln(c.dim(`  ${this.paletteFeedback}`));
   }
 
   private _renderHelpOverlay(): void {
@@ -901,6 +924,10 @@ export class TuiApp {
 
   private _renderDomainScreen(screen: DomainScreen): void {
     const r = this.renderer;
+    if (screen === "build-board" && this.taskBoardScreen) {
+      this.taskBoardScreen.render(r);
+      return;
+    }
     if (screen === "tasks" && this.taskListScreen) {
       this.taskListScreen.render(r);
       return;
@@ -1137,6 +1164,7 @@ export class TuiApp {
     if (this.domainScreen) {
       if (key === "q" || key === "\x1b") {
         this.domainScreen = null;
+        this.taskBoardScreen = null;
         this.taskListScreen?.dispose();
         this.taskListScreen = null;
         this.currentScreen = "nav";
@@ -1151,6 +1179,11 @@ export class TuiApp {
       if (key === "\x0b") {
         this.paletteOpen = !this.paletteOpen;
         await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "build-board" && this.taskBoardScreen) {
+        const consumed = await this.taskBoardScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
         return;
       }
       if (this.domainScreen === "tasks" && this.taskListScreen) {
@@ -1281,6 +1314,22 @@ export class TuiApp {
   }
 
   private async _handleNavKey(key: string): Promise<void> {
+    if (this.paletteOpen) {
+      if (key === "j" || key === "\x1b[B") {
+        this.paletteCursor = Math.min(this.paletteCursor + 1, COMMAND_PALETTE_ACTIONS.length - 1);
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "k" || key === "\x1b[A") {
+        this.paletteCursor = Math.max(this.paletteCursor - 1, 0);
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "\r" || key === "\n") {
+        await this._runPaletteAction(COMMAND_PALETTE_ACTIONS[this.paletteCursor]!);
+        return;
+      }
+    }
     if (key === "j" || key === "\x1b[B") {
       this.navCursor = Math.min(this.navCursor + 1, NAV_ENTRIES.length - 1);
       await this._renderCurrentScreen();
@@ -1293,11 +1342,13 @@ export class TuiApp {
     }
     if (key === "\x1b") {
       this.paletteOpen = false;
+      this.paletteFeedback = null;
       await this._renderCurrentScreen();
       return;
     }
     if (key === "/" || key === "\x0b") {
       this.paletteOpen = !this.paletteOpen;
+      this.paletteFeedback = null;
       await this._renderCurrentScreen();
       return;
     }
@@ -1356,11 +1407,42 @@ export class TuiApp {
     await this._navigate(entry.screen);
   }
 
+  private async _runPaletteAction(action: typeof COMMAND_PALETTE_ACTIONS[number]): Promise<void> {
+    this.selectedNavAction = action;
+    this.paletteFeedback = `ran ${action}`;
+    if (action === "Create task") {
+      await this._navigate("build-board");
+      if (this.taskBoardScreen) {
+        await this.taskBoardScreen.handleKey("c");
+        await this._renderCurrentScreen();
+      }
+      return;
+    }
+    if (action === "Create doc") {
+      await this._openNewDoc();
+      return;
+    }
+    if (action === "Search") {
+      await this._navigate("search");
+      return;
+    }
+    if (action === "Dispatch run") {
+      await this._navigate("runs");
+      return;
+    }
+    if (action === "Settings") {
+      await this._navigate("doctor");
+      return;
+    }
+    await this._renderCurrentScreen();
+  }
+
   private async _navigate(screen: TuiScreen): Promise<void> {
     this.currentPath = null;
     this.domainScreen = null;
     this.currentScreen = "nav";
     this.paletteOpen = false;
+    this.paletteFeedback = null;
 
     if (isDomainScreen(screen)) {
       this.domainScreen = screen;
@@ -1515,9 +1597,32 @@ export class TuiApp {
   private async _loadDomainRows(screen: DomainScreen): Promise<void> {
     this.domainRows = [];
     this.domainError = null;
+    this.taskBoardScreen = null;
     this.taskListScreen?.dispose();
     this.taskListScreen = null;
     try {
+      if (screen === "build-board") {
+        const tasks = this.caller.tasks;
+        if (!tasks?.list || !tasks.update || !tasks.create) {
+          throw new Error("Build Board API disconnected: missing tasks.list, tasks.update, or tasks.create. Recovery: run fulcrum doctor, export FULCRUM_SERVER_URL, then reopen :board.");
+        }
+        this.taskBoardScreen = new TaskBoardScreen({
+          caller: {
+            tasks: {
+              list: async () => (await tasks.list()).map(toTuiTask),
+              update: async (input) => toTuiTask(await tasks.update!(input) as Parameters<typeof toTuiTask>[0]),
+              create: async (input) => toTuiTask(await tasks.create!(input) as Parameters<typeof toTuiTask>[0]),
+            },
+          },
+          onOpenTask: (id) => {
+            this.selectedNavAction = `open task ${id}`;
+          },
+          createScope: { source: "board" },
+        });
+        await this.taskBoardScreen.load();
+        return;
+      }
+
       if (screen === "tasks" && this.caller.tasks) {
         this.taskListScreen = new TaskListScreen({
           caller: {
@@ -1787,6 +1892,7 @@ class OpenTuiOutput implements TuiOutput {
 function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
   return [
     "projects",
+    "build-board",
     "tasks",
     "sprints",
     "docs",
@@ -1803,6 +1909,7 @@ function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
 function domainTitle(screen: DomainScreen): string {
   const titles: Record<DomainScreen, string> = {
     projects: "Projects",
+    "build-board": "Build Board",
     tasks: "Tasks",
     sprints: "Sprints",
     docs: "Docs",
@@ -1834,6 +1941,44 @@ function screenTitle(screen: Screen): string {
   };
   return titles[screen];
 }
+
+const NAV_DETAILS: Partial<Record<TuiScreen, { summary: string; action: string; status: string }>> = {
+  projects: {
+    summary: "Project scope, branch posture, and active build context.",
+    action: "Enter opens project rows; g p jumps here from stage navigation.",
+    status: "ready",
+  },
+  "build-board": {
+    summary: "Kanban build cockpit with selected card, h/l status movement, and inline create.",
+    action: "Enter opens board; / Create task opens the same board create flow.",
+    status: "ready",
+  },
+  tasks: {
+    summary: "Task list, filters, multi-select, dependency preview, and manual workbench.",
+    action: "Enter opens task workflow rows.",
+    status: "ready",
+  },
+  planning: {
+    summary: "Approved-plan breakdown, freeform planning, and workflow cycle handoff.",
+    action: "Enter opens planning cockpit.",
+    status: "ready",
+  },
+  runs: {
+    summary: "Agent run list with live transcript/log pane.",
+    action: "Enter opens run monitor.",
+    status: "ready",
+  },
+  search: {
+    summary: "Search and command-palette discovery.",
+    action: "Enter opens search rows.",
+    status: "ready",
+  },
+  doctor: {
+    summary: "Settings and diagnostic checks.",
+    action: "Enter opens doctor/settings.",
+    status: "ready",
+  },
+};
 
 function formatDomainRow(row: unknown): string {
   if (!row || typeof row !== "object") return String(row);
