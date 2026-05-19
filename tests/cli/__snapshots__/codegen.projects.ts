@@ -116,5 +116,24 @@ export function createProjectsCommand(): Command {
     }
   });
 
+  const updateToolPermissionModeCommand = command.command("update-tool-permission-mode");
+  updateToolPermissionModeCommand.description("projects updateToolPermissionMode");
+  updateToolPermissionModeCommand.option("--json", "Emit JSON output");
+  updateToolPermissionModeCommand.option("--id <string>", "id");
+  updateToolPermissionModeCommand.addOption(new Option("--permission-mode <choice>", "permission-mode").choices(["review_each_tool","auto","danger"]));
+  updateToolPermissionModeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for projects.updateToolPermissionMode requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   return command;
 }

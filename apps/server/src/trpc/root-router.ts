@@ -58,7 +58,7 @@ import { router as trpcRouter } from "./trpc.ts";
 
 type RouterFactory = typeof trpcRouter;
 
-export function buildFulcrumAppRouter(router: RouterFactory = trpcRouter) {
+export const buildFulcrumAppRouter = (router: RouterFactory = trpcRouter) => {
   const dbRouter = router({
     ping: publicProcedure
       .output(z.object({ ok: z.boolean() }))
@@ -127,5 +127,4 @@ export function buildFulcrumAppRouter(router: RouterFactory = trpcRouter) {
     notifySubscriptions: notifySubscriptionRouter,
     orchestrationSubscriptions: orchestrationSubscriptionRouter,
   });
-}
-
+};

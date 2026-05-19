@@ -308,7 +308,7 @@ async function runInit(argv: readonly string[], io: Io): Promise<void> {
 async function runProjects(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
   const [sub, ...rest] = argv;
   if (sub !== "list") return usage(io, `fulcrum product projects: unknown verb '${sub ?? ""}'`);
-  printValue(await caller.projects?.list({ limit: numberFlag(rest, "--limit") }) ?? [], rest, io.print);
+  printValue(await requireProjects(caller).list({ limit: numberFlag(rest, "--limit") }), rest, io.print);
 }
 
 async function runTasks(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
@@ -567,7 +567,7 @@ async function resolveCaller(opts: ProductRunOptions): Promise<{ caller: Product
   if (opts.caller) return { caller: opts.caller, cleanup: async () => {} };
   const publicCaller = createProductPublicApiCaller(opts.env, opts.fetch);
   if (publicCaller) return { caller: publicCaller, cleanup: async () => {} };
-  throw new Error("Product API caller is not configured");
+  throw new Error(productApiConfigError(opts.env));
 }
 
 function createProductPublicApiCaller(
@@ -645,6 +645,13 @@ function createProductPublicApiCaller(
   }
 
   return Object.keys(caller).length > 0 ? caller : null;
+}
+
+function requireProjects(caller: ProductCaller): NonNullable<ProductCaller["projects"]> {
+  if (!caller.projects) {
+    throw new Error("projects caller is not configured; missing FULCRUM_ORG_ID for project API commands");
+  }
+  return caller.projects;
 }
 
 function requireTasks(caller: ProductCaller): NonNullable<ProductCaller["tasks"]> {
@@ -1167,4 +1174,17 @@ function isUsageError(error: unknown): boolean {
     message.startsWith("missing value for flag:") ||
     message.startsWith("flag does not take a value:") ||
     message.startsWith("missing required flag");
+}
+
+function productApiConfigError(env: Record<string, string | undefined> | undefined): string {
+  const effective = env ?? process.env;
+  const missing = [];
+  if (!effective["FULCRUM_SERVER_URL"] && !effective["FULCRUM_PUBLIC_API_URL"]) {
+    missing.push("FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL");
+  }
+  return [
+    "Product API caller is not configured",
+    missing.length ? `missing ${missing.join(", ")}` : "no public API clients were created",
+    "run `fulcrum product init --json` for local readiness, then export FULCRUM_SERVER_URL and FULCRUM_ORG_ID",
+  ].join("; ");
 }

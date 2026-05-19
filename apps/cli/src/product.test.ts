@@ -262,6 +262,21 @@ describe("fulcrum product CLI", () => {
     expect(io.out).toEqual([]);
     expect(io.exits).toEqual([1]);
     expect(io.err.join("\n")).toContain("Product API caller is not configured");
+    expect(io.err.join("\n")).toContain("missing FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL");
+    expect(io.err.join("\n")).toContain("export FULCRUM_SERVER_URL and FULCRUM_ORG_ID");
+  });
+
+  test("product project commands name the missing org config when only workflow API is configured", async () => {
+    const io = testIo();
+    await runProduct(["projects", "list", "--json"], {
+      ...io.opts,
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210" },
+      fetch: (async () => Response.json([])) as unknown as typeof fetch,
+    });
+
+    expect(io.out).toEqual([]);
+    expect(io.exits).toEqual([1]);
+    expect(io.err.join("\n")).toContain("missing FULCRUM_ORG_ID for project API commands");
   });
 
   test("product projects list --json uses caller fixture", async () => {
