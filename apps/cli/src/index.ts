@@ -24,7 +24,7 @@ Usage:
   fulcrum auth <whoami|invite|login|logout> [options]
   fulcrum projects <list|stats> [--json]
   fulcrum capture <review|status|action> [--json]
-  fulcrum tasks <list|get|create|update|delete> [--json]
+  fulcrum task|tasks <list|get|new|create|update|delete> [--json]
   fulcrum relationships|comments|templates|automations|recurrence|saved_views|taskCustomFields [--json]
   fulcrum work <create|inspect|move|link|report> [--json]
   fulcrum sprints <list|get|create|update|delete|add-task|remove-task> [--json]
@@ -212,6 +212,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runCapture(rest);
       return;
     }
+    case "task":
     case "tasks": {
       const { run: runTasks } = await import("./commands/tasks.ts");
       await runTasks(rest);

@@ -105,6 +105,8 @@ fulcrum context inspect   --task <id>
 fulcrum context diff      --task <id> --against <run-id>
 ```
 
+`fulcrum task new` mirrors the quick-create tray: human output shows project, sprint, module, and cycle scope before submission; JSON output includes recurrence preview and generated-instance summary when `--recurrence` is present. Validation and duplicate-title failures preserve entered fields and emit a retry command.
+
 ### 1.4 Review stage commands
 
 ```
