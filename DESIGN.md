@@ -195,7 +195,7 @@ Five canonical content shapes used across stages:
 
 1. **List + Detail (peek-overview).** Left list (320 px) + right detail (flex). Click row = peek modal slides over without changing route (research-07 §1.3). Used: tasks, runs, artifacts, audit.
 2. **Multi-layout grid.** View switcher (board / list / table / calendar / gantt) over same data set. Used: tasks (Build), reviews (Review). Verbatim Plane shape.
-3. **Editor surface.** Tree (240 px) + editor (flex) + backlinks rail (collapsible 280 px). Used: docs (Capture), plans (Plan).
+3. **Editor surface.** Tree (240 px) + editor (flex) + backlinks rail (collapsible 280 px). Used: docs (Capture), plans (Plan). Document delete opens an inline impact preview before the action: child pages, backlinks, attachments, ContextBundles, and artifacts. Soft-deleted Documents disappear from the normal PageTree and remain in a reachable trash view. Restore targets the original parent when it still exists, otherwise asks for a new destination. Permanent delete requires elevated permission and typed title confirmation.
 4. **Live session pane.** Sessions list (220 px) + transcript (flex) + workspace dock (320 px, tabs: Shell · Files · Browser · Plan · Cost). Sticky plan strip at top of transcript (research-02 § Web Live Session Pane). Used: ACP planning (Plan), agent runs (Build).
 5. **Subsystem table.** Full-width table with inline expand. Used: doctor (Operate), audit (Ship), error logs (Operate).
 

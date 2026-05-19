@@ -217,6 +217,39 @@ test.describe("build graph doc search", () => {
 		await expect(page.locator("[data-import-overwrite-guard]")).toContainText("No overwrite until conflict preview accepted");
 	});
 
+	test("shows document trash impact, restore destination, and permanent delete guard", async ({ page }) => {
+		await openBuildGraph(page);
+
+		await expect(page.locator("[data-doc-trash-workflow]")).toBeVisible();
+		await expect(page.locator("[data-normal-doc-tree]")).toContainText("Release readiness");
+		await expect(page.locator("[data-trash-view]")).toContainText("Legacy runbook");
+		await expect(page.locator("[data-delete-impact-preview]")).toContainText("Release readiness");
+		await expect(page.locator("[data-impact-children]")).toContainText("QA checklist");
+		await expect(page.locator("[data-impact-backlinks]")).toContainText("Ship review");
+		await expect(page.locator("[data-impact-attachments]")).toContainText("coverage-export.json");
+		await expect(page.locator("[data-impact-context-bundles]")).toContainText("ctx-operator-brief");
+		await expect(page.locator("[data-impact-artifacts]")).toContainText("artifact-review-log");
+
+		await page.locator("[data-soft-delete-doc]").click();
+		await expect(page.locator("[data-active-doc-row][data-doc-id='doc-release-parent']")).toHaveCount(0);
+		await expect(page.locator("[data-trash-doc-row][data-doc-id='doc-release-parent']")).toBeVisible();
+		await expect(page.locator("[data-trash-state]")).toContainText("trash");
+
+		await page.locator("[data-restore-doc]").click();
+		await expect(page.locator("[data-restore-status]")).toContainText("Release readiness restored to Build graph");
+		await expect(page.locator("[data-active-doc-row][data-doc-id='doc-release-parent']")).toBeVisible();
+
+		await page.locator("[data-trash-doc-row][data-doc-id='doc-legacy-runbook'] [data-select-trash-doc]").click();
+		await expect(page.locator("[data-restore-parent]").filter({ hasText: "Original parent missing" })).toBeVisible();
+		await expect(page.locator("[data-restore-destination-field]")).toContainText("New destination");
+		await page.locator("[data-permanent-delete-doc]").click();
+		await expect(page.locator("[data-permanent-delete-guard]")).toContainText("requires Knowledge admin permission");
+		await expect(page.locator("[data-permanent-delete-guard]")).toContainText("typed document title confirmation");
+		await page.locator("[data-restore-destination]").fill("Recovered docs");
+		await page.locator("[data-restore-doc]").click();
+		await expect(page.locator("[data-restore-status]")).toContainText("Legacy runbook restored to Recovered docs");
+	});
+
 	test("filters by owner and attachment state without leaking unrelated rows", async ({ page }) => {
 		await openBuildGraph(page);
 

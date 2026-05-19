@@ -205,6 +205,18 @@ One sentence naming the next workflow action.
 >
 > [ I understand. Delete project ]   [ Cancel ]
 
+**Document trash impact:**
+> Move `Release readiness` to trash?
+>
+> Review affected child pages, backlinks, attachments, ContextBundles, and artifacts before moving it. Restore returns the Document to its original parent when possible.
+>
+> [ Move to trash ]   [ Cancel ]
+
+**Permanent document delete blocked:**
+> Permanent delete blocked.
+>
+> Requires Knowledge admin permission and typed document title confirmation.
+
 ### Hard bans on error copy
 
 - "Something went wrong" → banned.

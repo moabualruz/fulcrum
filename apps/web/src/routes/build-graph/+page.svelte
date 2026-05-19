@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { Alert, Badge, Button } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
   type DocType = "decision" | "runbook" | "note" | "spec";
   type DependencyStatus = "done" | "running" | "blocked" | "waiting";
   type ExportScope = "single" | "subtree";
   type RunState = "ready" | "running" | "cancelled";
+  type TrashState = "active" | "trash";
 
   interface DocSearchResult {
     id: string;
@@ -67,6 +69,19 @@
     traceRefs: string[];
     sourceEvent: string;
     overwriteGuard: string;
+  }
+
+  interface DocumentTrashPreview {
+    id: string;
+    title: string;
+    parent: string;
+    originalParentValid: boolean;
+    state: TrashState;
+    children: string[];
+    backlinks: string[];
+    attachments: string[];
+    contextBundles: string[];
+    artifacts: string[];
   }
 
   const RESULTS: DocSearchResult[] = [
@@ -228,6 +243,33 @@
     overwriteGuard: "No overwrite until conflict preview accepted.",
   };
 
+  const TRASH_PREVIEWS: DocumentTrashPreview[] = [
+    {
+      id: "doc-release-parent",
+      title: "Release readiness",
+      parent: "Build graph",
+      originalParentValid: true,
+      state: "active",
+      children: ["QA checklist", "Rollback notes", "Operator handoff"],
+      backlinks: ["Ship review", "Deploy runbook", "Artifact manifest"],
+      attachments: ["release-proof.png", "coverage-export.json"],
+      contextBundles: ["ctx-release-review", "ctx-operator-brief"],
+      artifacts: ["artifact-release-v2.tgz", "artifact-review-log"],
+    },
+    {
+      id: "doc-legacy-runbook",
+      title: "Legacy runbook",
+      parent: "Archived imports",
+      originalParentValid: false,
+      state: "trash",
+      children: ["Old migration notes"],
+      backlinks: ["Import review"],
+      attachments: ["legacy-import.csv"],
+      contextBundles: ["ctx-import-cleanup"],
+      artifacts: ["artifact-import-audit"],
+    },
+  ];
+
   const STATUS_COPY: Record<DependencyStatus, string> = {
     done: "done",
     running: "running",
@@ -256,6 +298,11 @@
   let dependencyTasks = $state<DependencyTask[]>(DEPENDENCY_TASKS);
   let exportScope = $state<ExportScope>("subtree");
   let exportArtifactAttached = $state(false);
+  let trashDocs = $state<DocumentTrashPreview[]>(TRASH_PREVIEWS);
+  let selectedTrashDocId = $state("doc-release-parent");
+  let restoreDestination = $state("Knowledge archive");
+  let restoredDoc = $state("");
+  let permanentDeleteAttempt = $state("");
   let runFeedback = $state([
     "Run state loaded from dependency execution API snapshot",
     "Blocked node task-build explains approval gate before write",
@@ -264,6 +311,9 @@
   const blockedTasks = $derived(dependencyTasks.filter((task) => task.blocker));
   const activeTask = $derived(dependencyTasks.find((task) => task.status === "running") ?? dependencyTasks[0]);
   const exportPackage = $derived(EXPORT_PACKAGES[exportScope]);
+  const selectedTrashDoc = $derived(trashDocs.find((doc) => doc.id === selectedTrashDocId) ?? trashDocs[0]);
+  const activeDocs = $derived(trashDocs.filter((doc) => doc.state === "active"));
+  const trashedDocs = $derived(trashDocs.filter((doc) => doc.state === "trash"));
 
   const filteredResults = $derived.by(() => RESULTS.filter((result) =>
     (!selectedProject || result.project === selectedProject)
@@ -322,6 +372,29 @@
 
   function attachExportArtifact(): void {
     exportArtifactAttached = true;
+  }
+
+  function previewDelete(id: string): void {
+    selectedTrashDocId = id;
+    restoredDoc = "";
+    permanentDeleteAttempt = "";
+  }
+
+  function softDeleteSelectedDoc(): void {
+    trashDocs = trashDocs.map((doc) => doc.id === selectedTrashDoc.id ? { ...doc, state: "trash" } : doc);
+    permanentDeleteAttempt = "";
+  }
+
+  function restoreSelectedDoc(): void {
+    const destination = selectedTrashDoc.originalParentValid ? selectedTrashDoc.parent : restoreDestination.trim();
+    if (!destination) return;
+    trashDocs = trashDocs.map((doc) => doc.id === selectedTrashDoc.id ? { ...doc, state: "active", parent: destination, originalParentValid: true } : doc);
+    restoredDoc = `${selectedTrashDoc.title} restored to ${destination}`;
+    permanentDeleteAttempt = "";
+  }
+
+  function requestPermanentDelete(): void {
+    permanentDeleteAttempt = "Blocked. Permanent delete requires Knowledge admin permission and typed document title confirmation.";
   }
 </script>
 
@@ -486,6 +559,105 @@
         </div>
         <p data-source-import-event data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>{IMPORT_PREVIEW.sourceEvent}</p>
         <p data-import-overwrite-guard data-contrast-sample class={cn("rounded-sm border border-border-strong bg-background px-2 py-1.5 text-xs font-medium text-foreground")}>{IMPORT_PREVIEW.overwriteGuard}</p>
+      </div>
+    </section>
+
+    <section data-doc-trash-workflow class={cn("grid min-w-0 gap-3 rounded-md border border-border bg-card p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+      <div class={cn("min-w-0 space-y-3")}>
+        <div class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3")}>
+          <div>
+            <p data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Document trash</p>
+            <h2 class={cn("type-h2 text-foreground")}>Delete impact preview</h2>
+            <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Soft delete hides Documents from the normal PageTree after users inspect linked children, refs, bundles, and artifacts.</p>
+          </div>
+          <Badge data-trash-reference variant="warning">spec-backed</Badge>
+        </div>
+
+        <div data-normal-doc-tree class={cn("space-y-2")}>
+          <p data-contrast-sample class={cn("type-caption text-foreground")}>Normal PageTree</p>
+          {#each activeDocs as doc (doc.id)}
+            <article data-active-doc-row data-doc-id={doc.id} class={cn("rounded-sm border border-border bg-background p-3")}>
+              <div class={cn("flex flex-wrap items-start justify-between gap-2")}>
+                <div class={cn("min-w-0")}>
+                  <h3 class={cn("type-caption text-foreground")}>{doc.title}</h3>
+                  <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>parent:{doc.parent}</p>
+                </div>
+                <Button data-preview-delete size="xs" variant="outline" onclick={() => previewDelete(doc.id)}>Preview delete</Button>
+              </div>
+            </article>
+          {:else}
+            <p data-active-doc-empty data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>No active Documents visible in the normal tree.</p>
+          {/each}
+        </div>
+
+        <div data-delete-impact-preview class={cn("rounded-sm border border-warning/50 bg-warning/10 p-3")}>
+          <div class={cn("flex flex-wrap items-start justify-between gap-2")}>
+            <div>
+              <p data-contrast-sample class={cn("type-caption text-foreground")}>{selectedTrashDoc.title}</p>
+              <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Current parent: {selectedTrashDoc.parent}</p>
+            </div>
+            <Badge data-trash-state variant={selectedTrashDoc.state === "trash" ? "destructive" : "outline"}>{selectedTrashDoc.state}</Badge>
+          </div>
+          <div class={cn("mt-3 grid gap-2 md:grid-cols-2")}>
+            <div data-impact-children data-contrast-sample class={cn("rounded-sm bg-background p-2 text-xs text-foreground")}>Child pages: {selectedTrashDoc.children.join(", ")}</div>
+            <div data-impact-backlinks data-contrast-sample class={cn("rounded-sm bg-background p-2 text-xs text-foreground")}>Backlinks: {selectedTrashDoc.backlinks.join(", ")}</div>
+            <div data-impact-attachments data-contrast-sample class={cn("rounded-sm bg-background p-2 text-xs text-foreground")}>Attachments: {selectedTrashDoc.attachments.join(", ")}</div>
+            <div data-impact-context-bundles data-contrast-sample class={cn("rounded-sm bg-background p-2 text-xs text-foreground")}>Context bundles: {selectedTrashDoc.contextBundles.join(", ")}</div>
+            <div data-impact-artifacts data-contrast-sample class={cn("rounded-sm bg-background p-2 text-xs text-foreground md:col-span-2")}>Artifacts: {selectedTrashDoc.artifacts.join(", ")}</div>
+          </div>
+          <div class={cn("mt-3 flex flex-wrap gap-2")}>
+            <Button data-soft-delete-doc size="sm" variant="destructive" disabled={selectedTrashDoc.state === "trash"} onclick={softDeleteSelectedDoc}>Move to trash</Button>
+            <Button data-permanent-delete-doc size="sm" variant="outline" onclick={requestPermanentDelete}>Permanent delete</Button>
+          </div>
+        </div>
+      </div>
+
+      <div class={cn("min-w-0 space-y-3")}>
+        <div class={cn("border-b border-border pb-3")}>
+          <p data-contrast-sample class={cn("type-caption uppercase text-fg-subtle")}>Trash view</p>
+          <h2 class={cn("type-h2 text-foreground")}>Restore and permanent delete guard</h2>
+          <p data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>Trash remains reachable from the docs workbench and keeps restore decisions explicit.</p>
+        </div>
+
+        <div data-trash-view class={cn("space-y-2")}>
+          {#each trashedDocs as doc (doc.id)}
+            <article data-trash-doc-row data-doc-id={doc.id} class={cn("rounded-sm border border-border bg-background p-3")}>
+              <div class={cn("flex flex-wrap items-start justify-between gap-2")}>
+                <div class={cn("min-w-0")}>
+                  <h3 class={cn("type-caption text-foreground")}>{doc.title}</h3>
+                  <p data-restore-parent data-contrast-sample class={cn("mt-1 text-xs text-fg-subtle")}>
+                    {doc.originalParentValid ? `Restore target: ${doc.parent}` : "Original parent missing. Choose a new destination."}
+                  </p>
+                </div>
+                <Button data-select-trash-doc size="xs" variant="outline" onclick={() => previewDelete(doc.id)}>Inspect</Button>
+              </div>
+            </article>
+          {:else}
+            <p data-trash-empty data-contrast-sample class={cn("rounded-sm bg-muted p-3 text-xs text-foreground")}>Trash is empty.</p>
+          {/each}
+        </div>
+
+        {#if selectedTrashDoc.state === "trash" && !selectedTrashDoc.originalParentValid}
+          <label data-restore-destination-field data-contrast-sample class={cn("block text-xs font-medium text-fg-subtle")}>
+            New destination
+            <input data-restore-destination bind:value={restoreDestination} class={cn("mt-1 h-9 w-full rounded-sm border border-input bg-background px-3 text-sm text-foreground")} />
+          </label>
+        {/if}
+
+        <div class={cn("flex flex-wrap gap-2")}>
+          <Button data-restore-doc size="sm" variant="default" disabled={selectedTrashDoc.state !== "trash"} onclick={restoreSelectedDoc}>Restore</Button>
+          <span data-restore-status data-contrast-sample class={cn("rounded-sm bg-muted px-2 py-1.5 text-xs text-foreground")}>{restoredDoc || "No restore applied."}</span>
+        </div>
+
+        {#if permanentDeleteAttempt}
+          <Alert data-permanent-delete-guard tone="error" title="Permanent delete blocked">
+            {permanentDeleteAttempt}
+          </Alert>
+        {:else}
+          <Alert data-permanent-delete-guard tone="warning" title="Permanent delete policy">
+            Requires elevated permission and typed document title confirmation before any hard delete.
+          </Alert>
+        {/if}
       </div>
     </section>
 

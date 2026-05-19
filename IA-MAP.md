@@ -440,7 +440,7 @@ Per research-05 §3.1. Two-level noun-verb hub-and-spoke (gh/wrangler shape).
 
 ```
 # Capture
-fulcrum doc      <list|new|view|edit|attach|history|restore|link|search>
+fulcrum doc      <list|new|view|edit|attach|history|trash|restore|delete|link|search>
 fulcrum note     <new|view|search|tag>
 fulcrum capture  <text|url|file>          # generic intake
 

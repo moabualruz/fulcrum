@@ -38,6 +38,14 @@ _Avoid_: Inbound link, reverse link, related doc.
 A reply-one-level-deep thread anchored to a **Document**, optionally tied to a Yjs relative-position selection for inline placement.
 _Avoid_: Annotation, note (overloaded), discussion.
 
+**TrashEntry**:
+A soft-deleted **Document** or subtree retained outside the normal **PageTree** with its original parent, child page impact, Backlinks, attachments, ContextBundles, and artifact references available for review and restore.
+_Avoid_: Deleted page, archive, recycle bin item.
+
+**PermanentDelete**:
+An irreversible removal of a **TrashEntry** after elevated permission and typed title confirmation. Normal delete actions never hard-delete directly.
+_Avoid_: Hard delete (except in code comments explaining storage behavior), purge.
+
 ### Memory surface
 
 **Memory**:
@@ -83,6 +91,7 @@ _Avoid_: Bookmark, query, filter preset.
 - A **Document** belongs to exactly one `SpaceId` and has zero or one parent **Document** (forming the **PageTree**).
 - A **Document** has many **Revisions**, many **Comments**, and many **Wikilinks**; **Wikilinks** materialize as **Backlinks** in the opposite direction.
 - A **Document**'s `DocType` selects exactly one **Frontmatter** schema from `FrontmatterSchemaMap`.
+- A **Document** moved to trash becomes a **TrashEntry** and no longer appears in the normal **PageTree**; restore returns it to the original parent when valid or requires a new destination.
 - A **Comment** has zero or one parent **Comment** (replies are flat — no reply-to-reply).
 - A **Memory** belongs to one org, optionally one project, has one **MemoryKind**, one **Importance**, and zero or one **SourceRef**.
 - A **ContextBundle** aggregates many **Memories** plus excerpts from many **Documents** for one agent run.
@@ -104,3 +113,4 @@ _Avoid_: Bookmark, query, filter preset.
 - **"Version" vs "Revision"** — the persisted DTO is `DocVersion` but the conceptual entity is **Revision**. Resolution: keep `DocVersion` in code; use **Revision** in prose and ADRs.
 - **"Link"** — covers **Wikilink** (doc→doc, slug-resolved), `LinkKind: mention` (doc→user), `task_ref`/`run_ref` (doc→external entity), and **Memory** `SourceRef` (memory→origin). Resolution: never say "link" alone; always name the variant.
 - **"Scope"** — appears in `Scope` enum (`project | global` on Documents/Memories) and **Search** `Scope` (`current | all | global`). Resolution: qualify as "doc scope" or "search scope" when both could apply.
+- **"Trash" vs "Archive"** — **TrashEntry** is a recoverable soft-delete state for Documents. Archive is a product/workflow retention state elsewhere and is not used for Document deletion.
