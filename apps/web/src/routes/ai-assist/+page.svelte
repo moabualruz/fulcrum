@@ -38,6 +38,11 @@
     { speaker: "AI Assist", text: "I found 4 source refs, 2 task links, and 1 blocker. Planning can start with trace tr_8f29a4c1b3e0d5f7." },
     { speaker: "Tool", text: "read.document doc_auth_rewrite · read.attachment att_sec_review · list.related task_auth_42" },
   ];
+  const promptEditTrace = {
+    before: "Use the selected document and attachment to start planning the authentication rewrite.",
+    after: "Use the selected document, attachment, and task blocker to draft a lower-risk implementation plan.",
+    runAttempt: "run_attempt_8f29a4c1b3e0d5f7",
+  };
 
   const agentRows = [
     { name: "claude-code", status: "Ready", latency: "0.8s", mcp: 12, plugins: 4 },
@@ -271,6 +276,29 @@
               <p class="text-sm leading-6 text-muted-foreground">{message.text}</p>
             </article>
           {/each}
+          <article class="rounded-md border border-border bg-background p-3" data-ai-assist-prompt-edit>
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-xs font-semibold">Prompt edit</h3>
+              <Chip tone="neutral">paused</Chip>
+            </div>
+            <label class="grid gap-1 text-xs font-semibold text-muted-foreground">
+              Edited prompt
+              <textarea
+                class="min-h-24 resize-y rounded-md border border-input bg-card p-3 text-sm leading-6 text-foreground"
+                aria-label="Edited prompt"
+                data-ai-assist-prompt-editor
+              >{promptEditTrace.after}</textarea>
+            </label>
+            <div class="mt-3 grid gap-2 rounded-md bg-muted/40 p-3 text-xs text-muted-foreground" data-ai-assist-edit-trace>
+              <span class="font-mono">attempt {promptEditTrace.runAttempt}</span>
+              <span>before: {promptEditTrace.before}</span>
+              <span>after: {promptEditTrace.after}</span>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" data-ai-assist-cancel-edit>Cancel</Button>
+              <Button type="button" size="sm" data-ai-assist-rerun-prompt>Re-run from this prompt</Button>
+            </div>
+          </article>
         </div>
       </section>
 

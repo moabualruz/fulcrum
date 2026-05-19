@@ -27,4 +27,11 @@ describe("fulcrum ai assist", () => {
       workspacePath: "/workspace/fulcrum",
     });
   });
+
+  test("documents prompt edit re-run peer command path", async () => {
+    const out: string[] = [];
+    await run(["help"], { print: (line) => out.push(line) });
+
+    expect(out.join("\n")).toContain("fulcrum ai start");
+  });
 });

@@ -31,6 +31,15 @@ describe("ai assist reference route", () => {
     expect(source).toContain("Agent overrides saved");
   });
 
+  test("ships inline paused prompt edit and re-run provenance", () => {
+    expect(source).toContain("data-ai-assist-prompt-edit");
+    expect(source).toContain("data-ai-assist-prompt-editor");
+    expect(source).toContain("Re-run from this prompt");
+    expect(source).toContain("data-ai-assist-edit-trace");
+    expect(source).toContain("run_attempt_8f29a4c1b3e0d5f7");
+    expect(source).toContain("data-ai-assist-cancel-edit");
+  });
+
   test("keeps the drawer usable on mobile without page-level overflow", () => {
     expect(source).toContain("overflow-x-hidden");
     expect(source).toContain("max-w-full");
