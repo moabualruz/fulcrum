@@ -51,4 +51,27 @@ test.describe("project settings labels", () => {
 		await page.locator("[data-label-delete='lbl_legacy']").click();
 		await expect(page.locator("[data-label-archived-row='lbl_legacy']")).toHaveCount(0);
 	});
+
+	test("cycle settings form exposes duration, start day, naming pattern, and auto-create", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await expect(page.locator("[data-cycle-settings]")).toBeVisible();
+		await expect(page.locator("[data-cycle-duration]")).toHaveValue("14");
+		await expect(page.locator("[data-cycle-start-day]")).toHaveValue("monday");
+		await expect(page.locator("[data-cycle-naming-pattern]")).toHaveValue("Sprint {n}");
+		await expect(page.locator("[data-cycle-auto-create]")).toBeChecked();
+	});
+
+	test("valid cycle save shows confirmation; invalid input shows error", async ({ page }) => {
+		await page.goto("/project-settings");
+
+		await page.locator("[data-cycle-duration]").fill("21");
+		await page.locator("[data-cycle-start-day]").selectOption("tuesday");
+		await page.locator("[data-cycle-save]").click();
+		await expect(page.locator("[data-cycle-saved]")).toContainText("Cycle settings saved");
+
+		await page.locator("[data-cycle-naming-pattern]").fill("Bad pattern");
+		await page.locator("[data-cycle-save]").click();
+		await expect(page.locator("[data-cycle-error]")).toContainText("placeholder");
+	});
 });

@@ -93,6 +93,33 @@
     if (!target || target.status !== "archived") return;
     labels = labels.filter((label) => label.id !== id && label.parentId !== id);
   }
+
+  type StartDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+
+  let cycleDuration = $state<number>(14);
+  let autoCreate = $state(true);
+  let namingPattern = $state("Sprint {n}");
+  let cycleStartDay = $state<StartDay>("monday");
+  let cycleSaved = $state(false);
+  let cycleError = $state<string | null>(null);
+
+  const START_DAYS: StartDay[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+  function saveCycle(event: Event): void {
+    event.preventDefault();
+    if (!Number.isInteger(cycleDuration) || cycleDuration < 1 || cycleDuration > 90) {
+      cycleError = "Cycle duration must be an integer between 1 and 90 days.";
+      cycleSaved = false;
+      return;
+    }
+    if (!namingPattern.includes("{n}")) {
+      cycleError = "Naming pattern must include the {n} placeholder.";
+      cycleSaved = false;
+      return;
+    }
+    cycleError = null;
+    cycleSaved = true;
+  }
 </script>
 
 <svelte:head>
@@ -210,6 +237,69 @@
         </li>
       {/each}
     </ul>
+  </section>
+
+  <section data-cycle-settings class="flex flex-col gap-3 rounded-md border border-border p-4">
+    <header>
+      <h2 class="text-base font-medium">Cycles</h2>
+      <p class="text-xs text-muted-foreground">Configure sprint duration, auto-creation, naming pattern, and start day.</p>
+    </header>
+    <form data-cycle-form class="grid grid-cols-1 gap-3 sm:grid-cols-2" onsubmit={saveCycle}>
+      <label class="flex flex-col gap-1 text-sm">
+        Cycle duration (days)
+        <input
+          type="number"
+          data-cycle-duration
+          min="1"
+          max="90"
+          bind:value={cycleDuration}
+          class="h-9 rounded-md border border-input bg-background px-2"
+        />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        Start day
+        <select
+          data-cycle-start-day
+          bind:value={cycleStartDay}
+          class="h-9 rounded-md border border-input bg-background px-2 capitalize"
+        >
+          {#each START_DAYS as day (day)}
+            <option value={day}>{day}</option>
+          {/each}
+        </select>
+      </label>
+      <label class="flex flex-col gap-1 text-sm sm:col-span-2">
+        Naming pattern
+        <input
+          type="text"
+          data-cycle-naming-pattern
+          bind:value={namingPattern}
+          class="h-9 rounded-md border border-input bg-background px-2 font-mono"
+        />
+        <span class="text-xs text-muted-foreground">Use {`{n}`} as the cycle sequence number placeholder.</span>
+      </label>
+      <label class="flex items-center gap-2 text-sm sm:col-span-2">
+        <input
+          type="checkbox"
+          data-cycle-auto-create
+          bind:checked={autoCreate}
+        />
+        Auto-create next cycle when current cycle ends
+      </label>
+      <div class="flex items-center gap-3 sm:col-span-2">
+        <button
+          type="submit"
+          data-cycle-save
+          class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >Save cycle settings</button>
+        {#if cycleSaved && !cycleError}
+          <span data-cycle-saved class="text-sm text-green-600">Cycle settings saved.</span>
+        {/if}
+        {#if cycleError}
+          <span data-cycle-error class="text-sm text-destructive">{cycleError}</span>
+        {/if}
+      </div>
+    </form>
   </section>
 
   <section data-label-archived class="flex flex-col gap-3 rounded-md border border-border p-4">
