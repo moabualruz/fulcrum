@@ -137,8 +137,54 @@ test.describe("build board design reference", () => {
 		await expect(failedCard.locator("[data-build-task-error]")).toContainText("HTTP 500");
 		await expect(failedCard.locator("[data-build-task-error-trace]")).toContainText("tr_optimistic_5xx");
 
-		await failedCard.locator("[data-build-task-retry]").click();
-		await expect(failedCard).toHaveCount(0, { timeout: 5_000 });
+		await failedCard.locator("[data-build-task-undo]").click();
+		await expect(failedCard).toHaveCount(0);
+	});
+
+	test("optimistic rollback escalates after 3 retries with expanded payload + troubleshooting link", async ({ page }) => {
+		await page.goto("/build-board");
+
+		const queuedColumn = page.locator("[data-build-column='queued']");
+
+		await queuedColumn.locator("[data-build-board-new-task-trigger]").click();
+		const input = queuedColumn.locator("[data-build-board-new-task-input]");
+		await input.fill("force-fail rotation kid");
+		await input.press("Enter");
+
+		const card = queuedColumn.locator("[data-build-task-optimistic][data-failed='true']");
+		await expect(card).toHaveCount(1);
+		await expect(card.locator("[data-build-task-error]"))
+			.toHaveAttribute("data-build-task-error-attempts", "1");
+		await expect(card.locator("[data-build-task-error]"))
+			.not.toHaveAttribute("data-build-task-error-escalated", "true");
+		await expect(card.locator("[data-build-task-error-payload]")).toHaveCount(0);
+
+		await card.locator("[data-build-task-retry]").click();
+		await expect(card.locator("[data-build-task-error]"))
+			.toHaveAttribute("data-build-task-error-attempts", "2", { timeout: 5_000 });
+		await expect(card.locator("[data-build-task-error-payload]")).toHaveCount(0);
+
+		await card.locator("[data-build-task-retry]").click();
+		await expect(card.locator("[data-build-task-error]"))
+			.toHaveAttribute("data-build-task-error-escalated", "true", { timeout: 5_000 });
+		await expect(card.locator("[data-build-task-error]"))
+			.toHaveAttribute("data-build-task-error-attempts", "3");
+
+		const payload = card.locator("[data-build-task-error-payload]");
+		await expect(payload).toBeVisible();
+		await expect(payload).toContainText("attempt 3");
+		await expect(payload).toContainText("force-fail rotation kid");
+
+		const actions = card.locator("[data-build-task-error-actions]");
+		await expect(actions).toContainText("Check network");
+		await expect(actions).toContainText("View logs");
+
+		const trouble = card.locator("[data-build-task-error-troubleshooting]");
+		await expect(trouble).toContainText("View troubleshooting");
+		await expect(trouble).toHaveAttribute("href", /troubleshooting/);
+
+		await card.locator("[data-build-task-undo]").click();
+		await expect(card).toHaveCount(0);
 	});
 
 	test("keeps the board usable on mobile without page-level overflow", async ({ page }) => {

@@ -3,15 +3,23 @@
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import {
+    OptimisticRollback,
     OptimisticStore,
+    ROLLBACK_SUGGESTED_ACTIONS,
+    ROLLBACK_TROUBLESHOOTING_HREF,
+    ROLLBACK_TROUBLESHOOTING_LABEL,
     type OptimisticEntry,
+    type RollbackFailure,
   } from "$lib/optimistic/index.ts";
 
   type PendingTask = { columnId: string; title: string };
 
   const optimisticTasks = new OptimisticStore<PendingTask>();
+  const optimisticRollback = new OptimisticRollback();
   let optimisticEntries = $state<ReadonlyArray<OptimisticEntry<PendingTask>>>([]);
+  let rollbackFailures = $state<ReadonlyArray<RollbackFailure>>([]);
   optimisticTasks.subscribe((entries) => { optimisticEntries = entries; });
+  optimisticRollback.subscribe((failures) => { rollbackFailures = failures; });
 
   let optimisticSequence = 0;
   function nextOptimisticId(): string {
@@ -26,15 +34,25 @@
     );
   }
 
+  function rollbackFor(id: string): RollbackFailure | undefined {
+    return rollbackFailures.find((f) => f.id === id);
+  }
+
   function persistOptimisticTask(id: string, value: PendingTask): void {
+    optimisticRollback.clear(id);
     const handle = optimisticTasks.apply(id, value);
     void simulateMutationResult(value.title).then((result) => {
       if (result.kind === "success") {
         handle.confirm({ traceId: result.traceId });
-        // Confirmed entries fade out from the pending render path; in a real
-        // wiring slice the tRPC return value would seed a real task row.
+        optimisticRollback.resolve(id);
       } else {
         handle.fail({ message: result.message, traceId: result.traceId });
+        optimisticRollback.recordFailure({
+          id,
+          error: result.message,
+          traceId: result.traceId,
+          payload: { title: value.title, columnId: value.columnId },
+        });
       }
     });
   }
@@ -43,29 +61,39 @@
     const entry = optimisticEntries.find((e) => e.id === id);
     if (!entry) return;
     const handle = optimisticTasks.apply(id, entry.value);
-    void simulateMutationResult(entry.value.title, { forceSuccess: true }).then((result) => {
+    void simulateMutationResult(entry.value.title).then((result) => {
       if (result.kind === "success") {
         handle.confirm({ traceId: result.traceId });
+        optimisticRollback.resolve(id);
       } else {
         handle.fail({ message: result.message, traceId: result.traceId });
+        optimisticRollback.recordFailure({
+          id,
+          error: result.message,
+          traceId: result.traceId,
+          payload: { title: entry.value.title, columnId: entry.value.columnId },
+        });
       }
     });
   }
 
+  function undoOptimisticTask(id: string): void {
+    optimisticTasks.remove(id);
+    optimisticRollback.resolve(id);
+  }
+
   function dismissOptimisticTask(id: string): void {
     optimisticTasks.remove(id);
+    optimisticRollback.resolve(id);
   }
 
   type SimulatedResult =
     | { kind: "success"; traceId: string }
     | { kind: "failure"; message: string; traceId: string };
 
-  async function simulateMutationResult(
-    title: string,
-    options: { forceSuccess?: boolean } = {},
-  ): Promise<SimulatedResult> {
+  async function simulateMutationResult(title: string): Promise<SimulatedResult> {
     await new Promise((resolve) => setTimeout(resolve, 750));
-    if (!options.forceSuccess && title.toLowerCase().includes("force-fail")) {
+    if (title.toLowerCase().includes("force-fail")) {
       return {
         kind: "failure",
         message: "Server rejected the mutation (HTTP 500).",
@@ -74,6 +102,12 @@
     }
     return { kind: "success", traceId: "tr_optimistic_ok" };
   }
+
+  const ROLLBACK_TROUBLESHOOTING = {
+    href: ROLLBACK_TROUBLESHOOTING_HREF,
+    label: ROLLBACK_TROUBLESHOOTING_LABEL,
+    actions: ROLLBACK_SUGGESTED_ACTIONS,
+  };
 
   type BoardTask = {
     key: string;
@@ -511,13 +545,37 @@
               {#if entry.status === "pending"}
                 <p class={cn("mt-2 text-[11px] text-muted-foreground")}>Saving…</p>
               {:else if entry.status === "failed"}
-                <div data-build-task-error class={cn("mt-2 space-y-1 text-xs text-destructive")}>
+                {@const rollback = rollbackFor(entry.id)}
+                <div
+                  data-build-task-error
+                  data-build-task-error-attempts={rollback?.attempts ?? 0}
+                  data-build-task-error-escalated={rollback?.escalated ? "true" : undefined}
+                  class={cn("mt-2 space-y-1 text-xs text-destructive")}
+                >
                   <p>{entry.error}</p>
                   {#if entry.traceId}
                     <p class={cn("font-mono text-[10px] text-muted-foreground")}>
                       trace
                       <span data-build-task-error-trace>{entry.traceId}</span>
                     </p>
+                  {/if}
+                  {#if rollback?.escalated}
+                    <details data-build-task-error-payload class={cn("rounded-md border border-destructive/30 bg-destructive/5 p-2 text-foreground")}>
+                      <summary class={cn("cursor-pointer text-[11px] font-medium text-destructive")}>
+                        Last request payload (attempt {rollback.attempts})
+                      </summary>
+                      <pre class={cn("mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-muted-foreground")}><code>{JSON.stringify(rollback.lastPayload, null, 2)}</code></pre>
+                    </details>
+                    <ul data-build-task-error-actions class={cn("flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground")}>
+                      {#each ROLLBACK_TROUBLESHOOTING.actions as action}
+                        <li class={cn("rounded-md border border-border bg-background px-2 py-0.5")}>{action}</li>
+                      {/each}
+                    </ul>
+                    <a
+                      href={ROLLBACK_TROUBLESHOOTING.href}
+                      data-build-task-error-troubleshooting
+                      class={cn("inline-flex items-center text-[11px] font-medium text-accent underline-offset-2 hover:underline")}
+                    >{ROLLBACK_TROUBLESHOOTING.label}</a>
                   {/if}
                   <div class={cn("flex items-center gap-2 pt-1")}>
                     <Button
@@ -526,6 +584,12 @@
                       data-build-task-retry
                       onclick={() => retryOptimisticTask(entry.id)}
                     >Retry</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      data-build-task-undo
+                      onclick={() => undoOptimisticTask(entry.id)}
+                    >Undo</Button>
                     <Button
                       size="sm"
                       variant="ghost"
