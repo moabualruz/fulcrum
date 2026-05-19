@@ -68,3 +68,38 @@ export function renderTuiErrorFrame(renderer: Renderer, frame: TuiErrorFrame): v
   }
   renderer.writeln(`  ${c.dim(frame.recoveryHint)}`);
 }
+
+export interface ListViewport {
+  totalRows: number;
+  selectedIndex: number;
+  viewportRows: number;
+  scrollOffset: number;
+}
+
+export function clampSelection(totalRows: number, selectedIndex: number): number {
+  if (totalRows <= 0) return 0;
+  if (selectedIndex < 0) return 0;
+  if (selectedIndex >= totalRows) return totalRows - 1;
+  return selectedIndex;
+}
+
+export function reflowListViewport(input: ListViewport): ListViewport {
+  const totalRows = Math.max(0, Math.floor(input.totalRows));
+  const viewportRows = Math.max(1, Math.floor(input.viewportRows));
+  const selectedIndex = clampSelection(totalRows, Math.floor(input.selectedIndex));
+
+  let scrollOffset = Math.max(0, Math.floor(input.scrollOffset));
+  if (scrollOffset > selectedIndex) scrollOffset = selectedIndex;
+  const lastInView = scrollOffset + viewportRows - 1;
+  if (lastInView < selectedIndex) {
+    scrollOffset = selectedIndex - viewportRows + 1;
+  }
+  const lastVisibleIndex = Math.max(0, totalRows - 1);
+  if (totalRows <= viewportRows) {
+    scrollOffset = 0;
+  } else if (scrollOffset > lastVisibleIndex - viewportRows + 1) {
+    scrollOffset = lastVisibleIndex - viewportRows + 1;
+  }
+
+  return { totalRows, selectedIndex, viewportRows, scrollOffset: Math.max(0, scrollOffset) };
+}
