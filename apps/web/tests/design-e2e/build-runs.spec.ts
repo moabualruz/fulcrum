@@ -57,4 +57,50 @@ test.describe("code review loop", () => {
 		const overflow = await page.locator("[data-build-runs-review]").evaluate((element) => element.scrollWidth - element.clientWidth);
 		expect(overflow).toBeLessThanOrEqual(1);
 	});
+
+	test("shows pending automated feedback runs and latest verdicts", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await expect(page.locator("[data-qa-feedback-gate]")).toBeVisible();
+		await expect(page.locator("[data-run-status='qa-feedback-17']")).toHaveText("running");
+		await expect(page.locator("[data-run-status='implementation-feedback-18']")).toHaveText("pending");
+		await expect(page.locator("[data-latest-verdict='qa-feedback-17']")).toContainText("REVISE");
+		await expect(page.locator("[data-latest-verdict='review-feedback-19']")).toContainText("APPROVE");
+	});
+
+	test("keeps UAT disabled while retryable QA feedback exists then unlocks after exhaustion", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await expect(page.locator("[data-start-uat]")).toBeDisabled();
+		await expect(page.locator("[data-gate-explanation]")).toContainText("retryable QA feedback exists");
+
+		await page.locator("[data-gate-exhausted]").click();
+		await expect(page.locator("[data-start-uat]")).toBeEnabled();
+		await expect(page.locator("[data-gate-explanation]")).toContainText("automation exhausted after 3 attempts");
+	});
+
+	test("requires blocked reason and owner before recording a blocked state", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await page.locator("[data-gate-blocked]").click();
+		await expect(page.locator("[data-record-blocked]")).toBeDisabled();
+		await page.locator("[data-blocked-reason]").fill("Reviewer unavailable");
+		await expect(page.locator("[data-record-blocked]")).toBeDisabled();
+		await page.locator("[data-blocked-owner]").fill("qa-lead");
+		await expect(page.locator("[data-record-blocked]")).toBeEnabled();
+		await expect(page.locator("[data-blocked-record]")).toContainText("qa-lead");
+		await expect(page.locator("[data-blocked-record]")).toContainText("Reviewer unavailable");
+	});
+
+	test("records why automation is exhausted before approval", async ({ page }) => {
+		await page.goto("/build-runs");
+
+		await expect(page.locator("[data-record-exhaustion]")).toBeDisabled();
+		await page.locator("[data-gate-exhausted]").click();
+		await page.locator("[data-exhaustion-reason]").fill("QA, task, and review agents reached retry cap with passing final verdicts.");
+		await page.locator("[data-record-exhaustion]").click();
+		await expect(page.locator("[data-exhaustion-record]")).toContainText(
+			"QA, task, and review agents reached retry cap with passing final verdicts.",
+		);
+	});
 });

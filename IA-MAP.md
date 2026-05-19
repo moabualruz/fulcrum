@@ -145,7 +145,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /desktop                                                  desktop-shell preview (Tauri window chrome, gated by FULCRUM_FEATURES=desktop-app)
 /os-widgets                                               gallery of macOS-style OS-level surfaces (tray menu, native notification, dock badge); internal preview only; not part of web shell production routes
 /build-graph                                              internal design-e2e preview for doc search, scoped filters, snippets, graph counts, and planning-context actions
-/build-runs                                               internal design-e2e preview for local diff code review, line-anchored annotations, feedback export, and approval identity
+/build-runs                                               internal design-e2e preview for local diff code review, line-anchored annotations, feedback export, QA feedback exhaustion gate, and approval identity
 /build-timeline                                           internal design-e2e preview for document version timeline, inline diff, restore confirmation, comments, backlinks, and planning conversion
 /task-filters                                             internal design-e2e preview for persistent task filters, AND/OR logic, and saved filtered views
 /palette                                                  internal design-e2e preview for permission-aware CommandPalette actions and SavedView access
