@@ -1,5 +1,32 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+
+  type HeaderState = "expanded" | "collapsed";
+  const COLLAPSE_THRESHOLD_PX = 50;
+  const EXPAND_THRESHOLD_PX = 20;
+
+  let headerState = $state<HeaderState>("expanded");
+  let scrollY = $state(0);
+  let lastDirectionChangeY = $state(0);
+  let scrollDirection = $state<"up" | "down">("up");
+
+  function handleScroll(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const next = target.scrollTop;
+    const direction: "up" | "down" = next > scrollY ? "down" : "up";
+    if (direction !== scrollDirection) {
+      lastDirectionChangeY = scrollY;
+      scrollDirection = direction;
+    }
+    const delta = Math.abs(next - lastDirectionChangeY);
+    if (direction === "down" && delta >= COLLAPSE_THRESHOLD_PX) {
+      headerState = "collapsed";
+    } else if (direction === "up" && delta >= EXPAND_THRESHOLD_PX) {
+      headerState = "expanded";
+    }
+    scrollY = next;
+  }
 </script>
 
 <main
@@ -14,10 +41,29 @@
     style:padding-left="var(--fulcrum-gesture-zone-inline)"
     style:padding-right="var(--fulcrum-gesture-zone-inline)"
   >
-    <header data-android-status-header class={cn("sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur")}>
+    <header
+      data-android-status-header
+      data-header-state={headerState}
+      class={cn(
+        "sticky top-0 z-10 border-b border-border bg-background/95 px-4 backdrop-blur transition-[height,padding]",
+        headerState === "expanded" ? "h-[56px] py-3" : "h-[24px] overflow-hidden py-0",
+      )}
+    >
       <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Android safe area</p>
       <h1 class={cn("mt-1 text-lg font-semibold")}>Gesture-safe mobile shell</h1>
     </header>
+    <nav data-collapsing-breadcrumb class={cn("sticky top-[24px] z-10 flex items-center gap-2 border-b border-border bg-background/95 px-4 py-1 text-xs")}>
+      <a href="/" class="text-primary underline">Home</a>
+      <span aria-hidden="true">/</span>
+      <a href="/cross-cutting-mobile" class="text-primary underline">Mobile</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">Header collapse</span>
+    </nav>
+    <div data-scroll-region onscroll={handleScroll} class={cn("max-h-[60vh] overflow-y-auto")}>
+      <div data-fake-content-block style="height: 1200px">
+        <p data-current-scroll>scrollY={scrollY} direction={scrollDirection} state={headerState}</p>
+      </div>
+    </div>
 
     <div class={cn("grid flex-1 gap-3 p-4")}>
       <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>

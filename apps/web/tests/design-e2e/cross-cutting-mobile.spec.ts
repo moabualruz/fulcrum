@@ -144,4 +144,19 @@ test.describe("cross-cutting mobile safe areas", () => {
       expect(overflow).toBeLessThanOrEqual(1);
     }
   });
+
+  test("topbar collapses on downscroll past 50px and restores on upscroll", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/cross-cutting-mobile");
+
+    const header = page.locator("[data-android-status-header]");
+    await expect(header).toHaveAttribute("data-header-state", "expanded");
+
+    await page.locator("[data-scroll-region]").evaluate((element) => { element.scrollTop = 200; element.dispatchEvent(new Event("scroll")); });
+    await expect(header).toHaveAttribute("data-header-state", "collapsed");
+    await expect(page.locator("[data-collapsing-breadcrumb]")).toBeVisible();
+
+    await page.locator("[data-scroll-region]").evaluate((element) => { element.scrollTop = 150; element.dispatchEvent(new Event("scroll")); });
+    await expect(header).toHaveAttribute("data-header-state", "expanded");
+  });
 });
