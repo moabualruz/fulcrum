@@ -389,6 +389,11 @@ Per DESIGN.md §3.1 + research-01 §11. Slides over content as an overlay with a
 - **Agent picker header opens a full panel** listing every configured CLI agent (claude-code · codex · gemini-cli · opencode · pi-cli · custom), with status dot · client kind · latency · MCP count · plugin count · ring badge. Includes a filter input and `+ Add CLI agent (claude-code, codex, gemini-cli, opencode, pi-cli …)` shortcut. Footer link: `Manage agents, MCP & plugins in Settings →`.
 - Entry point: the **right-most segment of the status footer** on web (`✨ AI Assist  ⌘/`), the **right-most tab** of the bottom tab bar on mobile (accent-tinted), or the **right-most segment of the terminal footer** in TUI. Never decorative; always accent-tinted left-border.
 - Mobile: bottom sheet 92vw × full-height-minus-tabs.
+- Session actions inside the AI Assist workbench:
+  - Pause / Resume are direct form actions on the active session.
+  - Abort opens reason + required-note confirmation before `?/abortWithReason`.
+  - Checkpoint timeline actions post to `?/restoreCheckpoint` for newest checkpoint or `?/forkFromCheckpoint` after older-checkpoint confirmation.
+  - Paused sessions show a pause-queue count so queued prompts remain visible before resume.
 
 ---
 

@@ -36,6 +36,7 @@
   let copiedToolDetailId = $state<string | null>(null);
   let errorDismissed = $state(false);
   let abortConfirmOpen = $state(false);
+  let forkCheckpointId = $state<string | null>(null);
   let deleteSessionId = $state<string | null>(null);
   let selectedAgentName = $state(availableAgents[0]?.name ?? "");
   let cwdValue = $state("");
@@ -45,6 +46,8 @@
   let selectedRuntime = $state("");
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
+  const newestCheckpointId = $derived(model.checkpoints[0]?.id ?? null);
+  const forkCheckpoint = $derived(model.checkpoints.find((checkpoint) => checkpoint.id === forkCheckpointId) ?? null);
   const selectedAgent = $derived(availableAgents.find((agent) => agent.name === selectedAgentName) ?? availableAgents[0] ?? null);
   const startModes = [
     { id: "planning", name: "Planning", description: "Explore context, constraints, and implementation sequence before edits." },
@@ -245,11 +248,7 @@
   }
 
   function requestAbort(): void {
-    if (hasMutatingToolCalls) {
-      abortConfirmOpen = true;
-      return;
-    }
-    document.querySelector<HTMLFormElement>("[data-abort-session-form]")?.requestSubmit();
+    abortConfirmOpen = true;
   }
 
   async function chooseWorkingDirectory(): Promise<void> {
@@ -494,11 +493,14 @@
     {/if}
   </div>
 
-  <form method="POST" action="?/abortSession" data-abort-session-form class={cn("hidden")}></form>
-
   {#if model.connection.paused}
-    <div data-session-paused class={cn("mt-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm")}>
-      AI Assist is paused. Resume when you want the agent to continue.
+    <div data-session-paused data-pause-queue-count={model.pauseQueue.queuedPromptCount} class={cn("mt-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm")}>
+      <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+        <span>AI Assist is paused. Resume when you want the agent to continue.</span>
+        <span data-pause-queue-indicator class={cn("rounded-md border border-amber-500/40 px-2 py-0.5 text-xs")}>
+          {model.pauseQueue.queuedPromptCount} queued
+        </span>
+      </div>
     </div>
   {/if}
 
@@ -507,18 +509,32 @@
       <div role="dialog" aria-modal="true" aria-labelledby="abort-title" class={cn("w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl")}>
         <h3 id="abort-title" class={cn("text-base font-semibold")}>Abort active work?</h3>
         <p class={cn("mt-2 text-sm text-muted-foreground")}>
-          AI Assist has active tool calls. Aborting stops the session and may leave partial file changes for review.
+          AI Assist will stop this session and keep partial work available for review.
+          {hasMutatingToolCalls ? " Active tool calls are still in flight." : ""}
         </p>
-        <div class={cn("mt-4 flex justify-end gap-2")}>
-          <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
-            Keep running
-          </button>
-          <form method="POST" action="?/abortSession">
+        <form method="POST" action="?/abortWithReason" class={cn("mt-4 grid gap-3")}>
+          <label class={cn("grid gap-1 text-xs font-medium text-muted-foreground")}>
+            Abort reason
+            <select name="reason" required data-abort-reason class={cn("rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground")}>
+              <option value="user-cancel">User cancel</option>
+              <option value="dangerous-output">Dangerous output</option>
+              <option value="wrong-context">Wrong context</option>
+              <option value="cost-cap">Cost cap</option>
+            </select>
+          </label>
+          <label class={cn("grid gap-1 text-xs font-medium text-muted-foreground")}>
+            Note
+            <textarea name="note" required data-abort-note class={cn("min-h-24 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground")} placeholder="Why this AI Assist session is being stopped"></textarea>
+          </label>
+          <div class={cn("flex justify-end gap-2")}>
+            <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
+              Keep running
+            </button>
             <button type="submit" data-abort-confirm class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>
               Abort session
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   {/if}
@@ -735,6 +751,74 @@
       {/if}
     </div>
   </div>
+
+  <section data-checkpoint-timeline class={cn("mt-4 rounded-md border border-border p-3")}>
+    <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+      <h3 class={cn("text-sm font-medium")}>Checkpoint timeline</h3>
+      <span class={cn("text-xs text-muted-foreground")}>{model.checkpoints.length} saved</span>
+    </div>
+    {#if model.checkpoints.length === 0}
+      <p data-checkpoint-empty class={cn("mt-3 text-sm text-muted-foreground")}>No checkpoints yet.</p>
+    {:else}
+      <ol class={cn("mt-3 space-y-2")}>
+        {#each model.checkpoints as checkpoint}
+          <li data-checkpoint-row={checkpoint.id} data-checkpoint-kind={checkpoint.kind} data-checkpoint-current={checkpoint.current} class={cn("grid gap-3 rounded-md border border-border p-3 text-sm sm:grid-cols-[auto_1fr_auto] sm:items-center")}>
+            <span data-checkpoint-kind-icon class={cn("inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-muted font-mono text-[0.65rem] text-muted-foreground")}>
+              {checkpoint.kind.slice(0, 2).toUpperCase()}
+            </span>
+            <div class={cn("min-w-0")}>
+              <div class={cn("flex flex-wrap items-center gap-2")}>
+                <span class={cn("truncate font-medium")}>{checkpoint.label ?? checkpoint.id}</span>
+                <span data-checkpoint-turn class={cn("rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground")}>turn {checkpoint.turnIndex}</span>
+                {#if checkpoint.current}
+                  <span data-checkpoint-current-badge class={cn("rounded-md bg-primary/10 px-1.5 py-0.5 text-xs text-primary")}>current</span>
+                {/if}
+              </div>
+              <p class={cn("mt-1 truncate text-xs text-muted-foreground")}>
+                {checkpoint.createdAt} · {checkpoint.kind}
+              </p>
+            </div>
+            <div class={cn("flex flex-wrap gap-2 sm:justify-end")}>
+              {#if checkpoint.id === newestCheckpointId}
+                <form method="POST" action="?/restoreCheckpoint">
+                  <input type="hidden" name="checkpointId" value={checkpoint.id} />
+                  <button type="submit" data-restore-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                    Resume from checkpoint
+                  </button>
+                </form>
+              {:else}
+                <button type="button" data-fork-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (forkCheckpointId = checkpoint.id)}>
+                  Fork into new session
+                </button>
+              {/if}
+            </div>
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </section>
+
+  {#if forkCheckpoint}
+    <div data-fork-checkpoint-confirmation class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4")}>
+      <div role="dialog" aria-modal="true" aria-labelledby="fork-checkpoint-title" class={cn("w-full max-w-md rounded-lg border border-border bg-background p-4 shadow-xl")}>
+        <h3 id="fork-checkpoint-title" class={cn("text-base font-semibold")}>Fork into new session?</h3>
+        <p class={cn("mt-2 text-sm text-muted-foreground")}>
+          This restores {forkCheckpoint.label ?? forkCheckpoint.id} into a new AI Assist session.
+        </p>
+        <div class={cn("mt-4 flex justify-end gap-2")}>
+          <button type="button" data-fork-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (forkCheckpointId = null)}>
+            Cancel
+          </button>
+          <form method="POST" action="?/forkFromCheckpoint">
+            <input type="hidden" name="checkpointId" value={forkCheckpoint.id} />
+            <button type="submit" data-fork-confirm class={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+              Fork session
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if model.permission}
     <div data-session-permission data-permission-backdrop class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm")}>

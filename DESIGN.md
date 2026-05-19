@@ -481,6 +481,9 @@ Per research-02 § Web Live Session Pane. Used in Plan stage (ACP planning) and 
 - ACP `session/update` notifications drive transcript: `plan`, `agent_message_chunk`, `tool_call`, `tool_call_update`, `available_commands_update`, `current_mode_update` (research-02 §13).
 - "Fork from this turn" action on every transcript row.
 - Inline permission prompts (research-02 §10 + research-07 §5.4): one button per option, Cancel, never modal except for irreversible ops.
+- Checkpoint timeline sits below active tool-call state in `AgentSessionWorkbench`: newest checkpoint uses inline **Resume from checkpoint**, older checkpoints open **Fork into new session?** confirmation. Rows show kind icon, label, turn index, created time, and current marker.
+- Abort is irreversible: Web uses modal confirmation with reason dropdown (`user-cancel`, `dangerous-output`, `wrong-context`, `cost-cap`) plus required note. Copy says **AI Assist**, never protocol names.
+- Pause queue indicator appears only while paused and shows queued prompt count beside the resume affordance; resume clears it through live session state.
 
 ---
 

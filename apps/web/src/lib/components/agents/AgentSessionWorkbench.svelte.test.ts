@@ -83,6 +83,15 @@ describe("AgentSessionWorkbench component", () => {
     expect(body).toContain("services/planning-review/brief.md");
     expect(body).toContain("abort-btn");
     expect(body).toContain("pause-btn");
+    expect(body).toContain("data-checkpoint-timeline");
+    expect(body).toContain('data-checkpoint-row="checkpoint-new"');
+    expect(body).toContain('data-checkpoint-kind="git"');
+    expect(body).toContain("data-checkpoint-kind-icon");
+    expect(body).toContain("turn 7");
+    expect(body).toContain("Resume from checkpoint");
+    expect(body).toContain('data-restore-checkpoint="checkpoint-new"');
+    expect(body).toContain('data-checkpoint-row="checkpoint-old"');
+    expect(body).toContain('data-fork-checkpoint="checkpoint-old"');
     expect(body).not.toContain("data-session-empty");
     expect(body).not.toContain("data-reconnect-banner");
   });
@@ -170,9 +179,28 @@ describe("AgentSessionWorkbench component", () => {
 
     expect(body).toContain("data-session-paused");
     expect(body).toContain("AI Assist is paused.");
+    expect(body).toContain('data-pause-queue-count="2"');
+    expect(body).toContain("data-pause-queue-indicator");
+    expect(body).toContain("2 queued");
     expect(body).toContain("resume-btn");
     expect(body).toContain("abort-btn");
-    expect(body).toContain("data-abort-session-form");
+  });
+
+  test("renders abort reason form contract", () => {
+    const source = Bun.file(new URL("./AgentSessionWorkbench.svelte", import.meta.url)).text();
+
+    return source.then((body) => {
+      expect(body).toContain('action="?/abortWithReason"');
+      expect(body).toContain('name="reason"');
+      expect(body).toContain('value="user-cancel"');
+      expect(body).toContain('value="dangerous-output"');
+      expect(body).toContain('value="wrong-context"');
+      expect(body).toContain('value="cost-cap"');
+      expect(body).toContain('name="note"');
+      expect(body).toContain("data-abort-note");
+      expect(body).toContain('required data-abort-reason');
+      expect(body).toContain('required data-abort-note');
+    });
   });
 });
 
@@ -195,6 +223,31 @@ function activeModel(): SessionWorkbenchModel {
       lastUpdated: 1,
       supportsResume: true,
     },
+    checkpoints: [
+      {
+        id: "checkpoint-new",
+        sessionId: "row-1",
+        kind: "git",
+        ref: "refs/fulcrum/checkpoints/row-1/7",
+        turnIndex: 7,
+        messageUuid: "msg-7",
+        label: "Before edits",
+        createdAt: "2026-05-19T10:00:00.000Z",
+        current: true,
+      },
+      {
+        id: "checkpoint-old",
+        sessionId: "row-1",
+        kind: "message",
+        ref: "manual:1",
+        turnIndex: 2,
+        messageUuid: "msg-2",
+        label: "Discovery",
+        createdAt: "2026-05-19T09:00:00.000Z",
+        current: false,
+      },
+    ],
+    pauseQueue: { queuedPromptCount: 2 },
     controls: {
       canPrompt: true,
       canCancel: true,
@@ -367,6 +420,8 @@ function idleModel(): SessionWorkbenchModel {
       paused: false,
     },
     session: null,
+    checkpoints: [],
+    pauseQueue: { queuedPromptCount: 0 },
     controls: {
       canPrompt: false,
       canCancel: false,

@@ -111,12 +111,19 @@ export const actions: Actions = {
     return actionOk("AI Assist reconnected");
   },
 
-  abortSession: async ({ locals }) => {
+  abortWithReason: async ({ request, locals }) => {
+    const form = await request.formData();
+    const reason = (form.get("reason") as string | null) ?? "";
+    const note = ((form.get("note") as string | null) ?? "").trim();
+    if (!["user-cancel", "dangerous-output", "wrong-context", "cost-cap"].includes(reason)) {
+      return { success: false, message: "valid abort reason required" };
+    }
+    if (!note) return { success: false, message: "abort note required" };
     const { em } = await requestServiceScope(locals);
     const { abortActiveSession } = await import(
       "@agent-client-protocol/application/session-manager.ts"
     );
-    await abortActiveSession(em);
+    await abortActiveSession(em, { reason, note });
     return actionOk("AI Assist session aborted");
   },
 
@@ -136,6 +143,30 @@ export const actions: Actions = {
     );
     await resumeActiveSession(em);
     return actionOk("AI Assist resumed");
+  },
+
+  restoreCheckpoint: async ({ request, locals }) => {
+    const form = await request.formData();
+    const checkpointId = (form.get("checkpointId") as string | null) ?? "";
+    if (!checkpointId) return { success: false, message: "checkpointId required" };
+    const { em } = await requestServiceScope(locals);
+    const { restoreActiveSessionCheckpoint } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await restoreActiveSessionCheckpoint(em, { checkpointId });
+    return actionOk("AI Assist restored from checkpoint");
+  },
+
+  forkFromCheckpoint: async ({ request, locals }) => {
+    const form = await request.formData();
+    const checkpointId = (form.get("checkpointId") as string | null) ?? "";
+    if (!checkpointId) return { success: false, message: "checkpointId required" };
+    const { em } = await requestServiceScope(locals);
+    const { forkActiveSessionFromCheckpoint } = await import(
+      "@agent-client-protocol/application/session-manager.ts"
+    );
+    await forkActiveSessionFromCheckpoint(em, { checkpointId });
+    return actionOk("AI Assist session forked from checkpoint");
   },
 
   resumeSavedSession: async ({ request, locals }) => {

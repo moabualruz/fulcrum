@@ -36,6 +36,26 @@ _Avoid_: Device padding, notch padding, spacer.
 The 420px right-side slide-over (Cloudflare-overlay pattern) that hosts the live AI Assist session scoped to the current Step. Mobile becomes a bottom sheet.
 _Avoid_: AI panel, chat panel, ACP panel, sidebar drawer, assistant pane.
 
+**Checkpoint**:
+An AI Assist recovery point shown in the workbench timeline with kind, label, turn index, created time, and current marker.
+_Avoid_: save point, restore blob, protocol checkpoint.
+
+**Restore**:
+The inline action that resumes the newest checkpoint in the current AI Assist session.
+_Avoid_: rewind, rollback, reset.
+
+**Fork**:
+The confirmation-gated action that starts a new AI Assist session from an older checkpoint.
+_Avoid_: clone chat, duplicate ACP session.
+
+**Abort Reason**:
+The required `user-cancel`, `dangerous-output`, `wrong-context`, or `cost-cap` value plus note captured before stopping active AI Assist work.
+_Avoid_: cancel reason, stop note without enum.
+
+**Pause Queue**:
+The visible count of prompts waiting while AI Assist is paused; resume drains the queue through live session state.
+_Avoid_: hidden backlog, pending chat count.
+
 **TaskQuickCreateTray**:
 An inline Build-stage task creation surface that preserves board, backlog, table, or planning scope while showing required title, sprint, module, cycle, recurrence preview, validation, duplicate prevention, and retry state.
 _Avoid_: task create modal, hidden project scope, create dialog, cleared draft on failure.

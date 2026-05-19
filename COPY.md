@@ -449,6 +449,21 @@ Risk: destructive
 - Inline in transcript, not modal (unless action is irreversible).
 - Persists `Allow always` decisions per-(agent, tool-pattern, project).
 
+### AI Assist abort reason copy
+
+Use these exact reason labels in Web, CLI, and TUI:
+
+| Value | Label |
+|---|---|
+| `user-cancel` | User cancel |
+| `dangerous-output` | Dangerous output |
+| `wrong-context` | Wrong context |
+| `cost-cap` | Cost cap |
+
+- Required note placeholder: "Why this AI Assist session is being stopped".
+- Confirmation title: "Abort active work?"
+- Never say "ACP" in the dialog; use "AI Assist".
+
 ---
 
 ## 11. Notification copy

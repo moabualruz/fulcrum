@@ -36,6 +36,9 @@ export interface AcpSessionState {
   startupPhase: string;
   startupLogs: string[];
   startupElapsed: number;
+  checkpoints: AcpSessionCheckpointState[];
+  currentCheckpointId: string | null;
+  queuedPromptCount: number;
   readonly hasActiveSession: boolean;
   readonly messageList: ChatMessage[];
   readonly toolCallList: ToolCallInfo[];
@@ -44,6 +47,17 @@ export interface AcpSessionState {
   now(): number;
   disconnectState(): void;
   clearError(): void;
+}
+
+export interface AcpSessionCheckpointState {
+  id: string;
+  sessionId: string;
+  kind: "git" | "file" | "message";
+  ref: string;
+  turnIndex: number;
+  messageUuid: string;
+  label: string | null;
+  createdAt: number;
 }
 
 class MutableAcpSessionState implements AcpSessionState {
@@ -68,6 +82,9 @@ class MutableAcpSessionState implements AcpSessionState {
   startupPhase = "starting";
   startupLogs: string[] = [];
   startupElapsed = 0;
+  checkpoints: AcpSessionCheckpointState[] = [];
+  currentCheckpointId: string | null = null;
+  queuedPromptCount = 0;
   private readonly createIdFn: () => string;
   private readonly nowFn: () => number;
 
@@ -112,6 +129,9 @@ class MutableAcpSessionState implements AcpSessionState {
     this.availableModels = [];
     this.currentModelId = "";
     this.pendingPermission = null;
+    this.checkpoints = [];
+    this.currentCheckpointId = null;
+    this.queuedPromptCount = 0;
   }
 
   clearError(): void {

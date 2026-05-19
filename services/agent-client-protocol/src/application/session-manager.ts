@@ -308,14 +308,14 @@ export class AcpSessionManager {
     await client.cancel({ sessionId: session.sessionId });
   }
 
-  async abortSession(): Promise<void> {
+  async abortSession(input: { reason?: string | null; note?: string | null } = {}): Promise<void> {
     const client = this.acpClient;
     const session = this.state.currentSession;
     if (client && session) {
       await client.cancel({ sessionId: session.sessionId });
       await client.disconnect();
     }
-    if (session) await this.repository?.abort(session.id, { reason: "user-requested" });
+    if (session) await this.repository?.abort(session.id, { reason: input.reason ?? "user-requested", note: input.note ?? null });
     this.acpClient = null;
     this.state.disconnectState();
   }
@@ -337,8 +337,9 @@ export class AcpSessionManager {
 
   async recordCheckpoint(input: Omit<CreateAcpSessionCheckpointInput, "id" | "sessionId"> & { id?: string }): Promise<void> {
     const session = this.requireSession();
+    const id = input.id ?? this.state.createId();
     await this.repository?.createCheckpoint({
-      id: input.id ?? this.state.createId(),
+      id,
       sessionId: session.id,
       kind: input.kind,
       ref: input.ref,
@@ -346,6 +347,50 @@ export class AcpSessionManager {
       messageUuid: input.messageUuid,
       label: input.label ?? null,
     });
+    this.state.currentCheckpointId = id;
+    this.state.checkpoints = [
+      ...this.state.checkpoints.filter((checkpoint) => checkpoint.id !== id),
+      {
+        id,
+        sessionId: session.id,
+        kind: input.kind,
+        ref: input.ref,
+        turnIndex: input.turnIndex,
+        messageUuid: input.messageUuid,
+        label: input.label ?? null,
+        createdAt: this.state.now(),
+      },
+    ];
+  }
+
+  async restoreCheckpoint(checkpointId: string): Promise<void> {
+    const session = this.requireSession();
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === checkpointId);
+    if (!checkpoint) throw new Error(`Checkpoint '${checkpointId}' not found`);
+    this.state.currentCheckpointId = checkpoint.id;
+    await this.repository?.save({ id: session.id, currentCheckpointId: checkpoint.id });
+  }
+
+  async forkFromCheckpoint(checkpointId: string): Promise<SavedSession> {
+    const session = this.requireSession();
+    const checkpoint = this.state.checkpoints.find((candidate) => candidate.id === checkpointId);
+    if (!checkpoint) throw new Error(`Checkpoint '${checkpointId}' not found`);
+    const fork: SavedSession = {
+      ...session,
+      id: this.state.createId(),
+      sessionId: this.state.createId(),
+      title: `${session.title} (fork)`,
+      lastUpdated: this.state.now(),
+    };
+    this.state.savedSessions = [...this.state.savedSessions, fork];
+    this.state.currentSession = fork;
+    this.state.currentCheckpointId = checkpoint.id;
+    await this.repository?.save({
+      id: fork.id,
+      status: "active",
+      currentCheckpointId: checkpoint.id,
+    });
+    return fork;
   }
 
   resolvePermission(optionId: string): void {
@@ -496,10 +541,13 @@ export async function reconnectActiveSession(_em: unknown): Promise<void> {
   await manager.reconnectActiveSession();
 }
 
-export async function abortActiveSession(_em: unknown): Promise<void> {
+export async function abortActiveSession(
+  _em: unknown,
+  input: { reason?: string | null; note?: string | null } = {},
+): Promise<void> {
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active AI Assist session manager");
-  await manager.abortSession();
+  await manager.abortSession(input);
 }
 
 export async function resumeSavedSession(_em: unknown, input: { savedSessionId: string }): Promise<void> {
@@ -524,6 +572,24 @@ export async function resumeActiveSession(_em: unknown): Promise<void> {
   const manager = activeSessionManager;
   if (!manager) throw new Error("No active AI Assist session manager");
   await manager.resumePausedSession();
+}
+
+export async function restoreActiveSessionCheckpoint(
+  _em: unknown,
+  input: { checkpointId: string },
+): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.restoreCheckpoint(input.checkpointId);
+}
+
+export async function forkActiveSessionFromCheckpoint(
+  _em: unknown,
+  input: { checkpointId: string },
+): Promise<void> {
+  const manager = activeSessionManager;
+  if (!manager) throw new Error("No active AI Assist session manager");
+  await manager.forkFromCheckpoint(input.checkpointId);
 }
 
 export async function updateTrafficControl(

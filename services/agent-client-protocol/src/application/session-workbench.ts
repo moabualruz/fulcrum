@@ -37,6 +37,10 @@ export interface SessionWorkbenchModel {
     paused: boolean;
   };
   session: SessionWorkbenchSession | null;
+  checkpoints: SessionWorkbenchCheckpoint[];
+  pauseQueue: {
+    queuedPromptCount: number;
+  };
   controls: {
     canPrompt: boolean;
     canCancel: boolean;
@@ -82,6 +86,18 @@ export interface SessionWorkbenchSession {
 
 export interface SessionWorkbenchListItem extends SessionWorkbenchSession {
   status: "running" | "paused" | "errored" | "saved" | "completed";
+  current: boolean;
+}
+
+export interface SessionWorkbenchCheckpoint {
+  id: string;
+  sessionId: string;
+  kind: "git" | "file" | "message";
+  ref: string;
+  turnIndex: number;
+  messageUuid: string;
+  label: string | null;
+  createdAt: string;
   current: boolean;
 }
 
@@ -149,6 +165,16 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
       paused: state.isPaused,
     },
     session,
+    checkpoints: state.checkpoints
+      .map((checkpoint) => ({
+        ...checkpoint,
+        createdAt: new Date(checkpoint.createdAt).toISOString(),
+        current: checkpoint.id === state.currentCheckpointId,
+      }))
+      .sort((a, b) => b.turnIndex - a.turnIndex || b.createdAt.localeCompare(a.createdAt)),
+    pauseQueue: {
+      queuedPromptCount: state.queuedPromptCount,
+    },
     controls: {
       canPrompt: state.isConnected && session !== null,
       canCancel: state.isConnected && session !== null && state.isLoading,
