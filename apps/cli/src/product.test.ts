@@ -1312,6 +1312,8 @@ describe("fulcrum product CLI", () => {
       "ann-cli-inline",
       "--type",
       "suggestion",
+      "--scope",
+      "line",
       "--file",
       "src/app.ts",
       "--line-start",
@@ -1320,10 +1322,17 @@ describe("fulcrum product CLI", () => {
       "1",
       "--side",
       "new",
+      "--severity",
+      "important",
+      "--decorations",
+      "blocking,if-minor",
       "--text",
       "Inline CLI review note.",
       "--suggested-code",
       "trace()",
+      "--viewed-files",
+      "src/app.ts",
+      "--hide-viewed",
       "--search",
       "trace",
       "--json",
@@ -1463,15 +1472,139 @@ describe("fulcrum product CLI", () => {
         reviewId: "review_cli_session",
         annotationId: "ann-cli-inline",
         type: "suggestion",
+        scope: "line",
         filePath: "src/app.ts",
         lineStart: 1,
         lineEnd: 1,
         side: "new",
         text: "Inline CLI review note.",
         suggestedCode: "trace()",
+        severity: "important",
+        decorations: ["blocking", "if-minor"],
+        viewedFilePaths: ["src/app.ts"],
+        hideViewedFiles: true,
         searchQuery: "trace",
       },
     }]);
+  });
+
+  test("product reports validate decision, type, severity, and review identity errors", async () => {
+    const caller = {
+      reports: {
+        recordUatCodeReviewDecision: async () => ({}),
+        runGeneratedE2eRegressionTests: async () => ({}),
+        saveReviewWorkbenchSession: async () => ({}),
+        loadReviewWorkbenchSession: async () => ({}),
+        appendReviewWorkbenchAnnotation: async () => ({}),
+      },
+    };
+
+    const invalidDecision = testIo();
+    await runProduct([
+      "reports",
+      "decision",
+      "--project",
+      "project-1",
+      "--decision",
+      "skip_review",
+      "--type",
+      "uat",
+    ], { ...invalidDecision.opts, caller });
+    expect(invalidDecision.exits).toEqual([2]);
+    expect(invalidDecision.err.join("\n")).toContain(
+      "--decision must be one of: start_uat, start_code_review, request_changes, approve_without_manual_review",
+    );
+
+    const invalidDecisionType = testIo();
+    await runProduct([
+      "reports",
+      "decision",
+      "--project",
+      "project-1",
+      "--decision",
+      "start_uat",
+      "--type",
+      "plan",
+    ], { ...invalidDecisionType.opts, caller });
+    expect(invalidDecisionType.exits).toEqual([2]);
+    expect(invalidDecisionType.err.join("\n")).toContain("--type must be one of: uat, code_review");
+
+    const invalidRunner = testIo();
+    await runProduct([
+      "reports",
+      "e2e-run",
+      "--project",
+      "project-1",
+      "--runner",
+      "shell",
+    ], { ...invalidRunner.opts, caller });
+    expect(invalidRunner.exits).toEqual([2]);
+    expect(invalidRunner.err.join("\n")).toContain("--runner must be one of: bun, playwright");
+
+    const missingReviewIdentity = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "load",
+      "--project",
+      "project-1",
+    ], { ...missingReviewIdentity.opts, caller });
+    expect(missingReviewIdentity.exits).toEqual([2]);
+    expect(missingReviewIdentity.err.join("\n")).toContain("missing required flag --review or --trace");
+
+    const invalidAnnotation = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "annotate",
+      "--project",
+      "project-1",
+      "--review",
+      "review-1",
+      "--file",
+      "src/app.ts",
+      "--line-start",
+      "1",
+      "--line-end",
+      "2",
+      "--type",
+      "finding",
+      "--scope",
+      "range",
+      "--side",
+      "both",
+      "--severity",
+      "warning",
+    ], { ...invalidAnnotation.opts, caller });
+    expect(invalidAnnotation.exits).toEqual([2]);
+    expect(invalidAnnotation.err.join("\n")).toContain("--type must be one of: comment, suggestion, concern");
+
+    const invalidSeverity = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "annotate",
+      "--project",
+      "project-1",
+      "--review",
+      "review-1",
+      "--file",
+      "src/app.ts",
+      "--line-start",
+      "1",
+      "--line-end",
+      "2",
+      "--type",
+      "concern",
+      "--scope",
+      "line",
+      "--side",
+      "new",
+      "--severity",
+      "warning",
+    ], { ...invalidSeverity.opts, caller });
+    expect(invalidSeverity.exits).toEqual([2]);
+    expect(invalidSeverity.err.join("\n")).toContain("--severity must be one of: important, nit, pre_existing");
   });
 
   test("product workflows acceptance-cycle run delegates full-cycle payload to caller", async () => {
@@ -2148,7 +2281,7 @@ describe("fulcrum product CLI", () => {
       "--severity", "critical",
       "--json",
     ], { ...io.opts, caller });
-    expect(io.exits).toEqual([1]);
+    expect(io.exits).toEqual([2]);
     expect(io.err[0]).toContain("--severity must be info, warning, or error");
   });
 

@@ -908,25 +908,33 @@ function finalQaFeedbackGateInput(argv: readonly string[]): Record<string, unkno
 }
 
 function uatDecisionInput(argv: readonly string[]): Record<string, unknown> {
+  const decision = requiredFlag(argv, "--decision");
+  const reviewType = requiredFlag(argv, "--type");
+  const runner = flagValue(argv, "--runner");
+  assertOneOf("--decision", decision, ["start_uat", "start_code_review", "request_changes", "approve_without_manual_review"]);
+  assertOneOf("--type", reviewType, ["uat", "code_review"]);
+  if (runner) assertOneOf("--runner", runner, ["bun", "playwright"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
-    decision: requiredFlag(argv, "--decision"),
-    reviewType: requiredFlag(argv, "--type"),
+    decision,
+    reviewType,
     feedbackText: flagValue(argv, "--feedback"),
     feedbackAgent: flagValue(argv, "--feedback-agent"),
     feedbackModel: flagValue(argv, "--feedback-model"),
     taskIds: csvFlag(flagValue(argv, "--tasks")),
-    e2eRunner: flagValue(argv, "--runner"),
+    e2eRunner: runner,
   });
 }
 
 function e2eRunInput(argv: readonly string[]): Record<string, unknown> {
+  const runner = flagValue(argv, "--runner");
+  if (runner) assertOneOf("--runner", runner, ["bun", "playwright"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
     taskIds: csvFlag(flagValue(argv, "--tasks")),
-    runner: flagValue(argv, "--runner"),
+    runner,
     planOnly: argv.includes("--plan-only") ? true : undefined,
   });
 }
@@ -948,10 +956,12 @@ async function reviewWorkbenchInput(argv: readonly string[]): Promise<Record<str
 }
 
 async function reviewWorkbenchSessionSaveInput(argv: readonly string[]): Promise<Record<string, unknown>> {
+  const reviewType = flagValue(argv, "--type");
+  if (reviewType) assertOneOf("--type", reviewType, ["plan", "uat", "code_review"]);
   return compact({
     ...(await reviewWorkbenchInput(argv)),
     projectId: requiredFlag(argv, "--project"),
-    reviewType: flagValue(argv, "--type"),
+    reviewType,
     title: flagValue(argv, "--title"),
   });
 }
@@ -975,21 +985,29 @@ function reviewWorkbenchSessionAnnotateInput(argv: readonly string[]): Record<st
   const reviewId = flagValue(argv, "--review");
   const traceId = flagValue(argv, "--trace");
   if (!reviewId && !traceId) throw new Error("missing required flag --review or --trace");
+  const type = flagValue(argv, "--type");
+  const scope = flagValue(argv, "--scope");
+  const side = flagValue(argv, "--side");
+  const severity = flagValue(argv, "--severity");
+  if (type) assertOneOf("--type", type, ["comment", "suggestion", "concern"]);
+  if (scope) assertOneOf("--scope", scope, ["line", "file"]);
+  if (side) assertOneOf("--side", side, ["old", "new"]);
+  if (severity) assertOneOf("--severity", severity, ["important", "nit", "pre_existing"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     reviewId,
     traceId,
     annotationId: flagValue(argv, "--annotation"),
-    type: flagValue(argv, "--type"),
-    scope: flagValue(argv, "--scope"),
+    type,
+    scope,
     filePath: requiredFlag(argv, "--file"),
     lineStart: requiredNumberFlag(argv, "--line-start"),
     lineEnd: requiredNumberFlag(argv, "--line-end"),
-    side: flagValue(argv, "--side"),
+    side,
     text: flagValue(argv, "--text"),
     suggestedCode: flagValue(argv, "--suggested-code"),
     originalCode: flagValue(argv, "--original-code"),
-    severity: flagValue(argv, "--severity"),
+    severity,
     conventionalLabel: flagValue(argv, "--conventional-label"),
     decorations: csvFlag(flagValue(argv, "--decorations")),
     author: flagValue(argv, "--author"),
@@ -1154,6 +1172,12 @@ function validateFlags(argv: readonly string[], allowed: ReadonlySet<string>): v
   }
 }
 
+function assertOneOf(flag: string, value: string, allowed: readonly string[]): void {
+  if (!allowed.includes(value)) {
+    throw new Error(`${flag} must be one of: ${allowed.join(", ")}`);
+  }
+}
+
 function compact(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
@@ -1173,7 +1197,8 @@ function isUsageError(error: unknown): boolean {
   return message.startsWith("unknown flag:") ||
     message.startsWith("missing value for flag:") ||
     message.startsWith("flag does not take a value:") ||
-    message.startsWith("missing required flag");
+    message.startsWith("missing required flag") ||
+    message.includes(" must be ");
 }
 
 function productApiConfigError(env: Record<string, string | undefined> | undefined): string {
