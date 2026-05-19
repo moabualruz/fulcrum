@@ -18,6 +18,7 @@ const GENERATED_OR_VENDOR_DIRS = new Set([
   "dist",
   "node_modules",
   "target",
+  "test-results",
   "vendor",
 ]);
 
