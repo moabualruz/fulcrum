@@ -65,6 +65,12 @@ export async function createFulcrumNestApplication(
     .setTitle("Fulcrum API")
     .setDescription("Agent-native project workflow API")
     .setVersion("0.1.0")
+    .addBearerAuth({
+      type: "http",
+      scheme: "bearer",
+      bearerFormat: "API key",
+      description: "Public API requests use Authorization: Bearer <api-key>.",
+    })
     .build();
   const openApiDocument = SwaggerModule.createDocument(app, openApiConfig, {
     deepScanRoutes: true,

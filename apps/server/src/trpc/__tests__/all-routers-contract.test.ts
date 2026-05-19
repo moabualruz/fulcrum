@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { TrpcRouter } from "@fulcrum/server/trpc/trpc.router.ts";
+import { TrpcService } from "@fulcrum/server/trpc/trpc.service.ts";
 
 const REQUIRED_NAMESPACES = [
   "tasks",
@@ -90,10 +92,11 @@ const ALLOWLIST: Record<string, string> = {
 };
 
 function procedureNamespaces(): string[] {
-  return [...new Set(
-    Object.keys((appRouter as never as { _def: { procedures: Record<string, unknown> } })._def.procedures)
-      .map((path) => path.split(".")[0]!),
-  )].sort();
+  return [...new Set(procedurePaths(appRouter).map((path) => path.split(".")[0]!))].sort();
+}
+
+function procedurePaths(router: unknown): string[] {
+  return Object.keys((router as { _def: { procedures: Record<string, unknown> } })._def.procedures).sort();
 }
 
 function testFiles(): string[] {
@@ -140,5 +143,12 @@ describe("all tRPC router contract gate", () => {
     const localCallerNamespaces = procedureNamespaces();
 
     expect(localCallerNamespaces).toEqual(expect.arrayContaining(nestNamespaces));
+  });
+
+  test("Nest tRPC middleware and CLI/TUI local caller expose the same procedure contract", () => {
+    const nestRouter = new TrpcRouter(new TrpcService());
+    nestRouter.onModuleInit();
+
+    expect(procedurePaths(nestRouter.appRouter)).toEqual(procedurePaths(appRouter));
   });
 });

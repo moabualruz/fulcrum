@@ -62,7 +62,7 @@ function noopDecorator() {
 }
 
 class TestDocumentBuilder {
-  private readonly values: Record<string, string> = {};
+  private readonly values: Record<string, unknown> = {};
 
   setTitle(value: string): this {
     this.values["title"] = value;
@@ -79,7 +79,12 @@ class TestDocumentBuilder {
     return this;
   }
 
-  build(): Record<string, string> {
+  addBearerAuth(value: Record<string, string>): this {
+    this.values["bearerAuth"] = value;
+    return this;
+  }
+
+  build(): Record<string, unknown> {
     return { ...this.values };
   }
 }
@@ -134,6 +139,12 @@ describe("Nest server application bootstrap", () => {
       title: "Fulcrum API",
       description: "Agent-native project workflow API",
       version: "0.1.0",
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "API key",
+        description: "Public API requests use Authorization: Bearer <api-key>.",
+      },
     }, {
       deepScanRoutes: true,
       operationIdFactory: expect.any(Function),
@@ -144,6 +155,10 @@ describe("Nest server application bootstrap", () => {
         title: "Fulcrum API",
         description: "Agent-native project workflow API",
         version: "0.1.0",
+        bearerAuth: expect.objectContaining({
+          scheme: "bearer",
+          bearerFormat: "API key",
+        }),
       }),
       info: expect.objectContaining({
         "x-fulcrum-route-taxonomy": expect.any(Object),

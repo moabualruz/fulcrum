@@ -34,8 +34,8 @@ describe("root wiring — canonical router mounts", () => {
     expect(keys).toContain("fulcrum_skills");
   });
 
-  test("router.ts source contains imports for all three canonical routers", async () => {
-    const src = await readFile(new URL("../router.ts", import.meta.url), "utf-8");
+  test("shared root-router source contains imports for all three canonical routers", async () => {
+    const src = await readFile(new URL("../root-router.ts", import.meta.url), "utf-8");
     expect(src).toContain('inferenceRouter');
     expect(src).toContain('routingRouter');
     expect(src).toContain('skillsRouter');
