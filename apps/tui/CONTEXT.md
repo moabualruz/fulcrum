@@ -64,6 +64,10 @@ _Avoid_: API client, RPC stub.
 The project-scoped `:automations` **TuiScreen** for listing, searching, creating, enabling/disabling, and deleting automation rules through the same work-management automation service used by CLI and web.
 _Avoid_: Local rules editor, TUI-only automation state, settings table.
 
+**UnsavedQuitConfirmation**:
+The per-screen `q` guard shown only when the focused **TuiScreen** owns an unsaved draft; it renders `Unsaved edits. Quit? (y/n)` plus the exact loss hint, accepts `y` to discard/quit and `n` or Esc to stay.
+_Avoid_: Generic exit prompt, always-on quit modal, shell-level dirty flag.
+
 ## Relationships
 
 - A **TuiScreen** is identified by its `:` address (`:board`, `:run/<id>`); every CLI verb has a matching screen and vice versa (CLI↔TUI parity).
@@ -77,6 +81,7 @@ _Avoid_: Local rules editor, TUI-only automation state, settings table.
 - **DensityMode** applies globally across every **TuiScreen** that renders a list.
 - **ScopeChip** is local to `:mcp`, `:plugins`, `:agents`, `:routes` — it does not affect other screens.
 - **AutomationRulesScreen** mirrors `fulcrum automations …` CLI verbs and the web automation rule list; it must call **KernelCaller** services instead of owning rule persistence.
+- **UnsavedQuitConfirmation** belongs to each dirty **TuiScreen** because draft ownership differs by screen; the shell delegates `q` first and only exits/navigates when the screen reports no unsaved draft.
 
 ## Example dialogue
 

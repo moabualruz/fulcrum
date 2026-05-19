@@ -1269,15 +1269,18 @@ export class TuiApp {
     }
 
     if (this.currentScreen === "routing-rules") {
+      const consumed = this.routingRulesScreen
+        ? await this.routingRulesScreen.handleKey(key)
+        : false;
+      if (consumed) {
+        await this._renderCurrentScreen();
+        return;
+      }
       if (key === "q" || key === "\x1b") {
         this.currentScreen = "nav";
         await this._renderCurrentScreen();
         return;
       }
-      const consumed = this.routingRulesScreen
-        ? await this.routingRulesScreen.handleKey(key)
-        : false;
-      if (consumed) await this._renderCurrentScreen();
       return;
     }
 

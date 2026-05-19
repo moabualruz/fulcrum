@@ -1,5 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c, pad, truncate } from "../renderer.ts";
+import { QuitConfirmation } from "../quit-confirmation.ts";
 
 export interface TuiRoutingRule {
   id: string;
@@ -88,6 +89,7 @@ export class RoutingRulesScreen {
   private decision: TuiEnrichedDecision | null = null;
   private rawJsonInput = "";
   private rawJsonError = "";
+  private readonly quitConfirmation = new QuitConfirmation();
 
   constructor(private readonly opts: RoutingRulesScreenOptions) {}
 
@@ -270,6 +272,15 @@ export class RoutingRulesScreen {
   // ── Keyboard handling ───────────────────────────────────────────────
 
   async handleKey(key: string): Promise<boolean> {
+    const quitAnswer = this.quitConfirmation.answer(key);
+    if (quitAnswer === "stay" || quitAnswer === "confirm") return true;
+    if (quitAnswer === "quit") {
+      this.overlay = "none";
+      return true;
+    }
+
+    if (key === "q") return this.requestQuit();
+
     // Handle overlay keys first
     if (this.overlay === "delete") {
       if (key === "y" || key === "Y") {
@@ -285,11 +296,13 @@ export class RoutingRulesScreen {
           this.rules = this.rules.filter((candidate) => candidate.id !== row.id);
         }
         this.overlay = "none";
+        this.quitConfirmation.clear();
         this.clampCursor();
         return true;
       }
       if (key === "n" || key === "N" || key === "\x1b") {
         this.overlay = "none";
+        this.quitConfirmation.clear();
         return true;
       }
     }
@@ -353,11 +366,13 @@ export class RoutingRulesScreen {
     }
     if (key === "n") {
       this.overlay = "new";
+      this.quitConfirmation.clear();
       this.decision = null;
       return true;
     }
     if (key === "e" && this.selectedRule) {
       this.overlay = "edit";
+      this.quitConfirmation.clear();
       return true;
     }
     if (key === "d" && this.selectedRule) {
@@ -366,6 +381,7 @@ export class RoutingRulesScreen {
     }
     if (key === "t" && this.selectedRule) {
       this.overlay = "test";
+      this.quitConfirmation.clear();
       this.decision = null;
       return true;
     }
@@ -440,6 +456,7 @@ export class RoutingRulesScreen {
       this.cursor = 0;
       this.scrollTop = 0;
       this.overlay = "none";
+      this.quitConfirmation.clear();
       return;
     }
 
@@ -452,6 +469,7 @@ export class RoutingRulesScreen {
       if (index >= 0) this.rules[index] = updated;
     }
     this.overlay = "none";
+    this.quitConfirmation.clear();
   }
 
   async submitDryRun(taskJson: Record<string, unknown>): Promise<void> {
@@ -486,6 +504,13 @@ export class RoutingRulesScreen {
   }
 
   private renderOverlay(renderer: Renderer): void {
+    if (this.quitConfirmation.message) {
+      renderer.writeln();
+      renderer.writeln(c.yellow(`  ${this.quitConfirmation.message}`));
+      renderer.writeln(c.dim(`  ${this.quitConfirmation.hint ?? ""}`));
+      return;
+    }
+
     if (this.overlay === "none") return;
     renderer.writeln();
 
@@ -525,6 +550,23 @@ export class RoutingRulesScreen {
       if (this.rawJsonError) renderer.writeln(c.red(`  ${this.rawJsonError}`));
       return;
     }
+  }
+
+  requestQuit(): boolean {
+    const decision = this.quitConfirmation.request(
+      this.hasUnsavedDraft,
+      "Discard routing rule draft changes.",
+    );
+    if (decision === "quit") return false;
+    return true;
+  }
+
+  get hasUnsavedDraft(): boolean {
+    return this.overlay === "new" || this.overlay === "edit" || this.overlay === "raw-json";
+  }
+
+  get quitConfirmationMessage(): string | null {
+    return this.quitConfirmation.message;
   }
 
   private clampCursor(): void {

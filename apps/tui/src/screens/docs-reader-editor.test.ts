@@ -66,4 +66,69 @@ describe("DocsReaderEditorScreen", () => {
     expect(tty.plainText()).toContain("hocuspocus");
     expect(tty.plainText()).toContain("1 clients");
   });
+
+  test("confirms before discarding unsaved document edits", async () => {
+    const screen = new DocsReaderEditorScreen({
+      docId: "doc-1",
+      caller: {
+        docs: {
+          get: async () => ({
+            id: "doc-1",
+            title: "Planning brief",
+            docType: "spec",
+            scope: "project",
+            body: "Saved body",
+          }),
+          update: async () => ({ ok: true }),
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("e");
+    screen.setEditorBody("Unsaved body");
+
+    expect(await screen.handleKey("q")).toBe(true);
+    expect(screen.hasUnsavedEdits).toBe(true);
+    expect(screen.quitConfirmationMessage).toBe("Unsaved edits. Quit? (y/n)");
+
+    const tty = new FakeTTY({ columns: 120, rows: 40 });
+    const renderer = new Renderer(tty);
+    screen.render(renderer);
+    expect(tty.plainText()).toContain("Unsaved edits. Quit? (y/n)");
+    expect(tty.plainText()).toContain("Discard document draft changes.");
+
+    expect(await screen.handleKey("n")).toBe(true);
+    expect(screen.editorBody).toBe("Unsaved body");
+    expect(screen.quitConfirmationMessage).toBeNull();
+
+    await screen.handleKey("q");
+    expect(await screen.handleKey("y")).toBe(true);
+    expect(screen.editorBody).toBe("Saved body");
+    expect(screen.hasUnsavedEdits).toBe(false);
+  });
+
+  test("leaves unchanged editor without confirmation", async () => {
+    const screen = new DocsReaderEditorScreen({
+      docId: "doc-1",
+      caller: {
+        docs: {
+          get: async () => ({
+            id: "doc-1",
+            title: "Planning brief",
+            docType: "spec",
+            scope: "project",
+            body: "Saved body",
+          }),
+          update: async () => ({ ok: true }),
+        },
+      },
+    });
+
+    await screen.load();
+    await screen.handleKey("e");
+
+    expect(await screen.handleKey("q")).toBe(true);
+    expect(screen.quitConfirmationMessage).toBeNull();
+  });
 });
