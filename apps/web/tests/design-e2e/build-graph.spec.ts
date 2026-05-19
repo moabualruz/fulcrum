@@ -4,10 +4,11 @@ import { readFileSync } from "node:fs";
 
 async function openBuildGraph(page: Page): Promise<void> {
 	await page.goto("/build-graph");
+	await page.waitForLoadState("networkidle");
 	await expect(page.locator("[data-build-graph-ready='true']")).toBeVisible();
 	await page.evaluate(async () => {
 		await document.fonts.ready;
-		await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+		await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 	});
 }
 
@@ -116,6 +117,18 @@ test.describe("build graph doc search", () => {
 		const offScaleUtilities = source.match(/\b(?:[mp][trblxy]?|gap|space-[xy])-([0-9]+|\[[^\]]+\])/g)
 			?.filter((token) => !/(?:^|-)0$|(?:^|-)1$|(?:^|-)2$|(?:^|-)3$|(?:^|-)4$|(?:^|-)6$|(?:^|-)8$|(?:^|-)12$|(?:^|-)16$/.test(token));
 		expect(offScaleUtilities ?? []).toEqual([]);
+	});
+
+	test("keeps operational surfaces flat without nested card clutter", async ({ page }) => {
+		await openBuildGraph(page);
+
+		const nestedCardCount = await page.locator("[data-build-graph-search] .bg-card .bg-card").count();
+		expect(nestedCardCount).toBe(0);
+
+		const sectionRadii = await page.locator("[data-build-graph-search] section").evaluateAll((elements) =>
+			elements.map((element) => Number.parseFloat(getComputedStyle(element).borderRadius)),
+		);
+		expect(sectionRadii.every((radius) => radius <= 8)).toBe(true);
 	});
 
 	test("shows dependency order, run state, blockers, and execution actions", async ({ page }) => {
