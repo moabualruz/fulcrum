@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { DataSource } from "typeorm";
 
 import { AppModule } from "./app.module.ts";
+import { LogRedactionInterceptor } from "@platform-core/application/log-redaction/logger-interceptor.ts";
 import { TrpcRouter } from "./trpc/trpc.router.ts";
 import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createGracefulShutdown } from "@platform-core/application/platform-operations/shutdown-coordinator.ts";
@@ -59,6 +60,7 @@ export async function createFulcrumNestApplication(
     transform: true,
     whitelist: true,
   }));
+  app.useGlobalInterceptors(new LogRedactionInterceptor());
   app.enableShutdownHooks();
 
   const openApiConfig = new DocumentBuilder()

@@ -3,11 +3,13 @@ import { ValidationPipe } from "@nestjs/common";
 
 type FakeNestApp = {
   readonly pipes: unknown[];
+  readonly interceptors: unknown[];
   readonly shutdownHooks: unknown[];
   shutdownHooksEnabled: boolean;
   readonly listenedPorts: number[];
   closeCalls: number;
   useGlobalPipes: (...pipes: unknown[]) => void;
+  useGlobalInterceptors: (...interceptors: unknown[]) => void;
   enableShutdownHooks: (...signals: unknown[]) => void;
   get: (token: unknown, options?: unknown) => unknown;
   listen: (port: number) => Promise<void>;
@@ -19,12 +21,16 @@ const trpcApplyMiddleware = mock(async (_app: unknown) => {});
 function createFakeNestApp(): FakeNestApp {
   return {
     pipes: [],
+    interceptors: [],
     shutdownHooks: [],
     shutdownHooksEnabled: false,
     listenedPorts: [],
     closeCalls: 0,
     useGlobalPipes(...pipes: unknown[]) {
       this.pipes.push(...pipes);
+    },
+    useGlobalInterceptors(...interceptors: unknown[]) {
+      this.interceptors.push(...interceptors);
     },
     enableShutdownHooks(...signals: unknown[]) {
       this.shutdownHooksEnabled = true;
@@ -134,6 +140,10 @@ describe("Nest server application bootstrap", () => {
     expect(nestCreate).toHaveBeenCalledTimes(1);
     expect(app).toBe(createdApp as unknown as typeof app);
     expect(createdApp.pipes[0]).toBeInstanceOf(ValidationPipe);
+    const interceptorNames = createdApp.interceptors.map(
+      (i) => (i as { constructor: { name: string } }).constructor.name,
+    );
+    expect(interceptorNames).toContain("LogRedactionInterceptor");
     expect(createdApp.shutdownHooksEnabled).toBe(true);
     expect(swaggerCreateDocument).toHaveBeenCalledWith(app, {
       title: "Fulcrum API",

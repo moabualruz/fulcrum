@@ -1,6 +1,10 @@
 #!/usr/bin/env bun
 // fulcrum — multi-agent foundation CLI.
 
+import { installCliLogRedaction } from "./log.ts";
+
+installCliLogRedaction();
+
 const HELP = `fulcrum — multi-agent foundation CLI
 
 Usage:

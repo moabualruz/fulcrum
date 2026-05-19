@@ -23,6 +23,7 @@
  */
 
 import type { TuiOutput, TuiInput } from "./testing/fake-tty.ts";
+import { installTuiLogRedaction } from "./log.ts";
 import { StdoutOutput } from "./testing/fake-tty.ts";
 import { Renderer, c } from "./renderer.ts";
 import { createFulcrumTuiRenderer, type FulcrumTuiRenderer } from "./opentui/adapter.ts";
@@ -79,6 +80,8 @@ import type { SubscriptionBridge } from "./subscriptions.ts";
 import type {
   WorkflowAcceptanceCycleInput,
 } from "@workflow-coordination/interface/workflow-cycle.ts";
+
+installTuiLogRedaction();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
