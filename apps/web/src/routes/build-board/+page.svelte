@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Badge, Button, Chip, EmptyState, Input, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
+  import { Badge, Button, Chip, EmptyState, ErrorBanner, FieldError, Input, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import {
@@ -108,6 +108,47 @@
     label: ROLLBACK_TROUBLESHOOTING_LABEL,
     actions: ROLLBACK_SUGGESTED_ACTIONS,
   };
+
+  type ErrorDemoState =
+    | { kind: "idle" }
+    | { kind: "validation"; field: "title"; reason: string }
+    | { kind: "network"; message: string; traceId: string; surface: "row" | "form" | "drawer" | "block" }
+    | { kind: "unexpected"; message: string; traceId: string; stack: string };
+
+  let errorDemo = $state<ErrorDemoState>({ kind: "idle" });
+  let errorDemoTitle = $state("");
+
+  function triggerValidationError(): void {
+    errorDemoTitle = "";
+    errorDemo = { kind: "validation", field: "title", reason: "Title is required." };
+  }
+
+  function triggerNetworkError(): void {
+    errorDemo = {
+      kind: "network",
+      message: "Network request failed before reaching the server.",
+      traceId: "tr_err_5xx",
+      surface: "form",
+    };
+  }
+
+  function triggerUnexpectedError(): void {
+    errorDemo = {
+      kind: "unexpected",
+      message: "Unexpected error while saving the task.",
+      traceId: "tr_err_unexpected",
+      stack: [
+        "TypeError: Cannot read properties of undefined (reading 'id')",
+        "  at submitInlineCreate (build-board/+page.svelte:120:7)",
+        "  at handleCreateKeydown (build-board/+page.svelte:88:9)",
+      ].join("\n"),
+    };
+  }
+
+  function resetErrorDemo(): void {
+    errorDemo = { kind: "idle" };
+    errorDemoTitle = "";
+  }
 
   type BoardTask = {
     key: string;
@@ -670,4 +711,70 @@
       </section>
     {/each}
   </div>
+
+  <section
+    data-build-board-error-states
+    class={cn("flex flex-col gap-3 border-t border-border bg-muted/30 p-4")}
+  >
+    <header class={cn("flex flex-wrap items-center gap-3")}>
+      <h2 class={cn("text-sm font-semibold")}>Error states</h2>
+      <p class={cn("flex-1 text-xs text-muted-foreground")}>
+        Errors render inline at the surface that triggered them — never as toasts.
+      </p>
+      <Button size="sm" variant="outline" data-build-error-trigger-validation onclick={triggerValidationError}>Trigger 400</Button>
+      <Button size="sm" variant="outline" data-build-error-trigger-network onclick={triggerNetworkError}>Trigger 500</Button>
+      <Button size="sm" variant="outline" data-build-error-trigger-unexpected onclick={triggerUnexpectedError}>Trigger unexpected</Button>
+      <Button size="sm" variant="ghost" data-build-error-reset onclick={resetErrorDemo}>Reset</Button>
+    </header>
+
+    <form
+      data-build-error-form
+      class={cn("space-y-2 rounded-md border border-border bg-card p-3")}
+      onsubmit={(event) => { event.preventDefault(); }}
+    >
+      <label class={cn("block space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground")}>
+        <span>Task title</span>
+        <Input
+          data-build-error-title-input
+          aria-invalid={errorDemo.kind === "validation" ? "true" : undefined}
+          bind:value={errorDemoTitle}
+          placeholder="Enter a task title"
+        />
+      </label>
+      {#if errorDemo.kind === "validation"}
+        <FieldError data-build-error-field-error>
+          {errorDemo.field}: {errorDemo.reason}
+        </FieldError>
+      {/if}
+    </form>
+
+    {#if errorDemo.kind === "network"}
+      <ErrorBanner
+        data-build-error-network
+        surface={errorDemo.surface}
+        title="Could not save the task"
+        message={errorDemo.message}
+        traceId={errorDemo.traceId}
+        onRetry={triggerNetworkError}
+      />
+    {/if}
+
+    {#if errorDemo.kind === "unexpected"}
+      <ErrorBanner
+        data-build-error-unexpected
+        surface="block"
+        title="Unexpected error while saving the task"
+        message={errorDemo.message}
+        traceId={errorDemo.traceId}
+        viewDetailsLabel="View details"
+        details={errorDemoDetails}
+      />
+    {/if}
+  </section>
 </section>
+
+{#snippet errorDemoDetails()}
+  {#if errorDemo.kind === "unexpected"}
+    <pre data-build-error-details class={cn("overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-muted-foreground")}><code>{errorDemo.stack}</code></pre>
+  {/if}
+{/snippet}

@@ -158,6 +158,11 @@ export {
 } from "./components/banner/index.js";
 export type { BannerProps, BannerTone } from "./components/banner/index.js";
 export {
+	ErrorBanner,
+	Root as ErrorBannerRoot,
+} from "./components/error-banner/index.js";
+export type { ErrorBannerProps, ErrorBannerSurface } from "./components/error-banner/index.js";
+export {
 	EmptyState,
 	Root as EmptyStateRoot,
 } from "./components/empty-state/index.js";

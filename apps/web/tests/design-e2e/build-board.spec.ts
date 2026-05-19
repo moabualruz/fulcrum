@@ -206,4 +206,46 @@ test.describe("build board design reference", () => {
 			.evaluate((element) => element.scrollWidth > element.clientWidth);
 		expect(scrollable).toBe(true);
 	});
+
+	test("renders inline validation, network, and unexpected error states with trace ids — never toasts", async ({ page }) => {
+		await page.goto("/build-board");
+
+		const errorStates = page.locator("[data-build-board-error-states]");
+		await expect(errorStates).toBeVisible();
+		await expect(page.locator("[data-slot='toast']")).toHaveCount(0);
+
+		await errorStates.locator("[data-build-error-trigger-validation]").click();
+		const titleInput = errorStates.locator("[data-build-error-title-input]");
+		await expect(titleInput).toHaveAttribute("aria-invalid", "true");
+		const fieldError = errorStates.locator("[data-build-error-field-error]");
+		await expect(fieldError).toContainText("title: Title is required.");
+		await expect(fieldError).toHaveAttribute("role", "alert");
+
+		await errorStates.locator("[data-build-error-reset]").click();
+		await expect(errorStates.locator("[data-build-error-field-error]")).toHaveCount(0);
+
+		await errorStates.locator("[data-build-error-trigger-network]").click();
+		const networkBanner = errorStates.locator("[data-build-error-network]");
+		await expect(networkBanner).toBeVisible();
+		await expect(networkBanner).toHaveAttribute("data-tone", "error");
+		await expect(networkBanner).toHaveAttribute("data-surface", "form");
+		await expect(networkBanner).toContainText("Could not save the task");
+		await expect(networkBanner.locator("[data-slot='error-banner-trace']")).toContainText("tr_err_5xx");
+		const retryBtn = networkBanner.locator("[data-slot='error-banner-retry']");
+		await expect(retryBtn).toBeVisible();
+		await retryBtn.click();
+		await expect(networkBanner).toBeVisible();
+
+		await errorStates.locator("[data-build-error-trigger-unexpected]").click();
+		const unexpectedBanner = errorStates.locator("[data-build-error-unexpected]");
+		await expect(unexpectedBanner).toBeVisible();
+		await expect(unexpectedBanner).toHaveAttribute("data-surface", "block");
+		await expect(unexpectedBanner.locator("[data-slot='error-banner-trace']")).toContainText("tr_err_unexpected");
+		const details = unexpectedBanner.locator("[data-slot='error-banner-details']");
+		await expect(details).toBeVisible();
+		await details.locator("summary").click();
+		await expect(unexpectedBanner.locator("[data-build-error-details]")).toContainText("TypeError");
+
+		await expect(page.locator("[data-slot='toast']")).toHaveCount(0);
+	});
 });
