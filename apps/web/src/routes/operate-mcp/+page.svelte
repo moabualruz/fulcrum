@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   type Protocol = "http" | "stdio";
   type Status = "connected" | "disconnected" | "connecting" | "error";
@@ -442,11 +443,9 @@
 
         <label class="flex flex-col gap-1 text-sm sm:col-span-2">
           Auth token (optional)
-          <input
+          <CredentialInput
             data-mcp-register-token
-            type="password"
             bind:value={regToken}
-            class="h-9 rounded-md border border-border px-2 font-mono"
           />
         </label>
       </div>

@@ -2,7 +2,7 @@
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
   import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "@fulcrum/ui-kit";
+  import { buttonVariants, CredentialInput } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
 
@@ -62,10 +62,12 @@
       </label>
       <label class={cn("flex flex-col gap-1 text-sm font-medium")}>
         Value
-        <!-- Value field: type=password ensures value never visible in DOM as plain text -->
-        <input name="value" type="password" bind:value={addValue} required autocomplete="new-password"
+        <CredentialInput
+          name="value"
+          bind:value={addValue}
+          required
           data-secret-value-input
-          class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm")} />
+        />
       </label>
       <button type="submit" class={cn(buttonVariants({ variant: "default" }))}>Save</button>
     </form>
@@ -108,9 +110,14 @@
                 {#if rotateId === cred.id}
                   <form method="POST" action="?/rotate" use:enhance={() => ({ update }) => { rotateId = null; rotateValue = ""; update(); }}>
                     <input type="hidden" name="id" value={cred.id} />
-                    <input name="value" type="password" placeholder="New value" bind:value={rotateValue} required
+                    <CredentialInput
+                      name="value"
+                      placeholder="New value"
+                      bind:value={rotateValue}
+                      required
                       data-rotate-value-input
-                      class={cn("border-input bg-background h-7 w-32 rounded-md border px-2 text-xs mr-1")} />
+                      class="h-7 w-32 mr-1"
+                    />
                     <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }))}>Save</button>
                     <button type="button" onclick={() => { rotateId = null; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Cancel</button>
                   </form>

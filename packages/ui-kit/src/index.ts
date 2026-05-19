@@ -8,6 +8,11 @@ export {
 } from "./components/button/index.js";
 export { Input, Root as InputRoot } from "./components/input/index.js";
 export {
+	CredentialInput,
+	Root as CredentialInputRoot,
+} from "./components/credential-input/index.js";
+export type { CredentialInputProps } from "./components/credential-input/index.js";
+export {
 	Card,
 	CardAction,
 	CardContent,

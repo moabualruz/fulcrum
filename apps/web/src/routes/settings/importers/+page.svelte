@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ActionData, PageData } from "./$types";
   import type { ImporterName } from "./+page.server.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -109,13 +110,11 @@
             {:else}
               <div class="flex flex-col gap-1.5">
                 <label for="api-key-{selectedTab}" class="text-sm font-medium">{tabLabel(selectedTab)} API Key</label>
-                <input
+                <CredentialInput
                   id="api-key-{selectedTab}"
                   name="apiKey"
-                  type="password"
                   placeholder="Enter API key"
                   data-api-key-input
-                  class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
                 />
               </div>
             {/if}

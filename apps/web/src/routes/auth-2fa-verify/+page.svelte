@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { CredentialInput } from "@fulcrum/ui-kit";
+
   type Step = "password" | "2fa" | "done";
   let step = $state<Step>("password");
   let password = $state("");
@@ -45,7 +47,7 @@
     <form data-auth-password class="space-y-2 rounded-md border border-border p-4" onsubmit={submitPassword}>
       <label class="flex flex-col gap-1 text-xs">
         Password
-        <input type="password" data-auth-password-input bind:value={password} aria-required="true" class="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+        <CredentialInput data-auth-password-input bind:value={password} aria-required="true" autocomplete="current-password" />
       </label>
       {#if error}<p data-auth-error class="text-xs text-destructive">{error}</p>{/if}
       <button type="submit" data-auth-password-submit class="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Sign in</button>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   type Stage = "idle" | "confirming" | "verified" | "scheduled";
 
@@ -81,12 +82,11 @@
     {:else if stage === "confirming"}
       <h2 class="text-base font-medium">Verify your password</h2>
       <form data-account-delete-form class="mt-3 flex flex-col gap-2" onsubmit={verifyPassword}>
-        <input
-          type="password"
+        <CredentialInput
           data-account-password
           bind:value={password}
           placeholder="Current password"
-          class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          autocomplete="current-password"
         />
         <textarea
           data-account-delete-reason

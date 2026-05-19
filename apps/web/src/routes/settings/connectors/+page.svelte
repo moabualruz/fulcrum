@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ActionData, PageData } from "./$types";
   import type { ConnectorName } from "./+page.server.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -90,13 +91,11 @@
             </div>
             <div class="flex flex-col gap-1.5">
               <label for="token-{connector.name}" class="text-sm font-medium">API Token</label>
-              <input
+              <CredentialInput
                 id="token-{connector.name}"
                 name="token"
-                type="password"
                 placeholder="••••••••"
                 value={connector.config?.token ?? ""}
-                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
               />
             </div>
             <button

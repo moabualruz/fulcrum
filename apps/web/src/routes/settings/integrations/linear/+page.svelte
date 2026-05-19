@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -34,8 +35,7 @@
 
           <label>
             API Key
-            <input
-              type="password"
+            <CredentialInput
               name="api_key"
               placeholder={resolved.hasApiKey ? "••••••••" : "lin_api_..."}
             />

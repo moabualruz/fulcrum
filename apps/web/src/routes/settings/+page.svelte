@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from "$app/environment";
   import { onMount } from "svelte";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   type SettingsDraft = {
     apiBaseUrl: string;
@@ -173,7 +174,7 @@
 
       <label class="grid gap-1 type-caption">
         Connector token
-        <input data-settings-token-input type="password" bind:value={draft.connectorToken} class="rounded-md border border-input bg-background px-3 py-2 type-body" />
+        <CredentialInput data-settings-token-input bind:value={draft.connectorToken} />
       </label>
 
       <label class="grid gap-1 type-caption">

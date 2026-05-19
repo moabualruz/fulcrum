@@ -25,6 +25,7 @@
 		ToastRegion,
 		ToastStore,
 		Textarea,
+		CredentialInput,
 		Switch,
 		FormField,
 		Popover,
@@ -156,6 +157,9 @@
 	const toastStore = new ToastStore();
 
 	let bioValue = $state("");
+	let credentialDefault = $state("");
+	let credentialVisible = $state("seed-key-3f9a2c");
+	let credentialError = $state("sk_invalid_demo");
 	let notifyEnabled = $state(true);
 	let titleValue = $state("");
 	const titleError = $derived(titleValue.trim().length > 0 ? "" : "Title is required.");
@@ -535,6 +539,45 @@
 				<span class="text-xs text-muted-foreground" data-design-kit-textarea-length>
 					Length: {bioValue.length}
 				</span>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="credential-input"
+		>
+			<h2 class="text-lg font-semibold">CredentialInput</h2>
+			<div class="grid gap-4 sm:max-w-md">
+				<label class="grid gap-1.5 text-sm">
+					<span class="text-foreground font-medium">Default (masked)</span>
+					<CredentialInput
+						bind:value={credentialDefault}
+						placeholder="Enter API key"
+						aria-label="Default credential"
+						data-design-kit-credential="default"
+					/>
+				</label>
+				<label class="grid gap-1.5 text-sm">
+					<span class="text-foreground font-medium">Pre-visible</span>
+					<CredentialInput
+						bind:value={credentialVisible}
+						defaultVisible
+						aria-label="Visible credential"
+						data-design-kit-credential="visible"
+					/>
+				</label>
+				<label class="grid gap-1.5 text-sm">
+					<span class="text-foreground font-medium">With error</span>
+					<CredentialInput
+						bind:value={credentialError}
+						aria-invalid="true"
+						aria-label="Invalid credential"
+						data-design-kit-credential="error"
+					/>
+					<span class="text-xs text-destructive" data-design-kit-credential-error>
+						Key must start with <code>fk_</code>.
+					</span>
+				</label>
 			</div>
 		</article>
 

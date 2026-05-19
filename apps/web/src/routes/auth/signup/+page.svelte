@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ActionData } from "./$types";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     form?: ActionData;
@@ -64,13 +65,11 @@
 
     <div class="flex flex-col gap-1.5">
       <label for="signup-password" class="text-sm font-medium">Password</label>
-      <input
+      <CredentialInput
         id="signup-password"
         name="password"
-        type="password"
         autocomplete="new-password"
         required
-        class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
       />
     </div>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   type Severity = "error" | "warn" | "info";
   type ProviderTestStatus = "idle" | "connected" | "failed";
@@ -175,10 +176,9 @@
 
       <label data-provider-api-key class="flex flex-col gap-1 text-sm font-medium">
         API key
-        <input
+        <CredentialInput
           bind:value={providerApiKey}
-          class="h-11 rounded-md border border-input bg-background px-3 text-sm"
-          type="password"
+          class="h-11"
           autocomplete="off"
           aria-label="Provider API key"
         />
