@@ -13,10 +13,34 @@ import {
   launchTui,
   type TuiCaller,
 } from "@fulcrum/tui/index.ts";
-import { ScreenRegistry } from "@fulcrum/tui/screen-registry.ts";
+import {
+  ScreenRegistry,
+  buildTuiScreenRegistry,
+  resolveColonRoute,
+} from "@fulcrum/tui/screen-registry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 import { getDefaultKeybindings } from "@platform-core/application/input-bindings/index.ts";
 import { buildTheme } from "@fulcrum/tui/theme/index.ts";
+import {
+  STAGE_CHORDS,
+  STAGE_CHORD_PREFIX,
+  TUI_CHORD_PREFIXES,
+  createStageChordHandler,
+  createChordLatch,
+} from "@fulcrum/tui/keybindings.ts";
+import {
+  Palette,
+  PALETTE_SECTIONS,
+  CLI_COMMAND_TREE,
+  completeColonCommand,
+  isKnownColonCommand,
+} from "@fulcrum/tui/widgets/Palette.ts";
+import {
+  STAGE_CHORD_BINDINGS,
+  COMMAND_SURFACE_BINDINGS,
+  helpCheatsheetBindings,
+  stageChordBindingsCoverChordMap,
+} from "@fulcrum/tui/screens/palette.ts";
 
 function fakeCaller(): TuiCaller {
   return {
@@ -178,5 +202,262 @@ describe("TuiApp theme contract", () => {
     await app.mount();
     expect(app.theme?.name).toBe("dracula");
     app.stop();
+  });
+});
+
+// ─── StageChord key map (CLI-TUI-UX.md §7.2) ───────────────────────────────
+//
+// `g c/g p/g b/g B/g r/g s/g o` is the canonical stage navigation. agent-tui-
+// review.md Critical finding 3 names the absent `g`-chord state machine a
+// critical gap; these tests lock every chord to its stage screen.
+
+describe("StageChord key map", () => {
+  it("maps every g-chord second key to a stage colon route", () => {
+    // CLI-TUI-UX.md §7.2 — `g B` is a distinct key from `g b`.
+    expect(STAGE_CHORDS).toEqual({
+      c: ":capture",
+      p: ":plan",
+      b: ":runs",
+      B: ":board",
+      r: ":review",
+      s: ":ship",
+      o: ":doctor",
+    });
+    expect(STAGE_CHORD_PREFIX).toBe("g");
+  });
+
+  it("every StageChord resolves to a registered stage screen", () => {
+    const handler = createStageChordHandler();
+    const registry = buildTuiScreenRegistry();
+    for (const key of Object.keys(STAGE_CHORDS)) {
+      const resolved = handler.resolve(key);
+      expect(resolved).not.toBeNull();
+      const screenKey = resolveColonRoute(resolved!.route);
+      expect(screenKey).toBeDefined();
+      // The chord opens a screen the canonical registry knows.
+      expect(registry.has(screenKey!)).toBe(true);
+    }
+  });
+
+  it("g b opens the runs feed and g B opens the Build board", () => {
+    const handler = createStageChordHandler();
+    expect(resolveColonRoute(handler.resolve("b")!.route)).toBe("runs");
+    expect(resolveColonRoute(handler.resolve("B")!.route)).toBe("build-board");
+  });
+
+  it("rejects a stray second key instead of navigating", () => {
+    const handler = createStageChordHandler();
+    expect(handler.resolve("x")).toBeNull();
+    expect(handler.resolve("z")).toBeNull();
+    expect(handler.isChordKey("c")).toBe(true);
+    expect(handler.isChordKey("x")).toBe(false);
+  });
+});
+
+describe("chord-prefix latch — g / y two-key sequencing", () => {
+  it("arms on g, then resolves g c as a StageChord", () => {
+    const latch = createChordLatch(TUI_CHORD_PREFIXES);
+    const handler = createStageChordHandler();
+
+    const armed = latch.feed("g");
+    expect(armed.kind).toBe("armed");
+    expect(latch.armed).toBe(true);
+
+    const chord = latch.feed("c");
+    expect(chord.kind).toBe("chord");
+    if (chord.kind === "chord") {
+      expect(chord.prefix).toBe("g");
+      expect(handler.resolve(chord.key)?.route).toBe(":capture");
+    }
+    expect(latch.armed).toBe(false);
+  });
+
+  it("Esc while armed cancels the chord without navigating", () => {
+    const latch = createChordLatch(TUI_CHORD_PREFIXES);
+    latch.feed("g");
+    const cancelled = latch.feed("\x1b");
+    expect(cancelled.kind).toBe("cancelled");
+    expect(latch.armed).toBe(false);
+  });
+
+  it("a bare list-navigation key passes through, never latching", () => {
+    const latch = createChordLatch(TUI_CHORD_PREFIXES);
+    for (const key of ["j", "k", "Enter", "x", "/"]) {
+      const out = latch.feed(key);
+      expect(out.kind).toBe("passthrough");
+      expect(latch.armed).toBe(false);
+    }
+  });
+
+  it("the y trace-yank prefix latches independently of g", () => {
+    // CLI-TUI-UX.md §7.6 — `y` is the second chord family; it must not collide
+    // with the `g` StageChord prefix or with list navigation.
+    const latch = createChordLatch(TUI_CHORD_PREFIXES);
+    expect(TUI_CHORD_PREFIXES).toEqual(["g", "y"]);
+    const armed = latch.feed("y");
+    expect(armed.kind).toBe("armed");
+    if (armed.kind === "armed") expect(armed.prefix).toBe("y");
+    const chord = latch.feed("t");
+    expect(chord.kind).toBe("chord");
+    if (chord.kind === "chord") expect(chord.prefix).toBe("y");
+  });
+});
+
+// ─── ColonPalette command grammar (CLI-TUI-UX.md §7.1, §9) ──────────────────
+
+describe("ColonPalette CLI command grammar", () => {
+  it("tab-completes a partial verb against the CLI command tree", () => {
+    // `:run` → run, runs — every tree verb with that prefix.
+    const runCandidates = completeColonCommand(":run");
+    expect(runCandidates).toContain("run");
+    expect(runCandidates).toContain("runs");
+    // `:r` → run, runs, routing, routes, repos, review — real fulcrum verbs.
+    const rCandidates = completeColonCommand(":r");
+    expect(rCandidates).toContain("routing");
+    expect(rCandidates).toContain("routes");
+    expect(rCandidates).toContain("review");
+  });
+
+  it("tab-completes a subcommand after a verb", () => {
+    // `:run n` → `run new` (CLI-TUI-UX.md §9.1 `:run new`).
+    expect(completeColonCommand(":run n")).toEqual(["run new"]);
+    // `:agent invoke` is the §9.1 example command.
+    expect(completeColonCommand(":agent i")).toEqual(["agent invoke"]);
+  });
+
+  it("recognises the §9.1 example commands as known", () => {
+    expect(isKnownColonCommand(":run new")).toBe(true);
+    expect(isKnownColonCommand(":doctor")).toBe(true);
+    expect(isKnownColonCommand(":agent invoke")).toBe(true);
+    // An unknown command is never runnable.
+    expect(isKnownColonCommand(":frobnicate")).toBe(false);
+    expect(isKnownColonCommand(":run bogus")).toBe(false);
+  });
+
+  it("mirrors the workflow stages — every stage verb is in the tree", () => {
+    const verbs = new Set(CLI_COMMAND_TREE.map((n) => n.verb));
+    for (const verb of ["capture", "runs", "review", "artifacts", "doctor", "ai"]) {
+      expect(verbs.has(verb)).toBe(true);
+    }
+  });
+
+  it("Tab completes the query and Enter only fires a known command", () => {
+    const fired: string[] = [];
+    const palette = new Palette({
+      width: 64,
+      height: 24,
+      items: [],
+      mode: "colon",
+      onAction: (cmd) => fired.push(cmd),
+    });
+    palette.open();
+    palette.setQuery(":doct");
+    palette.handleKey("tab"); // completes to the single matching verb
+    expect(palette.currentQuery).toBe("doctor");
+    palette.handleKey("enter");
+    expect(fired).toEqual(["doctor"]);
+
+    // Unknown command — Enter must not fire onAction.
+    fired.length = 0;
+    palette.setQuery(":frobnicate");
+    palette.handleKey("enter");
+    expect(fired).toEqual([]);
+  });
+
+  it("Esc cancels the ColonPalette without running anything", () => {
+    const fired: string[] = [];
+    const palette = new Palette({
+      width: 64,
+      height: 24,
+      items: [],
+      mode: "colon",
+      onAction: (cmd) => fired.push(cmd),
+    });
+    palette.open();
+    palette.setQuery(":doctor");
+    palette.handleKey("escape");
+    expect(palette.isOpen).toBe(false);
+    expect(fired).toEqual([]);
+  });
+});
+
+describe("ColonPalette OD section structure (tui-runs.html)", () => {
+  it("renders the five OD section headers in order", () => {
+    expect(PALETTE_SECTIONS.map((s) => s.header)).toEqual([
+      "stages",
+      "step actions",
+      "search",
+      "agents · MCP · plugins · routes",
+      "system",
+    ]);
+  });
+
+  it("the stages section lists every StageChord with its g-chord hint", () => {
+    const stages = PALETTE_SECTIONS.find((s) => s.header === "stages")!;
+    const hints = stages.commands.map((c) => c.hint);
+    expect(hints).toEqual([
+      "g c",
+      "g p",
+      "g b",
+      "g B",
+      "g r",
+      "g s",
+      "g o",
+      ":run",
+    ]);
+  });
+
+  it("renders the OD section structure as a snapshot when opened empty", () => {
+    // Height budget large enough to render every OD section + chrome.
+    const palette = new Palette({ width: 70, height: 40, items: [], mode: "colon" });
+    palette.open();
+    const text = palette.render().join("\n");
+    // OD `tui-runs.html` palette copy — section headers + the `›` prompt.
+    expect(text).toContain("palette · type to filter");
+    expect(text).toContain("stages");
+    expect(text).toContain("step actions");
+    expect(text).toContain("search");
+    expect(text).toContain("agents · MCP · plugins · routes");
+    expect(text).toContain("system");
+    expect(text).toContain("open Capture");
+    expect(text).toContain("g c");
+    expect(text).toContain("keyboard cheatsheet");
+  });
+
+  it("renders CLI-command completions once a query is typed", () => {
+    const palette = new Palette({ width: 70, height: 28, items: [], mode: "colon" });
+    palette.open();
+    palette.setQuery(":r");
+    const text = palette.render().join("\n");
+    expect(text).toContain(":run");
+    expect(text).toContain(":runs");
+    expect(text).toContain(":routing");
+  });
+});
+
+describe("help cheatsheet StageChord coverage", () => {
+  it("the help cheatsheet lists every StageChord", () => {
+    expect(STAGE_CHORD_BINDINGS.map((b) => b.key)).toEqual([
+      "g c",
+      "g p",
+      "g b",
+      "g B",
+      "g r",
+      "g s",
+      "g o",
+    ]);
+    // The cheatsheet rows agree with the keybindings.ts STAGE_CHORDS map.
+    expect(stageChordBindingsCoverChordMap()).toBe(true);
+  });
+
+  it("the help cheatsheet separates `:` palette from `/` search", () => {
+    const surfaces = COMMAND_SURFACE_BINDINGS.map((b) => `${b.key}=${b.action}`);
+    // `:` is the command palette; `/` (foundation) is in-screen search.
+    expect(surfaces.some((s) => s.startsWith(":=Open command palette"))).toBe(true);
+    const cheatsheet = helpCheatsheetBindings();
+    const slash = cheatsheet.find((b) => b.key === "/");
+    expect(slash?.action).toBe("Search/filter current screen");
+    // The full cheatsheet carries the StageChord rows.
+    expect(cheatsheet.some((b) => b.key === "g b")).toBe(true);
   });
 });
