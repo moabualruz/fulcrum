@@ -86,62 +86,131 @@ describe("VirtualList", () => {
   });
 });
 
-// ─── StatusBar ──────────────────────────────────────────────────────────────
+// ─── StatusFooter (StatusBarWidget) ─────────────────────────────────────────
+//
+// prd-tui-status-footer-od-parity: the TUI StatusFooter mirrors the web
+// `@fulcrum/ui-kit` StatusFooter segment-for-segment (CLI-TUI-UX.md §8,
+// DESIGN.md §3.1). These tests assert the OD segment contract and explicitly
+// no longer assert the legacy org/user/screen StatusBar shape.
 
-import { StatusBarWidget } from "@fulcrum/tui/widgets/StatusBar.ts";
+import { StatusBarWidget, FOOTER_SEGMENT_ORDER } from "@fulcrum/tui/widgets/StatusBar.ts";
 
-describe("StatusBar", () => {
-  it("renders org name, user email, and current screen", () => {
+/**
+ * Shared web↔TUI footer parity matrix. The web StatusFooter consumer
+ * (apps/web TraceFooter.svelte) maps mode·profile·branch·run·agent·mcp into
+ * the left cluster and trace·time·help·palette·ai-assist into the right
+ * cluster; the TUI `FOOTER_SEGMENT_ORDER` is checked against this exact list
+ * so the two surfaces can never drift out of segment order.
+ */
+const WEB_TUI_FOOTER_SEGMENT_MATRIX = [
+  "mode",
+  "profile",
+  "branch",
+  "run",
+  "agent",
+  "mcp",
+  "trace",
+  "time",
+  "help",
+  "palette",
+  "ai-assist",
+] as const;
+
+describe("StatusFooter (StatusBarWidget)", () => {
+  it("renders the eleven OD footer segments in stable web-mirrored order", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Build",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      run: "01HXYZ 12/47",
+      agent: "claude-opus-4-7",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      time: "14:02",
+      width: 120,
     });
-    const line = stripAnsi(sb.render());
-    expect(line).toContain("Acme");
-    expect(line).toContain("admin@acme.com");
-    expect(line).toContain("Dashboard");
+    expect(sb.segments().map((s) => s.id)).toEqual([...WEB_TUI_FOOTER_SEGMENT_MATRIX]);
   });
 
-  it("shows bell count badge when > 0", () => {
-    const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 3,
-      width: 80,
-    });
-    const line = stripAnsi(sb.render());
-    expect(line).toContain("3");
+  it("FOOTER_SEGMENT_ORDER is the single shared web↔TUI parity matrix", () => {
+    expect([...FOOTER_SEGMENT_ORDER]).toEqual([...WEB_TUI_FOOTER_SEGMENT_MATRIX]);
   });
 
-  it("increments bell count on notification event", () => {
+  it("renders mode pill, profile, branch, agent, mcp, trace, time, and AI Assist", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Capture",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      agent: "claude-opus-4-7",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      time: "14:02",
+      width: 120,
     });
-    sb.setBellCount(5);
     const line = stripAnsi(sb.render());
-    expect(line).toContain("5");
+    expect(line).toContain("CAPTURE");
+    expect(line).toContain("profile: dev");
+    expect(line).toContain("auth/rewrite");
+    expect(line).toContain("agent: claude-opus-4-7");
+    expect(line).toContain("mcp 7/7");
+    expect(line).toContain("trace:4f3a1c9e");
+    expect(line).toContain("14:02");
+    expect(line).toContain(":ai");
   });
 
-  it("updates email on session change", () => {
+  it("renders trace/run/span as mono, copy-keybind-addressable segments", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "old@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Runs",
+      orgName: "dev",
+      traceId: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      width: 120,
     });
-    sb.setUserEmail("new@acme.com");
+    const segs = new Map(sb.segments().map((s) => [s.id, s]));
+    expect(segs.get("trace")?.mono).toBe(true);
+    expect(segs.get("trace")?.copyKeybind).toBe("y t");
+    expect(segs.get("run")?.mono).toBe(true);
+    expect(segs.get("run")?.copyKeybind).toBe("y r");
+    expect(sb.copyKeybinds()).toEqual({
+      "y t": "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      "y r": "01HXYZ",
+      "y s": "8b2d4a6f",
+    });
+  });
+
+  it("shows the bell count in the help hint when > 0", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Build",
+      orgName: "dev",
+      width: 120,
+    });
+    sb.setBellCount(3);
     const line = stripAnsi(sb.render());
-    expect(line).toContain("new@acme.com");
-    expect(line).not.toContain("old@acme.com");
+    expect(line).toContain("🔔3");
+  });
+
+  it("flips the mode pill on screen change", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Capture",
+      orgName: "dev",
+      width: 120,
+    });
+    sb.setCurrentScreen("Runs");
+    expect(stripAnsi(sb.render())).toContain("RUNS");
+  });
+
+  it("no longer renders the legacy user-email StatusBar segment", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Build",
+      orgName: "dev",
+      userEmail: "admin@acme.com",
+      width: 120,
+    });
+    // The OD footer carries `profile`, never a user identity (DESIGN.md §3.1).
+    expect(stripAnsi(sb.render())).not.toContain("admin@acme.com");
   });
 });
 

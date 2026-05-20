@@ -169,6 +169,46 @@ describe("Surface TUI parity inventory", () => {
   test("dead legacy TUI root is removed", async () => {
     expect(await exists(new URL("../app.ts", import.meta.url))).toBe(false);
   });
+
+  test("mounted root renders the OD StatusFooter segments, not the legacy org/user/screen bar", async () => {
+    // prd-tui-status-footer-od-parity: index.ts wires StatusBarWidget so the
+    // always-on bottom strip mirrors the web StatusFooter (CLI-TUI-UX.md §8).
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: createCaller(),
+      traceContext: {
+        projectId: "auth/rewrite",
+        runId: "01HXYZ",
+        spanId: "8b2d4a6f",
+        traceId: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      },
+    });
+
+    await app.mount();
+    const rendered = tty.plainText();
+
+    // OD footer segments are present (mode pill, profile, branch, mcp, trace).
+    expect(rendered).toContain("LAUNCHER");
+    expect(rendered).toContain("profile:");
+    expect(rendered).toContain("auth/rewrite");
+    expect(rendered).toMatch(/mcp \S+/);
+    expect(rendered).toContain("trace:4f3a1c9e");
+    expect(rendered).toContain(":ai");
+    // The legacy footer rendered a raw user email — the OD footer never does.
+    expect(rendered).not.toContain("operator@fulcrum.local");
+
+    app.stop();
+  });
+
+  test("index.ts consumes the StatusBarWidget for footer rendering", async () => {
+    const source = await readFile(new URL("../index.ts", import.meta.url), "utf-8");
+    // Consumed-by proof: the footer widget is imported and constructed, not
+    // a hand-rolled route-local bar (snapshot-fidelity done_mode).
+    expect(source).toContain('from "./widgets/StatusBar.ts"');
+    expect(source).toContain("new StatusBarWidget(");
+  });
 });
 
 function createSubscriptionHarness() {

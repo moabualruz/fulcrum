@@ -21,25 +21,113 @@ function expectWithinWidth(output: string | string[], width: number): void {
 }
 
 describe("TUI widgets", () => {
-  test("StatusBar renders fixed-width output and updates status fields", () => {
+  test("StatusBar renders the OD StatusFooter segments in stable order", () => {
     const status = new StatusBarWidget({
-      orgName: "Fulcrum",
-      userEmail: "operator@example.test",
-      currentScreen: "Repos",
+      currentScreen: "Capture",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      run: "01HXYZ 12/47",
+      agent: "claude-opus-4-7",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      time: "14:02",
       bellCount: 0,
-      width: 48,
+      width: 160,
     });
 
-    expectWithinWidth(status.render(), 48);
-    expect(stripAnsi(status.render())).toContain("Repos");
+    // Segment order mirrors the web StatusFooter (FOOTER_SEGMENT_ORDER).
+    expect(status.segments().map((s) => s.id)).toEqual([
+      "mode",
+      "profile",
+      "branch",
+      "run",
+      "agent",
+      "mcp",
+      "trace",
+      "time",
+      "help",
+      "palette",
+      "ai-assist",
+    ]);
+
+    const line = stripAnsi(status.render());
+    expectWithinWidth(line, 160);
+    expect(line).toContain("CAPTURE");
+    expect(line).toContain("profile: dev");
+    expect(line).toContain("auth/rewrite");
+    expect(line).toContain("agent: claude-opus-4-7");
+    expect(line).toContain("mcp 7/7");
+    expect(line).toContain("trace:4f3a1c9e");
+    expect(line).toContain("14:02");
+    expect(line).toContain(":ai");
+  });
+
+  test("StatusBar never drops a segment in a width-starved terminal", () => {
+    const status = new StatusBarWidget({
+      currentScreen: "Build",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      run: "01HXYZ 12/47",
+      agent: "claude-opus-4-7-with-a-very-long-id",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      time: "14:02",
+      width: 120,
+    });
+    const line = stripAnsi(status.render());
+    expectWithinWidth(line, 120);
+    // CLI-TUI-UX §8: the footer never collapses — every segment stays present,
+    // only the long agent value is ellipsized.
+    expect(line).toContain("BUILD");
+    expect(line).toContain("profile:");
+    expect(line).toContain("auth/rewrite");
+    expect(line).toContain("agent:");
+    expect(line).toContain("mcp 7/7");
+    expect(line).toContain("trace:4f3a1c9e");
+    expect(line).toContain(":ai");
+  });
+
+  test("StatusBar trace/run/span segments are mono and copy-keybind addressable", () => {
+    const status = new StatusBarWidget({
+      currentScreen: "Runs",
+      orgName: "dev",
+      traceId: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      bellCount: 0,
+      width: 120,
+    });
+
+    const segs = new Map(status.segments().map((s) => [s.id, s]));
+    expect(segs.get("trace")?.mono).toBe(true);
+    expect(segs.get("trace")?.copyKeybind).toBe("y t");
+    expect(segs.get("run")?.mono).toBe(true);
+    expect(segs.get("run")?.copyKeybind).toBe("y r");
+
+    // Copy keybinds yank the exact identity the footer displays.
+    expect(status.copyKeybinds()).toEqual({
+      "y t": "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      "y r": "01HXYZ",
+      "y s": "8b2d4a6f",
+    });
+  });
+
+  test("StatusBar updates mode pill and bell hint on state change", () => {
+    const status = new StatusBarWidget({
+      currentScreen: "Capture",
+      orgName: "dev",
+      bellCount: 0,
+      width: 120,
+    });
 
     status.setCurrentScreen("Runs");
     status.setBellCount(7);
-    status.setUserEmail("ops@example.test");
     const updated = stripAnsi(status.render());
-    expect(updated).toContain("Runs");
-    expect(updated).toContain("7");
-    expect(updated.length).toBe(48);
+    expect(updated).toContain("RUNS");
+    expect(updated).toContain("🔔7");
+    expectWithinWidth(updated, 120);
   });
 
   test("VirtualList keeps cursor and visible window bounded", () => {

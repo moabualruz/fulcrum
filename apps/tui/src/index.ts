@@ -67,6 +67,7 @@ import { AuditLogScreen } from "./screens/audit.ts";
 import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import { HelpOverlay, type KeyBinding } from "./widgets/HelpOverlay.ts";
+import { StatusBarWidget } from "./widgets/StatusBar.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import {
@@ -691,27 +692,43 @@ export class TuiApp {
     }
   }
 
+  /**
+   * Render the OD StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1) — the
+   * always-on bottom strip that mirrors the web `StatusFooter` primitive
+   * segment-for-segment. The `StatusBarWidget` owns the segment order, mono
+   * trace identity, and copy keybinds; this method only supplies shell data.
+   */
   private _renderStatusBar(): void {
-    const info = this.statusInfo;
-    const badge = this._formatInferenceBadge();
-    const screen = `Screen:${this._currentScreenLabel()}`;
-    const trace = this._formatTraceFooter();
-    if (!info) {
-      this.renderer.statusBar("Fulcrum TUI", [screen, trace, badge].filter(Boolean).join("  "));
-      return;
-    }
-    const left = `${info.orgId}  ${info.email}`;
-    const right = [screen, trace, `Bell:${this.bellCount}`, badge, "q:quit", "?:help"].filter(Boolean).join("  ");
-    this.renderer.statusBar(left, right);
+    this.renderer.writeln(this._statusFooter().render());
   }
 
-  private _formatTraceFooter(): string {
-    const segments = [];
-    if (this.traceContext.traceId) segments.push(`trace:${this.traceContext.traceId}`);
-    if (this.traceContext.runId) segments.push(`run:${this.traceContext.runId}`);
-    if (this.traceContext.spanId) segments.push(`span:${this.traceContext.spanId}`);
-    if (this.traceContext.projectId) segments.push(`project:${this.traceContext.projectId}`);
-    return segments.join(" ");
+  /**
+   * Build the `StatusBarWidget` from current shell state. Exposed so the
+   * keyboard layer can read `copyKeybinds()` for `y t`/`y r`/`y s` trace yanks
+   * against the exact identity the footer renders.
+   */
+  private _statusFooter(): StatusBarWidget {
+    return new StatusBarWidget({
+      currentScreen: this._currentScreenLabel(),
+      orgName: this.statusInfo?.orgId ?? "local",
+      branch: this.traceContext.projectId ?? "main",
+      run: this.traceContext.runId ?? null,
+      agent: this.inferenceModels[0]?.id ?? "claude-opus-4-7",
+      mcpHealth: this.inferenceInfo.status === "ok" ? "ok" : this.inferenceInfo.status,
+      mcpDegraded: this.inferenceInfo.tone !== "green",
+      traceId: this.traceContext.traceId ?? null,
+      runId: this.traceContext.runId ?? null,
+      spanId: this.traceContext.spanId ?? null,
+      time: this._footerClock(),
+      bellCount: this.bellCount,
+      width: this.renderer.width,
+    });
+  }
+
+  /** Wall-clock `HH:MM` for the footer `time` segment (OD `.term-foot` `14:02`). */
+  private _footerClock(): string {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
   private async _loadBellCount(): Promise<void> {
