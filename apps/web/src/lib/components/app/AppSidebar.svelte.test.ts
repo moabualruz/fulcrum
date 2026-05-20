@@ -52,26 +52,42 @@ describe("AppSidebar component", () => {
     expect(body).toContain('data-collapsed="false"');
   });
 
-  test("renders the six WorkflowStages with canonical labels", () => {
+  test("does NOT render the six-stage workflow axis as rail items", () => {
+    // Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
+    // Capture→Operate axis belongs to the ScopeBar tab strip — the rail must
+    // render zero six-stage list items.
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
     const stageItems = body.match(/data-slot="stage-rail-item"/g) ?? [];
-    expect(stageItems).toHaveLength(6);
-    for (const label of ["Capture", "Plan", "Build", "Review", "Ship", "Operate"]) {
+    expect(stageItems).toHaveLength(0);
+    expect(body).not.toContain('data-slot="stage-rail-label"');
+  });
+
+  test("renders the active stage's sub-navigation as the rail's primary group", () => {
+    // Root `/` resolves to the Capture stage; the rail shows Capture's sub-nav.
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain('data-slot="stage-rail-substage-group"');
+    expect(body).toContain('data-stage="capture"');
+    const substageItems = body.match(/data-slot="stage-rail-substage-item"/g) ?? [];
+    expect(substageItems.length).toBeGreaterThan(0);
+    // Capture's sub-nav per nav-data: Inbox · Docs.
+    for (const label of ["Inbox", "Docs"]) {
       expect(body).toContain(label);
     }
   });
 
-  test("marks the Capture stage active for the workspace root", () => {
+  test("keeps the rail synced to the active stage via data-current", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
+    // data-current is the route→stage mapping kept as data for the ScopeBar.
     expect(body).toContain('data-current="capture"');
-    expect(body).toMatch(/data-stage="capture"[^>]*data-active="true"|data-active="true"[^>]*data-stage="capture"/);
   });
 
-  test("supplies the Workspace group with the preserved portfolio links", () => {
+  test("supplies the persistent Workspace group with the preserved portfolio links", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });

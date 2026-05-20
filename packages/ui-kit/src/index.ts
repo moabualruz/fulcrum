@@ -382,6 +382,7 @@ export {
 export type {
 	StageRailProps,
 	StageRailItem,
+	StageRailSubnavItem,
 	StageRailSystemItem,
 	StageRailWorkspaceItem,
 	WorkflowStage,

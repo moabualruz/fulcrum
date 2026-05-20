@@ -1,16 +1,25 @@
-import type { WorkflowStage } from "@fulcrum/ui-kit";
+import type { StageRailSubnavItem, WorkflowStage } from "@fulcrum/ui-kit";
 
 export type { WorkflowStage } from "@fulcrum/ui-kit";
 
 /**
- * The canonical left-to-right WorkflowStage axis (DESIGN.md §3.1, IA-MAP.md §3).
- * The StageRail primitive owns the six-stage `WORKFLOW_STAGES` order; this module
- * supplies the production route each stage opens plus the route→stage mapping.
+ * Navigation data for the OD shell (DESIGN.md §3.1, IA-MAP.md §3).
+ *
+ * Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
+ * Capture→Operate workflow axis belongs to the **ScopeBar tab strip**, not the
+ * StageRail. The StageRail renders the *active stage's sub-navigation* plus the
+ * persistent Workspace and System groups (the OD `desktop-shell.html` rail
+ * replica). This module therefore exposes two distinct things:
+ *
+ *  1. `STAGE_NAV_ITEMS` + `stageForPath` — the route↔stage mapping kept as
+ *     **data** for the ScopeBar to consume; it is never rendered as rail items.
+ *  2. `STAGE_SUBNAV` + `subnavForStage` — the per-stage sub-navigation the
+ *     StageRail renders for whichever stage is active.
  */
 
-/** A WorkflowStage entry the StageRail navigates: a stage id and the route it opens. */
+/** A WorkflowStage entry the ScopeBar tab strip navigates: a stage id and the route it opens. */
 export interface StageNavItem {
-	/** The WorkflowStage this rail item represents. */
+	/** The WorkflowStage this entry represents. */
 	stage: WorkflowStage;
 	/** Production route the stage opens (always begins with "/"). */
 	href: string;
@@ -18,8 +27,9 @@ export interface StageNavItem {
 
 /**
  * One stage → its production route. Capture is the workspace root `/`; the rest
- * open their stage workbench. Old feature-bucket routes redirect to these stage
- * homes via `prd-web-stage-route-model`; this map only fixes the rail targets.
+ * open their stage workbench. This is **data only** — the ScopeBar stage-tab
+ * strip consumes it; the StageRail does not render it. Old feature-bucket routes
+ * redirect to these stage homes via `prd-web-stage-route-model`.
  */
 export const STAGE_NAV_ITEMS: readonly StageNavItem[] = [
 	{ stage: "capture", href: "/" },
@@ -32,10 +42,11 @@ export const STAGE_NAV_ITEMS: readonly StageNavItem[] = [
 
 /**
  * Route-prefix → WorkflowStage mapping. Every pre-existing destination resolves
- * to exactly one stage so the rail can show an accurate `aria-current` active
- * stage. Order matters: the first prefix that matches the pathname wins, so
- * longer/more-specific prefixes are listed before shorter ones. The literal
- * root `/` is handled separately by `stageForPath` (exact match only).
+ * to exactly one stage so the ScopeBar can show an accurate active stage and the
+ * StageRail can pick the right sub-navigation. Order matters: the first prefix
+ * that matches the pathname wins, so longer/more-specific prefixes are listed
+ * before shorter ones. The literal root `/` is handled separately by
+ * `stageForPath` (exact match only).
  *
  * No nav destination is dropped by the migration: the old feature-bucket and
  * System routes (`/boards`, `/docs`, `/runs`, `/artifacts`, `/agents`,
@@ -77,9 +88,10 @@ const STAGE_ROUTE_PREFIXES: ReadonlyArray<readonly [string, WorkflowStage]> = [
 ] as const;
 
 /**
- * Resolve any pathname to the WorkflowStage whose rail item should read as
+ * Resolve any pathname to the WorkflowStage whose ScopeBar tab should read as
  * active. The workspace root `/` is the Capture stage; every other path falls
- * back to Capture only when no stage prefix matches.
+ * back to Capture only when no stage prefix matches. This resolver is consumed
+ * by the ScopeBar (active tab) and by `AppSidebar` (active-stage sub-nav).
  */
 export function stageForPath(pathname: string): WorkflowStage {
 	if (pathname === "/") return "capture";
@@ -87,6 +99,51 @@ export function stageForPath(pathname: string): WorkflowStage {
 		if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return stage;
 	}
 	return "capture";
+}
+
+/**
+ * Per-stage sub-navigation the StageRail renders for the active stage — the OD
+ * `desktop-shell.html` rail replica (`Plan` → `Sessions / Reviews / Prototypes /
+ * Templates / Prompts`). Each entry's `href` resolves to a real production route
+ * so no destination 404s; the IA-MAP §1 stage route grammar is the source.
+ */
+export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]> = {
+	capture: [
+		{ id: "capture-inbox", label: "Inbox", href: "/inbox" },
+		{ id: "capture-docs", label: "Docs", href: "/docs" },
+	],
+	plan: [
+		{ id: "plan-sessions", label: "Sessions", href: "/plan-session" },
+		{ id: "plan-reviews", label: "Reviews", href: "/plan-review" },
+		{ id: "plan-prototypes", label: "Prototypes", href: "/plan-prototypes" },
+		{ id: "plan-templates", label: "Templates", href: "/review-templates" },
+		{ id: "plan-prompts", label: "Prompts", href: "/plan-prompts" },
+	],
+	build: [
+		{ id: "build-board", label: "Board", href: "/build-board" },
+		{ id: "build-graph", label: "Graph", href: "/build-graph" },
+		{ id: "build-runs", label: "Runs", href: "/build-runs" },
+		{ id: "build-timeline", label: "Timeline", href: "/build-timeline" },
+	],
+	review: [
+		{ id: "review-search", label: "Workbench", href: "/review-search" },
+		{ id: "review-comments", label: "Comments", href: "/comments" },
+		{ id: "review-templates", label: "Templates", href: "/review-templates" },
+	],
+	ship: [{ id: "ship-archive", label: "Archive", href: "/ship-archive" }],
+	operate: [
+		{ id: "operate-doctor", label: "Doctor", href: "/doctor" },
+		{ id: "operate-alerts", label: "Alerts", href: "/operate-alerts" },
+		{ id: "operate-audit", label: "Audit", href: "/audit" },
+	],
+} as const;
+
+/**
+ * The sub-navigation the StageRail must render for a given active stage. Always
+ * returns a non-empty list so the rail's primary group is never blank.
+ */
+export function subnavForStage(stage: WorkflowStage): readonly StageRailSubnavItem[] {
+	return STAGE_SUBNAV[stage];
 }
 
 export const LUCIDE_ICON_NAMES = [
@@ -119,13 +176,13 @@ export interface NavGroup {
 }
 
 /**
- * The persistent non-stage groups the StageRail renders below the stage axis.
- * Group order is locked by `nav-items.test.ts`; reordering requires updating
- * the test snapshot.
+ * The persistent non-stage groups the StageRail renders below the active-stage
+ * sub-navigation. Group order is locked by `nav-items.test.ts`; reordering
+ * requires updating the test snapshot.
  *
  * - `Workspace` preserves the former `Portfolio` group verbatim — portfolio
  *   destinations that travel with every stage, kept visually quiet so they do
- *   not compete with the workflow-stage axis.
+ *   not compete with the active-stage sub-navigation.
  * - `System` re-points to `Settings · Knowledge · MCP · Plugins` per
  *   IA-MAP.md §3 / DESIGN.md §3.1.
  */

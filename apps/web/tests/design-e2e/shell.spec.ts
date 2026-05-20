@@ -6,12 +6,19 @@ import { expect, test } from "@playwright/test";
  * StageRail). Source: `desktop-shell.html` / `index.html`, DESIGN.md §3.1,
  * IA-MAP.md §3.
  *
- * States covered: `populated` (the default rail with stages/workspace/system)
- * and `forced-colors` (Windows high-contrast emulation).
+ * Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the OD
+ * `desktop-shell.html` rail replica renders the *active stage's
+ * sub-navigation* (`Plan` → Sessions / Reviews / Prototypes / Templates /
+ * Prompts) plus a persistent Workspace and System group — NOT the six-stage
+ * Capture→Operate axis. That workflow axis is owned by the ScopeBar tab strip.
+ * These specs prove the rail carries zero six-stage list items.
+ *
+ * States covered: `populated` (the rail with sub-nav/workspace/system) and
+ * `forced-colors` (Windows high-contrast emulation).
  */
 
 test.describe("OD shell StageRail — populated", () => {
-	test("renders the 220px workflow rail with stage, workspace, and system groups", async ({
+	test("renders the 220px rail with active-stage sub-nav, workspace, and system groups", async ({
 		page,
 	}) => {
 		await page.goto("/");
@@ -24,21 +31,21 @@ test.describe("OD shell StageRail — populated", () => {
 		const box = await rail.boundingBox();
 		expect(Math.round(box?.width ?? 0)).toBe(220);
 
-		// Six WorkflowStages in canonical Capture→Operate order.
-		await expect(rail.locator("[data-slot='stage-rail-item']")).toHaveCount(6);
-		await expect(rail.locator("[data-slot='stage-rail-label']")).toHaveText([
-			"Capture",
-			"Plan",
-			"Build",
-			"Review",
-			"Ship",
-			"Operate",
-		]);
+		// The rail does NOT render the six-stage workflow axis — that is the
+		// ScopeBar tab strip's job. Zero six-stage list items.
+		await expect(rail.locator("[data-slot='stage-rail-item']")).toHaveCount(0);
+		await expect(rail.locator("[data-slot='stage-rail-label']")).toHaveCount(0);
 
-		// Active stage carries data-active + aria-current; root `/` is Capture.
-		const activeStage = rail.locator("[data-slot='stage-rail-item'][data-active='true']");
-		await expect(activeStage).toHaveAttribute("aria-current", "page");
-		await expect(activeStage).toHaveAttribute("data-stage", "capture");
+		// The rail's primary group is the active stage's sub-navigation. Root `/`
+		// is the Capture stage, so the group header reads the active stage name.
+		const subnavGroup = rail.locator("[data-slot='stage-rail-substage-group']");
+		await expect(subnavGroup).toBeVisible();
+		await expect(subnavGroup).toHaveAttribute("data-stage", "capture");
+		await expect(rail.locator("[data-slot='stage-rail-substage-item']").first()).toBeVisible();
+
+		// data-current keeps the rail synced to the active stage (data for the
+		// ScopeBar tab strip).
+		await expect(rail).toHaveAttribute("data-current", "capture");
 
 		// Persistent Workspace (Portfolio) group — destinations preserved by the migration.
 		await expect(rail.locator("[data-slot='stage-rail-workspace-group']")).toBeVisible();
@@ -71,25 +78,21 @@ test.describe("OD shell StageRail — populated", () => {
 		const skipLink = page.locator("[data-slot='skip-link']");
 		await expect(skipLink).toBeFocused();
 
-		// Next Tab steps into the StageRail; the focused stage shows a visible
-		// focus-visible ring (a box-shadow ring using the border-focus token).
+		// Next Tab steps into the StageRail sub-navigation; the focused link shows
+		// a visible focus-visible ring (a box-shadow ring using the ring token).
 		await page.keyboard.press("Tab");
-		const focusedStage = page.locator("[data-slot='stage-rail-item']:focus-visible").first();
-		await expect(focusedStage).toBeVisible();
-		const focusRing = await focusedStage.evaluate(
-			(node) => getComputedStyle(node).boxShadow,
-		);
+		const focusedItem = page
+			.locator("[data-slot='stage-rail-substage-item']:focus-visible")
+			.first();
+		await expect(focusedItem).toBeVisible();
+		const focusRing = await focusedItem.evaluate((node) => getComputedStyle(node).boxShadow);
 		expect(focusRing).not.toBe("none");
 		expect(focusRing.length).toBeGreaterThan(0);
-
-		// Focus traverses stages in declared order.
-		await expect(focusedStage).toHaveAttribute("data-stage", "capture");
-		await page.keyboard.press("Tab");
-		const nextStage = page.locator("[data-slot='stage-rail-item']:focus-visible").first();
-		await expect(nextStage).toHaveAttribute("data-stage", "plan");
 	});
 
-	test("maps existing routes to an explicit active workflow stage", async ({ page }) => {
+	test("rail sub-navigation changes with the active workflow stage", async ({ page }) => {
+		// The route→stage mapping stays available as data; the rail consumes it to
+		// pick the right sub-nav, but never renders the six-stage axis itself.
 		const cases = [
 			{ path: "/", stage: "capture" },
 			{ path: "/planning", stage: "plan" },
@@ -101,11 +104,15 @@ test.describe("OD shell StageRail — populated", () => {
 
 		for (const item of cases) {
 			await page.goto(item.path);
-			const activeStage = page
-				.locator("[data-slot='stage-rail-item'][data-active='true']")
-				.first();
-			await expect(activeStage).toHaveAttribute("data-stage", item.stage);
-			await expect(activeStage).toHaveAttribute("aria-current", "page");
+			const rail = page.locator("[data-slot='stage-rail']").first();
+			await expect(rail).toHaveAttribute("data-current", item.stage);
+			// Still no six-stage rail list on any route.
+			await expect(rail.locator("[data-slot='stage-rail-item']")).toHaveCount(0);
+			// The sub-nav group header tracks the active stage.
+			await expect(rail.locator("[data-slot='stage-rail-substage-group']")).toHaveAttribute(
+				"data-stage",
+				item.stage,
+			);
 		}
 	});
 });
@@ -117,11 +124,11 @@ test.describe("OD shell StageRail — forced-colors", () => {
 
 		const rail = page.locator("[data-slot='stage-rail']").first();
 		await expect(rail).toBeVisible();
-		await expect(rail.locator("[data-slot='stage-rail-item']")).toHaveCount(6);
-
-		// The active stage remains identifiable via aria-current — not colour alone.
-		const activeStage = rail.locator("[data-slot='stage-rail-item'][data-active='true']");
-		await expect(activeStage).toHaveAttribute("aria-current", "page");
+		// No six-stage rail list, and the Workspace + System groups remain visible.
+		await expect(rail.locator("[data-slot='stage-rail-item']")).toHaveCount(0);
+		await expect(rail.locator("[data-slot='stage-rail-substage-group']")).toBeVisible();
+		await expect(rail.locator("[data-slot='stage-rail-workspace-group']")).toBeVisible();
+		await expect(rail.locator("[data-slot='stage-rail-system-item']")).toHaveCount(4);
 
 		await test.info().attach("shell-stage-rail-forced-colors", {
 			body: await page.screenshot({ fullPage: true }),
