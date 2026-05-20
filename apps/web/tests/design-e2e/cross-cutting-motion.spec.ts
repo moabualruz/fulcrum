@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
 
 function seconds(value: string): number {
   return value
@@ -71,21 +70,9 @@ test.describe("cross-cutting reduced motion", () => {
     expect(values.autoplayPlayState).toBe("paused");
   });
 
-  test("keeps production CSS and settings override wired", async () => {
-    const appCss = readFileSync("src/app.css", "utf8");
-    const themeSettings = readFileSync("src/routes/settings/theme/theme.ts", "utf8");
-    const themePage = readFileSync("src/routes/settings/theme/+page.svelte", "utf8");
-
-    expect(appCss).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(appCss).toContain("animation-duration: 0.001ms !important");
-    expect(appCss).toContain("animation-iteration-count: 1 !important");
-    expect(appCss).toContain("transition-duration: 0.001ms !important");
-    expect(appCss).toContain("scroll-behavior: auto !important");
-    expect(themeSettings).toContain("animationSpeed");
-    expect(themeSettings).toContain('"reduced"');
-    expect(themeSettings).toContain('"off"');
-    expect(themePage).toContain("data-animation-speed");
-  });
+  // The production-CSS / theme-settings source-contract check moved to
+  // `web-source-contract.test.ts` — a `@media` block in the CSS bundle and a
+  // config-module export are proven by reading source, not by a rendered route.
 
   test("motion timing scale documents 150/200/300ms tokens", async ({ page }) => {
     await page.goto("/cross-cutting-motion");

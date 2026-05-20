@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync } from "node:fs";
 
 test.describe("cross-cutting mobile safe areas", () => {
   test("keeps Android portrait chrome outside status and gesture zones", async ({ page }) => {
@@ -88,19 +87,10 @@ test.describe("cross-cutting mobile safe areas", () => {
     expect(inlinePadding.right).toBeGreaterThanOrEqual(47);
   });
 
-  test("keeps production shell wired to browser safe-area APIs", async () => {
-    const appHtml = readFileSync("src/app.html", "utf8");
-    const appCss = readFileSync("src/app.css", "utf8");
-    const layout = readFileSync("src/routes/+layout.svelte", "utf8");
-
-    expect(appHtml).toContain("viewport-fit=cover");
-    expect(appCss).toContain("env(safe-area-inset-top");
-    expect(appCss).toContain("env(safe-area-inset-bottom");
-    expect(appCss).toContain("env(safe-area-inset-left");
-    expect(appCss).toContain("env(safe-area-inset-right");
-    expect(layout).toContain("var(--fulcrum-safe-area-top)");
-    expect(layout).toContain("var(--fulcrum-gesture-zone-bottom)");
-  });
+  // Source-contract checks (`app.html`/`app.css`/`+layout.svelte` safe-area
+  // wiring, Tailwind v4 breakpoint tokens, the OpenAPI route building the spec)
+  // moved to `web-source-contract.test.ts` — they read source text, not a
+  // rendered route, so they must not masquerade as visual design tests.
 
   test("treats /api/v1/openapi.json as a JSON contract endpoint, not blank visual chrome", async ({ request }) => {
     const response = await request.get("/api/v1/openapi.json");
@@ -115,31 +105,6 @@ test.describe("cross-cutting mobile safe areas", () => {
       expect(response.status()).toBe(404);
       expect(body.error).toContain("Public API");
     }
-
-    const settingsApi = readFileSync("src/routes/settings/api/+page.svelte", "utf8");
-    const openApiRoute = readFileSync("src/routes/api/v1/openapi.json/+server.ts", "utf8");
-    expect(settingsApi).toContain('href="/api/v1/openapi.json"');
-    expect(openApiRoute).toContain("_buildOpenApiSpec");
-  });
-
-  test("documents Tailwind v4 breakpoints in the CSS theme and keeps mobile query aligned", async () => {
-    const appCss = readFileSync("src/app.css", "utf8");
-    const mediaQuery = readFileSync("src/lib/util/media-query.ts", "utf8");
-
-    for (const [name, rem] of Object.entries({
-      xs: "30rem",
-      sm: "40rem",
-      md: "48rem",
-      lg: "64rem",
-      xl: "80rem",
-      "2xl": "96rem",
-    })) {
-      expect(appCss).toContain(`--breakpoint-${name}: ${rem};`);
-    }
-
-    expect(mediaQuery).toContain("md: 768");
-    expect(mediaQuery).toContain("BREAKPOINTS.md - 1");
-    expect(mediaQuery).toContain("MOBILE_QUERY");
   });
 
   test("reflows breakpoint fixture at sm, md, lg, and xl viewports", async ({ page }) => {

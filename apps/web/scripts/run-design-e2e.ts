@@ -1,13 +1,19 @@
 /**
  * Rendered-screenshot design-gate harness.
  *
- * Two responsibilities, both run only when this file is the process entrypoint:
+ * Three responsibilities, all run only when this file is the process entrypoint:
  *   1. Screenshot-capture phase — build the web app, boot a real preview
  *      server, drive Playwright chromium over every production route the
  *      harness enumerates (at minimum `/`), capture one desktop-viewport
  *      screenshot per route, then tear the browser + server down cleanly.
- *   2. Spec-suite phase — run the design-e2e Playwright specs (including
- *      `harness.spec.ts`) against the chunked Playwright `webServer` setup.
+ *   2. Source-contract phase — run the design-e2e `*.test.ts` files under
+ *      `bun test`: the regression guard that fails if a `.spec.ts` imports
+ *      `bun:test` without launching a page, plus architecture source-contract
+ *      checks. Labelled separately from visual design so test output
+ *      distinguishes source-contract checks from rendered design tests.
+ *   3. Visual design phase — run the design-e2e Playwright `*.spec.ts` specs
+ *      (including `harness.spec.ts`) against the chunked Playwright `webServer`
+ *      setup. These are the only files that prove rendered OD fidelity.
  *
  * `captureScreenshot` is exported as a side-effect-free helper so design-e2e
  * specs can import it directly — proving the harness is consumed, not dead.
@@ -221,6 +227,36 @@ function runDesignSpecs(webRoot: string, requestedSpecs: string[], designPorts: 
 	}
 }
 
+/**
+ * Source-contract phase: run the design-e2e `*.test.ts` files under `bun test`.
+ *
+ * These are deliberately NOT visual design tests — they are the regression
+ * guard (`design-e2e-no-source-only.test.ts`, fails if a `.spec.ts` imports
+ * `bun:test` without launching a page) and the architecture source-contract
+ * checks (`web-source-contract.test.ts`, reads production CSS/config text). The
+ * harness runs them as a clearly-labelled separate phase so test output
+ * distinguishes source-contract checks from the rendered visual design specs.
+ */
+function runSourceContractTests(webRoot: string): void {
+	const designE2eDir = path.join(webRoot, "tests/design-e2e");
+	const contractTests = readdirSync(designE2eDir)
+		.filter((name) => name.endsWith(".test.ts"))
+		.sort()
+		.map((name) => path.join("tests/design-e2e", name));
+
+	if (contractTests.length === 0) return;
+
+	console.log(`design-e2e SOURCE-CONTRACT phase (not visual design): ${contractTests.join(", ")}`);
+	const result = spawnSync("bun", ["test", ...contractTests], {
+		cwd: webRoot,
+		stdio: "inherit",
+		env: process.env,
+	});
+	if (result.status !== 0) {
+		process.exit(result.status ?? 1);
+	}
+}
+
 function stopDesignProcesses(webRoot: string, port?: string): void {
 	const patterns = [
 		`${webRoot}.*bun run build.*bun run preview`,
@@ -256,6 +292,11 @@ async function main(): Promise<void> {
 	}
 
 	if (!captureOnly) {
+		// Source-contract phase first: the regression guard fails fast if a
+		// design-e2e spec went back to source-only assertions.
+		runSourceContractTests(webRoot);
+
+		console.log("design-e2e VISUAL DESIGN phase: rendered Playwright specs");
 		const specCount = resolveSpecs(requestedSpecs).length;
 		const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "10");
 		const designPorts = await allocatePortBlock({
