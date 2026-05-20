@@ -41,7 +41,7 @@ describe("fulcrum tasks list --sort", () => {
       } as never,
     });
 
-    const payload = JSON.parse(io.out[0]!) as { data: Array<{ key: string }>; sort: unknown };
+    const payload = sortResult(io.out[0]!);
     expect(payload.data.map((task) => task.key)).toEqual(["T-1", "T-2", "T-3"]);
     expect(payload.sort).toEqual({ field: "priority", direction: "asc" });
     expect(calls).toEqual([{ sortField: "priority", sortDirection: "asc" }]);
@@ -57,7 +57,7 @@ describe("fulcrum tasks list --sort", () => {
       caller: { tasks: { list: async () => TASKS } } as never,
     });
 
-    const payload = JSON.parse(io.out[0]!) as { data: Array<{ key: string }>; sort: unknown };
+    const payload = sortResult(io.out[0]!);
     expect(payload.data.map((task) => task.key)).toEqual(["T-3", "T-2", "T-1"]);
     expect(payload.sort).toEqual({ field: "priority", direction: "desc" });
   });
@@ -78,7 +78,7 @@ describe("fulcrum tasks list --sort", () => {
       } as never,
     });
 
-    const payload = JSON.parse(io.out[0]!) as { data: Array<{ key: string }> };
+    const payload = sortResult(io.out[0]!);
     expect(payload.data.map((task) => task.key)).toEqual(["T-1", "T-2", "T-10"]);
   });
 
@@ -91,7 +91,19 @@ describe("fulcrum tasks list --sort", () => {
     });
 
     expect(io.out).toEqual([]);
-    expect(io.err.join("\n")).toContain("Usage: fulcrum tasks list --sort");
+    // Canonical Build-stage verb name is `task` (CLI-TUI-UX §1.3).
+    expect(io.err.join("\n")).toContain("Usage: fulcrum task list --sort");
     expect(io.exits).toEqual([2]);
   });
 });
+
+/**
+ * `fulcrum task list --sort --json` wraps its `{ data, sort }` payload in the
+ * canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX §3); unwrap `.result`
+ * (prd-cli-build-stage-parity).
+ */
+function sortResult(line: string): { data: Array<{ key: string }>; sort: unknown } {
+  const envelope = JSON.parse(line) as { schema: string; result: { data: Array<{ key: string }>; sort: unknown } };
+  expect(envelope.schema).toBe("fulcrum.cli.v1");
+  return envelope.result;
+}

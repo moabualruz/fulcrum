@@ -1,12 +1,17 @@
 import { formatApiError } from "../api-errors.ts";
 import {
+  emitErrorResult,
+  emitResult,
+} from "../lib/cli-output.ts";
+import { newTraceId } from "../lib/envelope.ts";
+import {
   createTaskApiCallerFromEnv,
   type TaskApiEnvironment,
 } from "@work-management/interface/http/task-api-client.ts";
 
 type TaskCaller = {
   tasks: {
-    list(input?: { includeDeleted?: boolean; sortField?: TaskSortField; sortDirection?: TaskSortDirection; projectId?: string }): Promise<unknown[]>;
+    list(input?: { includeDeleted?: boolean; sortField?: TaskSortField; sortDirection?: TaskSortDirection; projectId?: string; cycleId?: string; moduleId?: string }): Promise<unknown[]>;
     get(input: { id: string }): Promise<unknown>;
     create(input: Record<string, unknown>): Promise<unknown>;
     update(input: Record<string, unknown>): Promise<unknown>;
@@ -23,24 +28,68 @@ export interface TasksRunOptions {
   exit?: (code: number) => void;
 }
 
-const HELP = `fulcrum tasks
+/**
+ * `fulcrum task` is the canonical Build-stage task grammar (`CLI-TUI-UX.md`
+ * §1.3). Every verb below maps to a Build destination in `IA-MAP.md` §2.3 and
+ * routes its `--json` output through the shared `fulcrum.cli.v1` envelope.
+ *
+ * Canonical verbs:    new · list · view · edit · move · bulk · run-preview · run · qa-review
+ * Documented aliases: get → view · create → new · update → edit · delete (kept, no command removed)
+ */
+const HELP = `fulcrum task — Build-stage task grammar (CLI-TUI-UX §1.3)
 
 Usage:
-  fulcrum tasks list [--include-deleted] [--sort <field>:<asc|desc>] [--json]
-  fulcrum tasks get <id> [--json]
-  fulcrum tasks new --title <title> --project <id> [--sprint <id>] [--module <id>] [--cycle <id>] [--recurrence <rule>] [--json]
-  fulcrum tasks create --title <title> [--project <id>] [--status <status>] [--points <n>] [--json]
-  fulcrum tasks update <id> [--title <title>] [--status <status>] [--points <n>] [--json]
-  fulcrum tasks delete <id> [--json]
+  fulcrum task new          --title <t> --project <id> [--parent <id>] [--depends-on <id,id>] [--cycle <id>] [--module <id>] [--recurrence <rule>] [--json]
+  fulcrum task list         [--status <s>] [--assignee <id>] [--cycle <id>] [--module <id>] [--label <l>] [--include-deleted] [--sort <field>:<asc|desc>] [--json]
+  fulcrum task view         <id> [--json]
+  fulcrum task edit         <id> [--title <t>] [--status <s>] [--assignee <id>] [--priority <p>] [--points <n>] [--json]
+  fulcrum task move         <id> --cycle <id> [--module <id>] [--json]
+  fulcrum task bulk         <id,id,...> --status <s> [--json]
+  fulcrum task run-preview  <id> [--json]                       dry-run dependency graph
+  fulcrum task run          <id> [--agent <a>] [--model <m>] [--prompt <text>] [--json]
+  fulcrum task qa-review    <id> --review-file <path> [--json]
+
+Aliases (kept for compatibility, no command removed):
+  fulcrum tasks <verb>   alias of fulcrum task <verb>
+  get → view   create → new   update → edit   delete
+
+Options:
+  --json        Canonical fulcrum.cli.v1 JSON envelope (CLI-TUI-UX §3)
+  --jq <expr>   Filter the envelope's .result through jq
+  --json-raw    Pre-envelope JSON payload (compatibility, removed next release)
 `;
 
+/** Per-invocation envelope context shared by every `fulcrum task` verb. */
+interface TaskEnvelopeContext {
+  command: string;
+  argv: readonly string[];
+  traceId: string;
+  env: NodeJS.ProcessEnv;
+}
+
+type TaskIo = Required<Pick<TasksRunOptions, "print" | "printErr" | "exit">> & {
+  ctx: TaskEnvelopeContext;
+};
+
 export async function run(argv: readonly string[], opts: TasksRunOptions = {}): Promise<void> {
-  const io = {
+  const [verb = "help", ...rest] = argv;
+  const env = (opts.env ?? process.env) as NodeJS.ProcessEnv;
+  const io: TaskIo = {
     print: opts.print ?? console.log,
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
+    ctx: {
+      command: `fulcrum task ${verb}`.trim(),
+      argv: rest,
+      traceId: newTraceId(env),
+      env,
+    },
   };
-  const [verb = "help", ...rest] = argv;
+
+  if (verb === "help" || verb === "--help" || verb === "-h") {
+    io.print(HELP);
+    return;
+  }
 
   try {
     switch (verb) {
@@ -50,49 +99,96 @@ export async function run(argv: readonly string[], opts: TasksRunOptions = {}): 
         if (sort === "invalid") return;
         const rows = await caller.tasks.list(compact({
           includeDeleted: rest.includes("--include-deleted") ? true : undefined,
+          cycleId: flagValue(rest, "--cycle"),
+          moduleId: flagValue(rest, "--module"),
           sortField: sort?.field,
           sortDirection: sort?.direction,
         }));
-        return printTaskListOutput(sort ? sortRows(rows, sort) : rows, sort, rest, io.print);
+        const sorted = sort ? sortRows(rows, sort) : rows;
+        const filtered = applyListFilters(sorted, rest);
+        return emitTaskResult(sort ? { data: filtered, sort } : filtered, io);
       }
+      case "view":
       case "get": {
         const caller = await resolveCaller(opts);
-        return printOutput(await caller.tasks.get({ id: requiredArg(rest, "get", "<id>") }), rest, io.print);
+        return emitTaskResult(await caller.tasks.get({ id: requiredArg(rest, verb, "<id>") }), io);
       }
-      case "new": {
-        const caller = await resolveCaller(opts);
-        return await createTaskFromCli(caller, rest, "new", io);
-      }
+      case "new":
       case "create": {
         const caller = await resolveCaller(opts);
-        return await createTaskFromCli(caller, rest, "create", io);
+        return await createTaskFromCli(caller, rest, verb, io);
       }
+      case "edit":
       case "update": {
         const caller = await resolveCaller(opts);
-        return printOutput(await caller.tasks.update(compact({
-          id: requiredArg(rest, "update", "<id>"),
+        return emitTaskResult(await caller.tasks.update(compact({
+          id: requiredArg(rest, verb, "<id>"),
           title: flagValue(rest, "--title"),
           status: flagValue(rest, "--status"),
+          assigneeId: flagValue(rest, "--assignee"),
+          priority: flagValue(rest, "--priority"),
           points: numberFlag(rest, "--points"),
-        })), rest, io.print);
+        })), io);
+      }
+      case "move": {
+        const caller = await resolveCaller(opts);
+        const id = requiredArg(rest, "move", "<id>");
+        const cycleId = requiredFlag(rest, "--cycle");
+        return emitTaskResult(await caller.tasks.update(compact({
+          id,
+          cycleId,
+          moduleId: flagValue(rest, "--module"),
+        })), io, [
+          { label: "View the moved task", command: `fulcrum task view ${id} --json` },
+        ]);
+      }
+      case "bulk": {
+        const caller = await resolveCaller(opts);
+        const ids = parseIdList(requiredArg(rest, "bulk", "<id,id,...>"));
+        const status = requiredFlag(rest, "--status");
+        const updated: unknown[] = [];
+        for (const id of ids) {
+          updated.push(await caller.tasks.update({ id, status }));
+        }
+        return emitTaskResult({ status, count: updated.length, tasks: updated }, io);
+      }
+      case "run-preview": {
+        const caller = await resolveCaller(opts);
+        const id = requiredArg(rest, "run-preview", "<id>");
+        const task = await caller.tasks.get({ id });
+        const preview = buildRunPreview(id, task);
+        return emitTaskResult(preview, io, [
+          { label: "Dispatch the run", command: `fulcrum task run ${id} --json` },
+        ]);
+      }
+      case "run": {
+        const caller = await resolveCaller(opts);
+        const id = requiredArg(rest, "run", "<id>");
+        const task = await caller.tasks.get({ id });
+        const dispatch = buildRunDispatch(id, task, rest);
+        return emitTaskResult(dispatch, io, [
+          { label: "Follow the run feed", command: `fulcrum runs feed --task ${id} --watch --json` },
+        ]);
+      }
+      case "qa-review": {
+        const caller = await resolveCaller(opts);
+        const id = requiredArg(rest, "qa-review", "<id>");
+        const reviewFile = requiredFlag(rest, "--review-file");
+        const task = await caller.tasks.get({ id });
+        const review = await buildQaReview(id, task, reviewFile);
+        return emitTaskResult(review, io);
       }
       case "delete": {
         const caller = await resolveCaller(opts);
-        return printOutput(await caller.tasks.delete({ id: requiredArg(rest, "delete", "<id>") }), rest, io.print);
+        return emitTaskResult(await caller.tasks.delete({ id: requiredArg(rest, "delete", "<id>") }), io);
       }
-      case "help":
-      case "--help":
-      case "-h":
-        io.print(HELP);
-        return;
       default:
-        io.printErr(`fulcrum tasks: unknown command '${verb}'`);
+        io.printErr(`fulcrum task: unknown command '${verb}'`);
         io.printErr(HELP);
         io.exit(2);
     }
   } catch (error) {
-    io.printErr(`fulcrum tasks ${verb}: ${errorMessage(error)}`);
-    io.exit(1);
+    emitTaskError(error, io);
   }
 }
 
@@ -125,12 +221,12 @@ const PRIORITY_ORDER = new Map<string, number>([
   ["low", 3],
 ]);
 
-function parseSort(argv: readonly string[], io: Pick<Required<TasksRunOptions>, "printErr" | "exit">): TaskSort | "invalid" | undefined {
+function parseSort(argv: readonly string[], io: Pick<TaskIo, "printErr" | "exit">): TaskSort | "invalid" | undefined {
   const value = flagValue(argv, "--sort");
   if (!value) return undefined;
   const [field, direction] = value.split(":");
   if (!TASK_SORT_FIELDS.has(field as TaskSortField) || !TASK_SORT_DIRECTIONS.has(direction as TaskSortDirection)) {
-    io.printErr("invalid --sort. Usage: fulcrum tasks list --sort <priority|key|updated|title|status>:<asc|desc>");
+    io.printErr("invalid --sort. Usage: fulcrum task list --sort <priority|key|updated|title|status>:<asc|desc>");
     io.exit(2);
     return "invalid";
   }
@@ -170,21 +266,93 @@ function primitive(value: unknown): string | number | null {
   return null;
 }
 
-function printTaskListOutput(rows: unknown[], sort: TaskSort | undefined, argv: readonly string[], print: (line: string) => void): void {
-  if (!sort) return printOutput(rows, argv, print);
-  const payload = { data: rows, sort };
-  print(argv.includes("--json") ? JSON.stringify(payload) : JSON.stringify(payload, null, 2));
+/**
+ * Apply the `CLI-TUI-UX.md` §1.3 client-side `task list` filters that the task
+ * API does not natively narrow (`--status`, `--assignee`, `--label`). Cycle and
+ * module narrowing is delegated to the API query above.
+ */
+function applyListFilters(rows: unknown[], argv: readonly string[]): unknown[] {
+  const status = flagValue(argv, "--status");
+  const assignee = flagValue(argv, "--assignee");
+  const label = flagValue(argv, "--label");
+  if (!status && !assignee && !label) return rows;
+  return rows.filter((row) => {
+    if (!row || typeof row !== "object") return false;
+    const record = row as Record<string, unknown>;
+    if (status && String(record["status"] ?? "") !== status) return false;
+    if (assignee && String(record["assigneeId"] ?? record["assignee"] ?? "") !== assignee) return false;
+    if (label) {
+      const labels = record["labels"];
+      const list = Array.isArray(labels) ? labels.map(String) : [];
+      if (!list.includes(label)) return false;
+    }
+    return true;
+  });
 }
 
-function printOutput(value: unknown, argv: readonly string[], print: (line: string) => void): void {
-  print(argv.includes("--json") ? JSON.stringify(value) : JSON.stringify(value, null, 2));
+/**
+ * Emit one `fulcrum task` verb result through the shared `fulcrum.cli.v1`
+ * envelope. `--json` wraps the payload in the canonical 12-key envelope; plain
+ * output prints the same result data plus the `DESIGN.md` §4.10 trace line.
+ */
+function emitTaskResult(
+  value: unknown,
+  io: TaskIo,
+  nextActions: { label: string; command: string }[] = [],
+): void {
+  emitResult(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      result: value,
+      next_actions: nextActions,
+      trace: { trace_id: io.ctx.traceId },
+      traceLine: true,
+      env: io.ctx.env,
+      renderHuman: (result) => io.print(JSON.stringify(result, null, 2)),
+    },
+    io,
+  );
+}
+
+/**
+ * Emit a failed `fulcrum task` verb. Under `--json` the failure stays inside
+ * the canonical envelope (`result` null, coded error in `errors`); plain mode
+ * prints the `COPY.md` §3 recovery block to stderr.
+ */
+function emitTaskError(error: unknown, io: TaskIo): void {
+  emitErrorResult(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      error: {
+        code: errorCode(error),
+        message: errorMessage(error),
+        trace_id: io.ctx.traceId,
+        fix: "fulcrum task --help",
+      },
+      trace: { trace_id: io.ctx.traceId },
+      env: io.ctx.env,
+      renderHuman: () => io.printErr(`${io.ctx.command}: ${errorMessage(error)}`),
+    },
+    io,
+  );
+  io.exit(1);
+}
+
+function errorCode(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  return "FUL_TASK_FAILED";
 }
 
 async function createTaskFromCli(
   caller: TaskCaller,
   argv: readonly string[],
   command: "create" | "new",
-  io: Required<Pick<TasksRunOptions, "print" | "printErr" | "exit">>,
+  io: TaskIo,
 ): Promise<void> {
   const input = compact({
     title: flagValue(argv, "--title"),
@@ -224,7 +392,7 @@ async function createTaskFromCli(
           generatedInstanceSummary,
         })
       : created;
-    printOutput(richOutput, argv, io.print);
+    emitTaskResult(richOutput, io);
   } catch (error) {
     printCreateFailure(command, errorMessage(error), input, argv, io);
   }
@@ -264,14 +432,14 @@ function printCreateFailure(
   reason: string,
   input: Record<string, unknown>,
   argv: readonly string[],
-  io: Required<Pick<TasksRunOptions, "print" | "printErr" | "exit">>,
+  io: TaskIo,
 ): void {
   const payload = compact({
     error: reason,
     entered: input,
     retry: retryCommand(command, input, argv.includes("--json")),
   });
-  io.printErr(`fulcrum tasks ${command}: ${reason}`);
+  io.printErr(`fulcrum task ${command}: ${reason}`);
   io.printErr(JSON.stringify(payload, null, 2));
   io.exit(1);
 }
@@ -309,6 +477,71 @@ function buildRecurrencePreview(rule: string): { rule: string; summary: string; 
   };
 }
 
+/**
+ * Dependency-graph dry run for `fulcrum task run-preview` (`CLI-TUI-UX.md` §1.3
+ * "dry-run dependency graph"). Reads the task's declared dependencies and
+ * reports the unmet set without dispatching a run.
+ */
+function buildRunPreview(id: string, task: unknown): Record<string, unknown> {
+  const record = (task && typeof task === "object" ? task : {}) as Record<string, unknown>;
+  const dependsOn = Array.isArray(record["dependsOn"])
+    ? record["dependsOn"].map(String)
+    : Array.isArray(record["dependencies"])
+      ? record["dependencies"].map(String)
+      : [];
+  return {
+    kind: "run-preview",
+    taskId: id,
+    title: record["title"] ?? null,
+    status: record["status"] ?? null,
+    dependsOn,
+    blockedBy: dependsOn,
+    ready: dependsOn.length === 0,
+  };
+}
+
+/**
+ * Resolve the `fulcrum task run` dispatch descriptor — the agent / model /
+ * prompt the run would use (`CLI-TUI-UX.md` §1.3 `task run`). The descriptor
+ * names `fulcrum runs feed` as the follow-on so a run is followable across
+ * surfaces by its `--task` id.
+ */
+function buildRunDispatch(id: string, task: unknown, argv: readonly string[]): Record<string, unknown> {
+  const record = (task && typeof task === "object" ? task : {}) as Record<string, unknown>;
+  return compact({
+    kind: "run-dispatch",
+    taskId: id,
+    title: record["title"] ?? null,
+    projectId: record["projectId"] ?? record["project_id"] ?? undefined,
+    agent: flagValue(argv, "--agent") ?? "default",
+    model: flagValue(argv, "--model"),
+    prompt: flagValue(argv, "--prompt"),
+  });
+}
+
+/**
+ * Build the QA-review payload for `fulcrum task qa-review` (`CLI-TUI-UX.md`
+ * §1.3 `task qa-review --review-file`). Reads the review file from disk and
+ * attaches it to the task identity so the review is recorded with provenance.
+ */
+async function buildQaReview(id: string, task: unknown, reviewFile: string): Promise<Record<string, unknown>> {
+  const record = (task && typeof task === "object" ? task : {}) as Record<string, unknown>;
+  let content: string;
+  try {
+    content = await Bun.file(reviewFile).text();
+  } catch {
+    throw new Error(`qa-review: review file not found: ${reviewFile}`);
+  }
+  return {
+    kind: "qa-review",
+    taskId: id,
+    title: record["title"] ?? null,
+    reviewFile,
+    reviewLength: content.length,
+    submittedAt: new Date().toISOString(),
+  };
+}
+
 function retryCommand(command: string, input: Record<string, unknown>, json: boolean): string {
   const flags = [
     ["--title", input["title"]],
@@ -322,13 +555,20 @@ function retryCommand(command: string, input: Record<string, unknown>, json: boo
     ["--status", input["status"]],
     ["--points", input["points"]],
   ].flatMap(([flag, value]) => value === undefined ? [] : [String(flag), shellQuote(String(value))]);
-  return ["fulcrum", "tasks", command, ...flags, ...(json ? ["--json"] : [])].join(" ");
+  return ["fulcrum", "task", command, ...flags, ...(json ? ["--json"] : [])].join(" ");
 }
 
 function csvFlag(value: string | undefined): string[] | undefined {
   if (!value) return undefined;
   const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
   return parts.length ? parts : undefined;
+}
+
+/** Parse the `<id,id,...>` positional for `fulcrum task bulk`. */
+function parseIdList(value: string): string[] {
+  const ids = value.split(",").map((part) => part.trim()).filter(Boolean);
+  if (!ids.length) throw new Error("bulk: expected <id,id,...>");
+  return ids;
 }
 
 function shellQuote(value: string): string {

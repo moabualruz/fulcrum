@@ -59,7 +59,9 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<Array<{ id: string }>>(tasks)[0]?.id).toBe("task-1");
+    // `fulcrum task` verbs wrap `--json` output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the payload is `.result` (prd-cli-build-stage-parity).
+    expect(parseLastJson<{ result: Array<{ id: string }> }>(tasks).result[0]?.id).toBe("task-1");
 
     const createdTask = capture();
     await runTasksCli(["create", "--title", "Surface smoke", "--json"], {
@@ -70,7 +72,7 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<{ title: string }>(createdTask).title).toBe("Surface smoke");
+    expect(parseLastJson<{ result: { title: string } }>(createdTask).result.title).toBe("Surface smoke");
 
     const docs = capture();
     await runDocsCli(["list", "--json"], {

@@ -97,11 +97,19 @@ describe("fulcrum tasks new", () => {
     });
 
     expect(io.exits).toEqual([]);
-    const payload = JSON.parse(io.out[0]!) as {
-      task: { id: string; recurrence: string };
-      recurrencePreview: { rule: string; instances: string[]; summary: string };
-      generatedInstanceSummary: { count: number; first: string; last: string };
+    // `fulcrum task new --json` wraps its payload in the canonical
+    // `fulcrum.cli.v1` envelope (CLI-TUI-UX §3); the rich create payload is
+    // `.result` (prd-cli-build-stage-parity).
+    const envelope = JSON.parse(io.out[0]!) as {
+      schema: string;
+      result: {
+        task: { id: string; recurrence: string };
+        recurrencePreview: { rule: string; instances: string[]; summary: string };
+        generatedInstanceSummary: { count: number; first: string; last: string };
+      };
     };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    const payload = envelope.result;
     expect(payload.task).toMatchObject({ id: "task-2", recurrence: "weekly" });
     expect(payload.recurrencePreview).toMatchObject({
       rule: "weekly",
@@ -124,7 +132,8 @@ describe("fulcrum tasks new", () => {
     expect(io.err[0]).toContain("title is required");
     const payload = JSON.parse(io.err[1]!) as { entered: Record<string, unknown>; retry: string };
     expect(payload.entered).toMatchObject({ projectId: "project-1", cycleId: "cycle-1" });
-    expect(payload.retry).toContain("fulcrum tasks new");
+    // Canonical Build-stage verb name is `task` (CLI-TUI-UX §1.3).
+    expect(payload.retry).toContain("fulcrum task new");
     expect(payload.retry).toContain("--project project-1");
   });
 

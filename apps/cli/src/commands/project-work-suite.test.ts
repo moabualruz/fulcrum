@@ -118,7 +118,13 @@ describe("project work command suite", () => {
       ["addTask", { sprintId: "sprint-1", taskId: "task-1" }],
       ["removeTask", { sprintId: "sprint-1", taskId: "task-1" }],
     ]);
-    expect(taskIo.out.map((line) => JSON.parse(line))).toEqual([
+    // `fulcrum task` verbs wrap `--json` output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the payload is `.result` (prd-cli-build-stage-parity).
+    expect(taskIo.out.map((line) => {
+      const envelope = JSON.parse(line) as { schema: string; result: unknown };
+      expect(envelope.schema).toBe("fulcrum.cli.v1");
+      return envelope.result;
+    })).toEqual([
       { id: "task-1", status: "todo" },
       { id: "task-1", status: "in_progress" },
       [{ id: "task-1", status: "todo" }],

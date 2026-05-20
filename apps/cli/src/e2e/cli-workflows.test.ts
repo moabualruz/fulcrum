@@ -37,7 +37,13 @@ describe("CLI E2E CRUD workflows with application callers", () => {
     await runTasks(["delete", "task-1", "--json"], { ...io.opts, caller } as never);
 
     expect(calls).toEqual(["create:Ship E2E", "update:task-1:done", "delete:task-1"]);
-    expect(io.out.map((line) => JSON.parse(line))).toEqual([
+    // `fulcrum task` verbs wrap `--json` output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the payload is `.result` (prd-cli-build-stage-parity).
+    expect(io.out.map((line) => {
+      const envelope = JSON.parse(line) as { schema: string; result: unknown };
+      expect(envelope.schema).toBe("fulcrum.cli.v1");
+      return envelope.result;
+    })).toEqual([
       { id: "task-1", title: "Ship E2E", status: "todo" },
       { id: "task-1", status: "done" },
       { id: "task-1", deleted: true },
@@ -89,7 +95,11 @@ describe("CLI E2E CRUD workflows with application callers", () => {
       const evidence = await readManualSimulationEvidence(evidencePath);
 
       expect(result.exitCode).toBe(0);
-      expect(JSON.parse(result.stdout)).toEqual([{ id: "artifact-1", filename: "manual-proof.txt" }]);
+      // `artifact list --json` emits the canonical fulcrum.cli.v1 envelope
+      // (prd-cli-ship-stage-parity); the artifact rows are under `.result`.
+      const artifactEnvelope = JSON.parse(result.stdout) as { schema: string; result: unknown };
+      expect(artifactEnvelope.schema).toBe("fulcrum.cli.v1");
+      expect(artifactEnvelope.result).toEqual([{ id: "artifact-1", filename: "manual-proof.txt" }]);
       expect(result.stderr).toBe("");
       expect(result.evidencePath).toContain(workspace.logsDir);
       expect(api.requests.map((request) => `${request.method} ${request.path}`)).toEqual(["GET /api/v1/artifacts"]);
