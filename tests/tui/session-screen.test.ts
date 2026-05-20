@@ -6,6 +6,8 @@ import {
 	type SessionScreenCheckpoint,
 	type SessionScreenSession,
 } from "@fulcrum/tui/screens/session-screen.ts";
+import { TuiApp, type TuiCaller } from "@fulcrum/tui/index.ts";
+import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function recordingCaller(initial: {
 	session: SessionScreenSession;
@@ -151,5 +153,86 @@ describe("SessionScreen", () => {
 		const screen = new SessionScreen({ caller });
 		await screen.load();
 		await expect(screen.dispatchPalette(":banana")).rejects.toThrow("unknown palette command");
+	});
+});
+
+/**
+ * Integration coverage for the TUI-native inline `:ai` AI Assist pane
+ * (CLI-TUI-UX.md §6 `:ai` row, §6.1, §7.5, §10). Asserts the pane is reachable
+ * three ways — `:ai` colon route, `:ai` tab, footer `[ :ai ]` segment — that
+ * the footer mode pill flips to `:AI`, that `q` pops back to the previous
+ * screen, and that thread state survives screen navigation.
+ */
+function aiAssistCaller(): TuiCaller {
+	return {
+		auth: {
+			whoami: async () => ({
+				userId: "user-x",
+				orgId: "org-x",
+				email: "x@test.local",
+				role: "owner",
+			}),
+		},
+		flags: { list: async () => [], set: async () => ({ ok: true }) },
+	};
+}
+
+describe(":ai inline AI Assist pane (ChatPane screen)", () => {
+	test(":ai colon route opens the inline pane and flips the footer to :AI", async () => {
+		const tty = new FakeTTY({ columns: 120, rows: 32 });
+		const app = new TuiApp({ output: tty, caller: aiAssistCaller() });
+		await app.mount();
+
+		const target = await app.navigateColon(":ai");
+		expect(target).toBe("ai-assist");
+		const out = tty.plainText();
+		expect(out).toContain(":ai · inline AI pane (TUI-native)");
+		expect(out).toContain("composer");
+		// OD StatusFooter `mode` pill renders the AI Assist pane as `:AI`.
+		expect(out).toContain(":AI");
+
+		app.stop();
+	});
+
+	test(":ai tab navigation opens the same inline pane", async () => {
+		const tty = new FakeTTY({ columns: 120, rows: 32 });
+		const app = new TuiApp({ output: tty, caller: aiAssistCaller() });
+		await app.mount();
+
+		await app.navigateTo("ai-assist");
+		expect(app.screen).toBe("ai-assist");
+		expect(tty.plainText()).toContain("@scope mention · /cmd slash · ⌘↵ run · ⌘s save thread");
+
+		app.stop();
+	});
+
+	test("q pops back to the screen the pane was opened from", async () => {
+		const tty = new FakeTTY({ columns: 120, rows: 32 });
+		const app = new TuiApp({ output: tty, caller: aiAssistCaller() });
+		await app.mount();
+
+		await app.navigateColon(":runs");
+		await app.navigateColon(":ai");
+		expect(app.screen).toBe("ai-assist");
+		await app.handleKey("q");
+		expect(app.screen).not.toBe("ai-assist");
+
+		app.stop();
+	});
+
+	test("thread state survives navigating away and back to :ai", async () => {
+		const tty = new FakeTTY({ columns: 120, rows: 32 });
+		const app = new TuiApp({ output: tty, caller: aiAssistCaller() });
+		await app.mount();
+
+		await app.navigateColon(":ai");
+		"hello".split("").forEach((ch) => void app.handleKey(ch));
+		await app.handleKey("\r");
+		await app.navigateColon(":runs");
+		await app.navigateColon(":ai");
+		const out = tty.plainText();
+		expect(out).toContain("hello");
+
+		app.stop();
 	});
 });

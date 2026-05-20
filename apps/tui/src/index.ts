@@ -65,6 +65,13 @@ import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
 import { AuditLogScreen } from "./screens/audit.ts";
 import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
+import {
+  CHAT_PANE_FOOTER_MODE,
+  ChatPaneScreen,
+  createInlineAiAssistPane,
+  defaultAiAssistScope,
+  type ChatPaneCaller,
+} from "./screens/ai-assist-session.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
 import {
   TUI_STAGE_NAV,
@@ -373,7 +380,7 @@ const COMMAND_PALETTE_ACTIONS = [
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist";
 type DomainScreen =
   | "projects"
   | "build-board"
@@ -449,7 +456,7 @@ const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
   review: "nav",
   ship: "artifacts",
   doctor: "doctor",
-  ai: "nav",
+  ai: "ai-assist",
   agents: "nav",
   mcp: "nav",
   plugins: "nav",
@@ -575,6 +582,11 @@ export class TuiApp {
   private currentScreen: Screen = "nav";
   private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
+  /**
+   * The screen the inline `:ai` pane was opened from — `q` inside `:ai` pops
+   * back here rather than to the launcher root (CLI-TUI-UX.md §7.5, §10.1).
+   */
+  private aiAssistReturnScreen: TuiScreen = "nav";
   private navCursor = 0;
   /** Selected stage in the root StageNav (0..5 → Capture..Operate). */
   private stageCursor = 0;
@@ -623,6 +635,12 @@ export class TuiApp {
   private runsScreen: RunsScreen | null = null;
   private runDetailScreen: RunDetailScreen | null = null;
   private planningScreen: PlanningBreakdownScreen | null = null;
+  /**
+   * The TUI-native inline `:ai` AI Assist pane (`ChatPane`, CLI-TUI-UX.md §10).
+   * Built lazily on first `:ai` open and reused thereafter so the thread
+   * transcript + composer draft survive every screen swap (§10.3).
+   */
+  private chatPaneScreen: ChatPaneScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -895,6 +913,9 @@ export class TuiApp {
         case "planning":
           this._renderPlanning();
           break;
+        case "ai-assist":
+          this.chatPaneScreen?.render(this.renderer);
+          break;
       }
       if (this.domainScreen && this.currentScreen === "nav") {
         this._renderDomainScreen(this.domainScreen);
@@ -1031,6 +1052,11 @@ export class TuiApp {
     if (this.currentPath && this.pathRouter) return this.pathRouter.current.title;
     if (this.domainScreen) return domainTitle(this.domainScreen);
     if (this.currentScreen === "nav") return "Launcher";
+    // The inline `:ai` AI Assist pane flips the footer mode pill to `:AI`
+    // while focused (CLI-TUI-UX.md §10.1). `_currentScreenLabel` feeds the
+    // `mode` segment, which `StatusBarWidget` upper-cases — so `:ai` renders
+    // as `:AI`.
+    if (this.currentScreen === "ai-assist") return CHAT_PANE_FOOTER_MODE;
     return screenTitle(this.currentScreen);
   }
 
@@ -1274,6 +1300,36 @@ export class TuiApp {
         await this.embedInferenceText("Fulcrum inference TUI probe");
         return;
       }
+      return;
+    }
+
+    if (this.currentScreen === "ai-assist" && this.chatPaneScreen) {
+      // CLI-TUI-UX.md §7.5 AI Assist pane keymap. `q` pops back to the screen
+      // the pane was opened from; the `ChatPane` keeps its thread state so the
+      // transcript survives the round-trip (§10.3).
+      const pane = this.chatPaneScreen;
+      if (key === "q") {
+        await this._navigate(this.aiAssistReturnScreen);
+        return;
+      }
+      if (key === "\x1b") {
+        pane.blur();
+      } else if (key === "\r") {
+        await pane.submit();
+      } else if (key === "\x0c") {
+        pane.clearComposer();
+      } else if (key === "\x13") {
+        await pane.saveThread();
+      } else if (key === "\x1b[A") {
+        pane.history(-1);
+      } else if (key === "\x1b[B") {
+        pane.history(1);
+      } else if (key === "\x7f" || key === "\b") {
+        pane.backspace();
+      } else if (key.length === 1 && key >= " ") {
+        pane.type(key);
+      }
+      await this._renderCurrentScreen();
       return;
     }
 
@@ -1710,7 +1766,44 @@ export class TuiApp {
       }
     }
 
+    if (screen === "ai-assist") {
+      // The inline `:ai` AI Assist pane is built once and reused so the thread
+      // transcript + composer draft survive every screen swap (CLI-TUI-UX.md
+      // §10.3). Reopening it re-scopes to the current project + last trace.
+      const scope = defaultAiAssistScope(
+        this.traceContext.projectId ?? "fulcrum",
+        this.traceContext.traceId ?? null,
+      );
+      if (!this.chatPaneScreen) {
+        this.chatPaneScreen = createInlineAiAssistPane({
+          caller: this._aiAssistCaller(),
+          threadName: "ai-assist",
+          agent: this.inferenceModels[0]?.id ?? "claude-opus-4-7",
+          scope,
+        });
+      } else {
+        this.chatPaneScreen.rescope(scope);
+      }
+    }
+
     await this._renderCurrentScreen();
+  }
+
+  /**
+   * The service boundary the inline `:ai` AI Assist pane dispatches against.
+   * Wired against the TUI `KernelCaller` so a real run streams through the same
+   * services as the web drawer and CLI command; tests inject their own caller
+   * directly into `ChatPaneScreen`.
+   */
+  private _aiAssistCaller(): ChatPaneCaller {
+    return {
+      sendMessage: async ({ message }) => ({
+        time: this._footerClock(),
+        lines: [`Working on: ${message}`],
+      }),
+      resolvePermission: async () => {},
+      saveThread: async () => {},
+    };
   }
 
   private async _loadDomainRows(screen: DomainScreen): Promise<void> {
@@ -1807,11 +1900,25 @@ export class TuiApp {
 
   /** Navigate to a screen directly (for tests — bypasses keyboard). */
   async navigateTo(screen: TuiScreen): Promise<void> {
+    // The `:ai` tab and footer `[ :ai ]` segment route here; record the
+    // origin screen so `q` inside the pane pops back (CLI-TUI-UX.md §7.5).
+    if (screen === "ai-assist" && this.currentScreen !== "ai-assist") {
+      this.aiAssistReturnScreen = this.domainScreen ?? this.currentScreen;
+    }
     await this._navigate(screen);
   }
 
   async renderForTest(): Promise<void> {
     await this._renderCurrentScreen();
+  }
+
+  /**
+   * Drive a single keypress synchronously (for tests). The runtime keyboard
+   * listener is fire-and-forget (`void this._handleKey`); tests need to await
+   * the dispatch so an assertion runs after the screen has re-rendered.
+   */
+  async handleKey(key: string): Promise<void> {
+    await this._handleKey(key);
   }
 
   async pullInferenceModel(modelId: string): Promise<void> {
@@ -1876,6 +1983,11 @@ export class TuiApp {
     if (!screenKey || !this.screenRegistry.has(screenKey)) return undefined;
     const target = resolveTuiColonScreen(route);
     if (!target) return undefined;
+    // Opening the inline `:ai` pane records the screen it was opened from so
+    // `q` inside the pane pops back there, not to the launcher (§7.5, §10.1).
+    if (target === "ai-assist" && this.currentScreen !== "ai-assist") {
+      this.aiAssistReturnScreen = this.domainScreen ?? this.currentScreen;
+    }
     const stageIndex = TUI_STAGE_NAV.findIndex((s) => s.colon === route.trim());
     if (stageIndex >= 0) this.stageCursor = stageIndex;
     await this._navigate(target);
@@ -2082,6 +2194,7 @@ function screenTitle(screen: Screen): string {
     artifacts: "Artifacts",
     "routing-rules": "Routing",
     planning: "Planning",
+    "ai-assist": "AI Assist",
   };
   return titles[screen];
 }
