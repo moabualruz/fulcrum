@@ -30,6 +30,8 @@
  * data. The verb grammar is complete; the envelope contract always holds.
  */
 
+import type { ArtifactApiEnvironment } from "@workflow-coordination/interface/http/artifact-api-client.ts";
+
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 import { run as runArtifacts, type ArtifactsCaller } from "./artifacts.ts";
 
@@ -130,9 +132,11 @@ export async function run(argv: readonly string[], opts: ShipStageRunOptions = {
       return runShipLauncher(rest, io, opts);
     case "artifact":
       // The `artifact` group is fully backed — delegate to the artifact host.
+      // A `ProcessEnv` is structurally a valid `ArtifactApiEnvironment`
+      // (the artifact env only reads `FULCRUM_SERVER_URL` / `_PUBLIC_API_URL`).
       await runArtifacts(rest, {
         caller: opts.artifactsCaller,
-        env: opts.env,
+        env: opts.env as ArtifactApiEnvironment | undefined,
         print: io.print,
         printErr: io.printErr,
         exit: io.exit,

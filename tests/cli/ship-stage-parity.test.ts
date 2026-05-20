@@ -168,8 +168,9 @@ describe("Ship verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
 
 describe("artifact verbs re-homed under Ship (artifacts kept as alias)", () => {
   test("the re-homed artifact verbs cover list/view/diff/export/download", () => {
+    const verbs: readonly string[] = ARTIFACT_VERBS;
     for (const verb of ["list", "view", "diff", "export", "download"]) {
-      expect(ARTIFACT_VERBS).toContain(verb);
+      expect(verbs).toContain(verb);
     }
   });
 
