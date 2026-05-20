@@ -15,7 +15,7 @@
 	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
 	import { buildProjectCommandItems } from "$lib/components/command-palette/project-command-items";
 	import ShortcutHelpOverlay from "$lib/components/ShortcutHelpOverlay.svelte";
-	import { Sheet, SheetContent, SheetTrigger } from "@fulcrum/ui-kit";
+	import { Sheet, SheetContent, SheetTrigger, TraceBadge } from "@fulcrum/ui-kit";
 	import { buttonVariants } from "@fulcrum/ui-kit";
 	import {
 		MOBILE_QUERY,
@@ -215,7 +215,38 @@
 				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(1.5rem+var(--fulcrum-gesture-zone-bottom))]")}>
 					{@render children?.()}
 				</main>
-				<TraceFooter traceId={data?.traceId ?? null} requestId={data?.requestId ?? null} />
+				<!--
+					Mobile (DESIGN.md §3.2): the 44px StatusFooter is hidden; the trace
+					id stays reachable through a swipe-down quick panel — a disclosure
+					carrying the shared DESIGN.md §4.10 TraceBadge.
+				-->
+				<details
+					data-mobile-trace-panel
+					class={cn(
+						"border-t border-border bg-surface-elevated text-xs text-fg-subtle",
+						"pb-[var(--fulcrum-gesture-zone-bottom)]",
+					)}
+				>
+					<summary
+						data-mobile-trace-summary
+						aria-label="Show trace id"
+						class={cn(
+							"flex cursor-pointer list-none items-center justify-center gap-1.5 px-4 py-2",
+							"font-mono text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+						)}
+					>
+						<span aria-hidden="true">⌃</span>
+						<span>Trace</span>
+					</summary>
+					<div class="flex items-center gap-2 px-4 pb-3">
+						<TraceBadge
+							badge
+							data-mobile-trace-id
+							traceId={data?.traceId ?? data?.requestId ?? "trace-init"}
+							project="fulcrum"
+						/>
+					</div>
+				</details>
 			</div>
 		</Sheet>
 	{:else}

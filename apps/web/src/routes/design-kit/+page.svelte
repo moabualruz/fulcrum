@@ -1445,8 +1445,9 @@
 		>
 			<h2 class="text-lg font-semibold">StatusFooter</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 — 44px bottom strip; compact 38 / base 44 / comfortable 50; right-most AI
-				Assist segment with accent left-border.
+				DESIGN.md §3.1 / IA-MAP.md §3 — 44px bottom strip; compact 38 / base 44 / comfortable 50.
+				Left segments mode · profile · branch · run x/y · agent · MCP; right segments trace ·
+				time · ? · ⌘K, then the right-most AI Assist segment with accent left-border.
 			</p>
 			<div class="flex flex-wrap gap-1">
 				{#each ["compact", "base", "comfortable"] as const as mode}
@@ -1467,8 +1468,20 @@
 					onAiAssist={() => (acpOpen = true)}
 				>
 					{#snippet rightCluster()}
-						<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" copyable={false} />
+						<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" project="fulcrum" />
 						<span class="font-mono text-[11px] text-fg-subtle">13:04</span>
+						<button
+							type="button"
+							aria-label="Keyboard shortcuts · ?"
+							class="grid size-6 place-items-center rounded-sm text-fg-subtle hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							><span aria-hidden="true">?</span></button
+						>
+						<button
+							type="button"
+							aria-label="Command palette · ⌘K"
+							class="grid h-6 place-items-center rounded-sm px-1 font-mono text-[11px] text-fg-subtle hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							><span aria-hidden="true">⌘K</span></button
+						>
 					{/snippet}
 				</StatusFooter>
 			</div>
