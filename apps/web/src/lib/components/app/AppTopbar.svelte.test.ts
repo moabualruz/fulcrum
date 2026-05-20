@@ -21,9 +21,10 @@ mock.module("$app/state", () => ({
 type AppTopbarProps = {
   pathname: string;
   activeProjectId: string | null;
-  densityMode?: "default" | "advanced";
+  densityMode?: "compact" | "cozy" | "comfortable";
   bellCount?: number;
   bellItems?: Array<{ id: string; kind: string; title: string }>;
+  traceId?: string | null;
 };
 
 describe("AppTopbar component", () => {
@@ -46,94 +47,67 @@ describe("AppTopbar component", () => {
     expect(matches).toHaveLength(1);
   });
 
-  test("root pathname renders only a 'Dashboard' breadcrumb page (no link)", () => {
+  test("root pathname renders the OD ScopeBar, not breadcrumb chrome", () => {
     const { body } = render(AppTopbar, {
-      props: { pathname: "/", activeProjectId: null },
+      props: { pathname: "/", activeProjectId: null, traceId: "4f3a1c9e2b7d8a6c" },
     });
-    const pageMatches =
-      body.match(
-        /<span\b[^>]*data-slot="breadcrumb-page"[^>]*aria-current="page"[^>]*>Dashboard<\/span>/g,
-      ) ?? [];
-    expect(pageMatches).toHaveLength(1);
-    // No link crumbs when at root.
+    expect(body).toMatch(/data-slot="scope-bar"/);
+    expect(body).toMatch(/data-scope-bar/);
+    expect(body).toContain("Fulcrum");
     expect(body).not.toMatch(/data-slot="breadcrumb-link"/);
-    // Active-project label shows the em dash placeholder.
-    expect(body).toMatch(
-      /<span[^>]*data-active-project[^>]*>—<\/span>/,
-    );
+    expect(body).not.toMatch(/data-slot="breadcrumb-page"/);
+    expect(body).toMatch(/data-slot="trace-chip"/);
+    expect(body).toContain("trace:");
   });
 
-  test("/projects renders Dashboard link + separator + Projects page", () => {
+  test("stage tabs mirror the six workflow stages and preserve active stage", () => {
     const { body } = render(AppTopbar, {
-      props: { pathname: "/projects", activeProjectId: null },
+      props: { pathname: "/projects/fulcrum/build", activeProjectId: "fulcrum" },
     });
-    expect(body).toMatch(
-      /<a\b[^>]*data-slot="breadcrumb-link"[^>]*href="\/"[^>]*>Dashboard<\/a>/,
-    );
-    expect(body).toMatch(/data-slot="breadcrumb-separator"/);
-    expect(body).toMatch(
-      /<span\b[^>]*data-slot="breadcrumb-page"[^>]*aria-current="page"[^>]*>Projects<\/span>/,
-    );
+    const tabs = body.match(/data-slot="scope-bar-tab"/g) ?? [];
+    expect(tabs).toHaveLength(6);
+    for (const label of ["Capture", "Plan", "Build", "Review", "Ship", "Operate"]) {
+      expect(body).toContain(label);
+    }
+    expect(body).toMatch(/data-active-stage="build"/);
+    expect(body).toMatch(/data-stage="build"[^>]*data-active="true"/);
   });
 
-  test("/projects/fulcrum renders three crumbs (Dashboard link, Projects link, Fulcrum page)", () => {
+  test("right system cluster exposes canonical tooltips and aria-expanded state", () => {
     const { body } = render(AppTopbar, {
-      props: { pathname: "/projects/fulcrum", activeProjectId: "fulcrum" },
+      props: { pathname: "/", activeProjectId: null, bellCount: 3 },
     });
-    expect(body).toMatch(
-      /<a\b[^>]*data-slot="breadcrumb-link"[^>]*href="\/"[^>]*>Dashboard<\/a>/,
-    );
-    expect(body).toMatch(
-      /<a\b[^>]*data-slot="breadcrumb-link"[^>]*href="\/projects"[^>]*>Projects<\/a>/,
-    );
-    expect(body).toMatch(
-      /<span\b[^>]*data-slot="breadcrumb-page"[^>]*aria-current="page"[^>]*>Fulcrum<\/span>/,
-    );
-    const linkMatches = body.match(/data-slot="breadcrumb-link"/g) ?? [];
-    expect(linkMatches).toHaveLength(2);
-    const pageMatches = body.match(/data-slot="breadcrumb-page"/g) ?? [];
-    expect(pageMatches).toHaveLength(1);
-  });
-
-  test('theme toggle: exactly one element has aria-label="toggle theme" and data-theme-toggle', () => {
-    const { body } = render(AppTopbar, {
-      props: { pathname: "/", activeProjectId: null },
-    });
-    const ariaMatches =
-      body.match(/aria-label="toggle theme"/g) ?? [];
-    expect(ariaMatches).toHaveLength(1);
-    const hookMatches = body.match(/data-theme-toggle/g) ?? [];
-    expect(hookMatches).toHaveLength(1);
-  });
-
-  test('cmd+K hint: <kbd aria-label="open command palette">⌘K</kbd>', () => {
-    const { body } = render(AppTopbar, {
-      props: { pathname: "/", activeProjectId: null },
-    });
-    expect(body).toMatch(
-      /<kbd\b[^>]*aria-label="open command palette"[^>]*>⌘K<\/kbd>/,
-    );
+    for (const label of [
+      "Command palette · ⌘K",
+      "Notifications · 3 unread",
+      "Display, density, mode, theme",
+      "Keyboard shortcuts · ?",
+      "Account · sign out, switch workspace",
+    ]) {
+      expect(body).toContain(`aria-label="${label}"`);
+    }
+    const expanded = body.match(/aria-expanded="false"/g) ?? [];
+    expect(expanded.length).toBeGreaterThanOrEqual(5);
   });
 
   test("active project label reflects activeProjectId prop", () => {
     const { body } = render(AppTopbar, {
       props: { pathname: "/", activeProjectId: "fulcrum" },
     });
-    expect(body).toMatch(
-      /<span[^>]*data-active-project[^>]*>fulcrum<\/span>/,
-    );
+    expect(body).toContain("mkh / fulcrum");
   });
 
-  test("renders scope indicator and density mode switch without changing permissions", () => {
+  test("renders canonical density terms", () => {
     const { body } = render(AppTopbar, {
-      props: { pathname: "/projects/fulcrum/board", activeProjectId: "fulcrum", densityMode: "advanced" },
+      props: { pathname: "/projects/fulcrum/board", activeProjectId: "fulcrum", densityMode: "comfortable" },
     });
-    expect(body).toMatch(/data-scope-indicator/);
-    expect(body).toContain("fulcrum");
     expect(body).toMatch(/data-density-switch/);
-    expect(body).toMatch(/data-density-mode="advanced"/);
-    expect(body).toMatch(/aria-label="default density"/);
-    expect(body).toMatch(/aria-label="advanced density"/);
+    expect(body).toMatch(/data-density-mode="comfortable"/);
+    expect(body).toContain("Compact");
+    expect(body).toContain("Cozy");
+    expect(body).toContain("Comfortable");
+    expect(body).not.toContain("Default");
+    expect(body).not.toContain("Advanced");
   });
 
   test("bell badge renders count, top-five unread items, and See all inbox link", () => {

@@ -129,3 +129,79 @@ test.describe("OD shell StageRail — forced-colors", () => {
 		});
 	});
 });
+
+test.describe("OD shell ScopeBar — populated", () => {
+	test("renders the 48px ScopeBar with brand, workspace, stage tabs, trace, and system icons", async ({
+		page,
+	}) => {
+		await page.goto("/");
+
+		const scopeBar = page.locator("[data-slot='scope-bar']").first();
+		await expect(scopeBar).toBeVisible();
+		await expect(scopeBar).toHaveAttribute("data-scope-bar", "");
+		await expect(scopeBar).toHaveAttribute("data-active-stage", "capture");
+
+		const box = await scopeBar.boundingBox();
+		expect(Math.round(box?.height ?? 0)).toBe(48);
+
+		await expect(scopeBar.locator("[data-slot='scope-bar-brand']")).toContainText("Fulcrum");
+		await expect(scopeBar.locator("[data-slot='scope-bar-workspace']")).toContainText(
+			"mkh / all-projects",
+		);
+
+		const tabs = scopeBar.locator("[data-slot='scope-bar-tab']");
+		await expect(tabs).toHaveCount(6);
+		await expect(tabs).toHaveText(["Capture", "Plan", "Build", "Review", "Ship", "Operate"]);
+
+		const trace = scopeBar.locator("[data-slot='trace-chip'][data-variant='badge']").first();
+		await expect(trace).toBeVisible();
+		await expect(trace.locator("[data-slot='trace-chip-prefix']")).toHaveText("trace:");
+
+		for (const label of [
+			"Command palette · ⌘K",
+			"Notifications · 0 unread",
+			"Display, density, mode, theme",
+			"Keyboard shortcuts · ?",
+			"Account · sign out, switch workspace",
+		]) {
+			const icon = scopeBar.locator(`button[aria-label="${label}"]`).first();
+			await expect(icon).toBeVisible();
+			await expect(icon).toHaveAttribute("aria-expanded", "false");
+		}
+
+		await expect(scopeBar.locator("[data-density-switch]")).toHaveAttribute(
+			"data-density-mode",
+			"cozy",
+		);
+		await expect(scopeBar.locator("[data-density-option]")).toHaveText([
+			"Compact",
+			"Cozy",
+			"Comfortable",
+		]);
+
+		await test.info().attach("shell-scope-bar", {
+			body: await page.screenshot({ fullPage: true }),
+			contentType: "image/png",
+		});
+	});
+
+	test("maps existing routes to the active ScopeBar stage tab", async ({ page }) => {
+		const cases = [
+			{ path: "/", stage: "capture" },
+			{ path: "/planning", stage: "plan" },
+			{ path: "/build-runs", stage: "build" },
+			{ path: "/review-search", stage: "review" },
+			{ path: "/ship-archive", stage: "ship" },
+			{ path: "/operate-mcp", stage: "operate" },
+		];
+
+		for (const item of cases) {
+			await page.goto(item.path);
+			const activeTab = page
+				.locator("[data-slot='scope-bar-tab'][data-active='true']")
+				.first();
+			await expect(activeTab).toHaveAttribute("data-stage", item.stage);
+			await expect(activeTab).toHaveAttribute("aria-current", "page");
+		}
+	});
+});

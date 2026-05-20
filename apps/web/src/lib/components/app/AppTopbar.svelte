@@ -1,12 +1,15 @@
 <script lang="ts">
-	import Sun from "@lucide/svelte/icons/sun";
-	import Cpu from "@lucide/svelte/icons/cpu";
+	import Bell from "@lucide/svelte/icons/bell";
+	import CircleHelp from "@lucide/svelte/icons/circle-help";
+	import Search from "@lucide/svelte/icons/search";
+	import Settings2 from "@lucide/svelte/icons/settings-2";
+	import UserCircle from "@lucide/svelte/icons/user-circle";
 
-	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { ScopeBar, TraceChip, type WorkflowStage } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
-	export type DensityMode = "default" | "advanced";
+	export type DensityMode = "compact" | "cozy" | "comfortable";
 
 	interface Props {
 		pathname: string;
@@ -15,6 +18,7 @@
 		densityMode?: DensityMode;
 		onDensityModeChange?: (mode: DensityMode) => void;
 		inferenceStatus?: InferenceStatus;
+		traceId?: string | null;
 		bellCount?: number;
 		bellItems?: Array<{ id: string; kind: string; title: string }>;
 	}
@@ -23,136 +27,116 @@
 		pathname,
 		activeProjectId,
 		onThemeToggle = () => {},
-		densityMode = "default",
+		densityMode = "cozy",
 		onDensityModeChange = () => {},
 		inferenceStatus = "unknown",
+		traceId = null,
 		bellCount = 0,
 		bellItems = [],
 	}: Props = $props();
 
-	function badgeColor(s: InferenceStatus): string {
-		if (s === "healthy") return "text-green-500";
-		if (s === "degraded") return "text-yellow-500";
-		if (s === "unreachable") return "text-red-500";
-		return "text-muted-foreground";
-	}
+	const densityModes: Array<{ id: DensityMode; label: string }> = [
+		{ id: "compact", label: "Compact" },
+		{ id: "cozy", label: "Cozy" },
+		{ id: "comfortable", label: "Comfortable" },
+	];
 
-	interface Crumb {
-		label: string;
-		href: string;
-	}
+	const stageOrder: WorkflowStage[] = ["capture", "plan", "build", "review", "ship", "operate"];
 
-	// Splits a pathname into breadcrumb segments. Root collapses to a single
-	// "Dashboard" crumb; deeper paths prepend Dashboard then capitalise each
-	// segment. Kept inline (no export) so tests verify rendered output, not
-	// the helper itself.
-	function crumbsFor(p: string): Crumb[] {
-		const segments = p.split("/").filter((s) => s.length > 0);
-		const out: Crumb[] = [{ label: "Dashboard", href: "/" }];
-		let acc = "";
-		for (const seg of segments) {
-			acc += `/${seg}`;
-			out.push({
-				label: seg.charAt(0).toUpperCase() + seg.slice(1),
-				href: acc,
-			});
+	function stageForPath(path: string): WorkflowStage {
+		const lower = path.toLowerCase();
+		for (const stage of stageOrder) {
+			if (lower === `/${stage}` || lower.includes(`/${stage}/`) || lower.endsWith(`/${stage}`)) {
+				return stage;
+			}
 		}
-		return out;
+		if (lower.includes("/planning") || lower.includes("/plan-")) return "plan";
+		if (lower.includes("/build") || lower.includes("/boards") || lower.includes("/runs")) return "build";
+		if (lower.includes("/review")) return "review";
+		if (lower.includes("/ship")) return "ship";
+		if (lower.includes("/operate") || lower.includes("/settings")) return "operate";
+		return "capture";
 	}
 
-	let crumbs = $derived(crumbsFor(pathname));
-	let scopeLabel = $derived(activeProjectId ?? "All projects");
+	function stageHref(stage: WorkflowStage): string {
+		if (activeProjectId) return `/projects/${activeProjectId}/${stage}`;
+		return `/${stage}`;
+	}
+
+	function selectStage(stage: WorkflowStage) {
+		if (typeof window !== "undefined") {
+			window.location.href = stageHref(stage);
+		}
+	}
+
+	const activeStage = $derived(stageForPath(pathname));
+	const workspacePath = $derived(`mkh / ${activeProjectId ?? "all-projects"}`);
+	const notificationLabel = $derived(`Notifications · ${bellCount} unread`);
+	const traceBadgeId = $derived(traceId ?? "4f3a1c9e2b7d8a6c");
+	const iconButtonClass = cn(
+		"grid size-7 place-items-center rounded-md text-fg-subtle transition-colors",
+		"hover:bg-surface-sunken hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+	);
 </script>
 
-<header
-	class={cn("flex h-14 items-center gap-4 border-b border-border px-6")}
+<ScopeBar
 	data-app-topbar
+	brand="Fulcrum"
+	workspacePath={workspacePath}
+	activeStage={activeStage}
+	onSelectStage={selectStage}
 >
-	<nav data-slot="breadcrumb" aria-label="breadcrumb">
-		<ol
-			data-slot="breadcrumb-list"
-			class={cn("flex items-center gap-1.5 text-sm")}
-		>
-			{#each crumbs as crumb, i (crumb.href)}
-				{@const isLast = i === crumbs.length - 1}
-				<li data-slot="breadcrumb-item" class={cn("inline-flex items-center")}>
-					{#if isLast}
-						<span
-							data-slot="breadcrumb-page"
-							aria-current="page"
-							class={cn("text-foreground font-normal")}
-						>{crumb.label}</span>
-					{:else}
-						<a
-							data-slot="breadcrumb-link"
-							href={crumb.href}
-							class={cn("text-muted-foreground hover:text-foreground transition-colors")}
-						>{crumb.label}</a>
-					{/if}
-				</li>
-				{#if !isLast}
-					<li
-						data-slot="breadcrumb-separator"
-						aria-hidden="true"
-						class={cn("text-muted-foreground")}
-					>/</li>
-				{/if}
-			{/each}
-		</ol>
-	</nav>
-
-	<div class={cn("ml-auto flex items-center gap-2")}>
-		<span
-			data-scope-indicator
-			class={cn("inline-flex h-7 items-center rounded-md border border-border px-2 text-xs text-muted-foreground")}
-		>{scopeLabel}</span>
+		{#snippet trace()}
+			<TraceChip
+				badge
+				traceId={traceBadgeId}
+				project={activeProjectId ?? "all-projects"}
+				timestamp="current request"
+			/>
+		{/snippet}
+		{#snippet systemCluster()}
 		<div
 			data-density-switch
 			data-density-mode={densityMode}
-			class={cn("inline-flex h-8 overflow-hidden rounded-md border border-border")}
+			class={cn("hidden h-7 overflow-hidden rounded-md border border-border lg:inline-flex")}
 			aria-label="density mode"
 		>
-			<button
-				type="button"
-				aria-label="default density"
-				aria-pressed={densityMode === "default"}
-				onclick={() => onDensityModeChange("default")}
-				class={cn("px-2 text-xs", densityMode === "default" && "bg-muted text-foreground")}
-			>Default</button>
-			<button
-				type="button"
-				aria-label="advanced density"
-				aria-pressed={densityMode === "advanced"}
-				onclick={() => onDensityModeChange("advanced")}
-				class={cn("px-2 text-xs", densityMode === "advanced" && "bg-muted text-foreground")}
-			>Advanced</button>
+			{#each densityModes as mode (mode.id)}
+				<button
+					type="button"
+					aria-label="{mode.label} density"
+					aria-pressed={densityMode === mode.id}
+					data-density-option={mode.id}
+					onclick={() => onDensityModeChange(mode.id)}
+					class={cn(
+						"px-2 text-xs text-fg-subtle",
+						densityMode === mode.id && "bg-surface-sunken text-fg",
+					)}
+				>{mode.label}</button>
+			{/each}
 		</div>
-		<span
-			data-inference-badge
-			data-inference-status={inferenceStatus}
-			aria-label="inference backend status: {inferenceStatus}"
-			class={cn("inline-flex items-center gap-1 text-xs", badgeColor(inferenceStatus))}
+		<button
+			type="button"
+			aria-label="Command palette · ⌘K"
+			aria-expanded="false"
+			data-scope-system-icon="command-palette"
+			class={iconButtonClass}
 		>
-			<Cpu class="h-4 w-4" aria-hidden="true" />
-			<span class="hidden sm:inline capitalize">{inferenceStatus}</span>
-		</span>
-		<kbd
-			class={cn(
-				"hidden h-6 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-xs sm:inline-flex",
-			)}
-			aria-label="open command palette">⌘K</kbd
-		>
+			<Search class="size-4" aria-hidden="true" />
+		</button>
 		<button
 			type="button"
 			data-notification-bell
-			aria-label="notifications"
-			class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "relative")}
+			aria-label={notificationLabel}
+			aria-expanded={bellItems.length > 0 ? "true" : "false"}
+			data-scope-system-icon="notifications"
+			class={cn(iconButtonClass, "relative")}
 		>
-			<span aria-hidden="true">!</span>
+			<Bell class="size-4" aria-hidden="true" />
 			{#if bellCount > 0}
 				<span
 					data-notification-badge
-					class={cn("absolute -right-1 -top-1 rounded-full bg-primary px-1 text-[10px] text-primary-foreground")}
+					class={cn("absolute -right-1 -top-1 rounded-full bg-accent px-1 text-[10px] text-primary-foreground")}
 				>{bellCount}</span>
 			{/if}
 		</button>
@@ -166,17 +150,34 @@
 		{/if}
 		<button
 			type="button"
-			data-slot="button"
-			data-theme-toggle
-			aria-label="toggle theme"
+			aria-label="Display, density, mode, theme"
+			aria-expanded="false"
+			data-scope-system-icon="display"
 			onclick={onThemeToggle}
-			class={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
+			class={iconButtonClass}
 		>
-			<Sun aria-hidden="true" />
+			<Settings2 class="size-4" aria-hidden="true" />
 		</button>
-		<span
-			class={cn("text-xs text-muted-foreground")}
-			data-active-project>{activeProjectId ?? "—"}</span
+		<button
+			type="button"
+			aria-label="Keyboard shortcuts · ?"
+			aria-expanded="false"
+			data-scope-system-icon="keyboard-help"
+			class={iconButtonClass}
 		>
-	</div>
-</header>
+			<CircleHelp class="size-4" aria-hidden="true" />
+		</button>
+		<button
+			type="button"
+			aria-label="Account · sign out, switch workspace"
+			aria-expanded="false"
+			data-scope-system-icon="account"
+			class={iconButtonClass}
+		>
+			<UserCircle class="size-4" aria-hidden="true" />
+		</button>
+		<span data-inference-status={inferenceStatus} class="sr-only">
+			Inference backend status: {inferenceStatus}
+		</span>
+		{/snippet}
+</ScopeBar>

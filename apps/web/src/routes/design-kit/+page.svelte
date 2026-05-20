@@ -1126,24 +1126,28 @@
 						<button
 							type="button"
 							aria-label="Command palette · ⌘K"
+							aria-expanded="false"
 							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
 							>⌘K</button
 						>
 						<button
 							type="button"
 							aria-label="Notifications · 2 unread"
+							aria-expanded="false"
 							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
 							>🔔</button
 						>
 						<button
 							type="button"
 							aria-label="Display, density, mode, theme"
+							aria-expanded="false"
 							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
 							>⚙</button
 						>
 						<button
 							type="button"
 							aria-label="Keyboard shortcuts · ?"
+							aria-expanded="false"
 							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
 							>?</button
 						>
