@@ -61,11 +61,17 @@ describe("fulcrum binary entrypoint", () => {
     await buildBinary();
   });
 
-  test("--help exits 0 and lists top-level subcommands", async () => {
+  test("--help exits 0 and groups subcommands by workflow stage", async () => {
     const result = await runFulcrum(["--help"]);
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
+    // Root help is workflow-stage organized (CLI-TUI-UX.md §1).
+    for (const stage of ["CAPTURE", "PLAN", "BUILD", "REVIEW", "SHIP", "OPERATE", "AI ASSIST"]) {
+      expect(result.stdout).toContain(stage);
+    }
+    expect(result.stdout).toContain("CROSS-CUTTING / GLOBAL");
+    // Commands still surface under the stage that owns them.
     expect(result.stdout).toContain("init");
     expect(result.stdout).toContain("db");
     expect(result.stdout).toContain("web");
@@ -73,8 +79,18 @@ describe("fulcrum binary entrypoint", () => {
     expect(result.stdout).toContain("inference");
     expect(result.stdout).toContain("projects");
     expect(result.stdout).toContain("tasks");
-    expect(result.stdout).toContain("credentials");
     expect(result.stdout).toContain("webhooks");
+  });
+
+  test("help <stage> exits 0 with per-stage commands and examples", async () => {
+    const result = await runFulcrum(["help", "build"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("Build stage");
+    expect(result.stdout).toContain("Commands:");
+    expect(result.stdout).toContain("Examples:");
+    expect(result.stdout).toContain("--json");
   });
 
   test("--version exits 0 with package semver", async () => {
