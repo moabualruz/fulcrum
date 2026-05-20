@@ -140,11 +140,18 @@ test.describe("shell reduced-motion guard", () => {
 		await page.goto("/ai-assist", { waitUntil: "load" });
 		await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
-		// The AI Assist drawer is the slide-over DESIGN.md §5 calls out as the
-		// exact animation that must collapse. Its rendered surface keeps no
-		// live transition/animation under reduced motion.
-		const drawer = page.locator("[data-ai-assist-drawer]").first();
-		await expect(drawer).toBeVisible();
+		// AI Assist is no longer a page-local route component — `prd-web-global-ai-assist-drawer`
+		// moved it to the single shell-level overlay `AcpDrawer` in `+layout.svelte`,
+		// opened from any route by the `⌘/` (Meta+Slash) keyboard chord. The chord
+		// listener binds in the layout's `onMount`; pressing it before hydration is
+		// a no-op, so retry the chord until the shell drawer renders. This drives
+		// the real shell entry point rather than a page-local surface.
+		const modifier = process.platform === "darwin" ? "Meta" : "Control";
+		const drawer = page.locator("[data-slot='acp-drawer']").first();
+		await expect(async () => {
+			await page.keyboard.press(`${modifier}+Slash`);
+			await expect(drawer).toBeVisible({ timeout: 1_000 });
+		}).toPass({ timeout: 15_000 });
 		const drawerTiming = await drawer.evaluate((node) => {
 			const style = getComputedStyle(node);
 			return {
