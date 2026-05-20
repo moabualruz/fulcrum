@@ -46,7 +46,7 @@ describe("fulcrum capture command", () => {
     const caller = fakeCaller();
     const lines: string[] = [];
 
-    await run(["review", "cap-1", "--note", "ready for approval", "--trace", "trace-1", "--json"], {
+    await run(["review", "cap-1", "--note", "ready for approval", "--trace", "trace-1", "--json-raw"], {
       caller,
       print: (line) => lines.push(line),
       printErr: () => {},
@@ -69,7 +69,7 @@ describe("fulcrum capture command", () => {
     const caller = fakeCaller();
     const lines: string[] = [];
 
-    await run(["status", "cap-2", "--status", "approved", "--json"], {
+    await run(["status", "cap-2", "--status", "approved", "--json-raw"], {
       caller,
       print: (line) => lines.push(line),
       printErr: () => {},
@@ -96,10 +96,10 @@ describe("fulcrum capture command", () => {
       exit: () => {},
     };
 
-    await run(["action", "cap-3", "--action", "assign", "--assignee", "user-1", "--json"], opts);
-    await run(["action", "cap-3", "--action", "block", "--reason", "missing source", "--json"], opts);
-    await run(["action", "cap-3", "--action", "approve", "--json"], opts);
-    await run(["quick-action", "cap-3", "--action", "escalate", "--trace", "trace-escalate", "--json"], opts);
+    await run(["action", "cap-3", "--action", "assign", "--assignee", "user-1", "--json-raw"], opts);
+    await run(["action", "cap-3", "--action", "block", "--reason", "missing source", "--json-raw"], opts);
+    await run(["action", "cap-3", "--action", "approve", "--json-raw"], opts);
+    await run(["quick-action", "cap-3", "--action", "escalate", "--trace", "trace-escalate", "--json-raw"], opts);
 
     expect(caller.calls).toEqual([
       ["runQuickAction", { captureId: "cap-3", action: "assign", assigneeId: "user-1", reason: undefined, traceId: undefined }],
@@ -125,7 +125,7 @@ describe("fulcrum capture command", () => {
       });
     }) as unknown as typeof fetch;
 
-    await run(["review", "cap-api", "--note", "api note", "--trace", "trace-api", "--json"], {
+    await run(["review", "cap-api", "--note", "api note", "--trace", "trace-api", "--json-raw"], {
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210" },
       fetch: fetchFn,
       print: (line) => lines.push(line),
@@ -146,7 +146,7 @@ describe("fulcrum capture command", () => {
     const errors: string[] = [];
     let exitCode: number | undefined;
 
-    await run(["status", "cap-4", "--status", "review", "--json"], {
+    await run(["status", "cap-4", "--status", "review", "--json-raw"], {
       env: {},
       fetch: (async () => {
         throw new Error("fetch should not run without API configuration");

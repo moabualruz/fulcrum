@@ -129,7 +129,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("runs list filters by status and emits JSON claim fields", async () => {
     const h = harness();
-    await runPillar14Command("runs", ["list", "--status", "running", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("runs", ["list", "--status", "running", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual([runningRun]);
@@ -155,31 +155,31 @@ describe("P14#08 generated domain CLI contracts", () => {
       return Response.json([{ id: "run-public", status: "running", agent: "codex" }]);
     }) as typeof globalThis.fetch;
 
-    await runPillar14Command("runs", ["list", "--status", "running", "--json"], {
+    await runPillar14Command("runs", ["list", "--status", "running", "--json-raw"], {
       caller: caller(),
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
       fetch,
       ...h,
     });
-    await runPillar14Command("runs", ["show", "run-public", "--json"], {
+    await runPillar14Command("runs", ["show", "run-public", "--json-raw"], {
       caller: caller(),
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
       fetch,
       ...h,
     });
-    await runPillar14Command("runs", ["cancel", "run-public", "--json"], {
+    await runPillar14Command("runs", ["cancel", "run-public", "--json-raw"], {
       caller: caller(),
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
       fetch,
       ...h,
     });
-    await runPillar14Command("runs", ["retry", "run-public", "--json"], {
+    await runPillar14Command("runs", ["retry", "run-public", "--json-raw"], {
       caller: caller(),
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
       fetch,
       ...h,
     });
-    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json"], {
+    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json-raw"], {
       caller: caller(),
       env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3000", FULCRUM_ORG_ID: "org-1" },
       fetch,
@@ -207,7 +207,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("runs cancel accepts positional id and emits JSON", async () => {
     const h = harness();
-    await runPillar14Command("runs", ["cancel", "run-1", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("runs", ["cancel", "run-1", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "run-1", status: "cancelled" });
@@ -217,13 +217,13 @@ describe("P14#08 generated domain CLI contracts", () => {
     const h = harness();
     const fakeCaller = caller();
 
-    await runPillar14Command("runs", ["show", "run-1", "--json"], { caller: fakeCaller, ...h });
-    await runPillar14Command("runs", ["retry", "--id", "run-1", "--json"], { caller: fakeCaller, ...h });
-    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json"], {
+    await runPillar14Command("runs", ["show", "run-1", "--json-raw"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["retry", "--id", "run-1", "--json-raw"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["dispatch", "--task", "task-1", "--agent", "codex", "--json-raw"], {
       caller: fakeCaller,
       ...h,
     });
-    await runPillar14Command("runs", ["watch", "run-1", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["watch", "run-1", "--json-raw"], { caller: fakeCaller, ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toMatchObject({ id: "run-1", status: "running" });
@@ -240,9 +240,9 @@ describe("P14#08 generated domain CLI contracts", () => {
     const h = harness();
     const fakeCaller = caller();
 
-    await runPillar14Command("runs", ["show", "missing", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["show", "missing", "--json-raw"], { caller: fakeCaller, ...h });
     await runPillar14Command("runs", ["watch", "missing"], { caller: fakeCaller, ...h });
-    await runPillar14Command("runs", ["dispatch", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("runs", ["dispatch", "--json-raw"], { caller: fakeCaller, ...h });
 
     expect(h.exitCode).toBe(1);
     expect(JSON.parse(h.lines[0] as string).error.message).toBe("run 'missing' not found");
@@ -292,7 +292,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("notify list --unread --json emits unread notifications", async () => {
     const h = harness();
-    await runPillar14Command("notify", ["list", "--unread", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("notify", ["list", "--unread", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({
@@ -315,8 +315,8 @@ describe("P14#08 generated domain CLI contracts", () => {
     const h = harness();
     const fakeCaller = caller();
 
-    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json"], { caller: fakeCaller, ...h });
-    await runPillar14Command("notify", ["mark-all-read", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json-raw"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", ["mark-all-read", "--json-raw"], { caller: fakeCaller, ...h });
     await runPillar14Command("notify", ["watch", "--unread"], { caller: fakeCaller, ...h });
     await runPillar14Command("notify", [
       "mute",
@@ -326,7 +326,7 @@ describe("P14#08 generated domain CLI contracts", () => {
       "task-1",
       "--muted-until",
       "2026-01-03T00:00:00.000Z",
-      "--json",
+      "--json-raw",
     ], { caller: fakeCaller, ...h });
 
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "n-1", read: true });
@@ -372,16 +372,16 @@ describe("P14#08 generated domain CLI contracts", () => {
       FULCRUM_USER_ID: "user-1",
     };
 
-    await runPillar14Command("notify", ["list", "--unread", "--json"], { caller: fakeCaller, env, fetch, ...h });
-    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json"], { caller: fakeCaller, env, fetch, ...h });
-    await runPillar14Command("notify", ["mark-all-read", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", ["list", "--unread", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", ["mark-read", "--id", "n-1", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("notify", ["mark-all-read", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
     await runPillar14Command("notify", [
       "mute",
       "--subject-kind",
       "task",
       "--subject-id",
       "task-1",
-      "--json",
+      "--json-raw",
     ], { caller: fakeCaller, env, fetch, ...h });
 
     expect(h.exitCode).toBeUndefined();
@@ -399,7 +399,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("notify watch reports a public API boundary gap", async () => {
     const h = harness();
-    await runPillar14Command("notify", ["watch", "--json"], {
+    await runPillar14Command("notify", ["watch", "--json-raw"], {
       env: {
         FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
         FULCRUM_ORG_ID: "org-1",
@@ -422,7 +422,7 @@ describe("P14#08 generated domain CLI contracts", () => {
       throw new Error("Metadata for entity Notification not found");
     };
 
-    await runPillar14Command("notify", ["list", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("notify", ["list", "--json-raw"], { caller: fakeCaller, ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual([]);
@@ -430,7 +430,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("audit query filters by kind and since", async () => {
     const h = harness();
-    await runPillar14Command("audit", ["query", "--kind", "task", "--since", "2026-01-01", "--json"], {
+    await runPillar14Command("audit", ["query", "--kind", "task", "--since", "2026-01-01", "--json-raw"], {
       caller: caller(),
       ...h,
     });
@@ -442,7 +442,7 @@ describe("P14#08 generated domain CLI contracts", () => {
   it("audit query uses the configured Nest API caller with generated CLI filters", async () => {
     const h = harness();
     const calls: Array<{ url: string; init: RequestInit }> = [];
-    await runPillar14Command("audit", ["query", "--kind", "task", "--since", "2026-01-01", "--json"], {
+    await runPillar14Command("audit", ["query", "--kind", "task", "--since", "2026-01-01", "--json-raw"], {
       caller: caller(),
       env: {
         FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
@@ -561,7 +561,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("audit retention set emits JSON", async () => {
     const h = harness();
-    await runPillar14Command("audit", ["retention", "set", "--days", "90", "--json"], {
+    await runPillar14Command("audit", ["retention", "set", "--days", "90", "--json-raw"], {
       caller: caller(),
       ...h,
     });
@@ -572,7 +572,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("audit retention rejects invalid days and retention without set subaction", async () => {
     const h = harness();
-    await runPillar14Command("audit", ["retention", "set", "--days", "-1", "--json"], {
+    await runPillar14Command("audit", ["retention", "set", "--days", "-1", "--json-raw"], {
       caller: caller(),
       ...h,
     });
@@ -588,7 +588,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("webhooks list emits JSON rows", async () => {
     const h = harness();
-    await runPillar14Command("webhooks", ["list", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("webhooks", ["list", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "wh-1", url: "https://example.test/hook" }]);
@@ -596,7 +596,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("webhooks test creates a ping delivery row", async () => {
     const h = harness();
-    await runPillar14Command("webhooks", ["test", "wh-1", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("webhooks", ["test", "wh-1", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({
@@ -632,8 +632,8 @@ describe("P14#08 generated domain CLI contracts", () => {
       FULCRUM_PUBLIC_API_URL: "http://127.0.0.1:4321/base/",
       FULCRUM_ORG_ID: "org-1",
     };
-    await runPillar14Command("webhooks", ["list", "--json"], { caller: fakeCaller, env, fetch, ...h });
-    await runPillar14Command("webhooks", ["test", "wh-1", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("webhooks", ["list", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("webhooks", ["test", "wh-1", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual([{ id: "wh-1", url: "https://example.test/hook" }]);
@@ -662,7 +662,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("connectors enable jira returns JSON FeatureDisabledError and exits 1", async () => {
     const h = harness();
-    await runPillar14Command("connectors", ["enable", "jira", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("connectors", ["enable", "jira", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBe(1);
     expect(JSON.parse(h.lines[0] as string)).toEqual({
@@ -675,7 +675,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("connectors sync jira emits JSON result", async () => {
     const h = harness();
-    await runPillar14Command("connectors", ["sync", "jira", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("connectors", ["sync", "jira", "--json-raw"], { caller: caller(), ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "sync-1", connector: "jira", status: "queued" });
@@ -705,8 +705,8 @@ describe("P14#08 generated domain CLI contracts", () => {
       FULCRUM_ORG_ID: "org-1",
     };
 
-    await runPillar14Command("connectors", ["enable", "jira", "--json"], { caller: fakeCaller, env, fetch, ...h });
-    await runPillar14Command("connectors", ["sync", "jira", "--json"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("connectors", ["enable", "jira", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
+    await runPillar14Command("connectors", ["sync", "jira", "--json-raw"], { caller: fakeCaller, env, fetch, ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ id: "jira", enabled: true });
@@ -719,7 +719,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("generated domain commands require a caller or public API configuration", async () => {
     const h = harness();
-    await runPillar14Command("runs", ["list", "--json"], { ...h });
+    await runPillar14Command("runs", ["list", "--json-raw"], { ...h });
 
     expect(h.exitCode).toBe(1);
     expect(JSON.parse(h.lines[0] as string).error.message).toContain("Public API caller is not configured");
@@ -728,8 +728,8 @@ describe("P14#08 generated domain CLI contracts", () => {
   it("flags set router-llm on is reflected by flags list", async () => {
     const h = harness();
     const fakeCaller = caller();
-    await runPillar14Command("flags", ["set", "router-llm", "on", "--json"], { caller: fakeCaller, ...h });
-    await runPillar14Command("flags", ["list", "--json"], { caller: fakeCaller, ...h });
+    await runPillar14Command("flags", ["set", "router-llm", "on", "--json-raw"], { caller: fakeCaller, ...h });
+    await runPillar14Command("flags", ["list", "--json-raw"], { caller: fakeCaller, ...h });
 
     expect(h.exitCode).toBeUndefined();
     expect(JSON.parse(h.lines[0] as string)).toEqual({ name: "router-llm", enabled: true });
@@ -738,7 +738,7 @@ describe("P14#08 generated domain CLI contracts", () => {
 
   it("flags set rejects non on/off values and unknown commands exit 2", async () => {
     const h = harness();
-    await runPillar14Command("flags", ["set", "router-llm", "maybe", "--json"], { caller: caller(), ...h });
+    await runPillar14Command("flags", ["set", "router-llm", "maybe", "--json-raw"], { caller: caller(), ...h });
     await runPillar14Command("connectors", ["remove", "jira"], { caller: caller(), ...h });
 
     expect(JSON.parse(h.lines[0] as string).error.message).toBe("flags set: value must be on or off");

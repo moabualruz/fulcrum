@@ -34,7 +34,7 @@ Product workflow parity commands live under `fulcrum product reports …`: `uat-
 
 - `install` and `uninstall` route through `profile.default` / `profile.minimal` via the component lifecycle engine; flags translate to planner exclusions.
 - `--dry-run` calls the same planner as real execution and never writes files or runs vendor CLIs.
-- `--json` output is parseable; flag is supported on every list/get verb.
+- `--json` output is wrapped in the canonical `fulcrum.cli.v1` envelope (`CLI-TUI-UX.md` §3) via the shared helper `src/lib/envelope.ts` / `src/lib/cli-output.ts` — twelve keys (`schema`, `trace_id`, `span_id`, `run_id`, `project_id`, `command`, `args`, `result`, `errors`, `next_actions`, `duration_ms`, `timestamp`); `errors`/`next_actions` are always arrays. Streaming commands emit JSONL — one envelope per line plus a `{schema,result:null,end:true,trace_id}` end sentinel. `--jq <expr>` filters `.result`. `--json-raw` is a one-release compatibility flag that emits the pre-envelope payload shape for scripts not yet migrated; it is documented for removal in the next release. Plain (non-`--json`) output renders the same underlying result data.
 - Commands operating on `package.*` components must use package-aware helpers; generic registry/skills code never touches package-owned MCPs/skills.
 - Generated agent mirrors exclude `.original.md`, `.backup.md`, `_archive`, `_template`, `.git`, `node_modules`, and worktree dirs. Project source keeps `.original.md`.
 

@@ -106,7 +106,7 @@ describe("Surface final cross-surface parity smoke", () => {
     expect(parseLastJson<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
 
     const notifications = capture();
-    await runPillar14Command("notify", ["list", "--unread", "--json"], {
+    await runPillar14Command("notify", ["list", "--unread", "--json-raw"], {
       ...notifications,
       caller: { notify: { list: async () => [{ id: "notification-1", read: false }] } },
     });

@@ -17,7 +17,7 @@ describe("fulcrum ai assist", () => {
       "build",
       "--workspace",
       "/workspace/fulcrum",
-      "--json",
+      "--json-raw",
     ], { print: (line) => out.push(line), exit: (code) => { throw new Error(`exit ${code}`); } });
 
     expect(JSON.parse(out[0] ?? "{}")).toMatchObject({
@@ -37,7 +37,7 @@ describe("fulcrum ai assist", () => {
 
   test("keeps AI Assist command peer available for run preview dispatch", async () => {
     const out: string[] = [];
-    await run(["start", "--task", "preview-1", "--title", "Preview run", "--route", "plan", "--json"], {
+    await run(["start", "--task", "preview-1", "--title", "Preview run", "--route", "plan", "--json-raw"], {
       print: (line) => out.push(line),
       exit: (code) => { throw new Error(`exit ${code}`); },
     });

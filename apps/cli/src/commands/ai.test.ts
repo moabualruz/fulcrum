@@ -19,7 +19,7 @@ describe("fulcrum ai", () => {
       "plan",
       "--workspace",
       "/workspace/fulcrum",
-      "--json",
+      "--json-raw",
     ], { print: (line) => out.push(line), exit: (code) => { throw new Error(`exit ${code}`); } });
 
     expect(JSON.parse(out[0] ?? "{}")).toMatchObject({

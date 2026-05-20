@@ -1,5 +1,7 @@
 import { startTaskAiAssistSession } from "@agent-client-protocol/application/task-ai-assist-session.ts";
 
+import { emitResult } from "../lib/cli-output.ts";
+
 export interface AiCommandOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
@@ -10,6 +12,11 @@ const HELP = `fulcrum ai
 
 Usage:
   fulcrum ai start --task <id> --title <title> [--description <text>] [--agent <id>] [--route plan|build|review] [--workspace <path>] [--json]
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+  --jq <expr>       Filter the envelope's .result through jq
+  --json-raw        Pre-envelope JSON payload (compatibility, removed next release)
 `;
 
 export async function run(argv: readonly string[], opts: AiCommandOptions = {}): Promise<void> {
@@ -39,7 +46,20 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
         route: flagValue(rest, "--route"),
         workspacePath: flagValue(rest, "--workspace"),
       });
-      io.print(rest.includes("--json") ? JSON.stringify(session) : JSON.stringify(session, null, 2));
+      // `--json` wraps the session in the canonical `fulcrum.cli.v1` envelope;
+      // plain output pretty-prints the same session object.
+      emitResult(
+        {
+          argv: rest,
+          command: "fulcrum ai start",
+          result: session,
+          next_actions: [
+            { label: "Open in TUI", command: "fulcrum tui :ai" },
+          ],
+          renderHuman: (value) => io.print(JSON.stringify(value, null, 2)),
+        },
+        { print: io.print, printErr: io.printErr },
+      );
       return;
     }
     case "help":

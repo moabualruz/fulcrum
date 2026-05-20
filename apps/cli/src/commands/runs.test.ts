@@ -14,7 +14,7 @@ describe("fulcrum runs", () => {
 
   test("dispatch uses agent argument through CLI peer", async () => {
     const out: string[] = [];
-    await run(["dispatch", "--task", "task-1", "--agent", "codex", "--json"], {
+    await run(["dispatch", "--task", "task-1", "--agent", "codex", "--json-raw"], {
       caller: {
         runs: { dispatch: async (input: Record<string, unknown>) => ({ id: "run-1", ...input }) },
         orchestration: { dispatchRun: async (input: Record<string, unknown>) => ({ id: "run-1", ...input }) },

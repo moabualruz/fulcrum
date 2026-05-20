@@ -1,4 +1,5 @@
 import { formatApiError } from "../api-errors.ts";
+import { emitResult } from "../lib/cli-output.ts";
 
 type CaptureStatus = "triage" | "review" | "approved";
 type CaptureQuickAction = "assign" | "block" | "approve" | "escalate";
@@ -61,7 +62,9 @@ Usage:
   fulcrum capture action <id> --action <assign|block|approve|escalate> [--assignee <id>] [--reason <text>] [--trace <id>] [--json]
 
 Options:
-  --json            Machine-readable JSON output
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+  --jq <expr>       Filter the envelope's .result through jq
+  --json-raw        Pre-envelope JSON payload (compatibility, removed next release)
 `;
 
 export async function run(argv: readonly string[], opts: CaptureRunOptions = {}): Promise<void> {
@@ -81,7 +84,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           note: requiredFlag(rest, "--note", "review"),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, rest, io.print);
+        printOutput(result, "fulcrum capture review", rest, io.print);
         return;
       }
       case "status": {
@@ -91,7 +94,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           status: parseStatus(requiredFlag(rest, "--status", "status")),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, rest, io.print);
+        printOutput(result, "fulcrum capture status", rest, io.print);
         return;
       }
       case "action":
@@ -104,7 +107,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           reason: flagValue(rest, "--reason"),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, rest, io.print);
+        printOutput(result, `fulcrum capture ${verb}`, rest, io.print);
         return;
       }
       case "help":
@@ -153,13 +156,33 @@ async function request(fetchFn: typeof fetch, url: string, input: CaptureReviewI
   return await response.json() as CaptureCommandResult;
 }
 
-function printOutput(result: CaptureCommandResult, argv: readonly string[], print: (line: string) => void): void {
-  if (argv.includes("--json")) {
-    print(JSON.stringify(result));
-    return;
-  }
-  print(`${result.captureId} ${result.status} ${result.action} trace=${result.traceId}`);
-  print(result.message);
+function printOutput(
+  result: CaptureCommandResult,
+  command: string,
+  argv: readonly string[],
+  print: (line: string) => void,
+): void {
+  // `--json` wraps the same `result` data in the canonical `fulcrum.cli.v1`
+  // envelope; plain output renders the same fields. The result's own trace id
+  // propagates into the envelope so the two surfaces stay correlatable.
+  emitResult(
+    {
+      argv,
+      command,
+      result,
+      trace: { trace_id: normalizeTraceId(result.traceId) },
+      renderHuman: (value) => {
+        print(`${value.captureId} ${value.status} ${value.action} trace=${value.traceId}`);
+        print(value.message);
+      },
+    },
+    { print, printErr: print },
+  );
+}
+
+/** A 32-char lowercase-hex trace id passes through; anything else stays unset. */
+function normalizeTraceId(value: string | undefined): string | undefined {
+  return value && /^[0-9a-f]{32}$/i.test(value) ? value.toLowerCase() : undefined;
 }
 
 function requiredArg(argv: readonly string[], command: string, label: string): string {

@@ -1,6 +1,13 @@
 import { writeFile, readFile, stat as fsStat } from "node:fs/promises";
 
 import { apiErrorCode, formatUnknownError } from "../api-errors.ts";
+import {
+  emitErrorResult,
+  emitResult,
+  emitStreamEnd,
+  emitStreamEnvelope,
+} from "../lib/cli-output.ts";
+import { newTraceId } from "../lib/envelope.ts";
 import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
 import { createConnectorApiCallerFromEnv } from "@integration-hub/interface/http/connector-api-client.ts";
 import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";
@@ -19,7 +26,17 @@ export interface Pillar14RunOptions {
   exit?: (code: number) => void;
 }
 
-type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
+/** Per-invocation envelope context: full command name + raw argv (drives `--json` envelope). */
+interface EnvelopeContext {
+  command: string;
+  argv: readonly string[];
+  /** Stable trace id for the whole invocation — shared by every envelope line. */
+  traceId: string;
+}
+
+type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">> & {
+  ctx: EnvelopeContext;
+};
 
 const HELP: Record<Pillar14Domain, string> = {
   runs: `fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs|attach> [--json]
@@ -38,7 +55,12 @@ Subcommands:
   worker-tick --project <id> [--trace <id>] [--worker <id>]
                                                     Claim and execute one queued dependency-run worker job
   logs <run-id> [--follow]                          Show run transcript logs
-  attach <run-id>                                   Attach to a running run (follow logs)`,
+  attach <run-id>                                   Attach to a running run (follow logs)
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope (streaming verbs emit JSONL + end sentinel)
+  --jq <expr>                                       Filter the envelope's .result through jq
+  --json-raw                                        Pre-envelope JSON payload (compatibility, removed next release)`,
   notify: "fulcrum notify <list|mark-read|mark-all-read|mute|watch> [--unread] [--json]",
   audit: "fulcrum audit <query|export|retention> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
@@ -51,12 +73,17 @@ export async function runPillar14Command(
   argv: readonly string[],
   opts: Pillar14RunOptions = {},
 ): Promise<void> {
-  const io = {
+  const [sub = "help", ...rest] = argv;
+  const io: Io = {
     print: opts.print ?? console.log,
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
+    ctx: {
+      command: `fulcrum ${domain} ${sub}`.trim(),
+      argv: rest,
+      traceId: newTraceId((opts.env ?? process.env) as NodeJS.ProcessEnv),
+    },
   };
-  const [sub = "help", ...rest] = argv;
 
   if (sub === "help" || sub === "--help" || sub === "-h") {
     io.print(HELP[domain]);
@@ -191,17 +218,19 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     const input = compact({ projectId, runId, taskId, traceId });
 
     if (watch) {
-      // Poll until executor is inactive
+      // Streaming command: emit one canonical envelope per JSONL line, then a
+      // `{schema,result:null,end:true,trace_id}` end sentinel (CLI-TUI-UX §3).
       const POLL_MS = 1000;
       const MAX_WAIT_MS = 300_000;
       const start = Date.now();
       while (Date.now() - start < MAX_WAIT_MS) {
         const feedback = await depCaller.loadDependencyRunLiveFeedback(input);
-        emitJson(feedback, io);
+        emitStreamLine(feedback, io);
         const status = feedback as { executorStatus?: { active?: boolean } };
         if (!status.executorStatus?.active) break;
         await new Promise((r) => setTimeout(r, POLL_MS));
       }
+      emitStreamSentinel(io);
     } else {
       emitJson(await depCaller.loadDependencyRunLiveFeedback(input), io);
     }
@@ -230,8 +259,9 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
       const stream = watchRun({ runId: id, id });
       if (stream && typeof stream[Symbol.asyncIterator] === "function") {
         for await (const event of stream) {
-          emitJson(event, io);
+          emitStreamLine(event, io);
         }
+        emitStreamSentinel(io);
         return;
       }
     }
@@ -362,8 +392,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
         throw new Error("notify watch operation is not available through the configured public API.");
       }
       for await (const event of caller.notify.watch(input)) {
-        emitJson(event, io);
+        emitStreamLine(event, io);
       }
+      emitStreamSentinel(io);
       return;
     }
     emitJson(await safeListNotifications(caller, input), io);
@@ -376,8 +407,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
       throw new Error("notify watch operation is not available through the configured public API.");
     }
     for await (const event of caller.notify.watch(input)) {
-      emitJson(event, io);
+      emitStreamLine(event, io);
     }
+    emitStreamSentinel(io);
     return;
   }
 
@@ -505,18 +537,77 @@ async function runFlags(sub: string, argv: readonly string[], caller: any, io: I
   unknown("flags", sub, io);
 }
 
+/**
+ * Emit a single command result. `--json` wraps `value` in the canonical
+ * `fulcrum.cli.v1` envelope; plain output renders the same data. `--jq` and
+ * `--json-raw` are honoured by the shared helper.
+ */
 function emitJson(value: unknown, io: Io): void {
-  io.print(JSON.stringify(value));
+  emitResult(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      result: value,
+      trace: { trace_id: io.ctx.traceId },
+      // Generated domain commands have no bespoke human renderer; plain output
+      // is the same result payload as compact JSON (one line, pipe-safe).
+      renderHuman: (result) => io.print(JSON.stringify(result)),
+    },
+    io,
+  );
 }
 
+/**
+ * Emit one envelope line of a JSONL stream. Each streamed item is a full
+ * canonical envelope sharing the invocation trace id; close the stream with
+ * `emitStreamSentinel`.
+ */
+function emitStreamLine(value: unknown, io: Io): void {
+  emitStreamEnvelope(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      result: value,
+      trace: { trace_id: io.ctx.traceId },
+      renderHuman: (result) => io.print(JSON.stringify(result)),
+    },
+    io,
+  );
+}
+
+/** Emit the JSONL end-of-stream sentinel for a streaming command. */
+function emitStreamSentinel(io: Io): void {
+  emitStreamEnd(io.ctx.argv, io.ctx.traceId, io);
+}
+
+/**
+ * Emit a failed command outcome and exit 1.
+ *
+ * Under `--json` the failure stays inside the canonical envelope (`result`
+ * null, the coded error in the always-array `errors` field). Under the
+ * `--json-raw` compatibility flag it keeps the legacy `{error:{code,message}}`
+ * shape. Plain mode writes the message to stderr. The `jsonMode` argument is a
+ * legacy hint; JSON detection is driven by the invocation argv so `--json-raw`
+ * is honoured too.
+ */
 function emitError(error: unknown, jsonMode: boolean, io: Io): void {
   const code = errorCode(error);
   const message = formatUnknownError(error);
-  if (jsonMode) {
-    io.print(JSON.stringify({ error: { code, message } }));
-  } else {
-    io.printErr(message);
-  }
+  const hasJsonFlag = io.ctx.argv.includes("--json") || io.ctx.argv.includes("--json-raw");
+  const wantsJson = jsonMode || hasJsonFlag;
+  emitErrorResult(
+    {
+      // Force a JSON exit when the caller asked for JSON either via the flag
+      // hint or the invocation argv; under `--json-raw` the legacy
+      // `{error:{code,message}}` shape is preserved.
+      argv: wantsJson && !hasJsonFlag ? [...io.ctx.argv, "--json"] : io.ctx.argv,
+      command: io.ctx.command,
+      error: { code, message, trace_id: io.ctx.traceId },
+      trace: { trace_id: io.ctx.traceId },
+      renderHuman: () => io.printErr(message),
+    },
+    io,
+  );
   io.exit(1);
 }
 

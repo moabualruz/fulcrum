@@ -90,7 +90,7 @@ describe("client workflow UAT client contract", () => {
       },
     });
 
-    await runPillar14Command("runs", ["dispatch", "--task", ids.taskId, "--agent", "codex", "--json"], dispatch.opts);
+    await runPillar14Command("runs", ["dispatch", "--task", ids.taskId, "--agent", "codex", "--json-raw"], dispatch.opts);
 
     expect(JSON.parse(dispatch.out[0] ?? "{}")).toMatchObject({
       runId: ids.runId,
@@ -117,7 +117,7 @@ describe("client workflow UAT client contract", () => {
       },
     });
 
-    await runPillar14Command("runs", ["watch", ids.runId, "--json"], watch.opts);
+    await runPillar14Command("runs", ["watch", ids.runId, "--json-raw"], watch.opts);
 
     expect(JSON.parse(watch.out[0] ?? "{}")).toMatchObject({
       id: ids.runId,
