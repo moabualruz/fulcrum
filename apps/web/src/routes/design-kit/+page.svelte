@@ -22,6 +22,7 @@
 		Alert,
 		Banner,
 		EmptyState,
+		ErrorBanner,
 		ToastRegion,
 		ToastStore,
 		Textarea,
@@ -231,6 +232,143 @@
 	let acpSide = $state<AcpDrawerSide>("right");
 	let traceCopied = $state<string | null>(null);
 	let traceAction = $state<string | null>(null);
+
+	// Empty / error state fixtures — COPY.md §2 + §3.
+	// The eight OD empty-states.html stages, each carrying the COPY.md §2 verbatim
+	// H2 / paragraph and a one-primary-plus-one-ghost action pair (never three).
+	type EmptyStateFixture = {
+		id: string;
+		stage: string;
+		route: string;
+		title: string;
+		description: string;
+		keyHint?: string;
+		primary: string;
+		ghost: string;
+		tone: "absence" | "steady";
+	};
+	const emptyStateFixtures: EmptyStateFixture[] = [
+		{
+			id: "capture-drafts",
+			stage: "Capture",
+			route: "/capture · drafts",
+			title: "No drafts yet.",
+			description:
+				"Drafts collect half-formed ideas. Press c to capture, or hand off from intake.",
+			keyHint: "Press c to capture.",
+			primary: "New draft",
+			ghost: "Open inbox",
+			tone: "absence",
+		},
+		{
+			id: "plan-prototypes",
+			stage: "Plan",
+			route: "/plan · prototypes",
+			title: "No prototypes yet.",
+			description:
+				"Prototypes appear when a planning session ships a draft. Start one to seed this list.",
+			primary: "Start planning",
+			ghost: "Open templates",
+			tone: "absence",
+		},
+		{
+			id: "build-list",
+			stage: "Build",
+			route: "/build · list",
+			title: "No tasks yet.",
+			description: "Materialize an approved plan, or press c to create a task directly.",
+			keyHint: "Press c to create a task.",
+			primary: "Materialize plan",
+			ghost: "New task",
+			tone: "absence",
+		},
+		{
+			id: "review-queue",
+			stage: "Review",
+			route: "/review · queue",
+			title: "No reviews waiting.",
+			description: "Items appear here when a task moves to in-review. Push something forward.",
+			primary: "Open board",
+			ghost: "View completed",
+			tone: "absence",
+		},
+		{
+			id: "ship-archive",
+			stage: "Ship",
+			route: "/ship · archive",
+			title: "No releases shipped.",
+			description: "Approved reviews send artifacts here. Cut a release once review is green.",
+			primary: "Open Ship",
+			ghost: "View artifacts",
+			tone: "absence",
+		},
+		{
+			id: "operate-alerts",
+			stage: "Operate",
+			route: "/operate · alerts",
+			title: "No alerts firing.",
+			description: "Doctor is quiet. Re-probe to refresh, or open telemetry for trends.",
+			primary: "Re-probe",
+			ghost: "Open telemetry",
+			tone: "steady",
+		},
+		{
+			id: "ai-assist-drawer",
+			stage: "AI Assist",
+			route: "⌘ / · drawer",
+			title: "No saved sessions yet.",
+			description: "Create a new session to begin. The thread persists with the run until you save it.",
+			primary: "Create session",
+			ghost: "Open run feed",
+			tone: "absence",
+		},
+		{
+			id: "knowledge-sources",
+			stage: "Knowledge",
+			route: "/system/knowledge",
+			title: "No indexed sources.",
+			description:
+				"Point Fulcrum at a folder, a URL, or an MCP and it indexes incrementally. Captured docs index automatically.",
+			primary: "Add source",
+			ghost: "Re-index now",
+			tone: "absence",
+		},
+	];
+
+	// COPY.md §3 inline error fixtures: [what failed]. [why]. [exact next step]. trace=<id>
+	type InlineErrorFixture = {
+		id: string;
+		title: string;
+		message: string;
+		traceId: string;
+		retryLabel: string;
+	};
+	const inlineErrorFixtures: InlineErrorFixture[] = [
+		{
+			id: "api-5xx",
+			title: "Fulcrum couldn't reach the local API.",
+			message: "The server may be restarting. Retry, or open the trace in Audit.",
+			traceId: "tr_4f3a1c9e2b7d",
+			retryLabel: "Retry",
+		},
+		{
+			id: "agent-run-failed",
+			title: "Run run_56e3d12 failed at step build.",
+			message: "Tool bash exited 1. Retry from the failed step, or view the transcript.",
+			traceId: "tr_56e3d12fa1b8",
+			retryLabel: "Retry from step",
+		},
+		{
+			id: "migration-mismatch",
+			title: "Database schema is out of date.",
+			message: "A pending migration has not run. Run fulcrum db migrate, then reload.",
+			traceId: "tr_db9a7c2e4f10",
+			retryLabel: "Retry",
+		},
+	];
+
+	let emptyStateBranch = $state<"populated" | "empty">("empty");
+	let errorStateBranch = $state<"populated" | "error">("error");
 </script>
 
 <svelte:head>
@@ -520,6 +658,148 @@
 					</button>
 				{/snippet}
 			</EmptyState>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="empty-state-stages"
+		>
+			<div class="flex items-baseline justify-between gap-3">
+				<h2 class="text-lg font-semibold">EmptyState · per-stage zero-data</h2>
+				<span class="text-xs text-muted-foreground"
+					>COPY.md §2 · one sentence + one action · never three buttons</span
+				>
+			</div>
+			<p class="text-sm text-muted-foreground">
+				The eight <code class="rounded bg-muted px-1 text-[11px]">empty-states.html</code> stages.
+				Each carries the COPY.md §2 verbatim H2 and paragraph, one primary verb action, and one
+				ghost escape hatch. The Operate card uses the
+				<code class="rounded bg-muted px-1 text-[11px]">steady</code> tone — empty is a healthy
+				steady state, not an absence.
+			</p>
+			<div class="flex flex-wrap items-center gap-1">
+				{#each ["empty", "populated"] as const as branch}
+					<button
+						type="button"
+						class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+						data-design-kit-empty-branch={branch}
+						aria-pressed={emptyStateBranch === branch}
+						onclick={() => (emptyStateBranch = branch)}
+					>
+						{branch}
+					</button>
+				{/each}
+				<span class="text-xs text-muted-foreground" data-design-kit-empty-branch-state>
+					Branch: {emptyStateBranch}
+				</span>
+			</div>
+			<div class="grid gap-3 sm:grid-cols-2" data-design-kit-empty-grid>
+				{#each emptyStateFixtures as fixture (fixture.id)}
+					<div
+						class="grid gap-2 rounded-md border border-border bg-surface-sunken p-3"
+						data-design-kit-empty-card={fixture.id}
+					>
+						<div
+							class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wide text-muted-foreground"
+						>
+							<span class="font-semibold">{fixture.stage}</span>
+							<span class="flex-1"></span>
+							<span>{fixture.route}</span>
+						</div>
+						{#if emptyStateBranch === "empty"}
+							<EmptyState
+								title={fixture.title}
+								description={fixture.description}
+								keyHint={fixture.keyHint}
+								tone={fixture.tone}
+							>
+								{#snippet icon()}
+									<span class="text-lg font-semibold" aria-hidden="true">○</span>
+								{/snippet}
+								{#snippet actions()}
+									<button
+										type="button"
+										class="rounded-md border border-border bg-accent px-3 py-1.5 text-sm font-medium text-primary-foreground"
+										data-design-kit-empty-primary={fixture.id}
+									>
+										{fixture.primary}
+									</button>
+									<button
+										type="button"
+										class="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+										data-design-kit-empty-ghost={fixture.id}
+									>
+										{fixture.ghost}
+									</button>
+								{/snippet}
+							</EmptyState>
+						{:else}
+							<div
+								class="grid place-items-center rounded-md border border-dashed border-border bg-card px-6 py-10 text-sm text-muted-foreground"
+								data-design-kit-empty-populated={fixture.id}
+							>
+								{fixture.stage} has data — the populated branch renders here.
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="inline-error"
+		>
+			<div class="flex items-baseline justify-between gap-3">
+				<h2 class="text-lg font-semibold">ErrorBanner · inline error state</h2>
+				<span class="text-xs text-muted-foreground"
+					>COPY.md §3 · [what failed]. [why]. [next step]. trace=&lt;id&gt;</span
+				>
+			</div>
+			<p class="text-sm text-muted-foreground">
+				Errors live inline at the surface where they happen — never as toasts. Every failure
+				carries a copyable trace id and an imperative recovery action. The COPY.md §3 hard-ban
+				list (generic apology copy, vague reassurance) is enforced by design-e2e.
+			</p>
+			<div class="flex flex-wrap items-center gap-1">
+				{#each ["error", "populated"] as const as branch}
+					<button
+						type="button"
+						class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+						data-design-kit-error-branch={branch}
+						aria-pressed={errorStateBranch === branch}
+						onclick={() => (errorStateBranch = branch)}
+					>
+						{branch}
+					</button>
+				{/each}
+				<span class="text-xs text-muted-foreground" data-design-kit-error-branch-state>
+					Branch: {errorStateBranch}
+				</span>
+			</div>
+			<div class="grid gap-3" data-design-kit-error-grid>
+				{#each inlineErrorFixtures as fixture (fixture.id)}
+					<div data-design-kit-error-card={fixture.id}>
+						{#if errorStateBranch === "error"}
+							<ErrorBanner
+								title={fixture.title}
+								message={fixture.message}
+								traceId={fixture.traceId}
+								surface="block"
+								retryLabel={fixture.retryLabel}
+								onRetry={() => {}}
+							/>
+						{:else}
+							<div
+								class="rounded-md border border-dashed border-border bg-surface-sunken px-4 py-6 text-sm text-muted-foreground"
+								data-design-kit-error-populated={fixture.id}
+							>
+								This surface is healthy — the populated branch renders here.
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
 		</article>
 
 		<article

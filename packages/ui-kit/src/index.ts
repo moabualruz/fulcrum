@@ -166,7 +166,7 @@ export {
 	EmptyState,
 	Root as EmptyStateRoot,
 } from "./components/empty-state/index.js";
-export type { EmptyStateProps } from "./components/empty-state/index.js";
+export type { EmptyStateProps, EmptyStateTone } from "./components/empty-state/index.js";
 export {
 	ToastRegion,
 	Region as ToastRegionRoot,
