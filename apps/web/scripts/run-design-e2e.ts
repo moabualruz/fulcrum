@@ -19,9 +19,12 @@
  * specs can import it directly — proving the harness is consumed, not dead.
  * Importing this module never boots a server or a browser; only running it as
  * the entrypoint does (guarded by `import.meta.main`). Capturing a route is
- * unconditional: the harness never hard-fails because an OD shell primitive is
- * absent — asserting StageRail / ScopeBar / StatusFooter presence is OUT OF
- * SCOPE here and owned by `prd-design-gate-shell-assertions`.
+ * unconditional: the harness capture phase never hard-fails because an OD
+ * shell primitive is absent. The StageRail / ScopeBar / StatusFooter /
+ * TraceBadge / AI Assist presence assertions are owned by
+ * `prd-design-gate-shell-assertions` and live in the wave-2
+ * `shell-presence.spec.ts`, which this harness runs as part of the default
+ * `test:design` spec list (`DEFAULT_DESIGN_SPECS`).
  */
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
@@ -206,17 +209,30 @@ export const ACCESSIBILITY_SPECS = [
 	"tests/design-e2e/forced-colors.spec.ts",
 ] as const;
 
+/**
+ * The wave-2 shell-presence design gate (`prd-design-gate-shell-assertions`).
+ *
+ * The harness itself (wave 0) is assertion-free — it boots a server and
+ * captures screenshots but never asserts OD shell primitives, because those
+ * are wave-1 deliverables. `shell-presence.spec.ts` is the shell-assertions
+ * half of the split gate: it drives the six required production routes and
+ * asserts StageRail / ScopeBar / StatusFooter / TraceBadge / AI Assist render.
+ * It is part of the default `test:design` gate so a route that loses the OD
+ * shell fails the gate — the gate is real and can self-resolve.
+ */
+export const SHELL_PRESENCE_SPEC = "tests/design-e2e/shell-presence.spec.ts";
+
 /** The full default spec list `test:design` runs when no specs are requested. */
-export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, ...ACCESSIBILITY_SPECS];
+export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, SHELL_PRESENCE_SPEC, ...ACCESSIBILITY_SPECS];
 
 /**
  * Resolve the spec list for the spec-suite phase. When specs are passed
  * explicitly the harness runs exactly those (used by sibling PRDs to drive
- * specific design-e2e specs). With no args it runs the harness spec plus the
- * cross-cutting reduced-motion + forced-colors specs — the foundation
- * accessibility gate every rendered shell must pass (`DESIGN.md §1.6`).
- * The broader per-surface OD-fidelity spec coverage is owned by those
- * per-surface PRDs.
+ * specific design-e2e specs). With no args it runs the harness spec, the
+ * wave-2 shell-presence gate (`shell-presence.spec.ts`), and the cross-cutting
+ * reduced-motion + forced-colors specs — the foundation shell + accessibility
+ * gate every rendered shell must pass (`DESIGN.md §1.6`, §3.1). The broader
+ * per-surface OD-fidelity spec coverage is owned by those per-surface PRDs.
  */
 function resolveSpecs(requestedSpecs: string[]): string[] {
 	return requestedSpecs.length > 0 ? requestedSpecs : [...DEFAULT_DESIGN_SPECS];
