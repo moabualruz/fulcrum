@@ -52,6 +52,22 @@
     </div>
   </header>
 
+  <!--
+    The OD live session pane (DESIGN.md §8 — list / plan strip / transcript /
+    workspace dock, tool-call cards, inline diffs, permission prompts,
+    checkpoint timeline, abort modal) is delivered on the canonical Build runs
+    surface. This fixture is preserved for its existing coverage but defers the
+    live-session experience to `/build-runs`, so run detail does not duplicate.
+  -->
+  <a
+    data-run-detail-canonical-pane
+    href="/build-runs"
+    class="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+  >
+    <span aria-hidden="true">⏵</span>
+    <span>Open the live session pane on the Build runs feed.</span>
+  </a>
+
   <section data-run-workflow-summary class="grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-4">
     <div><h2 class="text-sm font-semibold">Live state</h2><p data-run-live-state class="mt-1 text-xs text-muted-foreground">Status running · elapsed 8m</p></div>
     <div><h2 class="text-sm font-semibold">Workflow</h2><a data-run-workflow-link href="/projects/project_alpha/runs" class="mt-1 block text-xs text-primary hover:underline">Project runs</a></div>

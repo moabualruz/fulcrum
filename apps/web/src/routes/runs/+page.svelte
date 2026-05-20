@@ -70,6 +70,24 @@
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Agent runs</h1>
 </header>
 
+<!--
+  The OD-faithful Build runs feed + live session pane (DESIGN.md §8/§9) is the
+  canonical runs surface. This table view keeps the live data wiring (dispatch,
+  filters, reassignment) but defers the runs-feed + live-session experience to
+  `/build-runs`, so the runs surfaces converge instead of duplicating.
+-->
+<a
+  data-runs-canonical-feed
+  href="/build-runs"
+  class={cn(
+    "mb-4 flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2",
+    "text-sm text-muted-foreground hover:bg-muted hover:text-foreground",
+  )}
+>
+  <span aria-hidden="true">⏵</span>
+  <span>Open the live Build runs feed — runs feed, transcript, tool-call cards, and inline diffs.</span>
+</a>
+
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
 {:then payload}
