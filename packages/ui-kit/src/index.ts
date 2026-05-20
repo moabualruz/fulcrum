@@ -282,11 +282,13 @@ export {
 	CommandPaletteList,
 	CommandPaletteItem,
 	CommandPaletteEmpty,
+	CommandPaletteGroup,
 	Root as CommandPaletteRoot,
 	Input as CommandPaletteInputRoot,
 	List as CommandPaletteListRoot,
 	Item as CommandPaletteItemRoot,
 	Empty as CommandPaletteEmptyRoot,
+	Group as CommandPaletteGroupRoot,
 } from "./components/command-palette/index.js";
 export type {
 	CommandPaletteProps,
@@ -294,6 +296,7 @@ export type {
 	CommandPaletteListProps,
 	CommandPaletteItemProps,
 	CommandPaletteEmptyProps,
+	CommandPaletteGroupProps,
 } from "./components/command-palette/index.js";
 export {
 	Tabs,

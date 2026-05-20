@@ -10,6 +10,7 @@
 
 	let {
 		ref = $bindable(null),
+		value = $bindable(""),
 		class: className,
 		...restProps
 	}: CommandPaletteInputProps = $props();
@@ -31,6 +32,7 @@
 	</svg>
 	<CommandPrimitive.Input
 		bind:ref
+		bind:value
 		data-slot="command-palette-input"
 		class={cn(
 			"h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground",

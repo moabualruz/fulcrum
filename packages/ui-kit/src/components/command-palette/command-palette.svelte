@@ -23,9 +23,17 @@
 <DialogPrimitive.Root bind:open>
 	<DialogPrimitive.Portal>
 		<DialogPrimitive.Overlay class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+		<!--
+			Positioning is set via inline `style` rather than Tailwind arbitrary
+			utilities (`top-[12vh]`, `-translate-x-1/2`): a consumer app's Tailwind
+			content scan does not always reach this package's source, so arbitrary
+			classes can silently no-op. The inline style guarantees the palette
+			renders as a top-anchored centred overlay in every consumer.
+		-->
 		<DialogPrimitive.Content
+			style="position:fixed;left:50%;top:12vh;transform:translateX(-50%);z-index:50;width:100%;"
 			class={cn(
-				"fixed left-1/2 top-[15%] z-50 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-md border border-border bg-card shadow-2xl",
+				"max-w-lg overflow-hidden rounded-md border border-border bg-card shadow-2xl",
 				className,
 			)}
 		>
