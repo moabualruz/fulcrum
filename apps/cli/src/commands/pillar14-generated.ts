@@ -6,6 +6,7 @@ import {
   emitResult,
   emitStreamEnd,
   emitStreamEnvelope,
+  emitStreamTraceLine,
 } from "../lib/cli-output.ts";
 import { newTraceId } from "../lib/envelope.ts";
 import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
@@ -32,6 +33,8 @@ interface EnvelopeContext {
   argv: readonly string[];
   /** Stable trace id for the whole invocation — shared by every envelope line. */
   traceId: string;
+  /** Process env — drives the CLI-TUI-UX §2.3 colour-disable conditions. */
+  env: NodeJS.ProcessEnv;
 }
 
 type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">> & {
@@ -82,6 +85,7 @@ export async function runPillar14Command(
       command: `fulcrum ${domain} ${sub}`.trim(),
       argv: rest,
       traceId: newTraceId((opts.env ?? process.env) as NodeJS.ProcessEnv),
+      env: (opts.env ?? process.env) as NodeJS.ProcessEnv,
     },
   };
 
@@ -220,6 +224,8 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     if (watch) {
       // Streaming command: emit one canonical envelope per JSONL line, then a
       // `{schema,result:null,end:true,trace_id}` end sentinel (CLI-TUI-UX §3).
+      // Plain mode prints the DESIGN.md §4.10 trace line once before streaming.
+      emitStreamLineHeader(io);
       const POLL_MS = 1000;
       const MAX_WAIT_MS = 300_000;
       const start = Date.now();
@@ -258,6 +264,8 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     if (typeof watchRun === "function") {
       const stream = watchRun({ runId: id, id });
       if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+        // Plain mode prints the §4.10 trace line once before streaming events.
+        emitStreamLineHeader(io);
         for await (const event of stream) {
           emitStreamLine(event, io);
         }
@@ -539,8 +547,9 @@ async function runFlags(sub: string, argv: readonly string[], caller: any, io: I
 
 /**
  * Emit a single command result. `--json` wraps `value` in the canonical
- * `fulcrum.cli.v1` envelope; plain output renders the same data. `--jq` and
- * `--json-raw` are honoured by the shared helper.
+ * `fulcrum.cli.v1` envelope; plain output renders the same data plus the
+ * DESIGN.md §4.10 trace header line so the run is followable across surfaces.
+ * `--jq` and `--json-raw` are honoured by the shared helper.
  */
 function emitJson(value: unknown, io: Io): void {
   emitResult(
@@ -549,6 +558,9 @@ function emitJson(value: unknown, io: Io): void {
       command: io.ctx.command,
       result: value,
       trace: { trace_id: io.ctx.traceId },
+      // Plain output prints the same `trace_id` the `--json` envelope carries.
+      traceLine: true,
+      env: io.ctx.env,
       // Generated domain commands have no bespoke human renderer; plain output
       // is the same result payload as compact JSON (one line, pipe-safe).
       renderHuman: (result) => io.print(JSON.stringify(result)),
@@ -581,6 +593,18 @@ function emitStreamSentinel(io: Io): void {
 }
 
 /**
+ * Print the DESIGN.md §4.10 plain-text trace header line once, before a
+ * streaming command starts emitting events. No-op under `--json` (the JSONL
+ * stream must not be interleaved with a non-JSON line).
+ */
+function emitStreamLineHeader(io: Io): void {
+  emitStreamTraceLine(
+    { argv: io.ctx.argv, trace: { trace_id: io.ctx.traceId }, env: io.ctx.env },
+    io,
+  );
+}
+
+/**
  * Emit a failed command outcome and exit 1.
  *
  * Under `--json` the failure stays inside the canonical envelope (`result`
@@ -602,13 +626,22 @@ function emitError(error: unknown, jsonMode: boolean, io: Io): void {
       // `{error:{code,message}}` shape is preserved.
       argv: wantsJson && !hasJsonFlag ? [...io.ctx.argv, "--json"] : io.ctx.argv,
       command: io.ctx.command,
-      error: { code, message, trace_id: io.ctx.traceId },
+      // The error carries the invocation trace id; plain mode prints the
+      // COPY.md §3 recovery block (message + Fix + trace=<id>) to stderr.
+      error: { code, message, trace_id: io.ctx.traceId, fix: recoveryFix(io.ctx.command) },
       trace: { trace_id: io.ctx.traceId },
+      env: io.ctx.env,
       renderHuman: () => io.printErr(message),
     },
     io,
   );
   io.exit(1);
+}
+
+/** The `Fix:` action surfaced in a plain-mode error — the command's own help. */
+function recoveryFix(command: string): string {
+  const domain = command.split(/\s+/)[1] ?? "runs";
+  return `fulcrum ${domain} --help`;
 }
 
 function errorCode(error: unknown): string {

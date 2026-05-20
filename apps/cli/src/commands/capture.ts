@@ -1,5 +1,5 @@
-import { formatApiError } from "../api-errors.ts";
-import { emitResult } from "../lib/cli-output.ts";
+import { apiErrorCode, formatApiError } from "../api-errors.ts";
+import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
 type CaptureStatus = "triage" | "review" | "approved";
 type CaptureQuickAction = "assign" | "block" | "approve" | "escalate";
@@ -84,7 +84,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           note: requiredFlag(rest, "--note", "review"),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, "fulcrum capture review", rest, io.print);
+        printOutput(result, "fulcrum capture review", rest, io.print, opts.env);
         return;
       }
       case "status": {
@@ -94,7 +94,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           status: parseStatus(requiredFlag(rest, "--status", "status")),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, "fulcrum capture status", rest, io.print);
+        printOutput(result, "fulcrum capture status", rest, io.print, opts.env);
         return;
       }
       case "action":
@@ -107,7 +107,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
           reason: flagValue(rest, "--reason"),
           traceId: flagValue(rest, "--trace"),
         });
-        printOutput(result, `fulcrum capture ${verb}`, rest, io.print);
+        printOutput(result, `fulcrum capture ${verb}`, rest, io.print, opts.env);
         return;
       }
       case "help":
@@ -121,7 +121,22 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
         io.exit(2);
     }
   } catch (error) {
-    io.printErr(`fulcrum capture ${verb}: ${formatApiError(error)}`);
+    // The failure carries recovery copy + the trace reference (COPY.md §3 /
+    // CLI-TUI-UX §5) so a CLI error is followable in web / TUI by the same id.
+    emitErrorResult(
+      {
+        argv: rest,
+        command: `fulcrum capture ${verb}`,
+        error: {
+          code: apiErrorCode(error) ?? "FUL_CAPTURE_FAILED",
+          message: `fulcrum capture ${verb}: ${formatApiError(error)}`,
+          fix: "fulcrum capture --help",
+        },
+        env: opts.env as NodeJS.ProcessEnv | undefined,
+        renderHuman: () => io.printErr(`fulcrum capture ${verb}: ${formatApiError(error)}`),
+      },
+      io,
+    );
     io.exit(1);
   }
 }
@@ -161,18 +176,22 @@ function printOutput(
   command: string,
   argv: readonly string[],
   print: (line: string) => void,
+  env: CaptureApiEnvironment | undefined,
 ): void {
   // `--json` wraps the same `result` data in the canonical `fulcrum.cli.v1`
-  // envelope; plain output renders the same fields. The result's own trace id
-  // propagates into the envelope so the two surfaces stay correlatable.
+  // envelope; plain output renders the same fields plus the DESIGN.md §4.10
+  // trace header line. The result's own trace id propagates into both surfaces
+  // so a capture action started here is followable in web / TUI by the same id.
   emitResult(
     {
       argv,
       command,
       result,
       trace: { trace_id: normalizeTraceId(result.traceId) },
+      traceLine: true,
+      env: env as NodeJS.ProcessEnv | undefined,
       renderHuman: (value) => {
-        print(`${value.captureId} ${value.status} ${value.action} trace=${value.traceId}`);
+        print(`${value.captureId} ${value.status} ${value.action}`);
         print(value.message);
       },
     },

@@ -246,7 +246,13 @@ describe("P14#08 generated domain CLI contracts", () => {
 
     expect(h.exitCode).toBe(1);
     expect(JSON.parse(h.lines[0] as string).error.message).toBe("run 'missing' not found");
-    expect(h.errLines).toContain("run 'missing' not found");
+    // Plain-mode `runs watch missing` prints the COPY.md §3 recovery block:
+    // the message, a `Fix:` action, and the `trace=<id>` reference.
+    expect(
+      h.errLines.some(
+        (line) => line.includes("run 'missing' not found") && /trace=[0-9a-f]{32}/.test(line),
+      ),
+    ).toBe(true);
     expect(JSON.parse(h.lines[1] as string).error.message).toBe("runs dispatch: missing --task");
   });
 
@@ -265,7 +271,13 @@ describe("P14#08 generated domain CLI contracts", () => {
 
       expect(h.lines).toEqual(["{\"event\":\"one\"}", "{\"event\":\"two\"}"]);
       expect(h.exitCode).toBe(1);
-      expect(h.errLines).toContain("no log file for run 'run-1'");
+      // Plain-mode error carries the COPY.md §3 recovery block + `trace=<id>`.
+      expect(
+        h.errLines.some(
+          (line) =>
+            line.includes("no log file for run 'run-1'") && /trace=[0-9a-f]{32}/.test(line),
+        ),
+      ).toBe(true);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

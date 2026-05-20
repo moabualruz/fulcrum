@@ -24,10 +24,12 @@ import {
   type EnvelopeInput,
   type EnvelopeNextAction,
   type EnvelopeStreamSentinel,
+  resolveTraceIdentity,
   serializeEnvelope,
   streamSentinel,
   wrapEnvelope,
 } from "./envelope.ts";
+import { formatErrorRecovery, formatTraceLine } from "./trace-line.ts";
 
 /** Output sink — defaults bind to the process streams. */
 export interface OutputIo {
@@ -64,6 +66,45 @@ export interface EmitResultInput<TResult> extends EnvelopeInput<TResult> {
   argv: readonly string[];
   /** Human renderer invoked when `--json` is absent. Receives the same result. */
   renderHuman: (result: TResult) => void;
+  /**
+   * When set, plain (non-`--json`) output prints the `DESIGN.md` §4.10 trace
+   * header line after `renderHuman` — the cross-surface trace spine. Pass
+   * `true` for the default line, or an object to also show the `span:` segment.
+   * The line uses the SAME resolved trace identity the `--json` envelope
+   * carries, so plain and JSON output for one invocation stay correlatable.
+   */
+  traceLine?: boolean | { withSpan?: boolean };
+  /** Process env — drives `CLI-TUI-UX.md` §2.3 colour-disable detection. */
+  env?: NodeJS.ProcessEnv;
+}
+
+/** Resolve whether the trace line is requested and with which options. */
+function traceLineOptions(
+  flag: boolean | { withSpan?: boolean } | undefined,
+): { withSpan: boolean } | undefined {
+  if (!flag) return undefined;
+  return { withSpan: flag === true ? false : Boolean(flag.withSpan) };
+}
+
+/**
+ * Print the `DESIGN.md` §4.10 plain-text trace header line for one invocation.
+ * Shared by `emitResult` / `emitStreamEnvelope` so plain output always carries
+ * the same trace identity as the `--json` envelope.
+ */
+function printTraceLine<TResult>(
+  input: EmitResultInput<TResult>,
+  io: OutputIo,
+  lineOpts: { withSpan: boolean },
+): void {
+  // Resolve identity exactly as `wrapEnvelope` does — same id in both surfaces.
+  const identity = resolveTraceIdentity(input.trace, input.env);
+  io.print(
+    formatTraceLine(identity, {
+      withSpan: lineOpts.withSpan,
+      env: input.env,
+      argv: input.argv,
+    }),
+  );
 }
 
 /**
@@ -113,6 +154,8 @@ export function emitResult<TResult>(input: EmitResultInput<TResult>, io: OutputI
   const mode = parseJsonOutputMode(input.argv);
   if (!mode.json) {
     input.renderHuman(input.result);
+    const lineOpts = traceLineOptions(input.traceLine);
+    if (lineOpts) printTraceLine(input, io, lineOpts);
     return;
   }
   if (mode.raw) {
@@ -146,6 +189,8 @@ export function emitStreamEnvelope<TResult>(input: EmitResultInput<TResult>, io:
     input.renderHuman(input.result);
     return;
   }
+  // Streaming JSONL never interleaves a plain trace line into the stream — the
+  // trace line for a streaming run is printed once by `emitStreamTraceLine`.
   if (mode.raw) {
     io.print(JSON.stringify(input.result));
     return;
@@ -174,7 +219,45 @@ export function emitStreamEnd(argv: readonly string[], traceId: string, io: Outp
   io.print(serializeEnvelope(streamSentinel(traceId)));
 }
 
-/** Emit a failed command outcome as a canonical envelope with a populated `errors` array. */
+/**
+ * Print the plain-text trace header line for a streaming run-bearing command.
+ *
+ * Streaming JSONL must not interleave a plain line, so a `runs feed --watch`
+ * style command calls this once *before* it starts streaming when `--json` is
+ * absent — the same `DESIGN.md` §4.10 line a non-streaming command prints.
+ */
+export function emitStreamTraceLine(
+  input: {
+    argv: readonly string[];
+    trace?: EnvelopeInput<null>["trace"];
+    env?: NodeJS.ProcessEnv;
+    withSpan?: boolean;
+  },
+  io: OutputIo,
+): void {
+  const mode = parseJsonOutputMode(input.argv);
+  if (mode.json) return;
+  const identity = resolveTraceIdentity(input.trace, input.env);
+  io.print(
+    formatTraceLine(identity, {
+      withSpan: Boolean(input.withSpan),
+      env: input.env,
+      argv: input.argv,
+    }),
+  );
+}
+
+/**
+ * Emit a failed command outcome.
+ *
+ * Under `--json` the failure stays inside the canonical envelope (`result`
+ * null, the coded error in the always-array `errors` field). Under `--json-raw`
+ * the legacy `{error:{code,message}}` shape is kept for one release. In plain
+ * mode it prints the `COPY.md` §3 / `CLI-TUI-UX.md` §5 recovery block — the
+ * error message, the `Fix:` action, and `trace=<id>` — to stderr, so a CLI
+ * failure is followable in web / TUI by the same trace id. The `renderHuman`
+ * callback is the fallback for commands that have no structured recovery copy.
+ */
 export function emitErrorResult(
   input: {
     argv: readonly string[];
@@ -183,12 +266,32 @@ export function emitErrorResult(
     error: EnvelopeError;
     next_actions?: EnvelopeNextAction[];
     trace?: EnvelopeInput<null>["trace"];
+    env?: NodeJS.ProcessEnv;
     renderHuman: () => void;
+    /**
+     * When `true` (the default), plain-mode failures print the structured
+     * `COPY.md` §3 recovery block instead of `renderHuman`. Pass `false` only
+     * for commands that own a bespoke plain error renderer.
+     */
+    recoveryCopy?: boolean;
   },
   io: OutputIo,
 ): void {
   const mode = parseJsonOutputMode(input.argv);
   if (!mode.json) {
+    const useRecoveryCopy = input.recoveryCopy ?? true;
+    if (useRecoveryCopy) {
+      // The trace id printed for follow-up is the same one the envelope carries.
+      const identity = resolveTraceIdentity(input.trace, input.env);
+      io.printErr(
+        formatErrorRecovery(input.error, {
+          traceId: input.error.trace_id ?? identity.trace_id,
+          env: input.env,
+          argv: input.argv,
+        }),
+      );
+      return;
+    }
     input.renderHuman();
     return;
   }

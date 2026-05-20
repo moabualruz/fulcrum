@@ -6,6 +6,8 @@ export interface AiCommandOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
+  /** Process env — drives the CLI-TUI-UX §2.3 colour-disable conditions. */
+  env?: NodeJS.ProcessEnv;
 }
 
 const HELP = `fulcrum ai
@@ -47,7 +49,10 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
         workspacePath: flagValue(rest, "--workspace"),
       });
       // `--json` wraps the session in the canonical `fulcrum.cli.v1` envelope;
-      // plain output pretty-prints the same session object.
+      // plain output pretty-prints the same session object plus the DESIGN.md
+      // §4.10 trace header line — starting an AI Assist session is a run, and
+      // its trace id is the same one the envelope carries (and `FULCRUM_TRACE_ID`
+      // propagates) so the session is followable in web / TUI.
       emitResult(
         {
           argv: rest,
@@ -56,6 +61,8 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
           next_actions: [
             { label: "Open in TUI", command: "fulcrum tui :ai" },
           ],
+          traceLine: true,
+          env: opts.env,
           renderHuman: (value) => io.print(JSON.stringify(value, null, 2)),
         },
         { print: io.print, printErr: io.printErr },
