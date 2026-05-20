@@ -9,6 +9,8 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 import { TASK_STATUSES, type TuiTask } from "./task-types.ts";
 import {
   renderStageWorkbenchFooter,
@@ -64,8 +66,22 @@ export class TaskBoardScreen {
   private createDraft: TaskCreateDraft = { title: "" };
   private createError: string | null = null;
   private loadError: string | null = null;
+  /** The focused task-card Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "task",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: TaskBoardScreenOptions) {}
+
+  /** The Step mode currently selected on the focused task card (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
 
   /** The OD stage-scope chrome for the Build · Board workbench. */
   private get scope(): StageWorkbenchScope {
@@ -131,7 +147,14 @@ export class TaskBoardScreen {
       renderer.writeln();
     }
 
-    renderer.writeln(c.dim("  h/l move  Enter detail  c create  q back"));
+    // ModePicker row for the focused task-card Step (acceptance: Step-bearing rows).
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+    renderer.writeln(c.dim("  h/l move  Enter detail  c create  m mode  q back"));
 
     if (this.createActive) {
       renderer.writeln();
@@ -150,6 +173,10 @@ export class TaskBoardScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`). Checked
+    // before list nav so an armed selector key is not stolen by h/l/j/k.
+    if (this.modePicker.handleChordKey(key)) return true;
+
     if (key === "h" || key === "\x1b[D") return this.moveCurrent(-1);
     if (key === "l" || key === "\x1b[C") return this.moveCurrent(1);
 

@@ -10,6 +10,7 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 import {
   renderStageWorkbenchFooter,
   renderStageWorkbenchHeader,
@@ -88,8 +89,22 @@ export class ArtifactsScreen {
   private filters: TuiArtifactFilters = {};
   private selectedIds = new Set<string>();
   private error: string | null = null;
+  /** The focused artifact-row Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "artifact",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: ArtifactsScreenOptions) {}
+
+  /** The Step mode currently selected on the focused artifact row (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
 
   /** The OD stage-scope chrome for the Ship workbench. */
   private get scope(): StageWorkbenchScope {
@@ -159,8 +174,17 @@ export class ArtifactsScreen {
     }
     for (const line of this.previewLines) renderer.writeln(truncateWide(`  ${line}`, Math.max(20, renderer.width)));
 
+    // ModePicker row for the focused artifact-row Step (acceptance: Step-bearing rows).
     renderer.writeln();
-    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  Enter preview  q back", Math.max(20, renderer.width))));
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+
+    renderer.writeln();
+    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m mode  Enter preview  q back", Math.max(20, renderer.width))));
 
     if (this.overlay === "upload") {
       renderer.writeln();
@@ -226,6 +250,10 @@ export class ArtifactsScreen {
       this.overlay = "none";
       return true;
     }
+
+    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`). Checked
+    // before the nav/action keys so an armed selector is not stolen by them.
+    if (this.overlay === "none" && this.modePicker.handleChordKey(key)) return true;
 
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.artifacts.length - 1));

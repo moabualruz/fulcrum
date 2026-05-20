@@ -753,3 +753,177 @@ describe("TUI status vocabulary + empty/error contract — runs/planning/review"
     expect(snap).toContain("⏸ BLOCKED");
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-step-modepicker-006 — the shared per-Step ModePicker row.
+//
+// Every Step-bearing TUI screen renders one ModePicker row carrying the four
+// canonical modes — ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist — the same
+// action set as the web `@fulcrum/ui-kit` ModeRow. The modes are reached
+// through a collision-free `m` chord. These tests are the terminal-snapshot
+// proof that the row + its key hints render on the representative screens
+// runs-screen / review-screen / task-board / artifacts / doctor, and that the
+// `m` chord drives a mode selection without colliding with screen keys.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("TUI per-Step ModePicker — runs / review / board / artifacts / doctor", () => {
+  async function renderAsync(
+    cols: number,
+    rows: number,
+    screen: { load: () => Promise<void>; render: (r: Renderer) => void },
+  ): Promise<string> {
+    const { Renderer } = await import("../renderer.ts");
+    await screen.load();
+    const tty = new FakeTTY({ columns: cols, rows });
+    screen.render(new Renderer(tty));
+    return tty.plainText();
+  }
+
+  function assertModeRow(snap: string): void {
+    // The row label + all four mode labels (copy_assertion).
+    expect(snap).toContain("step modes");
+    expect(snap).toContain("✋ Manual");
+    expect(snap).toContain("▶ Play");
+    expect(snap).toContain("💬 Discuss");
+    expect(snap).toContain("⊞ AI Assist");
+    // The collision-free `m`-chord key hints (interaction_assertion).
+    expect(snap).toContain("[m a]");
+    expect(snap).toContain("[m i]");
+  }
+
+  test("Build runs workbench (runs-screen.ts) renders the ModePicker row", async () => {
+    const { RunsControlScreen } = await import("../screens/runs-screen.ts");
+    const screen = new RunsControlScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [
+            { id: "run-1", agent: "codex", status: "running", taskTitle: "t", projectName: "p" },
+          ],
+          dispatch: async () => ({ id: "x", agent: "codex", status: "queued" }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "run-1", agent: "codex", status: "running" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+    assertModeRow(await renderAsync(120, 32, screen));
+  });
+
+  test("Review workbench (review-screen.ts) renders the ModePicker row", async () => {
+    const { ReviewScreen } = await import("../screens/review-screen.ts");
+    const screen = new ReviewScreen({
+      caller: {
+        reviews: {
+          listSessions: async () => [
+            { id: "r1", title: "PR #4218", status: "in_progress", reviewer: "jb" },
+          ],
+          getSession: async () => ({ id: "r1", title: "PR #4218", status: "in_progress" }),
+          startReview: async () => ({ id: "r2", title: "new", status: "draft" }),
+          approve: async () => ({ ok: true }),
+          requestChanges: async () => ({ ok: true }),
+          saveSession: async () => ({ ok: true }),
+        },
+      },
+    });
+    assertModeRow(await renderAsync(120, 32, screen));
+  });
+
+  test("Build board workbench (task-board.ts) renders the ModePicker row", async () => {
+    const { TaskBoardScreen } = await import("../screens/task-board.ts");
+    const screen = new TaskBoardScreen({
+      caller: {
+        tasks: {
+          list: async () => [{ id: "t1", orgId: "o", title: "rate limit", status: "todo" }],
+          update: async (i) => ({ id: i.id, orgId: "o", title: "x", status: i.status }),
+          create: async (i) => ({ id: "t2", orgId: "o", title: i.title, status: i.status }),
+        },
+      },
+    });
+    assertModeRow(await renderAsync(120, 32, screen));
+  });
+
+  test("Ship artifacts workbench (artifacts.ts) renders the ModePicker row", async () => {
+    const { ArtifactsScreen } = await import("../screens/artifacts.ts");
+    const screen = new ArtifactsScreen({
+      caller: {
+        artifacts: {
+          list: async () => [
+            { id: "a1", filename: "build.log", mime: "text/plain", path: "/a/build.log" },
+          ],
+          get: async () => null,
+          upload: async () => ({ id: "a2", path: "/a/x" }),
+          download: async () => ({ ok: true, path: "/a/x" }),
+          archive: async () => ({ ok: true, id: "a1" }),
+          delete: async () => ({ ok: true, id: "a1" }),
+        },
+      },
+    });
+    assertModeRow(await renderAsync(140, 40, screen));
+  });
+
+  test("Operate doctor workbench (doctor.ts) renders the ModePicker row", async () => {
+    const { DoctorScreen } = await import("../screens/doctor.ts");
+    const { Renderer } = await import("../renderer.ts");
+    const screen = new DoctorScreen({
+      results: [
+        {
+          name: "tui.render",
+          subsystem: "tui",
+          status: "ok",
+          message: "render gate passes",
+          durationMs: 4,
+        },
+      ],
+    });
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    screen.render(new Renderer(tty));
+    assertModeRow(tty.plainText());
+  });
+
+  test("the `m` chord selects a Step mode on the runs workbench without colliding", async () => {
+    const { RunsControlScreen } = await import("../screens/runs-screen.ts");
+    const screen = new RunsControlScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [
+            { id: "run-1", agent: "codex", status: "running", taskTitle: "t", projectName: "p" },
+          ],
+          dispatch: async () => ({ id: "x", agent: "codex", status: "queued" }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "run-1", agent: "codex", status: "running" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+    await screen.load();
+
+    // Bare `m` arms the chord; the selector commits the mode — `m d` → Discuss.
+    expect(await screen.handleKey("m")).toBe(true);
+    expect(await screen.handleKey("d")).toBe(true);
+    expect(screen.currentStepMode).toBe("discuss");
+
+    // Without the `m` prefix a bare `d` is the screen's own dispatch action,
+    // never a mode selection — the chord does not shadow screen keys.
+    expect(screen.currentStepMode).toBe("discuss");
+    expect(await screen.handleKey("d")).toBe(true); // dispatch overlay, not a mode
+    expect(screen.currentStepMode).toBe("discuss");
+  });
+
+  test("the `m` chord selects a Step mode on the doctor workbench", async () => {
+    const { DoctorScreen } = await import("../screens/doctor.ts");
+    const screen = new DoctorScreen({
+      results: [
+        {
+          name: "tui.render",
+          subsystem: "tui",
+          status: "ok",
+          message: "ok",
+          durationMs: 2,
+        },
+      ],
+    });
+    expect(await screen.handleKey("m")).toBe(true);
+    expect(await screen.handleKey("i")).toBe(true);
+    expect(screen.currentStepMode).toBe("assist");
+  });
+});

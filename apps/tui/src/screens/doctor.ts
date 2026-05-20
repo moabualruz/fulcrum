@@ -13,6 +13,8 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { DoctorCheckResult } from "@platform-core/interface/doctor-results.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 import {
   renderStageWorkbenchFooter,
   renderStageWorkbenchHeader,
@@ -73,10 +75,24 @@ export class DoctorScreen {
   private cursor = 0;
   private expanded = new Set<string>();
   private readonly subsystem: string;
+  /** The focused subsystem-row Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "subsystem",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: DoctorScreenOptions = {}) {
     this.results = opts.results ?? [];
     this.subsystem = opts.subsystem ?? "tui";
+  }
+
+  /** The Step mode currently selected on the focused subsystem row (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
   }
 
   /** The OD stage-scope chrome for the Operate workbench. */
@@ -108,6 +124,8 @@ export class DoctorScreen {
       this.opts.onExit?.();
       return true;
     }
+    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`).
+    if (this.modePicker.handleChordKey(key)) return true;
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.results.length - 1));
       return true;
@@ -172,8 +190,16 @@ export class DoctorScreen {
       }
     }
 
+    // ModePicker row for the focused subsystem-row Step (acceptance: Step-bearing rows).
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+
     renderer.separator();
-    renderer.writeln(c.dim("  j/k navigate  Enter expand  q back"));
+    renderer.writeln(c.dim("  j/k navigate  Enter expand  m mode  q back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 }

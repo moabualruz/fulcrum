@@ -24,6 +24,8 @@
  *   R       — retry failed run
  *   P       — preview dependency tree
  *   A       — reassign agent
+ *   m …     — Step mode picker chord: m a ✋ Manual / m p ▶ Play /
+ *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
  *   j/k     — navigate
  *   Enter   — open run detail
  *   q       — go back
@@ -32,7 +34,7 @@
 import type { Renderer } from "../renderer.ts";
 import { c, hRule } from "../renderer.ts";
 import { truncateWide } from "../utils/truncate.ts";
-import { ModePicker } from "../widgets/ModePicker.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StageWorkbench shell — shared per-stage workbench chrome
@@ -360,9 +362,22 @@ export class RunsControlScreen {
   private deps: TuiRunDep[] = [];
   private error: string | null = null;
   private reassignment: { from: string; to: string; status: string } | null = null;
-  private readonly modePicker = new ModePicker({ stepId: "run" });
+  /** The focused-run Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "run",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: RunsControlScreenOptions) {}
+
+  /** The Step mode currently selected on the focused run (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
 
   /** The OD stage-scope chrome for the Build runs workbench. */
   private get scope(): StageWorkbenchScope {
@@ -431,7 +446,12 @@ export class RunsControlScreen {
       }
       // ModePicker row for the focused run Step (acceptance: Step-bearing rows).
       renderer.writeln();
-      renderer.writeln(`  ${c.dim("step modes")}  ${this.modePicker.render()}`);
+      renderer.writeln(
+        truncateWide(
+          `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+          Math.max(20, renderer.width),
+        ),
+      );
     }
 
     // Dispatch overlay
@@ -468,7 +488,7 @@ export class RunsControlScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
+    renderer.writeln(c.dim("  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  m=mode  j/k=navigate  Enter=detail  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
@@ -492,6 +512,10 @@ export class RunsControlScreen {
       if (this.overlay === "deps") this.overlay = "none";
       return true;
     }
+
+    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`) selects a
+    // mode on the focused run Step without shadowing the action keys below.
+    if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "D" || key === "d") {
       this.overlay = "dispatch";

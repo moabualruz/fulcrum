@@ -13,6 +13,8 @@
  *   A       — approve
  *   X       — request changes
  *   S       — save session
+ *   m …     — Step mode picker chord: m a ✋ Manual / m p ▶ Play /
+ *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
  *   j/k     — navigate
  *   Enter   — open session detail
  *   q       — go back
@@ -20,6 +22,8 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 import {
   renderStageWorkbenchFooter,
   renderStageWorkbenchHeader,
@@ -79,8 +83,22 @@ export class ReviewScreen {
   private cursor = 0;
   private scrollTop = 0;
   private error: string | null = null;
+  /** The focused review-item Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "review",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: ReviewScreenOptions) {}
+
+  /** The Step mode currently selected on the focused review item (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
 
   /** The OD stage-scope chrome for the Review workbench. */
   private get scope(): StageWorkbenchScope {
@@ -156,8 +174,17 @@ export class ReviewScreen {
       renderer.writeln(`${pointer} ${badge} ${session.title}${reviewer}${date}  ${c.dim(session.id)}`);
     }
 
+    // ModePicker row for the focused review-item Step (acceptance: Step-bearing rows).
     renderer.writeln();
-    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  j/k=navigate  Enter=open  q=back"));
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+
+    renderer.writeln();
+    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  m=mode  j/k=navigate  Enter=open  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
@@ -173,6 +200,9 @@ export class ReviewScreen {
       this.keepCursorVisible();
       return true;
     }
+
+    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`).
+    if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "R" || key === "r") {
       await this.load();

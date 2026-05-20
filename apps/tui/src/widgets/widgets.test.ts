@@ -5,6 +5,14 @@ import { FakeTTY, stripAnsi } from "../testing/fake-tty.ts";
 import { renderBurndown, renderHistogram, renderSparkline, renderVelocityBar } from "./AsciiChart.ts";
 import { FilterChips } from "./FilterChips.ts";
 import { HelpOverlay } from "./HelpOverlay.ts";
+import {
+  MODE_AFFORDANCES,
+  MODE_CHORD_KEYBINDINGS,
+  MODE_CHORD_PREFIX,
+  ModePicker,
+  PALETTE_HELP_NAV_KEYS,
+  modeKeyCollidesWith,
+} from "./ModePicker.ts";
 import { Palette } from "./Palette.ts";
 import { StatusBarWidget } from "./StatusBar.ts";
 import { VirtualList } from "./VirtualList.ts";
@@ -222,5 +230,93 @@ describe("TUI widgets", () => {
 
     expect(tty.raw()).toContain("\x1b[");
     expect(tty.plainText()).toBe("ready\n");
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-step-modepicker-006 — the shared TUI per-Step ModePicker row.
+//
+// Every Step-bearing TUI screen (runs / review / board / artifacts / doctor)
+// renders one ModePicker row exposing the four canonical modes — ✋ Manual /
+// ▶ Play / 💬 Discuss / ⊞ AI Assist — the same action set as the web
+// `@fulcrum/ui-kit` `ModeRow` primitive. The modes are reached through a
+// collision-free `m` chord so they never shadow the palette (`:`), help (`?`),
+// or navigation chords. These snapshot tests lock the row labels + key hints.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("ModePicker — TUI per-Step mode affordance row", () => {
+  test("snapshot: the compact row renders all four mode labels + `m`-chord hints", () => {
+    const line = stripAnsi(new ModePicker({ stepId: "run" }).render());
+    // Mode labels — copy_assertion: Manual / Play / Discuss / AI Assist.
+    expect(line).toContain("✋ Manual");
+    expect(line).toContain("▶ Play");
+    expect(line).toContain("💬 Discuss");
+    expect(line).toContain("⊞ AI Assist");
+    // Key hints — every mode shows its full `m`-chord keybinding.
+    expect(line).toContain("[m a]");
+    expect(line).toContain("[m p]");
+    expect(line).toContain("[m d]");
+    expect(line).toContain("[m i]");
+  });
+
+  test("snapshot: the selected mode is reverse-video and an armed chord shows the cue", () => {
+    const picker = new ModePicker({ stepId: "run" });
+    // Default-pressed mode is Manual (OD default).
+    expect(picker.value).toBe("manual");
+
+    // Arming the `m` chord adds the `m>` selector cue to the rendered row.
+    expect(stripAnsi(picker.render())).not.toContain("m>");
+    picker.handleChordKey(MODE_CHORD_PREFIX);
+    expect(stripAnsi(picker.render())).toContain("m>");
+
+    // Completing the chord selects the mode and clears the cue.
+    picker.handleChordKey("p");
+    expect(picker.value).toBe("play");
+    expect(stripAnsi(picker.render())).not.toContain("m>");
+  });
+
+  test("mode keybindings do not collide with palette / help / navigation chords", () => {
+    // Acceptance: the `m` chord prefix is disjoint from `:` `?` `/` `j` `k`
+    // `q` `H` `L` `g`. modeKeyCollidesWith proves the contract.
+    expect(modeKeyCollidesWith(MODE_CHORD_PREFIX)).toBe(false);
+    expect(PALETTE_HELP_NAV_KEYS).not.toContain(MODE_CHORD_PREFIX);
+    // The documented full keybindings are the `m`-chord forms only.
+    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m a", "m p", "m d", "m i"]);
+    // Each chord keybinding starts with the collision-free `m` prefix.
+    for (const binding of MODE_CHORD_KEYBINDINGS) {
+      expect(binding.startsWith(`${MODE_CHORD_PREFIX} `)).toBe(true);
+    }
+  });
+
+  test("web ModeRow and TUI ModePicker expose the same four-mode action set", () => {
+    // parity_link: prd-web-mode-affordance-system. The TUI MODE_AFFORDANCES
+    // ids must equal the web `@fulcrum/ui-kit` WORKFLOW_MODES exactly so the
+    // surfaces never drift. WORKFLOW_MODES = [manual, play, discuss, assist].
+    expect(MODE_AFFORDANCES.map((m) => m.mode)).toEqual([
+      "manual",
+      "play",
+      "discuss",
+      "assist",
+    ]);
+    expect(MODE_AFFORDANCES.map((m) => m.glyph)).toEqual(["✋", "▶", "💬", "⊞"]);
+    expect(MODE_AFFORDANCES.map((m) => m.label)).toEqual([
+      "Manual",
+      "Play",
+      "Discuss",
+      "AI Assist",
+    ]);
+  });
+
+  test("the HelpOverlay lists every mode key when fed the picker keybindings", () => {
+    // The `?` overlay must surface the documented mode keybindings.
+    const help = new HelpOverlay({
+      screenName: "Build",
+      width: 60,
+      bindings: new ModePicker({ stepId: "run" }).keybindings(),
+    });
+    const rendered = help.render().join("\n");
+    expect(rendered).toContain("m a");
+    expect(rendered).toContain("✋ Manual");
+    expect(rendered).toContain("⊞ AI Assist");
   });
 });
