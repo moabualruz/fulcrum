@@ -44,16 +44,51 @@ describe("AppSidebar component", () => {
     expect(matches).toHaveLength(1);
   });
 
-  test("emits a link for each NAV_ITEMS entry with the correct href", async () => {
-    const { NAV_ITEMS } = await import("./nav-items.ts");
+  test("mounts the @fulcrum/ui-kit StageRail primitive", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
-    for (const item of NAV_ITEMS) {
-      const re = new RegExp(`<a\\b[^>]*href="${item.href.replace(/\//g, "\\/")}"`);
-      expect(body).toMatch(re);
-      // Label visible in the rendered output.
-      expect(body).toContain(item.label);
+    expect(body).toContain('data-slot="stage-rail"');
+    expect(body).toContain('data-collapsed="false"');
+  });
+
+  test("renders the six WorkflowStages with canonical labels", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    const stageItems = body.match(/data-slot="stage-rail-item"/g) ?? [];
+    expect(stageItems).toHaveLength(6);
+    for (const label of ["Capture", "Plan", "Build", "Review", "Ship", "Operate"]) {
+      expect(body).toContain(label);
+    }
+  });
+
+  test("marks the Capture stage active for the workspace root", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain('data-current="capture"');
+    expect(body).toMatch(/data-stage="capture"[^>]*data-active="true"|data-active="true"[^>]*data-stage="capture"/);
+  });
+
+  test("supplies the Workspace group with the preserved portfolio links", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain('data-slot="stage-rail-workspace-group"');
+    for (const label of ["All projects", "Search", "Memory", "Context"]) {
+      expect(body).toContain(label);
+    }
+  });
+
+  test("supplies the System group with Settings · Knowledge · MCP · Plugins", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    const systemItems = body.match(/data-slot="stage-rail-system-item"/g) ?? [];
+    expect(systemItems).toHaveLength(4);
+    for (const label of ["Settings", "Knowledge", "MCP", "Plugins"]) {
+      expect(body).toContain(label);
     }
   });
 

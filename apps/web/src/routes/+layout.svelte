@@ -139,6 +139,23 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<!--
+	Skip link (DESIGN.md §4.14): rendered immediately after <body> as the first
+	focusable element so the first Tab press reaches it; off-screen until focused,
+	then revealed with a visible focus-visible ring using the border-focus token.
+-->
+<a
+	href="#main-content"
+	id="skip-to-content"
+	data-slot="skip-link"
+	class={cn(
+		"sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-2 focus-visible:z-[9999]",
+		"focus-visible:rounded focus-visible:border focus-visible:border-accent focus-visible:bg-surface-elevated",
+		"focus-visible:px-4 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium focus-visible:text-accent",
+		"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+	)}
+>Skip to main content</a>
+
 <ModeWatcher />
 
 <!-- Toast region: aria-live so screen readers announce toasts without overwhelming them -->
@@ -162,20 +179,16 @@
 
 <ShortcutHelpOverlay open={shortcutHelpOpen} onClose={() => (shortcutHelpOpen = false)} />
 
-<!-- Skip link: must be first focusable element; becomes visible on focus -->
-<a
-	href="#main-content"
-	id="skip-to-content"
-	class={cn(
-		"sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999]",
-		"focus:rounded focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring",
-	)}
->Skip to main content</a>
-
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
 		<Sheet bind:open={sheetOpen}>
-			<SheetContent side="left" class="w-64 p-0" aria-label="Navigation menu">
+			<!-- Mobile shell region for the StageRail; width matches the 220px expanded rail. -->
+			<SheetContent
+				side="left"
+				class="w-[220px] p-0"
+				aria-label="Navigation menu"
+				data-shell-region="stage-rail"
+			>
 				<AppSidebar activeProjectId={data.activeProjectId} />
 			</SheetContent>
 			<div class={cn("flex min-w-0 flex-1 flex-col")}>
@@ -206,7 +219,8 @@
 			</div>
 		</Sheet>
 	{:else}
-		<div class={cn("sticky top-0 h-screen")}>
+		<!-- Desktop shell region for the StageRail (DESIGN.md §3.1 chrome left rail). -->
+		<div class={cn("sticky top-0 h-screen")} data-shell-region="stage-rail">
 			<AppSidebar activeProjectId={data.activeProjectId} />
 		</div>
 		<div class={cn("flex min-w-0 flex-1 flex-col")}>

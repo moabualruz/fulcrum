@@ -40,6 +40,21 @@
 		href?: string;
 	};
 
+	/**
+	 * A Workspace-group entry — the persistent portfolio destinations (All projects,
+	 * Search, Memory, Context) that travel with every WorkflowStage. Rendered above
+	 * the System divider so it never competes visually with the stage axis
+	 * (DESIGN.md §3.1, IA-MAP.md §3 — the OD `desktop-shell.html` `Workspace` group).
+	 */
+	export type StageRailWorkspaceItem = {
+		id: string;
+		label: string;
+		glyph?: string;
+		href?: string;
+		/** Optional mono count badge mirroring the OD rail (`Inbox 2`). */
+		count?: number;
+	};
+
 	export type StageRailItem = {
 		stage: WorkflowStage;
 		href?: string;
@@ -53,6 +68,8 @@
 		/** Collapsed = 56px icon-only rail; expanded = 220px (DESIGN.md §3.1). */
 		collapsed?: boolean;
 		stages?: StageRailItem[];
+		/** Workspace (Portfolio) group rendered between the stages and the System divider. */
+		workspace?: StageRailWorkspaceItem[];
 		/** System group rendered after the divider. */
 		system?: StageRailSystemItem[];
 		ariaLabel?: string;
@@ -66,6 +83,7 @@
 		current = $bindable("capture"),
 		collapsed = $bindable(false),
 		stages = WORKFLOW_STAGES.map((stage) => ({ stage })),
+		workspace = [],
 		system = [],
 		ariaLabel = "Workflow stages",
 		onSelect,
@@ -139,6 +157,44 @@
 			{/if}
 		</svelte:element>
 	{/each}
+
+	{#if workspace.length > 0}
+		<hr data-slot="stage-rail-divider" class="my-2 border-border" />
+		{#if !collapsed}
+			<p
+				data-slot="stage-rail-workspace-group"
+				class="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-fg-muted"
+			>
+				Workspace
+			</p>
+		{/if}
+		{#each workspace as item (item.id)}
+			<svelte:element
+				this={item.href ? "a" : "button"}
+				href={item.href}
+				type={item.href ? undefined : "button"}
+				aria-label={item.label}
+				title={collapsed ? item.label : undefined}
+				data-slot="stage-rail-workspace-item"
+				data-workspace-id={item.id}
+				class={cn(
+					"flex h-9 items-center gap-2 rounded-md text-sm text-fg-subtle transition-colors hover:bg-surface-elevated hover:text-fg",
+					collapsed ? "justify-center px-0" : "px-2",
+					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+				)}
+			>
+				<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{#if !collapsed}
+					<span class="flex-1 text-left">{item.label}</span>
+					{#if item.count !== undefined}
+						<span data-slot="stage-rail-workspace-count" class="font-mono text-xs text-fg-muted"
+							>{item.count}</span
+						>
+					{/if}
+				{/if}
+			</svelte:element>
+		{/each}
+	{/if}
 
 	{#if system.length > 0}
 		<hr data-slot="stage-rail-divider" class="my-2 border-border" />

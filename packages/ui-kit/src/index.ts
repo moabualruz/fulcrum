@@ -383,6 +383,7 @@ export type {
 	StageRailProps,
 	StageRailItem,
 	StageRailSystemItem,
+	StageRailWorkspaceItem,
 	WorkflowStage,
 } from "./components/stage-rail/index.js";
 export {

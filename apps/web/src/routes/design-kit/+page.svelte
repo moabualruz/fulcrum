@@ -205,6 +205,12 @@
 	// Shell primitive fixtures.
 	let railStage = $state<WorkflowStage>("build");
 	let railCollapsed = $state(false);
+	const railWorkspace = [
+		{ id: "projects", label: "All projects", glyph: "▦", count: 6 },
+		{ id: "search", label: "Search", glyph: "⌕" },
+		{ id: "memory", label: "Memory", glyph: "❖" },
+		{ id: "context", label: "Context", glyph: "⊞" },
+	];
 	const railSystem = [
 		{ id: "settings", label: "Settings", glyph: "⚙" },
 		{ id: "knowledge", label: "Knowledge", glyph: "❖" },
@@ -1064,8 +1070,8 @@
 		>
 			<h2 class="text-lg font-semibold">StageRail</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 — 220px expanded / 56px collapsed left rail; six WorkflowStages then a System
-				group.
+				DESIGN.md §3.1 — 220px expanded / 56px collapsed left rail; six WorkflowStages, then a
+				persistent Workspace (Portfolio) group, then a System group.
 			</p>
 			<div class="flex flex-wrap items-center gap-2">
 				<button
@@ -1092,6 +1098,7 @@
 						{ stage: "ship" },
 						{ stage: "operate" },
 					]}
+					workspace={railWorkspace}
 					system={railSystem}
 				/>
 				<div class="flex-1 bg-surface p-4 text-sm text-muted-foreground">Stage content</div>

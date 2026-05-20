@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { page } from "$app/state";
 
-	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { StageRail } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
-	import { LUCIDE_ICONS, NAV_GROUPS, type NavItem } from "./nav-items.ts";
+	import { STAGE_NAV_ITEMS, SYSTEM_NAV_ITEMS, WORKSPACE_NAV_ITEMS, stageForPath } from "./nav-items.ts";
 
 	interface Props {
 		activeProjectId: string | null;
@@ -12,49 +12,40 @@
 
 	let { activeProjectId }: Props = $props();
 
-	// Inline the shadcn ghost-button surface as a raw `<a>` so SSR-only
-	// component tests can render the sidebar without dragging the Button
-	// component (and its bits-ui dependency) into Svelte's server compiler.
-	function isCurrent(item: NavItem, pathname: string): boolean {
-		if (item.href === "/") return pathname === "/";
-		return pathname === item.href || pathname.startsWith(`${item.href}/`);
-	}
+	// AppSidebar is a thin data-supplying consumer of the `@fulcrum/ui-kit`
+	// StageRail primitive — it owns no rail markup of its own. It maps the live
+	// route to a WorkflowStage and hands the primitive the three groups:
+	// the six WorkflowStages, the persistent Workspace (Portfolio) group, and
+	// the System group. Collapse is fixed expanded here; the 56px collapsed
+	// rail is owned by the responsive shell PRD.
+	const activeStage = $derived(stageForPath(page.url.pathname));
+
+	const stages = STAGE_NAV_ITEMS.map((item) => ({ stage: item.stage, href: item.href }));
+
+	const workspace = WORKSPACE_NAV_ITEMS.map((item) => ({
+		id: item.id,
+		label: item.label,
+		href: item.href,
+	}));
+
+	const system = SYSTEM_NAV_ITEMS.map((item) => ({
+		id: item.id,
+		label: item.label,
+		href: item.href,
+	}));
 </script>
 
-<aside
-	aria-label="primary navigation"
-	class={cn(
-		"bg-sidebar text-sidebar-foreground flex h-full w-56 flex-col border-r",
-	)}
->
-	<nav class={cn("flex flex-col gap-3 p-3")} aria-label="primary">
-		{#each NAV_GROUPS as group (group.label)}
-			<div class={cn("flex flex-col gap-1")}>
-				<span class={cn("px-2 text-xs font-medium text-muted-foreground")}>{group.label}</span>
-				{#each group.items as item (item.href)}
-					{@const Icon = LUCIDE_ICONS[item.iconName]}
-					{@const current = isCurrent(item, page.url.pathname)}
-					<a
-						href={item.href}
-						data-slot="button"
-						data-current={current ? "true" : undefined}
-						aria-current={current ? "page" : undefined}
-						class={cn(
-							buttonVariants({ variant: "ghost" }),
-							"h-9 justify-start gap-2",
-							current && "border-l-2 border-primary bg-sidebar-accent text-sidebar-accent-foreground",
-						)}
-					>
-						<Icon aria-hidden="true" class="h-4 w-4" />
-						<span>{item.label}</span>
-					</a>
-				{/each}
-			</div>
-		{/each}
-	</nav>
-	<div class={cn("mt-auto border-t p-3")}>
-		<span class={cn("text-xs text-muted-foreground")}
-			>{activeProjectId ?? "—"}</span
-		>
+<aside aria-label="primary navigation" class={cn("flex h-full flex-col")}>
+	<StageRail
+		current={activeStage}
+		collapsed={false}
+		{stages}
+		{workspace}
+		{system}
+		ariaLabel="Workflow stages"
+		class="flex-1"
+	/>
+	<div class={cn("border-r border-t border-border bg-surface-sunken p-3")}>
+		<span class={cn("text-xs text-fg-muted")}>{activeProjectId ?? "—"}</span>
 	</div>
 </aside>
