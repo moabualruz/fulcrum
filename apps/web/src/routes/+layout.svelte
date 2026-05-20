@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
 	import { onMount } from "svelte";
+	import { get } from "svelte/store";
 	import { ModeWatcher, toggleMode } from "mode-watcher";
 	import { Toaster } from "svelte-sonner";
 
@@ -17,6 +18,7 @@
 	import ShortcutHelpOverlay from "$lib/components/ShortcutHelpOverlay.svelte";
 	import {
 		AcpDrawer,
+		Banner,
 		Chip,
 		Kbd,
 		Sheet,
@@ -29,6 +31,13 @@
 		type AcpDrawerSide,
 	} from "@fulcrum/ui-kit";
 	import { buttonVariants } from "@fulcrum/ui-kit";
+	import {
+		connectionState,
+		hasQueuedMutations,
+		initConnectionMonitor,
+		queuedMutations,
+		showConnectionBanner,
+	} from "$lib/stores/connection";
 	import {
 		MOBILE_QUERY,
 		browserDriver,
@@ -139,6 +148,34 @@
 	let chordTimer: ReturnType<typeof setTimeout> | undefined;
 	let railCollapsed = $state(false);
 
+	/*
+	 * Shell connection banner (COPY.md §3 "Offline + queued mutation",
+	 * cross-states.md §error.html). The shell — not a standalone route — owns the
+	 * offline experience: the `connection.ts` store machine (offline | syncing |
+	 * online) drives one Banner here. The former `offline` route's hard
+	 * reconnect-redirect is discarded; going offline keeps the operator in place,
+	 * so the active trace in `TraceFooter` survives (DESIGN.md §13 invariant 1).
+	 * `queuedExpanded` toggles the inline "View queued changes" disclosure —
+	 * errors live inline at the surface, never in a toast (COPY.md §3).
+	 */
+	let queuedExpanded = $state(false);
+	/** Banner tone per connection state — danger offline, warning syncing. */
+	const connectionBannerTone = $derived(
+		$connectionState === "offline" ? "error" : "warning",
+	);
+	/** Verbatim COPY.md §3 offline + queued-mutation copy; never "Please try again". */
+	const connectionBannerCopy = $derived(
+		$connectionState === "offline"
+			? "You're offline. This change is queued and will sync when you reconnect."
+			: "Back online. Replaying your queued changes now.",
+	);
+	const connectionBannerTitle = $derived(
+		$connectionState === "offline" ? "You're offline" : "Syncing queued changes",
+	);
+	function toggleQueuedChanges(): void {
+		queuedExpanded = !queuedExpanded;
+	}
+
 	/** One chord key → its destination path (canonical when in project scope). */
 	function chordDestination(key: string): string | null {
 		const pathname = page.url.pathname;
@@ -219,6 +256,16 @@
 	$effect(() => {
 		if (page.url.searchParams.get("e2e_palette") === "1") paletteOpen = true;
 		if (page.url.searchParams.get("e2e_help") === "1") shortcutHelpOpen = true;
+		// Design-e2e seed: `?e2e_offline_queue=1` populates the connection store
+		// with representative queued mutations so the rendered offline test can
+		// prove the "View queued changes" affordance against the real shell. The
+		// seed only fires on the explicit query param — never in production use.
+		if (page.url.searchParams.get("e2e_offline_queue") === "1" && get(queuedMutations).length === 0) {
+			queuedMutations.set([
+				{ kind: "task.update", summary: "FUL-127 moved to In review" },
+				{ kind: "comment.create", summary: "Review note on the trace dedupe run" },
+			]);
+		}
 	});
 
 	$effect(() => {
@@ -237,11 +284,17 @@
 		// The StatusFooter `✨ AI Assist` segment + every per-Step `⊞ AI Assist`
 		// mode button dispatch this event; the one shell drawer listens here.
 		window.addEventListener("fulcrum:open-ai-assist", openAiAssist);
+		// Shell connection monitor: tracks `navigator.onLine` + the window
+		// `online`/`offline` events so the connection banner reflects reality on
+		// every route (cross-states.md — `offline` + `cross-cutting-offline`
+		// routes absorbed into this shell store).
+		const teardownConnection = initConnectionMonitor();
 		return () => {
 			window.removeEventListener("keydown", onGlobalKeydown);
 			window.removeEventListener("keyup", onGlobalKeyup);
 			window.removeEventListener("fulcrum:open-shortcut-help", openHelp);
 			window.removeEventListener("fulcrum:open-ai-assist", openAiAssist);
+			teardownConnection();
 			if (chordTimer) clearTimeout(chordTimer);
 		};
 	});
@@ -435,6 +488,60 @@
 	{/snippet}
 </AcpDrawer>
 
+<!--
+	Shell connection banner (COPY.md §3, cross-states.md §error.html). Composed
+	from the @fulcrum/ui-kit `Banner` primitive — AGENTS.md ui-kit rule: never a
+	route-local overlay. One instance, rendered above `<main>` in both the mobile
+	and desktop shell branches, driven by the `connection.ts` store. Shown only
+	when offline or syncing; the inline "View queued changes" disclosure keeps the
+	queued mutations at the surface instead of a banned error toast.
+-->
+{#snippet connectionBanner()}
+	{#if $showConnectionBanner}
+		<Banner
+			tone={connectionBannerTone}
+			title={connectionBannerTitle}
+			data-shell-region="connection-banner"
+			data-connection-state={$connectionState}
+		>
+			<p data-connection-message>{connectionBannerCopy}</p>
+			{#if $hasQueuedMutations && queuedExpanded}
+				<ul
+					data-queued-changes-list
+					class={cn("mt-2 grid gap-1 border-l-2 border-border pl-3")}
+				>
+					{#each $queuedMutations as mutation (mutation.kind + mutation.summary)}
+						<li
+							data-queued-change
+							class={cn("flex flex-wrap items-baseline gap-x-2 text-xs")}
+						>
+							<code class={cn("font-mono text-fg-subtle")}>{mutation.kind}</code>
+							<span>{mutation.summary}</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#snippet actions()}
+				{#if $hasQueuedMutations}
+					<button
+						type="button"
+						data-view-queued-changes
+						aria-expanded={queuedExpanded}
+						onclick={toggleQueuedChanges}
+						class={cn(
+							"inline-flex h-8 items-center rounded-md border border-border bg-surface px-3",
+							"text-xs font-medium text-fg hover:bg-surface-sunken",
+							"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+						)}
+					>
+						{queuedExpanded ? "Hide queued changes" : "View queued changes"}
+					</button>
+				{/if}
+			{/snippet}
+		</Banner>
+	{/if}
+{/snippet}
+
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
 		<Sheet bind:open={sheetOpen}>
@@ -468,6 +575,7 @@
 						/>
 					</div>
 				</div>
+				{@render connectionBanner()}
 				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(1.5rem+var(--fulcrum-gesture-zone-bottom))]")}>
 					{@render children?.()}
 				</main>
@@ -530,6 +638,7 @@
 					/>
 				</div>
 			</div>
+			{@render connectionBanner()}
 			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 				{@render children?.()}
 			</main>
