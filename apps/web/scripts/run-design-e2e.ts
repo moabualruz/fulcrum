@@ -90,7 +90,7 @@ export function enumerateDesignRoutes(routesDir: string): DesignRoute[] {
 
 interface BootedServer {
 	url: string;
-	stop: () => void;
+	stop: () => Promise<void>;
 }
 
 /** Build the web app and boot a real preview server on an allocated port. */
@@ -118,8 +118,19 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 		env: { ...process.env, FULCRUM_E2E: "1" },
 	});
 
-	const stop = (): void => {
-		if (!server.killed) server.kill("SIGTERM");
+	const stop = async (): Promise<void> => {
+		if (server.exitCode !== null || server.signalCode !== null) return;
+		await new Promise<void>((resolve) => {
+			const timeout = setTimeout(() => {
+				if (server.exitCode === null && server.signalCode === null) server.kill("SIGKILL");
+				resolve();
+			}, 5_000);
+			server.once("exit", () => {
+				clearTimeout(timeout);
+				resolve();
+			});
+			if (!server.killed) server.kill("SIGTERM");
+		});
 	};
 
 	// Poll until the preview server answers, then the harness can navigate it.
@@ -135,7 +146,7 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 		}
 		await new Promise((resolve) => setTimeout(resolve, 500));
 	}
-	stop();
+	await stop();
 	throw new Error(`design-e2e harness: preview server did not become ready at ${url}`);
 }
 
@@ -174,7 +185,7 @@ async function captureProductionRoutes(webRoot: string): Promise<string[]> {
 		await context.close();
 	} finally {
 		await browser.close();
-		stop();
+		await stop();
 	}
 	return artifacts;
 }
@@ -259,9 +270,6 @@ function runSourceContractTests(webRoot: string): void {
 
 function stopDesignProcesses(webRoot: string, port?: string): void {
 	const patterns = [
-		`${webRoot}.*bun run build.*bun run preview`,
-		`${webRoot}.*bun run build`,
-		`${webRoot}.*vite build`,
 		port ? `${webRoot}.*bun run preview.*${port}` : `${webRoot}.*bun run preview`,
 		port ? `${webRoot}.*vite preview.*${port}` : `${webRoot}.*vite preview`,
 	].filter((pattern): pattern is string => Boolean(pattern));
