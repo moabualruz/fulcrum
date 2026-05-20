@@ -31,6 +31,8 @@ interface DashboardData {
   recentRuns: Array<{ id: string; agent: string; status: string; started_at: string; ended_at: string | null }>;
   recentDocs: Array<{ id: string; title: string; kind: string; updated_at: string }>;
   topTasks: Array<{ id: string; title: string; status: string; priority: number; project_id: string | null }>;
+  projectTiles: Array<{ id: string; name: string; openTasks: number; lastActivity: string | null }>;
+  unreadCount: number;
 }
 
 interface PageData {
@@ -44,7 +46,15 @@ interface PageProps {
   data: PageData;
 }
 
-describe("+page.svelte SSR", () => {
+/**
+ * Root `/` renders the portfolio Dashboard PortfolioSurface
+ * (`prd-web-root-default-screen`). The metric-dashboard root —
+ * `<h1>Dashboard</h1>` over four zero-value MetricCards
+ * (`00-executive-review.md` failure 5) — is retired. With an active project
+ * the server `load` redirects to the Capture stage workbench instead, so this
+ * surface only ever renders for the no-project case.
+ */
+describe("+page.svelte SSR — portfolio Dashboard", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
 
@@ -56,68 +66,35 @@ describe("+page.svelte SSR", () => {
     Page = mod.default;
   });
 
-  test("renders <h1>Dashboard</h1> + data-dashboard-header", () => {
-    const neverResolvingPromise = new Promise<DashboardData>(() => {});
-    const { body } = render(Page, {
-      props: {
-        data: {
-          activeProjectId: null,
-          streamed: { dashboard: neverResolvingPromise },
-        },
-      },
-    });
-    expect(body).toContain("data-dashboard-header");
-    expect(body).toContain("<h1");
-    expect(body).toContain("Dashboard");
+  function renderWith(dashboard: Promise<DashboardData>): string {
+    return render(Page, {
+      props: { data: { activeProjectId: null, streamed: { dashboard } } },
+    }).body;
+  }
+
+  test("renders the portfolio Dashboard PortfolioSurface, not a metric dashboard", () => {
+    const body = renderWith(new Promise<DashboardData>(() => {}));
+    // The portfolio surface carries the portfolio scope markers.
+    expect(body).toContain('data-route="portfolio-dashboard"');
+    expect(body).toContain('data-shell-scope="portfolio"');
+    expect(body).toContain("portfolio-hero");
   });
 
-  test("with unresolved streamed promise renders 4 data-dashboard-skeleton divs", () => {
-    // SSR renders the pending branch of {#await} for unresolved promises
-    const neverResolvingPromise = new Promise<DashboardData>(() => {});
-    const { body } = render(Page, {
-      props: {
-        data: {
-          activeProjectId: null,
-          streamed: { dashboard: neverResolvingPromise },
-        },
-      },
-    });
-    const skeletons = body.match(/data-dashboard-skeleton/g) ?? [];
-    expect(skeletons).toHaveLength(4);
+  test("no longer renders the retired <h1>Dashboard</h1> metric grid", () => {
+    const body = renderWith(new Promise<DashboardData>(() => {}));
+    // Copy assertion: the retired primary heading + zero-metric grid are gone.
+    expect(body).not.toContain(">Dashboard<");
+    expect(body).not.toContain("data-dashboard-header");
+    expect(body).not.toContain("data-dashboard-skeleton");
+    // The portfolio surface's heading is "Portfolio".
+    expect(body).toContain(">Portfolio<");
   });
 
-  test("with pre-resolved promise renders data-dashboard-grid and MetricCard instances", async () => {
-    // Svelte 5 SSR renders the {#await pending} branch for all promises
-    // (even already-resolved ones) since it cannot synchronously await them.
-    // This test verifies that when a resolved promise is provided the component
-    // still renders the header and skeleton (pending branch), not an error.
-    const resolvedData: DashboardData = {
-      counters: { projects: 3, openTasks: 7, docs: 12, runsLast7d: 5 },
-      recentRuns: [
-        { id: "01J0RUN1", agent: "codex", status: "succeeded", started_at: new Date().toISOString(), ended_at: null },
-      ],
-      recentDocs: [
-        { id: "01J0DOC1", title: "My Doc", kind: "note", updated_at: new Date().toISOString() },
-      ],
-      topTasks: [
-        { id: "01J0TASK1", title: "Top task", status: "pending", priority: 5, project_id: null },
-      ],
-    };
-
-    const { body } = render(Page, {
-      props: {
-        data: {
-          activeProjectId: null,
-          streamed: { dashboard: Promise.resolve(resolvedData) },
-        },
-      },
-    });
-
-    // Header always present regardless of promise state
-    expect(body).toContain("data-dashboard-header");
-    expect(body).toContain("Dashboard");
-    // SSR renders pending branch for both resolved and unresolved promises
-    const skeletons = body.match(/data-dashboard-skeleton/g) ?? [];
-    expect(skeletons).toHaveLength(4);
+  test("the pending branch is the route skeleton, never the four-card metric grid", () => {
+    const body = renderWith(new Promise<DashboardData>(() => {}));
+    // SSR renders the {#await} pending branch — the route-level skeleton —
+    // and never the retired four zero-metric MetricCard grid.
+    expect(body).toContain("portfolio-dashboard");
+    expect(body).not.toContain("data-metric-card");
   });
 });
