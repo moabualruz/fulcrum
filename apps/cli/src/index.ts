@@ -170,11 +170,13 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
     label: "AI Assist",
     summary: "Step-scoped agent sessions — the CLI side of the AI Assist drawer.",
     commands: [
+      "fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.",
       "fulcrum ai start --task <id> --title <title> Start a step-scoped AI Assist session.",
       "fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>",
       "                                             Control persisted AI Assist sessions.",
     ],
     examples: [
+      "fulcrum mode play AUTH-42 --agent codex --json",
       "fulcrum ai start --task t-9 --title \"draft tests\" --json",
       "fulcrum session list --json",
       "fulcrum session watch <id>",
@@ -573,6 +575,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "ai": {
       const { run: runAi } = await import("./commands/ai.ts");
       await runAi(rest);
+      return;
+    }
+    case "mode": {
+      const { run: runMode } = await import("./commands/mode.ts");
+      await runMode(rest);
       return;
     }
     case "components":

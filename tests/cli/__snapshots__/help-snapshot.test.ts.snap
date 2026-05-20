@@ -89,6 +89,7 @@ OPERATE
 
 AI ASSIST
   Step-scoped agent sessions — the CLI side of the AI Assist drawer.
+  fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.
   fulcrum ai start --task <id> --title <title> Start a step-scoped AI Assist session.
   fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>
                                                Control persisted AI Assist sessions.

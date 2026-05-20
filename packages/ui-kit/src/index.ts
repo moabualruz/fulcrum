@@ -355,8 +355,11 @@ export {
 	ModeRow,
 	Root as ModeRowRoot,
 	WORKFLOW_MODES,
+	TIGHT_MODES,
+	modeGlyph,
+	modeLabel,
 } from "./components/mode-row/index.js";
-export type { ModeRowProps, WorkflowMode } from "./components/mode-row/index.js";
+export type { ModeRowProps, ModeRowDensity, WorkflowMode } from "./components/mode-row/index.js";
 export {
 	TraceChip,
 	TraceBadge,

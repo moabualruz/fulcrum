@@ -108,6 +108,7 @@ async function main() {
     case "runs":
     case "session":
     case "ai":
+    case "mode":
     case "notify":
     case "audit":
     case "webhooks":
