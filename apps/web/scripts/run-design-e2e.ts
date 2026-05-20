@@ -194,15 +194,32 @@ async function captureProductionRoutes(webRoot: string): Promise<string[]> {
 export const HARNESS_SPEC = "tests/design-e2e/harness.spec.ts";
 
 /**
+ * Cross-cutting accessibility specs the harness runs in the default gate.
+ *
+ * `prefers-reduced-motion` and `forced-colors` are foundation-token guarantees
+ * in `DESIGN.md §1.6` / §3 lines 409-411 — every rendered shell must satisfy
+ * them. They are therefore part of the default `test:design` gate, not opt-in
+ * per-surface coverage. Owned by `prd-cross-a11y-motion-forced-colors`.
+ */
+export const ACCESSIBILITY_SPECS = [
+	"tests/design-e2e/motion.spec.ts",
+	"tests/design-e2e/forced-colors.spec.ts",
+] as const;
+
+/** The full default spec list `test:design` runs when no specs are requested. */
+export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, ...ACCESSIBILITY_SPECS];
+
+/**
  * Resolve the spec list for the spec-suite phase. When specs are passed
  * explicitly the harness runs exactly those (used by sibling PRDs to drive
- * specific design-e2e specs). With no args it runs only `harness.spec.ts` — a
- * green, harness-scoped rendering gate wave-1 shell/stage PRDs prove against.
- * The broader OD-fidelity spec coverage is owned by those per-surface PRDs,
- * not by this wave-0 harness PRD.
+ * specific design-e2e specs). With no args it runs the harness spec plus the
+ * cross-cutting reduced-motion + forced-colors specs — the foundation
+ * accessibility gate every rendered shell must pass (`DESIGN.md §1.6`).
+ * The broader per-surface OD-fidelity spec coverage is owned by those
+ * per-surface PRDs.
  */
 function resolveSpecs(requestedSpecs: string[]): string[] {
-	return requestedSpecs.length > 0 ? requestedSpecs : [HARNESS_SPEC];
+	return requestedSpecs.length > 0 ? requestedSpecs : [...DEFAULT_DESIGN_SPECS];
 }
 
 /** Spec-suite phase: run the design-e2e Playwright specs in chunks. */

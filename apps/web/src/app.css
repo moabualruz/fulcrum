@@ -185,6 +185,22 @@
   }
 }
 
+/* DESIGN.md §1.6 forced-colors guard. In Windows High Contrast / forced-colors
+   mode the OKLCH palette is overridden by the OS, so border tokens are
+   re-declared directly on :root with CSS system keywords — CanvasText for the
+   resting border, Highlight for the focus border — and every button keeps an
+   explicit ButtonText edge so interactive controls stay distinguishable. */
+@media (forced-colors: active) {
+  :root {
+    --color-border: CanvasText;
+    --color-border-focus: Highlight;
+  }
+  button,
+  [role="button"] {
+    border: 1px solid ButtonText;
+  }
+}
+
 .dark,
 [data-theme="dark"] {
   --surface: oklch(0.14 0.005 270);
