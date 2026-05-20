@@ -34,6 +34,20 @@ function parseLastJson<T>(captured: Captured): T {
   return JSON.parse(captured.lines.at(-1) ?? "null") as T;
 }
 
+/**
+ * Unwrap the `.result` of the last canonical `fulcrum.cli.v1` envelope line.
+ *
+ * `fulcrum artifact` re-homed under the Ship stage (`prd-cli-ship-stage-parity`)
+ * and now routes `--json` through the shared envelope helper, so its output is
+ * the twelve-key envelope, not a bare payload — the smoke check reads `.result`.
+ */
+function parseLastEnvelopeResult<T>(captured: Captured): T {
+  expect(captured.errors).toEqual([]);
+  expect(captured.exitCodes).toEqual([]);
+  const envelope = JSON.parse(captured.lines.at(-1) ?? "null") as { result: T };
+  return envelope.result;
+}
+
 describe("Surface final cross-surface parity smoke", () => {
   test("representative CLI JSON flows cover tasks, docs, repos, artifacts, and notifications", async () => {
     const tasks = capture();
@@ -92,7 +106,7 @@ describe("Surface final cross-surface parity smoke", () => {
       ...artifacts,
       caller: { artifacts: { list: async () => [{ id: "artifact-1", filename: "report.txt" }] } } as any,
     });
-    expect(parseLastJson<Array<{ filename: string }>>(artifacts)[0]?.filename).toBe("report.txt");
+    expect(parseLastEnvelopeResult<Array<{ filename: string }>>(artifacts)[0]?.filename).toBe("report.txt");
 
     const artifactDownload = capture();
     await runArtifactsCli(["download", "artifact-1", "--json"], {
@@ -103,7 +117,7 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
+    expect(parseLastEnvelopeResult<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
 
     const notifications = capture();
     await runPillar14Command("notify", ["list", "--unread", "--json-raw"], {
@@ -149,7 +163,7 @@ describe("Surface final cross-surface parity smoke", () => {
         body: null,
       },
     ]);
-    expect(parseLastJson<Array<{ id: string }>>(captured)[0]?.id).toBe("artifact-public");
+    expect(parseLastEnvelopeResult<Array<{ id: string }>>(captured)[0]?.id).toBe("artifact-public");
   });
 
   test("artifacts list requires a configured public API without injected caller", async () => {
@@ -163,7 +177,14 @@ describe("Surface final cross-surface parity smoke", () => {
       }) as unknown as typeof fetch,
     });
 
-    expect(captured.errors.join("\n")).toContain("Artifact API caller is not configured");
+    // `--json` keeps the failure inside the canonical envelope: the coded
+    // error sits in the always-array `errors` field, `result` is null.
+    const envelope = JSON.parse(captured.lines.at(-1) ?? "null") as {
+      result: unknown;
+      errors: Array<{ message: string }>;
+    };
+    expect(envelope.result).toBeNull();
+    expect(envelope.errors[0]?.message).toContain("Artifact API caller is not configured");
     expect(captured.exitCodes).toEqual([1]);
   });
 
