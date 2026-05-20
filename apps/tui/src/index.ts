@@ -66,6 +66,14 @@ import { NotificationRulesScreen } from "./screens/notification-rules.ts";
 import { AuditLogScreen } from "./screens/audit.ts";
 import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
+import {
+  TUI_STAGE_NAV,
+  TUI_TAB_STRIP,
+  buildTuiScreenRegistry,
+  resolveColonRoute,
+  type ScreenRegistry,
+  type StageNavEntry,
+} from "./screen-registry.ts";
 import { HelpOverlay, type KeyBinding } from "./widgets/HelpOverlay.ts";
 import { StatusBarWidget } from "./widgets/StatusBar.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
@@ -424,6 +432,44 @@ export function listTuiNavigationEntries(): readonly NavEntry[] {
   return TUI_NAV_ENTRIES;
 }
 
+/**
+ * Colon-route screen key (from `screen-registry.ts`) → the `TuiScreen` the root
+ * launcher navigates to. Keys whose dedicated stage workbench is still owned by
+ * a downstream PRD resolve to the launcher root with that stage pre-selected,
+ * so every colon route resolves to a real screen — never an unknown-screen
+ * crash. Existing screens keep their home (value-preservation: no lost route).
+ */
+const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
+  capture: "inbox",
+  plan: "planning",
+  runs: "runs",
+  "build-board": "build-board",
+  tasks: "tasks",
+  run: "runs",
+  review: "nav",
+  ship: "artifacts",
+  doctor: "doctor",
+  ai: "nav",
+  agents: "nav",
+  mcp: "nav",
+  plugins: "nav",
+  routes: "routing-rules",
+  settings: "doctor",
+  palette: "nav",
+  help: "nav",
+};
+
+/**
+ * Resolve a colon route (`:capture`, `:plan`, `:runs`, `:board`, `:review`,
+ * `:ship`, `:doctor`, `:ai`, …) to a `TuiScreen`. Returns `undefined` for an
+ * unknown route so the caller can render a not-found state instead of crashing.
+ */
+export function resolveTuiColonScreen(route: string): TuiScreen | undefined {
+  const screenKey = resolveColonRoute(route);
+  if (!screenKey) return undefined;
+  return COLON_SCREEN_TARGETS[screenKey];
+}
+
 function defaultPlanningInput(): PlanningBreakdownInput {
   return {
     planId: "tui-planning",
@@ -508,6 +554,8 @@ export class TuiApp {
   private readonly input: TuiInput | null;
   private readonly actions: Partial<Record<TuiAction, () => void | Promise<void>>>;
   private readonly pathRouter: TuiRouter | null;
+  /** Canonical TUI screen catalog — backs the root tab strip + colon routes. */
+  private readonly screenRegistry: ScreenRegistry;
   private readonly telemetry: TuiTelemetrySink;
   private readonly crashLog: TuiCrashLog;
   private readonly keybindings: Partial<KeybindingMap> | null;
@@ -528,6 +576,8 @@ export class TuiApp {
   private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
   private navCursor = 0;
+  /** Selected stage in the root StageNav (0..5 → Capture..Operate). */
+  private stageCursor = 0;
   private paletteOpen = false;
   private helpOpen = false;
   private domainRows: string[] = [];
@@ -583,12 +633,14 @@ export class TuiApp {
     });
     this.input = opts.input ?? null;
     this.actions = opts.actions ?? {};
+    this.screenRegistry = buildTuiScreenRegistry();
     this.pathRouter = opts.routes && opts.routes.length > 0
       ? new TuiRouter({
         routes: [
           { path: "/", screenKey: "nav", title: "Root", render: () => "" },
           ...opts.routes,
         ],
+        screenRegistry: this.screenRegistry,
       })
       : null;
     this.telemetry = opts.telemetry ?? new NullTelemetrySink();
@@ -874,6 +926,15 @@ export class TuiApp {
     r.writeln(c.bold("  Fulcrum TUI"));
     r.separator();
     r.writeln();
+
+    // OD `tui-runs.html` #tui-tabs — always-visible top tab strip (root chrome).
+    this._renderTabStrip();
+    r.writeln();
+
+    // Stage workbench launcher — the six workflow stages (CLI-TUI-UX.md §6).
+    this._renderStageNav();
+
+    r.writeln();
     r.writeln(c.bold("  Domain nav"));
 
     for (let i = 0; i < NAV_ENTRIES.length; i++) {
@@ -885,6 +946,10 @@ export class TuiApp {
 
     r.writeln();
     r.writeln(c.bold("  Detail / log pane"));
+    const activeStage = TUI_STAGE_NAV[this.stageCursor] as StageNavEntry | undefined;
+    if (activeStage) {
+      r.writeln(`  Stage: ${activeStage.label}  route:${activeStage.colon}  chord:g ${activeStage.chord}`);
+    }
     const selected = NAV_ENTRIES[this.navCursor];
     if (selected) {
       const detail = NAV_DETAILS[selected.screen] ?? {
@@ -900,9 +965,41 @@ export class TuiApp {
       r.writeln("  No domain selected.");
     }
     r.writeln();
+    // Palette + help are reachable from the root launcher (PRD acceptance).
+    r.writeln(c.dim("  Command palette: / or :  ·  Help: ?"));
+    r.writeln();
     r.writeln(c.bold("  Status footer"));
     r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / or Ctrl+K commands  ? help  q quit"));
     this._renderCommandPalette();
+  }
+
+  /**
+   * Render the OD `tui-runs.html` `#tui-tabs` strip — sixteen colon-route tabs
+   * in exact order. This is always-visible root chrome; every label and its
+   * position are sourced from `TUI_TAB_STRIP` in the screen registry, so the
+   * snapshot test locks concrete OD labels and order, not placeholder text.
+   */
+  private _renderTabStrip(): void {
+    const r = this.renderer;
+    r.writeln(c.bold("  Stage tab strip"));
+    const labels = TUI_TAB_STRIP.map((tab) => tab.label);
+    r.writeln(`  ${labels.join("  ")}`);
+  }
+
+  /**
+   * Render the root StageNav — the six workflow-stage launchers (Capture, Plan,
+   * Build, Review, Ship, Operate). Each row shows its colon route and `g`-chord
+   * so the operator can launch a stage workbench from the root.
+   */
+  private _renderStageNav(): void {
+    const r = this.renderer;
+    r.writeln(c.bold("  Stage nav"));
+    for (let i = 0; i < TUI_STAGE_NAV.length; i++) {
+      const stage = TUI_STAGE_NAV[i] as StageNavEntry;
+      const selected = i === this.stageCursor;
+      const row = `${stage.label}  ${stage.colon}  (g ${stage.chord})`;
+      r.navItem(formatFocusedRowLabel(row, selected), selected);
+    }
   }
 
   private _renderCommandPalette(): void {
@@ -1763,6 +1860,31 @@ export class TuiApp {
     this.currentPath = path;
     this.pathRouter.navigate(path);
     await this._renderCurrentScreen();
+  }
+
+  /**
+   * Resolve and navigate a colon route (`:capture`, `:plan`, `:runs`, `:board`,
+   * `:review`, `:ship`, `:doctor`, `:ai`, … plus aliases). Returns the resolved
+   * `TuiScreen`, or `undefined` for an unknown route — the launcher root stays
+   * mounted in that case rather than crashing. Stage routes pre-select the
+   * matching StageNav entry so the root reflects the requested stage.
+   */
+  async navigateColon(route: string): Promise<TuiScreen | undefined> {
+    const screenKey = resolveColonRoute(route);
+    // The colon route must resolve to a screen the canonical registry knows;
+    // an unknown route leaves the launcher mounted instead of crashing.
+    if (!screenKey || !this.screenRegistry.has(screenKey)) return undefined;
+    const target = resolveTuiColonScreen(route);
+    if (!target) return undefined;
+    const stageIndex = TUI_STAGE_NAV.findIndex((s) => s.colon === route.trim());
+    if (stageIndex >= 0) this.stageCursor = stageIndex;
+    await this._navigate(target);
+    return target;
+  }
+
+  /** The canonical TUI screen catalog (for tests and route inspection). */
+  get screens(): ScreenRegistry {
+    return this.screenRegistry;
   }
 
   /** Current screen name (for tests). */

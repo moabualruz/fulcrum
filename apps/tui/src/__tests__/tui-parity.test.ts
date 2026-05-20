@@ -211,6 +211,169 @@ describe("Surface TUI parity inventory", () => {
   });
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-root-navigation-od-parity
+//
+// The TUI root must launch the six workflow-stage screens (Capture / Plan /
+// Build / Review / Ship / Operate) and render the OD `tui-runs.html` #tui-tabs
+// strip as always-visible root chrome, and colon routes must resolve. These
+// tests compare CONCRETE labels and order against OD — not placeholder text.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("TUI root navigation — OD stage launcher parity", () => {
+  test("root renders the six-stage nav with exact OD stage labels in order", async () => {
+    const tty = new FakeTTY({ columns: 120, rows: 40 });
+    const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
+
+    await app.mount();
+    const rendered = tty.plainText();
+
+    // Stage nav section header and the six exact stage labels are present.
+    expect(rendered).toContain("Stage nav");
+    for (const stage of ["Capture", "Plan", "Build", "Review", "Ship", "Operate"]) {
+      expect(rendered).toContain(stage);
+    }
+
+    // Order is Capture → Operate, not alphabetical or arbitrary.
+    const order = ["Capture", "Plan", "Build", "Review", "Ship", "Operate"];
+    const indices = order.map((label) => rendered.indexOf(`${label}  :`));
+    for (let i = 1; i < indices.length; i++) {
+      expect(indices[i]).toBeGreaterThan(indices[i - 1]!);
+    }
+
+    app.stop();
+  });
+
+  test("root renders the OD #tui-tabs strip with exact labels and order", async () => {
+    const tty = new FakeTTY({ columns: 160, rows: 44 });
+    const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
+
+    await app.mount();
+    const rendered = tty.plainText();
+
+    // OD tui-runs.html #tui-tabs — sixteen buttons, exact order.
+    const odTabOrder = [
+      ":capture", ":plan", ":runs", ":board", ":review", ":ship", ":doctor",
+      ":run", ":ai", ":agents", ":mcp", ":plugins", ":routes", ":settings",
+      ":K", "?",
+    ];
+    expect(rendered).toContain("Stage tab strip");
+    let cursor = -1;
+    for (const tab of odTabOrder) {
+      const at = rendered.indexOf(tab, cursor);
+      expect(at).toBeGreaterThan(cursor);
+      cursor = at + tab.length;
+    }
+
+    app.stop();
+  });
+
+  test("colon routes :capture/:plan/:runs/:board/:review/:ship/:doctor/:ai resolve", async () => {
+    const app = new TuiApp({
+      output: new FakeTTY({ columns: 120, rows: 32 }),
+      input: new FakeTTY({ columns: 120, rows: 32 }),
+      caller: createCaller(),
+    });
+    await app.mount();
+
+    for (const route of [
+      ":capture", ":plan", ":runs", ":board", ":review", ":ship", ":doctor", ":ai",
+    ]) {
+      const resolved = await app.navigateColon(route);
+      expect(resolved).toBeDefined();
+    }
+
+    // An unknown colon route does not resolve and does not crash the launcher.
+    expect(await app.navigateColon(":nonexistent")).toBeUndefined();
+
+    app.stop();
+  });
+
+  test("palette and help are visible from the root launcher", async () => {
+    const tty = new FakeTTY({ columns: 120, rows: 40 });
+    const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
+
+    await app.mount();
+    const rendered = tty.plainText();
+
+    expect(rendered).toContain("Command palette");
+    expect(rendered).toMatch(/Help: \?/);
+
+    app.stop();
+  });
+
+  test("screen registry is the canonical catalog for stage nav and colon routes", async () => {
+    const { TUI_STAGE_NAV, TUI_TAB_STRIP, buildTuiScreenRegistry, resolveColonRoute } =
+      await import("../screen-registry.ts");
+
+    // Stage nav labels are exactly the six workflow stages, in order.
+    expect(TUI_STAGE_NAV.map((s) => s.label)).toEqual([
+      "Capture", "Plan", "Build", "Review", "Ship", "Operate",
+    ]);
+
+    // Tab strip labels and order match OD tui-runs.html #tui-tabs exactly.
+    expect(TUI_TAB_STRIP.map((t) => t.label)).toEqual([
+      ":capture", ":plan", ":runs", ":board", ":review", ":ship", ":doctor",
+      ":run", ":ai", ":agents", ":mcp", ":plugins", ":routes", ":settings",
+      ":K", "?",
+    ]);
+
+    // Every stage colon route resolves to a registered screen.
+    const registry = buildTuiScreenRegistry();
+    for (const route of [":capture", ":plan", ":runs", ":board", ":review", ":ship", ":doctor", ":ai"]) {
+      const key = resolveColonRoute(route);
+      expect(key).toBeDefined();
+      expect(registry.has(key as string)).toBe(true);
+    }
+  });
+
+  test("consumed-by: index.ts and router.ts both import the screen registry", async () => {
+    const indexSrc = await readFile(new URL("../index.ts", import.meta.url), "utf-8");
+    const routerSrc = await readFile(new URL("../router.ts", import.meta.url), "utf-8");
+    // The screen registry is the deliverable; both the launcher and router must
+    // consume it, or the registry is built-but-unused (snapshot-fidelity rule).
+    expect(indexSrc).toContain('from "./screen-registry.ts"');
+    expect(indexSrc).toContain("buildTuiScreenRegistry");
+    expect(routerSrc).toContain('from "./screen-registry.ts"');
+    expect(routerSrc).toContain("resolveColonRoute");
+  });
+
+  test("old-path resolution crawl — every tab-strip route and legacy nav entry resolves", async () => {
+    // Migration value-preservation: enumerate the full route surface this PRD
+    // reshapes and assert each resolves — never a not-found / unknown screen.
+    const { TUI_TAB_STRIP, buildTuiScreenRegistry, resolveColonRoute } =
+      await import("../screen-registry.ts");
+    const { TuiRouter } = await import("../router.ts");
+    const { listTuiNavigationEntries } = await import("../index.ts");
+
+    const registry = buildTuiScreenRegistry();
+    const router = new TuiRouter({
+      routes: [{ path: "/", screenKey: "nav", title: "Root", render: () => "" }],
+      screenRegistry: registry,
+    });
+
+    // 1. Every OD #tui-tabs route resolves to a registered screen.
+    for (const tab of TUI_TAB_STRIP) {
+      const key = resolveColonRoute(tab.label);
+      expect(key).toBe(tab.screenKey);
+      expect(router.resolveColon(tab.label)).toBe(tab.screenKey);
+    }
+
+    // 2. CLI-TUI-UX.md §6 colon aliases resolve (no 404 on alias routes).
+    for (const alias of [":inbox", ":plans", ":tasks", ":list", ":artifacts"]) {
+      expect(resolveColonRoute(alias)).toBeDefined();
+    }
+
+    // 3. The legacy Domain nav (24 feature buckets) is preserved, not removed —
+    //    the stage nav is additive root chrome above it.
+    const legacy = listTuiNavigationEntries();
+    expect(legacy.length).toBeGreaterThanOrEqual(24);
+    for (const label of ["Projects", "Tasks", "Docs", "Runs", "Doctor", "Audit"]) {
+      expect(legacy.some((e) => e.label === label)).toBe(true);
+    }
+  });
+});
+
 function createSubscriptionHarness() {
   const handlers = new Map<string, Array<(payload: unknown) => void>>();
   return {
