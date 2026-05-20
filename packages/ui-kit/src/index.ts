@@ -106,8 +106,15 @@ export type { BadgeProps, BadgeVariant, BadgeSize } from "./components/badge/ind
 export {
 	StatusBadge,
 	Root as StatusBadgeRoot,
+	CANONICAL_STATUS_VOCAB,
+	BANNED_STATUS_SYNONYMS,
+	statusLabel,
 } from "./components/status-badge/index.js";
-export type { StatusBadgeProps, WorkflowStatus } from "./components/status-badge/index.js";
+export type {
+	StatusBadgeProps,
+	WorkflowStatus,
+	CanonicalStatus,
+} from "./components/status-badge/index.js";
 export {
 	Avatar,
 	AvatarImage,

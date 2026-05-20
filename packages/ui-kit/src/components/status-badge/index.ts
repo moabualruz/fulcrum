@@ -1,6 +1,15 @@
 import Root from "./status-badge.svelte";
 
-export type { StatusBadgeProps, WorkflowStatus } from "./status-badge.svelte";
+export type {
+	StatusBadgeProps,
+	WorkflowStatus,
+	CanonicalStatus,
+} from "./status-badge.svelte";
+export {
+	CANONICAL_STATUS_VOCAB,
+	BANNED_STATUS_SYNONYMS,
+	statusLabel,
+} from "./status-badge.svelte";
 export {
 	Root,
 	//

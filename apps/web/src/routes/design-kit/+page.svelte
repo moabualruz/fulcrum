@@ -75,6 +75,9 @@
 		ScopeBar,
 		StatusFooter,
 		AcpDrawer,
+		CANONICAL_STATUS_VOCAB,
+		BANNED_STATUS_SYNONYMS,
+		statusLabel,
 	} from "@fulcrum/ui-kit";
 	import type {
 		SortState,
@@ -387,6 +390,64 @@
 
 	let emptyStateBranch = $state<"populated" | "empty">("empty");
 	let errorStateBranch = $state<"populated" | "error">("error");
+
+	// ── Copy-lock fixture (COPY.md §1/§4/§6/§10/§11/§12/§13) ──────────────────
+	// Every literal below is verbatim from COPY.md. This fixture is the single
+	// machine-checked source the copy-lock design-e2e spec asserts against, so a
+	// surface cannot ship non-canonical copy and still pass the design gate.
+	// The scan is SCOPED to this OD-referenced fixture, not raw app source.
+
+	// COPY.md §6 — the canonical 8-state status vocabulary, rendered as literals.
+	const copyLockStatusVocab = CANONICAL_STATUS_VOCAB;
+	const copyLockBannedStatus = BANNED_STATUS_SYNONYMS;
+
+	// COPY.md §4 — confirmation copy literals.
+	type CopyLockEntry = { id: string; label: string };
+	const copyLockConfirmations: CopyLockEntry[] = [
+		{ id: "saved", label: "Saved 8s ago" },
+		{ id: "saving", label: "Saving…" },
+		{ id: "confirm-archive", label: "Confirm archive? (3)" },
+		{ id: "session-choice", label: "Session choice saved" },
+	];
+
+	// COPY.md §10 — permission prompt buttons (three, never two) + abort reasons.
+	const copyLockPermissionButtons: CopyLockEntry[] = [
+		{ id: "allow-once", label: "Allow once" },
+		{ id: "allow-always", label: "Allow always for `claude` in this project" },
+		{ id: "deny", label: "Deny" },
+	];
+	const copyLockAbortReasons: CopyLockEntry[] = [
+		{ id: "user-cancel", label: "User cancel" },
+		{ id: "dangerous-output", label: "Dangerous output" },
+		{ id: "wrong-context", label: "Wrong context" },
+		{ id: "cost-cap", label: "Cost cap" },
+	];
+	const copyLockAbortTitle = "Abort active work?";
+
+	// COPY.md §11 — notification template strings.
+	const copyLockNotifications: CopyLockEntry[] = [
+		{ id: "mention", label: '@you mentioned in "Plan: auth refactor"' },
+		{ id: "review-requested", label: "Review requested by claude on TASK-471" },
+		{ id: "run-completed", label: "Run 01HXYZ… completed (12 of 47 tasks done)" },
+		{ id: "run-failed", label: 'Run 01HXYZ… failed at step "build". [ View ]' },
+		{ id: "permission-requested", label: "claude requests permission to run shell command. [ Review ]" },
+		{ id: "artifact-shipped", label: 'Artifact "release-v2.tgz" ready in Ship' },
+		{ id: "cycle-ending", label: 'Cycle "May sprint" ends in 2 days. 4 tasks in progress.' },
+	];
+
+	// COPY.md §12 — settings inheritance chip labels.
+	const copyLockSettingsChips: CopyLockEntry[] = [
+		{ id: "inherited", label: "Inherited" },
+		{ id: "overridden", label: "Overridden" },
+		{ id: "locked", label: "Locked" },
+	];
+
+	// COPY.md §13 — telemetry first-run prompt options.
+	const copyLockTelemetryOptions: CopyLockEntry[] = [
+		{ id: "on", label: "On" },
+		{ id: "anonymous-only", label: "Anonymous only" },
+		{ id: "off", label: "Off" },
+	];
 </script>
 
 <svelte:head>
@@ -1672,6 +1733,105 @@
 					costPerCall="$0.62"
 				/>
 			</div>
+		</article>
+
+		<article
+			id="copy-lock"
+			class="grid gap-5 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="copy-lock"
+			data-copy-lock=""
+		>
+			<header class="grid gap-1">
+				<h2 class="text-lg font-semibold">Copy lock</h2>
+				<p class="text-sm text-muted-foreground">
+					Every COPY.md user-visible literal, machine-checked. The copy-lock design-e2e
+					spec asserts these exact strings render and that no banned synonym, em dash,
+					first-person plural, or ACP chrome label is present in this fixture.
+				</p>
+			</header>
+
+			<!-- COPY.md §6 — canonical 8-state status vocabulary. -->
+			<section class="grid gap-2" data-copy-lock-group="status-labels">
+				<h3 class="text-sm font-semibold">Status labels · COPY.md §6</h3>
+				<div class="flex flex-wrap items-center gap-2">
+					{#each copyLockStatusVocab as status (status)}
+						<span data-copy-lock-status={status}>
+							<StatusBadge {status} />
+						</span>
+					{/each}
+				</div>
+				<p class="text-xs text-muted-foreground">
+					Canonical vocab:
+					<code data-copy-lock-status-vocab>{copyLockStatusVocab.join(" / ")}</code>.
+					Banned synonyms are never rendered:
+					<span data-copy-lock-banned-status hidden>{copyLockBannedStatus.join(", ")}</span>
+				</p>
+			</section>
+
+			<!-- COPY.md §4 — confirmation copy. -->
+			<section class="grid gap-2" data-copy-lock-group="confirmations">
+				<h3 class="text-sm font-semibold">Confirmations · COPY.md §4</h3>
+				<ul class="grid gap-1">
+					{#each copyLockConfirmations as entry (entry.id)}
+						<li class="text-sm" data-copy-lock-confirmation={entry.id}>{entry.label}</li>
+					{/each}
+				</ul>
+			</section>
+
+			<!-- COPY.md §10 — permission prompt buttons + abort reasons. -->
+			<section class="grid gap-2" data-copy-lock-group="permission">
+				<h3 class="text-sm font-semibold">Permission prompt · COPY.md §10</h3>
+				<div class="flex flex-wrap gap-2">
+					{#each copyLockPermissionButtons as entry (entry.id)}
+						<span
+							class="rounded border border-border px-2 py-1 text-xs"
+							data-copy-lock-permission-button={entry.id}>{entry.label}</span
+						>
+					{/each}
+				</div>
+				<p class="text-sm font-medium" data-copy-lock-abort-title>{copyLockAbortTitle}</p>
+				<div class="flex flex-wrap gap-2">
+					{#each copyLockAbortReasons as entry (entry.id)}
+						<span
+							class="rounded bg-muted px-2 py-1 text-xs"
+							data-copy-lock-abort-reason={entry.id}>{entry.label}</span
+						>
+					{/each}
+				</div>
+			</section>
+
+			<!-- COPY.md §11 — notification templates. -->
+			<section class="grid gap-2" data-copy-lock-group="notifications">
+				<h3 class="text-sm font-semibold">Notifications · COPY.md §11</h3>
+				<ul class="grid gap-1">
+					{#each copyLockNotifications as entry (entry.id)}
+						<li class="text-sm" data-copy-lock-notification={entry.id}>{entry.label}</li>
+					{/each}
+				</ul>
+			</section>
+
+			<!-- COPY.md §12 — settings inheritance chips. -->
+			<section class="grid gap-2" data-copy-lock-group="settings">
+				<h3 class="text-sm font-semibold">Settings chips · COPY.md §12</h3>
+				<div class="flex flex-wrap gap-2">
+					{#each copyLockSettingsChips as entry (entry.id)}
+						<Chip data-copy-lock-settings-chip={entry.id}>{entry.label}</Chip>
+					{/each}
+				</div>
+			</section>
+
+			<!-- COPY.md §13 — telemetry first-run options. -->
+			<section class="grid gap-2" data-copy-lock-group="telemetry">
+				<h3 class="text-sm font-semibold">Telemetry options · COPY.md §13</h3>
+				<div class="flex flex-wrap gap-2">
+					{#each copyLockTelemetryOptions as entry (entry.id)}
+						<span
+							class="rounded border border-border px-2 py-1 text-xs"
+							data-copy-lock-telemetry-option={entry.id}>{entry.label}</span
+						>
+					{/each}
+				</div>
+			</section>
 		</article>
 	</section>
 	<ToastRegion store={toastStore} position="bottom-right" />
