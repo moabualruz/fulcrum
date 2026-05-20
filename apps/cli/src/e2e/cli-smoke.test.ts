@@ -70,7 +70,11 @@ describe("CLI E2E smoke with application callers", () => {
       caller: { docs: { list: async () => [{ id: "doc-1", title: "interface doc" }] } },
     } as never);
 
-    expect(JSON.parse(io.out[0]!)).toEqual([{ id: "doc-1", title: "interface doc" }]);
+    // `docs list --json` emits the canonical fulcrum.cli.v1 envelope
+    // (prd-cli-capture-stage-parity); the doc rows are under `.result`.
+    const envelope = JSON.parse(io.out[0]!) as Record<string, unknown>;
+    expect(envelope["schema"]).toBe("fulcrum.cli.v1");
+    expect(envelope["result"]).toEqual([{ id: "doc-1", title: "interface doc" }]);
     expect(io.exits).toEqual([]);
   });
 

@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { formatApiError } from "../api-errors.ts";
+import { emitResult } from "../lib/cli-output.ts";
 import {
   createDocumentApiCallerFromEnv,
   type DocumentApiEnvironment,
@@ -19,6 +20,10 @@ type DocsCaller = {
     delete: (input: Record<string, unknown>) => Promise<DocRow | { deleted: true } | null>;
     search?: (input: Record<string, unknown>) => Promise<unknown>;
     versionsList?: (input: Record<string, unknown>) => Promise<DocRow[]>;
+    restoreVersion?: (input: Record<string, unknown>) => Promise<DocRow | null>;
+    attach?: (input: Record<string, unknown>) => Promise<DocRow>;
+    comment?: (input: Record<string, unknown>) => Promise<DocRow>;
+    link?: (input: Record<string, unknown>) => Promise<DocRow>;
     templates?: {
       list: (input: Record<string, unknown>) => Promise<DocRow[]>;
     };
@@ -36,17 +41,30 @@ export interface DocsRunOptions {
 
 const HELP = `fulcrum docs
 
-Docs commands.
+Capture stage — docs tree, freeform editor, and intake documents
+(CLI-TUI-UX.md §1.1 'fulcrum doc' grammar).
 
 Usage:
-  fulcrum docs list [--type <type>] [--scope <scope>] [--archived] [--limit <n>] [--offset <n>] [--json]
-  fulcrum docs get <slug|id> [--json]
-  fulcrum docs create --title <title> [--type <type>] [--scope <scope>] [--project <id>] [--parent <id>] [--body <markdown>] [--json]
+  fulcrum docs list [--type <type>] [--scope <scope>] [--project <id>] [--archived] [--limit <n>] [--offset <n>] [--json]
+  fulcrum docs new --title <title> [--type <type>] [--scope <scope>] [--project <id>] [--parent <id>] [--body <markdown>] [--json]
+  fulcrum docs view <slug|id> [--json]
   fulcrum docs edit <slug|id> [--editor <cmd>] [--json]
-  fulcrum docs delete <id> [--hard --yes] [--json]
+  fulcrum docs attach <slug|id> <file> [--json]
+  fulcrum docs history <doc-id> [--json]
+  fulcrum docs restore <doc-id> --version <n> [--json]
+  fulcrum docs comment <slug|id> --body <text> [--resolve <comment-id>] [--json]
+  fulcrum docs link <slug|id> --task <task-id> [--json]
   fulcrum docs search <query> [--type <type>] [--scope <scope>] [--limit <n>] [--json]
-  fulcrum docs versions list <doc-id> [--json]
+  fulcrum docs delete <id> [--hard --yes] [--json]
   fulcrum docs template list [--json]
+
+Aliases (compatibility — old names keep working):
+  create -> new      get -> view      versions list -> history
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+  --jq <expr>       Filter the envelope's .result through jq
+  --json-raw        Pre-envelope JSON payload (compatibility, removed next release)
 `;
 
 type ResolvedOptions = Required<Pick<DocsRunOptions, "print" | "printErr" | "exit">> & DocsRunOptions;
@@ -68,24 +86,49 @@ export async function run(
       return withErrors("list", resolved, async () => {
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.list(parseListInput(rest));
-        printOutput(result, rest, resolved.print, formatRows);
+        emitDocs(result, "fulcrum doc list", rest, resolved.print, formatRows);
       });
+    // `view` is the CLI-TUI-UX §1.1 verb; `get` stays as a documented alias.
+    case "view":
     case "get":
-      return withErrors("get", resolved, async () => {
-        const key = requireArg(rest, 0, "get", "<slug|id>");
+      return withErrors(sub, resolved, async () => {
+        const key = requireArg(rest, 0, sub, "<slug|id>");
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.get(docLookup(key));
-        printOutput(result, rest, resolved.print, formatRow);
+        emitDocs(result, "fulcrum doc view", rest, resolved.print, formatRow);
       });
+    // `new` is the CLI-TUI-UX §1.1 verb; `create` stays as a documented alias.
+    case "new":
     case "create":
-      return withErrors("create", resolved, async () => {
+      return withErrors(sub, resolved, async () => {
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.create(parseCreateInput(rest));
-        printOutput(result, rest, resolved.print, formatRow);
+        emitDocs(result, "fulcrum doc new", rest, resolved.print, formatRow);
       });
     case "edit":
       return withErrors("edit", resolved, async () => {
         await runEdit(rest, resolved);
+      });
+    case "attach":
+      return withErrors("attach", resolved, async () => {
+        await runAttach(rest, resolved);
+      });
+    // `history` is the CLI-TUI-UX §1.1 verb; `versions list` stays as an alias.
+    case "history":
+      return withErrors("history", resolved, async () => {
+        await runHistory(rest, resolved);
+      });
+    case "restore":
+      return withErrors("restore", resolved, async () => {
+        await runRestore(rest, resolved);
+      });
+    case "comment":
+      return withErrors("comment", resolved, async () => {
+        await runComment(rest, resolved);
+      });
+    case "link":
+      return withErrors("link", resolved, async () => {
+        await runLink(rest, resolved);
       });
     case "delete":
       return withErrors("delete", resolved, async () => {
@@ -119,7 +162,7 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
         const caller = await resolveCaller(opts);
         if (!caller.docs.templates?.list) throw new Error("docs template list operation is not available");
         const result = await caller.docs.templates.list({});
-        printOutput(result, rest, opts.print, formatRows);
+        emitDocs(result, "fulcrum doc template list", rest, opts.print, formatRows);
       });
     case "help":
     case "--help":
@@ -133,18 +176,14 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
   }
 }
 
+/** `fulcrum docs versions list <id>` — compatibility alias for `fulcrum docs history`. */
 async function runVersions(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const [sub = "help", ...rest] = argv;
   switch (sub) {
-    case "list": {
-      const docId = requireArg(rest, 0, "versions list", "<doc-id>");
+    case "list":
       return withErrors("versions list", opts, async () => {
-        const caller = await resolveCaller(opts);
-        if (!caller.docs.versionsList) throw new Error("docs.versionsList procedure is not available");
-        const result = await caller.docs.versionsList({ docId });
-        printOutput(result, rest, opts.print, formatRows);
+        await runHistory(rest, opts);
       });
-    }
     case "help":
     case "--help":
     case "-h":
@@ -155,6 +194,82 @@ async function runVersions(argv: readonly string[], opts: ResolvedOptions): Prom
       opts.printErr(HELP);
       opts.exit(2);
   }
+}
+
+/** `fulcrum docs history <doc-id>` — version history of one document (`CLI-TUI-UX.md` §1.1). */
+async function runHistory(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const docId = requireArg(argv, 0, "history", "<doc-id>");
+  const caller = await resolveCaller(opts);
+  if (!caller.docs.versionsList) throw new Error("docs version history operation is not available");
+  const result = await caller.docs.versionsList({ docId });
+  emitDocs(result, "fulcrum doc history", argv, opts.print, formatRows);
+}
+
+/** `fulcrum docs restore <doc-id> --version <n>` — restore a prior version (`CLI-TUI-UX.md` §1.1). */
+async function runRestore(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const docId = requireArg(argv, 0, "restore", "<doc-id>");
+  const version = flagValue(argv, "--version");
+  if (!version) throw new Error("fulcrum docs restore: missing required flag --version <n>");
+  const caller = await resolveCaller(opts);
+  if (!caller.docs.restoreVersion) throw new Error("docs restore operation is not available");
+  const result = await caller.docs.restoreVersion({ docId, version });
+  emitDocs(result, "fulcrum doc restore", argv, opts.print, formatRow);
+}
+
+/** `fulcrum docs attach <slug|id> <file>` — record an attachment on a doc (`CLI-TUI-UX.md` §1.1). */
+async function runAttach(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const key = requireArg(argv, 0, "attach", "<slug|id>");
+  const file = requireArg(argv, 1, "attach", "<file>");
+  const caller = await resolveCaller(opts);
+  if (!caller.docs.attach) throw new Error("docs attach operation is not available");
+  const doc = await caller.docs.get(docLookup(key));
+  if (!doc) throw new Error("Document not found.");
+  const id = requireDocId(doc);
+  const result = await caller.docs.attach({
+    docId: id,
+    fileName: file.split("/").pop() ?? file,
+    storagePath: file,
+  });
+  emitDocs(result, "fulcrum doc attach", argv, opts.print, () => `Attached ${file} to doc ${id}.`);
+}
+
+/** `fulcrum docs comment <slug|id> --body <text>` — add a thread comment (`CLI-TUI-UX.md` §1.1). */
+async function runComment(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const key = requireArg(argv, 0, "comment", "<slug|id>");
+  const body = flagValue(argv, "--body");
+  if (!body) throw new Error("fulcrum docs comment: missing required flag --body <text>");
+  const caller = await resolveCaller(opts);
+  if (!caller.docs.comment) throw new Error("docs comment operation is not available");
+  const doc = await caller.docs.get(docLookup(key));
+  if (!doc) throw new Error("Document not found.");
+  const id = requireDocId(doc);
+  const result = await caller.docs.comment(
+    compact({
+      docId: id,
+      bodyMd: body,
+      resolveCommentId: flagValue(argv, "--resolve"),
+    }),
+  );
+  emitDocs(result, "fulcrum doc comment", argv, opts.print, () => `Comment added to doc ${id}.`);
+}
+
+/** `fulcrum docs link <slug|id> --task <task-id>` — link a doc to a task (`CLI-TUI-UX.md` §1.1). */
+async function runLink(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const key = requireArg(argv, 0, "link", "<slug|id>");
+  const task = flagValue(argv, "--task");
+  if (!task) throw new Error("fulcrum docs link: missing required flag --task <task-id>");
+  const caller = await resolveCaller(opts);
+  if (!caller.docs.link) throw new Error("docs link operation is not available");
+  const doc = await caller.docs.get(docLookup(key));
+  if (!doc) throw new Error("Document not found.");
+  const id = requireDocId(doc);
+  const result = await caller.docs.link({
+    sourceDocId: id,
+    targetKind: "task",
+    targetId: task,
+    linkType: "source",
+  });
+  emitDocs(result, "fulcrum doc link", argv, opts.print, () => `Linked doc ${id} to task ${task}.`);
 }
 
 async function runEdit(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
@@ -182,7 +297,7 @@ async function runEdit(argv: readonly string[], opts: ResolvedOptions): Promise<
 
     const bodyMd = await readFile(file, "utf8");
     const result = await caller.docs.update({ id, bodyMd });
-    printOutput(result, argv, opts.print, formatRow);
+    emitDocs(result, "fulcrum doc edit", argv, opts.print, formatRow);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
@@ -197,7 +312,7 @@ async function runDelete(argv: readonly string[], opts: ResolvedOptions): Promis
 
   const caller = await resolveCaller(opts);
   const result = await caller.docs.delete(compact({ id, hard: hard ? true : undefined }));
-  printOutput(result, argv, opts.print, () => hard ? `Deleted doc ${id}.` : `Archived doc ${id}.`);
+  emitDocs(result, "fulcrum doc delete", argv, opts.print, () => hard ? `Deleted doc ${id}.` : `Archived doc ${id}.`);
 }
 
 async function runSearch(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
@@ -212,7 +327,7 @@ async function runSearch(argv: readonly string[], opts: ResolvedOptions): Promis
   const result = caller.docs.search
     ? await caller.docs.search(input)
     : await caller.docs.list({ ...input, query: undefined });
-  printOutput(result, argv, opts.print, formatRows);
+  emitDocs(result, "fulcrum doc search", argv, opts.print, formatRows);
 }
 
 function parseListInput(argv: readonly string[]): Record<string, unknown> {
@@ -257,6 +372,12 @@ function docLookup(value: string): Record<string, string> {
   return /^[0-9a-fA-F-]{36}$/.test(value) ? { id: value } : { slug: value };
 }
 
+function requireDocId(doc: DocRow): string {
+  const id = doc.id;
+  if (typeof id !== "string" || id.length === 0) throw new Error("Document response is missing id.");
+  return id;
+}
+
 function flagValue(argv: readonly string[], flag: string): string | undefined {
   const index = argv.indexOf(flag);
   if (index < 0) return undefined;
@@ -292,13 +413,28 @@ function requireArg(argv: readonly string[], index: number, command: string, nam
   return value;
 }
 
-function printOutput(
+/**
+ * Emit a docs result through the canonical `fulcrum.cli.v1` envelope. Under
+ * `--json` the payload is wrapped in the twelve-key envelope (`CLI-TUI-UX.md`
+ * §3); `--json-raw` keeps the pre-envelope shape for one release; plain output
+ * renders the caller-supplied human formatter over the same data.
+ */
+function emitDocs(
   value: unknown,
+  command: string,
   argv: readonly string[],
   print: (line: string) => void,
   human: (value: unknown) => string,
 ): void {
-  print(argv.includes("--json") ? JSON.stringify(value) : human(value));
+  emitResult(
+    {
+      argv,
+      command,
+      result: value,
+      renderHuman: (result) => print(human(result)),
+    },
+    { print, printErr: print },
+  );
 }
 
 function formatRows(value: unknown): string {
@@ -343,6 +479,17 @@ async function resolveCaller(opts: DocsRunOptions): Promise<DocsCaller> {
       versionsList: async (input) => await apiCaller.docs.listVersions({
         id: String(input.docId ?? input.id ?? ""),
       }) as DocRow[],
+      restoreVersion: async (input) => await apiCaller.docs.restoreVersion({
+        id: String(input.docId ?? input.id ?? ""),
+        version: String(input.version ?? ""),
+      }) as DocRow | null,
+      attach: async (input) => await apiCaller.docs.createAttachment(
+        input as Parameters<typeof apiCaller.docs.createAttachment>[0],
+      ) as DocRow,
+      comment: async (input) => await apiCaller.docs.createComment(
+        input as Parameters<typeof apiCaller.docs.createComment>[0],
+      ) as DocRow,
+      link: async (input) => await apiCaller.docs.createLink(input) as DocRow,
       templates: {
         list: async (input) => await apiCaller.docs.listTemplates(input) as DocRow[],
       },

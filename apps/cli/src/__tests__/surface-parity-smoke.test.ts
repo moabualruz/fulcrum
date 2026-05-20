@@ -77,7 +77,11 @@ describe("Surface final cross-surface parity smoke", () => {
       ...docs,
       caller: { docs: { list: async () => [{ id: "doc-1", title: "Surface contract" }] } } as any,
     });
-    expect(parseLastJson<Array<{ id: string }>>(docs)[0]?.id).toBe("doc-1");
+    // `docs list --json` emits the canonical fulcrum.cli.v1 envelope
+    // (prd-cli-capture-stage-parity); the doc rows live under `.result`.
+    const docsEnvelope = parseLastJson<{ schema: string; result: Array<{ id: string }> }>(docs);
+    expect(docsEnvelope.schema).toBe("fulcrum.cli.v1");
+    expect(docsEnvelope.result[0]?.id).toBe("doc-1");
 
     const repos = capture();
     await runReposCli(["list", "--json"], {

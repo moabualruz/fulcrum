@@ -37,6 +37,22 @@ function fakeCaller(): CaptureCaller & { calls: unknown[] } {
           message: `Quick action ${input.action} queued`,
         };
       },
+      intake: async (input) => {
+        calls.push(["intake", input]);
+        return { captureId: "cap-intake", kind: input.kind, traceId: input.traceId ?? "trace-intake", message: `Captured ${input.kind}` };
+      },
+      triageInbox: async (input) => {
+        calls.push(["triageInbox", input]);
+        return { captureId: input.captureId, kind: input.action, traceId: input.traceId ?? "trace-inbox", message: `Inbox ${input.action}` };
+      },
+      createNote: async (input) => {
+        calls.push(["createNote", input]);
+        return { captureId: "cap-note", kind: "note", traceId: input.traceId ?? "trace-note", message: "Note captured" };
+      },
+      listNotes: async (input) => {
+        calls.push(["listNotes", input]);
+        return [{ id: "note-1", text: "first idea", tag: input.tag }];
+      },
     },
   };
 }
