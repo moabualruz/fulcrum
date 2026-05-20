@@ -8,7 +8,8 @@
 		"./styles/tokens.css": "./src/styles/tokens.css"
 	},
 	"scripts": {
-		"build": "svelte-kit sync && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css && bun run --bun tsc -p tsconfig.json --noEmit"
+		"build": "svelte-kit sync && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css && bun run --bun tsc -p tsconfig.json --noEmit",
+		"lint": "bun run scripts/lint-token-purity.ts && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css"
 	},
 	"peerDependencies": {
 		"svelte": "^5.55.2"

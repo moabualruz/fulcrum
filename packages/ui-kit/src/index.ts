@@ -352,6 +352,7 @@ export {
 export type { ModeRowProps, WorkflowMode } from "./components/mode-row/index.js";
 export {
 	TraceChip,
+	TraceBadge,
 	Root as TraceChipRoot,
 } from "./components/trace-chip/index.js";
 export type { TraceChipProps } from "./components/trace-chip/index.js";
@@ -373,3 +374,33 @@ export type {
 	AgentIdentityCardProps,
 	AgentCapability,
 } from "./components/agent-identity-card/index.js";
+export {
+	StageRail,
+	Root as StageRailRoot,
+	WORKFLOW_STAGES,
+} from "./components/stage-rail/index.js";
+export type {
+	StageRailProps,
+	StageRailItem,
+	StageRailSystemItem,
+	WorkflowStage,
+} from "./components/stage-rail/index.js";
+export {
+	ScopeBar,
+	Root as ScopeBarRoot,
+} from "./components/scope-bar/index.js";
+export type { ScopeBarProps } from "./components/scope-bar/index.js";
+export {
+	StatusFooter,
+	Root as StatusFooterRoot,
+} from "./components/status-footer/index.js";
+export type {
+	StatusFooterProps,
+	StatusFooterMode,
+	StatusFooterSegment,
+} from "./components/status-footer/index.js";
+export {
+	AcpDrawer,
+	Root as AcpDrawerRoot,
+} from "./components/acp-drawer/index.js";
+export type { AcpDrawerProps, AcpDrawerSide } from "./components/acp-drawer/index.js";

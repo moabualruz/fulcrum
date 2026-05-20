@@ -70,8 +70,19 @@
 		RunFeedItem,
 		TaskRow,
 		AgentIdentityCard,
+		StageRail,
+		ScopeBar,
+		StatusFooter,
+		AcpDrawer,
 	} from "@fulcrum/ui-kit";
-	import type { SortState, TreeNode, WorkflowMode } from "@fulcrum/ui-kit";
+	import type {
+		SortState,
+		TreeNode,
+		WorkflowMode,
+		WorkflowStage,
+		StatusFooterMode,
+		AcpDrawerSide,
+	} from "@fulcrum/ui-kit";
 
 	let activeMode = $state<WorkflowMode>("play");
 	let taskSelected = $state(false);
@@ -190,6 +201,30 @@
 	const selectedPriorityLabel = $derived(
 		priorityOptions.find((option) => option.value === selectValue)?.label ?? "Choose priority",
 	);
+
+	// Shell primitive fixtures.
+	let railStage = $state<WorkflowStage>("build");
+	let railCollapsed = $state(false);
+	const railSystem = [
+		{ id: "settings", label: "Settings", glyph: "⚙" },
+		{ id: "knowledge", label: "Knowledge", glyph: "❖" },
+		{ id: "mcp", label: "MCP servers", glyph: "⊟" },
+		{ id: "plugins", label: "Plugins", glyph: "⧉" },
+	];
+	let scopeStage = $state<WorkflowStage>("plan");
+	let footerMode = $state<StatusFooterMode>("base");
+	const footerSegments = [
+		{ id: "mode", label: "NORMAL", pill: true },
+		{ id: "profile", label: "PRO" },
+		{ id: "branch", label: "auth/rewrite", glyph: "⎇" },
+		{ id: "run", label: "run 3/8" },
+		{ id: "agent", label: "Sonnet 4.6" },
+		{ id: "mcp", label: "mcp 4", glyph: "●" },
+	];
+	let acpOpen = $state(false);
+	let acpSide = $state<AcpDrawerSide>("right");
+	let traceCopied = $state<string | null>(null);
+	let traceAction = $state<string | null>(null);
 </script>
 
 <svelte:head>
@@ -986,17 +1021,232 @@
 			class="grid gap-4 rounded-md border border-border bg-card p-5"
 			data-design-kit-section="trace-chip"
 		>
-			<h2 class="text-lg font-semibold">TraceChip</h2>
+			<h2 class="text-lg font-semibold">TraceChip / TraceBadge</h2>
 			<div class="flex flex-wrap items-center gap-2">
 				<TraceChip
 					traceId="trace-9d8f7e6a-2c3b-4d5e-87f6-abcd12345678"
 					onCopy={(id) => (copiedTrace = id)}
 				/>
 				<TraceChip traceId="trace-shortid" short={false} copyable={false} />
+			</div>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §4.10 TraceBadge — <code class="rounded bg-muted px-1 text-[11px]">badge</code> prop:
+				<code class="rounded bg-muted px-1 text-[11px]">trace:</code> prefix, 8-char hex, surface-sunken,
+				hover tooltip, right-click Open in audit / Open in CLI.
+			</p>
+			<div class="flex flex-wrap items-center gap-3">
+				<TraceChip
+					badge
+					traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f"
+					project="fulcrum"
+					cycle="cycle-12"
+					timestamp="2026-05-20 13:04 UTC"
+					onCopy={(id) => {
+						copiedTrace = id;
+						traceCopied = id;
+					}}
+					onOpenAudit={() => (traceAction = "audit")}
+					onOpenCli={() => (traceAction = "cli")}
+				/>
+				<TraceChip badge traceId="8b2d4a6f1c3e5d7a" copyable={false} />
 				<span class="text-xs text-muted-foreground" data-design-kit-trace-copied>
 					Copied: {copiedTrace ?? "—"}
 				</span>
+				<span class="text-xs text-muted-foreground" data-design-kit-trace-action>
+					Action: {traceAction ?? "—"}
+				</span>
 			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="stage-rail"
+		>
+			<h2 class="text-lg font-semibold">StageRail</h2>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §3.1 — 220px expanded / 56px collapsed left rail; six WorkflowStages then a System
+				group.
+			</p>
+			<div class="flex flex-wrap items-center gap-2">
+				<button
+					type="button"
+					class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+					data-design-kit-rail-toggle
+					onclick={() => (railCollapsed = !railCollapsed)}
+				>
+					Toggle collapse
+				</button>
+				<span class="text-xs text-muted-foreground" data-design-kit-rail-state>
+					Stage: {railStage} · collapsed: {railCollapsed}
+				</span>
+			</div>
+			<div class="flex h-[360px] overflow-hidden rounded-md border border-border">
+				<StageRail
+					bind:current={railStage}
+					bind:collapsed={railCollapsed}
+					stages={[
+						{ stage: "capture", count: 7 },
+						{ stage: "plan", count: 3 },
+						{ stage: "build", count: 12 },
+						{ stage: "review", count: 2 },
+						{ stage: "ship" },
+						{ stage: "operate" },
+					]}
+					system={railSystem}
+				/>
+				<div class="flex-1 bg-surface p-4 text-sm text-muted-foreground">Stage content</div>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="scope-bar"
+		>
+			<h2 class="text-lg font-semibold">ScopeBar</h2>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §3.1 — 48px top chrome: brand · workspace · stage tabs · trace · system cluster.
+			</p>
+			<div class="overflow-hidden rounded-md border border-border">
+				<ScopeBar
+					bind:activeStage={scopeStage}
+					brand="Fulcrum"
+					workspacePath="mkh / fulcrum · auth-rewrite"
+				>
+					{#snippet trace()}
+						<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" project="fulcrum" />
+					{/snippet}
+					{#snippet systemCluster()}
+						<button
+							type="button"
+							aria-label="Command palette · ⌘K"
+							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
+							>⌘K</button
+						>
+						<button
+							type="button"
+							aria-label="Notifications · 2 unread"
+							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
+							>🔔</button
+						>
+						<button
+							type="button"
+							aria-label="Display, density, mode, theme"
+							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
+							>⚙</button
+						>
+						<button
+							type="button"
+							aria-label="Keyboard shortcuts · ?"
+							class="grid size-7 place-items-center rounded-md text-fg-subtle hover:bg-surface-sunken"
+							>?</button
+						>
+					{/snippet}
+				</ScopeBar>
+			</div>
+			<span class="text-xs text-muted-foreground" data-design-kit-scope-stage>
+				Active stage: {scopeStage}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="status-footer"
+		>
+			<h2 class="text-lg font-semibold">StatusFooter</h2>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §3.1 — 44px bottom strip; compact 38 / base 44 / comfortable 50; right-most AI
+				Assist segment with accent left-border.
+			</p>
+			<div class="flex flex-wrap gap-1">
+				{#each ["compact", "base", "comfortable"] as const as mode}
+					<button
+						type="button"
+						class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+						data-design-kit-footer-mode={mode}
+						onclick={() => (footerMode = mode)}
+					>
+						{mode}
+					</button>
+				{/each}
+			</div>
+			<div class="overflow-hidden rounded-md border border-border">
+				<StatusFooter
+					bind:mode={footerMode}
+					segments={footerSegments}
+					onAiAssist={() => (acpOpen = true)}
+				>
+					{#snippet rightCluster()}
+						<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" copyable={false} />
+						<span class="font-mono text-[11px] text-fg-subtle">13:04</span>
+					{/snippet}
+				</StatusFooter>
+			</div>
+			<span class="text-xs text-muted-foreground" data-design-kit-footer-state>
+				Footer mode: {footerMode}
+			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="acp-drawer"
+		>
+			<h2 class="text-lg font-semibold">AcpDrawer</h2>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §3.1 / apps/web CONTEXT.md — 420px right overlay AI Assist drawer; mobile bottom
+				sheet branch composes the ui-kit Sheet primitive.
+			</p>
+			<div class="flex flex-wrap items-center gap-2">
+				<button
+					type="button"
+					class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+					data-design-kit-acp-open="right"
+					onclick={() => {
+						acpSide = "right";
+						acpOpen = true;
+					}}
+				>
+					Open right drawer
+				</button>
+				<button
+					type="button"
+					class="rounded-md border border-border px-2 py-1 text-xs hover:bg-muted"
+					data-design-kit-acp-open="bottom"
+					onclick={() => {
+						acpSide = "bottom";
+						acpOpen = true;
+					}}
+				>
+					Open bottom sheet
+				</button>
+				<span class="text-xs text-muted-foreground" data-design-kit-acp-state>
+					Open: {acpOpen} · side: {acpSide}
+				</span>
+			</div>
+			<AcpDrawer
+				bind:open={acpOpen}
+				side={acpSide}
+				title="AI Assist"
+				scopeLabel="Step 3/8 · AUTH-43"
+			>
+				{#snippet trace()}
+					<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" project="fulcrum" />
+				{/snippet}
+				<p data-design-kit-acp-thread>Live thread streams agent messages here.</p>
+				{#snippet composer()}
+					<div class="flex items-center gap-2">
+						<input
+							type="text"
+							placeholder="Continue the session…"
+							class="flex-1 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+						/>
+						<button
+							type="button"
+							class="rounded-md bg-accent px-3 py-1.5 text-sm text-primary-foreground"
+							>▶ Send</button
+						>
+					</div>
+				{/snippet}
+			</AcpDrawer>
 		</article>
 
 		<article
