@@ -35,6 +35,8 @@
 		isMobileViewport,
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
+	import { withTrace, type WorkflowStage } from "$lib/components/app/route-map.ts";
+	import { STAGE_NAV_ITEMS } from "$lib/components/app/nav-data.ts";
 
 	import type { InferenceStatus } from "$lib/components/app/AppTopbar.svelte";
 
@@ -117,6 +119,64 @@
 		aiSavedNotice = "Thread saved as prompt template";
 	}
 
+	/*
+	 * Global `g <letter>` stage chords + `[` StageRail toggle
+	 * (`prd-web-stage-route-model`, IA-MAP.md §4.1).
+	 *
+	 *   g c|p|b|r|s|o  → the six WorkflowStages (Capture … Operate)
+	 *   g d            → Dashboard (portfolio)
+	 *   g i            → Inbox (portfolio)
+	 *   [              → toggle the StageRail collapsed state
+	 *
+	 * The chord navigates to the canonical stage route when the current URL is
+	 * already a `/<ws>/projects/<projId>/<stage>` path (it swaps only the
+	 * `<stage>` segment, preserving `<ws>`/`<projId>` and the trace hash + filter
+	 * query). On any other route it falls back to the stage's home route from
+	 * `STAGE_NAV_ITEMS`. Either way the `#trace=<id>` hash and filter query
+	 * survive (`withTrace`) so a stage hop never drops the active trace.
+	 */
+	let chordPending = $state(false);
+	let chordTimer: ReturnType<typeof setTimeout> | undefined;
+	let railCollapsed = $state(false);
+
+	/** One chord key → its destination path (canonical when in project scope). */
+	function chordDestination(key: string): string | null {
+		const pathname = page.url.pathname;
+		const segments = pathname.replace(/^\/+|\/+$/g, "").split("/");
+		const inProjectScope = segments[1] === "projects" && segments.length >= 4;
+
+		const STAGE_BY_KEY: Record<string, WorkflowStage> = {
+			c: "capture",
+			p: "plan",
+			b: "build",
+			r: "review",
+			s: "ship",
+			o: "operate",
+		};
+		const stage = STAGE_BY_KEY[key];
+		if (stage) {
+			if (inProjectScope) {
+				// Canonical scope — swap only the `<stage>` segment.
+				return `/${segments[0]}/projects/${segments[2]}/${stage}`;
+			}
+			// Legacy scope — fall back to the stage's home route.
+			return STAGE_NAV_ITEMS.find((item) => item.stage === stage)?.href ?? null;
+		}
+		if (key === "d") return inProjectScope ? `/${segments[0]}/dashboard` : "/";
+		if (key === "i") return inProjectScope ? `/${segments[0]}/inbox` : "/inbox";
+		return null;
+	}
+
+	function navigateChord(key: string): void {
+		const destination = chordDestination(key);
+		if (!destination) return;
+		void goto(withTrace(destination, page.url));
+	}
+
+	function toggleRailCollapsed(): void {
+		railCollapsed = !railCollapsed;
+	}
+
 	const commandKeydownHandler = makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next));
 
 	// Poll inference sidecar health every 30s (client-side only)
@@ -182,12 +242,14 @@
 			window.removeEventListener("keyup", onGlobalKeyup);
 			window.removeEventListener("fulcrum:open-shortcut-help", openHelp);
 			window.removeEventListener("fulcrum:open-ai-assist", openAiAssist);
+			if (chordTimer) clearTimeout(chordTimer);
 		};
 	});
 
 	function onGlobalKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const tag = typeof target?.tagName === "string" ? target.tagName.toLowerCase() : "";
+		const inTextField = tag === "input" || tag === "textarea" || target?.isContentEditable === true;
 		// ⌘/ (or Ctrl+/) toggles the AI Assist drawer from any route. The meta/ctrl
 		// modifier makes it a deliberate chord, so it fires inside text fields too
 		// without stealing a literal "/" keystroke (IA-MAP.md §5 "⌘/ from anywhere").
@@ -195,6 +257,39 @@
 			event.preventDefault();
 			toggleAiAssist();
 			return;
+		}
+		// `[` toggles the StageRail collapsed state (prd-web-stage-route-model).
+		if (event.key === "[" && !event.metaKey && !event.ctrlKey && !event.altKey && !inTextField) {
+			event.preventDefault();
+			toggleRailCollapsed();
+			return;
+		}
+		// `g <letter>` stage chord (IA-MAP.md §4.1). `g` arms a one-shot pending
+		// state; the next letter within 1s resolves the destination. No modifier,
+		// not inside a text field — leaves real typing untouched.
+		if (!event.metaKey && !event.ctrlKey && !event.altKey && !inTextField) {
+			if (chordPending) {
+				const key = event.key.toLowerCase();
+				if ("cpbrsodi".includes(key)) {
+					event.preventDefault();
+					chordPending = false;
+					if (chordTimer) clearTimeout(chordTimer);
+					navigateChord(key);
+					return;
+				}
+				// Any other key cancels the pending chord.
+				chordPending = false;
+				if (chordTimer) clearTimeout(chordTimer);
+			}
+			if (event.key.toLowerCase() === "g") {
+				event.preventDefault();
+				chordPending = true;
+				if (chordTimer) clearTimeout(chordTimer);
+				chordTimer = setTimeout(() => {
+					chordPending = false;
+				}, 1_000);
+				return;
+			}
 		}
 		if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
 			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
@@ -411,8 +506,17 @@
 			</div>
 		</Sheet>
 	{:else}
-		<!-- Desktop shell region for the StageRail (DESIGN.md §3.1 chrome left rail). -->
-		<div class={cn("sticky top-0 h-screen")} data-shell-region="stage-rail">
+		<!--
+			Desktop shell region for the StageRail (DESIGN.md §3.1 chrome left rail).
+			`[` toggles the collapsed state (prd-web-stage-route-model, IA-MAP.md
+			§4.1): `data-rail-collapsed` is the shell-level state attribute the rail
+			region carries; collapsed narrows the region to the 56px icon rail.
+		-->
+		<div
+			class={cn("sticky top-0 h-screen overflow-hidden transition-[width]", railCollapsed ? "w-14" : "w-[220px]")}
+			data-shell-region="stage-rail"
+			data-rail-collapsed={railCollapsed ? "true" : "false"}
+		>
 			<AppSidebar activeProjectId={data.activeProjectId} />
 		</div>
 		<div class={cn("flex min-w-0 flex-1 flex-col")}>
