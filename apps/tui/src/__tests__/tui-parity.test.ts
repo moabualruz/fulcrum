@@ -614,3 +614,142 @@ describe("TUI stage workbenches — Plan / Review / Board OD parity", () => {
     expect(snap).toContain("Press c to create a task.");
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-status-empty-error-contract — the shared 8-state status vocabulary
+// and empty/error contract on the runs / planning / review screens.
+//
+// CLI-TUI-UX.md §11 locks an 8-state status badge vocabulary (glyph + label,
+// never colour-only); CLI-TUI-UX.md §5 + COPY.md §2/§3 lock the empty-state
+// (one sentence + one action) and error-frame (`trace=<id>`) contracts. These
+// tests assert the EXACT badge labels and copy shape — not substrings — so the
+// vocabulary cannot drift screen to screen.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("TUI status vocabulary + empty/error contract — runs/planning/review", () => {
+  async function snapshotScreen(
+    cols: number,
+    rows: number,
+    screen: { load: () => Promise<void>; render: (r: Renderer) => void },
+  ): Promise<string> {
+    const { Renderer } = await import("../renderer.ts");
+    await screen.load();
+    const tty = new FakeTTY({ columns: cols, rows });
+    screen.render(new Renderer(tty));
+    return tty.plainText();
+  }
+
+  test("runs screen renders the canonical 8-state badges, not ad hoc bracket labels", async () => {
+    const { RunsScreen } = await import("../screens/runs.ts");
+    const screen = new RunsScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [
+            { id: "r1", agent: "codex", status: "running", taskTitle: "a", projectName: "p" },
+            { id: "r2", agent: "claude", status: "succeeded", taskTitle: "b", projectName: "p" },
+            { id: "r3", agent: "gemini", status: "failed", taskTitle: "c", projectName: "p" },
+          ],
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    const snap = await snapshotScreen(120, 32, screen);
+    // Exact glyph + UPPERCASE label — `succeeded` folds onto COMPLETE.
+    expect(snap).toContain("● RUNNING");
+    expect(snap).toContain("✓ COMPLETE");
+    expect(snap).toContain("✗ FAILED");
+    // The legacy ad hoc bracket labels are gone.
+    expect(snap).not.toContain("[running]");
+    expect(snap).not.toContain("[completed]");
+  });
+
+  test("runs screen empty + error states match the shared contract", async () => {
+    const { RunsScreen } = await import("../screens/runs.ts");
+    const empty = new RunsScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [],
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    const emptySnap = await snapshotScreen(80, 24, empty);
+    expect(emptySnap).toContain("No runs yet in this project.");
+    expect(emptySnap).toContain("Press d to dispatch the first run.");
+
+    const failing = new RunsScreen({
+      traceId: "tr_4f3a1c9e",
+      caller: {
+        agent_runs: {
+          list: async () => {
+            throw new Error("runs service offline");
+          },
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    const errSnap = await snapshotScreen(120, 32, failing);
+    expect(errSnap).toContain("Runs feed failed to load.");
+    expect(errSnap).toContain("trace=tr_4f3a1c9e");
+  });
+
+  test("planning screen renders canonical status badges for session states", async () => {
+    const { PlanningScreen } = await import("../screens/planning-screen.ts");
+    const screen = new PlanningScreen({
+      caller: {
+        planning: {
+          getState: async () => ({
+            activeSessions: [
+              { id: "s1", title: "oauth", status: "planning", mode: "guided" },
+            ],
+            recentSessions: [
+              { id: "s2", title: "rbac", status: "approved", mode: "freeform" },
+              { id: "s3", title: "audit", status: "awaiting_review", mode: "guided" },
+            ],
+          }),
+          startGuided: async () => ({ id: "x", title: "x", status: "idle", mode: "guided" }),
+          startFreeform: async () => ({ id: "x", title: "x", status: "idle", mode: "freeform" }),
+        },
+      },
+    });
+    const snap = await snapshotScreen(120, 32, screen);
+    // `planning` → RUNNING, `approved` → COMPLETE, `awaiting_review` → AWAITING.
+    expect(snap).toContain("● RUNNING");
+    expect(snap).toContain("✓ COMPLETE");
+    expect(snap).toContain("⌛ AWAITING");
+  });
+
+  test("review screen renders canonical badges for QA criteria and sessions", async () => {
+    const { ReviewScreen } = await import("../screens/review-screen.ts");
+    const screen = new ReviewScreen({
+      caller: {
+        reviews: {
+          listSessions: async () => [
+            {
+              id: "r1",
+              title: "PR #4218",
+              status: "changes_requested",
+              criteria: [
+                { name: "lint", status: "pass" },
+                { name: "types", status: "fail" },
+                { name: "e2e", status: "pending" },
+              ],
+            },
+          ],
+          getSession: async () => ({ id: "r1", title: "PR #4218", status: "in_progress" }),
+          startReview: async () => ({ id: "r2", title: "new", status: "draft" }),
+          approve: async () => ({ ok: true }),
+          requestChanges: async () => ({ ok: true }),
+          saveSession: async () => ({ ok: true }),
+        },
+      },
+    });
+    const snap = await snapshotScreen(120, 32, screen);
+    // QA criteria — `pass` → COMPLETE, `fail` → FAILED, `pending` → PENDING.
+    expect(snap).toContain("✓ COMPLETE");
+    expect(snap).toContain("✗ FAILED");
+    expect(snap).toContain("◌ PENDING");
+    // Session status — `changes_requested` → BLOCKED.
+    expect(snap).toContain("⏸ BLOCKED");
+  });
+});

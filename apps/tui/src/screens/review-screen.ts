@@ -23,6 +23,7 @@ import { c } from "../renderer.ts";
 import {
   renderStageWorkbenchFooter,
   renderStageWorkbenchHeader,
+  renderStatusBadge,
   renderWorkbenchEmptyState,
   renderWorkbenchErrorFrame,
   type StageWorkbenchScope,
@@ -138,7 +139,7 @@ export class ReviewScreen {
     if (selected?.criteria && selected.criteria.length > 0) {
       renderer.writeln(c.bold("  QA Report"));
       for (const criterion of selected.criteria) {
-        renderer.writeln(`  ${criterionBadge(criterion.status)} ${criterion.name}${criterion.detail ? c.dim(`  ${criterion.detail}`) : ""}`);
+        renderer.writeln(`  ${renderStatusBadge(criterion.status)} ${criterion.name}${criterion.detail ? c.dim(`  ${criterion.detail}`) : ""}`);
       }
       renderer.writeln();
     }
@@ -149,7 +150,7 @@ export class ReviewScreen {
     for (const session of visible) {
       const index = this.sessions.indexOf(session);
       const pointer = index === this.cursor ? c.bold(">") : " ";
-      const badge = sessionStatusBadge(session.status);
+      const badge = renderStatusBadge(session.status);
       const reviewer = session.reviewer ? c.dim(` @${session.reviewer}`) : "";
       const date = session.createdAt ? c.dim(` ${session.createdAt}`) : "";
       renderer.writeln(`${pointer} ${badge} ${session.title}${reviewer}${date}  ${c.dim(session.id)}`);
@@ -258,23 +259,3 @@ export class ReviewScreen {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function criterionBadge(status: string): string {
-  if (status === "pass") return c.green("[PASS]");
-  if (status === "fail") return c.red("[FAIL]");
-  if (status === "pending") return c.yellow("[PEND]");
-  if (status === "skipped") return c.dim("[SKIP]");
-  return `[${status}]`;
-}
-
-function sessionStatusBadge(status: string): string {
-  if (status === "approved") return c.green("[approved]");
-  if (status === "changes_requested") return c.red("[changes]");
-  if (status === "in_progress") return c.yellow("[in progress]");
-  if (status === "draft") return c.dim("[draft]");
-  if (status === "closed") return c.dim("[closed]");
-  return `[${status}]`;
-}

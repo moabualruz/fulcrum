@@ -169,6 +169,141 @@ export function workbenchErrorFrameText(failure: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// StatusBadge — the shared 8-state TUI status vocabulary
+//
+// CLI-TUI-UX.md §11 / DESIGN.md §4.9 lock one universal status vocabulary:
+// 8 states, each rendered as glyph + UPPERCASE label, never colour-only
+// (WCAG 1.4.1). Every TUI list/header status badge renders through this
+// module so the vocabulary cannot drift screen to screen — no more ad hoc
+// bracket labels, no more `complete` vs `completed` divergence.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The 8 canonical status states (CLI-TUI-UX.md §11). */
+export type StatusBadgeState =
+  | "pending"
+  | "running"
+  | "complete"
+  | "blocked"
+  | "awaiting"
+  | "failed"
+  | "cancelled"
+  | "degraded";
+
+/** One canonical status-badge descriptor: the glyph and the exact label. */
+interface StatusBadgeToken {
+  /** Single-cell glyph from CLI-TUI-UX.md §11. */
+  glyph: string;
+  /** Exact UPPERCASE label string — asserted verbatim by parity tests. */
+  label: string;
+  /** Colour function applied to the rendered badge. */
+  tone: (s: string) => string;
+}
+
+/**
+ * The canonical 8-state table — glyph + label + tone exactly as CLI-TUI-UX.md
+ * §11 / DESIGN.md §4.9 specify. `running` uses accent, `blocked`/`awaiting`/
+ * `degraded` use warn, `failed` uses danger, `cancelled` is muted.
+ */
+const STATUS_BADGE_TABLE: Record<StatusBadgeState, StatusBadgeToken> = {
+  pending: { glyph: "◌", label: "PENDING", tone: c.dim },
+  running: { glyph: "●", label: "RUNNING", tone: c.cyan },
+  complete: { glyph: "✓", label: "COMPLETE", tone: c.green },
+  blocked: { glyph: "⏸", label: "BLOCKED", tone: c.yellow },
+  awaiting: { glyph: "⌛", label: "AWAITING", tone: c.yellow },
+  failed: { glyph: "✗", label: "FAILED", tone: c.red },
+  cancelled: { glyph: "⊘", label: "CANCELLED", tone: c.dim },
+  degraded: { glyph: "⚠", label: "DEGRADED", tone: c.yellow },
+};
+
+/** The 8 canonical states, in CLI-TUI-UX.md §11 table order. */
+export const STATUS_BADGE_STATES: readonly StatusBadgeState[] = [
+  "pending",
+  "running",
+  "complete",
+  "blocked",
+  "awaiting",
+  "failed",
+  "cancelled",
+  "degraded",
+];
+
+/**
+ * Alias map — folds the many raw status strings the services emit onto the 8
+ * canonical states. `succeeded`/`ok`/`passed` → `complete`; `in_progress` →
+ * `running`; `error` → `failed`; `archived` → `cancelled`; review/planning
+ * lifecycle strings map onto the nearest canonical state. An unmapped string
+ * is treated as `pending` so a badge always renders one of the 8 states.
+ */
+const STATUS_ALIASES: Record<string, StatusBadgeState> = {
+  // pending family
+  pending: "pending",
+  queued: "pending",
+  idle: "pending",
+  draft: "pending",
+  todo: "pending",
+  unknown: "pending",
+  // running family
+  running: "running",
+  in_progress: "running",
+  executing: "running",
+  planning: "running",
+  // complete family
+  complete: "complete",
+  completed: "complete",
+  succeeded: "complete",
+  success: "complete",
+  ok: "complete",
+  passed: "complete",
+  pass: "complete",
+  approved: "complete",
+  // blocked family
+  blocked: "blocked",
+  changes_requested: "blocked",
+  rejected: "blocked",
+  // awaiting family
+  awaiting: "awaiting",
+  awaiting_review: "awaiting",
+  // failed family
+  failed: "failed",
+  fail: "failed",
+  error: "failed",
+  // cancelled family
+  cancelled: "cancelled",
+  canceled: "cancelled",
+  archived: "cancelled",
+  closed: "cancelled",
+  skipped: "cancelled",
+  // degraded family
+  degraded: "degraded",
+  partial: "degraded",
+};
+
+/** Fold any raw status string onto one of the 8 canonical states. */
+export function resolveStatusBadgeState(status: string): StatusBadgeState {
+  return STATUS_ALIASES[status.toLowerCase().trim()] ?? "pending";
+}
+
+/**
+ * Render a status badge — `glyph LABEL`, toned per the canonical table. Every
+ * TUI status badge in a list row or header renders through this one helper.
+ */
+export function renderStatusBadge(status: string): string {
+  const token = STATUS_BADGE_TABLE[resolveStatusBadgeState(status)];
+  return token.tone(`${token.glyph} ${token.label}`);
+}
+
+/** Plain-text `glyph LABEL` form — used by tests and snapshot fixtures. */
+export function statusBadgeText(status: string): string {
+  const token = STATUS_BADGE_TABLE[resolveStatusBadgeState(status)];
+  return `${token.glyph} ${token.label}`;
+}
+
+/** The exact UPPERCASE label for a status — `PENDING`, `RUNNING`, … */
+export function statusBadgeLabel(status: string): string {
+  return STATUS_BADGE_TABLE[resolveStatusBadgeState(status)].label;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -270,10 +405,10 @@ export class RunsControlScreen {
       return;
     }
 
-    // Status summary
+    // Status summary — canonical 8-state vocabulary (CLI-TUI-UX.md §11).
     const counts = statusCounts(this.runs);
     renderer.writeln(
-      `  ${c.dim("pending:")}${counts.pending}  ${c.yellow("running:")}${counts.running}  ${c.green("completed:")}${counts.completed}  ${c.red("failed:")}${counts.failed}`,
+      `  ${c.dim("PENDING")} ${counts.pending}  ${c.cyan("RUNNING")} ${counts.running}  ${c.green("COMPLETE")} ${counts.complete}  ${c.yellow("BLOCKED")} ${counts.blocked}  ${c.red("FAILED")} ${counts.failed}`,
     );
     renderer.writeln();
 
@@ -289,7 +424,7 @@ export class RunsControlScreen {
       for (const run of visible) {
         const index = this.runs.indexOf(run);
         const pointer = index === this.cursor ? c.bold(">") : " ";
-        const badge = runStatusBadge(run.status);
+        const badge = renderStatusBadge(run.status);
         const project = run.projectName ?? "no project";
         const task = run.taskTitle ?? run.id;
         renderer.writeln(`${pointer} ${badge} ${run.agent}  ${project}  ${task}  ${c.dim(run.id)}`);
@@ -315,7 +450,7 @@ export class RunsControlScreen {
         renderer.writeln(c.dim("  No dependencies."));
       } else {
         for (const dep of this.deps) {
-          const depBadge = runStatusBadge(dep.status);
+          const depBadge = renderStatusBadge(dep.status);
           renderer.writeln(`  ${depBadge} ${dep.label}  ${c.dim(dep.runId)}`);
         }
       }
@@ -459,21 +594,19 @@ export class RunsControlScreen {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function runStatusBadge(status: string): string {
-  const normalized = status === "succeeded" ? "completed" : status;
-  if (normalized === "running") return c.yellow("[running]");
-  if (normalized === "completed") return c.green("[completed]");
-  if (normalized === "failed") return c.red("[failed]");
-  if (normalized === "pending") return c.dim("[pending]");
-  if (normalized === "cancelled") return c.dim("[cancelled]");
-  return `[${normalized}]`;
-}
-
-function statusCounts(runs: TuiManagedRun[]): Record<string, number> {
-  const counts: Record<string, number> = { pending: 0, running: 0, completed: 0, failed: 0 };
+function statusCounts(runs: TuiManagedRun[]): Record<StatusBadgeState, number> {
+  const counts: Record<StatusBadgeState, number> = {
+    pending: 0,
+    running: 0,
+    complete: 0,
+    blocked: 0,
+    awaiting: 0,
+    failed: 0,
+    cancelled: 0,
+    degraded: 0,
+  };
   for (const run of runs) {
-    const s = run.status === "succeeded" ? "completed" : run.status;
-    if (s in counts) counts[s]!++;
+    counts[resolveStatusBadgeState(run.status)]++;
   }
   return counts;
 }

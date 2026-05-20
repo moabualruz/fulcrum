@@ -22,6 +22,7 @@ import { c } from "../renderer.ts";
 import {
   renderStageWorkbenchFooter,
   renderStageWorkbenchHeader,
+  renderStatusBadge,
   renderWorkbenchEmptyState,
   renderWorkbenchErrorFrame,
   type StageWorkbenchScope,
@@ -164,7 +165,7 @@ export class PlanningScreen {
       renderer.writeln(c.dim("  No active planning sessions."));
     } else {
       for (const session of active) {
-        const badge = planningStatusBadge(session.status);
+        const badge = renderStatusBadge(session.status);
         const mode = session.mode === "guided" ? c.cyan("[guided]") : c.magenta("[freeform]");
         const agent = session.agentName ? c.dim(` @${session.agentName}`) : "";
         const traffic = session.traffic?.length
@@ -186,7 +187,7 @@ export class PlanningScreen {
       for (const session of visible) {
         const index = allSessions.indexOf(session);
         const pointer = index === this.cursor ? c.bold(">") : " ";
-        const badge = planningStatusBadge(session.status);
+        const badge = renderStatusBadge(session.status);
         const mode = session.mode === "guided" ? c.cyan("[G]") : c.magenta("[F]");
         const date = session.createdAt ? c.dim(` ${session.createdAt}`) : "";
         renderer.writeln(`${pointer} ${badge} ${mode} ${session.title}${date}  ${c.dim(session.id)}`);
@@ -308,16 +309,3 @@ export class PlanningScreen {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function planningStatusBadge(status: string): string {
-  if (status === "idle") return c.dim("[idle]");
-  if (status === "planning") return c.yellow("[planning]");
-  if (status === "awaiting_review") return c.cyan("[review]");
-  if (status === "approved") return c.green("[approved]");
-  if (status === "rejected") return c.red("[rejected]");
-  if (status === "executing") return c.yellow("[executing]");
-  return `[${status}]`;
-}

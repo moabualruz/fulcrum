@@ -1,6 +1,12 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { TuiSubscription, SubscriptionBridge } from "../subscriptions.ts";
+import {
+  renderStatusBadge,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  resolveStatusBadgeState,
+} from "./runs-screen.ts";
 
 export interface TuiRun {
   id: string;
@@ -23,6 +29,8 @@ export interface TuiRunObservability {
 }
 
 export interface RunsScreenOptions {
+  /** Active trace id rendered into the error frame (CLI-TUI-UX.md §5). */
+  traceId?: string | null;
   caller: {
     agent_runs: {
       list: () => Promise<TuiRun[]>;
@@ -40,27 +48,50 @@ export class RunsScreen {
   private cursor = 0;
   private scrollTop = 0;
   private overlay: RunsOverlay = "none";
+  private error: string | null = null;
 
   constructor(private readonly opts: RunsScreenOptions) {}
 
   async load(): Promise<void> {
-    this.runs = await this.opts.caller.agent_runs.list();
-    this.clampCursor();
+    try {
+      this.runs = await this.opts.caller.agent_runs.list();
+      this.error = null;
+      this.clampCursor();
+    } catch (err) {
+      this.runs = [];
+      this.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   render(renderer: Renderer): void {
     renderer.writeln();
     renderer.writeln(c.bold("  Runs"));
     renderer.separator();
+
+    // Error frame — `[what failed]. [why]. [next step]. trace=<id>` (CLI-TUI-UX.md §5).
+    if (this.error) {
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Runs feed failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      return;
+    }
+
     renderer.writeln();
 
+    // Empty state — one sentence + one action (CLI-TUI-UX.md §5, COPY.md §2).
     if (this.visibleRuns.length === 0) {
-      renderer.writeln(c.dim("  No runs."));
+      renderWorkbenchEmptyState(
+        renderer,
+        "No runs yet in this project.",
+        "Press d to dispatch the first run.",
+      );
     } else {
       for (const run of this.visibleRuns) {
         const index = this.runs.indexOf(run);
         const pointer = index === this.cursor ? c.bold(">") : " ";
-        renderer.writeln(`${pointer} ${statusBadge(run.status)} ${run.agent}  ${run.projectName ?? "no project"}  ${run.taskTitle ?? run.id}  ${run.id}`);
+        renderer.writeln(`${pointer} ${renderStatusBadge(run.status)} ${run.agent}  ${run.projectName ?? "no project"}  ${run.taskTitle ?? run.id}  ${run.id}`);
       }
     }
 
@@ -173,8 +204,8 @@ export class RunDetailScreen {
       return;
     }
 
-    renderer.writeln(`  ${statusBadge(this.run.status)} agent:${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
-    if (isCompletedStatus(this.run.status)) {
+    renderer.writeln(`  ${renderStatusBadge(this.run.status)} agent:${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
+    if (resolveStatusBadgeState(this.run.status) === "complete") {
       renderer.writeln();
       renderer.writeln(c.green("  Run completed"));
     }
@@ -248,15 +279,3 @@ export class RunDetailScreen {
   }
 }
 
-function statusBadge(status: string): string {
-  const normalized = status === "succeeded" ? "completed" : status;
-  if (normalized === "running") return c.yellow("[running]");
-  if (normalized === "completed") return c.green("[completed]");
-  if (normalized === "failed") return c.red("[failed]");
-  if (normalized === "cancelled") return c.dim("[cancelled]");
-  return `[${normalized}]`;
-}
-
-function isCompletedStatus(status: string): boolean {
-  return status === "completed" || status === "succeeded";
-}

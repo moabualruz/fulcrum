@@ -4,7 +4,12 @@ import { EventEmitter } from "node:events";
 import { Renderer } from "@fulcrum/tui/renderer.ts";
 import { ArtifactsScreen } from "@fulcrum/tui/screens/artifacts.ts";
 import { RunDetailScreen, RunsScreen } from "@fulcrum/tui/screens/runs.ts";
-import { RunsControlScreen } from "@fulcrum/tui/screens/runs-screen.ts";
+import {
+  RunsControlScreen,
+  STATUS_BADGE_STATES,
+  statusBadgeLabel,
+  statusBadgeText,
+} from "@fulcrum/tui/screens/runs-screen.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
@@ -50,7 +55,13 @@ describe("RunsScreen", () => {
 
     await screen.load();
     const listing = renderPlain((renderer) => screen.render(renderer));
-    for (const status of ["[running]", "[completed]", "[failed]", "[cancelled]"]) expect(listing).toContain(status);
+    // Canonical 8-state vocabulary (CLI-TUI-UX.md §11) — glyph + exact label,
+    // never the legacy `[running]` ad hoc bracket labels.
+    for (const badge of ["● RUNNING", "✓ COMPLETE", "✗ FAILED", "⊘ CANCELLED"]) {
+      expect(listing).toContain(badge);
+    }
+    expect(listing).not.toContain("[running]");
+    expect(listing).not.toContain("[completed]");
 
     await screen.handleKey("d");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Dispatch run");
@@ -61,6 +72,107 @@ describe("RunsScreen", () => {
 
     await screen.handleKey("\r");
     expect(opened).toEqual(["run-new"]);
+  });
+
+  test("empty RunsScreen renders the shared one-sentence/one-action empty state", async () => {
+    const screen = new RunsScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [],
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderPlain((renderer) => screen.render(renderer));
+    // Empty contract: one sentence naming the surface + one action hint.
+    expect(snap).toContain("No runs yet in this project.");
+    expect(snap).toContain("Press d to dispatch the first run.");
+    expect(snap).not.toContain("No runs.");
+  });
+
+  test("failed RunsScreen renders the error frame carrying trace=<id>", async () => {
+    const screen = new RunsScreen({
+      traceId: "tr_9c1e3a5b",
+      caller: {
+        agent_runs: {
+          list: async () => {
+            throw new Error("runs service unreachable");
+          },
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderPlain((renderer) => screen.render(renderer));
+    // Error frame: [what failed]. [why]. [next step]. trace=<id> (COPY.md §3).
+    expect(snap).toContain("Runs feed failed to load.");
+    expect(snap).toContain("runs service unreachable");
+    expect(snap).toContain("trace=tr_9c1e3a5b");
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-status-empty-error-contract — the shared 8-state status vocabulary.
+//
+// CLI-TUI-UX.md §11 / DESIGN.md §4.9 lock one universal status vocabulary:
+// 8 states, glyph + UPPERCASE label, never colour-only. These tests assert the
+// EXACT label and glyph for every state — not substring presence.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("Shared TUI status badge vocabulary (CLI-TUI-UX.md §11)", () => {
+  test("renders all 8 canonical states with exact glyph + label", () => {
+    const expected: Record<string, string> = {
+      pending: "◌ PENDING",
+      running: "● RUNNING",
+      complete: "✓ COMPLETE",
+      blocked: "⏸ BLOCKED",
+      awaiting: "⌛ AWAITING",
+      failed: "✗ FAILED",
+      cancelled: "⊘ CANCELLED",
+      degraded: "⚠ DEGRADED",
+    };
+    // The module exposes exactly the 8 states, in CLI-TUI-UX.md §11 order.
+    expect([...STATUS_BADGE_STATES]).toEqual([
+      "pending",
+      "running",
+      "complete",
+      "blocked",
+      "awaiting",
+      "failed",
+      "cancelled",
+      "degraded",
+    ]);
+    for (const state of STATUS_BADGE_STATES) {
+      expect(statusBadgeText(state)).toBe(expected[state] ?? "");
+    }
+  });
+
+  test("labels are exactly the uppercase canonical strings", () => {
+    expect(STATUS_BADGE_STATES.map((s) => statusBadgeLabel(s))).toEqual([
+      "PENDING",
+      "RUNNING",
+      "COMPLETE",
+      "BLOCKED",
+      "AWAITING",
+      "FAILED",
+      "CANCELLED",
+      "DEGRADED",
+    ]);
+  });
+
+  test("raw service status strings fold onto the 8 canonical states", () => {
+    // `complete` vs `completed` drift is gone — both resolve to COMPLETE.
+    expect(statusBadgeLabel("completed")).toBe("COMPLETE");
+    expect(statusBadgeLabel("complete")).toBe("COMPLETE");
+    expect(statusBadgeLabel("succeeded")).toBe("COMPLETE");
+    expect(statusBadgeLabel("ok")).toBe("COMPLETE");
+    expect(statusBadgeLabel("passed")).toBe("COMPLETE");
+    expect(statusBadgeLabel("in_progress")).toBe("RUNNING");
+    expect(statusBadgeLabel("error")).toBe("FAILED");
+    expect(statusBadgeLabel("changes_requested")).toBe("BLOCKED");
+    expect(statusBadgeLabel("awaiting_review")).toBe("AWAITING");
+    expect(statusBadgeLabel("archived")).toBe("CANCELLED");
   });
 });
 
