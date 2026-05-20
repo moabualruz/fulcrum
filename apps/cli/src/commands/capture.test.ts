@@ -159,6 +159,10 @@ describe("fulcrum capture command", () => {
   });
 
   test("requires a configured capture API without injected caller", async () => {
+    // Under `--json-raw` the legacy `{error:{code,message}}` shape is emitted on
+    // stdout; in plain mode the recovery block goes to stderr. Capture both so
+    // the assertion proves the failure surfaces regardless of output mode.
+    const out: string[] = [];
     const errors: string[] = [];
     let exitCode: number | undefined;
 
@@ -167,7 +171,7 @@ describe("fulcrum capture command", () => {
       fetch: (async () => {
         throw new Error("fetch should not run without API configuration");
       }) as unknown as typeof fetch,
-      print: () => {},
+      print: (line) => out.push(line),
       printErr: (line) => errors.push(line),
       exit: (code) => {
         exitCode = code;
@@ -175,6 +179,25 @@ describe("fulcrum capture command", () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(errors.join("\n")).toContain("Capture API caller is not configured");
+    expect([...out, ...errors].join("\n")).toContain("Capture API caller is not configured");
+  });
+
+  test("emits the canonical fulcrum.cli.v1 envelope for an intake under --json", async () => {
+    const caller = fakeCaller();
+    const lines: string[] = [];
+
+    await run(["text", "rough idea", "--trace", "8f29a4c1b3e0d5f7c2a90e6b4d138a72", "--json"], {
+      caller,
+      print: (line) => lines.push(line),
+      printErr: () => {},
+      exit: () => {},
+    });
+
+    const envelope = JSON.parse(lines[0] as string);
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.errors).toEqual([]);
+    expect(envelope.result.kind).toBe("text");
+    // The trace spine carries the same id the intake was tagged with.
+    expect(envelope.trace_id).toBe("8f29a4c1b3e0d5f7c2a90e6b4d138a72");
   });
 });

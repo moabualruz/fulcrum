@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { onMount } from "svelte";
 	import type { PageData } from "./$types";
 
 	import { Badge } from "@fulcrum/ui-kit";
-	import { WORKFLOW_STAGES, type WorkflowStage } from "$lib/components/app/route-map.ts";
+	import { WORKFLOW_STAGES, type WorkflowStage, traceFromHash } from "$lib/components/app/route-map.ts";
+	import CaptureStageWorkbench from "$lib/components/app/CaptureStageWorkbench.svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -10,6 +12,17 @@
 	}
 
 	let { data }: Props = $props();
+
+	/**
+	 * The trace id — the server reads a `?trace=` fallback; the canonical
+	 * `#trace=<id>` hash never reaches the server, so the client hydrates it
+	 * from `location.hash` (IA-MAP §1 "trace survives as URL hash").
+	 */
+	let clientTraceId = $state<string | null>(null);
+	onMount(() => {
+		clientTraceId = traceFromHash(typeof location !== "undefined" ? location.hash : null);
+	});
+	const traceId = $derived(data.traceId ?? clientTraceId);
 
 	/**
 	 * One findable feature view of a stage, mapped to its existing production
@@ -69,6 +82,21 @@
 	<title>{stageLabel} · {data.projId}</title>
 </svelte:head>
 
+{#if data.stage === "capture" && data.captureView}
+	<!--
+		`/<ws>/projects/<projId>/capture` — the Capture WorkflowStage workbench
+		(`prd-web-capture-stage-shell`; OD `capture.html`, `capture-drafts.html`,
+		`capture-promoted.html`). The Capture stage renders its own OD-fidelity
+		docs/drafts/promoted/inbox workbench, not the generic stage card grid.
+	-->
+	<CaptureStageWorkbench
+		ws={data.ws}
+		projId={data.projId}
+		view={data.captureView}
+		steps={data.captureSteps}
+		{traceId}
+	/>
+{:else}
 <!--
 	`/<ws>/projects/<projId>/<stage>` — the canonical WorkflowStage workbench
 	(IA-MAP §1). Mirrors the OD `desktop-shell.html` `.canvas-rep` region: a hero
@@ -109,3 +137,4 @@
 		{/each}
 	</ul>
 </section>
+{/if}
