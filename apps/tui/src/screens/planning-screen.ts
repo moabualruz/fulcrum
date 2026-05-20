@@ -1,6 +1,10 @@
 /**
- * PlanningScreen — TUI ACP planning surface (W2).
+ * Plan stage workbench — the TUI `:plan` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `plan` screen).
  *
+ * The Plan stage's planning-sessions surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :plan · …` header,
+ * StatusFooter strip, and empty/error contract as every other stage workbench.
  * Shows current planning state, starts guided ACP or freeform planning
  * sessions, and displays session status with traffic info.
  *
@@ -15,6 +19,13 @@
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -51,6 +62,12 @@ export interface TuiPlanningState {
 
 export interface PlanningScreenOptions {
   projectId?: string;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
   caller: {
     planning: {
       getState: (input?: { projectId?: string }) => Promise<TuiPlanningState>;
@@ -81,6 +98,20 @@ export class PlanningScreen {
 
   constructor(private readonly opts: PlanningScreenOptions) {}
 
+  /** The OD stage-scope chrome for the Plan workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Plan",
+      route: ":plan",
+      purpose: "live planning",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.allSessions.length} sessions`,
+      agent: this.allSessions[this.cursor]?.agentName ?? null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? this.allSessions[this.cursor]?.traceId ?? null,
+    };
+  }
+
   async load(): Promise<void> {
     try {
       this.state = await this.opts.caller.planning.getState(
@@ -95,20 +126,34 @@ export class PlanningScreen {
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Planning"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
     if (this.error) {
-      renderer.writeln(c.red(`  ${this.error}`));
-      renderer.writeln();
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Planning state failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
     }
 
     if (!this.state) {
-      renderer.writeln(c.dim("  Loading planning state..."));
       renderer.writeln();
-      renderer.writeln(c.dim("  G=guided start  F=freeform start  q=back"));
+      renderer.writeln(c.dim("  Loading planning state..."));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.allSessions.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No planning sessions in this stage yet.",
+        "Press G for a guided session or F for freeform.",
+      );
+      renderer.writeln();
+      renderer.writeln(c.dim("  G=guided start  F=freeform start  R=refresh  q=back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
       return;
     }
 
@@ -161,6 +206,7 @@ export class PlanningScreen {
 
     renderer.writeln();
     renderer.writeln(c.dim("  G=guided start  F=freeform start  R=refresh  j/k=navigate  Enter=open  q=back"));
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {

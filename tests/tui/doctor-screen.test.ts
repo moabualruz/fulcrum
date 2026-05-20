@@ -302,3 +302,48 @@ describe("runOpenTuiSnapshotGate", () => {
     expect(result.message).toContain("HANDOVER.md");
   });
 });
+
+// ---------------------------------------------------------------------------
+// prd-tui-stage-workbenches-set — Operate stage workbench OD parity.
+//
+// The Operate (`:doctor`) workbench renders the OD `tui-runs.html` stage
+// chrome: the `fulcrum · :doctor · subsystems` header carrying the exact
+// stage name, the StatusFooter strip, and the shared empty-state contract.
+// Snapshots are locked at 80x24 and 120x32.
+// ---------------------------------------------------------------------------
+
+describe("Operate stage workbench (:doctor) — OD parity", () => {
+  function renderAt(cols: number, rows: number, screen: DoctorScreen): string {
+    const tty = new FakeTTY({ columns: cols, rows });
+    screen.render(new Renderer(tty));
+    return tty.plainText();
+  }
+
+  const checks: DoctorCheckResult[] = [
+    makeResult({ name: "tui.jwt-verification", status: "ok", message: "p95 4ms", durationMs: 4 }),
+    makeResult({ name: "tui.telemetry-contract", status: "fail", message: "schema mismatch", durationMs: 3, recovery: "rename schema or migrate field" }),
+  ];
+
+  it("renders the Operate workbench header + footer at 80x24 and 120x32", () => {
+    const screen = new DoctorScreen({
+      results: checks,
+      projectLabel: "auth/rewrite",
+      traceId: "tr_56e3d12",
+      mcp: "6/7",
+    });
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, screen);
+      expect(snap).toContain("Operate");
+      expect(snap).toContain("fulcrum · :doctor · subsystems");
+      expect(snap).toContain("OPERATE");
+      expect(snap).toContain("trace tr_56e3d1");
+    }
+  });
+
+  it("empty Operate workbench renders the shared one-sentence/one-action contract", () => {
+    const screen = new DoctorScreen({ subsystem: "tui" });
+    const snap = renderAt(80, 24, screen);
+    expect(snap).toContain("No tui subsystem checks have run yet.");
+    expect(snap).toContain("Running checks");
+  });
+});

@@ -7,6 +7,7 @@ import {
 } from "@platform-core/application/interface-parity/surface-domain-matrix.ts";
 import { FakeTTY } from "../testing/fake-tty.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
+import type { Renderer } from "../renderer.ts";
 
 function extractNavLabels(source: string): string[] {
   return [...source.matchAll(/label:\s*["']([^"']+)["']/g)].map((match) => match[1] ?? "");
@@ -440,3 +441,176 @@ function createCaller(subscriptions = createSubscriptionHarness()): TuiCaller {
     search: { query: async () => [], suggest: async () => [] },
   };
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-stage-workbenches-set — Plan / Review / Board stage workbenches.
+//
+// Each stage colon route opens a dense workbench rendering the OD
+// `tui-runs.html` stage chrome: a `fulcrum · :<route> · <purpose>` header
+// carrying the exact stage name, the StatusFooter strip, and the shared
+// empty-state / error-frame contract. Snapshots are locked at 80x24 and
+// 120x32 so the layout holds at the minimum and a wide terminal.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("TUI stage workbenches — Plan / Review / Board OD parity", () => {
+  async function snapshot(
+    cols: number,
+    rows: number,
+    screen: { load: () => Promise<void>; render: (r: Renderer) => void },
+  ): Promise<string> {
+    const { Renderer } = await import("../renderer.ts");
+    await screen.load();
+    const tty = new FakeTTY({ columns: cols, rows });
+    screen.render(new Renderer(tty));
+    return tty.plainText();
+  }
+
+  test("Plan workbench (:plan) renders stage chrome + footer at 80x24 and 120x32", async () => {
+    const { PlanningScreen } = await import("../screens/planning-screen.ts");
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const screen = new PlanningScreen({
+        projectLabel: "auth/rewrite",
+        traceId: "tr_8f29a4c1b3e0",
+        mcp: "7/7",
+        caller: {
+          planning: {
+            getState: async () => ({
+              activeSessions: [
+                { id: "s1", title: "oauth/refresh", status: "planning", mode: "guided", agentName: "claude-opus-4.7" },
+              ],
+              recentSessions: [],
+            }),
+            startGuided: async () => ({ id: "s2", title: "guided", status: "planning", mode: "guided" }),
+            startFreeform: async () => ({ id: "s3", title: "freeform", status: "planning", mode: "freeform" }),
+          },
+        },
+      });
+      const snap = await snapshot(cols, rows, screen);
+      expect(snap).toContain("Plan");
+      expect(snap).toContain("fulcrum · :plan · live planning");
+      expect(snap).toContain("PLAN");
+      expect(snap).toContain("trace tr_8f29a4");
+    }
+  });
+
+  test("Plan workbench empty + error states match the shared contract", async () => {
+    const { PlanningScreen } = await import("../screens/planning-screen.ts");
+    const empty = new PlanningScreen({
+      caller: {
+        planning: {
+          getState: async () => ({ activeSessions: [], recentSessions: [] }),
+          startGuided: async () => ({ id: "x", title: "x", status: "idle", mode: "guided" }),
+          startFreeform: async () => ({ id: "x", title: "x", status: "idle", mode: "freeform" }),
+        },
+      },
+    });
+    const emptySnap = await snapshot(80, 24, empty);
+    expect(emptySnap).toContain("No planning sessions in this stage yet.");
+    expect(emptySnap).toContain("Press G for a guided session or F for freeform.");
+
+    const failing = new PlanningScreen({
+      traceId: "tr_56e3d12",
+      caller: {
+        planning: {
+          getState: async () => {
+            throw new Error("planning service offline");
+          },
+          startGuided: async () => ({ id: "x", title: "x", status: "idle", mode: "guided" }),
+          startFreeform: async () => ({ id: "x", title: "x", status: "idle", mode: "freeform" }),
+        },
+      },
+    });
+    const errSnap = await snapshot(120, 32, failing);
+    expect(errSnap).toContain("Planning state failed to load.");
+    expect(errSnap).toContain("trace=tr_56e3d12");
+  });
+
+  test("Review workbench (:review) renders stage chrome + footer at 80x24 and 120x32", async () => {
+    const { ReviewScreen } = await import("../screens/review-screen.ts");
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const screen = new ReviewScreen({
+        projectLabel: "auth/rewrite",
+        traceId: "tr_8f29a4c1b3e0",
+        mcp: "6/7",
+        caller: {
+          reviews: {
+            listSessions: async () => [
+              { id: "r1", title: "PR #4218", status: "in_progress", reviewer: "jb" },
+            ],
+            getSession: async () => ({ id: "r1", title: "PR #4218", status: "in_progress" }),
+            startReview: async () => ({ id: "r2", title: "new", status: "draft" }),
+            approve: async () => ({ ok: true }),
+            requestChanges: async () => ({ ok: true }),
+            saveSession: async () => ({ ok: true }),
+          },
+        },
+      });
+      const snap = await snapshot(cols, rows, screen);
+      expect(snap).toContain("Review");
+      expect(snap).toContain("fulcrum · :review · review queue");
+      expect(snap).toContain("REVIEW");
+      expect(snap).toContain("trace tr_8f29a4");
+    }
+  });
+
+  test("Review workbench empty state matches the shared contract", async () => {
+    const { ReviewScreen } = await import("../screens/review-screen.ts");
+    const screen = new ReviewScreen({
+      caller: {
+        reviews: {
+          listSessions: async () => [],
+          getSession: async () => ({ id: "x", title: "x", status: "draft" }),
+          startReview: async () => ({ id: "x", title: "x", status: "draft" }),
+          approve: async () => ({ ok: true }),
+          requestChanges: async () => ({ ok: true }),
+          saveSession: async () => ({ ok: true }),
+        },
+      },
+    });
+    const snap = await snapshot(80, 24, screen);
+    expect(snap).toContain("No review sessions in this stage yet.");
+    expect(snap).toContain("Press R to start a review.");
+  });
+
+  test("Build board workbench (:board) renders stage chrome + footer at 80x24 and 120x32", async () => {
+    const { TaskBoardScreen } = await import("../screens/task-board.ts");
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const screen = new TaskBoardScreen({
+        projectLabel: "auth/rewrite",
+        cycleLabel: "cycle 24w13",
+        traceId: "tr_8f29a4c1b3e0",
+        mcp: "7/7",
+        caller: {
+          tasks: {
+            list: async () => [
+              { id: "t1", orgId: "o", title: "per-kid rate limit", status: "todo" },
+            ],
+            update: async (i) => ({ id: i.id, orgId: "o", title: "x", status: i.status }),
+            create: async (i) => ({ id: "t2", orgId: "o", title: i.title, status: i.status }),
+          },
+        },
+      });
+      const snap = await snapshot(cols, rows, screen);
+      expect(snap).toContain("Build");
+      expect(snap).toContain("fulcrum · :board · task board");
+      expect(snap).toContain("BUILD");
+      expect(snap).toContain("cycle 24w13");
+    }
+  });
+
+  test("Build board workbench empty state matches the shared contract", async () => {
+    const { TaskBoardScreen } = await import("../screens/task-board.ts");
+    const screen = new TaskBoardScreen({
+      caller: {
+        tasks: {
+          list: async () => [],
+          update: async (i) => ({ id: i.id, orgId: "o", title: "x", status: i.status }),
+          create: async (i) => ({ id: "t", orgId: "o", title: i.title, status: i.status }),
+        },
+      },
+    });
+    const snap = await snapshot(80, 24, screen);
+    expect(snap).toContain("No tasks on this board yet.");
+    expect(snap).toContain("Press c to create a task.");
+  });
+});

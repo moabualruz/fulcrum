@@ -1,22 +1,172 @@
 /**
- * RunsScreen — TUI run controls (W8).
+ * Build stage workbench — the TUI `:runs` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `build-runs` screen).
  *
- * Extended runs screen with dependency tree preview, dispatch, cancel, and
- * retry actions. Complements the existing runs.ts list/detail screens by
- * adding run lifecycle management.
+ * This file owns two things:
+ *
+ *  1. `StageWorkbench` — the shared per-stage workbench shell every stage
+ *     screen (Plan / Build / Review / Ship / Operate) renders through. It is
+ *     the TUI mirror of the OD `tui-runs.html` `.term` frame: a `term-head`
+ *     line (`fulcrum · :<route> · <purpose>` + scope), a primary workbench
+ *     body, and the OD StatusFooter strip. It also owns the shared
+ *     empty-state and error-frame contract (one sentence + one action; errors
+ *     carry `trace=<id>`) so every stage workbench renders states identically.
+ *
+ *  2. `RunsControlScreen` — the Build stage workbench. A dense runs feed with
+ *     status summary, dependency-tree preview, dispatch / cancel / retry /
+ *     reassign actions, and a focused-run ModePicker row. Re-homed under the
+ *     `StageWorkbench` shell so it carries the same scope chrome and footer as
+ *     every other stage.
  *
  * Keybindings:
  *   D       — dispatch new run
  *   C       — cancel selected run
  *   R       — retry failed run
  *   P       — preview dependency tree
+ *   A       — reassign agent
  *   j/k     — navigate
  *   Enter   — open run detail
  *   q       — go back
  */
 
 import type { Renderer } from "../renderer.ts";
-import { c } from "../renderer.ts";
+import { c, hRule } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker } from "../widgets/ModePicker.ts";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StageWorkbench shell — shared per-stage workbench chrome
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The five workflow stages that own a TUI stage workbench. Capture is covered
+ * by `prd-web-capture-stage-shell` (`capture.ts`); these five are owned here.
+ */
+export type StageWorkbenchStage = "Plan" | "Build" | "Review" | "Ship" | "Operate";
+
+/**
+ * The project / stage scope rendered into the workbench `term-head` and the
+ * StatusFooter. Mirrors the OD `tui-runs.html` term-head + term-foot segments.
+ */
+export interface StageWorkbenchScope {
+  /** Exact stage name — rendered verbatim in the header (`Plan`, `Build`, …). */
+  stage: StageWorkbenchStage;
+  /** Canonical colon route for the stage (`:plan`, `:runs`, `:board`, …). */
+  route: string;
+  /** One-line stage purpose, OD term-head form (`live agent sessions`). */
+  purpose: string;
+  /** Active project / branch scope (OD `auth-rewrite`). */
+  project?: string | null;
+  /** Stage-specific scope detail (OD `cycle:24w13`, `PR #4218`, `4 releases`). */
+  detail?: string | null;
+  /** Active agent for invocations (OD footer `agent: claude-opus-4.7`). */
+  agent?: string | null;
+  /** Healthy/total MCP servers (OD footer `mcp 7/7`). */
+  mcp?: string | null;
+  /** Current trace id (OD footer `trace tr_8f29a4c…`). */
+  traceId?: string | null;
+  /** Active workspace profile (OD footer `profile: dev`). */
+  profile?: string | null;
+}
+
+/**
+ * Render the workbench header — the OD `tui-runs.html` `.term-head` line.
+ * Form: `fulcrum · :<route> · <purpose>` on the left, scope on the right.
+ * The exact stage name is always present so the snapshot test can lock it.
+ */
+export function renderStageWorkbenchHeader(renderer: Renderer, scope: StageWorkbenchScope): void {
+  const left = `  ${c.bold(scope.stage)}  ${c.dim(`fulcrum · ${scope.route} · ${scope.purpose}`)}`;
+  const right = [scope.project, scope.detail].filter(Boolean).join(" · ");
+  const width = Math.max(20, renderer.width);
+  // Plain-width pad so the right-aligned scope lands at the terminal edge.
+  const plainLeft = `  ${scope.stage}  fulcrum · ${scope.route} · ${scope.purpose}`;
+  const gap = Math.max(2, width - plainLeft.length - right.length - 2);
+  renderer.writeln(truncateWide(`${left}${" ".repeat(gap)}${c.dim(right)}`, width));
+  renderer.writeln(c.dim(hRule(width, "─")));
+}
+
+/**
+ * Render the workbench footer — the OD `tui-runs.html` `.term-foot` strip.
+ * Segment order mirrors `StatusBar` / the web `StatusFooter`:
+ *   MODE · profile · branch · agent · mcp ···· trace · ? · :
+ * The MODE pill is the upper-cased stage name so each workbench is identifiable.
+ *
+ * The strip is a single line and never collapses (CONTEXT.md StatusFooter). On
+ * a narrow terminal the lower-priority `agent` / `mcp` segments are dropped
+ * before the high-priority `trace` segment is — an operator must always be able
+ * to read the trace id off the footer regardless of width.
+ */
+export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkbenchScope): void {
+  const width = Math.max(20, renderer.width);
+  const mode = c.inverse(` ${scope.stage.toUpperCase()} `);
+  const right = [`trace ${shortTrace(scope.traceId)}`, "?", ":"];
+  const rightPlain = right.join("  ");
+  // Left segments in priority order; drop trailing ones (agent, mcp) first.
+  const prioritized = [
+    `profile: ${scope.profile ?? "dev"}`,
+    scope.project ?? "—",
+    `agent: ${scope.agent ?? "any"}`,
+    `mcp ${scope.mcp ?? "0/0"}`,
+  ];
+  let segs = prioritized;
+  const fits = (left: string[]): boolean => {
+    const leftPlain = ` ${scope.stage.toUpperCase()}   ${left.join("  ")}`;
+    return leftPlain.length + rightPlain.length + 4 <= width;
+  };
+  while (segs.length > 2 && !fits(segs)) {
+    segs = segs.slice(0, -1);
+  }
+  const leftPlain = ` ${scope.stage.toUpperCase()}   ${segs.join("  ")}`;
+  const gap = Math.max(2, width - leftPlain.length - rightPlain.length - 2);
+  const line = ` ${mode}  ${c.dim(segs.join("  "))}${" ".repeat(gap)}${c.dim(rightPlain)} `;
+  renderer.writeln(c.dim(hRule(width, "─")));
+  renderer.writeln(truncateWide(line, width));
+}
+
+/** Short-form trace id for the footer (OD `tr_8f29a4c…`). */
+function shortTrace(traceId?: string | null): string {
+  if (!traceId) return "—";
+  return traceId.length > 10 ? `${traceId.slice(0, 9)}…` : traceId;
+}
+
+/**
+ * The shared TUI empty-state contract (CLI-TUI-UX.md §5, DESIGN.md): exactly
+ * one sentence describing the empty surface, then exactly one action hint.
+ * Every stage workbench renders its empty body through this so the contract
+ * never drifts screen to screen.
+ */
+export function renderWorkbenchEmptyState(
+  renderer: Renderer,
+  sentence: string,
+  action: string,
+): void {
+  renderer.writeln();
+  renderer.writeln(`  ${c.dim(sentence)}`);
+  renderer.writeln(`  ${c.cyan(action)}`);
+}
+
+/**
+ * The shared TUI error-frame contract (CLI-TUI-UX.md §5, DESIGN.md): the
+ * `[what failed]. [why]. [next step]. trace=<id>` shape. `trace=<id>` is always
+ * appended so an operator can follow the failure across web / CLI / TUI.
+ */
+export function renderWorkbenchErrorFrame(
+  renderer: Renderer,
+  failure: { what: string; next: string; traceId?: string | null },
+): void {
+  const traceId = failure.traceId ?? "unknown";
+  renderer.writeln(`  ${c.red(failure.what)}`);
+  renderer.writeln(`  ${c.dim(`next: ${failure.next}`)}  ${c.dim(`trace=${traceId}`)}`);
+}
+
+/** Plain-text form of the error frame — used by tests and snapshot fixtures. */
+export function workbenchErrorFrameText(failure: {
+  what: string;
+  next: string;
+  traceId?: string | null;
+}): string {
+  return `${failure.what} next: ${failure.next} trace=${failure.traceId ?? "unknown"}`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -42,6 +192,12 @@ export interface TuiManagedRun {
 
 export interface RunsControlScreenOptions {
   projectId?: string;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
   caller: {
     agent_runs: {
       list: (input?: { projectId?: string }) => Promise<TuiManagedRun[]>;
@@ -58,7 +214,7 @@ export interface RunsControlScreenOptions {
 type RunsOverlay = "none" | "dispatch" | "deps" | "reassign";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RunsControlScreen
+// RunsControlScreen — the Build stage workbench
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class RunsControlScreen {
@@ -69,8 +225,24 @@ export class RunsControlScreen {
   private deps: TuiRunDep[] = [];
   private error: string | null = null;
   private reassignment: { from: string; to: string; status: string } | null = null;
+  private readonly modePicker = new ModePicker({ stepId: "run" });
 
   constructor(private readonly opts: RunsControlScreenOptions) {}
+
+  /** The OD stage-scope chrome for the Build runs workbench. */
+  private get scope(): StageWorkbenchScope {
+    const focused = this.runs[this.cursor];
+    return {
+      stage: "Build",
+      route: ":runs",
+      purpose: "live agent sessions",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.runs.length} runs`,
+      agent: focused?.agent ?? null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? null,
+    };
+  }
 
   async load(): Promise<void> {
     try {
@@ -86,14 +258,16 @@ export class RunsControlScreen {
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Runs"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
     if (this.error) {
-      renderer.writeln(c.red(`  ${this.error}`));
-      renderer.writeln();
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Runs feed failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
     }
 
     // Status summary
@@ -103,9 +277,13 @@ export class RunsControlScreen {
     );
     renderer.writeln();
 
-    // Run list
+    // Run list — or the shared empty-state contract.
     if (this.runs.length === 0) {
-      renderer.writeln(c.dim("  No runs."));
+      renderWorkbenchEmptyState(
+        renderer,
+        "No agent runs in this stage yet.",
+        "Press D to dispatch a run.",
+      );
     } else {
       const visible = this.visibleRuns;
       for (const run of visible) {
@@ -116,6 +294,9 @@ export class RunsControlScreen {
         const task = run.taskTitle ?? run.id;
         renderer.writeln(`${pointer} ${badge} ${run.agent}  ${project}  ${task}  ${c.dim(run.id)}`);
       }
+      // ModePicker row for the focused run Step (acceptance: Step-bearing rows).
+      renderer.writeln();
+      renderer.writeln(`  ${c.dim("step modes")}  ${this.modePicker.render()}`);
     }
 
     // Dispatch overlay
@@ -153,6 +334,7 @@ export class RunsControlScreen {
 
     renderer.writeln();
     renderer.writeln(c.dim("  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {

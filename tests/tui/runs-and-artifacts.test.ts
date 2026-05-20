@@ -4,11 +4,23 @@ import { EventEmitter } from "node:events";
 import { Renderer } from "@fulcrum/tui/renderer.ts";
 import { ArtifactsScreen } from "@fulcrum/tui/screens/artifacts.ts";
 import { RunDetailScreen, RunsScreen } from "@fulcrum/tui/screens/runs.ts";
+import { RunsControlScreen } from "@fulcrum/tui/screens/runs-screen.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });
+  render(new Renderer(tty));
+  return tty.plainText();
+}
+
+/** Render a screen at an exact terminal geometry — for stage-workbench snapshots. */
+function renderAt(
+  cols: number,
+  rows: number,
+  render: (renderer: Renderer) => void,
+): string {
+  const tty = new FakeTTY({ columns: cols, rows });
   render(new Renderer(tty));
   return tty.plainText();
 }
@@ -289,3 +301,148 @@ describe("ArtifactsScreen", () => {
     expect(filters).toEqual([{ runId: "run-1", taskId: "task-1" }]);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-stage-workbenches-set — Build & Ship stage workbench OD parity.
+//
+// The Build (`:runs`) and Ship (`:ship`) workbenches must render the OD
+// `tui-runs.html` stage chrome: a `fulcrum · :<route> · <purpose>` header
+// carrying the exact stage name, the StatusFooter strip, and the shared
+// empty-state / error-frame contract. Snapshots are locked at 80x24 and
+// 120x32 so the dense layout holds at both the minimum and a wide terminal.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("Build stage workbench (:runs) — OD parity", () => {
+  function buildScreen(runs: TuiManagedRunFixture[] = sampleRuns()) {
+    return new RunsControlScreen({
+      projectId: "auth/rewrite",
+      projectLabel: "auth/rewrite",
+      traceId: "tr_8f29a4c1b3e0",
+      mcp: "7/7",
+      caller: {
+        agent_runs: {
+          list: async () => runs,
+          dispatch: async (input) => ({ id: "run-new", status: "pending", ...input }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "run-r", agent: "codex", status: "pending" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+  }
+
+  test("renders the Build workbench header, footer, and ModePicker at 80x24 and 120x32", async () => {
+    const screen = buildScreen();
+    await screen.load();
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, (r) => screen.render(r));
+      // Exact stage name in the OD term-head.
+      expect(snap).toContain("Build");
+      expect(snap).toContain("fulcrum · :runs · live agent sessions");
+      // StatusFooter strip with the BUILD mode pill + OD segments.
+      expect(snap).toContain("BUILD");
+      expect(snap).toContain("profile: dev");
+      expect(snap).toContain("trace tr_8f29a4");
+      // Step-bearing rows expose the ModePicker affordance row.
+      expect(snap).toContain("step modes");
+      expect(snap).toContain("Manual");
+    }
+  });
+
+  test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {
+    const screen = buildScreen([]);
+    await screen.load();
+    const snap = renderAt(80, 24, (r) => screen.render(r));
+    expect(snap).toContain("No agent runs in this stage yet.");
+    expect(snap).toContain("Press D to dispatch a run.");
+  });
+
+  test("failed Build workbench renders the error frame with trace=<id>", async () => {
+    const screen = new RunsControlScreen({
+      traceId: "tr_56e3d12",
+      caller: {
+        agent_runs: {
+          list: async () => {
+            throw new Error("server unreachable");
+          },
+          dispatch: async () => ({ id: "x", agent: "codex", status: "pending" }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "x", agent: "codex", status: "pending" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderAt(120, 32, (r) => screen.render(r));
+    expect(snap).toContain("Runs feed failed to load.");
+    expect(snap).toContain("trace=tr_56e3d12");
+  });
+});
+
+describe("Ship stage workbench (:ship) — OD parity", () => {
+  function shipScreen(list: () => Promise<unknown[]>) {
+    return new ArtifactsScreen({
+      projectLabel: "auth/rewrite",
+      traceId: "tr_8f29a4c1b3e0",
+      mcp: "7/7",
+      caller: {
+        artifacts: {
+          list: list as never,
+          get: async () => null,
+          upload: async () => ({ id: "x", filename: "x", mime: "text/plain", path: "x", sizeBytes: "0" }),
+          download: async () => ({ ok: true, path: "/tmp/x" }),
+          archive: async (input) => ({ ok: true, id: input.id }),
+          delete: async (input) => ({ ok: true, id: input.id }),
+        },
+      },
+    });
+  }
+
+  test("renders the Ship workbench header + footer at 80x24 and 120x32", async () => {
+    const screen = shipScreen(async () => [
+      { id: "v2.18.0", filename: "auth-rewrite", mime: "application/zip", path: "rel/auth.zip", sizeBytes: "100" },
+    ]);
+    await screen.load();
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, (r) => screen.render(r));
+      expect(snap).toContain("Ship");
+      expect(snap).toContain("fulcrum · :ship · artifacts");
+      expect(snap).toContain("SHIP");
+      expect(snap).toContain("trace tr_8f29a4");
+    }
+  });
+
+  test("empty Ship workbench renders the shared empty-state contract", async () => {
+    const screen = shipScreen(async () => []);
+    await screen.load();
+    const snap = renderAt(80, 24, (r) => screen.render(r));
+    expect(snap).toContain("No artifacts in this stage yet.");
+    expect(snap).toContain("Press u to upload a release artifact.");
+  });
+
+  test("failed Ship workbench renders the error frame with trace=<id>", async () => {
+    const screen = shipScreen(async () => {
+      throw new Error("artifact store offline");
+    });
+    await screen.load();
+    const snap = renderAt(120, 32, (r) => screen.render(r));
+    expect(snap).toContain("Artifacts feed failed to load.");
+    expect(snap).toContain("trace=tr_8f29a4c1b3e0");
+  });
+});
+
+interface TuiManagedRunFixture {
+  id: string;
+  agent: string;
+  status: string;
+  taskTitle?: string;
+  projectName?: string;
+}
+
+function sampleRuns(): TuiManagedRunFixture[] {
+  return [
+    { id: "run-1", agent: "claude-opus-4.7", status: "running", taskTitle: "persist issuance row", projectName: "auth/rewrite" },
+    { id: "run-2", agent: "gpt-5.4", status: "completed", taskTitle: "stripe webhook idempotency", projectName: "billing-3" },
+    { id: "run-3", agent: "gemini-3-pro", status: "failed", taskTitle: "auth.events schema", projectName: "telemetry" },
+  ];
+}

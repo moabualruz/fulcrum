@@ -1,6 +1,22 @@
+/**
+ * Build · Board stage workbench — the TUI `:board` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `build-board` screen).
+ *
+ * The Build stage's task-board layout, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :board · …` header,
+ * StatusFooter strip, and empty/error contract as every other stage workbench.
+ */
+
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import { TASK_STATUSES, type TuiTask } from "./task-types.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 export interface TaskBoardScreenOptions {
   caller: {
@@ -12,6 +28,14 @@ export interface TaskBoardScreenOptions {
   };
   onOpenTask?: (id: string) => void;
   createScope?: TaskCreateScope;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Stage-specific scope detail rendered in the workbench header (OD `cycle 24w13`). */
+  cycleLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
 }
 
 export interface TaskCreateScope {
@@ -39,19 +63,59 @@ export class TaskBoardScreen {
   private createActive = false;
   private createDraft: TaskCreateDraft = { title: "" };
   private createError: string | null = null;
+  private loadError: string | null = null;
 
   constructor(private readonly opts: TaskBoardScreenOptions) {}
 
+  /** The OD stage-scope chrome for the Build · Board workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Build",
+      route: ":board",
+      purpose: "task board",
+      project: this.opts.projectLabel ?? this.opts.createScope?.projectId ?? null,
+      detail: this.opts.cycleLabel ?? `${this.tasks.length} tasks`,
+      agent: null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? null,
+    };
+  }
+
   async load(): Promise<void> {
-    this.tasks = await this.opts.caller.tasks.list();
-    this.clampCursor();
+    try {
+      this.tasks = await this.opts.caller.tasks.list();
+      this.loadError = null;
+      this.clampCursor();
+    } catch (err) {
+      this.tasks = [];
+      this.loadError = err instanceof Error ? err.message : String(err);
+    }
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Task board"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
+
+    if (this.loadError) {
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Task board failed to load.",
+        next: this.loadError,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.tasks.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No tasks on this board yet.",
+        "Press c to create a task.",
+      );
+      renderer.writeln();
+      renderer.writeln(c.dim("  c create  q back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
 
     for (const status of TASK_STATUSES) {
       renderer.writeln(c.bold(`  ${status.toUpperCase()}`));
@@ -81,6 +145,8 @@ export class TaskBoardScreen {
       }
       renderer.writeln(c.dim("  Enter title, recurrence optional, submit keeps draft on error."));
     }
+
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {

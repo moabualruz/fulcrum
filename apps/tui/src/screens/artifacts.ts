@@ -1,6 +1,22 @@
+/**
+ * Ship stage workbench — the TUI `:ship` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `ship` screen).
+ *
+ * The Ship stage's release / artifact surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :ship · …` header,
+ * StatusFooter strip, and empty/error contract as every other stage workbench.
+ */
+
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import { truncateWide } from "../utils/truncate.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 export interface TuiArtifact {
   id: string;
@@ -53,6 +69,12 @@ export interface ArtifactsScreenOptions {
   taskId?: string;
   homeDir?: string;
   viewportRows?: number;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
 }
 
 type ArtifactOverlay = "none" | "upload" | "archive" | "delete" | "filter" | "detail";
@@ -65,24 +87,62 @@ export class ArtifactsScreen {
   private overlay: ArtifactOverlay = "none";
   private filters: TuiArtifactFilters = {};
   private selectedIds = new Set<string>();
+  private error: string | null = null;
 
   constructor(private readonly opts: ArtifactsScreenOptions) {}
 
+  /** The OD stage-scope chrome for the Ship workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Ship",
+      route: ":ship",
+      purpose: "artifacts",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.artifacts.length} artifacts`,
+      agent: null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? this.selectedArtifact?.runId ?? null,
+    };
+  }
+
   async load(): Promise<void> {
-    this.artifacts = await this.opts.caller.artifacts.list(this.listInput());
-    this.clampCursor();
-    await this.loadPreview();
+    try {
+      this.artifacts = await this.opts.caller.artifacts.list(this.listInput());
+      this.error = null;
+      this.clampCursor();
+      await this.loadPreview();
+    } catch (err) {
+      this.artifacts = [];
+      this.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Artifacts"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
-    if (this.visibleArtifacts.length === 0) {
-      renderer.writeln(c.dim("  No artifacts."));
-    } else {
+    if (this.error) {
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Artifacts feed failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.artifacts.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No artifacts in this stage yet.",
+        "Press u to upload a release artifact.",
+      );
+      renderer.writeln();
+      renderer.writeln(c.dim("  u upload  f filter  q back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    {
       for (const artifact of this.visibleArtifacts) {
         const index = this.artifacts.indexOf(artifact);
         const pointer = index === this.cursor ? c.bold(">") : " ";
@@ -135,6 +195,8 @@ export class ArtifactsScreen {
       renderer.writeln();
       renderer.writeln(c.bold(`  Detail ${displayName(this.selectedArtifact)}`));
     }
+
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {
