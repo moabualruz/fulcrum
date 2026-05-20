@@ -1,7 +1,34 @@
 <script lang="ts">
-  import { Badge, Button, Chip, EmptyState, ErrorBanner, FieldError, Input, Kbd, ModeRow, StatusBadge } from "@fulcrum/ui-kit";
+  /**
+   * Build · Board — the OD `build-board.html` workbench.
+   *
+   * The default Build-stage layout (`IA-MAP.md §2.3`, canonical route
+   * `/<ws>/projects/<projId>/build/board`): a horizontally-scrolling status
+   * board grouped by the canonical status vocabulary, a five-layout switcher
+   * tablist, group/sort/properties/filter controls, a filter-chip row, and
+   * per-card task rows that each carry the universal `DESIGN.md §4.11` mode
+   * affordance row.
+   *
+   * Composes `@fulcrum/ui-kit` primitives only (Badge / Button / Chip /
+   * EmptyState / ErrorBanner / FieldError / Input / Kbd / StatusBadge) plus the
+   * shared `mode-affordance-host` ModeRow. The optimistic-create + inline
+   * rollback recovery behavior (`OptimisticStore` / `OptimisticRollback` /
+   * `ErrorBanner`) is the inline-recovery contract the production board needs;
+   * it is carried forward here, not discarded (`design-alignment/build.md`).
+   *
+   * Project creation, integrations, API tokens, and webhooks are NOT Build-board
+   * concerns and have been removed from this route — they live in their own
+   * surfaces (`/projects`, `/onboarding`, `/api-tokens`, workspace settings).
+   * See the `design-alignment/build.md` route-disposition table.
+   */
+  import { Badge, Button, Chip, EmptyState, ErrorBanner, FieldError, Input, Kbd, StatusBadge } from "@fulcrum/ui-kit";
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
+  import {
+    ModeRow,
+    createStepModeRow,
+    modeAffordanceHooks,
+  } from "$lib/components/app/mode-affordance-host.ts";
   import {
     OptimisticRollback,
     OptimisticStore,
@@ -154,8 +181,7 @@
     key: string;
     title: string;
     status: WorkflowStatus;
-    estimate: string;
-    source: string;
+    meta: string;
     assignee: string;
     labels: Array<{ name: string; tone: "accent" | "success" | "warning" | "neutral" }>;
     href: string;
@@ -168,9 +194,14 @@
     tasks: BoardTask[];
   };
 
+  /** Active trace id for the board — the DESIGN.md §4.10 trace spine identity. */
+  const traceId = "tr_8f29a4c1b3e0d5f7";
+
   let activeCreateColumnId = $state<string | null>(null);
   let createDraftTitle = $state("");
   let createDraftTouched = $state(false);
+  /** When true the board renders its empty-state branch (`states: empty`). */
+  let showEmptyState = $state(false);
 
   function openInlineCreate(columnId: string): void {
     activeCreateColumnId = columnId;
@@ -217,8 +248,7 @@
           key: "AUTH-42",
           title: "Add kid and rotate flag to signToken",
           status: "queued",
-          estimate: "25m",
-          source: "src/auth/session.ts",
+          meta: "~25m · src/auth/session.ts",
           assignee: "co",
           labels: [{ name: "auth", tone: "accent" }],
           href: "/tasks/AUTH-42",
@@ -227,14 +257,25 @@
           key: "AUTH-46",
           title: "Migration: sessions table and kid index",
           status: "queued",
-          estimate: "15m",
-          source: "db/migrations",
+          meta: "~15m · db/migrations",
           assignee: "so",
           labels: [
             { name: "auth", tone: "accent" },
             { name: "db", tone: "success" },
           ],
           href: "/tasks/AUTH-46",
+        },
+        {
+          key: "AUTH-48",
+          title: "Telemetry events and dashboard tile",
+          status: "queued",
+          meta: "~25m · telemetry/",
+          assignee: "ge",
+          labels: [
+            { name: "auth", tone: "accent" },
+            { name: "telemetry", tone: "warning" },
+          ],
+          href: "/tasks/AUTH-48",
         },
       ],
     },
@@ -245,10 +286,9 @@
       tasks: [
         {
           key: "AUTH-43",
-          title: "Persist issuance row per kid",
+          title: "Persist issuance row per kid (ip, ua, ts)",
           status: "running",
-          estimate: "3m",
-          source: "run_8f29a4c",
+          meta: "3m · 2 files · run_8f29a4c",
           assignee: "co",
           labels: [
             { name: "auth", tone: "accent" },
@@ -260,11 +300,26 @@
           key: "AUTH-47",
           title: "Rate limiter: bucket per kid",
           status: "running",
-          estimate: "1m",
-          source: "src/limit",
+          meta: "1m · src/limit/",
           assignee: "co",
           labels: [{ name: "auth", tone: "accent" }],
           href: "/tasks/AUTH-47",
+        },
+      ],
+    },
+    {
+      id: "waiting-input",
+      title: "Waiting input",
+      status: "waiting-input",
+      tasks: [
+        {
+          key: "AUTH-44",
+          title: "verifyToken: lookup kid and dual-verify legacy",
+          status: "waiting-input",
+          meta: "blocked on AUTH-43",
+          assignee: "co",
+          labels: [{ name: "auth", tone: "accent" }],
+          href: "/tasks/AUTH-44",
         },
       ],
     },
@@ -274,17 +329,16 @@
       status: "blocked",
       tasks: [
         {
-          key: "AUTH-51",
-          title: "Verify risky write approval before rollout",
+          key: "AUTH-49",
+          title: "Settings UI: active sessions list",
           status: "blocked",
-          estimate: "waiting",
-          source: "approval queue",
-          assignee: "qa",
+          meta: "waiting on design lock",
+          assignee: "so",
           labels: [
-            { name: "review", tone: "warning" },
             { name: "auth", tone: "accent" },
+            { name: "ui", tone: "neutral" },
           ],
-          href: "/tasks/AUTH-51",
+          href: "/tasks/AUTH-49",
         },
       ],
     },
@@ -294,423 +348,294 @@
       status: "completed",
       tasks: [
         {
-          key: "AUTH-39",
-          title: "Expose trace links from session events",
+          key: "AUTH-45",
+          title: "DELETE /sessions/:kid endpoint",
           status: "completed",
-          estimate: "done",
-          source: "trace_4f3a1c9e",
+          meta: "merged 12m ago",
           assignee: "ge",
-          labels: [{ name: "telemetry", tone: "neutral" }],
-          href: "/tasks/AUTH-39",
+          labels: [{ name: "auth", tone: "accent" }],
+          href: "/tasks/AUTH-45",
         },
       ],
     },
   ];
 
-  const layoutLabels = ["Board", "List", "Timeline", "Calendar", "Graph"];
-  const activeFilters = ["sprint:24w13", "module:auth"];
-  const availableFilters = ["label:db", "label:telemetry", "@mine", "agent:any"];
-  const projectTemplates = [
-    { name: "Agent workflow", detail: "Plan, build, review, and ship stages with AI Assist ready." },
-    { name: "Repository maintenance", detail: "Issue intake, dependency graph, CI runs, and release checks." },
-    { name: "Blank workflow", detail: "Start empty while keeping project, repo, and stage setup visible." },
-  ];
-  const setupActions = ["Open overview", "Open board", "Open settings"];
-  const integrationCards = [
-    { name: "Slack", state: "Connected", detail: "#build-alerts - issue.created, run.failed", action: "Refresh OAuth", tone: "success" },
-    { name: "GitHub", state: "Needs review", detail: "acme/auth-service - pull_request, check_suite", action: "Review scopes", tone: "warning" },
-    { name: "Jira", state: "Disconnected", detail: "Map Fulcrum tasks to Jira issues.", action: "Connect Jira", tone: "neutral" },
+  /**
+   * The five Build layouts (`IA-MAP.md §2.3` / OD `build-board.html` switcher).
+   * Board / List / Timeline / Graph each have a production route. Calendar is
+   * deferred to its own PRD (`design-alignment/build.md` — no OD file yet); it
+   * stays in the switcher as a disabled affordance so the layout set is visible
+   * without exposing a 404.
+   */
+  const layouts = [
+    { id: "board", label: "Board", glyph: "▦", href: "/build-board" },
+    { id: "list", label: "List", glyph: "☰", href: "/build-list" },
+    { id: "timeline", label: "Timeline", glyph: "◰", href: "/build-timeline" },
+    { id: "calendar", label: "Calendar", glyph: "◯", href: null },
+    { id: "graph", label: "Graph", glyph: "◇", href: "/build-graph" },
   ] as const;
-  const webhookEvents = ["issue.created", "task.updated", "run.failed", "artifact.accepted"];
-  const integrationLogs = [
-    { time: "12:40:18", service: "webhook", status: "200", message: "issue.created delivered in 183 ms" },
-    { time: "12:38:04", service: "github", status: "401", message: "token scope missing repo:status" },
-    { time: "12:35:51", service: "slack", status: "200", message: "run.failed posted to #build-alerts" },
-    { time: "12:30:12", service: "webhook", status: "500", message: "receiver timeout after 3 retries" },
-  ];
-  let webhookUrl = $state("https://hooks.fulcrum.local/w/auth-rewrite/whsec_****0f9a");
-  let webhookVersion = $state(1);
-  let webhookTestStatus = $state("Not tested");
-  let oneTimeToken = $state("flcm_live_4y5c...shown-once");
-  let tokenCopied = $state(false);
-  let tokenRevoked = $state(false);
 
-  function rotateWebhook() {
-    webhookVersion += 1;
-    webhookUrl = `https://hooks.fulcrum.local/w/auth-rewrite/whsec_****${String(webhookVersion).padStart(4, "0")}`;
-    webhookTestStatus = "Rotated; dry-run required";
-  }
+  const activeFilters = ["cycle:24w13", "module:auth"];
+  const availableFilters = ["label:db", "label:telemetry", "@mine", "agent:any"];
 
-  function testWebhook() {
-    webhookTestStatus = "Dry-run sent: issue.created - 202 Accepted";
-  }
-
-  function copyToken() {
-    tokenCopied = true;
-    oneTimeToken = "Copied; hidden after first reveal";
-  }
-
-  function revokeToken() {
-    tokenRevoked = true;
-    tokenCopied = false;
-    oneTimeToken = "Revoked instantly";
-  }
+  const totalTasks = columns.reduce((sum, column) => sum + column.tasks.length, 0);
 </script>
 
 <svelte:head>
   <title>Build board</title>
 </svelte:head>
 
-<section data-build-board class={cn("flex min-h-[calc(100vh-8rem)] flex-col overflow-hidden")}>
-  <header data-build-board-header class={cn("flex flex-col gap-3 border-b border-border bg-background px-4 py-3")}>
-    <div class={cn("flex flex-wrap items-center gap-3")}>
-      <div>
-        <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Build</p>
-        <h1 class={cn("text-h2 font-semibold")}>Authentication rewrite board</h1>
-      </div>
+<section
+  data-build-board
+  data-state={showEmptyState ? "empty" : "populated"}
+  class={cn("flex min-h-[calc(100vh-8rem)] flex-col overflow-hidden")}
+>
+  <header data-build-board-header class={cn("flex flex-col gap-2 border-b border-border bg-card px-4 py-2")}>
+    <div class={cn("flex flex-wrap items-center gap-2")}>
+      <nav
+        data-build-board-layouts
+        role="tablist"
+        aria-label="Build layouts"
+        class={cn("inline-flex flex-wrap items-center gap-px rounded-md border border-border bg-muted/40 p-0.5")}
+      >
+        {#each layouts as layout}
+          {#if layout.href}
+            <a
+              href={layout.href}
+              role="tab"
+              aria-current={layout.id === "board" ? "page" : undefined}
+              aria-selected={layout.id === "board"}
+              data-build-layout={layout.id}
+              class={cn(
+                "inline-flex items-center gap-1 rounded-[3px] px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                layout.id === "board" && "bg-card text-foreground",
+              )}
+            >
+              <span aria-hidden="true">{layout.glyph}</span>
+              {layout.label}
+            </a>
+          {:else}
+            <span
+              role="tab"
+              aria-selected="false"
+              aria-disabled="true"
+              data-build-layout={layout.id}
+              data-build-layout-deferred="true"
+              title="Calendar layout — coming soon"
+              class={cn("inline-flex items-center gap-1 rounded-[3px] px-2 py-1 text-xs font-medium text-muted-foreground/50")}
+            >
+              <span aria-hidden="true">{layout.glyph}</span>
+              {layout.label}
+            </span>
+          {/if}
+        {/each}
+      </nav>
       <span class={cn("flex-1")}></span>
-      <Button size="sm" variant="outline" data-build-board-group>Group: Status</Button>
-      <Button size="sm" variant="outline" data-build-board-sort>Sort: Manual</Button>
-      <Button size="sm" variant="outline" data-build-board-properties>Properties</Button>
-      <Button size="sm" data-build-board-new-task>New task <Kbd>c</Kbd></Button>
+      <Button size="sm" variant="ghost" data-build-board-group>Group: Status</Button>
+      <Button size="sm" variant="ghost" data-build-board-sort>Sort: Manual</Button>
+      <Button size="sm" variant="ghost" data-build-board-properties>Properties</Button>
+      <Button size="sm" variant="outline" data-build-board-filter>+ Filter</Button>
+      <Button
+        size="sm"
+        data-build-board-new-task
+        onclick={() => openInlineCreate("queued")}
+      >+ New task <Kbd>c</Kbd></Button>
     </div>
-
-    <nav data-build-board-layouts class={cn("flex flex-wrap items-center gap-1")} aria-label="Build layouts">
-      {#each layoutLabels as label}
-        <a
-          href={label === "Board" ? "/build-board" : `/build-${label.toLowerCase()}`}
-          aria-current={label === "Board" ? "page" : undefined}
-          class={cn(
-            "rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground",
-            label === "Board" && "bg-card text-foreground",
-          )}
-          data-build-layout={label.toLowerCase()}
-        >
-          {label}
-        </a>
-      {/each}
-    </nav>
   </header>
 
-  <div data-build-board-filters class={cn("flex items-center gap-2 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 text-xs")}>
+  <div data-build-board-filters class={cn("flex items-center gap-1.5 overflow-x-auto border-b border-border bg-muted/30 px-4 py-1.5 text-xs")}>
     {#each activeFilters as filter}
       <Chip tone="accent" removable data-build-filter-active>{filter}</Chip>
     {/each}
     {#each availableFilters as filter}
       <Chip data-build-filter>{filter}</Chip>
     {/each}
+    <Chip data-build-filter-add>+ add</Chip>
     <span class={cn("min-w-4 flex-1")}></span>
-    <span data-build-board-summary class={cn("whitespace-nowrap text-muted-foreground")}>6 tasks · 1 sprint · 1 module</span>
+    <span data-build-board-summary class={cn("whitespace-nowrap text-muted-foreground")}>{totalTasks} tasks · 1 cycle · 1 module</span>
   </div>
 
-  <section data-project-setup-flow class={cn("grid gap-4 border-b border-border bg-background px-4 py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]")}>
-    <div class={cn("space-y-3")}>
-      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
-        <div>
-          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>New project path</p>
-          <h2 class={cn("text-lg font-semibold")}>Create a workflow container</h2>
-          <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
-            Capture the project name, repository, and template before the first board opens.
-          </p>
-        </div>
-        <Button size="sm" data-project-create-action>Create project</Button>
-      </div>
-
-      <div class={cn("grid gap-3 sm:grid-cols-2")}>
-        <label class={cn("space-y-1 text-sm font-medium")} data-project-name-field>
-          <span>Project name</span>
-          <Input aria-invalid="true" value="" placeholder="Authentication rewrite" />
-          <span data-project-validation class={cn("block text-xs text-destructive")}>Project name is required.</span>
-        </label>
-        <label class={cn("space-y-1 text-sm font-medium")} data-project-repo-field>
-          <span>Repository</span>
-          <Input value="github.com/acme/auth-service" placeholder="owner/repo or local path" />
-          <span class={cn("block text-xs text-muted-foreground")}>Linked repo unlocks files, commits, runs, and dependency graph actions.</span>
-        </label>
-      </div>
+  {#if showEmptyState}
+    <div data-build-board-empty class={cn("flex flex-1 items-center justify-center bg-background px-4 py-10")}>
+      <EmptyState
+        title="No tasks in this cycle."
+        description="The board groups tasks by status. Press c, or materialize an approved plan from Plan."
+        keyHint="c"
+      >
+        {#snippet icon()}
+          <span aria-hidden="true">▦</span>
+        {/snippet}
+        {#snippet actions()}
+          <Button size="sm" data-build-board-empty-add onclick={() => { showEmptyState = false; openInlineCreate("queued"); }}>Add task</Button>
+          <a href="/plan-review" data-build-board-empty-materialize class={cn("text-sm font-medium text-primary hover:underline")}>Materialize plan</a>
+        {/snippet}
+      </EmptyState>
     </div>
-
-    <aside data-project-template-panel class={cn("rounded-md border border-border bg-muted/35 p-3")}>
-      <div class={cn("mb-3 flex items-center gap-2")}>
-        <StatusBadge status="running" />
-        <span class={cn("text-sm font-semibold")}>Apply template</span>
-      </div>
-      <div class={cn("grid gap-2")}>
-        {#each projectTemplates as template}
-          <button
-            type="button"
-            data-project-template
-            class={cn("rounded-md border border-border bg-background p-3 text-left text-sm hover:border-border-strong")}
-          >
-            <span class={cn("block font-medium")}>{template.name}</span>
-            <span class={cn("mt-1 block text-xs text-muted-foreground")}>{template.detail}</span>
-          </button>
-        {/each}
-      </div>
-      <div data-project-next-actions class={cn("mt-3 flex flex-wrap gap-2")}>
-        {#each setupActions as action}
-          <a href="/projects/auth-rewrite" class={cn("rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground")}>{action}</a>
-        {/each}
-      </div>
-    </aside>
-  </section>
-
-  <section data-workspace-integrations class={cn("grid min-w-0 gap-4 border-b border-border bg-background px-4 py-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(22rem,1.05fr)]")}>
-    <div class={cn("min-w-0 space-y-3")}>
-      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
-        <div>
-          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Workspace settings</p>
-          <h2 class={cn("text-lg font-semibold")}>Integrations and webhooks</h2>
-          <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
-            Connect services, dry-run payloads, rotate secrets, and audit the latest delivery calls.
-          </p>
-        </div>
-        <Button size="sm" variant="outline" data-integration-audit-link>Open audit log</Button>
-      </div>
-
-      <div data-integration-oauth-grid class={cn("grid gap-2 md:grid-cols-3")}>
-        {#each integrationCards as integration}
-          <article data-integration-card={integration.name.toLowerCase()} class={cn("rounded-md border border-border bg-card p-3")}>
-            <div class={cn("mb-2 flex items-start justify-between gap-2")}>
-              <div>
-                <h3 class={cn("text-sm font-semibold")}>{integration.name}</h3>
-                <p class={cn("mt-1 text-xs text-muted-foreground")}>{integration.detail}</p>
-              </div>
-              <Badge variant={integration.tone === "neutral" ? "outline" : integration.tone} size="sm">{integration.state}</Badge>
-            </div>
-            <Button size="sm" variant="outline" data-integration-oauth-action={integration.name.toLowerCase()}>{integration.action}</Button>
-          </article>
-        {/each}
-      </div>
-
-      <div data-api-token-panel class={cn("rounded-md border border-border bg-muted/35 p-3")}>
-        <div class={cn("flex flex-wrap items-center gap-2")}>
-          <h3 class={cn("text-sm font-semibold")}>API token</h3>
-          <Badge variant={tokenRevoked ? "destructive" : "success"} size="sm">{tokenRevoked ? "Revoked" : "Active"}</Badge>
-          <span class={cn("flex-1")}></span>
-          <Button size="sm" variant="outline" data-api-token-copy disabled={tokenRevoked} onclick={copyToken}>Copy once</Button>
-          <Button size="sm" variant="destructive" data-api-token-revoke disabled={tokenRevoked} onclick={revokeToken}>Revoke now</Button>
-        </div>
-        <p data-api-token-value class={cn("mt-2 font-mono text-xs text-muted-foreground")}>{oneTimeToken}</p>
-        {#if tokenCopied}
-          <p data-api-token-copy-state class={cn("mt-2 text-xs text-muted-foreground")}>Copied to clipboard; secret will not appear in logs.</p>
-        {/if}
-      </div>
-    </div>
-
-    <aside data-webhook-panel class={cn("min-w-0 space-y-3 rounded-md border border-border bg-muted/35 p-3")}>
-      <div class={cn("flex flex-wrap items-center gap-2")}>
-        <h3 class={cn("text-sm font-semibold")}>Webhook endpoint</h3>
-        <Badge variant="success" size="sm">Signing enabled</Badge>
-        <span class={cn("flex-1")}></span>
-        <Button size="sm" variant="outline" data-webhook-rotate onclick={rotateWebhook}>Rotate URL</Button>
-        <Button size="sm" data-webhook-test onclick={testWebhook}>Send dry-run</Button>
-      </div>
-      <p data-webhook-url class={cn("break-all rounded-md border border-border bg-background px-3 py-2 font-mono text-xs")}>{webhookUrl}</p>
-      <div data-webhook-events class={cn("flex flex-wrap gap-2")}>
-        {#each webhookEvents as event}
-          <Chip tone="accent">{event}</Chip>
-        {/each}
-      </div>
-      <p data-webhook-test-status class={cn("text-xs text-muted-foreground")}>{webhookTestStatus}</p>
-      <div data-integration-log class={cn("min-w-0 overflow-x-auto")}>
-        <table class={cn("w-full min-w-[34rem] text-xs")}>
-          <caption class={cn("mb-2 text-left font-medium text-muted-foreground")}>Last 100 integration calls</caption>
-          <thead>
-            <tr class={cn("border-b border-border text-left")}>
-              <th class={cn("py-1 pr-3 font-medium")}>Time</th>
-              <th class={cn("py-1 pr-3 font-medium")}>Service</th>
-              <th class={cn("py-1 pr-3 font-medium")}>Status</th>
-              <th class={cn("py-1 font-medium")}>Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each integrationLogs as log}
-              <tr data-integration-log-row class={cn("border-b border-border/50 last:border-0")}>
-                <td class={cn("py-1 pr-3 font-mono")}>{log.time}</td>
-                <td class={cn("py-1 pr-3")}>{log.service}</td>
-                <td class={cn("py-1 pr-3 font-mono", log.status.startsWith("2") ? "text-green-700" : "text-destructive")}>{log.status}</td>
-                <td class={cn("py-1")}>{log.message}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    </aside>
-  </section>
-
-  <div data-build-board-empty-reference class={cn("border-b border-border bg-background px-4 py-4")}>
-    <EmptyState
-      title="No tasks on the board"
-      description="The board shows tasks grouped by status. Add a task or promote a capture to start."
-    >
-      {#snippet icon()}
-        <span aria-hidden="true">▦</span>
-      {/snippet}
-      {#snippet actions()}
-        <a href="/projects/new" class={cn("text-sm font-medium text-primary hover:underline")}>Create project</a>
-      {/snippet}
-    </EmptyState>
-  </div>
-
-  <div data-build-board-scroll class={cn("grid flex-1 grid-flow-col auto-cols-[minmax(17rem,19rem)] gap-3 overflow-auto bg-background p-4")}>
-    {#each columns as column}
-      <section data-build-column={column.id} class={cn("flex max-h-full min-h-[28rem] flex-col rounded-md border border-border bg-muted/35")}>
-        <header data-build-column-header class={cn("flex items-center gap-2 border-b border-border px-3 py-2")}>
-          <StatusBadge status={column.status} />
-          <span data-build-column-count class={cn("rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[11px] text-muted-foreground")}>{column.tasks.length}</span>
-          <span class={cn("flex-1")}></span>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={`Add task to ${column.title}`}
-            data-build-column-add
-            onclick={() => openInlineCreate(column.id)}
-          >+</Button>
-        </header>
-
-        <div class={cn("flex flex-col gap-2 overflow-y-auto p-2")}>
-          {#each pendingFor(column.id) as entry (entry.id)}
-            <article
-              data-build-task-card
-              data-build-task-optimistic={entry.id}
-              data-pending={entry.status === "pending" ? "true" : undefined}
-              data-failed={entry.status === "failed" ? "true" : undefined}
-              class={cn(
-                "rounded-md border border-dashed border-border p-3",
-                entry.status === "pending" && "bg-card/40 text-muted-foreground",
-                entry.status === "failed" && "border-destructive bg-destructive/5",
-              )}
-            >
-              <h2 class={cn("text-sm font-medium leading-5")}>{entry.value.title}</h2>
-              {#if entry.status === "pending"}
-                <p class={cn("mt-2 text-[11px] text-muted-foreground")}>Saving…</p>
-              {:else if entry.status === "failed"}
-                {@const rollback = rollbackFor(entry.id)}
-                <div
-                  data-build-task-error
-                  data-build-task-error-attempts={rollback?.attempts ?? 0}
-                  data-build-task-error-escalated={rollback?.escalated ? "true" : undefined}
-                  class={cn("mt-2 space-y-1 text-xs text-destructive")}
-                >
-                  <p>{entry.error}</p>
-                  {#if entry.traceId}
-                    <p class={cn("font-mono text-[10px] text-muted-foreground")}>
-                      trace
-                      <span data-build-task-error-trace>{entry.traceId}</span>
-                    </p>
-                  {/if}
-                  {#if rollback?.escalated}
-                    <details data-build-task-error-payload class={cn("rounded-md border border-destructive/30 bg-destructive/5 p-2 text-foreground")}>
-                      <summary class={cn("cursor-pointer text-[11px] font-medium text-destructive")}>
-                        Last request payload (attempt {rollback.attempts})
-                      </summary>
-                      <pre class={cn("mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-muted-foreground")}><code>{JSON.stringify(rollback.lastPayload, null, 2)}</code></pre>
-                    </details>
-                    <ul data-build-task-error-actions class={cn("flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground")}>
-                      {#each ROLLBACK_TROUBLESHOOTING.actions as action}
-                        <li class={cn("rounded-md border border-border bg-background px-2 py-0.5")}>{action}</li>
-                      {/each}
-                    </ul>
-                    <a
-                      href={ROLLBACK_TROUBLESHOOTING.href}
-                      data-build-task-error-troubleshooting
-                      class={cn("inline-flex items-center text-[11px] font-medium text-accent underline-offset-2 hover:underline")}
-                    >{ROLLBACK_TROUBLESHOOTING.label}</a>
-                  {/if}
-                  <div class={cn("flex items-center gap-2 pt-1")}>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      data-build-task-retry
-                      onclick={() => retryOptimisticTask(entry.id)}
-                    >Retry</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      data-build-task-undo
-                      onclick={() => undoOptimisticTask(entry.id)}
-                    >Undo</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      data-build-task-dismiss
-                      onclick={() => dismissOptimisticTask(entry.id)}
-                    >Dismiss</Button>
-                  </div>
-                </div>
-              {/if}
-            </article>
-          {/each}
-          {#each column.tasks as task}
-            <article
-              data-build-task-card
-              data-task-key={task.key}
-              class={cn("rounded-md border border-border bg-card p-3 shadow-xs transition-colors hover:border-border-strong")}
-            >
-              <div class={cn("mb-2 flex items-center gap-2")}>
-                <StatusBadge status={task.status} hideLabel />
-                <span class={cn("flex-1")}></span>
-                <a href={task.href} class={cn("font-mono text-[11px] text-muted-foreground hover:underline")}>{task.key}</a>
-              </div>
-              <h2 class={cn("text-sm font-medium leading-5")}>{task.title}</h2>
-              <p class={cn("mt-2 flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground")}>
-                <span data-build-task-assignee class={cn("inline-flex size-5 items-center justify-center rounded-full border border-border bg-accent/10 text-[10px] font-semibold text-accent")}>{task.assignee}</span>
-                <span>{task.estimate}</span>
-                <span aria-hidden="true">·</span>
-                <span>{task.source}</span>
-              </p>
-              <div class={cn("mt-3 flex flex-wrap items-center gap-2")}>
-                {#each task.labels as label}
-                  <Badge variant={label.tone === "neutral" ? "outline" : label.tone} size="sm">{label.name}</Badge>
-                {/each}
-                <span class={cn("flex-1")}></span>
-                <ModeRow modes={["play", "discuss", "ai-assist"]} value={task.status === "running" ? "play" : "ai-assist"} ariaLabel={`Modes for ${task.key}`} />
-              </div>
-            </article>
-          {/each}
-          {#if activeCreateColumnId === column.id}
-            <div
-              data-build-board-new-task-row
-              data-build-board-new-task-column={column.id}
-              class={cn("rounded-md border border-border bg-card p-3 shadow-xs")}
-            >
-              <label class={cn("block space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground")}>
-                <span>New task title</span>
-                <Input
-                  data-build-board-new-task-input
-                  autofocus
-                  aria-invalid={createDraftTouched && createDraftTitle.trim().length === 0 ? "true" : undefined}
-                  placeholder="Task title"
-                  bind:value={createDraftTitle}
-                  onkeydown={handleCreateKeydown}
-                  oninput={() => { createDraftTouched = true; }}
-                />
-              </label>
-              {#if createDraftTouched && createDraftTitle.trim().length === 0}
-                <p data-build-board-new-task-error class={cn("mt-1 text-xs text-destructive")}>Title is required.</p>
-              {/if}
-              <p class={cn("mt-2 text-[11px] text-muted-foreground")}>
-                <Kbd>Enter</Kbd> save · <Kbd>Esc</Kbd> cancel
-              </p>
-            </div>
-          {:else}
-            <button
-              type="button"
-              data-build-board-new-task-trigger
-              data-build-board-new-task-column={column.id}
-              class={cn(
-                "flex items-center gap-2 rounded-md border border-dashed border-border bg-transparent p-2 text-left text-xs text-muted-foreground hover:border-border-strong hover:text-foreground",
-              )}
+  {:else}
+    <div data-build-board-scroll class={cn("grid flex-1 grid-flow-col auto-cols-[minmax(17rem,18rem)] items-start gap-3 overflow-auto bg-background p-3")}>
+      {#each columns as column}
+        <section data-build-column={column.id} class={cn("flex max-h-full min-h-[28rem] flex-col rounded-md border border-border bg-muted/35")}>
+          <header data-build-column-header class={cn("flex items-center gap-2 border-b border-border px-2.5 py-2")}>
+            <StatusBadge status={column.status} />
+            <span data-build-column-count class={cn("rounded-full border border-border bg-card px-1.5 font-mono text-[10px] text-muted-foreground")}>{column.tasks.length}</span>
+            <span class={cn("flex-1")}></span>
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={`Add task to ${column.title}`}
+              data-build-column-add
               onclick={() => openInlineCreate(column.id)}
-            >
-              <span>+ New task</span>
-            </button>
-          {/if}
-        </div>
-      </section>
-    {/each}
-  </div>
+            >+</Button>
+          </header>
+
+          <div class={cn("flex flex-col gap-2 overflow-y-auto p-2")}>
+            {#each pendingFor(column.id) as entry (entry.id)}
+              <article
+                data-build-task-card
+                data-build-task-optimistic={entry.id}
+                data-pending={entry.status === "pending" ? "true" : undefined}
+                data-failed={entry.status === "failed" ? "true" : undefined}
+                class={cn(
+                  "rounded-md border border-dashed border-border p-2.5",
+                  entry.status === "pending" && "bg-card/40 text-muted-foreground",
+                  entry.status === "failed" && "border-destructive bg-destructive/5",
+                )}
+              >
+                <h2 class={cn("text-sm font-medium leading-5")}>{entry.value.title}</h2>
+                {#if entry.status === "pending"}
+                  <p class={cn("mt-2 text-[11px] text-muted-foreground")}>Saving…</p>
+                {:else if entry.status === "failed"}
+                  {@const rollback = rollbackFor(entry.id)}
+                  <div
+                    data-build-task-error
+                    data-build-task-error-attempts={rollback?.attempts ?? 0}
+                    data-build-task-error-escalated={rollback?.escalated ? "true" : undefined}
+                    class={cn("mt-2 space-y-1 text-xs text-destructive")}
+                  >
+                    <p>{entry.error}</p>
+                    {#if entry.traceId}
+                      <p class={cn("font-mono text-[10px] text-muted-foreground")}>
+                        trace
+                        <span data-build-task-error-trace>{entry.traceId}</span>
+                      </p>
+                    {/if}
+                    {#if rollback?.escalated}
+                      <details data-build-task-error-payload class={cn("rounded-md border border-destructive/30 bg-destructive/5 p-2 text-foreground")}>
+                        <summary class={cn("cursor-pointer text-[11px] font-medium text-destructive")}>
+                          Last request payload (attempt {rollback.attempts})
+                        </summary>
+                        <pre class={cn("mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] text-muted-foreground")}><code>{JSON.stringify(rollback.lastPayload, null, 2)}</code></pre>
+                      </details>
+                      <ul data-build-task-error-actions class={cn("flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground")}>
+                        {#each ROLLBACK_TROUBLESHOOTING.actions as action}
+                          <li class={cn("rounded-md border border-border bg-background px-2 py-0.5")}>{action}</li>
+                        {/each}
+                      </ul>
+                      <a
+                        href={ROLLBACK_TROUBLESHOOTING.href}
+                        data-build-task-error-troubleshooting
+                        class={cn("inline-flex items-center text-[11px] font-medium text-accent underline-offset-2 hover:underline")}
+                      >{ROLLBACK_TROUBLESHOOTING.label}</a>
+                    {/if}
+                    <div class={cn("flex items-center gap-2 pt-1")}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        data-build-task-retry
+                        onclick={() => retryOptimisticTask(entry.id)}
+                      >Retry</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        data-build-task-undo
+                        onclick={() => undoOptimisticTask(entry.id)}
+                      >Undo</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        data-build-task-dismiss
+                        onclick={() => dismissOptimisticTask(entry.id)}
+                      >Dismiss</Button>
+                    </div>
+                  </div>
+                {/if}
+              </article>
+            {/each}
+            {#each column.tasks as task}
+              {@const modeScope = { stepId: task.key, kind: "task-card" as const, traceId, title: task.title }}
+              <article
+                data-build-task-card
+                data-task-key={task.key}
+                {...modeAffordanceHooks(modeScope)}
+                aria-keyshortcuts="M K"
+                class={cn("rounded-md border border-border bg-card p-2.5 shadow-xs transition-colors hover:border-border-strong")}
+              >
+                <div class={cn("mb-1.5 flex items-center gap-2")}>
+                  <StatusBadge status={task.status} />
+                  <span class={cn("flex-1")}></span>
+                  <a href={task.href} class={cn("font-mono text-[10px] text-muted-foreground hover:underline")}>{task.key}</a>
+                </div>
+                <h2 class={cn("text-sm font-medium leading-snug text-foreground")}>{task.title}</h2>
+                <p class={cn("mt-1.5 flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-muted-foreground")}>
+                  <span data-build-task-assignee class={cn("inline-flex size-[18px] items-center justify-center rounded-full border border-card bg-accent/10 text-[9px] font-semibold text-accent")}>{task.assignee}</span>
+                  <span>{task.meta}</span>
+                </p>
+                <div class={cn("mt-2 flex flex-wrap items-center gap-1.5")}>
+                  <div data-build-task-labels class={cn("flex flex-wrap gap-1")}>
+                    {#each task.labels as label}
+                      <Badge variant={label.tone === "neutral" ? "outline" : label.tone} size="sm">{label.name}</Badge>
+                    {/each}
+                  </div>
+                  <span class={cn("flex-1")}></span>
+                  <ModeRow {...createStepModeRow(modeScope)} value={task.status === "running" ? "play" : "manual"} />
+                </div>
+              </article>
+            {/each}
+            {#if activeCreateColumnId === column.id}
+              <div
+                data-build-board-new-task-row
+                data-build-board-new-task-column={column.id}
+                class={cn("rounded-md border border-border bg-card p-2.5 shadow-xs")}
+              >
+                <label class={cn("block space-y-1 text-xs font-medium uppercase tracking-wide text-muted-foreground")}>
+                  <span>New task title</span>
+                  <Input
+                    data-build-board-new-task-input
+                    autofocus
+                    aria-invalid={createDraftTouched && createDraftTitle.trim().length === 0 ? "true" : undefined}
+                    placeholder="Task title"
+                    bind:value={createDraftTitle}
+                    onkeydown={handleCreateKeydown}
+                    oninput={() => { createDraftTouched = true; }}
+                  />
+                </label>
+                {#if createDraftTouched && createDraftTitle.trim().length === 0}
+                  <p data-build-board-new-task-error class={cn("mt-1 text-xs text-destructive")}>Title is required.</p>
+                {/if}
+                <p class={cn("mt-2 text-[11px] text-muted-foreground")}>
+                  <Kbd>Enter</Kbd> save · <Kbd>Esc</Kbd> cancel
+                </p>
+              </div>
+            {:else}
+              <button
+                type="button"
+                data-build-board-new-task-trigger
+                data-build-board-new-task-column={column.id}
+                class={cn(
+                  "flex items-center gap-2 rounded-md border border-dashed border-border bg-transparent p-2 text-left text-xs text-muted-foreground hover:border-border-strong hover:text-foreground",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                )}
+                onclick={() => openInlineCreate(column.id)}
+              >
+                <span>+ New task</span>
+              </button>
+            {/if}
+          </div>
+        </section>
+      {/each}
+    </div>
+  {/if}
 
   <section
     data-build-board-error-states
@@ -721,6 +646,9 @@
       <p class={cn("flex-1 text-xs text-muted-foreground")}>
         Errors render inline at the surface that triggered them — never as toasts.
       </p>
+      <Button size="sm" variant="outline" data-build-board-empty-toggle onclick={() => { showEmptyState = !showEmptyState; }}>
+        {showEmptyState ? "Show populated board" : "Show empty board"}
+      </Button>
       <Button size="sm" variant="outline" data-build-error-trigger-validation onclick={triggerValidationError}>Trigger 400</Button>
       <Button size="sm" variant="outline" data-build-error-trigger-network onclick={triggerNetworkError}>Trigger 500</Button>
       <Button size="sm" variant="outline" data-build-error-trigger-unexpected onclick={triggerUnexpectedError}>Trigger unexpected</Button>

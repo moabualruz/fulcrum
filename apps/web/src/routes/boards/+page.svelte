@@ -133,6 +133,27 @@
   }
 </script>
 
+<!--
+  `/boards` is the older standalone production board. The canonical Build-stage
+  board is the OD `build-board.html` workbench at `/build-board` (`IA-MAP.md
+  §2.3`, `design-alignment/build.md` route-disposition: "Reconcile — one
+  canonical Build board"). `/boards` still resolves and keeps its tRPC-backed
+  load + actions (no 404, no feature loss); the pointer below reconciles the
+  duplication by naming the one canonical Build board.
+-->
+<aside
+  data-boards-canonical-pointer
+  class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+>
+  <span class="text-muted-foreground">
+    The canonical Build board is the workbench at
+  </span>
+  <a href="/build-board" data-boards-canonical-link class="font-medium text-primary hover:underline">
+    Build · Board
+  </a>
+  <span class="text-muted-foreground">.</span>
+</aside>
+
 <header data-board-header class="mb-3 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">Board</h1>
   <nav aria-label="View mode">
