@@ -405,4 +405,9 @@ export {
 	AcpDrawer,
 	Root as AcpDrawerRoot,
 } from "./components/acp-drawer/index.js";
-export type { AcpDrawerProps, AcpDrawerSide } from "./components/acp-drawer/index.js";
+export type {
+	AcpDrawerProps,
+	AcpDrawerSide,
+	AcpDrawerMetaItem,
+	AcpDrawerAgentRow,
+} from "./components/acp-drawer/index.js";

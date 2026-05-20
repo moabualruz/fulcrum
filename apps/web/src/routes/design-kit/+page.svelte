@@ -230,6 +230,24 @@
 	];
 	let acpOpen = $state(false);
 	let acpSide = $state<AcpDrawerSide>("right");
+	let acpAgent = $state("claude-code");
+	let acpSaved = $state(false);
+	// OD `.drawer-meta` strip cells (ai-assist.html lines 118-125).
+	const acpMeta = [
+		{ id: "session", label: "session", value: "run_8f29a4c" },
+		{ id: "step", label: "step", value: "3 / 8" },
+		{ id: "policy", label: "policy", value: "ask-on-write" },
+		{ id: "cost", label: "cost", value: "$0.43" },
+		{ id: "tokens", label: "tokens", value: "12,480 / 4,312" },
+		{ id: "cache", label: "cache", value: "76%" },
+		{ id: "elapsed", label: "elapsed", value: "3m 42s" },
+	];
+	// Agent-picker full panel rows (IA-MAP.md §5).
+	const acpAgents = [
+		{ id: "claude-code", name: "Claude Code Opus", client: "claude-code", status: "Ready", tone: "ready" as const, latency: "0.8s", mcp: 12, plugins: 4, ring: "executor" },
+		{ id: "codex", name: "Codex High", client: "codex", status: "Ready", tone: "ready" as const, latency: "0.6s", mcp: 9, plugins: 3, ring: "validator" },
+		{ id: "gemini-cli", name: "Gemini Pro", client: "gemini-cli", status: "Paused", tone: "paused" as const, latency: "n/a", mcp: 5, plugins: 2, ring: "planner" },
+	];
 	let traceCopied = $state<string | null>(null);
 	let traceAction = $state<string | null>(null);
 
@@ -1531,11 +1549,22 @@
 				side={acpSide}
 				title="AI Assist"
 				scopeLabel="Step 3/8 · AUTH-43"
+				agentLabel={acpAgents.find((a) => a.id === acpAgent)?.name ?? acpAgent}
+				agents={acpAgents}
+				meta={acpMeta}
+				onAgentSelect={(id) => (acpAgent = id)}
+				onExpand={() => {}}
+				onSaveThread={() => (acpSaved = true)}
 			>
 				{#snippet trace()}
 					<TraceChip badge traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f" project="fulcrum" />
 				{/snippet}
 				<p data-design-kit-acp-thread>Live thread streams agent messages here.</p>
+				{#if acpSaved}
+					<p class="text-xs text-fg-subtle" data-design-kit-acp-saved>
+						Thread saved as prompt template
+					</p>
+				{/if}
 				{#snippet composer()}
 					<div class="flex items-center gap-2">
 						<input

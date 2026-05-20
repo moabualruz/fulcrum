@@ -27,6 +27,34 @@ describe("AcpDrawer", () => {
 		expect(typeof result.body).toBe("string");
 	});
 
+	test("renders without throwing with the OD meta strip + agent registry", () => {
+		const result = render(AcpDrawerRoot, {
+			props: {
+				open: true,
+				side: "right",
+				meta: [
+					{ id: "session", label: "session", value: "run_8f29a4c" },
+					{ id: "step", label: "step", value: "3 / 8" },
+					{ id: "cache", label: "cache", value: "76%" },
+				],
+				agents: [
+					{
+						id: "claude-code",
+						name: "Claude Code",
+						client: "claude-code",
+						status: "Ready",
+						tone: "ready",
+						latency: "0.8s",
+						mcp: 12,
+						plugins: 4,
+						ring: "executor",
+					},
+				],
+			},
+		});
+		expect(typeof result.body).toBe("string");
+	});
+
 	test("never emits raw hex/hsl color in SSR markup", () => {
 		const { body } = render(AcpDrawerRoot, { props: { open: false } });
 		expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);

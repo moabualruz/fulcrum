@@ -15,7 +15,19 @@
 	import { makeKeydownHandler } from "$lib/components/command-palette/command-palette-handlers";
 	import { buildProjectCommandItems } from "$lib/components/command-palette/project-command-items";
 	import ShortcutHelpOverlay from "$lib/components/ShortcutHelpOverlay.svelte";
-	import { Sheet, SheetContent, SheetTrigger, TraceBadge } from "@fulcrum/ui-kit";
+	import {
+		AcpDrawer,
+		Chip,
+		Kbd,
+		Sheet,
+		SheetContent,
+		SheetTrigger,
+		TraceBadge,
+		TraceChip,
+		type AcpDrawerAgentRow,
+		type AcpDrawerMetaItem,
+		type AcpDrawerSide,
+	} from "@fulcrum/ui-kit";
 	import { buttonVariants } from "@fulcrum/ui-kit";
 	import {
 		MOBILE_QUERY,
@@ -41,6 +53,70 @@
 	let paletteOpen = $state(false);
 	let shortcutHelpOpen = $state(false);
 	let inferenceStatus = $state<InferenceStatus>("unknown");
+
+	/*
+	 * Global AI Assist drawer (DESIGN.md §3.1, IA-MAP.md §5, ai-assist.html).
+	 * `+layout.svelte` owns the ONE shell-level AcpDrawer instance: every entry
+	 * point — `⌘/`, the StatusFooter `✨ AI Assist` segment, and (later) per-Step
+	 * `⊞ AI Assist` mode buttons — toggles this single drawer. Closing it pauses
+	 * the visual presence only; `aiSessionActive` keeps the session alive so the
+	 * transcript/composer state survives the move (cross-states.md §ai-assist.html).
+	 */
+	let aiAssistOpen = $state(false);
+	let aiSessionActive = $state(true);
+	let aiSelectedAgent = $state("claude-code");
+	let aiSavedNotice = $state("");
+	const aiDrawerSide = $derived<AcpDrawerSide>(mobile ? "bottom" : "right");
+
+	/*
+	 * The AI Assist drawer auto-scopes to the current Step. Static OD-backed
+	 * fixture data (ai-assist.html: planning session run_8f29a4c, Step 3/8) — a
+	 * real Step-scope feed lands with prd-cli-ai-assist-step-scope's web sibling.
+	 */
+	const aiTraceId = "4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f";
+	const aiScopeLabel = "Step 3 / 8 · Persist issuance row per kid";
+	const aiMeta: AcpDrawerMetaItem[] = [
+		{ id: "session", label: "session", value: "run_8f29a4c" },
+		{ id: "step", label: "step", value: "3 / 8" },
+		{ id: "policy", label: "policy", value: "ask-on-write" },
+		{ id: "cost", label: "cost", value: "$0.43" },
+		{ id: "tokens", label: "tokens", value: "12,480 / 4,312" },
+		{ id: "cache", label: "cache", value: "76%" },
+		{ id: "elapsed", label: "elapsed", value: "3m 42s" },
+	];
+	const aiAgents: AcpDrawerAgentRow[] = [
+		{ id: "claude-code", name: "Claude Code Opus", client: "claude-code", status: "Ready", tone: "ready", latency: "0.8s", mcp: 12, plugins: 4, ring: "executor" },
+		{ id: "codex", name: "Codex High", client: "codex", status: "Ready", tone: "ready", latency: "0.6s", mcp: 9, plugins: 3, ring: "validator" },
+		{ id: "gemini-cli", name: "Gemini Pro", client: "gemini-cli", status: "Paused", tone: "paused", latency: "n/a", mcp: 5, plugins: 2, ring: "planner" },
+		{ id: "opencode", name: "OpenCode Local", client: "opencode", status: "Ready", tone: "ready", latency: "1.1s", mcp: 7, plugins: 1, ring: null },
+		{ id: "pi-cli", name: "Pi Review", client: "pi-cli", status: "Offline", tone: "offline", latency: "n/a", mcp: 0, plugins: 0, ring: null },
+	];
+	const aiTranscript = [
+		{ speaker: "User", text: "Use the selected document and attachment to start planning the authentication rewrite." },
+		{ speaker: "AI Assist", text: "I found 4 source refs, 2 task links, and 1 blocker. Planning can start with trace 4f3a1c9e." },
+		{ speaker: "Tool", text: "read.document doc_auth_rewrite · read.attachment att_sec_review · list.related task_auth_42" },
+	];
+	const aiAgentLabel = $derived(
+		aiAgents.find((a) => a.id === aiSelectedAgent)?.name ?? aiSelectedAgent,
+	);
+
+	function openAiAssist(): void {
+		aiAssistOpen = true;
+	}
+	function toggleAiAssist(): void {
+		aiAssistOpen = !aiAssistOpen;
+	}
+	function onAiAssistOpenChange(next: boolean): void {
+		aiAssistOpen = next;
+		// Closing pauses visual presence only — the session is not aborted.
+	}
+	function selectAiAgent(agentId: string): void {
+		aiSelectedAgent = agentId;
+	}
+	function saveAiThread(): void {
+		aiSavedNotice = "Thread saved as prompt template";
+	}
+
 	const commandKeydownHandler = makeKeydownHandler(() => paletteOpen, (next) => (paletteOpen = next));
 
 	// Poll inference sidecar health every 30s (client-side only)
@@ -98,16 +174,28 @@
 		window.addEventListener("keyup", onGlobalKeyup);
 		const openHelp = () => (shortcutHelpOpen = true);
 		window.addEventListener("fulcrum:open-shortcut-help", openHelp);
+		// The StatusFooter `✨ AI Assist` segment + every per-Step `⊞ AI Assist`
+		// mode button dispatch this event; the one shell drawer listens here.
+		window.addEventListener("fulcrum:open-ai-assist", openAiAssist);
 		return () => {
 			window.removeEventListener("keydown", onGlobalKeydown);
 			window.removeEventListener("keyup", onGlobalKeyup);
 			window.removeEventListener("fulcrum:open-shortcut-help", openHelp);
+			window.removeEventListener("fulcrum:open-ai-assist", openAiAssist);
 		};
 	});
 
 	function onGlobalKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement | null;
 		const tag = typeof target?.tagName === "string" ? target.tagName.toLowerCase() : "";
+		// ⌘/ (or Ctrl+/) toggles the AI Assist drawer from any route. The meta/ctrl
+		// modifier makes it a deliberate chord, so it fires inside text fields too
+		// without stealing a literal "/" keystroke (IA-MAP.md §5 "⌘/ from anywhere").
+		if (event.key === "/" && (event.metaKey || event.ctrlKey) && !event.altKey) {
+			event.preventDefault();
+			toggleAiAssist();
+			return;
+		}
 		if (event.key === "?" && !event.metaKey && !event.ctrlKey && !event.altKey) {
 			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
 				event.preventDefault();
@@ -178,6 +266,79 @@
 />
 
 <ShortcutHelpOverlay open={shortcutHelpOpen} onClose={() => (shortcutHelpOpen = false)} />
+
+<!--
+	Global AI Assist drawer (DESIGN.md §3.1, IA-MAP.md §5, ai-assist.html).
+	The single shell-level AcpDrawer instance — composed from the @fulcrum/ui-kit
+	AcpDrawer primitive (AGENTS.md ui-kit rule: never a route-local overlay). Open
+	from `⌘/`, the StatusFooter segment, or per-Step `⊞ AI Assist`. 420px desktop
+	right overlay / 92vw mobile bottom sheet via the `aiDrawerSide` switch.
+-->
+<AcpDrawer
+	open={aiAssistOpen}
+	side={aiDrawerSide}
+	title="AI Assist"
+	scopeLabel={aiScopeLabel}
+	agentLabel={aiAgentLabel}
+	agents={aiAgents}
+	meta={aiMeta}
+	onOpenChange={onAiAssistOpenChange}
+	onAgentSelect={selectAiAgent}
+	onExpand={() => goto("/ai-assist")}
+	onSaveThread={saveAiThread}
+	class="ai-assist-shell-drawer"
+>
+	{#snippet trace()}
+		<TraceBadge badge data-ai-assist-trace traceId={aiTraceId} project="fulcrum" />
+	{/snippet}
+	<div class="grid gap-3" data-ai-assist-thread>
+		<p class="text-xs font-semibold uppercase tracking-wide text-fg-subtle">
+			Suggestions for this screen
+		</p>
+		{#each ["Summarize what's on this screen", "What should I do next?", "Explain the controls and shortcuts", "Find similar past work"] as suggestion}
+			<button
+				type="button"
+				data-ai-assist-suggestion
+				class="rounded-sm border border-border bg-surface px-3 py-2 text-left text-xs text-fg hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>{suggestion}</button
+			>
+		{/each}
+		{#each aiTranscript as message}
+			<article class="rounded-sm border border-border bg-surface p-3" data-ai-assist-message>
+				<div class="mb-1 flex items-center justify-between gap-2">
+					<h3 class="text-xs font-semibold text-fg">{message.speaker}</h3>
+					<TraceChip badge traceId={aiTraceId} project="fulcrum" />
+				</div>
+				<p class="text-xs leading-5 text-fg-subtle">{message.text}</p>
+			</article>
+		{/each}
+		{#if aiSavedNotice}
+			<p class="text-xs text-fg-subtle" data-ai-assist-saved>{aiSavedNotice}</p>
+		{/if}
+	</div>
+	{#snippet composer()}
+		<div class="grid gap-2" data-ai-assist-composer>
+			<textarea
+				class="min-h-16 resize-y rounded-sm border border-border bg-surface p-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				aria-label="AI Assist composer"
+				placeholder="type or paste; @ to mention scope…"
+			></textarea>
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<div class="flex items-center gap-1.5">
+					<Chip tone="neutral">@ scope</Chip>
+					<Chip tone="neutral">📎 attach</Chip>
+					<Kbd>⌘↵</Kbd>
+				</div>
+				<button
+					type="button"
+					data-ai-assist-send
+					class="rounded-sm bg-accent px-3 py-1.5 text-xs font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					>▶ Send</button
+				>
+			</div>
+		</div>
+	{/snippet}
+</AcpDrawer>
 
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}

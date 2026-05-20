@@ -1,6 +1,11 @@
 import Root from "./acp-drawer.svelte";
 
-export type { AcpDrawerProps, AcpDrawerSide } from "./acp-drawer.svelte";
+export type {
+	AcpDrawerProps,
+	AcpDrawerSide,
+	AcpDrawerMetaItem,
+	AcpDrawerAgentRow,
+} from "./acp-drawer.svelte";
 export {
 	Root,
 	//
