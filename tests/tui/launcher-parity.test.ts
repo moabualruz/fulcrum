@@ -85,7 +85,9 @@ describe("launchTui", () => {
       caller: fakeCaller(),
     });
 
-    expect(tty.plainText()).toContain("Screen:Launcher");
+    // OD StatusFooter: the active screen is the reverse-video `mode` pill —
+    // an uppercased label, not the legacy `Screen:<label>` segment.
+    expect(tty.plainText()).toContain("LAUNCHER");
 
     tty.inject("?");
     await Bun.sleep(1);
@@ -102,8 +104,9 @@ describe("launchTui", () => {
     tty.inject("\r");
     await Bun.sleep(1);
     // "Create task" command-palette action routes to the Build Board screen
-    // (where task creation lives) rather than the Projects screen.
-    expect(tty.plainText()).toContain("Screen:Build Board");
+    // (where task creation lives) rather than the Projects screen. The OD
+    // StatusFooter `mode` pill renders the screen label uppercased.
+    expect(tty.plainText()).toContain("BUILD BOARD");
 
     app.stop();
   });
@@ -128,7 +131,8 @@ describe("TuiRouter route states", () => {
 
     await app.navigatePath("/missing");
     expect(tty.plainText()).toContain("Unknown route: /missing");
-    expect(tty.plainText()).toContain("Screen:Not Found");
+    // OD StatusFooter `mode` pill renders the screen label uppercased.
+    expect(tty.plainText()).toContain("NOT FOUND");
 
     app.stop();
   });

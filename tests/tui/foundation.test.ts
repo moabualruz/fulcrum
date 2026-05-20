@@ -272,7 +272,7 @@ describe("TuiApp foundation behavior", () => {
     }
   });
 
-  it("status bar and auth screen render local org name from production caller", async () => {
+  it("status footer and auth screen render local org name from production caller", async () => {
     const db = await createTestOrm();
     try {
       const tty = new FakeTTY();
@@ -282,8 +282,10 @@ describe("TuiApp foundation behavior", () => {
       });
 
       await app.mount();
-      expect(tty.plainText()).toContain("Local");
-      expect(tty.plainText()).toContain("admin@local");
+      // OD StatusFooter renders the org name as the `profile:` segment; it
+      // drops the legacy user email — prd-tui-status-footer-od-parity.
+      expect(tty.plainText()).toContain("profile: Local");
+      expect(tty.plainText()).not.toContain("admin@local");
 
       tty.clear();
       await app.navigateTo("auth");

@@ -37,11 +37,13 @@ describe("TuiApp bell counter poll", () => {
     try {
       const tui = new TuiApp({ output, caller });
       await tui.mount();
-      expect(output.plainText()).toContain("Bell:2");
+      // OD StatusFooter: the unread bell count is folded into the `help`
+      // segment as `? 🔔<n>` (StatusBar.ts), not a standalone `Bell:<n>` bar.
+      expect(output.plainText()).toContain("🔔2");
       expect(intervals.some((interval) => interval.ms === 60_000)).toBe(true);
 
       await intervals.find((interval) => interval.ms === 60_000)?.callback();
-      expect(output.plainText()).toContain("Bell:7");
+      expect(output.plainText()).toContain("🔔7");
 
       tui.stop();
     } finally {

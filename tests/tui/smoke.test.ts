@@ -97,7 +97,7 @@ describe("TuiApp — headless mount", () => {
     app.stop();
   });
 
-  it("status bar shows admin@local after mount", async () => {
+  it("status footer shows the workspace profile after mount", async () => {
     const tty = new FakeTTY();
     const caller = fakeCaller({ email: "admin@local", orgId: "local" });
 
@@ -109,7 +109,10 @@ describe("TuiApp — headless mount", () => {
     await app.mount();
 
     const text = tty.plainText();
-    expect(text).toContain("admin@local");
+    // OD StatusFooter carries `profile:` (workspace scope), not a user email —
+    // the legacy org/user/screen bar is gone (prd-tui-status-footer-od-parity).
+    expect(text).toContain("profile: local");
+    expect(text).not.toContain("admin@local");
     app.stop();
   });
 
@@ -163,7 +166,9 @@ describe("TuiApp — headless mount", () => {
     await app.mount();
 
     expect(app.statusBarInfo).toEqual({ email: "(unauthenticated)", orgId: "local" });
-    expect(tty.plainText()).toContain("(unauthenticated)");
+    // OD StatusFooter renders the `profile:` scope, not a user email; the
+    // unauthenticated fallback surfaces as the `local` workspace profile.
+    expect(tty.plainText()).toContain("profile: local");
     app.stop();
   });
 

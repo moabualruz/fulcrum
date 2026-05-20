@@ -13,7 +13,7 @@ describe("TUI E2E data display", () => {
     expect(text).toContain("interface Project");
   });
 
-  test("status footer renders supplied trace, run, span, and project IDs", async () => {
+  test("status footer renders supplied trace, run, and branch identity", async () => {
     const tty = new FakeTTY({ columns: 140, rows: 30 });
     const app = new TuiApp({
       output: tty,
@@ -30,10 +30,14 @@ describe("TUI E2E data display", () => {
     await app.mount();
     const text = tty.plainText();
 
-    expect(text).toContain("trace:trace-visible");
-    expect(text).toContain("run:run-visible");
-    expect(text).toContain("span:span-visible");
-    expect(text).toContain("project:project-visible");
+    // OD StatusFooter: the `trace` segment renders the 8-char trace badge
+    // (the `trace[-_:]?` prefix is stripped — DESIGN.md §4.10 TraceBadge); the
+    // `run` segment carries the run id; `projectId` feeds the `branch` segment.
+    // Span identity is yank-only (`y s` copy keybind, exercised in
+    // apps/tui/src/widgets/widgets.test.ts), not a standalone footer segment.
+    expect(text).toContain("trace:visible");
+    expect(text).toContain("run: run-visible");
+    expect(text).toContain("project-visible");
     app.stop();
   });
 
