@@ -205,6 +205,7 @@ export class RunDetailScreen {
     }
 
     renderer.writeln(`  ${renderStatusBadge(this.run.status)} agent:${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
+    renderer.writeln(c.dim("  Shell  Files  Browser  Plan  Cost"));
     if (resolveStatusBadgeState(this.run.status) === "complete") {
       renderer.writeln();
       renderer.writeln(c.green("  Run completed"));
@@ -278,4 +279,3 @@ export class RunDetailScreen {
     }
   }
 }
-
