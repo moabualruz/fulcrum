@@ -60,6 +60,10 @@ _Avoid_: hidden backlog, pending chat count.
 The `/settings/ai-assist` route that edits checkpoint mode, checkpoint retention, and event transport while showing session > user > org > built-in resolution.
 _Avoid_: ACP settings page, hidden preference editor, protocol config.
 
+**SettingsSystemSurface**:
+The workspace-scoped `/settings` surface matching OD `settings.html` — a sticky section-nav rail plus nine stacked panels (General, Appearance, Keyboard, Privacy & safety, AI agents, Default routes, Integrations, Account, Danger zone) with a settings search filter, tight mode affordance per panel, segmented and toggle safe-edit controls, and confirm-gated danger actions. The pre-existing `/settings/*` sub-routes (theme, routing, connectors, api, flags, secrets) stay reachable as deep links from the panels — no feature loss.
+_Avoid_: settings dashboard, runtime control plane, settings card grid, preferences page.
+
 **TaskQuickCreateTray**:
 An inline Build-stage task creation surface that preserves board, backlog, table, or planning scope while showing required title, sprint, module, cycle, recurrence preview, validation, duplicate prevention, and retry state.
 _Avoid_: task create modal, hidden project scope, create dialog, cleared draft on failure.
