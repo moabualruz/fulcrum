@@ -251,9 +251,7 @@ export class ArtifactsScreen {
       return true;
     }
 
-    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`). Checked
-    // before the nav/action keys so an armed selector is not stolen by them.
-    if (this.overlay === "none" && this.modePicker.handleChordKey(key)) return true;
+    if (this.overlay === "none" && key === "m" && this.modePicker.handleKey(key)) return true;
 
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.artifacts.length - 1));

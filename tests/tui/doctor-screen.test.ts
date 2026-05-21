@@ -336,8 +336,21 @@ describe("Operate stage workbench (:doctor): OD parity", () => {
       expect(snap).toContain("Operate");
       expect(snap).toContain("fulcrum · :doctor · subsystems");
       expect(snap).toContain("OPERATE");
+      expect(snap).toContain("run: -");
       expect(snap).toContain("trace tr_56e3d1");
+      expect(snap).toContain("span -");
+      expect(snap).not.toContain("m mode");
     }
+  });
+
+  it("p/d/m select ModePicker modes", async () => {
+    const screen = new DoctorScreen({ results: checks });
+    await screen.handleKey("p");
+    expect(screen.currentStepMode).toBe("play");
+    await screen.handleKey("d");
+    expect(screen.currentStepMode).toBe("discuss");
+    await screen.handleKey("m");
+    expect(screen.currentStepMode).toBe("manual");
   });
 
   it("empty Operate workbench renders the shared one-sentence/one-action contract", () => {

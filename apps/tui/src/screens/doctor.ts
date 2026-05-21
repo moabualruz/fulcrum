@@ -124,8 +124,7 @@ export class DoctorScreen {
       this.opts.onExit?.();
       return true;
     }
-    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`).
-    if (this.modePicker.handleChordKey(key)) return true;
+    if (this.modePicker.handleKey(key)) return true;
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.results.length - 1));
       return true;
@@ -199,7 +198,7 @@ export class DoctorScreen {
     );
 
     renderer.separator();
-    renderer.writeln(c.dim("  j/k navigate  Enter expand  m mode  q back"));
+    renderer.writeln(c.dim("  j/k navigate  Enter expand  m/p/d modes  q back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 }

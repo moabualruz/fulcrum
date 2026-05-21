@@ -215,6 +215,55 @@ describe("RunDetailScreen", () => {
     bus.emit("runs.onRunUpdate", { id: "run-1", status: "completed", logLine: "after dispose" });
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("after dispose");
   });
+
+  test("dock tabs switch panes and footer carries run trace span identity", async () => {
+    const screen = new RunDetailScreen({
+      runId: "run-42",
+      traceId: "tr_8f29a4c1b3e0",
+      spanId: "span_0011223344",
+      caller: {
+        agent_runs: {
+          get: async () => ({
+            id: "run-42",
+            agent: "codex",
+            status: "running",
+            taskTitle: "Recover TUI dock",
+            projectName: "Fulcrum",
+            logLines: ["booted"],
+            traceId: "tr_8f29a4c1b3e0",
+            spanId: "span_0011223344",
+            observability: {
+              artifacts: [{ filename: "patch.diff", lifecycleState: "ready" }],
+              followUpTasks: [{ title: "verify footer identity" }],
+            },
+          }),
+          cancel: async () => ({ ok: true }),
+        },
+      },
+    });
+    await screen.load();
+
+    let text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Shell dock");
+    expect(text).toContain("run: run-42");
+    expect(text).toContain("trace:8f29a4c1");
+    expect(text).toContain("span_0011223344");
+
+    await screen.handleKey("f");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Files dock");
+    expect(text).toContain("patch.diff");
+
+    await screen.handleKey("p");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Plan dock");
+    expect(text).toContain("verify footer identity");
+
+    await screen.handleKey("c");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Cost dock");
+    expect(text).toContain("agent:codex");
+  });
 });
 
 describe("ArtifactsScreen", () => {
@@ -454,11 +503,29 @@ describe("Build stage workbench (:runs): OD parity", () => {
       // StatusFooter strip with the BUILD mode pill + OD segments.
       expect(snap).toContain("BUILD");
       expect(snap).toContain("profile: dev");
+      expect(snap).toContain("run: run-1");
       expect(snap).toContain("trace tr_8f29a4");
+      expect(snap).toContain("span span:run-");
       // Step-bearing rows expose the ModePicker affordance row.
       expect(snap).toContain("step modes");
       expect(snap).toContain("Manual");
     }
+  });
+
+  test("p/d/m select ModePicker modes instead of opening legacy run actions", async () => {
+    const screen = buildScreen();
+    await screen.load();
+
+    await screen.handleKey("p");
+    expect(screen.currentStepMode).toBe("play");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dependencies for");
+
+    await screen.handleKey("d");
+    expect(screen.currentStepMode).toBe("discuss");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dispatch run");
+
+    await screen.handleKey("m");
+    expect(screen.currentStepMode).toBe("manual");
   });
 
   test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {
