@@ -47,8 +47,10 @@ describe("KanbanBoard component (SSR)", () => {
     expect(body).toMatch(/data-status="pending"/);
     expect(body).toMatch(/data-status="completed"/);
     expect(body).toMatch(/data-board-card-title[^>]*>A very long task title/);
-    expect(body).toMatch(/data-board-card-priority[^>]*>P3</);
-    expect(body).toMatch(/data-board-card-priority[^>]*>P5</);
+    // Priority renders inside a ui-kit Badge; slotted content carries Svelte
+    // SSR comment markers (<!---->P3<!---->).
+    expect(body).toMatch(/data-board-card-priority[^>]*>(?:<!--[^>]*-->)*P3</);
+    expect(body).toMatch(/data-board-card-priority[^>]*>(?:<!--[^>]*-->)*P5</);
     expect(body).toMatch(/data-board-card-assignee[^>]*>Maya</);
     expect(body).toMatch(/data-board-card-due-date/);
     expect(body).toMatch(/data-board-card-estimate/);
