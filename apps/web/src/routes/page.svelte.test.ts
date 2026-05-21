@@ -15,8 +15,14 @@ mock.module("$app/state", () => ({
   },
 }));
 
+// `mock.module` registrations are process-global and the export-name set is
+// frozen on first registration — an incomplete stub here would strip
+// `invalidateAll` from every later test that imports the real module. Mirror
+// the real `$app/navigation` surface the component tree relies on.
 mock.module("$app/navigation", () => ({
   goto: () => Promise.resolve(),
+  invalidate: () => Promise.resolve(),
+  invalidateAll: () => Promise.resolve(),
 }));
 
 mock.module("$app/environment", () => ({

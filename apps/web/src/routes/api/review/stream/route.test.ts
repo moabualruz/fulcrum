@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { planningReviewMock } from "$lib/test/planning-review-mock";
 
 const calls: string[] = [];
 
@@ -9,7 +10,7 @@ mock.module("$lib/server/request-service-scope", () => ({
   },
 }));
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => ({
+mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   buildReviewWorkbenchModel: async (input: { projectId?: string; traceId?: string; reviewId?: string; selectedFilePath?: string }) => {
     calls.push(`preview:${input.projectId ?? ""}:${input.traceId ?? ""}:${input.reviewId ?? ""}:${input.selectedFilePath ?? ""}`);
     return {

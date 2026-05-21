@@ -54,7 +54,10 @@ mock.module("$lib/server/request-service-scope", () => ({
   }),
 }));
 
+// Complete `run-pages.ts` surface — `mock.module` freezes export names on
+// first registration, so `loadRunsPageData` is stubbed even though unused.
 mock.module("@execution-orchestration/interface/run-pages.ts", () => ({
+  loadRunsPageData: async () => ({ runs: [], projects: [], agents: [] }),
   getProjectRunPageData: async (_em: unknown, _ctx: unknown, runId: string) => {
     calls.push(`getRunPage:${runId}`);
     if (runId === "not-found") throw new Error("Run not found");
@@ -63,7 +66,13 @@ mock.module("@execution-orchestration/interface/run-pages.ts", () => ({
   listProjectRuns: async () => [],
 }));
 
+// `mock.module` is process-global and the export-name set is frozen on first
+// registration: this stub must declare every `run-actions.ts` export, or any
+// later test importing the real module loses the omitted names. dispatchRun /
+// dispatchTaskRun are unused here but kept so the surface stays complete.
 mock.module("@execution-orchestration/interface/run-actions.ts", () => ({
+  dispatchTaskRun: async () => ({ id: "run-dispatched" }),
+  dispatchRun: async () => ({ id: "run-dispatched" }),
   cancelRun: async (_em: unknown, _ctx: unknown, runId: string) => {
     calls.push(`cancel:${runId}`);
     return { ok: true };

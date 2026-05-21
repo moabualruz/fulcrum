@@ -1,5 +1,6 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { modeWatcherMock } from "$lib/test/mode-watcher-mock";
 
 /**
  * SSR smoke coverage for the canonical `CommandPalette` shell component.
@@ -34,7 +35,7 @@ mock.module("$app/navigation", () => ({
 
 mock.module("$app/environment", () => ({ browser: false, dev: false, building: false, version: "" }));
 
-mock.module("mode-watcher", () => ({ toggleMode: () => {}, ModeWatcher: () => "" }));
+mock.module("mode-watcher", () => modeWatcherMock());
 
 interface CommandItem {
   id: string;

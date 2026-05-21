@@ -1,13 +1,21 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
-import { makeId } from "@test-support/product-workspace-fixtures.ts";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
-let scratch: string;
+// The `/runs` route resolves its data through `requestServiceScope` and then
+// `loadRunsPageData`, which mixes raw-SQL run queries with TypeORM entity
+// queries (`listOpenTaskOptions` → `em.find(Task, ...)`). It therefore needs a
+// real TypeORM EntityManager — not a raw product-store handle. This test seeds
+// a TypeORM-backed store and mocks the scope to return its EntityManager.
+
+let orm: TestOrm | null = null;
+let activeCtx: { orgId: string; userId: null } = { orgId: "", userId: null };
+
+mock.module("$lib/server/request-service-scope", () => ({
+  requestServiceScope: async () => {
+    if (!orm) throw new Error("test orm not seeded");
+    return { em: orm.em, ctx: activeCtx };
+  },
+}));
 
 interface RunsPayload {
   runs: Array<{
@@ -27,55 +35,45 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-runs-list-"));
-  process.env["FULCRUM_HOME"] = scratch;
+beforeEach(async () => {
+  orm = await createTestOrm();
+  activeCtx = { orgId: orm.seed.orgId, userId: null };
 });
 
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
+afterEach(async () => {
+  await orm?.close();
+  orm = null;
 });
 
 async function seedRuns(): Promise<{ ids: string[] }> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, {
-    orgId: org.id,
-    slug: "alpha",
-    name: "Alpha",
-  });
+  const em = orm!.em;
+  const [{ id: projectId }] = (await em.query(
+    `INSERT INTO projects (id, org_id, slug, name) VALUES (gen_random_uuid(), $1, 'alpha', 'Alpha') RETURNING id`,
+    [activeCtx.orgId],
+  )) as Array<{ id: string }>;
   const ids: string[] = [];
-  // claude / succeeded
-  const r1 = makeId();
-  await db.query(
-    `INSERT INTO agent_runs (id, org_id, project_id, agent, model, prompt, status, started_at, ended_at)
-     VALUES ($1, $2, $3, 'claude', 'opus', 'p1', 'succeeded', $4, $5)`,
-    [r1, org.id, project.id, "2026-04-30T10:00:00.000Z", "2026-04-30T10:30:00.000Z"],
-  );
+  const [{ id: r1 }] = (await em.query(
+    `INSERT INTO agent_runs (id, org_id, task_id, agent_name, status, started_at)
+     VALUES (gen_random_uuid(), $1, NULL, 'claude', 'succeeded', $2) RETURNING id`,
+    [activeCtx.orgId, "2026-04-30T10:00:00.000Z"],
+  )) as Array<{ id: string }>;
   ids.push(r1);
-  // codex / running
-  const r2 = makeId();
-  await db.query(
-    `INSERT INTO agent_runs (id, org_id, project_id, agent, model, prompt, status, started_at)
-     VALUES ($1, $2, $3, 'codex', 'gpt-5', 'p2', 'running', $4)`,
-    [r2, org.id, project.id, "2026-04-30T11:00:00.000Z"],
-  );
+  const [{ id: r2 }] = (await em.query(
+    `INSERT INTO agent_runs (id, org_id, task_id, agent_name, status, started_at)
+     VALUES (gen_random_uuid(), $1, NULL, 'codex', 'running', $2) RETURNING id`,
+    [activeCtx.orgId, "2026-04-30T11:00:00.000Z"],
+  )) as Array<{ id: string }>;
   ids.push(r2);
-  await db.close();
+  void projectId;
   return { ids };
 }
 
 describe("/runs +page.server.ts load()", () => {
   test("returns seeded runs unfiltered", async () => {
     const { ids } = await seedRuns();
-    const url = new URL("http://localhost/runs");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      url,
+      url: new URL("http://localhost/runs"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     expect(result.activeProjectId).toBeNull();
@@ -84,7 +82,7 @@ describe("/runs +page.server.ts load()", () => {
     const returnedIds = payload.runs.map((r) => r.id);
     expect(returnedIds).toContain(ids[0]);
     expect(returnedIds).toContain(ids[1]);
-    expect(result.filter).toEqual({
+    expect(result.filter).toMatchObject({
       agent: "",
       status: "",
       range: "all",
@@ -93,27 +91,22 @@ describe("/runs +page.server.ts load()", () => {
   });
 
   test("project filter narrows to matching project", async () => {
-    const { ids: _ids } = await seedRuns();
-    void _ids;
-    // seedRuns assigns both runs to project "alpha"; assert filter on a
-    // non-existent project yields zero rows so we know the column is wired.
-    const url = new URL("http://localhost/runs?project=missing");
+    await seedRuns();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 9}`);
     const result = await mod.load({
-      url,
+      url: new URL("http://localhost/runs?project=00000000-0000-0000-0000-000000000000"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunsPayload>(result);
     expect(payload.runs).toEqual([]);
-    expect(result.filter.project).toBe("missing");
+    expect(result.filter.project).toBe("00000000-0000-0000-0000-000000000000");
   });
 
   test("agent filter narrows to matching agent", async () => {
     await seedRuns();
-    const url = new URL("http://localhost/runs?agent=claude");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
-      url,
+      url: new URL("http://localhost/runs?agent=claude"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunsPayload>(result);
@@ -124,10 +117,9 @@ describe("/runs +page.server.ts load()", () => {
 
   test("status filter narrows to matching status", async () => {
     await seedRuns();
-    const url = new URL("http://localhost/runs?status=running");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const result = await mod.load({
-      url,
+      url: new URL("http://localhost/runs?status=running"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunsPayload>(result);
@@ -136,15 +128,9 @@ describe("/runs +page.server.ts load()", () => {
   });
 
   test("returns empty array when DB has no runs", async () => {
-    const dbDir = join(scratch, "pglite.data");
-    mkdirSync(dbDir, { recursive: true });
-    const db = await openIsolatedStore(dbDir);
-    await migrateIsolatedStore(db);
-    await db.close();
-    const url = new URL("http://localhost/runs");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const result = await mod.load({
-      url,
+      url: new URL("http://localhost/runs"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunsPayload>(result);

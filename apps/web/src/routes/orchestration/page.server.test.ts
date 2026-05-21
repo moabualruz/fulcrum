@@ -26,15 +26,13 @@ const EMPTY_DASHBOARD: OrchestrationDashboardData = {
 };
 
 function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
-  mock.module("$lib/server/db", () => ({
-    openIsolatedStore: async () => ({
-      query: async (sql: string) => {
-        if (sql.includes("FROM projects")) return projects;
-        return [];
-      },
-      close: async () => {},
+  // The route resolves its data through `requestServiceScope`; it no longer
+  // touches `$lib/server/db` directly. Stub the service scope it actually uses.
+  mock.module("$lib/server/request-service-scope", () => ({
+    requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
+      em: { kind: "mock-em" },
+      ctx: { orgId: "org1", userId: "user1", projectId },
     }),
-    getDefaultOrgId: async () => "org1",
   }));
   mock.module("$lib/server/orchestration", () => ({
     loadOrchestrationDashboard: async (
@@ -49,9 +47,13 @@ function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
           )
         : dispatches,
     }),
+    // `+page.server.ts` also imports listOrchestrationProjectOptions; the
+    // mock must declare it or the route load() fails to resolve the import.
+    listOrchestrationProjectOptions: async () => projects,
     SYMPHONY_COLORS: {},
   }));
   mock.module("$lib/server/runs", () => ({
+    dispatchRunAction: async () => ({ id: "run-dispatched" }),
     cancelRunAction: async () => {},
     retryRunAction: async () => {},
   }));
@@ -102,6 +104,7 @@ describe("/orchestration +page.server.ts load()", () => {
         status: { ...EMPTY_DASHBOARD.status, concurrencyUsed: 1, workerConnected: true },
         dispatches,
       }),
+      listOrchestrationProjectOptions: async () => [],
       SYMPHONY_COLORS: {},
     }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
@@ -135,14 +138,8 @@ describe("/orchestration +page.server.ts load()", () => {
         ...EMPTY_DASHBOARD,
         dispatches,
       }),
+      listOrchestrationProjectOptions: async () => [],
       SYMPHONY_COLORS: {},
-    }));
-    mock.module("$lib/server/db", () => ({
-      openIsolatedStore: async () => ({
-        query: async () => [],
-        close: async () => {},
-      }),
-      getDefaultOrgId: async () => "org1",
     }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const result = await mod.load({
@@ -166,8 +163,8 @@ describe("/orchestration +page.server.ts load()", () => {
     ];
     mock.module("$lib/server/orchestration", () => ({
       loadOrchestrationDashboard: async (
-        _db: unknown,
-        _orgId: string,
+        _em: unknown,
+        _ctx: unknown,
         projectId?: string,
       ) => ({
         ...EMPTY_DASHBOARD,
@@ -175,14 +172,8 @@ describe("/orchestration +page.server.ts load()", () => {
           ? allDispatches.filter((d) => d.project_id === projectId)
           : allDispatches,
       }),
+      listOrchestrationProjectOptions: async () => [],
       SYMPHONY_COLORS: {},
-    }));
-    mock.module("$lib/server/db", () => ({
-      openIsolatedStore: async () => ({
-        query: async () => [],
-        close: async () => {},
-      }),
-      getDefaultOrgId: async () => "org1",
     }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const result = await mod.load({

@@ -256,8 +256,17 @@ function installRouteMocks() {
   }
 
   for (const moduleId of RUN_COMMAND_MODULES) {
+    // `mock.module` is process-global and freezes a module's export-name set
+    // on first registration. `run-actions.ts` exports five functions; stub
+    // every one (even the unused ones) so later tests importing the real
+    // module keep `dispatchRun` / `cancelRun` / `retryRun` /
+    // `recordRunApprovalDecision`.
     mock.module(moduleId, () => ({
       dispatchTaskRun: async () => ({ id: "run-1" }),
+      dispatchRun: async () => ({ id: "run-1" }),
+      cancelRun: async () => ({ ok: true }),
+      retryRun: async () => ({ id: "run-1" }),
+      recordRunApprovalDecision: async () => ({ ok: true }),
     }));
   }
 }

@@ -1,17 +1,36 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Window } from "happy-dom";
 import { CALLOUT_TYPES, CalloutNode, getSlashMenuItems, insertSlashMenuItem } from "./slash-menu";
 
+const globals = globalThis as unknown as Record<string, unknown>;
+const savedGlobals = {
+	window: globals["window"],
+	document: globals["document"],
+	HTMLElement: globals["HTMLElement"],
+	requestAnimationFrame: globals["requestAnimationFrame"],
+};
+
 beforeAll(() => {
 	const window = new Window();
 	window.SyntaxError = SyntaxError;
-	const globals = globalThis as unknown as Record<string, unknown>;
+	// happy-dom's Window does not surface the ES URI helpers; PGlite-backed
+	// tests that run later in the same process read `window.encodeURIComponent`.
+	(window as unknown as Record<string, unknown>)["encodeURIComponent"] = encodeURIComponent;
+	(window as unknown as Record<string, unknown>)["decodeURIComponent"] = decodeURIComponent;
 	globals.window = window;
 	globals.document = window.document;
 	globals.HTMLElement = window.HTMLElement;
 	globals.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(callback, 0);
+});
+
+afterAll(() => {
+	// Restore the globals so later test files do not inherit a happy-dom window.
+	for (const [key, value] of Object.entries(savedGlobals)) {
+		if (value === undefined) delete globals[key];
+		else globals[key] = value;
+	}
 });
 
 function createCalloutEditor(): Editor {

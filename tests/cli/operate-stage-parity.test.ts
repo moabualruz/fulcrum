@@ -152,7 +152,7 @@ describe("Operate verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
     // envelope, carrying a coded error in the always-array `errors` field.
     await runOperate(["plugin", "install", "caveman", "--json"], h.opts);
     expect(h.out).toHaveLength(1);
-    const env = expectCanonicalEnvelope(h.out[0]!, "plugin install");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin install");
     const errors = env["errors"] as { code: string }[];
     expect(errors).toHaveLength(1);
     expect(errors[0]!.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
@@ -170,7 +170,7 @@ describe("Operate verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
   test("`fulcrum operate plugin install` with no name emits a coded missing-name envelope", async () => {
     const h = harness();
     await runOperate(["plugin", "install", "--json"], h.opts);
-    const env = expectCanonicalEnvelope(h.out[0]!, "plugin install");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin install");
     const errors = env["errors"] as { code: string }[];
     expect(errors[0]!.code).toBe("FUL_OPERATE_PLUGIN_MISSING_NAME");
   });
@@ -211,7 +211,7 @@ describe("per-agent scoping rule (CLI-TUI-UX.md §1.8)", () => {
       ["plugin", "enable", "caveman", "--agent", "claude-code", "--agent", "codex", "--json"],
       h.opts,
     );
-    const env = expectCanonicalEnvelope(h.out[0]!, "plugin enable");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin enable");
     const args = env["args"] as Record<string, unknown>;
     expect(args["all_agents"]).toBe(false);
     expect(args["agents"]).toEqual(["claude-code", "codex"]);
@@ -220,7 +220,7 @@ describe("per-agent scoping rule (CLI-TUI-UX.md §1.8)", () => {
   test("`fulcrum operate plugin enable --all-agents` resolves the all-agents scope", async () => {
     const h = harness();
     await runOperate(["plugin", "enable", "caveman", "--all-agents", "--json"], h.opts);
-    const env = expectCanonicalEnvelope(h.out[0]!, "plugin enable");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin enable");
     const args = env["args"] as Record<string, unknown>;
     expect(args["all_agents"]).toBe(true);
     expect((args["agents"] as string[]).length).toBeGreaterThan(0);
@@ -229,7 +229,7 @@ describe("per-agent scoping rule (CLI-TUI-UX.md §1.8)", () => {
   test("`fulcrum operate plugin enable --agent <bad>` emits a coded unknown-agent envelope", async () => {
     const h = harness();
     await runOperate(["plugin", "enable", "caveman", "--agent", "bogus", "--json"], h.opts);
-    const env = expectCanonicalEnvelope(h.out[0]!, "plugin enable");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin enable");
     const errors = env["errors"] as { code: string }[];
     expect(errors[0]!.code).toBe("FUL_OPERATE_PLUGIN_UNKNOWN_AGENT");
   });
@@ -288,7 +288,10 @@ describe("fulcrum trace show <id> (CLI Issue 6 — agent-cli-review A-CLI-003)",
 });
 
 describe("no command removed — read-only plugin verbs preserved", () => {
-  test("`fulcrum operate plugin list --json` still emits the plain marker array", async () => {
+  // `operate-plugins.ts` emits the canonical `fulcrum.cli.v1` envelope for
+  // every verb's `--json` output (CLI-TUI-UX.md §3); `plugin list` carries the
+  // marker rows in the envelope `result`, not as a bare top-level array.
+  test("`fulcrum operate plugin list --json` emits the canonical envelope with marker rows", async () => {
     const h = harness();
     await runOperate(["plugin", "list", "--json"], {
       ...h.opts,
@@ -296,8 +299,10 @@ describe("no command removed — read-only plugin verbs preserved", () => {
         { id: "claude-code", name: "Claude Code", enabled: true, source: "claude", marker: "m" },
       ],
     });
-    const parsed = JSON.parse(h.out[0]!) as { id: string }[];
-    expect(parsed[0]!.id).toBe("claude-code");
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin list");
+    const result = env["result"] as { id: string }[];
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]!.id).toBe("claude-code");
   });
 
   test("the bare `list` verb (legacy entry) still dispatches to the plugin group", async () => {
@@ -306,6 +311,7 @@ describe("no command removed — read-only plugin verbs preserved", () => {
       ...h.opts,
       loadPlugins: async () => [],
     });
-    expect(JSON.parse(h.out[0]!)).toEqual([]);
+    const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin list");
+    expect(env["result"]).toEqual([]);
   });
 });

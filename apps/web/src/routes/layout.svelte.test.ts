@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { modeWatcherMock } from "$lib/test/mode-watcher-mock";
 
 // `svelte/server` `render()` harness needs server-compiled `.svelte` modules
 // (loaded via root `bunfig.toml [test] preload`). Stub virtual modules used
@@ -19,8 +20,14 @@ mock.module("$app/state", () => ({
   },
 }));
 
+// `mock.module` registrations are process-global and the export-name set is
+// frozen on first registration — an incomplete stub here would strip
+// `invalidateAll` from every later test that imports the real module. Mirror
+// the real `$app/navigation` surface the component tree relies on.
 mock.module("$app/navigation", () => ({
   goto: () => Promise.resolve(),
+  invalidate: () => Promise.resolve(),
+  invalidateAll: () => Promise.resolve(),
 }));
 
 mock.module("$app/environment", () => ({
@@ -31,10 +38,7 @@ mock.module("$app/environment", () => ({
 }));
 
 mock.module("$lib/assets/favicon.svg", () => ({ default: "/favicon.svg" }));
-mock.module("mode-watcher", () => ({
-  ModeWatcher: () => "",
-  toggleMode: () => undefined,
-}));
+mock.module("mode-watcher", () => modeWatcherMock());
 mock.module("$lib/feedback/use-form-toast", () => ({ toastFromForm: () => undefined }));
 mock.module("$lib/components/app/AppSidebar.svelte", () => ({ default: () => "<aside aria-label=\"primary navigation\"></aside>" }));
 mock.module("$lib/components/command-palette/CommandPalette.svelte", () => ({ default: () => "" }));

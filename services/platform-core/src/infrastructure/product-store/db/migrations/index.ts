@@ -43,6 +43,7 @@ import { migration as migration0008SavedViewsCompat } from "./0008_saved_views_c
 import { migration as migration0009ProjectSetup } from "./0009_project_setup.ts";
 import { migration as migration0010TaskSoftDelete } from "./0010_task_soft_delete.ts";
 import { migration as migration0011MetricsCacheReportColumns } from "./0011_metrics_cache_report_columns.ts";
+import { migration as migration0012IsolatedStoreCanonicalSchemaParity } from "./0012_isolated_store_canonical_schema_parity.ts";
 
 export type { ProductStoreMigration } from "./types.ts";
 
@@ -92,4 +93,5 @@ export const productStoreMigrations = [
   migration0009ProjectSetup,
   migration0010TaskSoftDelete,
   migration0011MetricsCacheReportColumns,
+  migration0012IsolatedStoreCanonicalSchemaParity,
 ] as const;

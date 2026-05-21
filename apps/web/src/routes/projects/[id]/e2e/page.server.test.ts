@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { planningReviewMock } from "$lib/test/planning-review-mock";
 
 const calls: string[] = [];
 let runShouldFail = false;
@@ -30,7 +31,7 @@ mock.module("$lib/server/request-service-scope", () => ({
   }),
 }));
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => ({
+mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   buildUatCodeReviewHandoff: async (_em: unknown, _ctx: unknown, input: { projectId: string }) => {
     calls.push(`handoff:${input.projectId}`);
     return { projectId: input.projectId, status: "ready" };

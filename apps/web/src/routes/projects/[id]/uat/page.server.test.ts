@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
+import { planningReviewMock } from "$lib/test/planning-review-mock";
 
 const calls: string[] = [];
 let loadShouldThrowNotFound = false;
@@ -13,14 +14,24 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/uat", { method: "POST", body: fd });
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string | null) => ({
+// The route was migrated to `request-service-scope` + an `ensureProjectExists`
+// guard; mock the modules the route actually imports today.
+mock.module("$lib/server/request-service-scope", () => ({
+  requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
     em: { kind: "mock-em" },
     ctx: { orgId: "org-1", userId: "user-1", projectId },
   }),
 }));
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => ({
+mock.module("$lib/server/project-api", () => ({
+  ensureProjectExists: async (_event: unknown, projectId: string) => {
+    if (projectId === "missing-project") {
+      throw Object.assign(new Error("Project not found"), { status: 404 });
+    }
+  },
+}));
+
+mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
     calls.push(`history:${input.projectId}:${input.limit ?? ""}`);
     return [];

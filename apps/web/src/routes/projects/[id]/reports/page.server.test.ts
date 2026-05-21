@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
+import { planningReviewMock } from "$lib/test/planning-review-mock";
 
 const calls: string[] = [];
 let loadShouldThrowNotFound = false;
@@ -32,7 +33,7 @@ mock.module("@work-management/interface/project-reports.ts", () => ({
   },
 }));
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => ({
+mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   buildFinalQaReport: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
     calls.push(`final-qa:${input.projectId}:${input.traceId ?? ""}`);
     return { projectId: input.projectId, traceId: input.traceId, status: "passed" };
