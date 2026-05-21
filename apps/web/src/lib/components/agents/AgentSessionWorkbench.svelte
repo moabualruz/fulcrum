@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "../../utils.js";
   import { buttonVariants } from "@fulcrum/ui-kit";
   import type { SessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
 
