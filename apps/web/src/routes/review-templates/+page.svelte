@@ -1,3 +1,14 @@
+<!--
+  Review-comment template library — reusable structured feedback templates.
+
+  Absorption note (`prd-web-review-workbench-od-fidelity`,
+  `design-alignment/review.md` §review.html migration): the five built-in
+  templates are absorbed into the Review workbench (`/review/<reviewId>`) as the
+  Comments-panel composer template picker — selecting a template seeds the
+  composer body. This route is kept as the template-library management surface
+  (custom-template authoring, scope filtering), with no feature loss; the
+  workbench consumes the template set as a composer affordance.
+-->
 <script lang="ts">
   type TemplateKind = "missing-criteria" | "stale-context" | "prototype-mismatch" | "test-gap" | "code-risk";
   type Scope = "workspace" | "planning" | "uat" | "code-review";

@@ -380,6 +380,16 @@ export {
 } from "./components/task-row/index.js";
 export type { TaskRowProps } from "./components/task-row/index.js";
 export {
+	CommentThread,
+	Root as CommentThreadRoot,
+} from "./components/comment-thread/index.js";
+export type {
+	CommentThreadProps,
+	CommentThreadState,
+	ThreadComment,
+	CommentAuthorKind,
+} from "./components/comment-thread/index.js";
+export {
 	AgentIdentityCard,
 	Root as AgentIdentityCardRoot,
 } from "./components/agent-identity-card/index.js";

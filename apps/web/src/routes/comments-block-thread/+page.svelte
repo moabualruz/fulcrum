@@ -1,3 +1,16 @@
+<!--
+  Block-anchored doc comment threads — the doc-version-review surface
+  (DESIGN.md §9.1: selection-anchored, resolvable, faded-when-resolved).
+
+  Absorption note (`prd-web-review-workbench-od-fidelity`,
+  `design-alignment/review.md` §review.html migration): the selection-anchored
+  resolvable-thread *responsibility* this route demonstrates is now promoted to
+  the `@fulcrum/ui-kit` `CommentThread` primitive, which the Review workbench
+  (`/review/<reviewId>`) consumes for its inline diff annotations and Comments
+  panel. This route is kept as the doc-version-review demo surface — block-
+  anchored doc comments stay available wherever that surface needs them, with
+  no feature loss.
+-->
 <script lang="ts">
   type Comment = { id: string; author: string; body: string; ts: string };
   type Thread = { id: string; blockId: string; selection: string; comments: Comment[]; resolved: boolean };
