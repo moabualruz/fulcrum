@@ -201,8 +201,9 @@ describe("fulcrum Plan-stage envelope + trace contract", () => {
     await runPlan(["list", "--status", "approved"], { caller: fakeCaller(), ...humanIo.opts });
 
     const envelopeResult = JSON.parse(jsonIo.lines[0]!).result;
-    // Plain output prints the same result payload plus the DESIGN.md §4.10 trace line.
-    expect(humanIo.lines[0]).toBe(JSON.stringify(envelopeResult, null, 2));
+    // Plain output prints the DESIGN.md §4.10 trace line before the same result payload.
+    expect(humanIo.lines[0]).toMatch(/^trace: [0-9a-f]{8}…/);
+    expect(humanIo.lines.slice(1).join("\n")).toBe(JSON.stringify(envelopeResult, null, 2));
   });
 
   test("a failed Plan verb stays inside the envelope with a populated errors array", async () => {

@@ -15,6 +15,7 @@ import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@platform-core/application/platform-operations/readiness-checks.ts";
 import { listProfiles } from "@execution-orchestration/interface/agent-catalog.ts";
+import { emitErrorResult, emitResult } from "./lib/cli-output.ts";
 import {
   buildMemoryEngineDoctorReport,
   buildProductKernelDoctorReport,
@@ -919,13 +920,40 @@ export async function run(args: string[]): Promise<void> {
 
   if (runFix) {
     if (runFix !== "pglite-rebuild") {
+      if (isJsonOutput) {
+        emitErrorResult(
+          {
+            argv: args,
+            command: "fulcrum doctor",
+            args: { run_fix: runFix },
+            error: {
+              code: "FUL_DOCTOR_UNKNOWN_FIX",
+              message: `fulcrum doctor: unknown fix '${runFix}'`,
+              fix: "Run `fulcrum doctor --json` or `fulcrum doctor --run-fix pglite-rebuild`.",
+            },
+            renderHuman: () => {},
+          },
+          { print: console.log, printErr: console.error },
+        );
+        process.exit(2);
+        return;
+      }
       console.error(`fulcrum doctor: unknown fix '${runFix}'`);
       process.exit(2);
       return;
     }
     const result = await rebuildLocalPgliteDatabase();
     if (isJsonOutput) {
-      console.log(JSON.stringify(result, null, 2));
+      emitResult(
+        {
+          argv: args,
+          command: "fulcrum doctor",
+          args: { run_fix: runFix },
+          result,
+          renderHuman: () => {},
+        },
+        { print: console.log, printErr: console.error },
+      );
     } else {
       console.log("pglite-rebuild");
       console.log(`  db: ${result.dbPath}`);
@@ -942,7 +970,16 @@ export async function run(args: string[]): Promise<void> {
       const { buildDefaultApiDoctorConfig, runApiDoctorChecks } = await import("@platform-core/application/health-checks/checks/api.ts");
       const apiReport = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
       if (isJsonOutput) {
-        console.log(JSON.stringify(apiReport, null, 2));
+        emitResult(
+          {
+            argv: args,
+            command: "fulcrum doctor",
+            args: { subsystem },
+            result: apiReport,
+            renderHuman: () => {},
+          },
+          { print: console.log, printErr: console.error },
+        );
       } else {
         console.log("api subsystem");
         for (const check of apiReport.checks) {
@@ -973,7 +1010,16 @@ export async function run(args: string[]): Promise<void> {
   }
 
   if (isJsonOutput) {
-    console.log(JSON.stringify(report, null, 2));
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum doctor",
+        args: { probe, checks: runOrchestratorChecks },
+        result: report,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
   } else {
     const home = process.env["HOME"] ?? "";
     printHumanFormat(report, home);

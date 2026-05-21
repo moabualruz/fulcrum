@@ -52,9 +52,9 @@ function captureLines() {
   };
 }
 
-/** The plain trace line is always the last stdout line for a run-bearing command. */
+/** The plain trace line is always present before content for a run-bearing command. */
 function traceLineOf(lines: readonly string[]): string {
-  return lines[lines.length - 1]!;
+  return lines.find((line) => line.startsWith("trace:")) ?? "";
 }
 
 function captureCaller() {

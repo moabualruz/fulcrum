@@ -458,7 +458,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "session": {
-      const { createLocalSessionCommandHost, runSessionCommand } = await import("./commands/session.ts");
+      const { createLocalSessionCommandHost, SESSION_HELP, runSessionCommand } = await import("./commands/session.ts");
+      if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
+        console.log(SESSION_HELP);
+        return;
+      }
       const { host, cleanup } = await createLocalSessionCommandHost();
       const controller = new AbortController();
       const stop = () => controller.abort();

@@ -201,8 +201,9 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
 
     const envelopeResult = JSON.parse(jsonIo.lines[0]!).result as { captureId: string; status: string };
     // Human line renders the same captureId + status the envelope `result` carries.
-    expect(humanIo.lines[0]).toContain(envelopeResult.captureId);
-    expect(humanIo.lines[0]).toContain(envelopeResult.status);
+    const humanResultLine = humanIo.lines.find((line) => line.includes(envelopeResult.captureId)) ?? "";
+    expect(humanResultLine).toContain(envelopeResult.captureId);
+    expect(humanResultLine).toContain(envelopeResult.status);
   });
 
   test("failed `--json` output stays inside the envelope with a populated `errors` array", async () => {

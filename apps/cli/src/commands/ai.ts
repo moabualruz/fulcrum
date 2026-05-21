@@ -45,6 +45,7 @@ export type AiFailureKind = "provider" | "rate" | "permission";
 const HELP = `fulcrum ai — AI Assist scoped to a Step
 
 Usage:
+  fulcrum ai --step <step-id> --thread <thread-id> [--title <title>]
   fulcrum ai start --task <id> --title <title> --step <step-id>
     [--description <text>] [--agent <id>] [--route plan|build|review]
     [--workspace <path>] [--json]
@@ -88,7 +89,8 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
   };
-  const [verb = "help", ...rest] = argv;
+  const [rawVerb = "help", ...rawRest] = argv;
+  const [verb, rest] = normalizeAiInvocation(rawVerb, rawRest);
 
   switch (verb) {
     case "start": {
@@ -213,6 +215,24 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
       io.printErr(HELP);
       io.exit(2);
   }
+}
+
+function normalizeAiInvocation(verb: string, rest: readonly string[]): [string, readonly string[]] {
+  if (verb !== "--step" && verb !== "--thread") return [verb, rest];
+  const rootArgs = [verb, ...rest];
+  const thread = flagValue(rootArgs, "--thread");
+  const step = flagValue(rootArgs, "--step");
+  const title = flagValue(rootArgs, "--title") ?? `AI Assist ${step ?? thread ?? "session"}`;
+  return [
+    "start",
+    [
+      "--task",
+      thread ?? step ?? "ai-session",
+      "--title",
+      title,
+      ...rootArgs,
+    ],
+  ];
 }
 
 /** Outcome of resolving the `--step` flag into a Step scope. */
