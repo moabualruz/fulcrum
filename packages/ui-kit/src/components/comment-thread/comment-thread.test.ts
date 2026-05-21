@@ -43,6 +43,22 @@ describe("CommentThread", () => {
 		expect(body).toContain('data-comment-thread-reply-input="t"');
 	});
 
+	test("exposes legacy thread selectors for absorbed route consumers", () => {
+		const { body } = render(CommentThreadRoot, {
+			props: {
+				threadId: "t",
+				anchorLabel: "Selection",
+				quote: "architecture decision",
+				comments: COMMENTS,
+				threadState: "open",
+			},
+		});
+		expect(body).toContain('data-thread-selection="true"');
+		expect(body).toContain('data-thread-comments="true"');
+		expect(body).toContain('data-thread-comment="c1"');
+		expect(body).toContain('data-thread-reply-input="t"');
+	});
+
 	test("resolved state fades and suppresses the composer", () => {
 		const { body } = render(CommentThreadRoot, {
 			props: { threadId: "t", anchorLabel: "a", comments: COMMENTS, threadState: "resolved" },
