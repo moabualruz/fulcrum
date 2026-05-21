@@ -108,6 +108,7 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     { name: "typecheck",     cmd: ["bun", "-e", SCOPED_TYPECHECK_SCRIPT], tier: "tier1" },
     { name: "architecture",  cmd: ["bun", "test", "tests/architecture/"], tier: "tier1" },
     { name: "license-audit", cmd: ["bun", "run", "scripts/license-audit.ts"], tier: "tier1" },
+    { name: "ui-kit-first",  cmd: ["bun", "run", "scripts/check-ui-kit-first.ts"], tier: "tier1" },
     { name: "ci:codegen",    cmd: ["bun", "run", "scripts/ci/codegen.ts"], tier: "tier1" },
     { name: "ci:schemas",    cmd: ["bun", "run", "scripts/ci-schemas.ts"], tier: "tier1" },
 
