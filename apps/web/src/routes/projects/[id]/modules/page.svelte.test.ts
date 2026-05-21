@@ -13,6 +13,6 @@ describe("/projects/[id]/modules +page.svelte source", () => {
     expect(source).toContain("data-modules-table");
     expect(source).toContain("data-module-row");
     expect(source).toContain("data-delete-module");
-    expect(source).toContain("module.traceId");
+    expect(source).toContain("projectModule.traceId");
   });
 });
