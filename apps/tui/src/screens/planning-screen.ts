@@ -27,6 +27,7 @@ import {
   renderWorkbenchErrorFrame,
   type StageWorkbenchScope,
 } from "./runs-screen.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -96,6 +97,13 @@ export class PlanningScreen {
   private cursor = 0;
   private scrollTop = 0;
   private error: string | null = null;
+  private readonly modePicker = new ModePicker({
+    stepId: "planning",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: PlanningScreenOptions) {}
 
@@ -206,11 +214,17 @@ export class PlanningScreen {
     }
 
     renderer.writeln();
+    renderer.writeln(`  ${c.dim("step modes")}  ${this.modePicker.render()}`);
+    renderer.writeln();
     renderer.writeln(c.dim("  G=guided start  F=freeform start  R=refresh  j/k=navigate  Enter=open  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.modePicker.handleChordKey(key)) {
+      return true;
+    }
+
     if (key === "j" || key === "\x1b[B") {
       const max = Math.max(0, this.allSessions.length - 1);
       this.cursor = Math.min(this.cursor + 1, max);
@@ -308,4 +322,3 @@ export class PlanningScreen {
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
 }
-

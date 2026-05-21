@@ -33,6 +33,7 @@ import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
 import { FOUNDATION_KEY_BINDINGS, formatFocusedRowLabel, renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { CaptureWorkbenchScreen } from "./screens/capture.ts";
 import { TaskBoardScreen, type TaskCreateInput } from "./screens/task-board.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
 import type { TuiTask } from "./screens/task-types.ts";
@@ -60,6 +61,8 @@ import {
   type TechnicalPlanningResult,
   type WorkflowCycleResultView,
 } from "./screens/planning-breakdown.ts";
+import { PlanningScreen } from "./screens/planning-screen.ts";
+import { ReviewScreen } from "./screens/review-screen.ts";
 import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
@@ -396,7 +399,7 @@ const COMMAND_PALETTE_ACTIONS = [
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "capture" | "plan" | "review" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist";
 type DomainScreen =
   | "projects"
   | "build-board"
@@ -463,15 +466,15 @@ export function listTuiNavigationEntries(): readonly NavEntry[] {
  * crash. Existing screens keep their home (value-preservation: no lost route).
  */
 const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
-  capture: "inbox",
-  plan: "planning",
+  capture: "capture",
+  plan: "plan",
   runs: "runs",
   "build-board": "build-board",
   tasks: "tasks",
   timeline: "tasks",
   graph: "tasks",
   run: "runs",
-  review: "nav",
+  review: "review",
   ship: "artifacts",
   archive: "artifacts",
   doctor: "doctor",
@@ -660,6 +663,9 @@ export class TuiApp {
   private authScreen: AuthScreen | null = null;
   private flagsScreen: FlagsScreen | null = null;
   private newDocScreen: NewDocScreen | null = null;
+  private captureWorkbenchScreen: CaptureWorkbenchScreen | null = null;
+  private planWorkbenchScreen: PlanningScreen | null = null;
+  private reviewWorkbenchScreen: ReviewScreen | null = null;
   private routingRulesScreen: RoutingRulesScreen | null = null;
   private notificationsScreen: NotificationsScreen | null = null;
   private activityScreen: ActivityFeedScreen | null = null;
@@ -934,6 +940,15 @@ export class TuiApp {
           break;
         case "new-doc":
           this._renderNewDoc();
+          break;
+        case "capture":
+          this.captureWorkbenchScreen?.render(this.renderer);
+          break;
+        case "plan":
+          this.planWorkbenchScreen?.render(this.renderer);
+          break;
+        case "review":
+          this.reviewWorkbenchScreen?.render(this.renderer);
           break;
         case "inbox":
           this.notificationsScreen?.render(this.renderer);
@@ -1448,6 +1463,39 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "capture" && this.captureWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.captureWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "plan" && this.planWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.planWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "review" && this.reviewWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.reviewWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
     if (this.currentScreen === "inbox" && this.notificationsScreen) {
       if (key === "q" || key === "\x1b") {
         this.currentScreen = "nav";
@@ -1837,6 +1885,44 @@ export class TuiApp {
       ]);
     }
 
+    if (screen === "capture") {
+      this.captureWorkbenchScreen = new CaptureWorkbenchScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? null,
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        data: {
+          inbox: [
+            {
+              id: "cap-tui-stage",
+              title: "Stage route capture",
+              preview: "Route opened from g c / :capture",
+              meta: "now · workbench · tui",
+            },
+          ],
+        },
+      });
+    }
+
+    if (screen === "plan") {
+      this.planWorkbenchScreen = new PlanningScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        caller: this._stagePlanningCaller(),
+      });
+      await this.planWorkbenchScreen.load();
+    }
+
+    if (screen === "review") {
+      this.reviewWorkbenchScreen = new ReviewScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? "trace-tui-review",
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        caller: this._stageReviewCaller(),
+      });
+      await this.reviewWorkbenchScreen.load();
+    }
+
     if (screen === "inbox") {
       this.notificationsScreen = this.caller.notify?.list && this.caller.notify.markRead && this.caller.notify.mute
         ? new NotificationsScreen({
@@ -1943,6 +2029,62 @@ export class TuiApp {
     }
 
     await this._renderCurrentScreen();
+  }
+
+  private _stagePlanningCaller(): ConstructorParameters<typeof PlanningScreen>[0]["caller"] {
+    return {
+      planning: {
+        getState: async () => ({
+          activeSessions: [
+            {
+              id: "plan-tui-stage",
+              title: "TUI stage workbench",
+              status: "planning",
+              mode: "guided",
+              agentName: "fulcrum",
+              traceId: this.traceContext.traceId ?? "trace-tui-plan",
+              traffic: [{ method: "g p / :plan" }],
+            },
+          ],
+          recentSessions: [],
+        }),
+        startGuided: async () => ({
+          id: "plan-guided",
+          title: "Guided planning",
+          status: "planning",
+          mode: "guided",
+          traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        }),
+        startFreeform: async () => ({
+          id: "plan-freeform",
+          title: "Freeform planning",
+          status: "planning",
+          mode: "freeform",
+          traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        }),
+      },
+    };
+  }
+
+  private _stageReviewCaller(): ConstructorParameters<typeof ReviewScreen>[0]["caller"] {
+    return {
+      reviews: {
+        listSessions: async () => [
+          {
+            id: "review-tui-stage",
+            title: "TUI stage review",
+            status: "in_progress",
+            reviewer: "fulcrum",
+            criteria: [{ name: "stage route opens canonical workbench", status: "pending" }],
+          },
+        ],
+        getSession: async ({ id }) => ({ id, title: "TUI stage review", status: "in_progress" }),
+        startReview: async () => ({ id: "review-new", title: "New review", status: "draft" }),
+        approve: async () => ({ ok: true }),
+        requestChanges: async () => ({ ok: true }),
+        saveSession: async () => ({ ok: true }),
+      },
+    };
   }
 
   /**
@@ -2343,6 +2485,9 @@ function screenTitle(screen: Screen): string {
     flags: "Feature Flags",
     inference: "Inference",
     "new-doc": "New Document",
+    capture: "Capture",
+    plan: "Plan",
+    review: "Review",
     inbox: "Notifications",
     activity: "Activity",
     "notification-rules": "Notification Rules",
