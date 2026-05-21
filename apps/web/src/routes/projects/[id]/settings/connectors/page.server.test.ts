@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
 
 interface ConnectorRow {
   id: string;
@@ -44,9 +46,11 @@ function fetchProject(calls: string[] = []): typeof fetch {
   }) as typeof fetch;
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async () => appScope,
-}));
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its seam while active (beforeAll/afterAll) so sibling suites that
+// mock the same path are never hijacked.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
 mock.module("@integration-hub/interface/project-connectors.ts", () => ({
   listProjectConnectors: async (_em: unknown, projectId: string) =>
@@ -96,6 +100,17 @@ beforeEach(() => {
 });
 
 describe("/projects/[id]/settings/connectors +page.server.ts", () => {
+  let disposeScope: (() => void) | undefined;
+  beforeAll(() => {
+    disposeScope = useApplicationScope((_locals, projectId) => ({
+      em: appScope.em,
+      ctx: { ...appScope.ctx, projectId: projectId ?? null },
+    }));
+  });
+  afterAll(() => {
+    disposeScope?.();
+  });
+
   test("server route uses project and connector interfaces instead of direct application imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("ensureProjectExists");

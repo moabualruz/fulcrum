@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { planningReviewMock } from "$lib/test/planning-review-mock";
+import { projectApiMock } from "$lib/test/project-api-mock";
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 
 const calls: string[] = [];
 let loadShouldThrowNotFound = false;
@@ -15,21 +17,32 @@ function form(data: Record<string, string>): Request {
 }
 
 // The route was migrated to `request-service-scope` + an `ensureProjectExists`
-// guard; mock the modules the route actually imports today.
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// guard. `mock.module` is process-global; both scope seams answer only while
+// this suite runs and otherwise delegate to the real implementations.
+let suiteActive = false;
 
-mock.module("$lib/server/project-api", () => ({
-  ensureProjectExists: async (_event: unknown, projectId: string) => {
-    if (projectId === "missing-project") {
-      throw Object.assign(new Error("Project not found"), { status: 404 });
-    }
-  },
-}));
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock((_locals, projectId) =>
+    suiteActive
+      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
+      : null,
+  ),
+);
+
+// `projectApiMock` keeps a complete export set (real `createProjectApiForEvent`
+// / `activeOrgId` / `currentUserId`) and only routes `ensureProjectExists` to
+// this suite's stub while the suite is active.
+mock.module("$lib/server/project-api", () =>
+  projectApiMock(() =>
+    suiteActive
+      ? (async (_event: unknown, projectId: string) => {
+          if (projectId === "missing-project") {
+            throw Object.assign(new Error("Project not found"), { status: 404 });
+          }
+        }) as never
+      : null,
+  ),
+);
 
 mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
@@ -80,6 +93,13 @@ beforeEach(() => {
 });
 
 describe("/projects/[id]/uat +page.server.ts", () => {
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
+
   test("server route uses service interfaces instead of direct application imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("@planning-review/interface/project-review-reports");

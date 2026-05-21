@@ -2,14 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { applicationScopeMock } from "$lib/test/application-scope-mock";
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
+import { projectSprintsMock, useProjectSprints } from "$lib/test/project-sprints-mock";
 
 const calls: string[] = [];
-
-// Active only while this suite runs. `mock.module` is process-wide, so the
-// seam falls through to the real scope resolver when a foreign suite is
-// exercising the module.
-let suiteActive = false;
 const pageData = {
   project: { id: "project-1", name: "Project" },
   sprint: {
@@ -29,18 +25,15 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/sprint/sprint-1", { method: "POST", body: fd });
 }
 
-// `applicationScopeMock` keeps a complete export set (so sibling suites that
-// import `__setApplicationScopeForTest` still resolve it). The `project-sprints`
-// interface is mocked too, so the `em` value is never actually queried here.
-mock.module("$lib/server/application-scope", () =>
-  applicationScopeMock((_locals, projectId) =>
-    suiteActive
-      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
-      : null,
-  ),
-);
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its seam while active (beforeAll/afterAll) so sibling suites that
+// mock the same path are never hijacked.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
-mock.module("@work-management/interface/project-sprints.ts", () => ({
+mock.module("@work-management/interface/project-sprints.ts", () => projectSprintsMock());
+
+const projectSprintsOverrides = {
   loadProjectSprintDetail: async () => pageData,
   createProjectTask: async (_em: unknown, _ctx: unknown, input: { title: string; status?: string | null; sprintId?: string | null }) => {
     calls.push(`create:${input.title}:${input.status}:${input.sprintId}`);
@@ -58,14 +51,22 @@ mock.module("@work-management/interface/project-sprints.ts", () => ({
     calls.push(`close:${sprintId}`);
     return { id: sprintId, metrics: { velocity: 0, completed_tasks: 0 } };
   },
-}));
+};
+
+let disposeScope: (() => void) | undefined;
+let disposeSprints: (() => void) | undefined;
 
 beforeAll(() => {
-  suiteActive = true;
+  disposeScope = useApplicationScope((_locals, projectId) => ({
+    em: { kind: "mock-em" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
+  }));
+  disposeSprints = useProjectSprints(projectSprintsOverrides);
 });
 
 afterAll(() => {
-  suiteActive = false;
+  disposeScope?.();
+  disposeSprints?.();
 });
 
 beforeEach(() => {

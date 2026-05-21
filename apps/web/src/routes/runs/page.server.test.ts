@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
 
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
+
 // The `/runs` route resolves its data through `requestServiceScope` and then
 // `loadRunsPageData`, which mixes raw-SQL run queries with TypeORM entity
 // queries (`listOpenTaskOptions` → `em.find(Task, ...)`). It therefore needs a
@@ -10,12 +12,11 @@ import { createTestOrm, type TestOrm } from "@test-support/application-database.
 let orm: TestOrm | null = null;
 let activeCtx: { orgId: string; userId: null } = { orgId: "", userId: null };
 
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async () => {
-    if (!orm) throw new Error("test orm not seeded");
-    return { em: orm.em, ctx: activeCtx };
-  },
-}));
+// `mock.module` is process-global; this seam answers only while this suite's
+// ORM is seeded and falls through to the real resolver for foreign suites.
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock(() => (orm ? { em: orm.em, ctx: activeCtx } : null)),
+);
 
 interface RunsPayload {
   runs: Array<{

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
 
 const calls: string[] = [];
 const boardTasks = [
@@ -20,12 +22,11 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/boards", { method: "POST", body: fd });
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its seam while active (beforeAll/afterAll) so sibling suites that
+// mock the same path are never hijacked.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
 mock.module("@work-management/interface/work-item-detail.ts", () => ({
   listBoardWorkItems: async (_em: unknown, ctx: { projectId?: string | null }) => {
@@ -73,6 +74,17 @@ beforeEach(() => {
 });
 
 describe("/boards +page.server.ts", () => {
+  let disposeScope: (() => void) | undefined;
+  beforeAll(() => {
+    disposeScope = useApplicationScope((_locals, projectId) => ({
+      em: { kind: "mock-em" },
+      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
+    }));
+  });
+  afterAll(() => {
+    disposeScope?.();
+  });
+
   test("server route uses work-management interfaces instead of direct application imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("@work-management/interface/work-item-actions");

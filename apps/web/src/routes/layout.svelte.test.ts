@@ -1,8 +1,15 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Component } from "svelte";
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
+import { mediaQueryMock } from "$lib/test/media-query-mock";
 import { modeWatcherMock } from "$lib/test/mode-watcher-mock";
+import { useFormToastMock } from "$lib/test/use-form-toast-mock";
+
+// `mock.module` is process-global; these two seams apply this suite's SSR-shell
+// doubles only while the suite runs and otherwise fall through to the real
+// implementations, so sibling unit suites importing the real modules pass.
+let suiteActive = false;
 
 // `svelte/server` `render()` harness needs server-compiled `.svelte` modules
 // (loaded via root `bunfig.toml [test] preload`). Stub virtual modules used
@@ -39,15 +46,18 @@ mock.module("$app/environment", () => ({
 
 mock.module("$lib/assets/favicon.svg", () => ({ default: "/favicon.svg" }));
 mock.module("mode-watcher", () => modeWatcherMock());
-mock.module("$lib/feedback/use-form-toast", () => ({ toastFromForm: () => undefined }));
+mock.module("$lib/feedback/use-form-toast", () =>
+  useFormToastMock(() => (suiteActive ? () => undefined : null)),
+);
 mock.module("$lib/components/app/AppSidebar.svelte", () => ({ default: () => "<aside aria-label=\"primary navigation\"></aside>" }));
 mock.module("$lib/components/command-palette/CommandPalette.svelte", () => ({ default: () => "" }));
-mock.module("$lib/components/ui/button", () => ({ buttonVariants: () => "" }));
-mock.module("$lib/util/media-query", () => ({
-  MOBILE_QUERY: "(max-width: 767px)",
-  browserDriver: () => ({}),
-  isMobileViewport: () => false,
-}));
+mock.module("$lib/util/media-query", () =>
+  mediaQueryMock(() =>
+    suiteActive
+      ? { browserDriver: () => ({ matches: () => false }), isMobileViewport: () => false }
+      : null,
+  ),
+);
 mock.module("$lib/utils.js", () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(" ") }));
 mock.module("$lib/components/app/BellBadge.svelte", () => ({ default: () => "" }));
 mock.module("@lucide/svelte/icons/bell", () => ({ default: () => "" }));
@@ -68,11 +78,16 @@ describe("+layout.svelte SSR shell", () => {
   let Layout: Component<LayoutProps>;
 
   beforeAll(async () => {
+    suiteActive = true;
     ({ render } = await import("svelte/server"));
     const mod = (await import("./+layout.svelte")) as {
       default: Component<LayoutProps>;
     };
     Layout = mod.default;
+  });
+
+  afterAll(() => {
+    suiteActive = false;
   });
 
   test("renders exactly one <header data-app-topbar>", () => {

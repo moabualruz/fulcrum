@@ -2,33 +2,27 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
 import { makeId } from "@test-support/product-workspace-fixtures.ts";
 import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 import { closeDatabase } from "$lib/server/db";
-import { applicationScopeMock } from "$lib/test/application-scope-mock";
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
 
 let scratch: string;
 let activeDb: TestStore | null = null;
 let activeOrgId = "";
 let activeProjectId: string | null = null;
 
-// `applicationScopeMock` keeps a complete export set (so sibling suites that
-// import `__setApplicationScopeForTest` still resolve it) and routes foreign
-// suites through the real scope resolver.
-mock.module("$lib/server/application-scope", () =>
-  applicationScopeMock((_locals, projectId) =>
-    activeDb
-      ? {
-          em: activeDb,
-          ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
-        }
-      : null,
-  ),
-);
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its `activeDb`-backed seam while active (beforeAll/afterAll) so
+// sibling suites that mock the same path are never hijacked. The seam reads
+// `activeDb` live, so it answers `null` between tests and lets foreign suites
+// fall through to the real resolver.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
 interface RunDetailPayload {
   run: {
@@ -139,6 +133,21 @@ function formEvent(id: string, fields: Record<string, string>) {
 }
 
 describe("/runs/[id] +page.server.ts", () => {
+  let disposeScope: (() => void) | undefined;
+  beforeAll(() => {
+    disposeScope = useApplicationScope((_locals, projectId) =>
+      activeDb
+        ? {
+            em: activeDb,
+            ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
+          }
+        : null,
+    );
+  });
+  afterAll(() => {
+    disposeScope?.();
+  });
+
   test("load returns run + null transcript when transcript_path missing", async () => {
     const { db, orgId, projectId } = await freshDb();
     const id = await seedRun(db, orgId, projectId, "succeeded", null);

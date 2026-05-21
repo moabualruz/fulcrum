@@ -112,6 +112,42 @@ export async function createProject(...args: unknown[]) { return callStore("stor
 export async function createSprint(...args: unknown[]) { return callStore("store/repositories", "createSprint", args); }
 export async function createTask(...args: unknown[]) { return callStore("store/repositories", "createTask", args); }
 export async function listEventsForProject(...args: unknown[]) { return callStore("store/repositories", "listEventsForProject", args); }
+export async function listEventsFiltered(...args: unknown[]) { return callStore("store/repositories", "listEventsFiltered", args); }
+
+/**
+ * Test fixture: events for a single subject (entity), newest first.
+ *
+ * The product store exposes `listEventsForProject` / `listEventsFiltered` but
+ * no per-entity query, so this fixture issues the entity-scoped read directly
+ * against the `events` table — the same table `appendEvent` writes. Used by the
+ * `/projects/[id]/activity` route test's per-entity activity coverage.
+ */
+export async function listEventsForEntity(
+  db: TestStore,
+  subjectKind: string,
+  subjectId: string,
+  options: { limit?: number } = {},
+): Promise<EventRow[]> {
+  const limit = options.limit ?? 50;
+  const rows = await db.query<Record<string, unknown>>(
+    `SELECT * FROM events
+      WHERE subject_kind = $1 AND subject_id = $2
+      ORDER BY created_at DESC, id DESC
+      LIMIT $3`,
+    [subjectKind, subjectId, limit],
+  );
+  return rows.map((r) => ({
+    id: r["id"] as string,
+    org_id: r["org_id"] as string,
+    project_id: (r["project_id"] as string | null) ?? null,
+    actor: (r["actor"] as string) ?? "system",
+    subject_kind: r["subject_kind"] as string,
+    subject_id: r["subject_id"] as string,
+    verb: r["verb"] as string,
+    payload: (r["payload"] as Record<string, unknown>) ?? {},
+    created_at: String(r["created_at"]),
+  }));
+}
 
 export async function getBlameForFile(...args: unknown[]) { return callStore("store/repo-files", "getBlameForFile", args); }
 export async function getFileContent(...args: unknown[]) { return callStore("store/repo-files", "getFileContent", args); }

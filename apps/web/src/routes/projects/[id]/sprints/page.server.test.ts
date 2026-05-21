@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { applicationScopeMock } from "$lib/test/application-scope-mock";
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
+import { projectLifecycleMock, useProjectLifecycle } from "$lib/test/project-lifecycle-mock";
+import { projectSprintsMock, useProjectSprints } from "$lib/test/project-sprints-mock";
 
 const calls: string[] = [];
 const pageData = {
@@ -10,29 +12,21 @@ const pageData = {
   velocity: [],
 };
 
-// Active only while this suite runs. `mock.module` is process-wide, so the
-// seam falls through to the real scope resolver when a foreign suite is
-// exercising the module.
-let suiteActive = false;
-
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
   for (const [key, value] of Object.entries(data)) fd.set(key, value);
   return new Request("http://localhost/projects/project-1/sprints", { method: "POST", body: fd });
 }
 
-// `applicationScopeMock` keeps a complete export set (so sibling suites that
-// import `__setApplicationScopeForTest` still resolve it). The `project-sprints`
-// interface is mocked too, so the `em` value is never actually queried here.
-mock.module("$lib/server/application-scope", () =>
-  applicationScopeMock((_locals, projectId) =>
-    suiteActive
-      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
-      : null,
-  ),
-);
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its seam while active (beforeAll/afterAll) so sibling suites that
+// mock the same path are never hijacked.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
-mock.module("@work-management/interface/project-sprints.ts", () => ({
+mock.module("@work-management/interface/project-sprints.ts", () => projectSprintsMock());
+
+const projectSprintsOverrides = {
   loadProjectSprints: async () => pageData,
   loadProjectSprintDetail: async () => ({
     project: { id: "project-1", name: "Project" },
@@ -70,18 +64,31 @@ mock.module("@work-management/interface/project-sprints.ts", () => ({
     calls.push(`goal:${sprintId}:${goal}`);
     return { ok: true };
   },
-}));
+};
 
-mock.module("@work-management/interface/project-lifecycle.ts", () => ({
+mock.module("@work-management/interface/project-lifecycle.ts", () => projectLifecycleMock());
+
+const projectLifecycleOverrides = {
   loadProjectOverview: async (_em: unknown, _ctx: unknown, projectId: string) => ({ id: projectId, name: "Project" }),
-}));
+};
+
+let disposeScope: (() => void) | undefined;
+let disposeLifecycle: (() => void) | undefined;
+let disposeSprints: (() => void) | undefined;
 
 beforeAll(() => {
-  suiteActive = true;
+  disposeScope = useApplicationScope((_locals, projectId) => ({
+    em: { kind: "mock-em" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
+  }));
+  disposeLifecycle = useProjectLifecycle(projectLifecycleOverrides);
+  disposeSprints = useProjectSprints(projectSprintsOverrides);
 });
 
 afterAll(() => {
-  suiteActive = false;
+  disposeScope?.();
+  disposeLifecycle?.();
+  disposeSprints?.();
 });
 
 beforeEach(() => {

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { planningReviewMock } from "$lib/test/planning-review-mock";
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 
 const calls: string[] = [];
 let runShouldFail = false;
@@ -24,12 +25,17 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/e2e", { method: "POST", body: fd });
 }
 
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `mock.module` is process-global; the seam answers only while this suite runs
+// and otherwise delegates to the real resolver for foreign suites.
+let suiteActive = false;
+
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock((_locals, projectId) =>
+    suiteActive
+      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
+      : null,
+  ),
+);
 
 mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   buildUatCodeReviewHandoff: async (_em: unknown, _ctx: unknown, input: { projectId: string }) => {
@@ -91,6 +97,13 @@ beforeEach(() => {
 });
 
 describe("/projects/[id]/e2e +page.server.ts", () => {
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
+
   test("server route delegates through service interfaces instead of direct application or ORM imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("@workflow-coordination/interface/http/workflow-api-client");

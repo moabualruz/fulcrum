@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
+import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
+import { projectLifecycleMock, useProjectLifecycle } from "$lib/test/project-lifecycle-mock";
 
 const updates: Array<{ id: string; name?: string; description?: string | null }> = [];
 const deleted: string[] = [];
@@ -30,14 +33,15 @@ function redirectOf(value: unknown): { status?: number; location?: string } {
   return value as { status?: number; location?: string };
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `mock.module` is process-wide and only one factory closure survives per
+// path. `applicationScopeMock()` routes through a shared seam slot; this suite
+// publishes its seam while active (beforeAll/afterAll) so sibling suites that
+// mock the same path are never hijacked.
+mock.module("$lib/server/application-scope", () => applicationScopeMock());
 
-mock.module("@work-management/interface/project-lifecycle.ts", () => ({
+mock.module("@work-management/interface/project-lifecycle.ts", () => projectLifecycleMock());
+
+const projectLifecycleOverrides = {
   loadProjectOverview: async () => overview,
   updateProject: async (_em: unknown, _ctx: unknown, input: { id: string; name?: string; description?: string | null }) => {
     updates.push(input);
@@ -58,7 +62,7 @@ mock.module("@work-management/interface/project-lifecycle.ts", () => ({
     template: { id: "template-1", name: "Template", workflow: { id: "workflow-1" } },
     trace: { audit: "event-1" },
   }),
-}));
+};
 
 beforeEach(() => {
   updates.splice(0, updates.length);
@@ -81,6 +85,20 @@ beforeEach(() => {
 });
 
 describe("/projects/[id] +page.server.ts", () => {
+  let disposeScope: (() => void) | undefined;
+  let disposeLifecycle: (() => void) | undefined;
+  beforeAll(() => {
+    disposeScope = useApplicationScope((_locals, projectId) => ({
+      em: { kind: "mock-em" },
+      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
+    }));
+    disposeLifecycle = useProjectLifecycle(projectLifecycleOverrides);
+  });
+  afterAll(() => {
+    disposeScope?.();
+    disposeLifecycle?.();
+  });
+
   test("server route uses the project lifecycle interface instead of direct application imports", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("@work-management/interface/project-lifecycle");
