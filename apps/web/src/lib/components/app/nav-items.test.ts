@@ -94,8 +94,17 @@ describe("stageForPath route mapping", () => {
 		expect(stageForPath("/operate-mcp")).toBe("operate");
 	});
 
+	test("maps canonical project-scoped stage routes to their WorkflowStage", () => {
+		expect(stageForPath("/acme/projects/fulcrum/capture")).toBe("capture");
+		expect(stageForPath("/acme/projects/fulcrum/plan")).toBe("plan");
+		expect(stageForPath("/acme/projects/fulcrum/build/board")).toBe("build");
+		expect(stageForPath("/acme/projects/fulcrum/review")).toBe("review");
+		expect(stageForPath("/acme/projects/fulcrum/ship")).toBe("ship");
+		expect(stageForPath("/acme/projects/fulcrum/operate/doctor")).toBe("operate");
+	});
+
 	test("maps old feature-bucket routes to their owning stage — no destination dropped", () => {
-		expect(stageForPath("/docs")).toBe("plan");
+		expect(stageForPath("/docs")).toBe("capture");
 		expect(stageForPath("/boards")).toBe("build");
 		expect(stageForPath("/runs")).toBe("build");
 		expect(stageForPath("/artifacts")).toBe("ship");

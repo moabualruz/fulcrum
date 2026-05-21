@@ -550,17 +550,4 @@ async function resolveChecks(fixture: string | null): Promise<SubsystemCheckResu
   return _runAll();
 }
 
-export const load: PageServerLoad = ({ url }) => {
-  const fixture = url.searchParams.get("fixture");
-  return {
-    streamed: {
-      workbench: resolveChecks(fixture).then(
-        (checks): DoctorWorkbench => ({
-          checks,
-          summary: _deriveSummary(checks),
-          telemetry: _doctorTelemetryTiles(),
-        }),
-      ),
-    },
-  };
-};
+export { redirectLegacyStageRoute as load } from "$lib/server/canonical-stage-redirect.ts";

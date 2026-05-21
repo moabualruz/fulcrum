@@ -7,7 +7,6 @@ import {
 	CURRENT_ROUTE_COVERAGE,
 	LEGACY_ROUTE_MAP,
 	STAGE_ORDER,
-	STAGE_WORKBENCH_ROUTE,
 	canonicalStageFor,
 	isPortfolioPath,
 	legacyRoutePaths,
@@ -78,9 +77,7 @@ test.describe("route model — canonical workspace/project/stage routes", () => 
 
 			const workbenchVisible = await expectWorkbenchIfBackendReady(page, STAGE_WORKBENCH_ANCHOR[stage]);
 
-			if (workbenchVisible && stage !== "capture") {
-				expect(new URL(page.url()).pathname).toBe(STAGE_WORKBENCH_ROUTE[stage]);
-			}
+			if (workbenchVisible) expect(new URL(page.url()).pathname).toBe(stageRoute(WS, PROJ, stage));
 			if (workbenchVisible) {
 				await expect(page.locator("[data-slot='stage-view-grid']")).toHaveCount(0);
 			}
@@ -136,7 +133,7 @@ test.describe("route model — trace + query preservation across stage navigatio
 
 		await page.goto(next, { waitUntil: "load" });
 		const workbenchVisible = await expectWorkbenchIfBackendReady(page, "[data-review-queue]");
-		if (workbenchVisible) expect(new URL(page.url()).pathname).toBe(STAGE_WORKBENCH_ROUTE.review);
+		if (workbenchVisible) expect(new URL(page.url()).pathname).toBe(stageRoute(WS, PROJ, "review"));
 	});
 
 	test("canonicalStageFor resolves canonical + legacy paths consistently", () => {
@@ -156,16 +153,24 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 	test("the shell chrome renders on a canonical stage route and marks the stage", async ({
 		page,
 	}) => {
-		await page.goto(stageRoute(WS, PROJ, "plan"), { waitUntil: "load" });
+		for (const stage of STAGE_ORDER) {
+			await page.goto(stageRoute(WS, PROJ, stage), { waitUntil: "load" });
 
-		// The StageRail + ScopeBar render around the canonical stage route.
-		await expectWorkbenchIfBackendReady(page, "[data-shell-region='stage-rail']");
-		await expectWorkbenchIfBackendReady(page, "[data-slot='stage-rail']");
-		await expectWorkbenchIfBackendReady(page, "[data-slot='scope-bar']");
-		await expectWorkbenchIfBackendReady(page, "[data-route='plan-session']");
+			await expect(page.locator("[data-slot='scope-bar']")).toHaveAttribute("data-active-stage", stage);
+			await expect(page.locator("[data-slot='stage-rail']")).toHaveAttribute("data-current", stage);
+			await expectWorkbenchIfBackendReady(page, STAGE_WORKBENCH_ANCHOR[stage]);
+		}
 
 		const shot = await page.screenshot({ fullPage: true });
-		await writeEvidenceShot("stage-route-plan.png", shot);
+		await writeEvidenceShot("stage-route-shell-chrome.png", shot);
+	});
+
+	test("mobile stage tabs mark the canonical project stage", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		for (const stage of STAGE_ORDER) {
+			await page.goto(stageRoute(WS, PROJ, stage), { waitUntil: "load" });
+			await expect(page.locator(`[data-slot='mobile-stage-tab'][data-stage='${stage}']`)).toHaveAttribute("data-active", "true");
+		}
 	});
 
 	test("[ toggles the StageRail collapsed state", async ({ page }) => {
@@ -193,7 +198,7 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 		// g b -> Build stage; the trace hash survives the chord navigation.
 		await page.keyboard.press("g");
 		await page.keyboard.press("b");
-		await page.waitForURL("**/build-board*", { timeout: 5_000 }).catch(() => {
+		await page.waitForURL("**/projects/**/build*", { timeout: 5_000 }).catch(() => {
 			console.log("route model: build chord did not navigate; backend data unavailable in design-e2e preview");
 		});
 		await expectWorkbenchIfBackendReady(page, "[data-build-board]");
@@ -201,7 +206,7 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 		// g o -> Operate stage.
 		await page.keyboard.press("g");
 		await page.keyboard.press("o");
-		await page.waitForURL("**/doctor*", { timeout: 5_000 }).catch(() => {
+		await page.waitForURL("**/projects/**/operate*", { timeout: 5_000 }).catch(() => {
 			console.log("route model: operate chord did not navigate; backend data unavailable in design-e2e preview");
 		});
 		await expectWorkbenchIfBackendReady(page, "[data-route='operate-doctor']");

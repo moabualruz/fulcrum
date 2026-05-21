@@ -4,7 +4,7 @@ import path from "node:path";
 
 import {
 	STAGE_ORDER,
-	STAGE_WORKBENCH_ROUTE,
+	canonicalRouteForLegacyPath,
 	stageRoute,
 } from "../../src/lib/components/app/route-map.ts";
 
@@ -35,13 +35,20 @@ test.describe("project-scoped stage workbench projection", () => {
 
 			await expect(page.locator(STAGE_WORKBENCH_ANCHOR[stage]).first()).toBeVisible();
 			await expect(page.locator("[data-slot='stage-view-grid']")).toHaveCount(0);
-
-			if (stage !== "capture") {
-				expect(new URL(page.url()).pathname).toBe(STAGE_WORKBENCH_ROUTE[stage]);
-			}
+			expect(new URL(page.url()).pathname).toBe(stageRoute(WS, PROJ, stage));
 
 			const shot = await page.screenshot({ fullPage: true });
 			await writeEvidenceShot(`stage-workbench-${stage}.png`, shot);
+		});
+	}
+
+	const legacyRoutes = ["/plan-session", "/build-board", "/review", "/ship", "/doctor"] as const;
+	for (const legacyRoute of legacyRoutes) {
+		test(`${legacyRoute} remains a 308 redirect to its canonical wrapper`, async ({ page }) => {
+			const response = await page.request.get(legacyRoute, { maxRedirects: 0 });
+			expect(response.status()).toBe(308);
+			const location = response.headers().location;
+			expect(location).toBe(canonicalRouteForLegacyPath(legacyRoute, "mkh", "fulcrum"));
 		});
 	}
 
@@ -49,7 +56,7 @@ test.describe("project-scoped stage workbench projection", () => {
 		await page.goto(stageRoute(WS, PROJ, "capture"), { waitUntil: "load" });
 
 		await page.getByRole("tab", { name: "Build" }).click();
-		await page.waitForURL("**/build-board*", { timeout: 5_000 });
+		await page.waitForURL(`**/projects/${PROJ}/build`, { timeout: 5_000 });
 		await expect(page.locator("[data-build-board]")).toBeVisible();
 	});
 

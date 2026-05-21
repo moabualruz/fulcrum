@@ -28,8 +28,8 @@
     createStepModeRow,
     modeAffordanceHooks,
   } from "$lib/components/app/mode-affordance-host.ts";
+  import type { TimelineLane } from "$lib/components/app/build-timeline-fixture.ts";
   import type { PageData } from "./$types";
-  import type { TimelineLane } from "./+page.server.ts";
 
   interface Props {
     data: PageData;

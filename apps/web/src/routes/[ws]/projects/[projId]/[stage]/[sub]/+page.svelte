@@ -18,5 +18,7 @@
 		captureView: null,
 		captureSteps: [],
 		traceId: data.traceId,
+		buildTimelineData: data.buildTimelineData,
+		doctorData: data.doctorData,
 	}}
 />
