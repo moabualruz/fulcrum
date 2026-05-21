@@ -96,8 +96,25 @@ interface BootedServer {
 	stop: () => Promise<void>;
 }
 
+function syncSvelteKitProject(projectRoot: string): void {
+	const result = spawnSync("bun", ["run", "svelte-kit", "sync"], {
+		cwd: projectRoot,
+		stdio: "inherit",
+		env: process.env,
+	});
+	if (result.status !== 0) {
+		throw new Error(`design-e2e harness: svelte-kit sync failed for ${projectRoot} (exit ${result.status ?? "unknown"})`);
+	}
+}
+
+function syncSvelteKitProjects(webRoot: string): void {
+	syncSvelteKitProject(webRoot);
+	syncSvelteKitProject(path.resolve(webRoot, "../../packages/ui-kit"));
+}
+
 /** Build the web app and boot a real preview server on an allocated port. */
 async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
+	syncSvelteKitProjects(webRoot);
 	const build = spawnSync("bun", ["run", "build"], { cwd: webRoot, stdio: "inherit", env: process.env });
 	if (build.status !== 0) {
 		throw new Error(`design-e2e harness: web build failed (exit ${build.status ?? "unknown"})`);
@@ -255,6 +272,7 @@ function runDesignSpecs(webRoot: string, requestedSpecs: string[], designPorts: 
 		console.log(`design-e2e chunk ${chunkNumber}: ${chunk.join(", ")}`);
 		if (chunkCount > 1) stopDesignProcesses(webRoot, designPort);
 		rmSync(svelteKitOutputDir, { recursive: true, force: true });
+		syncSvelteKitProjects(webRoot);
 		const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
 			cwd: webRoot,
 			stdio: "inherit",
@@ -311,21 +329,13 @@ function stopDesignProcesses(webRoot: string, port?: string): void {
 	}
 }
 
-function syncUiKit(webRoot: string): void {
-	const uiKitRoot = path.resolve(webRoot, "../../packages/ui-kit");
-	const result = spawnSync("bun", ["x", "svelte-kit", "sync"], { cwd: uiKitRoot, stdio: "inherit", env: process.env });
-	if (result.status !== 0) {
-		process.exit(result.status ?? 1);
-	}
-}
-
 async function main(): Promise<void> {
 	const webRoot = process.cwd();
 	const requestedSpecs = process.argv.slice(2).filter((arg) => arg !== "--specs-only" && arg !== "--capture-only");
 	const captureOnly = process.argv.includes("--capture-only");
 	const specsOnly = process.argv.includes("--specs-only");
 
-	syncUiKit(webRoot);
+	syncSvelteKitProjects(webRoot);
 
 	if (!specsOnly) {
 		const artifacts = await captureProductionRoutes(webRoot);
