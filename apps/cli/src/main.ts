@@ -3,6 +3,7 @@
 
 import { installCliLogRedaction } from "./log.ts";
 import { ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import { serializeEnvelope, wrapEnvelope } from "./lib/envelope.ts";
 
 installCliLogRedaction();
 
@@ -46,20 +47,13 @@ function printVersion(argv: readonly string[]): void {
   };
   if (argv.includes("--json")) {
     console.log(
-      JSON.stringify({
-        schema: "fulcrum.cli.v1",
-        trace_id: process.env["FULCRUM_TRACE_ID"] ?? "trace-cli-version",
-        span_id: null,
-        run_id: null,
-        project_id: null,
+      serializeEnvelope(wrapEnvelope({
         command: "fulcrum version",
         args: {},
         result,
-        errors: [],
-        next_actions: [],
-        duration_ms: 0,
-        timestamp: new Date().toISOString(),
-      }),
+        trace: { trace_id: process.env["FULCRUM_TRACE_ID"] },
+        startedAt: Date.now(),
+      })),
     );
     return;
   }

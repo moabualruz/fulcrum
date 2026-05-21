@@ -156,6 +156,7 @@ function runTraceShow(rest: readonly string[], io: TraceIo, opts: TraceRunOption
         { label: "Show audit events for this trace", command: `fulcrum audit list --trace ${normalized}` },
       ],
       env: opts.env,
+      traceLine: true,
       renderHuman: (value) => io.print(JSON.stringify(value, null, 2)),
     },
     io,
