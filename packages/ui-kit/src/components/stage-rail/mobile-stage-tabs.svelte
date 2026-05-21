@@ -56,7 +56,7 @@
 	data-bottom-stage-tabs
 	data-active-stage={current}
 	class={cn(
-		"fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface-elevated shadow-lg backdrop-blur",
+		"fixed inset-x-0 bottom-0 z-40 max-w-[100vw] overflow-hidden border-t border-border bg-surface-elevated shadow-lg backdrop-blur",
 		"pb-[var(--fulcrum-gesture-zone-bottom)]",
 		className,
 	)}

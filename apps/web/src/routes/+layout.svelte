@@ -551,15 +551,16 @@
 	{/if}
 {/snippet}
 
-<div class={cn("flex h-screen min-h-0 overflow-hidden bg-background text-foreground")}>
+<div class={cn("flex h-screen min-h-0 max-w-[100vw] overflow-hidden bg-background text-foreground")}>
 	{#if mobile}
-		<div class={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden")}>
-			<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
-				<div class="flex-1">
+		<div class={cn("flex min-h-0 w-full min-w-0 max-w-[100vw] flex-1 flex-col overflow-hidden")}>
+			<div class={cn("flex w-full min-w-0 max-w-[100vw] items-center pt-[var(--fulcrum-safe-area-top)]")}>
+				<div class="min-w-0 flex-1">
 					<AppTopbar
 						pathname={page.url.pathname}
 						activeProjectId={data.activeProjectId}
 						onThemeToggle={toggleMode}
+						mobile
 					/>
 				</div>
 			</div>
@@ -567,7 +568,9 @@
 			<main
 				id="main-content"
 				tabindex="-1"
-				class={cn("min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-[calc(6rem+var(--fulcrum-gesture-zone-bottom))]")}
+				class={cn(
+					"min-h-0 w-full min-w-0 max-w-[100vw] flex-1 overflow-y-auto overflow-x-clip px-6 pt-6 pb-[calc(6rem+var(--fulcrum-gesture-zone-bottom))]",
+				)}
 			>
 				{@render children?.()}
 			</main>
@@ -578,7 +581,7 @@
 			<details
 				data-mobile-trace-panel
 				class={cn(
-					"fixed inset-x-0 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom))] z-50 border-y border-border",
+					"fixed inset-x-0 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom))] z-50 max-w-[100vw] border-y border-border",
 					"bg-surface-elevated text-xs text-fg-subtle shadow-[0_-6px_18px_rgba(0,0,0,0.12)]",
 				)}
 			>
