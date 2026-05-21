@@ -1,4 +1,5 @@
 import { formatCommandError } from "../api-errors.ts";
+import { SecretInArgvError, assertNoSecretInArgv, wantsHelp } from "../lib/flag-conventions.ts";
 import {
   createAuthApiCallerFromEnv,
   type AuthApiEnvironment,
@@ -48,6 +49,13 @@ export async function run(
 ): Promise<void> {
   const { print = console.log, printErr = console.error, exit = process.exit } = opts;
   const [sub = "help", ...rest] = argv;
+
+  // CLI-TUI-UX.md §2 — `--help` always works, even after a subcommand or other
+  // flags (`fulcrum auth whoami --help`). Honour it before subcommand dispatch.
+  if (wantsHelp(argv)) {
+    print(HELP);
+    return;
+  }
 
   switch (sub) {
     case "whoami":
@@ -251,6 +259,21 @@ async function runLogin(
   opts: Required<Pick<AuthRunOptions, "print" | "printErr" | "exit">> & AuthRunOptions,
 ): Promise<void> {
   const { printErr, exit } = opts;
+
+  // CLI-TUI-UX.md §2.1 — a secret must never be read from argv (the process
+  // table leaks it). Refuse `--token` / `--password` / … before doing anything;
+  // the error names only the flag, never the value.
+  try {
+    assertNoSecretInArgv(argv);
+  } catch (err) {
+    if (err instanceof SecretInArgvError) {
+      printErr(`fulcrum auth login: ${err.message}`);
+      exit(2);
+      return;
+    }
+    throw err;
+  }
+
   const nonInteractive = argv.includes("--non-interactive");
 
   if (nonInteractive) {
