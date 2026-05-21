@@ -29,8 +29,19 @@ describe("ScrollArea", () => {
 	test("keeps the viewport keyboard-focusable", () => {
 		const { body } = render(ScrollAreaRoot, { props: {} });
 
+		expect(body).toContain('tabindex="0"');
+		expect(body).toContain('role="region"');
+		expect(body).toContain('aria-label="Scrollable content"');
 		expect(body).toContain("focus-visible:ring-3");
 		expect(body).toContain("outline-none");
+	});
+
+	test("lets callers provide a more specific viewport label", () => {
+		const { body } = render(ScrollAreaRoot, {
+			props: { viewportLabel: "Design kit component gallery" },
+		});
+
+		expect(body).toContain('aria-label="Design kit component gallery"');
 	});
 
 	test("merges caller classes onto the root without dropping the base class", () => {

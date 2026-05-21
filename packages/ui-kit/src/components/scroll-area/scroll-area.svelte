@@ -15,6 +15,10 @@
 		scrollbarYClasses?: string;
 		/** Extra classes for the viewport. */
 		viewportClasses?: string;
+		/** Accessible name for the keyboard-focusable viewport. */
+		viewportLabel?: string;
+		/** Landmark role for the keyboard-focusable viewport. */
+		viewportRole?: "region" | "group";
 	};
 </script>
 
@@ -30,6 +34,8 @@
 		scrollbarXClasses,
 		scrollbarYClasses,
 		viewportClasses,
+		viewportLabel = "Scrollable content",
+		viewportRole = "region",
 		children,
 		...restProps
 	}: ScrollAreaProps = $props();
@@ -45,6 +51,9 @@
 	<ScrollAreaPrimitive.Viewport
 		bind:ref={viewportRef}
 		data-slot="scroll-area-viewport"
+		tabindex="0"
+		role={viewportRole}
+		aria-label={viewportLabel}
 		class={cn(
 			"size-full rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-1",
 			viewportClasses,

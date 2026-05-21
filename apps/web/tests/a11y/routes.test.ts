@@ -10,6 +10,8 @@ const stableRoutes = [
   "/artifacts",
   "/inbox",
   "/runs",
+  "/notifications-empty",
+  "/sessions-empty",
   "/settings/api",
 ] as const;
 
@@ -39,6 +41,13 @@ test.describe("Surface route accessibility sweep", () => {
     const count = await iconButtons.count();
     for (let i = 0; i < count; i += 1) {
       await expect(iconButtons.nth(i)).toHaveAttribute("aria-label", /.+/);
+    }
+  });
+
+  test("empty preview routes use the shared EmptyState primitive", async ({ page }) => {
+    for (const route of ["/notifications-empty", "/sessions-empty"]) {
+      await page.goto(route);
+      await expect(page.locator("[data-slot='empty-state']")).toBeVisible();
     }
   });
 });

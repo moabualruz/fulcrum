@@ -402,13 +402,6 @@
     pendingConfirm = null;
   }
 
-  function onRowKeydown(event: KeyboardEvent, id: string): void {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openPeek(id);
-    }
-  }
-
   /** `Mod+R` cuts a release — opens the inline confirm tier (OD `⌘R` kbd). */
   function onWindowKeydown(event: KeyboardEvent): void {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
@@ -586,13 +579,9 @@
               data-status={release.status}
               data-channel={release.channel}
               aria-current={release.id === focusedId ? "true" : undefined}
-              role="button"
-              tabindex="0"
               onclick={() => openPeek(release.id)}
-              onkeydown={(event) => onRowKeydown(event, release.id)}
               class={cn(
                 "cursor-pointer transition-colors hover:bg-muted/50",
-                "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 release.id === focusedId && "bg-accent/10",
               )}
             >

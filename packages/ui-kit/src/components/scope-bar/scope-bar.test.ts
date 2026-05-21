@@ -25,7 +25,16 @@ describe("ScopeBar", () => {
 		const { body } = render(ScopeBarRoot, { props: { activeStage: "build" } });
 		expect(body).toContain('data-active-stage="build"');
 		expect(body).toContain('data-stage="build"');
-		expect(body).toContain('aria-selected="true"');
+		expect(body).toContain('aria-current="page"');
+	});
+
+	test("uses ordinary navigation buttons instead of ARIA tabs", () => {
+		const { body } = render(ScopeBarRoot, { props: { activeStage: "review" } });
+
+		expect(body).toContain('aria-label="Stages"');
+		expect(body).not.toContain('role="tab"');
+		expect(body).not.toContain('role="tablist"');
+		expect(body).not.toContain("aria-selected");
 	});
 
 	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {

@@ -20,13 +20,13 @@
 		brand?: string;
 		/** Monospace workspace path (`mkh / fulcrum · auth-rewrite`). */
 		workspacePath?: string;
-		/** Active WorkflowStage; drives the stage tab strip + `data-active-stage`. */
+		/** Active WorkflowStage; drives the stage navigation + `data-active-stage`. */
 		activeStage?: WorkflowStage;
 		stages?: WorkflowStage[];
 		onSelectStage?: (stage: WorkflowStage) => void;
-		/** TraceBadge slot — the consumer passes a `<TraceChip badge />`. */
+		/** TraceBadge slot - the consumer passes a `<TraceChip badge />`. */
 		trace?: Snippet;
-		/** System icon cluster slot (palette · notifications · display · help · avatar). */
+		/** System icon cluster slot (palette, notifications, display, help, avatar). */
 		systemCluster?: Snippet;
 	};
 </script>
@@ -77,13 +77,11 @@
 		>
 	{/if}
 
-	<nav data-slot="scope-bar-stages" aria-label="Stage tabs" class="flex items-center gap-1">
+	<nav data-slot="scope-bar-stages" aria-label="Stages" class="flex items-center gap-1">
 		{#each stages as stage (stage)}
 			{@const active = activeStage === stage}
 			<button
 				type="button"
-				role="tab"
-				aria-selected={active}
 				aria-current={active ? "page" : undefined}
 				data-slot="scope-bar-tab"
 				data-stage={stage}

@@ -138,6 +138,7 @@
 			data-scope-filter
 			data-testid="memory-search"
 			name="scope"
+			aria-label="Memory scope"
 			onchange={autoSubmit}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
 		>
@@ -149,6 +150,7 @@
 		<select
 			data-kind-filter
 			name="kind"
+			aria-label="Memory kind"
 			onchange={autoSubmit}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
 		>
