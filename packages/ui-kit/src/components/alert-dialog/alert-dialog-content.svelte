@@ -19,7 +19,7 @@
 <AlertDialogPrimitive.Portal>
 	<AlertDialogPrimitive.Overlay
 		data-slot="alert-dialog-overlay"
-		class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+		class="fixed inset-0 z-50 bg-surface-overlay backdrop-blur-sm"
 	/>
 	<AlertDialogPrimitive.Content
 		bind:ref

@@ -22,7 +22,7 @@
 
 <DialogPrimitive.Root bind:open>
 	<DialogPrimitive.Portal>
-		<DialogPrimitive.Overlay class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+		<DialogPrimitive.Overlay class="fixed inset-0 z-50 bg-surface-overlay backdrop-blur-sm" />
 		<!--
 			Positioning is set via inline `style` rather than Tailwind arbitrary
 			utilities (`top-[12vh]`, `-translate-x-1/2`): a consumer app's Tailwind
