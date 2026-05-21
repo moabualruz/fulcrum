@@ -108,6 +108,10 @@
 	--radius: var(--radius-md);
 }
 
+.bg-surface-overlay {
+	background-color: var(--surface-overlay);
+}
+
 .dark,
 [data-theme="dark"] {
 	/* DESIGN.md §1.2 row 1 */
