@@ -6,8 +6,8 @@ import { modeWatcherMock } from "$lib/test/mode-watcher-mock";
  * SSR smoke coverage for the canonical `CommandPalette` shell component.
  *
  * The palette content (sections, rows, scope chip) is portalled by the
- * `@fulcrum/ui-kit` `command-palette` primitive, which — like every bits-ui
- * `Dialog.Portal` — renders nothing during server render. So SSR can only
+ * `@fulcrum/ui-kit` `command-palette` primitive, which: like every bits-ui
+ * `Dialog.Portal`: renders nothing during server render. So SSR can only
  * prove the component mounts and exposes its outer `data-command-palette`
  * state wrapper without crashing. The section MODEL and Scope rule are pure
  * and unit-tested in `palette-sections.test.ts` + `palette-scope.test.ts`;

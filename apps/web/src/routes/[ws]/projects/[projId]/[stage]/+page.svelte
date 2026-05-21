@@ -35,7 +35,7 @@
 	let { data }: Props = $props();
 
 	/**
-	 * The trace id — the server reads a `?trace=` fallback; the canonical
+	 * The trace id: the server reads a `?trace=` fallback; the canonical
 	 * `#trace=<id>` hash never reaches the server, so the client hydrates it
 	 * from `location.hash` (IA-MAP §1 "trace survives as URL hash").
 	 */
@@ -67,7 +67,7 @@
 	</section>
 {:else if data.stage === "capture" && data.captureView}
 	<!--
-		`/<ws>/projects/<projId>/capture` — the Capture WorkflowStage workbench
+		`/<ws>/projects/<projId>/capture`: the Capture WorkflowStage workbench
 		(`prd-web-capture-stage-shell`; OD `capture.html`, `capture-drafts.html`,
 		`capture-promoted.html`). The Capture stage renders its own OD-fidelity
 		docs/drafts/promoted/inbox workbench, not the generic stage card grid.

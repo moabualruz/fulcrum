@@ -170,7 +170,7 @@
 		<div
 			data-empty-memories
 			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-		>No memories yet — create one.</div>
+		>No memories yet: create one.</div>
 	{:else}
 		<div data-slot="table-container" class={cn("relative w-full overflow-x-auto")}>
 			<table data-slot="table" class={cn("w-full caption-bottom text-sm")}>

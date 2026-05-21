@@ -3,7 +3,7 @@ import { createArtifactApiForEvent } from "$lib/server/artifact-api";
 
 /**
  * `/artifacts` is re-homed to the Ship stage workbench (`/ship`) per
- * `IA-MAP.md §2.5` and `design-alignment/ship.md` — the generic file-artifact
+ * `IA-MAP.md §2.5` and `design-alignment/ship.md`: the generic file-artifact
  * list is a subset of the Ship release surface. The list `load` issues a 301
  * (`MOVED_PERMANENTLY`) redirect to `/ship`, carrying the filter query string
  * forward so a bookmarked `/artifacts?mime=…` lands on the same filtered Ship
@@ -11,13 +11,13 @@ import { createArtifactApiForEvent } from "$lib/server/artifact-api";
  *
  * No feature loss: the `upload` and `bulk` (archive/delete) server actions and
  * the `/artifacts/[id]/download` endpoint are preserved verbatim below and at
- * their existing paths — the redirect only re-homes the *list view*, not the
+ * their existing paths: the redirect only re-homes the *list view*, not the
  * artifact mutation endpoints, so bulk archive/delete and download carry
  * forward exactly as before.
  */
 export const load: PageServerLoad = ({ url }) => {
   const query = url.search ? url.search : "";
-  // 301 MOVED_PERMANENTLY — the canonical Ship route is the permanent home.
+  // 301 MOVED_PERMANENTLY: the canonical Ship route is the permanent home.
   redirect(301, `/ship${query}`);
 };
 

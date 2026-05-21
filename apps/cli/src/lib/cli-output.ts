@@ -31,7 +31,7 @@ import {
 } from "./envelope.ts";
 import { formatErrorRecovery, formatTraceLine } from "./trace-line.ts";
 
-/** Output sink — defaults bind to the process streams. */
+/** Output sink: defaults bind to the process streams. */
 export interface OutputIo {
   print: (line: string) => void;
   printErr: (line: string) => void;
@@ -41,7 +41,7 @@ export interface OutputIo {
 export interface JsonOutputMode {
   /** `--json` present. */
   json: boolean;
-  /** `--json-raw` present — emit the pre-envelope shape (one-release compat). */
+  /** `--json-raw` present: emit the pre-envelope shape (one-release compat). */
   raw: boolean;
   /** `--jq <expr>` value, applied to `.result` of the envelope. */
   jq: string | undefined;
@@ -53,7 +53,7 @@ export function parseJsonOutputMode(argv: readonly string[]): JsonOutputMode {
   const jqValue = jqIndex >= 0 ? argv[jqIndex + 1] : undefined;
   const raw = argv.includes("--json-raw");
   return {
-    // `--json-raw` is a JSON-output mode too — it just selects the legacy shape.
+    // `--json-raw` is a JSON-output mode too: it just selects the legacy shape.
     json: argv.includes("--json") || raw,
     raw,
     jq: jqValue && !jqValue.startsWith("-") ? jqValue : undefined,
@@ -62,19 +62,19 @@ export function parseJsonOutputMode(argv: readonly string[]): JsonOutputMode {
 
 /** Everything `emitResult` needs to render one command outcome. */
 export interface EmitResultInput<TResult> extends EnvelopeInput<TResult> {
-  /** Raw argv for the command — mode is parsed from it. */
+  /** Raw argv for the command: mode is parsed from it. */
   argv: readonly string[];
   /** Human renderer invoked when `--json` is absent. Receives the same result. */
   renderHuman: (result: TResult) => void;
   /**
    * When set, plain (non-`--json`) output prints the `DESIGN.md` §4.10 trace
-   * header line after `renderHuman` — the cross-surface trace spine. Pass
+   * header line after `renderHuman`: the cross-surface trace spine. Pass
    * `true` for the default line, or an object to also show the `span:` segment.
    * The line uses the SAME resolved trace identity the `--json` envelope
    * carries, so plain and JSON output for one invocation stay correlatable.
    */
   traceLine?: boolean | { withSpan?: boolean };
-  /** Process env — drives `CLI-TUI-UX.md` §2.3 colour-disable detection. */
+  /** Process env: drives `CLI-TUI-UX.md` §2.3 colour-disable detection. */
   env?: NodeJS.ProcessEnv;
 }
 
@@ -97,7 +97,7 @@ function printTraceLine<TResult>(
   io: OutputIo,
   lineOpts: { withSpan: boolean },
 ): void {
-  // Resolve identity exactly as `wrapEnvelope` does — same id in both surfaces.
+  // Resolve identity exactly as `wrapEnvelope` does: same id in both surfaces.
   const identity = resolveTraceIdentity(input.trace, input.env);
   io.print(
     formatTraceLine(identity, {
@@ -111,7 +111,7 @@ function printTraceLine<TResult>(
 /**
  * Filter a JSON value through the `jq` binary. Returns the raw `jq` stdout
  * (already newline-delimited). Throws a coded error if `jq` is unavailable or
- * the expression fails — never silently drops output.
+ * the expression fails: never silently drops output.
  */
 export function applyJqFilter(expression: string, value: unknown): string {
   const probe = spawnSync("jq", ["--version"], { stdio: "ignore" });
@@ -141,7 +141,7 @@ export class JqUnavailableError extends Error {
 export class JqExpressionError extends Error {
   readonly code = "FUL_CLI_JQ_INVALID";
   constructor(expression: string, detail: string) {
-    super(`\`--jq\` expression failed: ${expression}${detail ? ` — ${detail}` : ""}`);
+    super(`\`--jq\` expression failed: ${expression}${detail ? `: ${detail}` : ""}`);
     this.name = "JqExpressionError";
   }
 }
@@ -190,7 +190,7 @@ export function emitStreamEnvelope<TResult>(input: EmitResultInput<TResult>, io:
     input.renderHuman(input.result);
     return;
   }
-  // Streaming JSONL never interleaves a plain trace line into the stream — the
+  // Streaming JSONL never interleaves a plain trace line into the stream: the
   // trace line for a streaming run is printed once by `emitStreamTraceLine`.
   if (mode.raw) {
     io.print(JSON.stringify(input.result));
@@ -225,7 +225,7 @@ export function emitStreamEnd(argv: readonly string[], traceId: string, io: Outp
  *
  * Streaming JSONL must not interleave a plain line, so a `runs feed --watch`
  * style command calls this once *before* it starts streaming when `--json` is
- * absent — the same `DESIGN.md` §4.10 line a non-streaming command prints.
+ * absent: the same `DESIGN.md` §4.10 line a non-streaming command prints.
  */
 export function emitStreamTraceLine(
   input: {
@@ -254,8 +254,8 @@ export function emitStreamTraceLine(
  * Under `--json` the failure stays inside the canonical envelope (`result`
  * null, the coded error in the always-array `errors` field). Under `--json-raw`
  * the legacy `{error:{code,message}}` shape is kept for one release. In plain
- * mode it prints the `COPY.md` §3 / `CLI-TUI-UX.md` §5 recovery block — the
- * error message, the `Fix:` action, and `trace=<id>` — to stderr, so a CLI
+ * mode it prints the `COPY.md` §3 / `CLI-TUI-UX.md` §5 recovery block: the
+ * error message, the `Fix:` action, and `trace=<id>`: to stderr, so a CLI
  * failure is followable in web / TUI by the same trace id. The `renderHuman`
  * callback is the fallback for commands that have no structured recovery copy.
  */

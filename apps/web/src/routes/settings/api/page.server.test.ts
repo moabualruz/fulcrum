@@ -4,7 +4,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 // was extracted to `@fulcrum/server/api/feature-flags.ts`; the route imports
 // it from there rather than re-exporting it, so the test imports it directly.
 
-describe("/settings/api — isPublicApiEnabled() and load()", () => {
+describe("/settings/api: isPublicApiEnabled() and load()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
 
   afterEach(() => {

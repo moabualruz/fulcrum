@@ -1,5 +1,5 @@
 /**
- * PlanReviewScreen — TUI workflow review surface.
+ * PlanReviewScreen: TUI workflow review surface.
  *
  * Shows docs, planning, execution, review, UAT, and E2E state in one
  * keyboard-navigable workflow with trace/run/task identifiers visible.

@@ -1,4 +1,4 @@
-/** Flat doc row from DB — enough for tree building. */
+/** Flat doc row from DB: enough for tree building. */
 export interface FlatDoc {
   id: string;
   title: string;

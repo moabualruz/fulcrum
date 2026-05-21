@@ -467,7 +467,7 @@ describe("fulcrum skills sync --install-cron", () => {
     expect(JSON.parse(captured.join(""))).toEqual({ cronInstalled: true });
   });
 
-  test("idempotent — write twice → one entry (macOS plist)", async () => {
+  test("idempotent: write twice → one entry (macOS plist)", async () => {
     process.env["FULCRUM_FEATURES"] = "skills-daily-sync";
 
     // Write cron entry twice

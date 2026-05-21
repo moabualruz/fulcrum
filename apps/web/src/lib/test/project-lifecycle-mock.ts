@@ -4,11 +4,11 @@
  *
  * Bun's `mock.module` is process-global and freezes a module's *export-name
  * set* on its first registration; only the first-registered factory closure
- * survives. Three route tests mock this module — `/projects/[id]` with a
+ * survives. Three route tests mock this module: `/projects/[id]` with a
  * six-export subset, `/projects/[id]/repos` and `/projects/[id]/sprints` with
  * only `loadProjectOverview`. Whichever registered first hijacked the others
  * and (for the one-export mocks) stripped `updateProject`, `deleteProject`,
- * `createProject`, `listProjectRows`, … — breaking sibling suites such as the
+ * `createProject`, `listProjectRows`, …: breaking sibling suites such as the
  * `/projects` route test, whose page server imports `listProjectRows`.
  *
  * `projectLifecycleMock()` returns an object carrying *every* real export name.

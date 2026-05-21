@@ -78,8 +78,8 @@
                   </details>
                 {/if}
               </td>
-              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.os ?? "—"}</td>
-              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.version ?? "—"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.os ?? "-"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.version ?? "-"}</td>
               <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.occurred_at.slice(0, 16)}</td>
             </tr>
           {/each}

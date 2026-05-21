@@ -1,23 +1,23 @@
 <script lang="ts">
 	/**
-	 * `/<ws>/projects/<projId>/plan/prototypes` — the Plan-stage prototype
+	 * `/<ws>/projects/<projId>/plan/prototypes`: the Plan-stage prototype
 	 * gallery (`prd-web-plan-prototypes-od-fidelity`; OD `plan-prototypes.html`;
 	 * IA-MAP.md §2.2 "prototype callout(s)" / §3 `:prototype` "prototype gallery ·
 	 * live + archived"; CLI-TUI-UX.md §1.2 `fulcrum prototype new|view|attach`;
 	 * COPY.md §2 plan-prototypes empty state; DESIGN.md §4.11/§4.13 mode row).
 	 *
-	 * A prototype is a Plan output — a throwaway scaffold attached to a plan. It
+	 * A prototype is a Plan output: a throwaway scaffold attached to a plan. It
 	 * lives only until the plan ships, then auto-archives. The OD frame renders
 	 * this as a responsive card grid:
 	 *
-	 *   ┌ canvas — 16:10 thumbnail, dashed inner frame, kind glyph + screen line ┐
-	 *   ├ body   — title · monospace meta (plan_id · screens · last edit)        │
-	 *   │          footer — live/archived badge · "embedded in plan review" ·    │
+	 *   ┌ canvas: 16:10 thumbnail, dashed inner frame, kind glyph + screen line ┐
+	 *   ├ body  : title · monospace meta (plan_id · screens · last edit)        │
+	 *   │          footer: live/archived badge · "embedded in plan review" ·    │
 	 *   │                   Open / Duplicate (live) or Restore (archived)        │
-	 *   └          mode-row — Manual / Play / Discuss / AI Assist                ┘
+	 *   └          mode-row: Manual / Play / Discuss / AI Assist                ┘
 	 *
 	 * Each card's Open action opens the live preview embedded in the
-	 * `plan-review.html` pane-2 prototype callout — the gallery and the review
+	 * `plan-review.html` pane-2 prototype callout: the gallery and the review
 	 * tripane (`prd-web-plan-review-od-fidelity`) share the prototype-preview
 	 * seam. Archived cards are dimmed + grayscaled; Restore moves an archived
 	 * prototype back to live.
@@ -28,12 +28,12 @@
 	 * and the artifact-detail/audit-inspector shape belong to the Ship cluster
 	 * (`fulcrum artifact list|view|diff|export`, IA-MAP.md §3); that disposition
 	 * is recorded in `design-alignment/ship.md` under the Ship `artifacts`
-	 * surface — no feature loss, artifact inspection survives under Ship. This
+	 * surface: no feature loss, artifact inspection survives under Ship. This
 	 * file rebuilds `plan-prototypes` as the genuine OD prototype-kind card
 	 * gallery.
 	 *
-	 * Composes `@fulcrum/ui-kit` primitives only — `Badge`, `Button`, `Card`,
-	 * `EmptyState`, `ModeRow` — never re-implements a primitive (AGENTS.md
+	 * Composes `@fulcrum/ui-kit` primitives only: `Badge`, `Button`, `Card`,
+	 * `EmptyState`, `ModeRow`: never re-implements a primitive (AGENTS.md
 	 * ui-kit rule). The OD shell chrome (StageRail / ScopeBar / StatusFooter /
 	 * AcpDrawer) is provided by the root `+layout.svelte`.
 	 */
@@ -48,7 +48,7 @@
 	 * archive. Archived prototypes render dimmed + grayscaled.
 	 */
 	type Prototype = {
-		/** Stable prototype id — the per-card `data-prototype` token. */
+		/** Stable prototype id: the per-card `data-prototype` token. */
 		id: string;
 		/** Card title. */
 		title: string;
@@ -56,16 +56,16 @@
 		planId: string;
 		/** Kind glyph + scope shown inside the 16:10 canvas stub. */
 		canvasLabel: string;
-		/** Monospace meta — `plan_id · N screens · last edit …` (OD `.meta`). */
+		/** Monospace meta: `plan_id · N screens · last edit …` (OD `.meta`). */
 		meta: string;
-		/** Lifecycle state — drives the live/archived badge and the dim/gray. */
+		/** Lifecycle state: drives the live/archived badge and the dim/gray. */
 		state: "live" | "archived";
 		/** The currently-selected per-card mode (DESIGN.md §4.13 ModeRow). */
 		mode: WorkflowMode;
 	};
 
 	/**
-	 * Seed prototypes — two live, one archived, matching the OD frame. In
+	 * Seed prototypes: two live, one archived, matching the OD frame. In
 	 * production this list is the `fulcrum prototype` data path scoped to the
 	 * active `(workspace, project, plan)`; the route owns zero persistence.
 	 */
@@ -102,8 +102,8 @@
 	/**
 	 * The `?state=empty` query param forces the zero-data branch so the
 	 * design-e2e empty-state contract can render it without interaction. It is
-	 * read once at component init — both during SSR and on the client, so the
-	 * hydrated markup matches — and never re-forced: the empty branch the user
+	 * read once at component init: both during SSR and on the client, so the
+	 * hydrated markup matches: and never re-forced: the empty branch the user
 	 * then leaves (e.g. via "Start planning") stays populated.
 	 */
 	const startEmpty = page.url.searchParams.get("state") === "empty";
@@ -112,17 +112,17 @@
 		startEmpty ? [] : SEED_PROTOTYPES.map((p) => ({ ...p })),
 	);
 
-	/** Live + archived partitions — drive the `N live · M archived` count. */
+	/** Live + archived partitions: drive the `N live · M archived` count. */
 	const liveCount = $derived(prototypes.filter((p) => p.state === "live").length);
 	const archivedCount = $derived(prototypes.filter((p) => p.state === "archived").length);
-	/** The gallery is empty only when no prototype — live or archived — exists. */
+	/** The gallery is empty only when no prototype: live or archived: exists. */
 	const isEmpty = $derived(prototypes.length === 0);
 
 	/**
 	 * Open a prototype's live preview embedded in the plan-review pane-2
-	 * prototype callout. Navigating to the plan-review route — the surface that
+	 * prototype callout. Navigating to the plan-review route: the surface that
 	 * owns the embedded prototype-preview frame (`prd-web-plan-review-od-fidelity`,
-	 * `data-prototype-pane`) — is the OD "embedded in plan review" handoff. The
+	 * `data-prototype-pane`): is the OD "embedded in plan review" handoff. The
 	 * prototype id rides along as a query param so the review tripane can scope
 	 * its callout (interaction_assertion 1).
 	 */
@@ -130,7 +130,7 @@
 		void goto(`/plan-review?prototype=${encodeURIComponent(prototype.id)}`);
 	}
 
-	/** Duplicate a live prototype — a new live scaffold seeded from this one. */
+	/** Duplicate a live prototype: a new live scaffold seeded from this one. */
 	function duplicate(prototype: Prototype): void {
 		const copy: Prototype = {
 			...prototype,
@@ -157,12 +157,12 @@
 		);
 	}
 
-	/** Select a per-card mode — the universal Step ModeAffordance. */
+	/** Select a per-card mode: the universal Step ModeAffordance. */
 	function selectMode(prototype: Prototype, mode: WorkflowMode): void {
 		prototypes = prototypes.map((p) => (p.id === prototype.id ? { ...p, mode } : p));
 	}
 
-	/** Re-seed the gallery — the empty-state "Start planning" recovery action. */
+	/** Re-seed the gallery: the empty-state "Start planning" recovery action. */
 	function startPlanning(): void {
 		prototypes = SEED_PROTOTYPES.map((p) => ({ ...p }));
 	}
@@ -198,7 +198,7 @@
 
 	{#if isEmpty}
 		<!--
-			COPY.md §2 plan-prototypes worked example — verbatim H2 + paragraph +
+			COPY.md §2 plan-prototypes worked example: verbatim H2 + paragraph +
 			the one-primary-plus-one-ghost action pair. This is the source of truth;
 			the OD inline copy ("Throwaway scaffolds attach to a plan…") diverges
 			and is reconciled to the COPY.md text here (copy_assertion 1).
@@ -220,7 +220,7 @@
 		</EmptyState>
 	{:else}
 		<!--
-			The responsive card grid — `auto-fill minmax(20rem, 1fr)` matches the OD
+			The responsive card grid: `auto-fill minmax(20rem, 1fr)` matches the OD
 			`.proto-grid`. Each card carries `data-prototype` + `data-prototype-state`
 			so design-e2e can assert the live/archived partition.
 		-->
@@ -262,7 +262,7 @@
 							{prototype.meta}
 						</p>
 
-						<!-- Footer — live/archived badge · note · Open/Duplicate/Restore. -->
+						<!-- Footer: live/archived badge · note · Open/Duplicate/Restore. -->
 						<div
 							class="flex flex-wrap items-center gap-2 border-t border-border pt-2"
 							data-prototype-footer
@@ -305,7 +305,7 @@
 
 						<!--
 							The universal per-Step mode affordance (DESIGN.md §4.13,
-							`prd-web-mode-affordance-system`) — every prototype card is a Step.
+							`prd-web-mode-affordance-system`): every prototype card is a Step.
 						-->
 						<ModeRow
 							value={prototype.mode}

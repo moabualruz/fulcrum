@@ -139,7 +139,7 @@ describe("OrchestratorPane", () => {
     const pane = new OrchestratorPane({ caller });
     await pane.load();
 
-    // Default: All tab — all visible
+    // Default: All tab: all visible
     const v1 = renderer();
     pane.render(v1.renderer);
     const text1 = v1.tty.plainText();
@@ -190,7 +190,7 @@ describe("OrchestratorPane", () => {
     await pane.load();
 
     await pane.handleKey("\r"); // open overlay
-    await pane.handleKey("\x1b"); // Esc — close overlay
+    await pane.handleKey("\x1b"); // Esc: close overlay
     const v = renderer();
     pane.render(v.renderer);
     const text = v.tty.plainText();

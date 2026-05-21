@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * RecurrenceConfig — popover for configuring task recurrence rules.
+   * RecurrenceConfig: popover for configuring task recurrence rules.
    */
   import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";

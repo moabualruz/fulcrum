@@ -156,7 +156,7 @@
               <tr>
                 <td colspan="4" class="bg-muted/20 px-4 py-4">
                   <div data-metrics-pane class="flex flex-col gap-2">
-                    <h3 class="text-sm font-semibold">Metrics — {selectedExp.name}</h3>
+                    <h3 class="text-sm font-semibold">Metrics: {selectedExp.name}</h3>
                     <p class="text-xs text-muted-foreground">Variants, assignment counts, and conversion metrics use recorded experiment events.</p>
                     <div class="flex gap-4">
                       {#each selectedExp.variants as variant}

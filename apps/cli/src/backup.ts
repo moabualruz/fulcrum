@@ -23,7 +23,7 @@ export async function run(args: string[]): Promise<void> {
     process.exit(2);
   }
 
-  // Stub — full implementation creates actual backup via product kernel
+  // Stub: full implementation creates actual backup via product kernel
   const result: BackupResult = {
     path: `${outputDir}/fulcrum-backup-${Date.now()}.tar.gz`,
     sizeBytes: 0,

@@ -16,7 +16,7 @@ mock.module("$app/state", () => ({
 }));
 
 // `mock.module` registrations are process-global and the export-name set is
-// frozen on first registration — an incomplete stub here would strip
+// frozen on first registration: an incomplete stub here would strip
 // `invalidateAll` from every later test that imports the real module. Mirror
 // the real `$app/navigation` surface the component tree relies on.
 mock.module("$app/navigation", () => ({
@@ -54,13 +54,13 @@ interface PageProps {
 
 /**
  * Root `/` renders the portfolio Dashboard PortfolioSurface
- * (`prd-web-root-default-screen`). The metric-dashboard root —
+ * (`prd-web-root-default-screen`). The metric-dashboard root -
  * `<h1>Dashboard</h1>` over four zero-value MetricCards
- * (`00-executive-review.md` failure 5) — is retired. With an active project
+ * (`00-executive-review.md` failure 5): is retired. With an active project
  * the server `load` redirects to the Capture stage workbench instead, so this
  * surface only ever renders for the no-project case.
  */
-describe("+page.svelte SSR — portfolio Dashboard", () => {
+describe("+page.svelte SSR: portfolio Dashboard", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component<PageProps>;
 
@@ -98,7 +98,7 @@ describe("+page.svelte SSR — portfolio Dashboard", () => {
 
   test("the pending branch is the route skeleton, never the four-card metric grid", () => {
     const body = renderWith(new Promise<DashboardData>(() => {}));
-    // SSR renders the {#await} pending branch — the route-level skeleton —
+    // SSR renders the {#await} pending branch: the route-level skeleton -
     // and never the retired four zero-metric MetricCard grid.
     expect(body).toContain("portfolio-dashboard");
     expect(body).not.toContain("data-metric-card");

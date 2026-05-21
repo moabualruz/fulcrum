@@ -35,7 +35,7 @@
 </script>
 
 <svelte:head>
-  <title>Portfolio — Workspace Overview</title>
+  <title>Portfolio: Workspace Overview</title>
 </svelte:head>
 
 <div data-testid="portfolio-page" class="portfolio-page container mx-auto max-w-7xl px-4 py-8">

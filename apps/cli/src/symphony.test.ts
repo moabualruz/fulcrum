@@ -1,5 +1,5 @@
 /**
- * TDD — fulcrum symphony CLI surface parity (P3#19).
+ * TDD: fulcrum symphony CLI surface parity (P3#19).
  *
  * All commands tested via dependency-injected caller stubs.
  */
@@ -271,7 +271,7 @@ describe("symphony conformance", () => {
     const h = harness();
     await run(["conformance", "--json"], {
       ...h.opts,
-      // conformance is hand-rolled, no caller needed — uses subprocess
+      // conformance is hand-rolled, no caller needed: uses subprocess
       caller: stubCaller(),
       // inject a stub conformance runner
       runConformanceCheck: async () => ({

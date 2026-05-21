@@ -1,5 +1,5 @@
 /**
- * TUI Auth screen — Settings → Auth
+ * TUI Auth screen: Settings → Auth
  *
  * Renders:
  *   - Current user email, org name, role
@@ -112,7 +112,7 @@ export class AuthScreen {
       return true;
     }
     if (key === "e") {
-      // enroll passkey — stub: emit hint (real passkey URL from slice 13)
+      // enroll passkey: stub: emit hint (real passkey URL from slice 13)
       this.renderer.writeln(c.cyan("  Opening browser for passkey enrollment..."));
       return true;
     }

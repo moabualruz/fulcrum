@@ -29,7 +29,7 @@
       confirmImportOpen = true;
     }
     if (form && "imported" in form && form.imported) {
-      toast.success(`Import complete — ${form.totalRows} rows`);
+      toast.success(`Import complete: ${form.totalRows} rows`);
       confirmImportOpen = false;
       preflightSummary = null;
       importFile = null;

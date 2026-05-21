@@ -1,10 +1,10 @@
 <script lang="ts">
   /**
-   * Operate · Alerts — OD `operate-alerts.html` fidelity surface.
+   * Operate · Alerts: OD `operate-alerts.html` fidelity surface.
    *
    * Canonical route: `/<ws>/projects/<projId>/operate/alerts` (IA-MAP.md §2.6
    * screen table `Operate | :alerts | firing alerts | severity tabs`). The live
-   * `operate-alerts` route folder is the migration alias — `route-map.ts`
+   * `operate-alerts` route folder is the migration alias: `route-map.ts`
    * `LEGACY_ROUTE_MAP` maps `operate-alerts → operate`, so the old
    * `/operate-alerts` path keeps resolving (no 404) while presenting as the
    * Operate stage.
@@ -17,19 +17,19 @@
    * `_migrated-content/+page.svelte.preserved` so the Auth/account-security
    * cluster PRD (`prd-web-system-account-security`) can re-home it into the
    * Settings active-sessions panel with its `data-operate-alerts-*` hooks
-   * renamed to `data-account-sessions-*` — no feature loss. This route is now
+   * renamed to `data-account-sessions-*`: no feature loss. This route is now
    * rebuilt fresh as the OD Alerts console; the `operate-alerts` route NAME
    * belongs to the OD Alerts surface.
    *
    * Severity is grouped into the OD `tabs` strip (Firing / Awaiting ack /
    * Resolved / Silenced); selecting a tab regroups the alert list. Each alert
-   * row carries the universal compact `ModeRow` (DESIGN.md §4.11 / §4.13 —
-   * "every step header … subsystem row" — an alert row is a Step). Status
+   * row carries the universal compact `ModeRow` (DESIGN.md §4.11 / §4.13 -
+   * "every step header … subsystem row": an alert row is a Step). Status
    * badges use the canonical 8-state vocabulary via the ui-kit `StatusBadge`
-   * (DESIGN.md §4.9 — color + glyph + text, never color alone): the OD badge
+   * (DESIGN.md §4.9: color + glyph + text, never color alone): the OD badge
    * labels `failing` / `waiting-input` / `completed` map directly. The empty
    * state uses the locked `COPY.md` operate-alerts strings (the divergent OD
-   * hidden `empty-state` copy is intentionally NOT used — COPY.md is canonical).
+   * hidden `empty-state` copy is intentionally NOT used: COPY.md is canonical).
    */
   import { page } from "$app/stores";
   import {
@@ -42,13 +42,13 @@
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
-  /** OD `sev-dot` severity classes — `crit` / `warn` / `info`. */
+  /** OD `sev-dot` severity classes: `crit` / `warn` / `info`. */
   type AlertSeverity = "crit" | "warn" | "info";
 
   /**
    * The four OD severity tabs. `firing` and `awaiting-ack` are the two live
    * lanes; `resolved` and `silenced` are the closed lanes. An alert belongs to
-   * exactly one lane — the lane is the lifecycle bucket the OD tab strip groups
+   * exactly one lane: the lane is the lifecycle bucket the OD tab strip groups
    * by.
    */
   type AlertLane = "firing" | "awaiting-ack" | "resolved" | "silenced";
@@ -67,26 +67,26 @@
   ] as const;
 
   interface ThresholdAlert {
-    /** Stable id — also the design-e2e row hook value. */
+    /** Stable id: also the design-e2e row hook value. */
     id: string;
     /** OD pulsing `sev-dot` severity. */
     severity: AlertSeverity;
     /** Severity-tab lane this alert is grouped under. */
     lane: AlertLane;
-    /** OD `.title` — the human alert name. */
+    /** OD `.title`: the human alert name. */
     title: string;
-    /** OD `.desc` — mono threshold-breach detail line carrying the `rule_id`. */
+    /** OD `.desc`: mono threshold-breach detail line carrying the `rule_id`. */
     description: string;
-    /** Threshold-breach rule id (`alr_*`) — surfaced in the desc line. */
+    /** Threshold-breach rule id (`alr_*`): surfaced in the desc line. */
     ruleId: string;
     /**
      * Canonical 8-state status the OD `badge` maps onto. OD badge labels
      * `failing` / `waiting-input` / `completed` are exactly canonical states.
      */
     status: WorkflowStatus;
-    /** Trace id for the firing — OD `meta` column. Closed alerts may omit it. */
+    /** Trace id for the firing: OD `meta` column. Closed alerts may omit it. */
     traceId?: string;
-    /** Relative-time string — OD `meta` column (`3m ago`, `yesterday`). */
+    /** Relative-time string: OD `meta` column (`3m ago`, `yesterday`). */
     age: string;
     /**
      * OD lifecycle-state `meta` column (`ongoing` / `ack pending` /
@@ -99,7 +99,7 @@
 
   /**
    * The threshold-breach alerts the OD `operate-alerts.html` rows model. These
-   * are design-fixture rows for the rendered OD-fidelity surface — the
+   * are design-fixture rows for the rendered OD-fidelity surface: the
    * threshold-breach rule evaluator that produces live `alr_*`-tagged firings
    * is the CLI/TUI vertical-slice's concern, out of this web route's scope.
    */
@@ -177,10 +177,10 @@
   let alerts = $state<ThresholdAlert[]>(structuredClone([...ALERT_FIXTURE]));
   let activeLane = $state<AlertLane>("firing");
 
-  /** Alerts visible right now — empty when the empty data state is forced. */
+  /** Alerts visible right now: empty when the empty data state is forced. */
   const liveAlerts = $derived(emptyState ? [] : alerts);
 
-  /** Per-lane alert count — drives the OD tab count pills + the head count line. */
+  /** Per-lane alert count: drives the OD tab count pills + the head count line. */
   const laneCounts = $derived(
     Object.fromEntries(
       ALERT_LANES.map((lane) => [
@@ -190,17 +190,17 @@
     ) as Record<AlertLane, number>,
   );
 
-  /** The alert rows for the selected severity tab — OD list regroups on tab change. */
+  /** The alert rows for the selected severity tab: OD list regroups on tab change. */
   const visibleAlerts = $derived(
     liveAlerts.filter((alert) => alert.lane === activeLane),
   );
 
-  /** OD head count line — `2 firing · 1 awaiting ack · 7 resolved today`. */
+  /** OD head count line: `2 firing · 1 awaiting ack · 7 resolved today`. */
   const headCount = $derived(
     `${laneCounts.firing} firing · ${laneCounts["awaiting-ack"]} awaiting ack · ${laneCounts.resolved} resolved today`,
   );
 
-  /** OD badge label — the OD file labels its badges with canonical state words. */
+  /** OD badge label: the OD file labels its badges with canonical state words. */
   function statusLabel(status: WorkflowStatus): string {
     if (status === "failing") return "failing";
     if (status === "waiting-input") return "waiting-input";
@@ -208,7 +208,7 @@
     return status;
   }
 
-  /** Resolved + silenced lanes are closed — OD dims those rows to `opacity: 0.6`. */
+  /** Resolved + silenced lanes are closed: OD dims those rows to `opacity: 0.6`. */
   function isClosed(lane: AlertLane): boolean {
     return lane === "resolved" || lane === "silenced";
   }
@@ -224,7 +224,7 @@
   }
 
   /**
-   * Acknowledge a firing alert — moves it from `firing` to `awaiting-ack`
+   * Acknowledge a firing alert: moves it from `firing` to `awaiting-ack`
    * resolved into the `waiting-input` canonical state. Mirrors the OD
    * `ack pending` lifecycle transition.
    */
@@ -243,7 +243,7 @@
   }
 
   /**
-   * Resolve an alert — moves it to the `resolved` lane in the `completed`
+   * Resolve an alert: moves it to the `resolved` lane in the `completed`
    * canonical state. Mirrors the OD `resolved by mkh` lifecycle transition.
    */
   function resolveAlert(id: string): void {
@@ -312,7 +312,7 @@
     />
   {/if}
 
-  <!-- OD severity tab strip — selecting a tab regroups the alert list. -->
+  <!-- OD severity tab strip: selecting a tab regroups the alert list. -->
   <div
     data-alerts-tabs
     role="tablist"
@@ -360,7 +360,7 @@
     data-alerts-panel={activeLane}
   >
     {#if emptyState}
-      <!-- COPY.md operate-alerts empty state — the locked strings. The quiet
+      <!-- COPY.md operate-alerts empty state: the locked strings. The quiet
            zero-alerts state is a healthy steady state, not an absence. -->
       <div data-alerts-empty class="mt-3">
         <EmptyState
@@ -383,7 +383,7 @@
         </EmptyState>
       </div>
     {:else if visibleAlerts.length === 0}
-      <!-- A populated console with an empty severity lane — the lane has no
+      <!-- A populated console with an empty severity lane: the lane has no
            rows but the surface is not the global quiet state. -->
       <p data-alerts-lane-empty class="mt-6 text-xs text-muted-foreground">
         No alerts in this lane.
@@ -490,7 +490,7 @@
 
 <style>
   /*
-   * OD `operate-alerts.html` pulsing `sev-dot.crit` — a 1.4s expanding-ring
+   * OD `operate-alerts.html` pulsing `sev-dot.crit`: a 1.4s expanding-ring
    * pulse on critical alerts (the OD `@keyframes pulse`). Reduced-motion users
    * get the static dot per DESIGN.md §1.6.
    */

@@ -6,9 +6,9 @@
  * set* on its first registration. The `/context/preview` route test mocks this
  * module with only `loadContextPreviewOptions` + `loadContextBundle` (the two
  * exports its page server uses). That froze `previewContext` out of the
- * export-name set, so a sibling suite — `/runs/[id]`, whose page server pulls
+ * export-name set, so a sibling suite: `/runs/[id]`, whose page server pulls
  * in `getProjectRunPageData` → `execution-orchestration/.../runs/queries.ts`,
- * which statically imports `previewContext` — failed to evaluate with
+ * which statically imports `previewContext`: failed to evaluate with
  * "Export named 'previewContext' not found".
  *
  * `contextQueriesMock()` returns an object carrying *every* real export name.

@@ -156,7 +156,7 @@
       class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50")}
     >
       <div class={cn("rounded-lg border border-border bg-background p-6 shadow-lg w-full max-w-md")}>
-        <h2 class={cn("text-lg font-semibold mb-4")}>Dispatch run — {dispatchAgent}</h2>
+        <h2 class={cn("text-lg font-semibold mb-4")}>Dispatch run: {dispatchAgent}</h2>
 
         <form method="POST" action="?/dispatch" use:enhance>
           <input type="hidden" name="agent" value={dispatchAgent} />
@@ -170,7 +170,7 @@
               required
               class={cn("w-full rounded-md border border-input bg-background px-3 py-2 text-sm")}
             >
-              <option value="">— select a task —</option>
+              <option value="">- select a task -</option>
               {#each payload.tasks as task (task.id)}
                 <option value={task.id}>{task.title}</option>
               {/each}
@@ -185,7 +185,7 @@
               bind:value={dispatchProjectId}
               class={cn("w-full rounded-md border border-input bg-background px-3 py-2 text-sm")}
             >
-              <option value="">— any project —</option>
+              <option value="">- any project -</option>
               {#each payload.projects as project (project.id)}
                 <option value={project.id}>{project.name}</option>
               {/each}

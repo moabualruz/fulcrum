@@ -1,5 +1,5 @@
 /**
- * Operate stage workbench — the TUI `:doctor` workbench (DESIGN.md §3.1,
+ * Operate stage workbench: the TUI `:doctor` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `operate` screen).
  *
  * The Operate stage's subsystem-health surface, re-homed under the shared
@@ -52,7 +52,7 @@ function statusIcon(status: DoctorCheckResult["status"]): string {
 }
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — loads and renders TUI subsystem checks
+// DoctorScreen: loads and renders TUI subsystem checks
 // ---------------------------------------------------------------------------
 
 export interface DoctorScreenOptions {
@@ -124,7 +124,7 @@ export class DoctorScreen {
       this.opts.onExit?.();
       return true;
     }
-    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`).
+    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`).
     if (this.modePicker.handleChordKey(key)) return true;
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.results.length - 1));
@@ -205,7 +205,7 @@ export class DoctorScreen {
 }
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — FakeTTY snapshot suite failure counter
+// OpenTUI gate: FakeTTY snapshot suite failure counter
 // ---------------------------------------------------------------------------
 
 export interface OpenTuiGateResult {
@@ -255,7 +255,7 @@ export function runOpenTuiSnapshotGate(
 
   for (const screen of screens) {
     const expected = snapshots[screen.name];
-    if (expected === undefined) continue; // no baseline — skip
+    if (expected === undefined) continue; // no baseline: skip
     try {
       const actual = screen.render();
       if (actual !== expected) {

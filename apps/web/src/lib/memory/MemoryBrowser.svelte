@@ -157,7 +157,7 @@
 
               <!-- Project -->
               <td class="px-4 py-3 text-muted-foreground">
-                {memory.projectId ?? "—"}
+                {memory.projectId ?? "-"}
               </td>
 
               <!-- Global toggle -->

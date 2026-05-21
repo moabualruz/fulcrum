@@ -44,7 +44,7 @@ interface RunOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const HELP = `fulcrum audit — compliance audit-log query and export
+const HELP = `fulcrum audit: compliance audit-log query and export
 
 Usage:
   fulcrum audit query [--project <id>] [--user <id>] [--kind <kind>]

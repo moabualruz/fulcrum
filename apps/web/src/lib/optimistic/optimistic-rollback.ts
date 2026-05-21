@@ -17,7 +17,7 @@ export type RollbackSubscriber = (failures: ReadonlyArray<RollbackFailure>) => v
  * Tracks consecutive optimistic mutation failures keyed by stable mutation id.
  * After three failed attempts the failure escalates so the UI can expand the
  * inline error block with the last request payload and a troubleshooting link
- * — banning toasts and `Contact support` copy per `COPY.md` §Hard bans.
+ *: banning toasts and `Contact support` copy per `COPY.md` §Hard bans.
  */
 export class OptimisticRollback {
   private readonly threshold: number;

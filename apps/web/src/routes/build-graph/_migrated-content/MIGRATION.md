@@ -1,4 +1,4 @@
-# build-graph — mislabeled-route content migration
+# build-graph: mislabeled-route content migration
 
 > Migrated by `prd-cross-mislabeled-route-content-migration` (Design Fidelity
 > Recovery). The `build-graph` route name is freed for its OD surface; the
@@ -7,7 +7,7 @@
 
 ## What this route currently rendered (mislabeled)
 
-`<h1>Task dependency execution</h1>` — NOT the OD Sugiyama dependency graph.
+`<h1>Task dependency execution</h1>`: NOT the OD Sugiyama dependency graph.
 The body was a design-fixture grab-bag: a typography reference block
 (`data-type-token`), a form-field reference (`data-form-field` for
 text/email/password/number/url/...), presence/safe-save state, package-manifest
@@ -17,7 +17,7 @@ rows, and an execution-feedback block. Only `data-dependency-node` rows +
 
 ## Preserved artifact
 
-- `+page.svelte.preserved` — the full 971-line route content, verbatim.
+- `+page.svelte.preserved`: the full 971-line route content, verbatim.
 
 ## Disposition
 
@@ -27,7 +27,7 @@ rows, and an execution-feedback block. Only `data-dependency-node` rows +
   Migration notes); presence/safe-save, package-manifest, delete-impact,
   active-doc/trash-doc fixtures → Capture/docs surfaces.
 - **Owning rebuild PRD:** `prd-web-build-graph-od-fidelity` (`vertical-prds.jsonl`,
-  status `proposed`) — it `depends_on` this PRD, and its acceptance bullet
+  status `proposed`): it `depends_on` this PRD, and its acceptance bullet
   "The misnamed fixture content is re-homed: typography/form-field references
   to /design-kit, doc-trash fixtures to Capture/docs" lifts this artifact.
 - **Live route now:** `+page.server.ts` 308-redirects `/build-graph` →

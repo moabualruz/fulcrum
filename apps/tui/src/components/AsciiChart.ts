@@ -1,5 +1,5 @@
 /**
- * AsciiChart — ASCII chart rendering component using asciichart.
+ * AsciiChart: ASCII chart rendering component using asciichart.
  *
  * Provides sparkline, bar chart, and line chart rendering for TUI screens.
  * Used by ReportsScreen for burndown, velocity, throughput, and WIP charts.
@@ -26,12 +26,12 @@ export interface LineChartOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sparkline — single line of unicode block chars for velocity trend
+// Sparkline: single line of unicode block chars for velocity trend
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Render a single-line sparkline using unicode block characters.
- * Does NOT use asciichart — sparklines are inherently single-row.
+ * Does NOT use asciichart: sparklines are inherently single-row.
  */
 export function renderSparkline(data: number[], _width?: number): string {
   if (data.length === 0) return "";
@@ -43,7 +43,7 @@ export function renderSparkline(data: number[], _width?: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bar chart — ASCII horizontal bars for workload / per-assignee views
+// Bar chart: ASCII horizontal bars for workload / per-assignee views
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -67,12 +67,12 @@ export function renderBarChart(data: BarDatum[], maxBarWidth = 30): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Line chart — multi-series chart via asciichart (burndown, burnup, cfd)
+// Line chart: multi-series chart via asciichart (burndown, burnup, cfd)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Render a multi-series line chart using asciichart.plot().
- * series: array of number arrays — each is one line on the chart.
+ * series: array of number arrays: each is one line on the chart.
  * labels: optional legend labels for each series.
  */
 export function renderLineChart(series: number[][], labels?: string[], opts: LineChartOptions = {}): string {

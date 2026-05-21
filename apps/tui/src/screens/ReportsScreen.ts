@@ -1,18 +1,18 @@
 /**
- * ReportsScreen — TUI reports screen with ASCII charts.
+ * ReportsScreen: TUI reports screen with ASCII charts.
  *
  * Methodology-aware tabs:
  *   scrum:  Sprint | Flow | Project | Team
  *   kanban: Flow | Project | Team
  *   none:   Project | Team
  *
- * Data fetched via tRPC caller (shared service layer — D-84).
+ * Data fetched via tRPC caller (shared service layer: D-84).
  * Charts rendered via AsciiChart component (D-83, D-87).
  *
  * Keyboard navigation:
- *   Tab / 1-4 — switch tabs
- *   j/k       — scroll within tab
- *   q         — go back
+ *   Tab / 1-4: switch tabs
+ *   j/k      : scroll within tab
+ *   q        : go back
  */
 
 import type { Renderer } from "../renderer.ts";
@@ -118,7 +118,7 @@ export class ReportsScreen {
       }
     }
 
-    // Fetch report data — try unified metrics endpoint first, fall back to individual
+    // Fetch report data: try unified metrics endpoint first, fall back to individual
     let burndown: BurndownRow[] = [];
     let velocity: VelocityRow[] = [];
     let throughput: ThroughputRow[] = [];
@@ -325,7 +325,7 @@ export class ReportsScreen {
     if (key === "j") { this.scrollOffset++; return true; }
     if (key === "k") { this.scrollOffset = Math.max(0, this.scrollOffset - 1); return true; }
 
-    // q — signal caller to pop screen
+    // q: signal caller to pop screen
     if (key === "q") return false;
 
     return false;

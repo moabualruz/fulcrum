@@ -20,7 +20,7 @@ mock.module("$app/state", () => ({
 // shape (`@knowledge-workspace` `loadContextBundle` / `loadContextPreviewOptions`).
 // `+page.svelte` reads `data.streamed.options` and `data.streamed.bundle`; SSR
 // `render()` runs synchronously, and Svelte's `{#await}` renders its `:then`
-// branch immediately when the awaited value is a plain (non-thenable) value —
+// branch immediately when the awaited value is a plain (non-thenable) value -
 // so the tests pass resolved objects, not Promises, to exercise the panes.
 
 type MemorySlice = { id: string; key: string; body: string };
@@ -159,7 +159,7 @@ describe("/context/preview +page.svelte", () => {
   test("the bundle await block carries a failure branch surfacing the assembly error", () => {
     // The bundle-assembly failure is rendered by the `{#await}` `:catch`
     // branch. Svelte SSR `render()` is synchronous and always renders the
-    // *pending* branch for a thenable — it can never reach `:catch` — so the
+    // *pending* branch for a thenable: it can never reach `:catch`: so the
     // surviving coverage intent (a failure branch exists and surfaces the
     // error message) is asserted against the source structure instead.
     const pageSrc = readFileSync(

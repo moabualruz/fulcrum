@@ -1,5 +1,5 @@
 /**
- * PM tool import helpers — shared between CLI and tests.
+ * PM tool import helpers: shared between CLI and tests.
  * Contains runImport, formatImportResult, NullCredentialRepository, FetchHttpClient.
  */
 
@@ -41,7 +41,7 @@ export function formatImportResult(result: ImportResult, json: boolean): string 
   return lines.join("\n");
 }
 
-/** Credential repository that always returns null — used in CLI when no real keystore configured. */
+/** Credential repository that always returns null: used in CLI when no real keystore configured. */
 export class NullCredentialRepository implements CredentialRepository {
   async get(_key: string): Promise<string | null> {
     return null;

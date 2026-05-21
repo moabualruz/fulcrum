@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * `/artifacts` re-home stub — the generic file-artifact list is re-homed to
+   * `/artifacts` re-home stub: the generic file-artifact list is re-homed to
    * the Ship stage workbench at `/ship` (`IA-MAP.md §2.5`,
    * `design-alignment/ship.md`). `+page.server.ts` issues a 301
    * (`MOVED_PERMANENTLY`) redirect to `/ship` on every GET, so this markup is
@@ -8,7 +8,7 @@
    * `+page.svelte` and as a no-JS deprecation notice.
    *
    * The `upload` / `bulk` server actions and the `/artifacts/[id]/download`
-   * endpoint are preserved on the server — only the *list view* moved.
+   * endpoint are preserved on the server: only the *list view* moved.
    */
   import { Button } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

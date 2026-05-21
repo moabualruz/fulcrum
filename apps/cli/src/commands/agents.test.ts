@@ -125,7 +125,7 @@ describe("fulcrum agents help", () => {
 });
 
 // ---------------------------------------------------------------------------
-// runs CLI — JSONL log fixture test
+// runs CLI: JSONL log fixture test
 // ---------------------------------------------------------------------------
 
 let SCRATCH: string;

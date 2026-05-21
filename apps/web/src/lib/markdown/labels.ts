@@ -2,7 +2,7 @@
  * Helpers for the comma-separated `labels` field on the document form.
  *
  * The DB stores `frontmatter.labels` as `string[]`; the form input is a
- * single text field. These two functions are the boundary mapping —
+ * single text field. These two functions are the boundary mapping -
  * `parseLabels` reads user input, `serializeLabels` re-renders the array
  * back into the form when seeding `superValidate` from a stored doc.
  */

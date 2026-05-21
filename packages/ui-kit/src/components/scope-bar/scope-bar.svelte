@@ -24,7 +24,7 @@
 		activeStage?: WorkflowStage;
 		stages?: WorkflowStage[];
 		onSelectStage?: (stage: WorkflowStage) => void;
-		/** TraceBadge slot — the consumer passes a `<TraceChip badge />`. */
+		/** TraceBadge slot: the consumer passes a `<TraceChip badge />`. */
 		trace?: Snippet;
 		/** System icon cluster slot (palette · notifications · display · help · avatar). */
 		systemCluster?: Snippet;

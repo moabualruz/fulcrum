@@ -8,7 +8,7 @@ import {
 const now = new Date("2026-04-30T12:00:00Z");
 
 const rows: readonly RunRow[] = [
-  // 1h ago — within 24h
+  // 1h ago: within 24h
   {
     id: "r1",
     agent: "claude",
@@ -20,7 +20,7 @@ const rows: readonly RunRow[] = [
     sandbox_mode: null,
     iteration_count: null,
   },
-  // 2 days ago — within 7d but outside 24h
+  // 2 days ago: within 7d but outside 24h
   {
     id: "r2",
     agent: "codex",
@@ -32,7 +32,7 @@ const rows: readonly RunRow[] = [
     sandbox_mode: null,
     iteration_count: null,
   },
-  // 10 days ago — within 30d but outside 7d
+  // 10 days ago: within 30d but outside 7d
   {
     id: "r3",
     agent: "claude",
@@ -44,7 +44,7 @@ const rows: readonly RunRow[] = [
     sandbox_mode: null,
     iteration_count: null,
   },
-  // 60 days ago — outside 30d
+  // 60 days ago: outside 30d
   {
     id: "r4",
     agent: "gemini",

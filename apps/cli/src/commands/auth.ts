@@ -50,7 +50,7 @@ export async function run(
   const { print = console.log, printErr = console.error, exit = process.exit } = opts;
   const [sub = "help", ...rest] = argv;
 
-  // CLI-TUI-UX.md §2 — `--help` always works, even after a subcommand or other
+  // CLI-TUI-UX.md §2: `--help` always works, even after a subcommand or other
   // flags (`fulcrum auth whoami --help`). Honour it before subcommand dispatch.
   if (wantsHelp(argv)) {
     print(HELP);
@@ -260,7 +260,7 @@ async function runLogin(
 ): Promise<void> {
   const { printErr, exit } = opts;
 
-  // CLI-TUI-UX.md §2.1 — a secret must never be read from argv (the process
+  // CLI-TUI-UX.md §2.1: a secret must never be read from argv (the process
   // table leaks it). Refuse `--token` / `--password` / … before doing anything;
   // the error names only the flag, never the value.
   try {

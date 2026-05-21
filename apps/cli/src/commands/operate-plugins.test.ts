@@ -81,7 +81,7 @@ describe("fulcrum operate plugins", () => {
   });
 });
 
-describe("operate plugin list — canonical envelope, not a raw array", () => {
+describe("operate plugin list: canonical envelope, not a raw array", () => {
   test("`list --json` emits the fulcrum.cli.v1 envelope even with an injected loader", async () => {
     const io = captureIO();
     await run(["list", "--json"], { ...io, loadPlugins: async () => fakeMarkers() });
@@ -129,7 +129,7 @@ describe("operate plugin list — canonical envelope, not a raw array", () => {
   });
 });
 
-describe("fulcrum plugin — CLI-TUI-UX.md §1.6 root alias", () => {
+describe("fulcrum plugin: CLI-TUI-UX.md §1.6 root alias", () => {
   test("`plugin list --json` reports the root grammar in the envelope command", async () => {
     const io = captureIO();
     await run(["plugin", "list", "--json"], {
@@ -161,7 +161,7 @@ describe("fulcrum plugin — CLI-TUI-UX.md §1.6 root alias", () => {
   });
 });
 
-describe("operate plugin mutations — coded error envelopes (no cross-agent server)", () => {
+describe("operate plugin mutations: coded error envelopes (no cross-agent server)", () => {
   test("`enable <name> --agent codex --json` emits FUL_OPERATE_PLUGIN_UNAVAILABLE", async () => {
     const io = captureIO();
     await run(["plugin", "enable", "caveman", "--agent", "codex", "--json"], io);

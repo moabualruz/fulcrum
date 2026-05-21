@@ -42,7 +42,7 @@
     3: { label: "High", color: "text-orange-500", icon: "↑" },
     2: { label: "Medium", color: "text-yellow-500", icon: "→" },
     1: { label: "Low", color: "text-blue-500", icon: "↓" },
-    0: { label: "None", color: "text-muted-foreground", icon: "—" },
+    0: { label: "None", color: "text-muted-foreground", icon: "-" },
   };
 
   const pMeta = $derived(

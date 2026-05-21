@@ -29,7 +29,7 @@ describe("StatusFooter", () => {
 		}
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		const { body } = render(StatusFooterRoot, {
 			props: { segments: [{ id: "branch", label: "main" }] },
 		});

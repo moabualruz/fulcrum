@@ -4,7 +4,7 @@
  * `fulcrum --help` groups commands by the six product workflow stages
  * (Capture · Plan · Build · Review · Ship · Operate) plus AI Assist and a
  * Cross-cutting / Global group, so a CLI user shares the same mental model as
- * the web and TUI surfaces (CLI-TUI-UX.md §1; PRODUCT.md hard invariant 7 —
+ * the web and TUI surfaces (CLI-TUI-UX.md §1; PRODUCT.md hard invariant 7 -
  * "Workflow-stage navigation is non-negotiable"). Existing flat command names
  * keep working as compatibility wrappers; this help points at the canonical
  * stage-organized command home first.
@@ -218,7 +218,7 @@ function renderStageGroup(stage: StageHelp): string {
   return `${heading}\n  ${stage.summary}\n${body}`;
 }
 
-/** Root `fulcrum --help` — workflow-stage organized command tree. */
+/** Root `fulcrum --help`: workflow-stage organized command tree. */
 const ROOT_HELP = `fulcrum: local-first CLI Agent OS
 
 Commands are grouped by workflow stage so the CLI shares one mental model with

@@ -82,7 +82,7 @@ export const actions: Actions = {
       const { em, ctx } = await requestProjectScope(locals, params.id);
       const { id: sprintId, metrics } = await completeProjectSprint(em, ctx, parsed.output.id);
 
-      // LLM narrative step — gated behind FULCRUM_FEATURES=report-llm-narration
+      // LLM narrative step: gated behind FULCRUM_FEATURES=report-llm-narration
       const llmEnabled = isFeatureEnabled("report-llm-narration");
       if (llmEnabled) {
         const narration = await generateNarration({
@@ -97,8 +97,8 @@ export const actions: Actions = {
           return { ...actionOk("Sprint completed"), narrative: narration.text };
         }
         if ("error" in narration) {
-          // Sidecar offline — return ok but with warning; sprint close not blocked
-          return { ...actionOk("Sprint completed"), narrativeError: "Narrative unavailable — sidecar offline" };
+          // Sidecar offline: return ok but with warning; sprint close not blocked
+          return { ...actionOk("Sprint completed"), narrativeError: "Narrative unavailable: sidecar offline" };
         }
       }
 

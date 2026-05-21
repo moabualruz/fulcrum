@@ -46,8 +46,8 @@
                 <a href="/artifacts/{artifact.id}" class={cn("text-primary underline-offset-4 hover:underline")}>{artifact.title}</a>
               </td>
               <td class={cn("py-2")}>{artifact.kind}</td>
-              <td class={cn("py-2")}>{artifact.mime ?? "—"}</td>
-              <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "—"}</td>
+              <td class={cn("py-2")}>{artifact.mime ?? "-"}</td>
+              <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "-"}</td>
               <td class={cn("py-2")}>{artifact.created_at.slice(0, 10)}</td>
             </tr>
           {/each}

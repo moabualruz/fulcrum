@@ -7,7 +7,7 @@
  *    `--json` (the same envelope contract as the rest of the CLI surface).
  *
  * The existing `fulcrum product planning …` commands are kept as documented
- * aliases — they are exercised elsewhere and unchanged by this PRD.
+ * aliases: they are exercised elsewhere and unchanged by this PRD.
  */
 
 import { describe, expect, test } from "bun:test";

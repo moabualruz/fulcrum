@@ -1,4 +1,4 @@
-// fulcrum backup --output /path — PGlite dump + artifacts manifest tarball.
+// fulcrum backup --output /path: PGlite dump + artifacts manifest tarball.
 
 import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";

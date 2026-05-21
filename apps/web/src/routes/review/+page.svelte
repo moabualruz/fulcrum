@@ -1,26 +1,26 @@
 <script lang="ts">
 	/**
-	 * Review queue — `/review`, the production surface for OD `review-queue.html`.
+	 * Review queue: `/review`, the production surface for OD `review-queue.html`.
 	 *
 	 * `prd-web-review-queue-od-fidelity`. The canonical IA-MAP §2.4 home is
 	 * `/<ws>/projects/<projId>/review`; this top-level `/review` folder is the
 	 * rendered production review-queue route the stage workbench links to and the
 	 * StageRail resolves under the Review WorkflowStage.
 	 *
-	 * The OD ships the **Review queue** — the intake list of PRs/reviews awaiting
+	 * The OD ships the **Review queue**: the intake list of PRs/reviews awaiting
 	 * an operator decision:
 	 *
 	 *  - a `page-head` (`Review queue` + a count line `3 awaiting review · 12
 	 *    merged today`);
 	 *  - a four-tab lifecycle strip (`Awaiting review` / `Changes requested` /
-	 *    `Approved` / `Merged today`), each with a count pill — `CLI-TUI-UX.md`
+	 *    `Approved` / `Merged today`), each with a count pill: `CLI-TUI-UX.md`
 	 *    §478 maps the TUI `:review` tabs to this exact set;
 	 *  - a `pr-row` grid: PR icon, title + `desc` (`FUL-1284 · 14 files changed ·
 	 *    +287 −94`), a four-dot check-row (lint/test/bench/a11y), stacked reviewer
 	 *    avatars, a status badge, relative age, and a compact per-Step mode row;
 	 *  - an `empty-state` block reconciled to `COPY.md` review-queue.
 	 *
-	 * Status vocabulary is the canonical `COPY.md` §6 / §362 8-state set —
+	 * Status vocabulary is the canonical `COPY.md` §6 / §362 8-state set -
 	 * `awaiting` maps to `waiting-input`; `changes` to `blocked`; `approved` to
 	 * `passing`; `merged` to `completed`. A non-canonical synonym is a copy bug,
 	 * so every tab label and row badge resolves through `@fulcrum/ui-kit`
@@ -28,7 +28,7 @@
 	 *
 	 * Migration note (`design-alignment/review.md` §review-queue): the
 	 * `review-search` route's kind/status/author filter logic is **re-homed** into
-	 * this queue's tab + filter model — no feature loss. `review-search` itself is
+	 * this queue's tab + filter model: no feature loss. `review-search` itself is
 	 * deferred (`design-alignment/review.md` disposition: "Absorb → defer route").
 	 *
 	 * Every UI primitive is composed from `@fulcrum/ui-kit` per the AGENTS.md
@@ -58,7 +58,7 @@
 	/**
 	 * The four review lifecycle tabs (OD `review-queue.html` lines 58–63;
 	 * `CLI-TUI-UX.md` §478 `:review` tabs). Each tab carries the OD label and the
-	 * canonical `WorkflowStatus` a row in that tab maps to — `awaiting` →
+	 * canonical `WorkflowStatus` a row in that tab maps to: `awaiting` →
 	 * `waiting-input`, `changes` → `blocked`, `approved` → `passing`, `merged` →
 	 * `completed` (`COPY.md` §362 8-state vocab).
 	 */
@@ -79,33 +79,33 @@
 		{ id: "merged", label: "Merged today", status: "completed" },
 	] as const;
 
-	/** A pre-merge check result — the OD four-dot check-row (lint/test/bench/a11y). */
+	/** A pre-merge check result: the OD four-dot check-row (lint/test/bench/a11y). */
 	type CheckTone = "ok" | "warn" | "danger";
 
 	interface ReviewCheck {
-		/** Check name — surfaces in the dot `title` for hover + a11y. */
+		/** Check name: surfaces in the dot `title` for hover + a11y. */
 		name: string;
 		tone: CheckTone;
 	}
 
-	/** A reviewer assigned to a PR — rendered as a stacked monogram avatar. */
+	/** A reviewer assigned to a PR: rendered as a stacked monogram avatar. */
 	interface Reviewer {
 		/** Stable id used as the avatar key. */
 		id: string;
-		/** Full name — the avatar `aria-label` / monogram source. */
+		/** Full name: the avatar `aria-label` / monogram source. */
 		name: string;
 	}
 
 	/**
-	 * One PR/review item in the queue — the OD `pr-row`. Each carries a stable
+	 * One PR/review item in the queue: the OD `pr-row`. Each carries a stable
 	 * `key` (`FUL-1284`), a title, a `diff` summary, the four checks, reviewers, a
-	 * lifecycle, a relative `age`, and — for `review-search` parity — the
+	 * lifecycle, a relative `age`, and: for `review-search` parity: the
 	 * `kind`/`status`/`author` the re-homed filter model queries.
 	 */
 	interface ReviewRow {
 		key: string;
 		title: string;
-		/** Diff summary — files + insertions/deletions, OD `desc` line. */
+		/** Diff summary: files + insertions/deletions, OD `desc` line. */
 		diff: string;
 		checks: readonly ReviewCheck[];
 		reviewers: readonly Reviewer[];
@@ -123,7 +123,7 @@
 	 * `awaiting` PRs + the two `merged` PRs) and extends it across the
 	 * `changes`/`approved` lifecycle tabs so every tab is exercised. This is
 	 * rendered reference data for the production route, not a production-API mock
-	 * — the queue route ships before its `reviews.list` tRPC binding, exactly as
+	 *: the queue route ships before its `reviews.list` tRPC binding, exactly as
 	 * the sibling stage-workbench OD-fidelity routes do.
 	 */
 	const REVIEW_ROWS: readonly ReviewRow[] = [
@@ -272,17 +272,17 @@
 		},
 	] as const;
 
-	/** The re-homed `review-search` kind facet — `all` plus every review kind. */
+	/** The re-homed `review-search` kind facet: `all` plus every review kind. */
 	const KIND_FILTERS = ["all", "diff", "plan", "prototype", "annotation", "feedback"] as const;
 	type KindFilter = (typeof KIND_FILTERS)[number];
 
-	/** Selected lifecycle tab — regroups the queue (interaction assertion). */
+	/** Selected lifecycle tab: regroups the queue (interaction assertion). */
 	let activeTab = $state<ReviewLifecycle>("awaiting");
 	/** Re-homed `review-search` facets: kind select + author text filter. */
 	let kindFilter = $state<KindFilter>("all");
 	let authorFilter = $state("");
 
-	/** Per-lifecycle row count — drives the OD tab count pills + head count. */
+	/** Per-lifecycle row count: drives the OD tab count pills + head count. */
 	const countByLifecycle = $derived(
 		LIFECYCLE_TABS.reduce<Record<ReviewLifecycle, number>>(
 			(acc, tab) => {
@@ -309,7 +309,7 @@
 		}),
 	);
 
-	/** The OD head count line — `3 awaiting review · 12 merged today`. */
+	/** The OD head count line: `3 awaiting review · 12 merged today`. */
 	const headCount = $derived(
 		`${countByLifecycle.awaiting} awaiting review · ${countByLifecycle.merged} merged today`,
 	);
@@ -319,7 +319,7 @@
 		return LIFECYCLE_TABS.find((tab) => tab.id === lifecycle)?.status ?? "waiting-input";
 	}
 
-	/** Two-letter monogram from a reviewer name — OD `.avatar` content. */
+	/** Two-letter monogram from a reviewer name: OD `.avatar` content. */
 	function monogram(name: string): string {
 		return name
 			.split(/\s+/)
@@ -329,7 +329,7 @@
 			.toUpperCase();
 	}
 
-	/** The mode-affordance scope for a review row — a `review-item` Step. */
+	/** The mode-affordance scope for a review row: a `review-item` Step. */
 	function rowScope(row: ReviewRow): ModeStepScope {
 		return { stepId: row.key, kind: "review-item", title: row.title };
 	}
@@ -347,7 +347,7 @@
 	data-review-queue
 	data-state={isEmpty ? "empty" : "populated"}
 >
-	<!-- page-head — OD `review-queue.html` lines 46–49. -->
+	<!-- page-head: OD `review-queue.html` lines 46–49. -->
 	<header class="flex items-baseline gap-3" data-review-queue-head>
 		<h1 class="text-[22px] font-semibold tracking-tight text-foreground">Review queue</h1>
 		<span class="font-mono text-xs text-muted-foreground" data-review-queue-count>
@@ -358,7 +358,7 @@
 	<!--
 		Re-homed `review-search` facets. `design-alignment/review.md` §review-queue:
 		the `review-search` kind/status/author filter logic folds into the queue's
-		tab + filter model — no feature loss. Lifecycle (status) is the tab strip;
+		tab + filter model: no feature loss. Lifecycle (status) is the tab strip;
 		kind + author stay as filter controls here.
 	-->
 	<section
@@ -391,7 +391,7 @@
 	</section>
 
 	<!--
-		Four-tab lifecycle strip — OD `review-queue.html` lines 58–63;
+		Four-tab lifecycle strip: OD `review-queue.html` lines 58–63;
 		`CLI-TUI-UX.md` §478 `:review` tabs. Tab labels use canonical copy; the
 		count pill mirrors the OD `.pill`. Selecting a tab regroups the queue.
 	-->
@@ -448,7 +448,7 @@
 	>
 		{#if isEmpty}
 			<!--
-				Empty state — reconciled to `COPY.md` review-queue (lines 68–69):
+				Empty state: reconciled to `COPY.md` review-queue (lines 68–69):
 				H2 `No reviews waiting.`, body `Items appear here when a task moves to
 				in-review. Push something forward.`, actions `Open board` / `View
 				completed`. The OD inline copy ("Push a branch or open a PR…") is a
@@ -483,7 +483,7 @@
 							row.lifecycle === "merged" && "opacity-65",
 						)}
 					>
-						<!-- PR icon — OD `.ic` git-pull-request glyph. -->
+						<!-- PR icon: OD `.ic` git-pull-request glyph. -->
 						<span
 							data-review-row-icon
 							aria-hidden="true"
@@ -495,7 +495,7 @@
 							⎇
 						</span>
 
-						<!-- Title + diff summary — OD `.title` / `.desc`. -->
+						<!-- Title + diff summary: OD `.title` / `.desc`. -->
 						<div class="min-w-0">
 							<div data-review-row-title class="truncate text-[13px] font-medium text-foreground">
 								{row.title}
@@ -505,7 +505,7 @@
 							</div>
 						</div>
 
-						<!-- Four-dot check-row — OD `.check-row` lint/test/bench/a11y. -->
+						<!-- Four-dot check-row: OD `.check-row` lint/test/bench/a11y. -->
 						<div class="inline-flex gap-1.5" data-review-row-checks aria-label="Pre-merge checks">
 							{#each row.checks as check (check.name)}
 								<span
@@ -524,7 +524,7 @@
 							{/each}
 						</div>
 
-						<!-- Stacked reviewer avatars — OD `.reviewers` / `.avatar`. -->
+						<!-- Stacked reviewer avatars: OD `.reviewers` / `.avatar`. -->
 						<div class="flex" data-review-row-reviewers aria-label="Reviewers">
 							{#each row.reviewers as reviewer, index (reviewer.id)}
 								<Avatar
@@ -543,16 +543,16 @@
 							{/each}
 						</div>
 
-						<!-- Canonical status badge — `COPY.md` §362 8-state vocab. -->
+						<!-- Canonical status badge: `COPY.md` §362 8-state vocab. -->
 						<StatusBadge {status} data-review-row-status />
 
-						<!-- Relative age — OD `.meta`. -->
+						<!-- Relative age: OD `.meta`. -->
 						<span data-review-row-age class="font-mono text-[11px] text-muted-foreground">
 							{row.age}
 						</span>
 
 						<!--
-							Compact per-Step mode row — OD `.mode-row.compact`. The universal
+							Compact per-Step mode row: OD `.mode-row.compact`. The universal
 							ModeAffordance (`prd-web-mode-affordance-system`); `⊞ AI Assist`
 							opens the one shell drawer (`prd-web-global-ai-assist-drawer`).
 						-->

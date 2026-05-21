@@ -1,7 +1,7 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
 
-// `svelte/server` `render()` needs server-compiled `.svelte` modules — Bun's
+// `svelte/server` `render()` needs server-compiled `.svelte` modules: Bun's
 // `.svelte` loader is registered globally via `bunfig.toml` `[test] preload`.
 
 mock.module("$app/state", () => ({

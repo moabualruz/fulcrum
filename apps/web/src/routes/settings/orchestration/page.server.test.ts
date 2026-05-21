@@ -20,7 +20,7 @@ function streamedData<T>(result: unknown): Promise<T> {
  * The orchestration route reaches its database through `requestServiceScope`
  * (`requestAppScope`). When `locals.em` is supplied it is used directly; with
  * an explicit `orgId`, scope resolution short-circuits and never needs a
- * TypeORM `EntityManager` — the route's orchestration queries only require a
+ * TypeORM `EntityManager`: the route's orchestration queries only require a
  * `{ query }` SQL executor, which the isolated store provides.
  *
  * The store is migrated with the raw-SQL `productStoreMigrations` set, which

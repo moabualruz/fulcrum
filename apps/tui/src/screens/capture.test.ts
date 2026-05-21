@@ -87,7 +87,7 @@ describe("capture review actions", () => {
 });
 
 describe(":capture workbench screen", () => {
-  test("exposes the four Capture views — inbox, seedlings, drafts, promoted", () => {
+  test("exposes the four Capture views: inbox, seedlings, drafts, promoted", () => {
     expect(CAPTURE_WORKBENCH_VIEWS).toEqual(["inbox", "seedlings", "drafts", "promoted"]);
   });
 

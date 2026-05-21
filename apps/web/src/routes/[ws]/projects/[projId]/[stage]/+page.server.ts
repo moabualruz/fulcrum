@@ -17,9 +17,9 @@ import {
 import { buildTimelineFixtureData } from "$lib/components/app/build-timeline-fixture.ts";
 
 /**
- * `/<ws>/projects/<projId>/<stage>` — the canonical WorkflowStage workbench
+ * `/<ws>/projects/<projId>/<stage>`: the canonical WorkflowStage workbench
  * route (IA-MAP §1). `<stage>` must be one of the six canonical WorkflowStages;
- * any other value is genuinely not a route and 404s — that is correct, an
+ * any other value is genuinely not a route and 404s: that is correct, an
  * unknown stage segment has no canonical home.
  *
  * The route resolves the active stage and its default sub-view; the rendered
@@ -30,12 +30,12 @@ import { buildTimelineFixtureData } from "$lib/components/app/build-timeline-fix
  * The Capture stage (`prd-web-capture-stage-shell`) additionally resolves its
  * `?view=` sub-view (docs / drafts / promoted / inbox) and loads the real
  * project documents through the same document API the legacy `/docs` route
- * uses — preserving every tRPC call (value-preservation item 1). When the API
+ * uses: preserving every tRPC call (value-preservation item 1). When the API
  * is unavailable (design-e2e harness skips the API server) the loader returns
  * an empty Capture surface, which is the honest `empty` data state.
  */
 
-/** A document row as returned by the document API — the shape we project from. */
+/** A document row as returned by the document API: the shape we project from. */
 interface CaptureDocRow {
 	id: string;
 	title?: string;
@@ -62,7 +62,7 @@ function toCaptureStep(doc: CaptureDocRow): CaptureStep {
 }
 
 /**
- * Resolve the maturity of a document from its frontmatter — the projection
+ * Resolve the maturity of a document from its frontmatter: the projection
  * key the Capture sub-views filter on. `draft` / `seedling` documents are
  * unsent drafts; a `promotedTo` reference marks a promoted capture.
  */
@@ -77,7 +77,7 @@ function docMaturity(doc: CaptureDocRow): "draft" | "promoted" | "doc" {
 /**
  * Load the Capture Step rows for the active sub-view. Filters the real
  * project document set onto the sub-view's projection. Returns `[]` on any
- * API failure — the workbench renders the locked empty state, never an error
+ * API failure: the workbench renders the locked empty state, never an error
  * page (migration-strategy.md "no 404"; the Capture stage always resolves).
  */
 async function loadCaptureSteps(
@@ -142,7 +142,7 @@ export const load: PageServerLoad = async (event) => {
 		return { ...base, captureView: null, captureSteps: [], traceId };
 	}
 
-	// Capture stage — resolve the `?view=` sub-view and load real captures.
+	// Capture stage: resolve the `?view=` sub-view and load real captures.
 	const captureView = resolveCaptureView(event.url.searchParams.get("view"));
 	const captureSteps = await loadCaptureSteps(event, captureView);
 

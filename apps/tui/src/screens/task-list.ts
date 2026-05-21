@@ -197,7 +197,7 @@ export class TaskListScreen {
         renderer.writeln(`  - ${run.queuePosition}. ${run.id} task:${run.taskId ?? "none"} status:${run.status}`);
       }
       for (const event of this.runFeedback.events.slice(-5)) {
-        renderer.writeln(`  * ${event.summary}${event.output ? ` — ${event.output}` : ""}`);
+        renderer.writeln(`  * ${event.summary}${event.output ? `: ${event.output}` : ""}`);
       }
     }
 

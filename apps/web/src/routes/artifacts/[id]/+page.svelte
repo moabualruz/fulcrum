@@ -41,7 +41,7 @@
   </header>
 
   <dl data-artifact-detail-metadata class={cn("mb-4 grid gap-2 text-sm md:grid-cols-2")}>
-    <div><dt class={cn("text-muted-foreground")}>Digest</dt><dd>{artifact.sha256 ?? "—"}</dd></div>
+    <div><dt class={cn("text-muted-foreground")}>Digest</dt><dd>{artifact.sha256 ?? "-"}</dd></div>
     <div><dt class={cn("text-muted-foreground")}>MIME</dt><dd>{artifact.mime ?? "application/octet-stream"}</dd></div>
     <div data-artifact-retention><dt class={cn("text-muted-foreground")}>Retention</dt><dd>{retentionStatus(artifact)}</dd></div>
     <div><dt class={cn("text-muted-foreground")}>Preview</dt><dd>{previewKind(artifact)}</dd></div>
@@ -51,7 +51,7 @@
         {#if artifact.run_id}
           <a data-artifact-run-link href="/runs/{artifact.run_id}" class={cn("text-primary underline-offset-4 hover:underline")}>{artifact.run_id}</a>
         {:else}
-          —
+          -
         {/if}
       </dd>
     </div>

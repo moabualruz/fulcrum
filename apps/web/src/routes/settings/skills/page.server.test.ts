@@ -138,7 +138,7 @@ describe("/settings/skills +page.server.ts load()", () => {
 
     const bat = payload.skills.find((skill) => skill.slug === "bat");
     const jq = payload.skills.find((skill) => skill.slug === "jq");
-    // Only `jq` has a conflict row — `bat` stays conflict-free.
+    // Only `jq` has a conflict row: `bat` stays conflict-free.
     expect(bat?.upstream_conflict).toBeNull();
     expect(jq?.upstream_conflict).toMatchObject({
       local_content: "sha-jq",

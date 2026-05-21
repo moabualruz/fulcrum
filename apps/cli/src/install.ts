@@ -1,10 +1,10 @@
-// fulcrum install — splice rules/AGENTS.md into each agent's primary rules
+// fulcrum install: splice rules/AGENTS.md into each agent's primary rules
 // file via <!-- BEGIN/END FULCRUM RULES --> sentinel markers, vendor recipe
 // pool, seed tool-output-policy.toml, and install caveman per detected agent.
 //
 // Idempotent. Non-destructive: user content outside the markers is preserved.
 //
-// HARD RULE: never write to ~/.agents/ — shared path pollutes every agent's
+// HARD RULE: never write to ~/.agents/: shared path pollutes every agent's
 // context. Each agent has its own skills folder; install ONLY there.
 //
 // Flags:
@@ -42,19 +42,19 @@ let DRY_RUN = false;
 /** Toggle dry-run mode (used by tests). */
 export function setDryRun(v: boolean): void { DRY_RUN = v; }
 
-/** writeFile wrapper — skips in dry-run. */
+/** writeFile wrapper: skips in dry-run. */
 async function wf(path: string, data: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would write: ${path}`); return; }
   await writeFile(path, data);
 }
 
-/** mkdir({ recursive: true }) wrapper — skips in dry-run. */
+/** mkdir({ recursive: true }) wrapper: skips in dry-run. */
 async function mk(path: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would mkdir: ${path}`); return; }
   await mkdir(path, { recursive: true });
 }
 
-/** copyFile wrapper — skips in dry-run. */
+/** copyFile wrapper: skips in dry-run. */
 async function cp(src: string, dst: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would copy: ${src} → ${dst}`); return; }
   await copyFile(src, dst);
@@ -249,7 +249,7 @@ async function installCavemanFromRepo(
 ): Promise<boolean> {
   const gitPath = await which("git");
   if (!gitPath) {
-    console.log(`     · ${label}: git not on PATH — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
+    console.log(`     · ${label}: git not on PATH: manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
     return false;
   }
 
@@ -260,7 +260,7 @@ async function installCavemanFromRepo(
     if (!DRY_RUN) await mk(dirname(tmp));
     const clone = await runProcDry(["git", "clone", "--depth", "1", CAVEMAN_REPO, tmp]);
     if (clone.exit !== 0) {
-      console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()} — manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
+      console.log(`     ✗ ${label} caveman git clone failed: ${clone.stderr.trim()}: manual: clone ${CAVEMAN_REPO} and copy skills/* to ${skillsRoot}`);
       return false;
     }
   }
@@ -296,13 +296,13 @@ async function installCavemanFromRepo(
   return true;
 }
 
-/** appendFile wrapper — skips in dry-run. */
+/** appendFile wrapper: skips in dry-run. */
 async function ap(path: string, data: string): Promise<void> {
   if (DRY_RUN) { console.log(`     [dry-run] would append: ${path}`); return; }
   await appendFile(path, data);
 }
 
-/** runProc wrapper — skips in dry-run. */
+/** runProc wrapper: skips in dry-run. */
 async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string; stderr: string }> {
   if (DRY_RUN) {
     console.log(`     [dry-run] would run: ${cmd.join(" ")}`);
@@ -364,7 +364,7 @@ export async function spliceSentinel(target: string, body: string, label: string
 
 function rulesTargets(home: string): Array<{ path: string; label: string; alwaysCreate?: boolean }> {
   // Gemini's rulesFile (~/AGENTS.md) must always be created even if ~/.gemini
-  // doesn't exist yet — that's the @AGENTS.md import source for GEMINI.md.
+  // doesn't exist yet: that's the @AGENTS.md import source for GEMINI.md.
   return [
     ...AGENTS
       .filter((a) => a.id !== "gemini")
@@ -456,7 +456,7 @@ export async function stripVendorRuleBlocks(filePath: string, dryRun: boolean): 
   try {
     content = await readFile(filePath, "utf8");
   } catch {
-    return; // file doesn't exist — nothing to do
+    return; // file doesn't exist: nothing to do
   }
 
   // Split content into "inside sentinel" and "outside sentinel" regions.
@@ -579,7 +579,7 @@ export async function installRulesBlocks(home: string, dryRun = false): Promise<
  * Install caveman into all detected agents.
  * Fail-soft per agent: log and continue on any error.
  *
- * HARD RULE: never write to ~/.agents/ — enforced via assertNotAgentsPath.
+ * HARD RULE: never write to ~/.agents/: enforced via assertNotAgentsPath.
  */
 export async function installCaveman(home: string, opts: { dryRun?: boolean } = {}): Promise<void> {
   const previousDryRun = DRY_RUN;
@@ -593,20 +593,20 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       if ((await isClaudePluginInstalled(home, "caveman@caveman")) && (await isDir(compressDir))) {
         console.log("     · skip Claude Code caveman (already installed)");
       } else if (!(await which("claude"))) {
-        console.log("     · skip Claude Code (claude not on PATH)  — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
+        console.log("     · skip Claude Code (claude not on PATH) : manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
       } else if (!(await shouldInstallClaudePlugin("caveman@caveman"))) {
         console.log("     · skip Claude Code caveman: pass --allow-claude-cli to opt in, or run manually: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman");
       } else {
         const r1 = await runProcDry(["claude", "plugin", "marketplace", "add", "JuliusBrussee/caveman"]);
         if (r1.exit !== 0) {
-          console.log(`     ✗ Claude Code caveman marketplace add failed: ${r1.stderr.trim()} — manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`);
+          console.log(`     ✗ Claude Code caveman marketplace add failed: ${r1.stderr.trim()}: manual: claude plugin marketplace add JuliusBrussee/caveman && claude plugin install caveman@caveman`);
         } else {
           if (!DRY_RUN) {
             await writeMarker({ plugin: "caveman@caveman", marketplace: "JuliusBrussee/caveman", source: "package.caveman", operation: "install" });
           }
           const r2 = await runProcDry(["claude", "plugin", "install", "caveman@caveman"]);
           if (r2.exit !== 0) {
-            console.log(`     ✗ Claude Code caveman install failed: ${r2.stderr.trim()} — manual: claude plugin install caveman@caveman`);
+            console.log(`     ✗ Claude Code caveman install failed: ${r2.stderr.trim()}: manual: claude plugin install caveman@caveman`);
           } else {
             console.log("     ✓ Claude Code caveman installed");
           }
@@ -623,11 +623,11 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       if (await isDir(geminiCavemanDir)) {
         console.log("     · skip Gemini CLI caveman (already installed)");
       } else if (!(await which("gemini"))) {
-        console.log("     · skip Gemini CLI (gemini not on PATH)  — manual: gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings");
+        console.log("     · skip Gemini CLI (gemini not on PATH) : manual: gemini extensions install https://github.com/JuliusBrussee/caveman --consent --skip-settings");
       } else {
         const r = await runProcDry(["gemini", "extensions", "install", CAVEMAN_REPO, "--consent", "--skip-settings"]);
         if (r.exit !== 0) {
-          console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()} — manual: gemini extensions install ${CAVEMAN_REPO} --consent --skip-settings`);
+          console.log(`     ✗ Gemini CLI caveman install failed: ${r.stderr.trim()}: manual: gemini extensions install ${CAVEMAN_REPO} --consent --skip-settings`);
         } else {
           console.log("     ✓ Gemini CLI caveman installed");
         }
@@ -636,7 +636,7 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       console.log("     · skip Gemini CLI (not detected)");
     }
 
-    // --- W1.3: Codex, OpenCode, Pi — direct vendor repo copy.
+    // --- W1.3: Codex, OpenCode, Pi: direct vendor repo copy.
     // Fulcrum copies Caveman surfaces into native per-agent roots. Codex gets
     // plugin metadata/assets/hooks as well as skills because Caveman ships more
     // than a bare SKILL.md.
@@ -669,7 +669,7 @@ export async function installCaveman(home: string, opts: { dryRun?: boolean } = 
       if (await installCavemanFromRepo(home, ag.skillsRoot, ag.label, ag.id, !!ag.includeCodexPlugin)) {
         console.log(`     ✓ ${ag.label} caveman installed from official repo`);
       } else {
-        console.log(`     ✗ ${ag.label} caveman install failed — expected ${cavemanSkillDir}`);
+        console.log(`     ✗ ${ag.label} caveman install failed: expected ${cavemanSkillDir}`);
       }
     }
 
@@ -724,7 +724,7 @@ export async function lockCavemanUltra(home: string): Promise<void> {
         return;
       }
     } catch {
-      // malformed JSON — overwrite below
+      // malformed JSON: overwrite below
     }
   }
   await mk(cfgDir);
@@ -758,7 +758,7 @@ export async function installMcpRegistryEntries(home: string): Promise<void> {
 
   // Dart hint: doctor also reports this, but surface it at install time too.
   if (!(await which("dart"))) {
-    console.log("     · dart not on PATH — dart MCP requires Dart SDK ≥ 3.9.0-163.0.dev; see: https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server");
+    console.log("     · dart not on PATH: dart MCP requires Dart SDK ≥ 3.9.0-163.0.dev; see: https://github.com/dart-lang/ai/tree/main/pkgs/dart_mcp_server");
   }
 
   // Package mirrors are owned by package.* components. The MCP registry only
@@ -858,11 +858,11 @@ export async function run(args: string[]): Promise<void> {
   }
 
   if (DRY_RUN) {
-    console.log("(dry-run mode — no files will be written)\n");
+    console.log("(dry-run mode: no files will be written)\n");
   }
 
   const root = repoRoot();
-  console.log(`Fulcrum install — source: ${root}\n`);
+  console.log(`Fulcrum install: source: ${root}\n`);
 
   if (installProfile === "full") {
     console.log("1/4  Vendoring hook registration snippets → ~/.fulcrum/hooks/snippets/");

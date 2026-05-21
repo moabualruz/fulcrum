@@ -4,7 +4,7 @@
   import { cn } from "$lib/utils.js";
 
   /**
-   * Build · dependency graph — the OD `build-graph.html` `◇ Graph` layout.
+   * Build · dependency graph: the OD `build-graph.html` `◇ Graph` layout.
    *
    * A Sugiyama layered dependency graph (DESIGN.md §9 orchestrator DAG,
    * research-07 §3.2): nodes laid out in left-to-right layers, status-colored
@@ -13,7 +13,7 @@
    * bottom-right info card (run / agent / run-id, the path-highlight
    * explanation, Open run / Open task actions, and a per-step ModeRow per
    * DESIGN.md §4.11). The route absorbs the former `agent-dependency-board`
-   * "Multi-agent dependency board" so there is one Build graph, not two —
+   * "Multi-agent dependency board" so there is one Build graph, not two -
    * see `_migrated-content/MIGRATION.md`.
    */
 
@@ -44,9 +44,9 @@
     { id: "AUTH-45", title: "DELETE /sessions/:kid endpoint", state: "done", meta: "gpt-5.4 · merged 12m", agent: "gpt-5.4", layer: 1, row: 1 },
     { id: "AUTH-42", title: "Add kid + rotate flag to signToken", state: "done", meta: "opus-4.7 · 25m", agent: "opus-4.7", layer: 2, row: 0 },
     { id: "AUTH-43", title: "Persist issuance row per kid", state: "run", meta: "opus-4.7 · 3m elapsed", agent: "opus-4.7", runId: "run_8f29a4c", layer: 2, row: 1 },
-    { id: "AUTH-44", title: "verifyToken · dual-verify legacy", state: "wait", meta: "blocked on AUTH-43", agent: "—", layer: 3, row: 0 },
+    { id: "AUTH-44", title: "verifyToken · dual-verify legacy", state: "wait", meta: "blocked on AUTH-43", agent: "-", layer: 3, row: 0 },
     { id: "AUTH-47", title: "Rate-limiter · bucket per kid", state: "run", meta: "opus-4.7 · 1m", agent: "opus-4.7", runId: "run_2c71fd0", layer: 3, row: 1 },
-    { id: "AUTH-49", title: "Settings UI · active sessions list", state: "blk", meta: "design lock", agent: "—", layer: 3, row: 2 },
+    { id: "AUTH-49", title: "Settings UI · active sessions list", state: "blk", meta: "design lock", agent: "-", layer: 3, row: 2 },
     { id: "AUTH-48", title: "Telemetry · issuance/revocation", state: "todo", meta: "gemini-3-pro", agent: "gemini-3-pro", layer: 4, row: 0 },
     { id: "AUTH-46", title: "Migration · sessions table + kid", state: "todo", meta: "sonnet-4.6 · 15m", agent: "sonnet-4.6", layer: 4, row: 1 },
   ];
@@ -61,7 +61,7 @@
     { from: "AUTH-47", to: "AUTH-46" },
   ];
 
-  /** OD `build-graph.html` layout switcher entries — DESIGN.md §4.4 / IA-MAP §2.3. */
+  /** OD `build-graph.html` layout switcher entries: DESIGN.md §4.4 / IA-MAP §2.3. */
   const LAYOUTS = [
     { glyph: "▦", label: "Board", href: "/build-board" },
     { glyph: "☰", label: "List", href: "/build-list" },
@@ -70,7 +70,7 @@
     { glyph: "◇", label: "Graph", href: "/build-graph" },
   ] as const;
 
-  /** Status legend — OD `.legend` swatches, one per graph state. */
+  /** Status legend: OD `.legend` swatches, one per graph state. */
   const LEGEND: { state: GraphState; label: string }[] = [
     { state: "todo", label: "queued" },
     { state: "run", label: "running" },
@@ -88,7 +88,7 @@
     todo: "queued",
   };
 
-  /** Sugiyama grid geometry — layer pitch, row pitch, node box size. */
+  /** Sugiyama grid geometry: layer pitch, row pitch, node box size. */
   const LAYER_X = [0, 30, 320, 660, 1000];
   const ROW_Y = 70;
   const ROW_PITCH = 160;
@@ -102,7 +102,7 @@
     return ROW_Y + n.row * ROW_PITCH;
   }
 
-  /** Bezier path between two node anchor points — OD `.canvas svg` edges. */
+  /** Bezier path between two node anchor points: OD `.canvas svg` edges. */
   function edgePath(edge: GraphEdge): string {
     const from = NODES.find((n) => n.id === edge.from);
     const to = NODES.find((n) => n.id === edge.to);
@@ -117,16 +117,16 @@
 
   /** OKLCH agent monogram background per DESIGN.md §4.16 (flat, no gradient). */
   function agentMonogram(agent: string): string {
-    return agent === "—" ? "—" : agent.slice(0, 2).toUpperCase();
+    return agent === "-" ? "-" : agent.slice(0, 2).toUpperCase();
   }
 
-  /** OD `run` node — the pre-selected, highlighted node is AUTH-43. */
+  /** OD `run` node: the pre-selected, highlighted node is AUTH-43. */
   let selectedId = $state<string>("AUTH-43");
   let mode = $state<WorkflowMode>("manual");
 
   const selected = $derived(NODES.find((n) => n.id === selectedId) ?? null);
 
-  /** Forward closure from the selected node — the highlighted dependency path. */
+  /** Forward closure from the selected node: the highlighted dependency path. */
   const highlightPath = $derived.by(() => {
     const path = new Set<string>();
     if (!selectedId) return path;
@@ -329,7 +329,7 @@
                 data-node-agent={node.agent}
                 class={cn(
                   "ml-auto inline-flex size-5 items-center justify-center rounded text-[10px] font-semibold text-foreground",
-                  node.agent === "—" ? "bg-muted text-muted-foreground" : "bg-accent/15",
+                  node.agent === "-" ? "bg-muted text-muted-foreground" : "bg-accent/15",
                 )}
               >
                 {agentMonogram(node.agent)}
@@ -372,7 +372,7 @@
                 Selected. Highlighted path shows {selected.id} → {nextNodeName()} and forward; other
                 nodes are dimmed on the canvas.
               {:else}
-                Selected. {selected.id} is a leaf node — nothing downstream depends on it.
+                Selected. {selected.id} is a leaf node: nothing downstream depends on it.
               {/if}
             </p>
             <div class={cn("flex flex-wrap items-center gap-2")}>
@@ -409,7 +409,7 @@
     }
   }
 
-  /* DESIGN.md §3 / app.css reduced-motion contract — the running-node pulse
+  /* DESIGN.md §3 / app.css reduced-motion contract: the running-node pulse
      and every node transition collapse to a static frame when the operator
      prefers reduced motion. The dotted canvas and status colors remain. */
   @media (prefers-reduced-motion: reduce) {

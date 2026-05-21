@@ -13,7 +13,7 @@
 	let { form, parentProjects = [] }: Props = $props();
 
 	// Local reactive copies seeded from the server-validated form. Plain Svelte
-	// runes are sufficient here — the heavy `superForm` client wiring is not
+	// runes are sufficient here: the heavy `superForm` client wiring is not
 	// needed for this single-action POST flow, and avoiding it keeps SSR clean
 	// (no `$app/stores`, `$app/navigation`, `$app/environment` imports leaking
 	// into server-render harnesses). `untrack` so the initial seed does not

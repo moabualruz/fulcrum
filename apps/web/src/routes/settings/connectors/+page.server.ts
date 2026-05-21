@@ -1,5 +1,5 @@
 /**
- * /settings/connectors — gated connector management (Confluence, Notion, GitHub Issues).
+ * /settings/connectors: gated connector management (Confluence, Notion, GitHub Issues).
  *
  * Gated by FULCRUM_FEATURES (C1, default OFF).
  * Each connector is independently gated:

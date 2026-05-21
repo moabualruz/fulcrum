@@ -41,10 +41,10 @@ function makeResult(overrides: Partial<DoctorCheckResult> = {}): DoctorCheckResu
 }
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — empty state
+// DoctorScreen: empty state
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — empty state", () => {
+describe("DoctorScreen: empty state", () => {
   it("renders loading placeholder when no results", () => {
     const screen = new DoctorScreen();
     const text = renderPlain(screen);
@@ -59,10 +59,10 @@ describe("DoctorScreen — empty state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — with results
+// DoctorScreen: with results
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — with results", () => {
+describe("DoctorScreen: with results", () => {
   const results: DoctorCheckResult[] = [
     makeResult({ name: "tui.binary-tui-entrypoint", status: "ok",   message: "entrypoint ok",   durationMs: 2 }),
     makeResult({ name: "tui.opentui-version",       status: "warn", message: "no opentui pkg",   durationMs: 1, recovery: "install opentui" }),
@@ -117,17 +117,17 @@ describe("DoctorScreen — with results", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — keyboard navigation
+// DoctorScreen: keyboard navigation
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — keyboard navigation", () => {
+describe("DoctorScreen: keyboard navigation", () => {
   it("j moves cursor down", async () => {
     const screen = new DoctorScreen({ results: [
       makeResult({ name: "tui.a" }),
       makeResult({ name: "tui.b" }),
     ]});
     await screen.handleKey("j");
-    // After j cursor is on second item — render should inverse tui.b row
+    // After j cursor is on second item: render should inverse tui.b row
     const tty = makeTTY();
     screen.render(new Renderer(tty));
     // Just check it doesn't throw and contains both names
@@ -180,7 +180,7 @@ describe("DoctorScreen — keyboard navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TuiDoctorCheckSchema — Zod validation
+// TuiDoctorCheckSchema: Zod validation
 // ---------------------------------------------------------------------------
 
 describe("TuiDoctorCheckSchema", () => {
@@ -201,7 +201,7 @@ describe("TuiDoctorCheckSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — evaluateOpenTuiGate
+// OpenTUI gate: evaluateOpenTuiGate
 // ---------------------------------------------------------------------------
 
 describe("evaluateOpenTuiGate", () => {
@@ -244,7 +244,7 @@ describe("evaluateOpenTuiGate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — runOpenTuiSnapshotGate
+// OpenTUI gate: runOpenTuiSnapshotGate
 // ---------------------------------------------------------------------------
 
 describe("runOpenTuiSnapshotGate", () => {
@@ -304,7 +304,7 @@ describe("runOpenTuiSnapshotGate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// prd-tui-stage-workbenches-set — Operate stage workbench OD parity.
+// prd-tui-stage-workbenches-set: Operate stage workbench OD parity.
 //
 // The Operate (`:doctor`) workbench renders the OD `tui-runs.html` stage
 // chrome: the `fulcrum · :doctor · subsystems` header carrying the exact
@@ -312,7 +312,7 @@ describe("runOpenTuiSnapshotGate", () => {
 // Snapshots are locked at 80x24 and 120x32.
 // ---------------------------------------------------------------------------
 
-describe("Operate stage workbench (:doctor) — OD parity", () => {
+describe("Operate stage workbench (:doctor): OD parity", () => {
   function renderAt(cols: number, rows: number, screen: DoctorScreen): string {
     const tty = new FakeTTY({ columns: cols, rows });
     screen.render(new Renderer(tty));

@@ -1,5 +1,5 @@
 /**
- * fulcrum db — database management CLI commands.
+ * fulcrum db: database management CLI commands.
  *
  * Commands:
  *   fulcrum db migrate [--target-version <N>] [--force]

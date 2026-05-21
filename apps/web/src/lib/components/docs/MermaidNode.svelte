@@ -52,7 +52,7 @@
       <pre class="mt-2 text-xs opacity-60"><code>{node.textContent}</code></pre>
     </div>
   {:else if svgHtml}
-    <!-- eslint-disable-next-line svelte/no-at-html-tags — mermaid output, not user-supplied -->
+    <!-- eslint-disable-next-line svelte/no-at-html-tags: mermaid output, not user-supplied -->
     <div class="mermaid-svg overflow-x-auto">{@html svgHtml}</div>
   {:else}
     <div class="mermaid-loading rounded-md bg-muted p-3 text-sm text-muted-foreground">Rendering diagram…</div>

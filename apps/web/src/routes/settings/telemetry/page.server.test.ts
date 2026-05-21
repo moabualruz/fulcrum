@@ -49,7 +49,7 @@ describe("/settings/telemetry route", () => {
     const mod = await import(`./+page.server.ts?telemetry-toggle=${Date.now()}`);
 
     // The action now also persists local consent and returns that snapshot
-    // alongside the toggled state — assert the toggled state via `toMatchObject`
+    // alongside the toggled state: assert the toggled state via `toMatchObject`
     // and verify the persisted consent mirrors the new opt-in value.
     const result = await mod.actions.toggleOptIn(telemetryEvent(fetch) as never);
     expect(result).toMatchObject({ success: true, optIn: false });

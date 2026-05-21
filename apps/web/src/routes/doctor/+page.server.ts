@@ -1,5 +1,5 @@
 /**
- * Operate · Doctor — per-subsystem health workbench (no-auth, boot diagnostics).
+ * Operate · Doctor: per-subsystem health workbench (no-auth, boot diagnostics).
  *
  * The Operate-stage Doctor surface. Runs a synthetic health check for each
  * Pillar P1–P17 subsystem, then shapes the result into the OD `operate.html`
@@ -33,7 +33,7 @@ export type SubsystemStatus = "ok" | "warn" | "fail";
 
 /**
  * The contextual recovery primary a failing/failed row carries. Mirrors the OD
- * `operate.html` row primaries — `Recover` (degraded subsystem), `Catch up now`
+ * `operate.html` row primaries: `Recover` (degraded subsystem), `Catch up now`
  * (a missed run window to backfill), `Open PR` (a blocking rollout PR). Routed
  * through the `operate.probe` / `operate.diagnose` action kinds (IA-MAP §9).
  */
@@ -41,21 +41,21 @@ export type RecoveryActionKind = "recover" | "catch-up" | "open-pr";
 
 /** One line of a probe-trace transcript shown in the inline expansion panel. */
 export interface ProbeTraceLine {
-  /** Line tone — drives the OKLCH-tokened glyph colour. */
+  /** Line tone: drives the OKLCH-tokened glyph colour. */
   tone: "command" | "retry" | "ok" | "trace";
   /** The rendered line text (already includes any leading glyph context). */
   text: string;
 }
 
 /**
- * The inline probe-trace transcript for a failing/failed subsystem — the
+ * The inline probe-trace transcript for a failing/failed subsystem: the
  * OD `tr.expanded + tr` mono panel (`$ doctor probe …` → reconnect lines →
  * `trace tr_… · 11:54:09 · 412 ms`).
  */
 export interface ProbeTrace {
   /** Transcript lines, rendered in order in the mono panel. */
   lines: ProbeTraceLine[];
-  /** The trace id the probe emitted — links the row to the trace spine. */
+  /** The trace id the probe emitted: links the row to the trace spine. */
   traceId: string;
 }
 
@@ -70,12 +70,12 @@ export interface SubsystemCheckResult {
   recovery: string;
   /** ISO 8601 timestamp when the check ran. */
   checked_at: string;
-  // — OD `operate.html` workbench fields (additive) —
+  //: OD `operate.html` workbench fields (additive) -
   /** Latency p99 in ms; `null` when the subsystem failed to respond. */
   latencyP99Ms: number | null;
   /**
    * Multi-sentence recovery prose (OD `td.reco`). For a passing subsystem this
-   * is the empty string and the row renders `—`.
+   * is the empty string and the row renders `-`.
    */
   recoveryCopy: string;
   /** The command the row's copy-command button copies, e.g. `fulcrum mcp test github`. */
@@ -92,7 +92,7 @@ export interface DoctorSummary {
   subsystems: number;
   /** Passing count (`status: ok`). */
   passing: number;
-  /** Failing count (`status: warn` — non-blocking degradation). */
+  /** Failing count (`status: warn`: non-blocking degradation). */
   failing: number;
   /** Failed count (`status: fail`). */
   failed: number;
@@ -102,7 +102,7 @@ export interface DoctorSummary {
 
 /** One telemetry tile below the subsystem table (OD `.tile`). */
 export interface DoctorTelemetryTile {
-  /** Tile id — stable design-e2e hook. */
+  /** Tile id: stable design-e2e hook. */
   id: "run-success-rate" | "active-runs";
   /** Tile title incl. its window, e.g. `Run success rate · last 1h`. */
   title: string;
@@ -110,7 +110,7 @@ export interface DoctorTelemetryTile {
   value: string;
   /** Delta string, e.g. `+0.4%`. */
   delta: string;
-  /** Delta trend — `up` is good for success rate, neutral-bad for active runs. */
+  /** Delta trend: `up` is good for success rate, neutral-bad for active runs. */
   trend: "up" | "down" | "flat";
   /** Sparkline polyline points (viewBox `0 0 200 56`). */
   sparkline: string;
@@ -135,7 +135,7 @@ function now(): string {
   return new Date().toISOString();
 }
 
-/** Stable synthetic latency p99 per subsystem (ms) — keyed by subsystem id. */
+/** Stable synthetic latency p99 per subsystem (ms): keyed by subsystem id. */
 const LATENCY_P99: Record<string, number> = {
   foundation: 6,
   inference: 240,
@@ -377,7 +377,7 @@ const CHECKS: CheckFn[] = [
 ];
 
 // ----------------------------------------------------------------------------
-// runAll — exported for CLI / test reuse
+// runAll: exported for CLI / test reuse
 // ----------------------------------------------------------------------------
 
 export async function _runAll(): Promise<SubsystemCheckResult[]> {
@@ -449,11 +449,11 @@ export function _doctorTelemetryTiles(): DoctorTelemetryTile[] {
 }
 
 // ----------------------------------------------------------------------------
-// OD reference fixture — the `operate.html` degraded scene
+// OD reference fixture: the `operate.html` degraded scene
 // ----------------------------------------------------------------------------
 
 /**
- * The `operate.html` degraded reference scene — a deterministic mix of
+ * The `operate.html` degraded reference scene: a deterministic mix of
  * passing / failing / failed subsystems with full multi-sentence recovery copy
  * and inline probe-traces. Surfaced ONLY when the route is loaded with
  * `?fixture=degraded`, so the design gate can prove the failing-row affordances
@@ -544,7 +544,7 @@ export function _degradedFixtureChecks(): SubsystemCheckResult[] {
 // SvelteKit load
 // ----------------------------------------------------------------------------
 
-/** Resolve the check set for a load — real checks, or the OD degraded fixture. */
+/** Resolve the check set for a load: real checks, or the OD degraded fixture. */
 async function resolveChecks(fixture: string | null): Promise<SubsystemCheckResult[]> {
   if (fixture === "degraded") return _degradedFixtureChecks();
   return _runAll();

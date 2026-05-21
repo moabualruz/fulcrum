@@ -1,33 +1,33 @@
 <script lang="ts">
 	/**
-	 * `/<ws>/projects/<projId>/plan/<planId>/review` — the Plan-stage review
+	 * `/<ws>/projects/<projId>/plan/<planId>/review`: the Plan-stage review
 	 * surface (`prd-web-plan-review-od-fidelity`; OD `plan-review.html`;
 	 * IA-MAP.md §2.2 "Plan + prototype + tasks tripane"; IA-MAP.md §4.4
 	 * Plannotator review; DESIGN.md §4.5 tool-call cards / §4.6 inline diff).
 	 *
 	 * The OD prototype renders the Plan review as a single-approve-gate tripane:
 	 *
-	 *   ┌ review-head — crumbs · plan title · waiting-input badge · mode-row ┐
-	 *   ├ tab bar — Plan & prototype · Comments · Free chat · History         ┤
-	 *   │ panes  — plan markdown (1.1fr) │ prototype callout (1fr) │ tasks    │
-	 *   └ gate   — Request changes · Save without promoting · Approve ⌘↵      ┘
+	 *   ┌ review-head: crumbs · plan title · waiting-input badge · mode-row ┐
+	 *   ├ tab bar: Plan & prototype · Comments · Free chat · History         ┤
+	 *   │ panes : plan markdown (1.1fr) │ prototype callout (1fr) │ tasks    │
+	 *   └ gate  : Request changes · Save without promoting · Approve ⌘↵      ┘
 	 *
 	 * IA-MAP.md §2.2: the review gate "approves all three [plan + prototype +
 	 * tasks] as one unit"; the Plannotator `Mod+Enter` overload (COPY.md §539 /
 	 * research-07 §4.1) approves when there are zero annotations and sends
-	 * feedback when annotations exist — that exact overload is wired to the
+	 * feedback when annotations exist: that exact overload is wired to the
 	 * `Approve & promote to Build  ⌘↵` button and the global `Mod+Enter` handler.
 	 *
 	 * The route name was previously occupied by a mislabelled six-stage
 	 * workflow-status tracker plus automation-rule builder, Jira import, and
-	 * custom-field config — a Build/Operate-settings surface. That content was
+	 * custom-field config: a Build/Operate-settings surface. That content was
 	 * already re-homed to `/settings` by `prd-cross-mislabeled-route-content-
 	 * migration` (its full markup is preserved under `_migrated-content/`); this
 	 * file replaces the interim 308-redirect with the genuine OD tripane.
 	 *
-	 * Composes `@fulcrum/ui-kit` primitives only — `Breadcrumb`, `StatusBadge`,
+	 * Composes `@fulcrum/ui-kit` primitives only: `Breadcrumb`, `StatusBadge`,
 	 * `ModeRow`, `Tabs`, `Button`, `Card`, `Chip`, `Badge`, `TraceChip`,
-	 * `Textarea`, `Kbd` — never re-implements a primitive (AGENTS.md ui-kit
+	 * `Textarea`, `Kbd`: never re-implements a primitive (AGENTS.md ui-kit
 	 * rule). The OD shell chrome (StageRail / ScopeBar / StatusFooter / AcpDrawer)
 	 * is provided by the root `+layout.svelte`; this route renders the review
 	 * tripane only.
@@ -51,21 +51,21 @@
 
 	/** A plan-markdown section that can carry an inline comment anchor. */
 	type PlanSection = {
-		/** Stable anchor id — the `data-commentable` token comment threads bind to. */
+		/** Stable anchor id: the `data-commentable` token comment threads bind to. */
 		anchor: string;
 		/** Heading / callout title. */
 		heading: string;
 		/** `h2` body section, the risk `callout`, or the `h3` references block. */
 		kind: "section" | "callout" | "references";
-		/** Rendered body — paragraphs, ordered/unordered list items. */
+		/** Rendered body: paragraphs, ordered/unordered list items. */
 		body: { type: "p" | "ol" | "ul"; items: string[] };
 		/** Open thread count, surfaced as a `data-comments` chip in the markdown. */
 		comments: number;
 	};
 
-	/** A task card in the breakdown pane — one unit of the approved plan. */
+	/** A task card in the breakdown pane: one unit of the approved plan. */
 	type PlanTask = {
-		/** Stable anchor id — the per-task `data-commentable` token. */
+		/** Stable anchor id: the per-task `data-commentable` token. */
 		anchor: string;
 		title: string;
 		status: "pending";
@@ -94,7 +94,7 @@
 	type ReviewThread = {
 		/** The `data-commentable` anchor this thread is attached to. */
 		anchor: string;
-		/** Where the anchor lives — drives the OD anchor icon + label. */
+		/** Where the anchor lives: drives the OD anchor icon + label. */
 		surface: "plan" | "prototype" | "task";
 		/** Human-readable anchor label (OD `Plan · Why · §1`). */
 		label: string;
@@ -102,7 +102,7 @@
 		comments: ThreadComment[];
 	};
 
-	/** A free-chat message — reviewers + AI in one stream. */
+	/** A free-chat message: reviewers + AI in one stream. */
 	type ChatMessage = {
 		author: string;
 		role: "human" | "agent";
@@ -127,7 +127,7 @@
 	const STORAGE_KEY = "fulcrum.plan-review.workbench";
 
 	/**
-	 * Pane 1 — the plan markdown, section by section, each carrying its
+	 * Pane 1: the plan markdown, section by section, each carrying its
 	 * `data-commentable` anchor (OD `plan-review.html` lines 230-265). Comment
 	 * anchors bind to these anchors (interaction_assertion 1).
 	 */
@@ -181,7 +181,7 @@
 				type: "ul",
 				items: [
 					"OAuth refresh-token rotation (separate effort, tracked in oauth/rotation).",
-					"Admin-side “log out everywhere” UI — owned by ops surface, not this plan.",
+					"Admin-side “log out everywhere” UI: owned by ops surface, not this plan.",
 				],
 			},
 		},
@@ -215,7 +215,7 @@
 		},
 	] as const;
 
-	/** Pane 2 — the embedded prototype callout device rows (OD lines 282-305). */
+	/** Pane 2: the embedded prototype callout device rows (OD lines 282-305). */
 	const PROTOTYPE_DEVICES: ReadonlyArray<{
 		device: string;
 		where: string;
@@ -242,7 +242,7 @@
 		},
 	] as const;
 
-	/** Pane 3 — the task breakdown (OD lines 320-390). */
+	/** Pane 3: the task breakdown (OD lines 320-390). */
 	const PLAN_TASKS: ReadonlyArray<PlanTask> = [
 		{ anchor: "task-1", title: "Add kid + rotate flag to signToken", status: "pending", agent: "claude-opus-4.7", estimate: "~25 min", scope: "src/auth/session.ts", comments: 2 },
 		{ anchor: "task-2", title: "Persist issuance row per kid", status: "pending", agent: "claude-opus-4.7", estimate: "~30 min", scope: "2 files", comments: 0 },
@@ -254,7 +254,7 @@
 		{ anchor: "task-8", title: "Settings UI · active sessions list (from callout)", status: "pending", agent: "sonnet-4.6", estimate: "~50 min", scope: "app/settings/sessions", comments: 0 },
 	] as const;
 
-	/** All anchored review threads — spanning plan / prototype / task surfaces. */
+	/** All anchored review threads: spanning plan / prototype / task surfaces. */
 	const REVIEW_THREADS: ReadonlyArray<ReviewThread> = [
 		{
 			anchor: "plan-why",
@@ -287,7 +287,7 @@
 					author: "You",
 					role: "human",
 					at: "11:52",
-					text: "14-day sunset is too long. Existing tokens issued before this ships should be force-rotated after 7 days — otherwise we leave the attack window wide for the lost-laptop case we are explicitly fixing.",
+					text: "14-day sunset is too long. Existing tokens issued before this ships should be force-rotated after 7 days: otherwise we leave the attack window wide for the lost-laptop case we are explicitly fixing.",
 				},
 			],
 		},
@@ -301,7 +301,7 @@
 					author: "Priya Shah",
 					role: "human",
 					at: "12:01",
-					text: "What's the behavior if dual-verify both succeed? We should reject not accept — picking the wrong key silently is the bug we'll spend a quarter chasing.",
+					text: "What's the behavior if dual-verify both succeed? We should reject not accept: picking the wrong key silently is the bug we'll spend a quarter chasing.",
 				},
 			],
 		},
@@ -315,7 +315,7 @@
 					author: "You",
 					role: "human",
 					at: "12:10",
-					text: "Move “this device” to a row pill rather than the title — easier to scan when you have 6 sessions. Also we need a “Revoke all other devices” action.",
+					text: "Move “this device” to a row pill rather than the title: easier to scan when you have 6 sessions. Also we need a “Revoke all other devices” action.",
 				},
 			],
 		},
@@ -355,7 +355,7 @@
 		},
 	] as const;
 
-	/** Free-chat stream — reviewers + AI together (OD lines 537-576). */
+	/** Free-chat stream: reviewers + AI together (OD lines 537-576). */
 	const CHAT_MESSAGES: ReadonlyArray<ChatMessage> = [
 		{
 			author: "Jordan Tate",
@@ -367,7 +367,7 @@
 			author: "You",
 			role: "human",
 			at: "11:41",
-			text: "Yes — they touch different code paths and OAuth refresh is owned by Sam. Different shipping cadence. This one is bounded.",
+			text: "Yes: they touch different code paths and OAuth refresh is owned by Sam. Different shipping cadence. This one is bounded.",
 		},
 		{
 			author: "claude-opus-4.7",
@@ -421,7 +421,7 @@
 	/**
 	 * The Plannotator annotation set. IA-MAP.md §4.4 / COPY.md §539: a review
 	 * carries zero-or-more annotations. The `Mod+Enter` overload approves when
-	 * this set is empty and sends feedback when it is not — so the gate's primary
+	 * this set is empty and sends feedback when it is not: so the gate's primary
 	 * action and the `⌘↵` chord are a single overloaded control.
 	 */
 	const initialAnnotations = REVIEW_THREADS.filter((t) => !t.resolved).map((t) => t.anchor);
@@ -455,7 +455,7 @@
 	 * The OD `Mod+Enter` overload (COPY.md §539, IA-MAP.md §2.2 line 198):
 	 * approve the plan + prototype + tasks as one unit when there are no open
 	 * annotations; otherwise send the accumulated annotations back as feedback.
-	 * Sending feedback does not silently resolve the reviewer's threads — the
+	 * Sending feedback does not silently resolve the reviewer's threads: the
 	 * reviewer still owns each thread; only an explicit Resolve clears one.
 	 */
 	function submitGate(): void {
@@ -475,26 +475,26 @@
 		gateOutcome = "";
 	}
 
-	/** Submit the Request-changes review — promotes nothing, notifies reviewers. */
+	/** Submit the Request-changes review: promotes nothing, notifies reviewers. */
 	function submitRequestChanges(): void {
 		gateOutcome = "changes-requested";
 		requestChangesOpen = false;
 	}
 
-	/** Resolve a thread — clears its annotation so the gate can flip to approve. */
+	/** Resolve a thread: clears its annotation so the gate can flip to approve. */
 	function resolveThread(anchor: string): void {
 		annotations = annotations.filter((a) => a !== anchor);
 		gateOutcome = "";
 	}
 
-	/** Re-open every thread — restores the send-feedback branch of the overload. */
+	/** Re-open every thread: restores the send-feedback branch of the overload. */
 	function reopenAllThreads(): void {
 		annotations = REVIEW_THREADS.filter((t) => !t.resolved).map((t) => t.anchor);
 		gateOutcome = "";
 	}
 
 	/**
-	 * Window-level `Mod+Enter` — the Plannotator chord. Mirrors the gate button
+	 * Window-level `Mod+Enter`: the Plannotator chord. Mirrors the gate button
 	 * so a keyboard reviewer triggers the same approve/send-feedback overload
 	 * without reaching the mouse (COPY.md §539).
 	 */
@@ -538,7 +538,7 @@
 <svelte:window onkeydown={onKeydown} />
 
 <!--
-	The OD `plan-review.html` tripane: a four-row grid — review head, tab bar,
+	The OD `plan-review.html` tripane: a four-row grid: review head, tab bar,
 	the active panel, and the bottom approve gate. `data-state` exposes the
 	populated branch to design-e2e; `data-has-annotations` exposes the
 	Mod+Enter overload branch.
@@ -551,7 +551,7 @@
 	data-has-annotations={openAnnotationCount > 0}
 	class="flex min-h-[40rem] flex-col gap-0 rounded-md border border-border bg-card"
 >
-	<!-- ── Review head — crumbs · plan title · waiting-input badge · mode-row ── -->
+	<!-- ── Review head: crumbs · plan title · waiting-input badge · mode-row ── -->
 	<header
 		data-slot="review-head"
 		data-review-head
@@ -571,7 +571,7 @@
 				{PLAN_TITLE}
 			</h1>
 			<!--
-				COPY.md §6 canonical 8-state vocab — `waiting-input` is the canonical
+				COPY.md §6 canonical 8-state vocab: `waiting-input` is the canonical
 				status for a review awaiting reviewer input. The ui-kit `StatusBadge`
 				renders the locked vocab; `data-status="waiting-input"` is the verbatim
 				canonical token (copy_assertion 2). `hideLabel` keeps the visible badge
@@ -587,12 +587,12 @@
 		<TraceChip traceId={TRACE_ID} />
 		<!--
 			The universal per-Step mode affordance (DESIGN.md §4.13,
-			`prd-web-mode-affordance-system`) — Manual / Play / Discuss / AI Assist.
+			`prd-web-mode-affordance-system`): Manual / Play / Discuss / AI Assist.
 		-->
 		<ModeRow bind:value={reviewMode} ariaLabel="Step mode" data-review-mode-row />
 	</header>
 
-	<!-- ── Tab bar — Plan & prototype · Comments · Free chat · History ──────── -->
+	<!-- ── Tab bar: Plan & prototype · Comments · Free chat · History ──────── -->
 	<Tabs bind:value={activeTab} class="flex min-h-0 flex-1 flex-col gap-0">
 		<TabsList
 			data-review-tabs
@@ -616,13 +616,13 @@
 			</TabsTrigger>
 		</TabsList>
 
-		<!-- ── Panel: Plan & prototype — the three-pane tripane ──────────────── -->
+		<!-- ── Panel: Plan & prototype: the three-pane tripane ──────────────── -->
 		<TabsContent
 			value="content"
 			data-review-panel="content"
 			class="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[1.1fr_1fr_380px]"
 		>
-			<!-- Pane 1 — plan markdown with inline-commentable sections. -->
+			<!-- Pane 1: plan markdown with inline-commentable sections. -->
 			<div
 				data-slot="plan-pane"
 				data-plan-pane
@@ -642,7 +642,7 @@
 					{#each PLAN_SECTIONS as section (section.anchor)}
 						{#if section.kind === "callout"}
 							<!--
-								The Risk callout — DESIGN.md §4.5 tool-call card register. Still
+								The Risk callout: DESIGN.md §4.5 tool-call card register. Still
 								an inline-commentable anchor (interaction_assertion 1).
 							-->
 							<div
@@ -715,7 +715,7 @@
 				</div>
 			</div>
 
-			<!-- Pane 2 — embedded prototype callout (a live device frame). -->
+			<!-- Pane 2: embedded prototype callout (a live device frame). -->
 			<div
 				data-slot="prototype-pane"
 				data-prototype-pane
@@ -792,7 +792,7 @@
 				</div>
 			</div>
 
-			<!-- Pane 3 — task breakdown with per-task comment anchors. -->
+			<!-- Pane 3: task breakdown with per-task comment anchors. -->
 			<div
 				data-slot="tasks-pane"
 				data-tasks-pane
@@ -842,7 +842,7 @@
 			</div>
 		</TabsContent>
 
-		<!-- ── Panel: Comments — all threads anchored across plan/proto/tasks ── -->
+		<!-- ── Panel: Comments: all threads anchored across plan/proto/tasks ── -->
 		<TabsContent
 			value="comments"
 			data-review-panel="comments"
@@ -911,7 +911,7 @@
 			</div>
 		</TabsContent>
 
-		<!-- ── Panel: Free chat — reviewers + AI in one stream ───────────────── -->
+		<!-- ── Panel: Free chat: reviewers + AI in one stream ───────────────── -->
 		<TabsContent
 			value="chat"
 			data-review-panel="chat"
@@ -959,7 +959,7 @@
 				<Textarea
 					bind:value={chatDraft}
 					data-chat-input
-					placeholder="Talk to plan reviewers and the AI together — @ to mention, / for slash commands"
+					placeholder="Talk to plan reviewers and the AI together: @ to mention, / for slash commands"
 					class="min-h-14 text-sm leading-6"
 				/>
 				<div class="flex flex-wrap items-center gap-2">
@@ -975,7 +975,7 @@
 			</form>
 		</TabsContent>
 
-		<!-- ── Panel: History — plan revisions with diff counts ──────────────── -->
+		<!-- ── Panel: History: plan revisions with diff counts ──────────────── -->
 		<TabsContent
 			value="history"
 			data-review-panel="history"
@@ -1022,7 +1022,7 @@
 		</TabsContent>
 	</Tabs>
 
-	<!-- ── Request-changes bar — inline, opens above the gate (OD lines 622-628) ── -->
+	<!-- ── Request-changes bar: inline, opens above the gate (OD lines 622-628) ── -->
 	{#if requestChangesOpen}
 		<div
 			data-request-changes-bar
@@ -1031,7 +1031,7 @@
 			<span aria-hidden="true" class="text-warning-foreground">⚠</span>
 			<strong class="text-warning-foreground">Request changes</strong>
 			<span class="flex-1">
-				{openAnnotationCount} thread{openAnnotationCount === 1 ? "" : "s"} still open — reviewers will be
+				{openAnnotationCount} thread{openAnnotationCount === 1 ? "" : "s"} still open: reviewers will be
 				notified once you submit.
 			</span>
 			<Textarea
@@ -1047,7 +1047,7 @@
 		</div>
 	{/if}
 
-	<!-- ── Bottom gate — the single approve gate for plan + prototype + tasks ── -->
+	<!-- ── Bottom gate: the single approve gate for plan + prototype + tasks ── -->
 	<footer
 		data-slot="review-gate"
 		data-review-gate
@@ -1060,7 +1060,7 @@
 
 		{#if gateOutcome}
 			<!--
-				The gate outcome — proves the Mod+Enter overload branch taken
+				The gate outcome: proves the Mod+Enter overload branch taken
 				(interaction_assertion 2 / copy_assertion 1).
 			-->
 			<span
@@ -1072,11 +1072,11 @@
 						: 'bg-accent/15 text-accent-foreground'}"
 			>
 				{#if gateOutcome === "approved"}
-					Approved — promoted to Build
+					Approved: promoted to Build
 				{:else if gateOutcome === "feedback-sent"}
 					Feedback sent to the planning agent
 				{:else if gateOutcome === "saved"}
-					Saved — not promoted
+					Saved: not promoted
 				{:else}
 					Changes requested
 				{/if}

@@ -117,7 +117,7 @@ export interface InferenceRunOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
-  /** Hook for static-proof — defaults to running scripts/static-build-proof.ts. */
+  /** Hook for static-proof: defaults to running scripts/static-build-proof.ts. */
   staticProof?: () => Promise<string>;
 }
 

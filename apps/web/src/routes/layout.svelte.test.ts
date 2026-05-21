@@ -28,7 +28,7 @@ mock.module("$app/state", () => ({
 }));
 
 // `mock.module` registrations are process-global and the export-name set is
-// frozen on first registration — an incomplete stub here would strip
+// frozen on first registration: an incomplete stub here would strip
 // `invalidateAll` from every later test that imports the real module. Mirror
 // the real `$app/navigation` surface the component tree relies on.
 mock.module("$app/navigation", () => ({
@@ -152,9 +152,9 @@ describe("+layout.svelte SSR shell", () => {
   // ui-kit `MobileStageTabs` primitive (commit "feat(web): add mobile stage
   // tabs"). The original regression guarded a hand-rolled bits-ui Sheet whose
   // Trigger had to share a Root context provider; that structure no longer
-  // exists. The surviving intent — the mobile nav is the ui-kit primitive and
+  // exists. The surviving intent: the mobile nav is the ui-kit primitive and
   // the shell carries no orphan hand-rolled Sheet overlay (AGENTS.md ui-kit
-  // rule) — is asserted against the source instead.
+  // rule): is asserted against the source instead.
   test("mobile nav uses the ui-kit MobileStageTabs primitive, no hand-rolled Sheet", () => {
     const layoutSrc = readFileSync(
       fileURLToPath(new URL("./+layout.svelte", import.meta.url)),
@@ -173,7 +173,7 @@ describe("+layout.svelte SSR shell", () => {
   });
 
   // OD shell redesign: the inline locale picker was removed from the global
-  // shell — locale selection now lives on the dedicated `/settings/i18n`
+  // shell: locale selection now lives on the dedicated `/settings/i18n`
   // route. The shell still receives `LayoutData.i18n` (enabled / locale /
   // dir) from `+layout.server.ts`; the surviving contract is that the shell
   // renders cleanly for any i18n config (RTL-enabled or disabled) and never

@@ -1,5 +1,5 @@
 /**
- * SvelteKit tRPC route handler — /api/trpc/[...path]
+ * SvelteKit tRPC route handler: /api/trpc/[...path]
  *
  * Delegates all /api/trpc/** requests to the server-owned route handler.
  * createContext reads session from event.locals (populated by hooks.server.ts).

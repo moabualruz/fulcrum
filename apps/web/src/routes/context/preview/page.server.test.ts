@@ -17,7 +17,7 @@ type LoadResult = {
 // path. Both factories route through a shared slot; this suite publishes its
 // seam/overrides while active (beforeAll/afterAll) so sibling suites that mock
 // the same paths are never hijacked. In particular `context/queries.ts` keeps
-// a complete export set — `previewContext` stays defined for foreign suites
+// a complete export set: `previewContext` stays defined for foreign suites
 // (`/runs/[id]` pulls it in transitively) instead of being frozen out.
 mock.module("$lib/server/application-scope", () => applicationScopeMock());
 mock.module("@knowledge-workspace/application/context/queries.ts", () => contextQueriesMock());

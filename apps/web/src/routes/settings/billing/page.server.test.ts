@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 
 // Tests for saas-auth gate on billing settings page.
 
-describe("/settings/billing — _isSaasAuthEnabled() and load()", () => {
+describe("/settings/billing: _isSaasAuthEnabled() and load()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
   const origFlag = process.env["FULCRUM_FLAG_SAAS_AUTH"];
 

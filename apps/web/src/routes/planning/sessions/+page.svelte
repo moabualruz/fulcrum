@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * `/planning/sessions` — legacy protocol-sessions feature route.
+	 * `/planning/sessions`: legacy protocol-sessions feature route.
 	 *
 	 * `prd-web-plan-session-od-fidelity` folded the guided/freeform session
 	 * controls into the OD Live Session Pane at `/plan-session` (DESIGN.md §8;
@@ -9,7 +9,7 @@
 	 * `planning/sessions/+page.server.ts` are preserved untouched; the Plan dock
 	 * tab of the new pane summarizes every guided session.
 	 *
-	 * This old path keeps resolving (`200`, no 404 — migration-strategy.md
+	 * This old path keeps resolving (`200`, no 404: migration-strategy.md
 	 * value-preservation item 2) and forwards to the canonical workbench.
 	 */
 	import { onMount } from "svelte";

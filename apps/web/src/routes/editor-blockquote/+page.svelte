@@ -68,7 +68,7 @@
         >
           <p>{block.text}</p>
           {#if block.author}
-            <footer data-quote-author class="mt-1 text-xs text-muted-foreground">— {block.author}</footer>
+            <footer data-quote-author class="mt-1 text-xs text-muted-foreground">- {block.author}</footer>
           {/if}
         </blockquote>
       {:else if block.kind === "list"}

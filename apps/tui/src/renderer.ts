@@ -1,5 +1,5 @@
 /**
- * TUI renderer utilities — ANSI-based terminal rendering.
+ * TUI renderer utilities: ANSI-based terminal rendering.
  *
  * Uses picocolors for ANSI colour codes. Provides box-drawing, layout, and
  * string-truncation helpers used by all TUI screens.
@@ -107,7 +107,7 @@ export function boxRow(content: string, width: number): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Renderer — writes to a TuiOutput
+// Renderer: writes to a TuiOutput
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class Renderer {

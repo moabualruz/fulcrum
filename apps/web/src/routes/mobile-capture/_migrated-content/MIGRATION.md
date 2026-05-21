@@ -1,4 +1,4 @@
-# mobile-capture — mislabeled-route content migration
+# mobile-capture: mislabeled-route content migration
 
 > Migrated by `prd-cross-mislabeled-route-content-migration` (Design Fidelity
 > Recovery). The `mobile-capture` route name is freed for its OD surface; the
@@ -15,7 +15,7 @@ panel (`createContext` Board/Backlog/Table/Planning, `taskSprint`/`taskModule`/
 
 ## Preserved artifact
 
-- `+page.svelte.preserved` — the full route content, verbatim.
+- `+page.svelte.preserved`: the full route content, verbatim.
 
 ## Disposition
 
@@ -26,7 +26,7 @@ panel (`createContext` Board/Backlog/Table/Planning, `taskSprint`/`taskModule`/
   `design-alignment/capture.md` §mobile-capture, the real mobile Capture editor
   is a responsive *state* of `/<ws>/projects/<projId>/capture/<docId>`, not a
   standalone route.
-- **Owning rebuild PRD:** `prd-web-capture-stage-shell` — its `od_examples`
+- **Owning rebuild PRD:** `prd-web-capture-stage-shell`: its `od_examples`
   explicitly lists `mobile-capture.html`; `capture.md` records owner
   `prd-web-operate-stage-doctor` / Build PRDs for the perf + task-tray content.
 - **Live route now:** `+page.server.ts` 308-redirects `/mobile-capture` →

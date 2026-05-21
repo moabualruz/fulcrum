@@ -2,12 +2,12 @@
  * CLI AI Assist Step-scope parity (`prd-cli-ai-assist-step-scope`).
  *
  * Proves that `fulcrum ai start` is anchored to a Step the way the OD
- * `ai-assist.html` drawer is — its header reads `Step 3 / 8 · …` and `@scope`
+ * `ai-assist.html` drawer is: its header reads `Step 3 / 8 · …` and `@scope`
  * attaches the current step. The CLI mirror:
  *
  *  - accepts `--step <step-id>` (a bare step id, NOT a `<stage>/<id>` ref) and
  *    echoes the resolved Step scope in both plain and `--json` output;
- *  - carries the SAME trace identity as the originating Step run — the trace
+ *  - carries the SAME trace identity as the originating Step run: the trace
  *    id propagates via `FULCRUM_TRACE_ID` so the session is followable in the
  *    web drawer / TUI `:ai` pane by one id (DESIGN.md §4.10);
  *  - wraps `--json` output in the canonical `fulcrum.cli.v1` envelope
@@ -16,7 +16,7 @@
  *    failure (message + `Fix:` action + `trace=<id>`).
  *
  * No production mocks: the command takes injectable `print`/`printErr`/`exit`
- * sinks and an `env` seam — the same seams the real CLI entrypoint passes.
+ * sinks and an `env` seam: the same seams the real CLI entrypoint passes.
  */
 
 import { describe, expect, test } from "bun:test";
@@ -63,7 +63,7 @@ function captureLines() {
   };
 }
 
-describe("fulcrum ai — Step scope + trace continuity", () => {
+describe("fulcrum ai: Step scope + trace continuity", () => {
   test("`--step` is echoed as the resolved Step scope in plain output", async () => {
     const io = captureLines();
     await runAi(
@@ -90,7 +90,7 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
     expect(Object.keys(envelope).sort()).toEqual([...CANONICAL_KEYS].sort());
     expect(envelope["schema"]).toBe(ENVELOPE_SCHEMA);
     expect(envelope["command"]).toBe("fulcrum ai start");
-    // The Step scope rides in `args` alongside the trace identity — scope and
+    // The Step scope rides in `args` alongside the trace identity: scope and
     // trace travel together.
     expect(envelope["args"]).toMatchObject({ task: "task-1", step: "step-3" });
     // …and the session `result` echoes the same resolved Step scope.
@@ -100,7 +100,7 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
   test("AI Assist session carries the originating Step run's trace identity", async () => {
     const jsonIo = captureLines();
     const plainIo = captureLines();
-    // `FULCRUM_TRACE_ID` is the trace id of the originating Step run — the AI
+    // `FULCRUM_TRACE_ID` is the trace id of the originating Step run: the AI
     // Assist session must inherit it so it is followable in web / TUI.
     const env = { FULCRUM_TRACE_ID: STEP_RUN_TRACE_ID };
     await runAi(
@@ -113,16 +113,16 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
     );
 
     const envelope = JSON.parse(jsonIo.lines[0]!) as Record<string, unknown>;
-    // The envelope trace id IS the Step run's trace id — trace continuity.
+    // The envelope trace id IS the Step run's trace id: trace continuity.
     expect(envelope["trace_id"]).toBe(STEP_RUN_TRACE_ID);
     // The plain-output trace header line carries the same trace id (truncated
-    // to the DESIGN.md §4.10 8-char prefix) — one identity across both modes.
+    // to the DESIGN.md §4.10 8-char prefix): one identity across both modes.
     const traceLine = plainIo.lines.find((l) => l.startsWith("trace:"));
     expect(traceLine).toBeDefined();
     expect(traceLine).toContain(STEP_RUN_TRACE_ID.slice(0, 8));
   });
 
-  test("a stage-qualified `--step` ref is rejected — scope is a bare step id", async () => {
+  test("a stage-qualified `--step` ref is rejected: scope is a bare step id", async () => {
     const io = captureLines();
     await runAi(
       ["start", "--task", "task-1", "--title", "Persist issuance row", "--step", "plan/step-3"],
@@ -191,7 +191,7 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
     expect(errors[0]!.context?.step).toBe("step-3");
   });
 
-  test("`--step` omitted — scope falls back to the task id, never unscoped", async () => {
+  test("`--step` omitted: scope falls back to the task id, never unscoped", async () => {
     const io = captureLines();
     await runAi(["start", "--task", "task-9", "--title", "Persist issuance row"], io.opts);
 

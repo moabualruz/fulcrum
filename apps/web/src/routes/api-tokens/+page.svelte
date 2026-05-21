@@ -66,7 +66,7 @@
 
   {#if revealed}
     <div data-token-revealed class="space-y-2 rounded-md border border-primary p-3 text-xs">
-      <p><strong>Token created.</strong> Copy now — you will not see the full value again.</p>
+      <p><strong>Token created.</strong> Copy now: you will not see the full value again.</p>
       <p>Name: <span data-token-revealed-name>{revealed.name}</span></p>
       <pre data-token-revealed-secret class="overflow-auto rounded-md bg-muted p-2">{revealed.secret}</pre>
       <button type="button" data-token-revealed-dismiss onclick={dismissReveal} class="rounded-md border border-border px-3 py-0.5">Dismiss</button>

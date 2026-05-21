@@ -1,9 +1,9 @@
 /**
- * Gated i18n module — active only when FULCRUM_FEATURES includes "i18n".
+ * Gated i18n module: active only when FULCRUM_FEATURES includes "i18n".
  *
  * Adapter: plain JSON catalog (svelte-i18n-compatible API surface).
  * Switching to paraglide-js or svelte-i18n requires only changing exports
- * from this file — all consumers import { t, locale, ... } from "$lib/i18n".
+ * from this file: all consumers import { t, locale, ... } from "$lib/i18n".
  *
  * Fallback adapter note: if paraglide-js breaks on a Svelte rune update,
  * swap the catalog loader here. The t() signature and CI gate remain the same.
@@ -85,7 +85,7 @@ export function isI18nEnabled(): boolean {
   return features.split(",").map((f) => f.trim()).includes("i18n");
 }
 
-/** All keys in the English catalog — used by CI extraction gate. */
+/** All keys in the English catalog: used by CI extraction gate. */
 export function getEnglishKeys(): string[] {
   return Object.keys(catalogs.en).sort();
 }
@@ -109,7 +109,7 @@ export function setLocaleCookie(
   });
 }
 
-/** Alias used by layout.server.ts — returns dir attribute for a locale. */
+/** Alias used by layout.server.ts: returns dir attribute for a locale. */
 export function dirForLocale(locale: string, enabled: boolean): "rtl" | "ltr" | undefined {
   if (!enabled) return undefined;
   return getDir(locale);

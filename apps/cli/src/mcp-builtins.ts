@@ -1,9 +1,9 @@
-// mcp-builtins.ts — canonical list of all Fulcrum-managed MCP servers.
+// mcp-builtins.ts: canonical list of all Fulcrum-managed MCP servers.
 //
 // install.ts iterates BUILTIN_MCPS and calls registerServer for each entry.
 // uninstall.ts relies on the registry alone (already does; no change needed).
 //
-// Wave 2: github (previously inline in install.ts — hoisted here).
+// Wave 2: github (previously inline in install.ts: hoisted here).
 // Wave 3: semgrep, context7, tavily, playwright, dart, cloudflare-* suite.
 
 import type { McpServerSpec } from "./mcp-registry.ts";
@@ -21,7 +21,7 @@ const NON_CLAUDE_VISIBLE = {
 export const DEFAULT_DEEPWIKI_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://mcp.deepwiki.com/mcp",
-  description: "DeepWiki MCP server — repository documentation and codebase Q&A",
+  description: "DeepWiki MCP server: repository documentation and codebase Q&A",
   vendor: "deepwiki",
   default_enabled: false,
   auth_env_vars: [],
@@ -31,7 +31,7 @@ export const DEFAULT_DEEPWIKI_SERVER: McpServerSpec = {
 export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://api.githubcopilot.com/mcp/",
-  description: "Official GitHub MCP server — repos, issues, PRs, Actions, code search",
+  description: "Official GitHub MCP server: repos, issues, PRs, Actions, code search",
   vendor: "github",
   default_enabled: false,
   auth_env_vars: ["GITHUB_TOKEN"],
@@ -40,22 +40,22 @@ export const DEFAULT_GITHUB_SERVER: McpServerSpec = {
 
 // ── Wave 3 ─────────────────────────────────────────────────────────────────
 
-/** W3.3 — Semgrep: in-binary stdio MCP via `semgrep mcp`. */
+/** W3.3: Semgrep: in-binary stdio MCP via `semgrep mcp`. */
 export const DEFAULT_SEMGREP_SERVER: McpServerSpec = {
   transport: "stdio",
   command: "semgrep mcp",
-  description: "Semgrep MCP server — static analysis and code security scanning",
+  description: "Semgrep MCP server: static analysis and code security scanning",
   vendor: "semgrep",
   default_enabled: false,
   auth_env_vars: [],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.4 — Context7: remote HTTP MCP at mcp.context7.com. */
+/** W3.4: Context7: remote HTTP MCP at mcp.context7.com. */
 export const DEFAULT_CONTEXT7_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://mcp.context7.com/mcp",
-  description: "Context7 MCP server — up-to-date library docs for AI code editors",
+  description: "Context7 MCP server: up-to-date library docs for AI code editors",
   vendor: "upstash",
   default_enabled: false,
   // Context7 free tier can answer without auth, but declaring the env var is
@@ -64,34 +64,34 @@ export const DEFAULT_CONTEXT7_SERVER: McpServerSpec = {
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.5 — Tavily: remote HTTP MCP. Auth: TAVILY_API_KEY required. */
+/** W3.5: Tavily: remote HTTP MCP. Auth: TAVILY_API_KEY required. */
 export const DEFAULT_TAVILY_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://mcp.tavily.com/mcp/",
-  description: "Tavily MCP server — real-time web search, extract, map and crawl",
+  description: "Tavily MCP server: real-time web search, extract, map and crawl",
   vendor: "tavily-ai",
   default_enabled: false,
   auth_env_vars: ["TAVILY_API_KEY"],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.6 — Playwright: stdio MCP via npx. No auth. */
+/** W3.6: Playwright: stdio MCP via npx. No auth. */
 export const DEFAULT_PLAYWRIGHT_SERVER: McpServerSpec = {
   transport: "stdio",
   command: "npx -y @playwright/mcp@latest",
-  description: "Playwright MCP server — browser automation via accessibility snapshots",
+  description: "Playwright MCP server: browser automation via accessibility snapshots",
   vendor: "microsoft",
   default_enabled: false,
   auth_env_vars: [],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.7 — Cloudflare hosted MCP suite. One entry per endpoint. */
+/** W3.7: Cloudflare hosted MCP suite. One entry per endpoint. */
 // Docs endpoint is public (no auth required); all others need CLOUDFLARE_API_TOKEN.
 export const DEFAULT_CLOUDFLARE_DOCS_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://docs.mcp.cloudflare.com/mcp",
-  description: "Cloudflare documentation MCP server — reference information (public, no auth)",
+  description: "Cloudflare documentation MCP server: reference information (public, no auth)",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: [],
@@ -103,7 +103,7 @@ export const DEFAULT_CLOUDFLARE_DOCS_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://bindings.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Workers Bindings MCP — storage, AI, compute primitives",
+  description: "Cloudflare Workers Bindings MCP: storage, AI, compute primitives",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -113,7 +113,7 @@ export const DEFAULT_CLOUDFLARE_WORKERS_BINDINGS_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://builds.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Workers Builds MCP — CI/build insights and management",
+  description: "Cloudflare Workers Builds MCP: CI/build insights and management",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -123,7 +123,7 @@ export const DEFAULT_CLOUDFLARE_WORKERS_BUILDS_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://observability.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Observability MCP — Workers logs and observability",
+  description: "Cloudflare Observability MCP: Workers logs and observability",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -133,7 +133,7 @@ export const DEFAULT_CLOUDFLARE_OBSERVABILITY_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_RADAR_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://radar.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Radar MCP — global internet traffic and security insights",
+  description: "Cloudflare Radar MCP: global internet traffic and security insights",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -143,7 +143,7 @@ export const DEFAULT_CLOUDFLARE_RADAR_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_LOGPUSH_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://logs.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Logpush MCP — Logpush job health summaries",
+  description: "Cloudflare Logpush MCP: Logpush job health summaries",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -153,7 +153,7 @@ export const DEFAULT_CLOUDFLARE_LOGPUSH_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_BROWSER_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://browser.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Browser Rendering MCP — serverless browser automation",
+  description: "Cloudflare Browser Rendering MCP: serverless browser automation",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -163,7 +163,7 @@ export const DEFAULT_CLOUDFLARE_BROWSER_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_CONTAINERS_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://containers.mcp.cloudflare.com/mcp",
-  description: "Cloudflare Containers MCP — container management",
+  description: "Cloudflare Containers MCP: container management",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
@@ -173,18 +173,18 @@ export const DEFAULT_CLOUDFLARE_CONTAINERS_SERVER: McpServerSpec = {
 export const DEFAULT_CLOUDFLARE_AI_GATEWAY_SERVER: McpServerSpec = {
   transport: "http",
   url: "https://ai-gateway.mcp.cloudflare.com/mcp",
-  description: "Cloudflare AI Gateway MCP — AI request management and observability",
+  description: "Cloudflare AI Gateway MCP: AI request management and observability",
   vendor: "cloudflare",
   default_enabled: false,
   auth_env_vars: ["CLOUDFLARE_API_TOKEN"],
   agent_visibility: { ...ALL_VISIBLE },
 };
 
-/** W3.8 — Dart: in-package stdio MCP. Command: `dart mcp-server`. No auth. */
+/** W3.8: Dart: in-package stdio MCP. Command: `dart mcp-server`. No auth. */
 export const DEFAULT_DART_SERVER: McpServerSpec = {
   transport: "stdio",
   command: "dart mcp-server",
-  description: "Dart Tooling MCP server — Dart/Flutter analysis, testing and tooling",
+  description: "Dart Tooling MCP server: Dart/Flutter analysis, testing and tooling",
   vendor: "dart-lang",
   default_enabled: false,
   auth_env_vars: [],

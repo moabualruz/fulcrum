@@ -39,7 +39,7 @@ function parseLastJson<T>(captured: Captured): T {
  *
  * `fulcrum artifact` re-homed under the Ship stage (`prd-cli-ship-stage-parity`)
  * and now routes `--json` through the shared envelope helper, so its output is
- * the twelve-key envelope, not a bare payload — the smoke check reads `.result`.
+ * the twelve-key envelope, not a bare payload: the smoke check reads `.result`.
  */
 function parseLastEnvelopeResult<T>(captured: Captured): T {
   expect(captured.errors).toEqual([]);

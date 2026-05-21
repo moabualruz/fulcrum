@@ -138,7 +138,7 @@ describe("/doctor +page.server.ts", () => {
     // route-level test only verifies the _runAll integration: the sandcastle
     // subsystem is present and reports a well-formed status. The concrete
     // status depends on whether a docker daemon happens to be reachable on the
-    // host — asserting it would pass in CI yet fail on a dev box with Docker
+    // host: asserting it would pass in CI yet fail on a dev box with Docker
     // Desktop installed, so the shape is asserted, not the host-dependent value.
     const origFeatures = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "sandbox-docker";

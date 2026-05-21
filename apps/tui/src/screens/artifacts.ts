@@ -1,5 +1,5 @@
 /**
- * Ship stage workbench — the TUI `:ship` workbench (DESIGN.md §3.1,
+ * Ship stage workbench: the TUI `:ship` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `ship` screen).
  *
  * The Ship stage's release / artifact surface, re-homed under the shared
@@ -251,7 +251,7 @@ export class ArtifactsScreen {
       return true;
     }
 
-    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`). Checked
+    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`). Checked
     // before the nav/action keys so an armed selector is not stolen by them.
     if (this.overlay === "none" && this.modePicker.handleChordKey(key)) return true;
 

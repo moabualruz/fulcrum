@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AgeChart.svelte — Task age horizontal bar chart (workflow milestone, D-44).
+   * AgeChart.svelte: Task age horizontal bar chart (workflow milestone, D-44).
    *
    * Shows current items grouped by status, bar length = days in current status.
    * Items > 14 days highlighted red (stale).

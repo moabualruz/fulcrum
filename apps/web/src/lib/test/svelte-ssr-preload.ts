@@ -3,7 +3,7 @@
 // `ui-primitives.smoke.test.ts` registers a CLIENT-mode `.svelte` loader at
 // its own top-level; without preload, whichever file Bun loads first wins
 // the `onLoad({ filter: /\.svelte$/ })` slot. Preloading this SSR loader
-// ensures `svelte/server`'s `render()` always sees server-compiled output —
+// ensures `svelte/server`'s `render()` always sees server-compiled output -
 // and the smoke test's "is component a function" check still passes since
 // server-mode components are also plain functions.
 import { plugin } from "bun";
@@ -25,7 +25,7 @@ const tsTranspiler = new Bun.Transpiler({ loader: "ts", target: "bun" });
 // SvelteKit's bundler injects the `svelte` condition so the project always
 // resolves the Svelte build; the bare `bun test` runtime resolver does not.
 // Bun honours `--conditions=svelte` but offers no `bunfig.toml` equivalent,
-// and plugin `onResolve` never fires for bare node_modules specifiers — so the
+// and plugin `onResolve` never fires for bare node_modules specifiers: so the
 // durable in-repo fix is to point each package's `default` condition at its
 // `svelte` entry, matching SvelteKit's resolution. Idempotent; runs once per
 // test process before any test imports.
@@ -39,7 +39,7 @@ function ensureDefaultExportCondition(): void {
     for (const pkgDir of safeReaddir(nestedModules)) {
       if (pkgDir.startsWith(".")) continue;
       if (pkgDir.startsWith("@")) {
-        // Scoped package directory — descend one more level to `@scope/name`.
+        // Scoped package directory: descend one more level to `@scope/name`.
         for (const scopedName of safeReaddir(join(nestedModules, pkgDir))) {
           patchPackageExports(join(nestedModules, pkgDir, scopedName, "package.json"));
         }
@@ -95,7 +95,7 @@ function patchPackageExports(packageJsonPath: string): void {
   try {
     writeFileSync(packageJsonPath, `${JSON.stringify(meta, null, 2)}\n`);
   } catch {
-    // Read-only store — nothing else we can safely do; tests for those
+    // Read-only store: nothing else we can safely do; tests for those
     // packages will surface the original resolution error.
   }
 }

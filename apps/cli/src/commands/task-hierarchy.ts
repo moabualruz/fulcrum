@@ -1,12 +1,12 @@
 /**
- * fulcrum task hierarchy — task hierarchy commands.
+ * fulcrum task hierarchy: task hierarchy commands.
  *
  * Usage:
- *   fulcrum task tree <taskId>              — display hierarchy tree
- *   fulcrum task list --type <type>         — filter by task type
- *   fulcrum task list --parent <parentId>   — show children only
- *   fulcrum task archive <taskId>           — archive task
- *   fulcrum task restore <taskId>           — restore archived task
+ *   fulcrum task tree <taskId>             : display hierarchy tree
+ *   fulcrum task list --type <type>        : filter by task type
+ *   fulcrum task list --parent <parentId>  : show children only
+ *   fulcrum task archive <taskId>          : archive task
+ *   fulcrum task restore <taskId>          : restore archived task
  */
 
 import {

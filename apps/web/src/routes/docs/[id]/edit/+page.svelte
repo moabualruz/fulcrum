@@ -46,7 +46,7 @@
 	);
 	const docType = $derived((data.doc.kind ?? "note") as DocType);
 
-	// Collab state — gated behind FULCRUM_FEATURES=real-time-collab-server
+	// Collab state: gated behind FULCRUM_FEATURES=real-time-collab-server
 	const collabEnabled = isCollabEnabled();
 	let presenceUsers = $state<CollabUser[]>([]);
 	let remoteCursors = $state<CursorState[]>([]);
@@ -61,7 +61,7 @@
 	onMount(async () => {
 		if (!collabEnabled) return;
 
-		// Dynamic import — Hocuspocus only bundled when flag ON
+		// Dynamic import: Hocuspocus only bundled when flag ON
 		const { createCollabProvider } = await import("$lib/collab/index.js");
 		const user: CollabUser = {
 			id: data.doc.id + "-" + Math.random().toString(36).slice(2),

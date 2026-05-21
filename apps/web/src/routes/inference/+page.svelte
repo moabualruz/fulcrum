@@ -171,14 +171,14 @@
                   {#if row.reason}
                     <span class={cn("text-muted-foreground")}>{row.reason}</span>
                   {:else}
-                    <span class={cn("text-muted-foreground")}>—</span>
+                    <span class={cn("text-muted-foreground")}>-</span>
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3 text-xs font-mono")}>
                   {#if row.model}
                     {row.model}
                   {:else}
-                    <span class={cn("text-muted-foreground")}>—</span>
+                    <span class={cn("text-muted-foreground")}>-</span>
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3")}>
@@ -189,7 +189,7 @@
                   {:else if row.embedProbe === "untested"}
                     <span class={cn("text-muted-foreground")}>Untested</span>
                   {:else}
-                    <span class={cn("text-muted-foreground")}>—</span>
+                    <span class={cn("text-muted-foreground")}>-</span>
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3")}>
@@ -200,14 +200,14 @@
                   {:else if row.generateProbe === "untested"}
                     <span class={cn("text-muted-foreground")}>Untested</span>
                   {:else}
-                    <span class={cn("text-muted-foreground")}>—</span>
+                    <span class={cn("text-muted-foreground")}>-</span>
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3 text-xs")}>
                   {#if row.dimensions}
                     {row.dimensions}
                   {:else}
-                    <span class={cn("text-muted-foreground")}>—</span>
+                    <span class={cn("text-muted-foreground")}>-</span>
                   {/if}
                 </td>
                 <td class={cn("px-4 py-3")}>
@@ -226,7 +226,7 @@
                       class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                     >Probe</button>
                   {:else}
-                    <span class={cn("text-xs text-muted-foreground")}>—</span>
+                    <span class={cn("text-xs text-muted-foreground")}>-</span>
                   {/if}
                 </td>
               </tr>

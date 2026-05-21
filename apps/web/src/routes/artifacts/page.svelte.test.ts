@@ -9,10 +9,10 @@ import { beforeAll, describe, expect, test } from "bun:test";
  * and this markup is the no-JS deprecation notice.
  *
  * No feature loss: the destructive bulk archive/delete controls move to the
- * Ship workbench — this suite asserts the stub points at `/ship` and that the
+ * Ship workbench: this suite asserts the stub points at `/ship` and that the
  * Ship route carries the release-management surface forward.
  */
-describe("/artifacts +page.svelte — re-home stub", () => {
+describe("/artifacts +page.svelte: re-home stub", () => {
   let render: typeof import("svelte/server").render;
   let Page: Component;
 

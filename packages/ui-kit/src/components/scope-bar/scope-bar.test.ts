@@ -28,7 +28,7 @@ describe("ScopeBar", () => {
 		expect(body).toContain('aria-selected="true"');
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		const { body } = render(ScopeBarRoot, { props: { activeStage: "plan" } });
 		expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
 		expect(body).not.toMatch(/\bhsl\(/);

@@ -4,7 +4,7 @@
  * Every `--json` CLI command wraps its payload in this envelope so an agent can
  * parse `trace_id` / `span_id` / `run_id` uniformly across the whole surface.
  *
- * The field set is the load-bearing contract defined in `CLI-TUI-UX.md` §3 —
+ * The field set is the load-bearing contract defined in `CLI-TUI-UX.md` §3 -
  * exactly twelve keys, no more, no fewer. `errors` and `next_actions` are
  * always arrays, never null. The spec uses `timestamp` (not the `DESIGN.md`
  * §4.10 `ts` shorthand); the conflict is resolved in favour of `timestamp` by
@@ -81,7 +81,7 @@ export interface EnvelopeInput<TResult> {
   trace?: Partial<TraceIdentity>;
   /** Command start time (ms epoch); `duration_ms` derives from `Date.now()`. */
   startedAt?: number;
-  /** Override the wall clock — test seam only. */
+  /** Override the wall clock: test seam only. */
   now?: () => number;
 }
 
@@ -98,7 +98,7 @@ export function newTraceId(env: NodeJS.ProcessEnv = process.env): string {
   return hexId(16);
 }
 
-/** 16-char lowercase hex span id — fresh per command invocation. */
+/** 16-char lowercase hex span id: fresh per command invocation. */
 export function newSpanId(): string {
   return hexId(8);
 }

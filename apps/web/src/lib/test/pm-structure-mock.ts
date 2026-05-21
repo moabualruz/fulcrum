@@ -2,7 +2,7 @@
  * Complete `mock.module` factory for `@work-management/interface/pm-structure.ts`.
  *
  * Bun's `mock.module` is process-global and freezes a module's *export-name
- * set* on its first registration — a later, fuller mock of the same path
+ * set* on its first registration: a later, fuller mock of the same path
  * cannot add names the first one omitted, and only the first-registered
  * factory closure survives for every later importer. The
  * `/projects/[id]/intake` and `/projects/[id]/modules` route tests each mock
@@ -17,7 +17,7 @@
  *
  * `pmStructureMock()` returns an object carrying *every* real export name of
  * `pm-structure` so no sibling importer is ever frozen out. The real
- * `pm-structure` is intentionally NOT imported — a static import of the mocked
+ * `pm-structure` is intentionally NOT imported: a static import of the mocked
  * path resolves back to this factory. The only test consumers of this module
  * (`intake`, `modules`) always publish their overrides while active, so the
  * "no active suite" branch never fires in practice; it throws a descriptive

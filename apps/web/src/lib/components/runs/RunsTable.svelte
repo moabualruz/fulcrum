@@ -103,7 +103,7 @@
             {/if}
           </td>
           <td class={cn("p-2 align-middle text-muted-foreground")}
-            >{row.model ?? "—"}</td
+            >{row.model ?? "-"}</td
           >
           <td class={cn("p-2 align-middle")}
             ><RunStatusBadge status={row.status} /></td

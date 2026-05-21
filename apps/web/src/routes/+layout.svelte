@@ -64,8 +64,8 @@
 	/*
 	 * Global AI Assist drawer (DESIGN.md §3.1, IA-MAP.md §5, ai-assist.html).
 	 * `+layout.svelte` owns the ONE shell-level AcpDrawer instance: every entry
-	 * point — `⌘/`, the StatusFooter `✨ AI Assist` segment, and (later) per-Step
-	 * `⊞ AI Assist` mode buttons — toggles this single drawer. Closing it pauses
+	 * point: `⌘/`, the StatusFooter `⊞ AI Assist` segment, and (later) per-Step
+	 * `⊞ AI Assist` mode buttons: toggles this single drawer. Closing it pauses
 	 * the visual presence only; `aiSessionActive` keeps the session alive so the
 	 * transcript/composer state survives the move (cross-states.md §ai-assist.html).
 	 */
@@ -79,7 +79,7 @@
 
 	/*
 	 * The AI Assist drawer auto-scopes to the current Step. Static OD-backed
-	 * fixture data (ai-assist.html: planning session run_8f29a4c, Step 3/8) — a
+	 * fixture data (ai-assist.html: planning session run_8f29a4c, Step 3/8): a
 	 * real Step-scope feed lands with prd-cli-ai-assist-step-scope's web sibling.
 	 */
 	const aiTraceId = "4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f";
@@ -117,7 +117,7 @@
 	}
 	function onAiAssistOpenChange(next: boolean): void {
 		aiAssistOpen = next;
-		// Closing pauses visual presence only — the session is not aborted.
+		// Closing pauses visual presence only: the session is not aborted.
 	}
 	function selectAiAgent(agentId: string): void {
 		aiSelectedAgent = agentId;
@@ -149,16 +149,16 @@
 
 	/*
 	 * Shell connection banner (COPY.md §3 "Offline + queued mutation",
-	 * cross-states.md §error.html). The shell — not a standalone route — owns the
+	 * cross-states.md §error.html). The shell: not a standalone route: owns the
 	 * offline experience: the `connection.ts` store machine (offline | syncing |
 	 * online) drives one Banner here. The former `offline` route's hard
 	 * reconnect-redirect is discarded; going offline keeps the operator in place,
 	 * so the active trace in `TraceFooter` survives (DESIGN.md §13 invariant 1).
-	 * `queuedExpanded` toggles the inline "View queued changes" disclosure —
+	 * `queuedExpanded` toggles the inline "View queued changes" disclosure -
 	 * errors live inline at the surface, never in a toast (COPY.md §3).
 	 */
 	let queuedExpanded = $state(false);
-	/** Banner tone per connection state — danger offline, warning syncing. */
+	/** Banner tone per connection state: danger offline, warning syncing. */
 	const connectionBannerTone = $derived(
 		$connectionState === "offline" ? "error" : "warning",
 	);
@@ -192,10 +192,10 @@
 		const stage = STAGE_BY_KEY[key];
 		if (stage) {
 			if (inProjectScope) {
-				// Canonical scope — swap only the `<stage>` segment.
+				// Canonical scope: swap only the `<stage>` segment.
 				return `/${segments[0]}/projects/${segments[2]}/${stage}`;
 			}
-			// Legacy scope — fall back to the stage's home route.
+			// Legacy scope: fall back to the stage's home route.
 			return STAGE_NAV_ITEMS.find((item) => item.stage === stage)?.href ?? null;
 		}
 		if (key === "d") return inProjectScope ? `/${segments[0]}/dashboard` : "/";
@@ -262,7 +262,7 @@
 		// Design-e2e seed: `?e2e_offline_queue=1` populates the connection store
 		// with representative queued mutations so the rendered offline test can
 		// prove the "View queued changes" affordance against the real shell. The
-		// seed only fires on the explicit query param — never in production use.
+		// seed only fires on the explicit query param: never in production use.
 		if (page.url.searchParams.get("e2e_offline_queue") === "1" && get(queuedMutations).length === 0) {
 			queuedMutations.set([
 				{ kind: "task.update", summary: "FUL-127 moved to In review" },
@@ -290,12 +290,12 @@
 		window.addEventListener("keydown", onGlobalKeydown);
 		const openHelp = () => (shortcutHelpOpen = true);
 		window.addEventListener("fulcrum:open-shortcut-help", openHelp);
-		// The StatusFooter `✨ AI Assist` segment + every per-Step `⊞ AI Assist`
+		// The StatusFooter `⊞ AI Assist` segment + every per-Step `⊞ AI Assist`
 		// mode button dispatch this event; the one shell drawer listens here.
 		window.addEventListener("fulcrum:open-ai-assist", openAiAssist);
 		// Shell connection monitor: tracks `navigator.onLine` + the window
 		// `online`/`offline` events so the connection banner reflects reality on
-		// every route (cross-states.md — `offline` + `cross-cutting-offline`
+		// every route (cross-states.md: `offline` + `cross-cutting-offline`
 		// routes absorbed into this shell store).
 		const teardownConnection = initConnectionMonitor();
 		return () => {
@@ -331,7 +331,7 @@
 		}
 		// `g <letter>` stage chord (IA-MAP.md §4.1). `g` arms a one-shot pending
 		// state; the next letter within 1s resolves the destination. No modifier,
-		// not inside a text field — leaves real typing untouched.
+		// not inside a text field: leaves real typing untouched.
 		if (!event.metaKey && !event.ctrlKey && !event.altKey && !inTextField) {
 			if (chordPending) {
 				const key = event.key.toLowerCase();
@@ -414,7 +414,7 @@
 
 <!--
 	Global AI Assist drawer (DESIGN.md §3.1, IA-MAP.md §5, ai-assist.html).
-	The single shell-level AcpDrawer instance — composed from the @fulcrum/ui-kit
+	The single shell-level AcpDrawer instance: composed from the @fulcrum/ui-kit
 	AcpDrawer primitive (AGENTS.md ui-kit rule: never a route-local overlay). Open
 	from `⌘/`, the StatusFooter segment, or per-Step `⊞ AI Assist`. 420px desktop
 	right overlay / 92vw mobile bottom sheet via the `aiDrawerSide` switch.
@@ -488,7 +488,7 @@
 
 <!--
 	Shell connection banner (COPY.md §3, cross-states.md §error.html). Composed
-	from the @fulcrum/ui-kit `Banner` primitive — AGENTS.md ui-kit rule: never a
+	from the @fulcrum/ui-kit `Banner` primitive: AGENTS.md ui-kit rule: never a
 	route-local overlay. One instance, rendered above `<main>` in both the mobile
 	and desktop shell branches, driven by the `connection.ts` store. Shown only
 	when offline or syncing; the inline "View queued changes" disclosure keeps the

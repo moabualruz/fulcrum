@@ -1,6 +1,6 @@
 /**
  * C1: i18n feature is gated behind FULCRUM_FEATURES=i18n.
- * Default OFF — no locale picker, no dir attribute, English only.
+ * Default OFF: no locale picker, no dir attribute, English only.
  */
 
 /**

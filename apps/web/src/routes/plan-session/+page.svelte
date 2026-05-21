@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * `/<ws>/projects/<projId>/plan/<sessionId>` — the Plan-stage live protocol session
+	 * `/<ws>/projects/<projId>/plan/<sessionId>`: the Plan-stage live protocol session
 	 * workbench (`prd-web-plan-session-od-fidelity`; OD `plan-session.html`;
 	 * IA-MAP.md §2.2 "Live protocol session"; DESIGN.md §8 Live Session Pane).
 	 *
@@ -11,17 +11,17 @@
 	 *
 	 * with a sticky plan strip at the top of the transcript and the workspace
 	 * dock tab set Shell · Files · Browser · Plan · Cost. Before this rebuild two
-	 * parallel implementations existed — this OD-faithful shell with no dock and
+	 * parallel implementations existed: this OD-faithful shell with no dock and
 	 * no sticky strip, and the service-wired forms on the legacy `/planning`
 	 * route. This file is now the single rendered Plan live-session target;
 	 * `/planning` and `/planning/sessions` redirect here, preserving every
 	 * `ActionForm` mode and the `AcpSession` typing under the OD pane (the dock's
-	 * **Plan** tab lists every planning mode + session action — value-preservation
+	 * **Plan** tab lists every planning mode + session action: value-preservation
 	 * item 4: moved features stay findable).
 	 *
-	 * Composes `@fulcrum/ui-kit` primitives only — `Badge`, `Button`, `Chip`,
+	 * Composes `@fulcrum/ui-kit` primitives only: `Badge`, `Button`, `Chip`,
 	 * `StatusBadge`, `TraceChip`, `Textarea`, `Tabs`, `EmptyState`, `ErrorBanner`,
-	 * `Card` — never re-implements a primitive (AGENTS.md ui-kit rule). The OD
+	 * `Card`: never re-implements a primitive (AGENTS.md ui-kit rule). The OD
 	 * shell chrome (StageRail / ScopeBar / StatusFooter / AcpDrawer) is provided
 	 * by the root `+layout.svelte`; this route renders the Live Session Pane only.
 	 */
@@ -55,7 +55,7 @@
 		| "tool_call_update"
 		| "trace_link";
 
-	/** One transcript / traffic row — a protocol session event. */
+	/** One transcript / traffic row: a protocol session event. */
 	type TrafficRow = { id: string; kind: TrafficKind; at: string; summary: string; payload: string };
 
 	/** A resumable planning session in the left sessions list. */
@@ -89,7 +89,7 @@
 
 	/**
 	 * `AcpSession` typing preserved verbatim from `planning/sessions/+page.svelte`
-	 * — the guided session shape the Plan dock summarizes (value-preservation
+	 *: the guided session shape the Plan dock summarizes (value-preservation
 	 * item 1: the typed mutation contract is not dropped by the migration).
 	 */
 	type ACPSession = {
@@ -155,7 +155,7 @@
 		},
 	];
 
-	/** Source / session / trace deep links — the trace-spine references. */
+	/** Source / session / trace deep links: the trace-spine references. */
 	const sourceLinks = $derived([
 		{ label: "Source document", href: `/docs/${sourceDocId}/planning`, value: sourceDocId },
 		{ label: "Session detail", href: `/planning/sessions#${sessionId}`, value: sessionId },
@@ -234,7 +234,7 @@
 	});
 
 	/**
-	 * Submit the prompt — appends protocol stream traffic, or surfaces the COPY.md §3
+	 * Submit the prompt: appends protocol stream traffic, or surfaces the COPY.md §3
 	 * error. `error` holds only the `[why]. [exact next step]. trace=<id>`
 	 * remainder; the `[what failed]` sentence is the ErrorBanner title.
 	 */
@@ -281,13 +281,13 @@
 		sessionId = "";
 	}
 
-	/** Empty the sessions list — drives the COPY.md §2 Plan empty state. */
+	/** Empty the sessions list: drives the COPY.md §2 Plan empty state. */
 	function clearAllSessions(): void {
 		sessions = [];
 		activeSessionId = "";
 	}
 
-	/** Re-seed the demo session — the empty-state "Start planning" action. */
+	/** Re-seed the demo session: the empty-state "Start planning" action. */
 	function startPlanning(): void {
 		sessions = initialSessions;
 		activeSessionId = initialSessions[0]?.id ?? "";
@@ -312,7 +312,7 @@
 </svelte:head>
 
 <!--
-	The DESIGN.md §8 Live Session Pane: a three-column grid —
+	The DESIGN.md §8 Live Session Pane: a three-column grid -
 	sessions list (220px) │ transcript (flex) │ workspace dock (320px).
 	`data-state` exposes the populated / empty branch to design-e2e.
 -->
@@ -333,7 +333,7 @@
 			/>
 		</div>
 	{:else}
-	<!-- ── Column 1 — sessions list (220px) ───────────────────────────── -->
+	<!-- ── Column 1: sessions list (220px) ───────────────────────────── -->
 	<aside
 		data-slot="session-list"
 		data-session-list
@@ -400,13 +400,13 @@
 		{/if}
 	</aside>
 
-	<!-- ── Column 2 — transcript (flex), with sticky plan strip ────────── -->
+	<!-- ── Column 2: transcript (flex), with sticky plan strip ────────── -->
 	<section
 		data-slot="session-transcript"
 		data-live-session-pane
 		class="flex min-w-0 flex-col rounded-md border border-border bg-card"
 	>
-		<!-- Sticky plan strip — DESIGN.md §8 "sticky plan strip at top of transcript". -->
+		<!-- Sticky plan strip: DESIGN.md §8 "sticky plan strip at top of transcript". -->
 		<header
 			data-slot="plan-strip"
 			data-plan-strip
@@ -444,7 +444,7 @@
 			</div>
 		</header>
 
-		<!-- Composer — prompt + required IDs + inline COPY.md §3 error recovery. -->
+		<!-- Composer: prompt + required IDs + inline COPY.md §3 error recovery. -->
 		<form
 			class="grid gap-3 border-b border-border p-4"
 			data-plan-session-form
@@ -492,8 +492,8 @@
 			{#if error}
 				<!--
 					COPY.md §3 error template: `[what failed]. [why]. [exact next
-					step]. trace=<id>`. The full template — including the literal
-					`trace=<id>` token — is rendered as the ErrorBanner message so
+					step]. trace=<id>`. The full template: including the literal
+					`trace=<id>` token: is rendered as the ErrorBanner message so
 					the copy lock matches OD `plan-session.html` verbatim; the
 					primitive's separate `traceId` slot uses `trace <id>`, a
 					different token, so it is intentionally not passed here.
@@ -514,7 +514,7 @@
 			</div>
 		</form>
 
-		<!-- Transcript — the protocol traffic stream + selected-event raw tool-call detail. -->
+		<!-- Transcript: the protocol traffic stream + selected-event raw tool-call detail. -->
 		<div class="grid min-h-0 flex-1 2xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]">
 			<div
 				data-slot="transcript-stream"
@@ -573,7 +573,7 @@
 		</div>
 	</section>
 
-	<!-- ── Column 3 — workspace dock (320px), tabs Shell · Files · Browser · Plan · Cost ─ -->
+	<!-- ── Column 3: workspace dock (320px), tabs Shell · Files · Browser · Plan · Cost ─ -->
 	<aside
 		data-slot="workspace-dock"
 		data-workspace-dock
@@ -655,7 +655,7 @@
 				<h2 class="text-sm font-semibold text-foreground">Cost</h2>
 				<Card class="grid gap-1 p-3">
 					<span class="text-xs font-semibold text-foreground">Tokens this session</span>
-					<span class="font-mono text-xs text-muted-foreground">—</span>
+					<span class="font-mono text-xs text-muted-foreground">-</span>
 				</Card>
 			</TabsContent>
 		</Tabs>

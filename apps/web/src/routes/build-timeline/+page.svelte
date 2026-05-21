@@ -1,21 +1,21 @@
 <script lang="ts">
   /**
-   * Build · Timeline — the OD `build-timeline.html` 14-day Gantt Workbench.
+   * Build · Timeline: the OD `build-timeline.html` 14-day Gantt Workbench.
    *
    * The `◰ Timeline` Build layout (`IA-MAP.md §2.3`, canonical route
-   * `/<ws>/projects/<projId>/build/gantt` — see `apps/web/CONTEXT.md`
+   * `/<ws>/projects/<projId>/build/gantt`: see `apps/web/CONTEXT.md`
    * "BuildTimelineWorkbench" for the timeline/gantt naming resolution). A
    * 14-day Gantt: a day-header row with today highlighted, one lane per work
    * item, a positioned status-colored bar per lane (`DESIGN.md §4.9` tones),
    * a `.now` vertical line at the current day, and a status legend.
    *
    * Each lane carries an icon and the universal `DESIGN.md §4.11` per-Step
-   * mode affordance row, rendered `compact` (icon-only) — `DESIGN.md §4.13`
+   * mode affordance row, rendered `compact` (icon-only): `DESIGN.md §4.13`
    * and `§7` list timeline lanes as a compact-mode surface.
    *
    * Bar geometry mirrors the TUI `apps/tui/src/screens/task-timeline.ts`
    * `barFor` helper exactly (`startOffset`/`endOffset` clamped to the window)
-   * so the web and TUI 14-day Gantt stay in parity — the lane shape is the TUI
+   * so the web and TUI 14-day Gantt stay in parity: the lane shape is the TUI
    * `TuiTask` contract (`design-alignment/build.md`).
    *
    * Composes `@fulcrum/ui-kit` primitives only (Button / EmptyState) plus the
@@ -37,7 +37,7 @@
 
   let { data }: Props = $props();
 
-  /** Active trace id for the Build Workbench — the `DESIGN.md §4.10` trace spine. */
+  /** Active trace id for the Build Workbench: the `DESIGN.md §4.10` trace spine. */
   const traceId = "tr_8f29a4c1b3e0d5f7";
 
   const timeline = $derived(data.timeline);
@@ -81,7 +81,7 @@
   });
 
   /**
-   * The `.now` vertical line offset, as a 0–1 fraction of the window — the
+   * The `.now` vertical line offset, as a 0–1 fraction of the window: the
    * current-day marker. Mirrors the OD `left: calc((idx) / 14 * 100%)`.
    */
   const nowFraction = $derived.by(() => {
@@ -91,7 +91,7 @@
   });
 
   /**
-   * Resolve a lane's bar geometry — `left`/`width` as 0–1 fractions of the
+   * Resolve a lane's bar geometry: `left`/`width` as 0–1 fractions of the
    * 14-day window. Uses the TUI `barFor` clamp: `startOffset` floored at 0,
    * `endOffset` capped at the last visible day; an inclusive day span.
    */
@@ -129,7 +129,7 @@
     blocked: "bg-destructive text-destructive-foreground",
   };
 
-  /** The bar label — OD shows id + progress (running) or id + ✓ (complete). */
+  /** The bar label: OD shows id + progress (running) or id + ✓ (complete). */
   function barLabel(lane: TimelineLane): string {
     if (lane.status === "complete") return `${lane.id} ✓`;
     if (typeof lane.progress === "number") return `${lane.id} · ${lane.progress}%`;
@@ -149,7 +149,7 @@
     { id: "runs", label: "Runs", glyph: "◉", href: "/build-runs" },
   ] as const;
 
-  /** The status legend — swatch tone + label, OD `.legend`. */
+  /** The status legend: swatch tone + label, OD `.legend`. */
   const legend = [
     { tone: "bg-accent", label: "running" },
     { tone: "bg-success", label: "complete" },
@@ -233,7 +233,7 @@
         class={cn("grid min-w-[56rem]")}
         style:grid-template-columns={`220px repeat(${timeline.daysVisible}, minmax(0, 1fr))`}
       >
-        <!-- Day-header row — today highlighted (OD `tl-head`). -->
+        <!-- Day-header row: today highlighted (OD `tl-head`). -->
         <div
           data-build-timeline-head-label
           class={cn("border-b border-r border-border bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground")}
@@ -254,7 +254,7 @@
           </div>
         {/each}
 
-        <!-- One lane per work item — the name cell is the addressable Step. -->
+        <!-- One lane per work item: the name cell is the addressable Step. -->
         {#each timeline.lanes as lane (lane.id)}
           {@const geo = barGeometry(lane)}
           {@const modeScope = { stepId: lane.id, kind: "task-card" as const, traceId, title: lane.title }}
@@ -300,7 +300,7 @@
               <div
                 data-build-timeline-bar={lane.id}
                 data-status={lane.status}
-                title={`${lane.title} — ${lane.status}`}
+                title={`${lane.title}: ${lane.status}`}
                 style:left={`${(geo.left * 100).toFixed(4)}%`}
                 style:width={`${(geo.width * 100).toFixed(4)}%`}
                 class={cn(
@@ -325,7 +325,7 @@
       {/each}
     </div>
 
-    <!-- Data-state switcher — drives the OD hidden empty-state branch. -->
+    <!-- Data-state switcher: drives the OD hidden empty-state branch. -->
     <div data-build-timeline-state-controls class={cn("flex items-center gap-2 pt-1")}>
       <a href="/build-timeline?state=empty" data-build-timeline-show-empty>
         <Button size="sm" variant="outline">Show empty timeline</Button>

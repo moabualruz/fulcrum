@@ -1,5 +1,5 @@
 /**
- * DocsTreeScreen — TUI doc tree/reader wired to tRPC documents.list + documents.get.
+ * DocsTreeScreen: TUI doc tree/reader wired to tRPC documents.list + documents.get.
  *
  * WHY: Three-surface parity (D-30/D-31). TUI renders bodyMd as plain text;
  * KaTeX/Mermaid shown as raw source blocks (no terminal rendering).

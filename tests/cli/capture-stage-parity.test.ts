@@ -3,17 +3,17 @@
  *
  * Proves that the full `CLI-TUI-UX.md` §1.1 Capture command grammar exists as
  * `fulcrum` verbs and that every Capture verb wraps its payload in the canonical
- * `fulcrum.cli.v1` JSON envelope (`CLI-TUI-UX.md` §3) under `--json` — so the
+ * `fulcrum.cli.v1` JSON envelope (`CLI-TUI-UX.md` §3) under `--json`: so the
  * CLI is an equal-weight Capture surface, followable by `trace_id` in web / TUI.
  *
  * Verbs covered:
- *  - `fulcrum capture text|url|file`   — freeform intake
- *  - `fulcrum capture inbox`           — intake-queue triage (snooze/accept/decline)
- *  - `fulcrum capture note new|list`   — short-form note intake
- *  - `fulcrum capture review|status|action` — existing review-state verbs (no rename)
+ *  - `fulcrum capture text|url|file`  : freeform intake
+ *  - `fulcrum capture inbox`          : intake-queue triage (snooze/accept/decline)
+ *  - `fulcrum capture note new|list`  : short-form note intake
+ *  - `fulcrum capture review|status|action`: existing review-state verbs (no rename)
  *  - `fulcrum doc list/new/view/edit/attach/history/restore/comment/link/search`
  *
- * No production mocks: both commands take an injectable caller seam — the same
+ * No production mocks: both commands take an injectable caller seam: the same
  * dependency-injection point the real HTTP client plugs into.
  */
 
@@ -56,7 +56,7 @@ function expectCanonicalEnvelope(line: string, command: string): Record<string, 
   return parsed;
 }
 
-/** Injectable capture caller — records every call, returns trace-bearing results. */
+/** Injectable capture caller: records every call, returns trace-bearing results. */
 function fakeCaptureCaller(): CaptureCaller & { calls: string[] } {
   const calls: string[] = [];
   return {
@@ -94,7 +94,7 @@ function fakeCaptureCaller(): CaptureCaller & { calls: string[] } {
   };
 }
 
-/** Injectable docs caller — records every call, returns one fixed doc row. */
+/** Injectable docs caller: records every call, returns one fixed doc row. */
 function fakeDocsCaller(): NonNullable<DocsRunOptions["caller"]> & { calls: string[] } {
   const calls: string[] = [];
   const doc = { id: "11111111-1111-4111-8111-111111111111", slug: "token-rotation", docType: "note", title: "Token rotation" };
@@ -129,7 +129,7 @@ async function docs(argv: string[], caller: NonNullable<DocsRunOptions["caller"]
   return lines;
 }
 
-describe("Capture-stage CLI verb parity — fulcrum capture", () => {
+describe("Capture-stage CLI verb parity: fulcrum capture", () => {
   test("capture text|url|file intake each dispatch and emit the fulcrum.cli.v1 envelope", async () => {
     const caller = fakeCaptureCaller();
     for (const [kind, value] of [["text", "half-baked idea"], ["url", "https://example.com"], ["file", "/tmp/note.md"]] as const) {
@@ -172,7 +172,7 @@ describe("Capture-stage CLI verb parity — fulcrum capture", () => {
     const action = await capture(["action", "cap_1", "--action", "approve", "--trace", TRACE, "--json"], caller);
     expectCanonicalEnvelope(action[0]!, "fulcrum capture action");
 
-    // `quick-action` is the documented compat alias for `action` — not removed.
+    // `quick-action` is the documented compat alias for `action`: not removed.
     const alias = await capture(["quick-action", "cap_1", "--action", "escalate", "--trace", TRACE, "--json"], caller);
     expectCanonicalEnvelope(alias[0]!, "fulcrum capture quick-action");
 
@@ -187,7 +187,7 @@ describe("Capture-stage CLI verb parity — fulcrum capture", () => {
   });
 });
 
-describe("Capture-stage CLI verb parity — fulcrum doc grammar", () => {
+describe("Capture-stage CLI verb parity: fulcrum doc grammar", () => {
   test("doc list/new/view/edit/history/restore/search/delete/template each emit the envelope", async () => {
     const caller = fakeDocsCaller();
     const cases: Array<[string[], string, string]> = [

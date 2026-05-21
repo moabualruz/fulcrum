@@ -41,7 +41,7 @@ export interface DocsRunOptions {
 
 const HELP = `fulcrum docs
 
-Capture stage — docs tree, freeform editor, and intake documents
+Capture stage: docs tree, freeform editor, and intake documents
 (CLI-TUI-UX.md §1.1 'fulcrum doc' grammar).
 
 Usage:
@@ -58,7 +58,7 @@ Usage:
   fulcrum docs delete <id> [--hard --yes] [--json]
   fulcrum docs template list [--json]
 
-Aliases (compatibility — old names keep working):
+Aliases (compatibility: old names keep working):
   create -> new      get -> view      versions list -> history
 
 Options:
@@ -176,7 +176,7 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
   }
 }
 
-/** `fulcrum docs versions list <id>` — compatibility alias for `fulcrum docs history`. */
+/** `fulcrum docs versions list <id>`: compatibility alias for `fulcrum docs history`. */
 async function runVersions(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const [sub = "help", ...rest] = argv;
   switch (sub) {
@@ -196,7 +196,7 @@ async function runVersions(argv: readonly string[], opts: ResolvedOptions): Prom
   }
 }
 
-/** `fulcrum docs history <doc-id>` — version history of one document (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum docs history <doc-id>`: version history of one document (`CLI-TUI-UX.md` §1.1). */
 async function runHistory(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const docId = requireArg(argv, 0, "history", "<doc-id>");
   const caller = await resolveCaller(opts);
@@ -205,7 +205,7 @@ async function runHistory(argv: readonly string[], opts: ResolvedOptions): Promi
   emitDocs(result, "fulcrum doc history", argv, opts.print, formatRows);
 }
 
-/** `fulcrum docs restore <doc-id> --version <n>` — restore a prior version (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum docs restore <doc-id> --version <n>`: restore a prior version (`CLI-TUI-UX.md` §1.1). */
 async function runRestore(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const docId = requireArg(argv, 0, "restore", "<doc-id>");
   const version = flagValue(argv, "--version");
@@ -216,7 +216,7 @@ async function runRestore(argv: readonly string[], opts: ResolvedOptions): Promi
   emitDocs(result, "fulcrum doc restore", argv, opts.print, formatRow);
 }
 
-/** `fulcrum docs attach <slug|id> <file>` — record an attachment on a doc (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum docs attach <slug|id> <file>`: record an attachment on a doc (`CLI-TUI-UX.md` §1.1). */
 async function runAttach(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const key = requireArg(argv, 0, "attach", "<slug|id>");
   const file = requireArg(argv, 1, "attach", "<file>");
@@ -233,7 +233,7 @@ async function runAttach(argv: readonly string[], opts: ResolvedOptions): Promis
   emitDocs(result, "fulcrum doc attach", argv, opts.print, () => `Attached ${file} to doc ${id}.`);
 }
 
-/** `fulcrum docs comment <slug|id> --body <text>` — add a thread comment (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum docs comment <slug|id> --body <text>`: add a thread comment (`CLI-TUI-UX.md` §1.1). */
 async function runComment(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const key = requireArg(argv, 0, "comment", "<slug|id>");
   const body = flagValue(argv, "--body");
@@ -253,7 +253,7 @@ async function runComment(argv: readonly string[], opts: ResolvedOptions): Promi
   emitDocs(result, "fulcrum doc comment", argv, opts.print, () => `Comment added to doc ${id}.`);
 }
 
-/** `fulcrum docs link <slug|id> --task <task-id>` — link a doc to a task (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum docs link <slug|id> --task <task-id>`: link a doc to a task (`CLI-TUI-UX.md` §1.1). */
 async function runLink(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
   const key = requireArg(argv, 0, "link", "<slug|id>");
   const task = flagValue(argv, "--task");

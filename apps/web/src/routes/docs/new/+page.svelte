@@ -29,7 +29,7 @@
 		templates,
 	}));
 
-	// Local mirrors seeded once — keystrokes don't recompute against re-rendered
+	// Local mirrors seeded once: keystrokes don't recompute against re-rendered
 	// `data.form.data` on every input event.
 	let titleValue = $state(untrack(() => data.form.data.title ?? ""));
 	let kindValue = $state(initialTemplateState.kind);

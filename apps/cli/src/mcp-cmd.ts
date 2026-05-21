@@ -1,4 +1,4 @@
-// fulcrum mcp — MCP registry CLI.
+// fulcrum mcp: MCP registry CLI.
 //
 // Subcommands:
 //   fulcrum mcp list [--json]

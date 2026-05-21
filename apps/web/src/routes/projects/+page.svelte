@@ -27,7 +27,7 @@
 	}
 
 	// Render `updated_at` as an ISO short stamp (`YYYY-MM-DD HH:mm`). Keeps the
-	// table column predictable across timezones — the live shell layout already
+	// table column predictable across timezones: the live shell layout already
 	// renders the user-local clock elsewhere; this column tracks the kernel's
 	// stored timestamp.
 	function formatUpdated(value: string): string {

@@ -100,7 +100,7 @@
 		class="flex h-full items-center gap-1.5 border-l-2 border-accent bg-surface-sunken px-3 font-medium text-accent transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 		onclick={() => onAiAssist?.()}
 	>
-		<span aria-hidden="true">✨</span>
+		<span aria-hidden="true">⊞</span>
 		<span>{aiAssistLabel}</span>
 		<kbd
 			data-slot="status-footer-ai-assist-kbd"

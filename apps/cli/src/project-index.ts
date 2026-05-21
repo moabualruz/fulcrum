@@ -1,7 +1,7 @@
-// project-index.ts — run vendor-default project-index commands in a directory.
+// project-index.ts: run vendor-default project-index commands in a directory.
 //
 // Scope: tools that produce a precomputed index artifact for the project
-// ast-grep, grep, etc) are NOT here — they have no index to build.
+// ast-grep, grep, etc) are NOT here: they have no index to build.
 //
 // Rules:
 //   - NEVER pass --output / --out / path-override flags. Vendor defaults apply.
@@ -32,7 +32,7 @@ export async function runProjectIndex(
   console.log("\nProject indices:");
   for (const cmd of INDEX_COMMANDS) {
     if (!(await which(cmd.bin))) {
-      console.log(`  · ${cmd.bin} not on PATH — skipping ${cmd.label}`);
+      console.log(`  · ${cmd.bin} not on PATH: skipping ${cmd.label}`);
       continue;
     }
     if (dryRun) {

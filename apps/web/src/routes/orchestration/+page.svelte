@@ -30,7 +30,7 @@
   }
 
   function claimLabel(row: { orchestration_state: string | null; claimed_by: string | null }): string {
-    if (!row.orchestration_state) return row.claimed_by ? `claimed:${row.claimed_by.slice(0, 8)}` : "—";
+    if (!row.orchestration_state) return row.claimed_by ? `claimed:${row.claimed_by.slice(0, 8)}` : "-";
     return row.claimed_by
       ? `${row.orchestration_state} (${row.claimed_by.slice(0, 8)})`
       : row.orchestration_state;

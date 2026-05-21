@@ -1,5 +1,5 @@
 /**
- * P15#01 — TUI foundation parity tests (renderer launcher, screen registry,
+ * P15#01: TUI foundation parity tests (renderer launcher, screen registry,
  * keybinding-driven dispatch, theme contract consumption).
  *
  * RED: registry, launcher, keybinding-action dispatch, theme getter all absent.
@@ -143,13 +143,13 @@ describe("launchTui", () => {
       caller: fakeCaller(),
     });
 
-    // OD StatusFooter: the active screen is the reverse-video `mode` pill —
+    // OD StatusFooter: the active screen is the reverse-video `mode` pill -
     // an uppercased label, not the legacy `Screen:<label>` segment.
     expect(tty.plainText()).toContain("LAUNCHER");
 
     tty.inject("?");
     await Bun.sleep(1);
-    expect(tty.plainText()).toContain("Launcher — Keybindings");
+    expect(tty.plainText()).toContain("Launcher: Keybindings");
     expect(tty.plainText()).toContain("Toggle command palette");
 
     tty.inject("?");
@@ -201,7 +201,7 @@ describe("TuiApp keybinding registry consumption", () => {
     const tty = new FakeTTY();
     const fired: string[] = [];
     const map = await getDefaultKeybindings("linux");
-    // task.create default is 'C' — case-insensitive single key.
+    // task.create default is 'C': case-insensitive single key.
     const app = new TuiApp({
       output: tty,
       input: tty,
@@ -247,7 +247,7 @@ describe("TuiApp theme contract", () => {
 
 describe("StageChord key map", () => {
   it("maps every g-chord second key to a stage colon route", () => {
-    // CLI-TUI-UX.md §7.2 — `g B` is a distinct key from `g b`.
+    // CLI-TUI-UX.md §7.2: `g B` is a distinct key from `g b`.
     expect(STAGE_CHORDS).toEqual({
       c: ":capture",
       p: ":plan",
@@ -288,7 +288,7 @@ describe("StageChord key map", () => {
   });
 });
 
-describe("chord-prefix latch — g / y two-key sequencing", () => {
+describe("chord-prefix latch: g / y two-key sequencing", () => {
   it("arms on g, then resolves g c as a StageChord", () => {
     const latch = createChordLatch(TUI_CHORD_PREFIXES);
     const handler = createStageChordHandler();
@@ -324,7 +324,7 @@ describe("chord-prefix latch — g / y two-key sequencing", () => {
   });
 
   it("the y trace-yank prefix latches independently of g", () => {
-    // CLI-TUI-UX.md §7.6 — `y` is the second chord family; it must not collide
+    // CLI-TUI-UX.md §7.6: `y` is the second chord family; it must not collide
     // with the `g` StageChord prefix or with list navigation.
     const latch = createChordLatch(TUI_CHORD_PREFIXES);
     expect(TUI_CHORD_PREFIXES).toEqual(["g", "y"]);
@@ -447,11 +447,11 @@ describe("FulcrumTui live shell TraceYank wiring", () => {
 
 describe("ColonPalette CLI command grammar", () => {
   it("tab-completes a partial verb against the CLI command tree", () => {
-    // `:run` → run, runs — every tree verb with that prefix.
+    // `:run` → run, runs: every tree verb with that prefix.
     const runCandidates = completeColonCommand(":run");
     expect(runCandidates).toContain("run");
     expect(runCandidates).toContain("runs");
-    // `:r` → run, runs, routing, routes, repos, review — real fulcrum verbs.
+    // `:r` → run, runs, routing, routes, repos, review: real fulcrum verbs.
     const rCandidates = completeColonCommand(":r");
     expect(rCandidates).toContain("routing");
     expect(rCandidates).toContain("routes");
@@ -474,7 +474,7 @@ describe("ColonPalette CLI command grammar", () => {
     expect(isKnownColonCommand(":run bogus")).toBe(false);
   });
 
-  it("mirrors the workflow stages — every stage verb is in the tree", () => {
+  it("mirrors the workflow stages: every stage verb is in the tree", () => {
     const verbs = new Set(CLI_COMMAND_TREE.map((n) => n.verb));
     for (const verb of ["capture", "runs", "review", "artifacts", "doctor", "ai"]) {
       expect(verbs.has(verb)).toBe(true);
@@ -497,7 +497,7 @@ describe("ColonPalette CLI command grammar", () => {
     palette.handleKey("enter");
     expect(fired).toEqual(["doctor"]);
 
-    // Unknown command — Enter must not fire onAction.
+    // Unknown command: Enter must not fire onAction.
     fired.length = 0;
     palette.setQuery(":frobnicate");
     palette.handleKey("enter");
@@ -552,7 +552,7 @@ describe("ColonPalette OD section structure (tui-runs.html)", () => {
     const palette = new Palette({ width: 70, height: 40, items: [], mode: "colon" });
     palette.open();
     const text = palette.render().join("\n");
-    // OD `tui-runs.html` palette copy — section headers + the `›` prompt.
+    // OD `tui-runs.html` palette copy: section headers + the `›` prompt.
     expect(text).toContain("palette · type to filter");
     expect(text).toContain("stages");
     expect(text).toContain("step actions");

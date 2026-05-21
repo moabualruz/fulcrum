@@ -1,10 +1,10 @@
 /**
- * ModePicker — the TUI per-Step mode affordance row (DESIGN.md §4.11, §4.13;
+ * ModePicker: the TUI per-Step mode affordance row (DESIGN.md §4.11, §4.13;
  * CLI-TUI-UX.md §7.4).
  *
  * Every Step in the web shell carries the `✋ Manual / ▶ Play / 💬 Discuss /
  * ⊞ AI Assist` ModeAffordance row. `prd-web-mode-affordance-system` makes that
- * affordance universal across surfaces; this widget is the TUI equivalent — the
+ * affordance universal across surfaces; this widget is the TUI equivalent: the
  * compact mode row rendered on a focused Step, mirroring the OD `.mode-row`
  * markup and exposing the same four modes as the web `@fulcrum/ui-kit`
  * `ModeRow` primitive.
@@ -12,29 +12,29 @@
  * Mode keys (CLI-TUI-UX §7.4 + DESIGN.md §4.11, per focused Step). Every
  * Step-bearing screen already binds bare `a` `p` `d` to its own list/action
  * keys, so the ModePicker reaches the four modes through a collision-free `m`
- * **chord** — press `m`, then the mode selector:
- *   m a   ✋ Manual    — work the step yourself (the leftmost mode)
- *   m p   ▶ Play       — hand off to an AI agent
- *   m d   💬 Discuss   — open the step's inline thread
- *   m i   ⊞ AI Assist  — open the TUI-native inline AI Assist pane (`:ai`)
+ * **chord**: press `m`, then the mode selector:
+ *   m a   ✋ Manual   : work the step yourself (the leftmost mode)
+ *   m p   ▶ Play      : hand off to an AI agent
+ *   m d   💬 Discuss  : open the step's inline thread
+ *   m i   ⊞ AI Assist : open the TUI-native inline AI Assist pane (`:ai`)
  *
  * The `m` prefix is disjoint from the global palette (`:`), help (`?`), and
  * navigation chords (`j` `k` `q` `H` `L`, the `g` stage chords, `/` search),
- * and from every screen action key — see `MODE_CHORD_PREFIX`,
+ * and from every screen action key: see `MODE_CHORD_PREFIX`,
  * `MODE_RESERVED_KEYS`, and `modeKeyCollidesWith`, which the parity tests use
  * to prove the contract.
  *
- * The widget owns no business logic — `handleChordKey` resolves the `m` chord
+ * The widget owns no business logic: `handleChordKey` resolves the `m` chord
  * to a `WorkflowMode` and fires the registered `onSelect` callback; the screen
  * wires `onSelect` to the actual run-start / thread / `:ai`-pane navigation.
- * This is the TUI sibling of the web `ModeRow` primitive — both share the same
+ * This is the TUI sibling of the web `ModeRow` primitive: both share the same
  * four-mode vocabulary so the surfaces never drift.
  */
 
 import pc from "picocolors";
 
 /**
- * A canonical workflow mode — the TUI mirror of the web `@fulcrum/ui-kit`
+ * A canonical workflow mode: the TUI mirror of the web `@fulcrum/ui-kit`
  * `WorkflowMode`. The web primitive names AI Assist `assist`; the TUI uses the
  * same id so the surfaces stay locked.
  */
@@ -42,7 +42,7 @@ export type WorkflowMode = "manual" | "play" | "discuss" | "assist";
 
 /** One mode affordance: id, OD glyph, label, and its per-Step chord selector. */
 export interface ModeAffordance {
-  /** The canonical mode id — shared with the web `ModeRow` + the `fulcrum mode` CLI. */
+  /** The canonical mode id: shared with the web `ModeRow` + the `fulcrum mode` CLI. */
   mode: WorkflowMode;
   /** OD glyph (DESIGN.md §4.13: `✋ ▶ 💬 ⊞`). */
   glyph: string;
@@ -78,7 +78,7 @@ export const MODE_RESERVED_KEYS: readonly string[] = MODE_AFFORDANCES.map(
 );
 
 /**
- * The full documented keybinding for each mode — the `m` chord plus the
+ * The full documented keybinding for each mode: the `m` chord plus the
  * selector (`m a`, `m p`, `m d`, `m i`). The parity / snapshot tests assert the
  * HelpOverlay and the rendered row carry these exact strings.
  */
@@ -127,7 +127,7 @@ const MODE_KEY_ALIASES: Record<string, WorkflowMode> = {
 export interface ModePickerOpts {
   /** The focused Step's addressable id (rendered into the row context). */
   stepId?: string;
-  /** Initially-selected mode. Defaults to `manual` — the OD default-pressed mode. */
+  /** Initially-selected mode. Defaults to `manual`: the OD default-pressed mode. */
   value?: WorkflowMode;
   /** Fired whenever a mode is selected via the chord or `select()`. */
   onSelect?: (mode: WorkflowMode, stepId?: string) => void;
@@ -151,7 +151,7 @@ export class ModePicker {
     this.onSelect = opts.onSelect;
   }
 
-  /** True while the `m` chord is armed — the next keystroke is a mode selector. */
+  /** True while the `m` chord is armed: the next keystroke is a mode selector. */
   get isChordArmed(): boolean {
     return this.chordArmed;
   }
@@ -166,7 +166,7 @@ export class ModePicker {
     return this.stepId;
   }
 
-  /** Select a mode programmatically — fires `onSelect`. */
+  /** Select a mode programmatically: fires `onSelect`. */
   select(mode: WorkflowMode): void {
     this._value = mode;
     this.onSelect?.(mode, this.stepId);
@@ -187,7 +187,7 @@ export class ModePicker {
   }
 
   /**
-   * Screen-facing chord handler — drives the collision-free `m` chord. A
+   * Screen-facing chord handler: drives the collision-free `m` chord. A
    * Step-bearing screen delegates every keystroke to this inside its own
    * `handleKey`:
    *   - bare `m` arms the chord and is consumed (returns `true`);
@@ -197,7 +197,7 @@ export class ModePicker {
    *     handles it normally;
    *   - when not armed, every non-`m` key is ignored (returns `false`).
    * The screen action keys (`d` dispatch, `a` reassign, …) are therefore only
-   * shadowed for the single keystroke after `m` — never otherwise.
+   * shadowed for the single keystroke after `m`: never otherwise.
    */
   handleChordKey(key: string): boolean {
     if (this.chordArmed) {
@@ -211,13 +211,13 @@ export class ModePicker {
     return false;
   }
 
-  /** Disarm the `m` chord — used when a screen swaps focus away from the row. */
+  /** Disarm the `m` chord: used when a screen swaps focus away from the row. */
   resetChord(): void {
     this.chordArmed = false;
   }
 
   /**
-   * The keybindings this row exposes — fed to the `HelpOverlay` so `?` lists
+   * The keybindings this row exposes: fed to the `HelpOverlay` so `?` lists
    * them. Each `key` is the full `m`-chord form (`m a`, `m p`, `m d`, `m i`).
    */
   keybindings(): Array<{ key: string; action: string }> {
@@ -228,7 +228,7 @@ export class ModePicker {
   }
 
   /**
-   * Render the mode row as one line — the four mode affordances with labels,
+   * Render the mode row as one line: the four mode affordances with labels,
    * the selected one reverse-video (the OD `aria-pressed` equivalent), each
    * followed by its full `m`-chord key hint in dim (`[m a]`, `[m p]`, …). When
    * the chord is armed the row prefixes an `m>` cue so the operator knows the

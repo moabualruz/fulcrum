@@ -10,7 +10,7 @@ import type { Actions, PageServerLoad } from "./$types";
 import { deleteProject, loadProjectOverview, updateProject } from "@work-management/interface/project-lifecycle.ts";
 import { requestProjectScope } from "../project-request-scope";
 
-// Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
+// Detail-page rename uses a narrower schema than `ProjectFormSchema`: slug
 // is immutable post-create (it's the URL-stable identifier baked into events
 // + cookies); only `name` and `description` are editable here.
 const RenameSchema = v.object({
@@ -27,11 +27,11 @@ const RenameSchema = v.object({
 
 // PGlite returns timestamp columns as JS `Date` values; the page expects an
 // ISO string so the `formatUpdated` helper can `slice()` it deterministically
-// across timezones — convert at the boundary.
+// across timezones: convert at the boundary.
 // Note: this loader is intentionally NOT wrapped in SvelteKit's `streamed`
 // pattern even though the rest of the detail routes are. The rename `<form>`
 // is built via `superValidate` *from* the loaded row's defaults, so the
-// initial form state is downstream of the DB read — there's no useful
+// initial form state is downstream of the DB read: there's no useful
 // header-paints-before-data window to gain by streaming this one row.
 export const load: PageServerLoad = async ({ params, parent, locals }) => {
   // Inherit `activeProjectId` from the root layout-data so the

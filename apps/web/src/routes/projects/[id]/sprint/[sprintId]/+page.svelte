@@ -116,13 +116,13 @@
           class={cn("text-sm text-left hover:underline")}
           title="Click to edit goal"
         >
-          {data.sprint.goal || "No goal set — click to add"}
+          {data.sprint.goal || "No goal set: click to add"}
         </button>
       {/if}
     </div>
 
     <!-- Date range -->
-    <span class={cn("text-xs text-muted-foreground")}>{data.sprint.start_date} — {data.sprint.end_date}</span>
+    <span class={cn("text-xs text-muted-foreground")}>{data.sprint.start_date}: {data.sprint.end_date}</span>
 
     <!-- Days remaining chip -->
     <span

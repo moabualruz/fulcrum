@@ -1,4 +1,4 @@
-/** TUI state machine — pure functions, no I/O. */
+/** TUI state machine: pure functions, no I/O. */
 
 import type { PaneId, TuiState } from "./types.ts";
 

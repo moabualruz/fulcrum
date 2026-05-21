@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Build · Board — the OD `build-board.html` workbench.
+   * Build · Board: the OD `build-board.html` workbench.
    *
    * The default Build-stage layout (`IA-MAP.md §2.3`, canonical route
    * `/<ws>/projects/<projId>/build/board`): a horizontally-scrolling status
@@ -17,7 +17,7 @@
    * it is carried forward here, not discarded (`design-alignment/build.md`).
    *
    * Project creation, integrations, API tokens, and webhooks are NOT Build-board
-   * concerns and have been removed from this route — they live in their own
+   * concerns and have been removed from this route: they live in their own
    * surfaces (`/projects`, `/onboarding`, `/api-tokens`, workspace settings).
    * See the `design-alignment/build.md` route-disposition table.
    */
@@ -194,7 +194,7 @@
     tasks: BoardTask[];
   };
 
-  /** Active trace id for the board — the DESIGN.md §4.10 trace spine identity. */
+  /** Active trace id for the board: the DESIGN.md §4.10 trace spine identity. */
   const traceId = "tr_8f29a4c1b3e0d5f7";
 
   let activeCreateColumnId = $state<string | null>(null);
@@ -363,7 +363,7 @@
   /**
    * The five Build layouts (`IA-MAP.md §2.3` / OD `build-board.html` switcher).
    * Board / List / Timeline / Graph each have a production route. Calendar is
-   * deferred to its own PRD (`design-alignment/build.md` — no OD file yet); it
+   * deferred to its own PRD (`design-alignment/build.md`: no OD file yet); it
    * stays in the switcher as a disabled affordance so the layout set is visible
    * without exposing a 404.
    */
@@ -422,7 +422,7 @@
               aria-disabled="true"
               data-build-layout={layout.id}
               data-build-layout-deferred="true"
-              title="Calendar layout — coming soon"
+              title="Calendar layout: coming soon"
               class={cn("inline-flex items-center gap-1 rounded-[3px] px-2 py-1 text-xs font-medium text-muted-foreground/50")}
             >
               <span aria-hidden="true">{layout.glyph}</span>
@@ -644,7 +644,7 @@
     <header class={cn("flex flex-wrap items-center gap-3")}>
       <h2 class={cn("text-sm font-semibold")}>Error states</h2>
       <p class={cn("flex-1 text-xs text-muted-foreground")}>
-        Errors render inline at the surface that triggered them — never as toasts.
+        Errors render inline at the surface that triggered them: never as toasts.
       </p>
       <Button size="sm" variant="outline" data-build-board-empty-toggle onclick={() => { showEmptyState = !showEmptyState; }}>
         {showEmptyState ? "Show populated board" : "Show empty board"}

@@ -67,7 +67,7 @@ const EMPTY_DASHBOARD: OrchestrationDashboardData = {
 
 function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
   // The route resolves its data through `requestServiceScope` and
-  // `$lib/server/orchestration` — both stubbed at the top of this file via the
+  // `$lib/server/orchestration`: both stubbed at the top of this file via the
   // shared complete-export factories. Here we only seed the suite-scoped data
   // the orchestration dashboard mock reads.
   suiteDispatches = dispatches;
@@ -80,7 +80,7 @@ function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
   // `$lib/feedback/action-result` is a pure module; the route's `actionOk`
   // result is never asserted by this load()-only suite. Mocking it here froze
   // a process-global, wrong-shaped (`success` vs `ok`) export set that broke
-  // every sibling suite importing the real module — left unmocked on purpose.
+  // every sibling suite importing the real module: left unmocked on purpose.
   return { projects };
 }
 

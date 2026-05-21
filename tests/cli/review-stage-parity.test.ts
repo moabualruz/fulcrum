@@ -1,8 +1,8 @@
 /**
  * Review-stage CLI verb parity (`prd-cli-review-stage-parity`).
  *
- * Asserts the full `CLI-TUI-UX.md` §1.4 Review grammar — `review`, `qa`,
- * `uat`, `e2e` — dispatches the right verb to the API caller, and that every
+ * Asserts the full `CLI-TUI-UX.md` §1.4 Review grammar: `review`, `qa`,
+ * `uat`, `e2e`: dispatches the right verb to the API caller, and that every
  * verb emits the canonical `fulcrum.cli.v1` envelope under `--json` while plain
  * output stays followable. The envelope is validated against the locked 12-key
  * shape via `isCanonicalEnvelope`.
@@ -178,7 +178,7 @@ describe("fulcrum Review-stage command tree (CLI-TUI-UX §1.4)", () => {
         exit: () => {},
       });
       const envelope = JSON.parse(lines[0] as string);
-      // The canonical 12-key envelope shape — schema + trace_id + arrays.
+      // The canonical 12-key envelope shape: schema + trace_id + arrays.
       expect(isCanonicalEnvelope(envelope)).toBe(true);
       expect(envelope.schema).toBe(ENVELOPE_SCHEMA);
       expect(envelope.schema).toBe("fulcrum.cli.v1");

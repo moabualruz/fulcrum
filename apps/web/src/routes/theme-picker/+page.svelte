@@ -41,7 +41,7 @@
   <section class="rounded-md border border-border p-4" data-theme-preview style="border-color: {accent}">
     <p class="text-sm">Live preview</p>
     <div data-theme-preview-swatch style="background: {accent}; border-radius: {settings.radius}rem; height: 48px; width: 100%"></div>
-    <p data-theme-preview-font class="mt-2 text-sm" style="font-family: {settings.fontFamily === "mono" ? "ui-monospace, SFMono-Regular, Menlo, monospace" : settings.fontFamily}">Aa — sample text</p>
+    <p data-theme-preview-font class="mt-2 text-sm" style="font-family: {settings.fontFamily === "mono" ? "ui-monospace, SFMono-Regular, Menlo, monospace" : settings.fontFamily}">Aa: sample text</p>
   </section>
 
   <fieldset class="grid gap-3 rounded-md border border-border p-3">

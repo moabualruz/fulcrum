@@ -36,7 +36,7 @@
 	 * An active-stage sub-navigation entry. Per the OD `desktop-shell.html` rail
 	 * replica, the StageRail's primary group is the *sub-navigation of the current
 	 * stage* (e.g. under `Plan`: Sessions / Reviews / Prototypes / Templates /
-	 * Prompts) — NOT the six-stage Capture→Operate axis. That workflow axis is
+	 * Prompts): NOT the six-stage Capture→Operate axis. That workflow axis is
 	 * owned by the ScopeBar stage-tab strip; the rail never renders it.
 	 */
 	export type StageRailSubnavItem = {
@@ -57,10 +57,10 @@
 	};
 
 	/**
-	 * A Workspace-group entry — the persistent portfolio destinations (All projects,
+	 * A Workspace-group entry: the persistent portfolio destinations (All projects,
 	 * Search, Memory, Context) that travel with every WorkflowStage. Rendered above
 	 * the System divider so it never competes visually with the active-stage
-	 * sub-navigation (DESIGN.md §3.1, IA-MAP.md §3 — the OD `desktop-shell.html`
+	 * sub-navigation (DESIGN.md §3.1, IA-MAP.md §3: the OD `desktop-shell.html`
 	 * `Workspace` group).
 	 */
 	export type StageRailWorkspaceItem = {
@@ -95,7 +95,7 @@
 		/** Collapsed = 56px icon-only rail; expanded = 220px (DESIGN.md §3.1). */
 		collapsed?: boolean;
 		/**
-		 * Active-stage sub-navigation — the rail's primary group. The group header
+		 * Active-stage sub-navigation: the rail's primary group. The group header
 		 * label is the active stage's name (e.g. `Plan`).
 		 */
 		substages?: StageRailSubnavItem[];
@@ -129,7 +129,7 @@
 	}: StageRailProps = $props();
 
 	// When the production shell supplies active-stage sub-navigation, the rail
-	// renders that — never the six-stage workflow axis. `stages` is the legacy
+	// renders that: never the six-stage workflow axis. `stages` is the legacy
 	// design-kit-only fallback, suppressed whenever `substages` is present.
 	const showLegacyStages = $derived(substages.length === 0 && stages.length > 0);
 	const subnavGroupLabel = $derived(STAGE_LABEL[current]);

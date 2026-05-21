@@ -17,7 +17,7 @@ export interface QueuedMutation {
   enqueuedAt: number;
 }
 
-/** Minimal storage interface — satisfied by both in-memory and IndexedDB impls. */
+/** Minimal storage interface: satisfied by both in-memory and IndexedDB impls. */
 export interface MutationStorage {
   getAll(): Promise<QueuedMutation[]>;
   add(item: QueuedMutation): Promise<void>;

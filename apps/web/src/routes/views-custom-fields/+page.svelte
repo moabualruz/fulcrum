@@ -141,7 +141,7 @@
               <div class="mt-1 flex flex-wrap gap-1">
                 {#each visibleOrderedFields() as field (field.id)}
                   <span data-task-chip-field={`${task.id}-${field.id}`} class="rounded-sm border border-border bg-muted px-2 py-0.5 text-[10px]">
-                    {field.label}: {task.customFields[field.id] ?? "—"}
+                    {field.label}: {task.customFields[field.id] ?? "-"}
                   </span>
                 {/each}
               </div>
@@ -186,7 +186,7 @@
                     class={cn("rounded border border-transparent px-1 py-0.5", (field.type === "text" || field.type === "select") && "hover:border-border")}
                     onclick={() => startEdit(task.id, field.id, task.customFields[field.id] ?? "")}
                     disabled={field.type !== "text" && field.type !== "select"}
-                  >{task.customFields[field.id] ?? "—"}</button>
+                  >{task.customFields[field.id] ?? "-"}</button>
                 {/if}
               </td>
             {/each}

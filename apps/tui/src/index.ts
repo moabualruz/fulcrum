@@ -1,5 +1,5 @@
 /**
- * TUI application root — `fulcrum tui` entry-point.
+ * TUI application root: `fulcrum tui` entry-point.
  *
  * Architecture:
  *   - Keyboard-first terminal UI rendered through the OpenTUI adapter at
@@ -307,10 +307,10 @@ export interface TuiCaller {
 export type TuiAction = "CreateItem";
 
 export interface TuiAppOptions {
-  /** Output driver — defaults to real stdout. Inject FakeTTY for tests. */
+  /** Output driver: defaults to real stdout. Inject FakeTTY for tests. */
   output?: TuiOutput;
 
-  /** Input driver — defaults to real stdin. Inject FakeTTY for tests. */
+  /** Input driver: defaults to real stdin. Inject FakeTTY for tests. */
   input?: TuiInput;
 
   /** HTTP API caller. Required. */
@@ -464,7 +464,7 @@ export function listTuiNavigationEntries(): readonly NavEntry[] {
  * Colon-route screen key (from `screen-registry.ts`) → the `TuiScreen` the root
  * launcher navigates to. Keys whose dedicated stage workbench is still owned by
  * a downstream PRD resolve to the launcher root with that stage pre-selected,
- * so every colon route resolves to a real screen — never an unknown-screen
+ * so every colon route resolves to a real screen: never an unknown-screen
  * crash. Existing screens keep their home (value-preservation: no lost route).
  */
 const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
@@ -596,7 +596,7 @@ export class TuiApp {
   private readonly input: TuiInput | null;
   private readonly actions: Partial<Record<TuiAction, () => void | Promise<void>>>;
   private readonly pathRouter: TuiRouter | null;
-  /** Canonical TUI screen catalog — backs the root tab strip + colon routes. */
+  /** Canonical TUI screen catalog: backs the root tab strip + colon routes. */
   private readonly screenRegistry: ScreenRegistry;
   private readonly telemetry: TuiTelemetrySink;
   private readonly crashLog: TuiCrashLog;
@@ -621,7 +621,7 @@ export class TuiApp {
   private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
   /**
-   * The screen the inline `:ai` pane was opened from — `q` inside `:ai` pops
+   * The screen the inline `:ai` pane was opened from: `q` inside `:ai` pops
    * back here rather than to the launcher root (CLI-TUI-UX.md §7.5, §10.1).
    */
   private aiAssistReturnScreen: TuiScreen = "nav";
@@ -827,7 +827,7 @@ export class TuiApp {
   }
 
   /**
-   * Render the OD StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1) — the
+   * Render the OD StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1): the
    * always-on bottom strip that mirrors the web `StatusFooter` primitive
    * segment-for-segment. The `StatusBarWidget` owns the segment order, mono
    * trace identity, and copy keybinds; this method only supplies shell data.
@@ -1022,11 +1022,11 @@ export class TuiApp {
     r.separator();
     r.writeln();
 
-    // OD `tui-runs.html` #tui-tabs — always-visible top tab strip (root chrome).
+    // OD `tui-runs.html` #tui-tabs: always-visible top tab strip (root chrome).
     this._renderTabStrip();
     r.writeln();
 
-    // Stage workbench launcher — the six workflow stages (CLI-TUI-UX.md §6).
+    // Stage workbench launcher: the six workflow stages (CLI-TUI-UX.md §6).
     this._renderStageNav();
 
     r.writeln();
@@ -1069,7 +1069,7 @@ export class TuiApp {
   }
 
   /**
-   * Render the OD `tui-runs.html` `#tui-tabs` strip — sixteen colon-route tabs
+   * Render the OD `tui-runs.html` `#tui-tabs` strip: sixteen colon-route tabs
    * in exact order. This is always-visible root chrome; every label and its
    * position are sourced from `TUI_TAB_STRIP` in the screen registry, so the
    * snapshot test locks concrete OD labels and order, not placeholder text.
@@ -1082,7 +1082,7 @@ export class TuiApp {
   }
 
   /**
-   * Render the root StageNav — the six workflow-stage launchers (Capture, Plan,
+   * Render the root StageNav: the six workflow-stage launchers (Capture, Plan,
    * Build, Review, Ship, Operate). Each row shows its colon route and `g`-chord
    * so the operator can launch a stage workbench from the root.
    */
@@ -1134,7 +1134,7 @@ export class TuiApp {
     if (this.currentScreen === "nav") return "Launcher";
     // The inline `:ai` AI Assist pane flips the footer mode pill to `:AI`
     // while focused (CLI-TUI-UX.md §10.1). `_currentScreenLabel` feeds the
-    // `mode` segment, which `StatusBarWidget` upper-cases — so `:ai` renders
+    // `mode` segment, which `StatusBarWidget` upper-cases: so `:ai` renders
     // as `:AI`.
     if (this.currentScreen === "ai-assist") return CHAT_PANE_FOOTER_MODE;
     return screenTitle(this.currentScreen);
@@ -1288,7 +1288,7 @@ export class TuiApp {
       }
     }
 
-    // External LLM Provider — shown only when flag enabled
+    // External LLM Provider: shown only when flag enabled
     const externalEnabled = (process.env["FULCRUM_FEATURES"] ?? "")
       .split(",").map((s) => s.trim()).includes("external-llm-provider");
     if (externalEnabled) {
@@ -2275,7 +2275,7 @@ export class TuiApp {
   // Headless helpers (for tests)
   // ─────────────────────────────────────────────────────────────────────────
 
-  /** Navigate to a screen directly (for tests — bypasses keyboard). */
+  /** Navigate to a screen directly (for tests: bypasses keyboard). */
   async navigateTo(screen: TuiScreen): Promise<void> {
     // The `:ai` tab and footer `[ :ai ]` segment route here; record the
     // origin screen so `q` inside the pane pops back (CLI-TUI-UX.md §7.5).
@@ -2349,7 +2349,7 @@ export class TuiApp {
   /**
    * Resolve and navigate a colon route (`:capture`, `:plan`, `:runs`, `:board`,
    * `:review`, `:ship`, `:doctor`, `:ai`, … plus aliases). Returns the resolved
-   * `TuiScreen`, or `undefined` for an unknown route — the launcher root stays
+   * `TuiScreen`, or `undefined` for an unknown route: the launcher root stays
    * mounted in that case rather than crashing. Stage routes pre-select the
    * matching StageNav entry so the root reflects the requested stage.
    */
@@ -2392,7 +2392,7 @@ export class TuiApp {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// buildCaller — production HTTP API caller factory
+// buildCaller: production HTTP API caller factory
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildCaller(
@@ -2484,7 +2484,7 @@ function tuiNotifyCaller(notify: NonNullable<TuiCaller["notify"]>) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// launchTui — convenience launcher used by the `fulcrum tui` binary entry.
+// launchTui: convenience launcher used by the `fulcrum tui` binary entry.
 // Constructs a TuiApp, mounts it, and returns the running instance.
 // Headless tests inject FakeTTY for both output + input.
 // ─────────────────────────────────────────────────────────────────────────────

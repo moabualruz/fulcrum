@@ -1,5 +1,5 @@
 /**
- * fulcrum my-work — show tasks assigned to current user.
+ * fulcrum my-work: show tasks assigned to current user.
  *
  * Usage:
  *   fulcrum my-work [--format json|table]

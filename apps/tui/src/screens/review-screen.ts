@@ -1,5 +1,5 @@
 /**
- * Review stage workbench — the TUI `:review` workbench (DESIGN.md §3.1,
+ * Review stage workbench: the TUI `:review` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `review` screen).
  *
  * The Review stage's QA / review-session surface, re-homed under the shared
@@ -9,15 +9,15 @@
  * and provides actions: load session, start review, approve/request-changes.
  *
  * Keybindings:
- *   R       — refresh
- *   A       — approve
- *   X       — request changes
- *   S       — save session
- *   m …     — Step mode picker chord: m a ✋ Manual / m p ▶ Play /
+ *   R      : refresh
+ *   A      : approve
+ *   X      : request changes
+ *   S      : save session
+ *   m …    : Step mode picker chord: m a ✋ Manual / m p ▶ Play /
  *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
- *   j/k     — navigate
- *   Enter   — open session detail
- *   q       — go back
+ *   j/k    : navigate
+ *   Enter  : open session detail
+ *   q      : go back
  */
 
 import type { Renderer } from "../renderer.ts";
@@ -201,7 +201,7 @@ export class ReviewScreen {
       return true;
     }
 
-    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`).
+    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`).
     if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "R" || key === "r") {

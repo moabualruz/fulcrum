@@ -1,5 +1,5 @@
 /**
- * fulcrum skills — CLI subcommands backed by the skill-supply public API.
+ * fulcrum skills: CLI subcommands backed by the skill-supply public API.
  *
  * Commands:
  *   fulcrum skills list [--json]
@@ -80,7 +80,7 @@ function isFeatureEnabled(feature: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// run — entry-point
+// run: entry-point
 // ---------------------------------------------------------------------------
 
 export async function run(
@@ -477,7 +477,7 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
     try {
       const existing = await readFile(plistPath, "utf8");
       if (existing.includes(PLIST_LABEL)) return;
-    } catch { /* not present — write it */ }
+    } catch { /* not present: write it */ }
 
     await mkdir(plistDir, { recursive: true });
     await writeFile(plistPath, PLIST_TEMPLATE, "utf8");
@@ -490,7 +490,7 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
     try {
       const existing = await readFile(cronPath, "utf8");
       if (existing.includes("fulcrum skills sync")) return;
-    } catch { /* not present — write it */ }
+    } catch { /* not present: write it */ }
 
     await mkdir(cronDir, { recursive: true });
     await writeFile(cronPath, `${CRON_LINE}\n`, "utf8");

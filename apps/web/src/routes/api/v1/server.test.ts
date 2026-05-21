@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 
 // Tests for public-api gate on /api/v1 route and OpenAPI spec.
 
-describe("/api/v1 — isPublicApiEnabled() and buildOpenApiSpec()", () => {
+describe("/api/v1: isPublicApiEnabled() and buildOpenApiSpec()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
 
   afterEach(() => {

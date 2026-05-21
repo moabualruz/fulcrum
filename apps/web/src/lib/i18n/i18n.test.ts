@@ -34,7 +34,7 @@ describe("i18n", () => {
     it("falls back to English for missing key in target locale", () => {
       setLocale("ar");
       // all keys exist in ar, so test with a hypothetical missing key
-      // by checking fallback behavior — key not in any catalog
+      // by checking fallback behavior: key not in any catalog
       expect(t("nonexistent.key")).toBe("[ar]nonexistent.key");
     });
 

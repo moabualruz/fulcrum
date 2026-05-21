@@ -219,7 +219,7 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
         if (result.ast.facets.label?.length) resolvedTag = result.ast.facets.label[0];
       }
     } catch {
-      // NL→filter failed — continue with plain-text query
+      // NL→filter failed: continue with plain-text query
     }
   }
 

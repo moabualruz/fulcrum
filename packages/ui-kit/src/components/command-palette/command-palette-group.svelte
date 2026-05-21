@@ -22,7 +22,7 @@
 </script>
 
 <!--
-	Grouped section of the CommandPalette — a labelled run of CommandPaletteItem
+	Grouped section of the CommandPalette: a labelled run of CommandPaletteItem
 	rows. Wraps the bits-ui `Command.Group` + `Command.GroupHeading` so a
 	consumer renders an IA-MAP §6 palette section (Recent, Workflow stage nav,
 	Step actions, …) without hand-rolling a heading. The heading uses

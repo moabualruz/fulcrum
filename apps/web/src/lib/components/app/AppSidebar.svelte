@@ -37,12 +37,12 @@
 	}
 
 	// AppSidebar is a thin data-supplying consumer of the `@fulcrum/ui-kit`
-	// StageRail primitive — it owns no rail markup of its own.
+	// StageRail primitive: it owns no rail markup of its own.
 	//
 	// Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
 	// Capture→Operate workflow axis is the ScopeBar tab strip's, NOT the rail's.
 	// The rail renders the *active stage's sub-navigation* plus the persistent
-	// Workspace (Portfolio) and System groups — the OD `desktop-shell.html` rail
+	// Workspace (Portfolio) and System groups: the OD `desktop-shell.html` rail
 	// replica. `stageForPath` resolves the live route to a WorkflowStage so the
 	// rail picks the right sub-nav; that route↔stage mapping stays available as
 	// data (`STAGE_NAV_ITEMS`, `stageForPath`) for the ScopeBar to consume.
@@ -84,6 +84,6 @@
 		class="flex-1"
 	/>
 	<div class={cn("border-r border-t border-border bg-surface-sunken p-3")}>
-		<span class={cn("text-xs text-fg-muted")}>{effectiveProjectId ?? "—"}</span>
+		<span class={cn("text-xs text-fg-muted")}>{effectiveProjectId ?? "-"}</span>
 	</div>
 </aside>

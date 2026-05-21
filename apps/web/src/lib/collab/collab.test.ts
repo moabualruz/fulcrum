@@ -46,9 +46,9 @@ describe("feature-flags", () => {
 	});
 });
 
-// ---- MockCollabProvider — flag OFF path ------------------------------------
+// ---- MockCollabProvider: flag OFF path ------------------------------------
 
-describe("MockCollabProvider — flag OFF (disconnected)", () => {
+describe("MockCollabProvider: flag OFF (disconnected)", () => {
 	it("starts disconnected", () => {
 		const p = new MockCollabProvider();
 		expect(p.connected).toBe(false);
@@ -62,9 +62,9 @@ describe("MockCollabProvider — flag OFF (disconnected)", () => {
 	});
 });
 
-// ---- MockCollabProvider — flag ON path ------------------------------------
+// ---- MockCollabProvider: flag ON path ------------------------------------
 
-describe("MockCollabProvider — flag ON (connected)", () => {
+describe("MockCollabProvider: flag ON (connected)", () => {
 	let provider: MockCollabProvider;
 	const alice: CollabUser = { id: "alice", name: "Alice", color: "#f00" };
 	const bob: CollabUser = { id: "bob", name: "Bob", color: "#00f" };
@@ -180,7 +180,7 @@ describe("createCollabProvider factory", () => {
 
 // ---- BellWebSocket ----------------------------------------------------------
 
-describe("BellWebSocket factory — flag OFF", () => {
+describe("BellWebSocket factory: flag OFF", () => {
 	it("returns null when disabled", async () => {
 		const { createBellWebSocket } = await import("./bell-websocket.js");
 		const result = createBellWebSocket(
@@ -191,7 +191,7 @@ describe("BellWebSocket factory — flag OFF", () => {
 	});
 });
 
-describe("BellWebSocket — flag ON (mock WebSocket)", () => {
+describe("BellWebSocket: flag ON (mock WebSocket)", () => {
 	it("attempts connection to /api/ws/notify when enabled", async () => {
 		const { createBellWebSocket } = await import("./bell-websocket.js");
 		const openUrls: string[] = [];

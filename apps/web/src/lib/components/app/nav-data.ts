@@ -12,9 +12,9 @@ export type { WorkflowStage } from "@fulcrum/ui-kit";
  * persistent Workspace and System groups (the OD `desktop-shell.html` rail
  * replica). This module therefore exposes two distinct things:
  *
- *  1. `STAGE_NAV_ITEMS` + `stageForPath` — the route↔stage mapping kept as
+ *  1. `STAGE_NAV_ITEMS` + `stageForPath`: the route↔stage mapping kept as
  *     **data** for the ScopeBar to consume; it is never rendered as rail items.
- *  2. `STAGE_SUBNAV` + `subnavForStage` — the per-stage sub-navigation the
+ *  2. `STAGE_SUBNAV` + `subnavForStage`: the per-stage sub-navigation the
  *     StageRail renders for whichever stage is active.
  */
 
@@ -28,7 +28,7 @@ export interface StageNavItem {
 
 /**
  * One stage → its production route. Capture is the workspace root `/`; the rest
- * open their stage workbench. This is **data only** — the ScopeBar stage-tab
+ * open their stage workbench. This is **data only**: the ScopeBar stage-tab
  * strip consumes it; the StageRail does not render it. Old feature-bucket routes
  * redirect to these stage homes via `prd-web-stage-route-model`.
  */
@@ -107,7 +107,7 @@ export function stageForPath(pathname: string): WorkflowStage {
 }
 
 /**
- * Per-stage sub-navigation the StageRail renders for the active stage — the OD
+ * Per-stage sub-navigation the StageRail renders for the active stage: the OD
  * `desktop-shell.html` rail replica (`Plan` → `Sessions / Reviews / Prototypes /
  * Templates / Prompts`). Each entry's `href` resolves to a real production route
  * so no destination 404s; the IA-MAP §1 stage route grammar is the source.
@@ -189,7 +189,7 @@ export interface NavGroup {
  * sub-navigation. Group order is locked by `nav-items.test.ts`; reordering
  * requires updating the test snapshot.
  *
- * - `Workspace` preserves the former `Portfolio` group verbatim — portfolio
+ * - `Workspace` preserves the former `Portfolio` group verbatim: portfolio
  *   destinations that travel with every stage, kept visually quiet so they do
  *   not compete with the active-stage sub-navigation.
  * - `System` re-points to `Settings · Knowledge · MCP · Plugins` per

@@ -1,10 +1,10 @@
 /**
- * Ship stage CLI verb parity — `prd-cli-ship-stage-parity`.
+ * Ship stage CLI verb parity: `prd-cli-ship-stage-parity`.
  *
  * Proves the Ship workflow stage (CLI-TUI-UX.md §1.5) is a real, dispatchable
  * command grammar, not just `fulcrum artifacts`. The Ship stage host
  * (`apps/cli/src/commands/ship-stage.ts`) dispatches the seven §1.5 verb
- * groups — `artifact`, `release`, `ship`, `repo`, `branch`, `pr`, `memory` —
+ * groups: `artifact`, `release`, `ship`, `repo`, `branch`, `pr`, `memory` -
  * and every verb's `--json` output is the canonical `fulcrum.cli.v1` envelope
  * (CLI-TUI-UX.md §3).
  *
@@ -13,7 +13,7 @@
  * `fulcrum release cut|roll-back|pause|promote` CLI verbs. The release domain
  * model does not exist yet (design-alignment/ship.md §"Migration notes"); those
  * verbs are real dispatchable commands that emit a canonical *error* envelope
- * (`FUL_SHIP_RELEASE_UNAVAILABLE`) — the honest non-mocked CLI behaviour — so
+ * (`FUL_SHIP_RELEASE_UNAVAILABLE`): the honest non-mocked CLI behaviour: so
  * the envelope contract still holds.
  */
 
@@ -107,7 +107,7 @@ describe("Ship stage CLI verb grammar (CLI-TUI-UX.md §1.5)", () => {
   });
 });
 
-describe("Ship verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
+describe("Ship verb dispatch: canonical fulcrum.cli.v1 envelope", () => {
   test("`fulcrum ship list --json` dispatches and emits the canonical envelope", async () => {
     const h = harness();
     await runShipStage(["ship", "list", "--json"], h.opts);
@@ -133,7 +133,7 @@ describe("Ship verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
     "`fulcrum release %s --json` is a real verb that emits the canonical envelope",
     async (verb, command) => {
       const h = harness();
-      // The release domain model does not exist yet — the verb is still a real
+      // The release domain model does not exist yet: the verb is still a real
       // dispatchable command and still emits the canonical envelope, carrying a
       // coded error in the always-array `errors` field.
       await runShipStage(["release", verb, "--json"], h.opts);

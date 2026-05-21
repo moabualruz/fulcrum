@@ -186,7 +186,7 @@ describe("CLI-TUI-UX canonical bin dispatch contract", () => {
 /**
  * CLI-TUI-UX.md §1.6: `fulcrum operate plugin …` and the root alias
  * `fulcrum plugin …` must BOTH be reachable through the actual bin and BOTH
- * emit the canonical `fulcrum.cli.v1` envelope — never a raw array. This block
+ * emit the canonical `fulcrum.cli.v1` envelope: never a raw array. This block
  * is the consumed-by proof for `prd-cli-operate-plugin-envelope-and-root-plugin`:
  * a parity check fails if the host exists but the bin does not dispatch it, or
  * if a live `--json` path falls back to a bare payload.

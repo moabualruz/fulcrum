@@ -32,7 +32,7 @@ describe("StageRail", () => {
 				system: [{ id: "settings", label: "Settings", href: "/settings" }],
 			},
 		});
-		// The six-stage axis slot must be absent — the ScopeBar owns that axis.
+		// The six-stage axis slot must be absent: the ScopeBar owns that axis.
 		expect(body).not.toContain('data-slot="stage-rail-item"');
 		expect(body).not.toContain('data-slot="stage-rail-label"');
 		// Workspace + System groups stay visible.
@@ -43,7 +43,7 @@ describe("StageRail", () => {
 	test("default props render no six-stage axis", () => {
 		const { body } = render(StageRailRoot, { props: {} });
 		expect(body).toContain('data-slot="stage-rail"');
-		// No stages and no substages by default — the rail is not a stage list.
+		// No stages and no substages by default: the rail is not a stage list.
 		expect(body).not.toContain('data-slot="stage-rail-item"');
 		expect(body).not.toContain('data-slot="stage-rail-substage-item"');
 	});
@@ -125,12 +125,12 @@ describe("StageRail", () => {
 				substages: [{ id: "sessions", label: "Sessions", href: "/plan/sessions" }],
 			},
 		});
-		// substages win — the legacy six-stage axis is not rendered.
+		// substages win: the legacy six-stage axis is not rendered.
 		expect(body).not.toContain('data-slot="stage-rail-item"');
 		expect(body).toContain('data-slot="stage-rail-substage-item"');
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		const { body } = render(StageRailRoot, {
 			props: {
 				current: "plan",

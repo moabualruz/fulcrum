@@ -1,5 +1,5 @@
 /**
- * Bell badge WebSocket — replaces 60s poll when flag ON.
+ * Bell badge WebSocket: replaces 60s poll when flag ON.
  * Connects to /api/ws/notify; auto-retries with exponential back-off.
  */
 import type { BellWebSocket, BellWebSocketOptions } from "./types.js";
@@ -56,7 +56,7 @@ export class BellWebSocketClient implements BellWebSocket {
 	}
 }
 
-/** Factory — returns null when flag OFF (no WebSocket attempted). */
+/** Factory: returns null when flag OFF (no WebSocket attempted). */
 export function createBellWebSocket(
 	opts: BellWebSocketOptions,
 	enabled: boolean,

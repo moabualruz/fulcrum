@@ -1,9 +1,9 @@
 /**
  * Build-stage CLI verb-parity contract test (`prd-cli-build-stage-parity`).
  *
- * Proves the canonical Build grammar from `CLI-TUI-UX.md` §1.3 — `fulcrum task`,
+ * Proves the canonical Build grammar from `CLI-TUI-UX.md` §1.3: `fulcrum task`,
  * `fulcrum run`, `fulcrum runs`, `fulcrum cycle`, `fulcrum module`,
- * `fulcrum context` — dispatches every documented verb and wraps `--json`
+ * `fulcrum context`: dispatches every documented verb and wraps `--json`
  * output in the canonical `fulcrum.cli.v1` envelope (`CLI-TUI-UX.md` §3).
  *
  * Consumed-by: this is the parity test the PRD `verify` array runs. It names
@@ -69,7 +69,7 @@ function expectCanonicalEnvelope(line: string, command: string): Record<string, 
   return parsed;
 }
 
-/** A task API caller stub — the test seam the production env caller fills in. */
+/** A task API caller stub: the test seam the production env caller fills in. */
 function taskCaller(overrides: Record<string, unknown> = {}) {
   return {
     tasks: {
@@ -163,7 +163,7 @@ describe("Build-stage CLI verb parity (CLI-TUI-UX §1.3)", () => {
     expect(nextActions[0]!.command).toContain("fulcrum task view");
   });
 
-  test("fulcrum task keeps documented aliases — get/create/update/delete still dispatch", async () => {
+  test("fulcrum task keeps documented aliases: get/create/update/delete still dispatch", async () => {
     for (const verb of ["get", "create", "update", "delete"]) {
       const io = capture();
       const args = buildTaskAliasArgs(verb);

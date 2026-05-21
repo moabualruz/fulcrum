@@ -111,8 +111,8 @@ describe("hooks CLI source command", () => {
 
     const text = await captureRun(["list"]);
     expect(text.stdout).toContain("Available hooks");
-    expect(text.stdout).toContain("format — edit-file; silent-fail-open; nonblocking");
-    expect(text.stdout).toContain("pm-policy — bash-command; blocking-stderr; blocking");
+    expect(text.stdout).toContain("format: edit-file; silent-fail-open; nonblocking");
+    expect(text.stdout).toContain("pm-policy: bash-command; blocking-stderr; blocking");
     expect(text.stdout).toContain("1 of 8 marked enabled");
   });
 

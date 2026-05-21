@@ -1,11 +1,11 @@
 /**
- * TUI New Document screen — `n` keybinding from any nav screen.
+ * TUI New Document screen: `n` keybinding from any nav screen.
  *
  * Flow:
  *   1. Loads doc templates from in-process tRPC caller.
  *   2. Shows a doc_type picker (j/k to navigate, Enter to select).
  *   3. After selection, shows template body in an editable textarea buffer.
- *   4. `s` saves (stub — wired when docs.create is implemented), `q` exits.
+ *   4. `s` saves (stub: wired when docs.create is implemented), `q` exits.
  *
  * Headless-testable via FakeTTY injection.
  * C4: TUI surface parity.
@@ -19,7 +19,7 @@ import { TUI_DOC_TYPES } from "./docs-types.ts";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface NewDocScreenOptions {
-  /** The `docs` portion of the TuiCaller — i.e. `caller.docs`. */
+  /** The `docs` portion of the TuiCaller: i.e. `caller.docs`. */
   caller: {
     templates: {
       list: (input: Record<string, never>) => Promise<DocTemplateRow[]>;

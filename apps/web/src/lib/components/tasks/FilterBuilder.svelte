@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * FilterBuilder — chip-based filter UI (Linear-style).
+   * FilterBuilder: chip-based filter UI (Linear-style).
    */
   import { createEventDispatcher } from "svelte";
   import type { SavedViewQuery, FilterClause, FilterOp } from "@work-management/interface/saved-view-filters.ts";

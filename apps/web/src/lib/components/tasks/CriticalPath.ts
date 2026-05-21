@@ -1,8 +1,8 @@
 /**
- * CriticalPath.ts — task workflow (D-102, D-103, D-104)
+ * CriticalPath.ts: task workflow (D-102, D-103, D-104)
  *
  * Pure TypeScript CPM (Critical Path Method) algorithm.
- * No Svelte dependency — fully unit-testable.
+ * No Svelte dependency: fully unit-testable.
  */
 
 export interface TaskNode {
@@ -77,13 +77,13 @@ function topologicalSort(
 // ── Main export ────────────────────────────────────────────────────────────────
 
 /**
- * computeCriticalPath — D-102
+ * computeCriticalPath: D-102
  *
  * CPM forward/backward pass to compute earliest/latest start times.
  * Only 'blocks' relationships are used as dependency edges.
  * Tasks with slack === 0 form the critical path.
  *
- * Complexity: O(V + E) — handles 10k tasks comfortably (D-103 accept).
+ * Complexity: O(V + E): handles 10k tasks comfortably (D-103 accept).
  */
 export function computeCriticalPath(
   tasks: TaskNode[],
@@ -157,7 +157,7 @@ export function computeCriticalPath(
 // ── Reactive cache (D-103) ─────────────────────────────────────────────────────
 
 /**
- * CriticalPathCache — wraps computeCriticalPath with identity-based caching.
+ * CriticalPathCache: wraps computeCriticalPath with identity-based caching.
  * Recompute only when tasks or relationships arrays change (by reference).
  */
 export class CriticalPathCache {

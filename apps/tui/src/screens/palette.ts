@@ -1,13 +1,13 @@
 /**
- * ColonPalette help bindings — the keyboard map shown in the help overlay.
+ * ColonPalette help bindings: the keyboard map shown in the help overlay.
  *
  * Two command surfaces, per CLI-TUI-UX.md §7.1 + §9 (apps/tui/CONTEXT.md
  * ColonPalette):
- *   - `:` opens the **ColonPalette** — the modal, text-driven command palette
+ *   - `:` opens the **ColonPalette**: the modal, text-driven command palette
  *     with k9s/Helix grammar that tab-completes against the CLI command tree.
  *   - `/` filters the *current* screen (in-screen search), it is NOT the
  *     command palette. The legacy wording that called `/` "command palette"
- *     was a copy bug — agent-tui-review.md Critical finding 3 names it.
+ *     was a copy bug: agent-tui-review.md Critical finding 3 names it.
  *
  * This module also publishes the StageChord cheatsheet rows (`g c`/`g p`/…)
  * so the help overlay renders the canonical CLI-TUI-UX.md §7.2 navigation map
@@ -25,7 +25,7 @@ export function isHelpToggleKey(key: string): boolean {
 /**
  * The foundation help bindings every screen shows. Key column is stable
  * (`j/k`, `gg / G`, `/`, `V`, `Enter`, `?`); the `/` row's action is
- * "Search/filter current screen" — `/` is in-screen search, not the palette
+ * "Search/filter current screen": `/` is in-screen search, not the palette
  * (CLI-TUI-UX.md §7.1). The ColonPalette is the separate `:` surface; see
  * {@link COMMAND_SURFACE_BINDINGS}.
  */
@@ -39,7 +39,7 @@ export const FOUNDATION_HELP_BINDINGS: KeyBinding[] = [
 ];
 
 /**
- * The command-surface bindings — `:` opens the ColonPalette, `Space` opens the
+ * The command-surface bindings: `:` opens the ColonPalette, `Space` opens the
  * SpaceMenu (CLI-TUI-UX.md §7.1, §9). Distinct from `/` in-screen search.
  */
 export const COMMAND_SURFACE_BINDINGS: KeyBinding[] = [
@@ -52,7 +52,7 @@ export const COMMAND_SURFACE_BINDINGS: KeyBinding[] = [
  * The StageChord cheatsheet (CLI-TUI-UX.md §7.2). Each row is `g <key>` →
  * stage screen. Order matches OD `tui-runs.html` help panel: Capture, Plan,
  * Build runs, Build board, Review, Ship, Operate. `g B` is a distinct row
- * from `g b` — uppercase opens the board, lowercase the runs feed.
+ * from `g b`: uppercase opens the board, lowercase the runs feed.
  */
 export const STAGE_CHORD_BINDINGS: KeyBinding[] = [
   { key: "g c", action: "Go to Capture" },
@@ -90,7 +90,7 @@ export function bindingsForContext(contextKey: string | null | undefined): KeyBi
 /**
  * The full help-overlay map: foundation list/search keys, then the command
  * surfaces (`:` ColonPalette / `Space` menu), then the StageChord navigation
- * cheatsheet. This is the OD `tui-runs.html` "? keyboard cheatsheet" content —
+ * cheatsheet. This is the OD `tui-runs.html` "? keyboard cheatsheet" content -
  * `bindingsForContext()` stays the per-screen subset, this is the global map.
  */
 export function helpCheatsheetBindings(
@@ -105,7 +105,7 @@ export function helpCheatsheetBindings(
 
 /**
  * Assert the StageChord cheatsheet covers exactly the `keybindings.ts`
- * `STAGE_CHORDS` map — one help row per chord second key, no drift. Returns
+ * `STAGE_CHORDS` map: one help row per chord second key, no drift. Returns
  * `true` when the help cheatsheet and the chord state machine agree.
  */
 export function stageChordBindingsCoverChordMap(): boolean {

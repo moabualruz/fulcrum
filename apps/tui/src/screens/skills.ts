@@ -1,7 +1,7 @@
 /**
- * TUI skills browser screen — table + conflict panel.
+ * TUI skills browser screen: table + conflict panel.
  *
- * P5#18 — renders skills table with slug/version/source/hash_verified/enabled_agents.
+ * P5#18: renders skills table with slug/version/source/hash_verified/enabled_agents.
  * Key bindings: s=sync, u=upgrade, D=uninstall(confirm), k=keep-local, U=use-upstream, m=editor merge.
  * Conflict panel: side-by-side diff when selected row has upstream_conflict.
  */
@@ -156,7 +156,7 @@ export class SkillsScreen {
       return true;
     }
 
-    // Conflict resolution keys — only when selected row has conflict
+    // Conflict resolution keys: only when selected row has conflict
     const selected = this.selectedSkill;
     if (selected?.upstreamConflict) {
       if (key === "k") {

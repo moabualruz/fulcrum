@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, mock, test } from "bun:test";
 // `prd-web-plan-session-od-fidelity` (`feat(web): plan-session OD Live Session
 // Pane workbench`) consolidated the legacy form-based `/planning` route into
 // the canonical `/plan-session` workbench. `/planning` is now a 200 redirect
-// stub — it must keep resolving and forward to the workbench. The legacy
+// stub: it must keep resolving and forward to the workbench. The legacy
 // planning *form* behaviour (preview / materialize / freeform / guided AI Assist /
 // continuous-update / generate / artifact-execution / workflow-cycle actions)
 // lives on in `planning/+page.server.ts` and is covered by

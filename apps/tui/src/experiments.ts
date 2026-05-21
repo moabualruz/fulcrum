@@ -70,7 +70,7 @@ export class ExperimentsPanel {
   }
 
   /**
-   * openMetrics — enter metrics pane for the currently selected experiment.
+   * openMetrics: enter metrics pane for the currently selected experiment.
    * Called when user presses Enter on a row.
    */
   openMetrics(metrics: MetricsResult): ExperimentMetricsPane | null {
@@ -91,7 +91,7 @@ export class ExperimentsPanel {
   // ── Render helpers ────────────────────────────────────────────────────────
 
   /**
-   * renderList — returns terminal-friendly rows for the experiment list.
+   * renderList: returns terminal-friendly rows for the experiment list.
    * Each row: "[selected?] name  variant  [badge counts]"
    */
   renderList(): string[] {
@@ -107,12 +107,12 @@ export class ExperimentsPanel {
   }
 
   /**
-   * renderMetrics — returns terminal-friendly metrics display.
+   * renderMetrics: returns terminal-friendly metrics display.
    * Shows assigned + conversion counts per variant.
    */
   renderMetrics(): string[] {
     if (!this.metricsPane) return [];
-    const lines: string[] = [`Metrics — ${this.metricsPane.experimentName}`];
+    const lines: string[] = [`Metrics: ${this.metricsPane.experimentName}`];
     for (const [variant, data] of Object.entries(this.metricsPane.metrics)) {
       lines.push(`  ${variant}: assigned=${data.assigned}  conversions=${data.conversions}`);
     }

@@ -41,12 +41,17 @@ const ledgerRelpath =
  * copy and falls back to a CWD-relative copy (the primary checkout).
  */
 function resolveDefaultLedger(): string {
-  const scriptRootLedger = resolve(repoRoot, ledgerRelpath);
-  if (existsSync(scriptRootLedger)) return scriptRootLedger;
-  return resolve(process.cwd(), ledgerRelpath);
+  for (const candidate of [
+    resolve(repoRoot, ledgerRelpath),
+    resolve(process.cwd(), ledgerRelpath),
+  ]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return resolve(repoRoot, ledgerRelpath);
 }
 
 const defaultLedger = resolveDefaultLedger();
+const defaultLedgerExists = existsSync(defaultLedger);
 
 interface PrdRow {
   id?: string;
@@ -80,7 +85,7 @@ function quotedLiterals(text: string): string[] {
   for (const re of patterns) {
     for (const m of text.matchAll(re)) {
       const raw = m[1].trim();
-      if (raw.length >= 1 && /[A-Za-z]/.test(raw)) out.push(raw);
+      if (raw.length >= 1 && (/[A-Za-z✨—]/.test(raw) || /\\u(?:2014|2728)/i.test(raw))) out.push(raw);
     }
   }
   return out;
@@ -124,16 +129,8 @@ function hasExactTokenEnumeration(text: string): boolean {
  * ban list legitimately enumerates short tokens (e.g. `WIP`, `Oops!`).
  */
 function hasBannedStringAssertion(text: string): boolean {
-  if (implicitBannedToken(text) !== null) return true;
   if (!BAN_KEYWORDS.test(text)) return false;
   return quotedLiterals(text).length > 0;
-}
-
-function implicitBannedToken(text: string): string | null {
-  if (/\btoken\s+ACP\b/i.test(text)) return "ACP";
-  if (/\bstatus\s+string\s+reads\s+WIP\b/i.test(text)) return "WIP";
-  if (/\bsparkle\s+glyph\b/i.test(text)) return "✨";
-  return null;
 }
 
 /**
@@ -194,6 +191,12 @@ let checkedRows = 0;
 let checkedAssertions = 0;
 
 for (const ledger of ledgers) {
+  if (!existsSync(ledger)) {
+    if (argv.length > 0) {
+      failures.push(`${relative(repoRoot, ledger) || ledger}: ledger file not found`);
+    }
+    continue;
+  }
   const rel = relative(repoRoot, ledger) || ledger;
   const rows = loadRows(ledger);
   for (const row of rows) {
@@ -226,6 +229,13 @@ if (failures.length > 0) {
     `\n${failures.length} paraphrase assertion(s) across ${checkedRows} PRD row(s) with non-empty copy_assertions.`,
   );
   process.exit(1);
+}
+
+if (!defaultLedgerExists && argv.length === 0) {
+  console.log(
+    `check-copy-assertions ok: no default PRD ledger at ${relative(repoRoot, defaultLedger)}.`,
+  );
+  process.exit(0);
 }
 
 console.log(

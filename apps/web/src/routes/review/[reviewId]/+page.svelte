@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * Review workbench — `/review/<reviewId>`, the production surface for OD
+	 * Review workbench: `/review/<reviewId>`, the production surface for OD
 	 * `review.html` (`prd-web-review-workbench-od-fidelity`).
 	 *
 	 * The canonical IA-MAP §2.4 home is `/<ws>/projects/<projId>/review/<reviewId>`;
@@ -8,37 +8,37 @@
 	 * route the Review queue (`/review`) links into and the StageRail resolves
 	 * under the Review WorkflowStage.
 	 *
-	 * The OD ships the **Review workbench** — the single dense surface where an
+	 * The OD ships the **Review workbench**: the single dense surface where an
 	 * operator inspects one PR and records a decision. The OD `.rev-shell` (lines
 	 * 13–23) is a four-region CSS grid:
 	 *
-	 *  - **head** — breadcrumb, PR title, the `waiting-input` decision badge, a
+	 *  - **head**: breadcrumb, PR title, the `waiting-input` decision badge, a
 	 *    trace pill, and the Re-run checks / Comment / `Approve & merge ⌘↵`
 	 *    decision actions;
-	 *  - **tabs** — Files / Comments / Free chat / Plan & tasks / Commits, plus a
+	 *  - **tabs**: Files / Comments / Free chat / Plan & tasks / Commits, plus a
 	 *    trailing split/unified Diff-view toggle;
-	 *  - **tree | diff | notes** — a folder-grouped file tree, the inline diff
+	 *  - **tree | diff | notes**: a folder-grouped file tree, the inline diff
 	 *    pane, and the right-hand annotations rail;
-	 *  - **tree | dock | notes** — the bottom Checks/Summary/Logs/Suggestions dock
+	 *  - **tree | dock | notes**: the bottom Checks/Summary/Logs/Suggestions dock
 	 *    with a gate readout.
 	 *
 	 * The inline diff is `DESIGN.md` §4.6: split/unified toggle, per-hunk
 	 * accept/reject, line numbers always on, commentable lines with a hover
 	 * affordance and anchored threads. Per-hunk keyboard is `DESIGN.md` §4.5
-	 * tool-call cards — `a` accept / `r` reject / `h` next-hunk. The decision
+	 * tool-call cards: `a` accept / `r` reject / `h` next-hunk. The decision
 	 * header carries the `Mod+Enter` approve / send-feedback overload (`IA-MAP.md`
 	 * §4.4 Plannotator): with zero annotations it approves, with annotations it
 	 * sends feedback.
 	 *
 	 * Migration (`design-alignment/review.md` §review.html migration notes):
 	 *  - `comments-block-thread` is absorbed as the ui-kit `CommentThread`
-	 *    primitive — selection-anchored, resolvable, faded-when-resolved threads
+	 *    primitive: selection-anchored, resolvable, faded-when-resolved threads
 	 *    (`DESIGN.md` §9.1). The standalone route is retired to a redirect.
 	 *  - `review-templates` becomes the Comments-panel composer template picker;
 	 *    its five built-in templates become composer affordances. The standalone
 	 *    route is retired to a redirect.
 	 *
-	 * Status vocabulary is the canonical `COPY.md` §362 8-state set — the
+	 * Status vocabulary is the canonical `COPY.md` §362 8-state set: the
 	 * `waiting-input` decision badge is canonical. Every UI primitive is composed
 	 * from `@fulcrum/ui-kit` per the AGENTS.md ui-kit rule; the `waiting-input`
 	 * badge resolves through `StatusBadge`, the trace identity through `TraceChip`.
@@ -141,7 +141,7 @@
 	}
 
 	interface DiffHunk {
-		/** Hunk header (OD `.hunk-head` — `@@ -42,7 +42,12 @@`). */
+		/** Hunk header (OD `.hunk-head`: `@@ -42,7 +42,12 @@`). */
 		header: string;
 		lines: readonly DiffLine[];
 	}
@@ -257,7 +257,7 @@
 					author: "Jamie Black",
 					context: "sec-review",
 					ts: "2m",
-					body: "Should the response really return the kid? Clients shouldn't need it — handing it back leaks revocation surface. Keep it server-only and expose a dedicated session endpoint instead.",
+					body: "Should the response really return the kid? Clients shouldn't need it: handing it back leaks revocation surface. Keep it server-only and expose a dedicated session endpoint instead.",
 				},
 			],
 		},
@@ -271,13 +271,13 @@
 					id: "c1",
 					author: "Priya Shah",
 					ts: "15m",
-					body: "If both the claims.kid path and legacy verify can succeed, reject — picking one silently is the bug we'll chase for a quarter.",
+					body: "If both the claims.kid path and legacy verify can succeed, reject: picking one silently is the bug we'll chase for a quarter.",
 				},
 			],
 		},
 	};
 
-	/* ── Comments panel — anchored threads (OD lines 443–518) ───────────────── */
+	/* ── Comments panel: anchored threads (OD lines 443–518) ───────────────── */
 
 	const COMMENT_PANEL_THREADS: readonly (InlineThread & { id: string })[] = [
 		{
@@ -324,7 +324,7 @@
 					kind: "agent",
 					context: "self-review",
 					ts: "7m",
-					body: "Added kid-keyed issuance table. No back-reference index on userId yet — the 'list my sessions' query will scan. I can add an index in a follow-up if you confirm cardinality is high enough.",
+					body: "Added kid-keyed issuance table. No back-reference index on userId yet: the 'list my sessions' query will scan. I can add an index in a follow-up if you confirm cardinality is high enough.",
 				},
 			],
 		},
@@ -339,7 +339,7 @@
 					id: "c1",
 					author: "Priya Shah",
 					ts: "22m",
-					body: "Contract test fails — emits kid but the registered schema expects tokenId. Either rename the schema or rename the field.",
+					body: "Contract test fails: emits kid but the registered schema expects tokenId. Either rename the schema or rename the field.",
 				},
 				{
 					id: "c2",
@@ -419,7 +419,7 @@
 			author: "You",
 			kind: "you",
 			ts: "just now",
-			where: "verify.ts · L18 — sunset",
+			where: "verify.ts · L18: sunset",
 			text: "Calendar reminder set for 2026-06-01 to drop verifyLegacy. Added to operate/doctor as a future-deprecation row.",
 			unresolved: false,
 		},
@@ -429,17 +429,17 @@
 			kind: "agent",
 			ts: "7m ago",
 			where: "issuance.repo.ts · summary",
-			text: "Added kid-keyed issuance table. No back-reference index on userId yet — the 'list my sessions' query will scan.",
+			text: "Added kid-keyed issuance table. No back-reference index on userId yet: the 'list my sessions' query will scan.",
 			unresolved: true,
 		},
 	] as const;
 
-	/* ── Composer template picker — absorbed `review-templates` (OD §template) ─ */
+	/* ── Composer template picker: absorbed `review-templates` (OD §template) ─ */
 
 	/**
 	 * The five built-in review-comment templates, absorbed from the retired
 	 * `review-templates` route per `design-alignment/review.md`. They become the
-	 * Comments-panel composer template picker — selecting one seeds the composer
+	 * Comments-panel composer template picker: selecting one seeds the composer
 	 * body. No feature loss: the template library is now a workbench affordance.
 	 */
 	const COMMENT_TEMPLATES: readonly { id: string; label: string; body: string }[] = [
@@ -454,7 +454,7 @@
 
 	let activeTab = $state<WorkbenchTab>("files");
 	let activeDockTab = $state<DockTab>("checks");
-	/** Diff render mode — split (two-pane) or unified, OD Diff-view toggle. */
+	/** Diff render mode: split (two-pane) or unified, OD Diff-view toggle. */
 	let diffMode = $state<"unified" | "split">("unified");
 	/** The active file in the tree (OD `aria-current`). */
 	let activeFile = $state<string>("session.ts");
@@ -462,7 +462,7 @@
 	let hunkDecisions = $state<Record<string, "accepted" | "rejected">>({});
 	/** The diff line index the per-hunk keyboard cursor is on. */
 	let cursorHunk = $state(0);
-	/** Comment-panel composer body — seeded by the template picker. */
+	/** Comment-panel composer body: seeded by the template picker. */
 	let composerBody = $state("");
 	/** The decision the workbench has recorded, once acted on. */
 	let decision = $state<"none" | "approved" | "feedback-sent">("none");
@@ -474,7 +474,7 @@
 	 */
 	const hasAnnotations = $derived(NOTE_CARDS.some((note) => note.unresolved));
 
-	/** The canonical decision-gate status — OD `waiting-input` badge. */
+	/** The canonical decision-gate status: OD `waiting-input` badge. */
 	const decisionStatus: WorkflowStatus = "waiting-input";
 
 	/** Flat ordered list of every hunk for the per-hunk keyboard cursor. */
@@ -581,7 +581,7 @@
 	data-review-id={reviewId}
 	data-decision={decision}
 >
-	<!-- ── HEAD — breadcrumb, title, waiting-input badge, trace pill, actions ── -->
+	<!-- ── HEAD: breadcrumb, title, waiting-input badge, trace pill, actions ── -->
 	<header
 		class="flex items-center gap-3 border-b border-border bg-card px-5 py-3.5"
 		style="grid-area: head;"
@@ -615,7 +615,7 @@
 		</Button>
 	</header>
 
-	<!-- ── TABS — Files / Comments / Free chat / Plan & tasks / Commits ──────── -->
+	<!-- ── TABS: Files / Comments / Free chat / Plan & tasks / Commits ──────── -->
 	<div
 		class="flex items-center border-b border-border bg-card px-2"
 		style="grid-area: tabs;"
@@ -652,7 +652,7 @@
 			</button>
 		{/each}
 		<span class="flex-1"></span>
-		<!-- Diff-view split/unified toggle — OD trailing `Diff view` tab. -->
+		<!-- Diff-view split/unified toggle: OD trailing `Diff view` tab. -->
 		<button
 			type="button"
 			data-review-diff-toggle
@@ -664,7 +664,7 @@
 		</button>
 	</div>
 
-	<!-- ── TREE — folder-grouped file tree ──────────────────────────────────── -->
+	<!-- ── TREE: folder-grouped file tree ──────────────────────────────────── -->
 	<aside
 		class="overflow-y-auto border-r border-border bg-muted/30 text-xs"
 		style="grid-area: tree;"
@@ -727,7 +727,7 @@
 			>
 				{#each DIFF_FILES as file (file.name)}
 					<article class="mb-5 rounded-md border border-border" data-review-diff-file={file.name}>
-						<!-- Sticky file head — OD `.file-head` with View raw / Mark viewed. -->
+						<!-- Sticky file head: OD `.file-head` with View raw / Mark viewed. -->
 						<header
 							class="flex items-center gap-2.5 rounded-t-md border-b border-border bg-card px-3.5 py-2.5 font-mono text-xs"
 						>
@@ -749,7 +749,7 @@
 							{@const verdict = hunkDecisions[key]}
 							{@const cursorOn = allHunks[cursorHunk]?.file === file.name && allHunks[cursorHunk]?.header === hunk.header}
 							<div data-review-hunk={hunk.header} data-hunk-verdict={verdict ?? "pending"}>
-								<!-- Hunk head — OD `.hunk-head` with Suggest / Comment + accept/reject. -->
+								<!-- Hunk head: OD `.hunk-head` with Suggest / Comment + accept/reject. -->
 								<div
 									class={cn(
 										"flex items-center gap-2 border-b border-border bg-muted/40 px-3.5 py-1.5 font-mono text-[11px] text-muted-foreground",
@@ -781,7 +781,7 @@
 										Reject <Kbd class="ml-1">r</Kbd>
 									</Button>
 								</div>
-								<!-- Diff lines — line numbers always on; commentable lines + threads. -->
+								<!-- Diff lines: line numbers always on; commentable lines + threads. -->
 								<div
 									class={cn(
 										"font-mono text-[12px]",
@@ -819,7 +819,7 @@
 										</div>
 										{#if line.thread && INLINE_THREADS[line.thread]}
 											{@const th = INLINE_THREADS[line.thread]}
-											<!-- Inline annotation thread — OD `annot-row` via ui-kit CommentThread. -->
+											<!-- Inline annotation thread: OD `annot-row` via ui-kit CommentThread. -->
 											<CommentThread
 												threadId={line.thread}
 												anchorLabel={th.anchorLabel}
@@ -858,7 +858,7 @@
 				data-review-panel="comments"
 				class="flex flex-col gap-3"
 			>
-				<!-- Composer template picker — absorbed `review-templates` route. -->
+				<!-- Composer template picker: absorbed `review-templates` route. -->
 				<div
 					class="flex flex-col gap-2 rounded-md border border-border bg-card p-3"
 					data-review-composer
@@ -870,7 +870,7 @@
 							class="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
 							onchange={applyTemplate}
 						>
-							<option value="">— pick a template —</option>
+							<option value="">- pick a template -</option>
 							{#each COMMENT_TEMPLATES as template (template.id)}
 								<option value={template.id}>{template.label}</option>
 							{/each}
@@ -880,7 +880,7 @@
 						data-review-composer-body
 						bind:value={composerBody}
 						rows="2"
-						placeholder="Comment on this PR — pick a template above or write your own…"
+						placeholder="Comment on this PR: pick a template above or write your own…"
 						aria-label="PR comment composer"
 						class="w-full resize-y rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
 					></textarea>
@@ -913,7 +913,7 @@
 				class="flex flex-col gap-3 text-sm"
 			>
 				<p class="text-xs text-muted-foreground">
-					Free-form chat with PR reviewers and AI — @ to mention.
+					Free-form chat with PR reviewers and AI: @ to mention.
 				</p>
 				<CommentThread
 					threadId="free-chat"
@@ -937,7 +937,7 @@
 				data-review-panel="plan"
 				class="flex flex-col gap-2 text-sm"
 			>
-				<h2 class="text-sm font-semibold">Plan · auth-rewrite — tasks 6 / 8</h2>
+				<h2 class="text-sm font-semibold">Plan · auth-rewrite: tasks 6 / 8</h2>
 				<p class="text-xs text-muted-foreground">Promoted from plan-review on 13:02.</p>
 				<ul class="flex flex-col gap-1.5 font-mono text-xs">
 					<li class="flex items-center gap-2 rounded-md border border-border px-3 py-2">
@@ -947,7 +947,7 @@
 						<StatusBadge status="completed" /> verifyToken dual-verify
 					</li>
 					<li class="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2">
-						<StatusBadge status="blocked" /> Telemetry events + dashboard — contract mismatch
+						<StatusBadge status="blocked" /> Telemetry events + dashboard: contract mismatch
 					</li>
 					<li class="flex items-center gap-2 rounded-md border border-border px-3 py-2">
 						<StatusBadge status="running" /> Settings UI · sessions list
@@ -979,7 +979,7 @@
 		{/if}
 	</section>
 
-	<!-- ── DOCK — Checks / Summary / Logs / Suggestions + gate readout ───────── -->
+	<!-- ── DOCK: Checks / Summary / Logs / Suggestions + gate readout ───────── -->
 	<section
 		class="flex min-h-0 flex-col border-r border-t border-border bg-card"
 		style="grid-area: dock;"
@@ -1012,7 +1012,7 @@
 				</button>
 			{/each}
 			<span class="flex-1"></span>
-			<!-- Gate readout — OD `.gate` `1 / 2 approvals · 0 blocking`. -->
+			<!-- Gate readout: OD `.gate` `1 / 2 approvals · 0 blocking`. -->
 			<span class="px-3 py-1 text-xs text-muted-foreground" data-review-gate>
 				<b class="text-foreground">1 / 2</b> approvals · <b class="text-foreground">1</b> blocking
 			</span>
@@ -1071,7 +1071,7 @@
 		</div>
 	</section>
 
-	<!-- ── NOTES — right-hand annotations rail ──────────────────────────────── -->
+	<!-- ── NOTES: right-hand annotations rail ──────────────────────────────── -->
 	<aside
 		class="flex flex-col overflow-y-auto border-l border-border bg-background"
 		style="grid-area: notes;"
@@ -1140,12 +1140,12 @@
 		</div>
 	</aside>
 
-	<!-- Decision readout — surfaces the recorded Mod+Enter overload outcome. -->
+	<!-- Decision readout: surfaces the recorded Mod+Enter overload outcome. -->
 	{#if decision !== "none"}
 		<p class="sr-only" role="status" data-review-decision-result={decision}>
 			{decision === "approved"
-				? "Approved and merged — no annotations were outstanding."
-				: "Feedback sent — the PR has unresolved annotations."}
+				? "Approved and merged: no annotations were outstanding."
+				: "Feedback sent: the PR has unresolved annotations."}
 		</p>
 	{/if}
 </main>

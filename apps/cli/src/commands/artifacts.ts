@@ -1,10 +1,10 @@
 /**
- * `fulcrum artifact` — the Ship stage artifact verb group (CLI-TUI-UX.md §1.5).
+ * `fulcrum artifact`: the Ship stage artifact verb group (CLI-TUI-UX.md §1.5).
  *
  * Re-homed under the Ship workflow stage: the canonical command is now
  * `fulcrum artifact <verb>` (and `fulcrum ship artifact <verb>` via the Ship
  * stage host), while the legacy `fulcrum artifacts` spelling is preserved as a
- * documented alias (CLI review fix A-CLI-001 — no command name removed without
+ * documented alias (CLI review fix A-CLI-001: no command name removed without
  * an alias). Both spellings dispatch through this one `run` handler.
  *
  * Verb spelling matches `ship.html` and CLI-TUI-UX.md §1.5:
@@ -13,7 +13,7 @@
  *   upload · accept · reject · archive · unarchive · delete (carried forward)
  *
  * Every `--json` invocation routes through the shared `emitResult` helper so the
- * output is the canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX.md §3) — twelve
+ * output is the canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX.md §3): twelve
  * keys, `errors`/`next_actions` always arrays.
  */
 
@@ -35,9 +35,9 @@ type ArtifactsCaller = {
     archive(input: { id: string }): Promise<unknown>;
     unarchive(input: { id: string }): Promise<unknown>;
     delete(input: { id: string; hard?: boolean }): Promise<unknown>;
-    /** Optional — release/artifact diff has no backing service yet. */
+    /** Optional: release/artifact diff has no backing service yet. */
     diff?(input: { id: string; against: string }): Promise<unknown>;
-    /** Optional — artifact export has no backing service yet. */
+    /** Optional: artifact export has no backing service yet. */
     export?(input: { id: string; out?: string }): Promise<unknown>;
   };
 };
@@ -71,7 +71,7 @@ export const ARTIFACT_VERBS = [
   "delete",
 ] as const;
 
-export const ARTIFACTS_HELP = `fulcrum artifact — Ship stage artifact verbs
+export const ARTIFACTS_HELP = `fulcrum artifact: Ship stage artifact verbs
 
 Usage:
   fulcrum artifact list      [--project-id <id>] [--run-id <id>] [--task-id <id>] [--archived] [--mime <type>] [--kind binary|spec|report|memory] [--json]
@@ -266,7 +266,7 @@ function emit(
 /**
  * Emit a canonical error envelope for a verb whose backing service does not
  * exist yet (artifact `diff` / `export`). The verb is a real dispatchable
- * command — the envelope contract still holds; the error states the gap.
+ * command: the envelope contract still holds; the error states the gap.
  */
 function emitUnavailable(
   command: string,
@@ -280,7 +280,7 @@ function emitUnavailable(
       command,
       error: {
         code: `FUL_SHIP_ARTIFACT_${verb.toUpperCase()}_UNAVAILABLE`,
-        message: `\`fulcrum artifact ${verb}\` is not available — the artifact ${verb} service is not configured.`,
+        message: `\`fulcrum artifact ${verb}\` is not available: the artifact ${verb} service is not configured.`,
         fix: `Connect an artifact server that supports ${verb}, or use \`fulcrum artifact view\` to inspect the artifact.`,
       },
       renderHuman: () => {},

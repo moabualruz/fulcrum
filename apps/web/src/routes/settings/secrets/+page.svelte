@@ -101,7 +101,7 @@
               class={cn("hover:bg-muted/50 border-b transition-colors", cred.archived && "opacity-50")}
             >
               <td class={cn("p-2 align-middle font-medium")}>{cred.name}</td>
-              <td class={cn("p-2 align-middle text-muted-foreground")}>{cred.provider || "—"}</td>
+              <td class={cn("p-2 align-middle text-muted-foreground")}>{cred.provider || "-"}</td>
               <td class={cn("p-2 align-middle font-mono text-xs")} data-secret-masked>••••••••</td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>
                 {cred.last_used_at ?? "never"}

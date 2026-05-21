@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * Operate · Plugins — OD `operate-plugins.html` fidelity surface.
+   * Operate · Plugins: OD `operate-plugins.html` fidelity surface.
    *
-   * Canonical route: `/<ws>/projects/<projId>/operate/plugins` (IA-MAP.md §2.6 —
+   * Canonical route: `/<ws>/projects/<projId>/operate/plugins` (IA-MAP.md §2.6 -
    * "Operate | :plugins | per-agent plugin scope | toggle / update /
    * install-across"). The live `operate-plugins` route folder is the migration
-   * alias — `route-map.ts` `LEGACY_ROUTE_MAP` maps `operate-plugins → operate`,
+   * alias: `route-map.ts` `LEGACY_ROUTE_MAP` maps `operate-plugins → operate`,
    * so the `/operate-plugins` path resolves (no 404) while presenting as the
    * Operate stage, the same alias pattern as the sibling `operate-mcp` route.
    *
@@ -13,13 +13,13 @@
    * item 9: "MCP servers and plugins are per agent … the Operate → MCP and
    * Operate → Plugins surfaces show a scope chip per agent, never a global
    * list"). Each CLI agent owns its own plugin registry; the segmented selector
-   * switches the card grid between agents — the same `seg-group` the OD
+   * switches the card grid between agents: the same `seg-group` the OD
    * `operate-plugins.html` and `operate-mcp.html` files share.
    *
    * Each plugin card carries the universal compact `ModeRow` (DESIGN.md §8.1 /
-   * §4.13 — "Universal — on every step header"; a plugin card is a Step) and an
-   * on/off `Switch` (DESIGN.md §11 — "Disabling a plugin keeps its files on
-   * disk; uninstall removes them"). The toggle never removes files — it flips
+   * §4.13: "Universal: on every step header"; a plugin card is a Step) and an
+   * on/off `Switch` (DESIGN.md §11: "Disabling a plugin keeps its files on
+   * disk; uninstall removes them"). The toggle never removes files: it flips
    * the `enabled` flag only.
    *
    * The `Install across all agents` affordance ships disabled, labelled
@@ -38,10 +38,10 @@
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
-  /** OD plugin source — `npm` / `git` / `local` (the `.v` line). */
+  /** OD plugin source: `npm` / `git` / `local` (the `.v` line). */
   type PluginSource = "npm" | "git" | "local";
 
-  /** A plugin capability `tag-pill` — the OD `tag-pill` vocabulary. */
+  /** A plugin capability `tag-pill`: the OD `tag-pill` vocabulary. */
   type PluginTag =
     | "palette"
     | "prompt"
@@ -61,22 +61,22 @@
     source: PluginSource;
     description: string;
     tags: PluginTag[];
-    /** OD card footer relative-time line — `last sync 2h ago` / `disabled 4d ago`. */
+    /** OD card footer relative-time line: `last sync 2h ago` / `disabled 4d ago`. */
     lastSync: string;
-    /** OD `update available · v2.1.5` — set only when a newer version exists. */
+    /** OD `update available · v2.1.5`: set only when a newer version exists. */
     updateVersion?: string;
     /** OD on/off `toggle`; `false` dims the card icon (the OD disabled card). */
     enabled: boolean;
-    /** True when this agent installed the plugin — drives the `By me` filter. */
+    /** True when this agent installed the plugin: drives the `By me` filter. */
     installedByMe: boolean;
     mode?: WorkflowMode;
   }
 
-  /** A configurable CLI agent — DESIGN.md §11 item 9 multi-CLI agent registry. */
+  /** A configurable CLI agent: DESIGN.md §11 item 9 multi-CLI agent registry. */
   interface CliAgent {
     id: string;
     label: string;
-    /** Two-letter monogram class — OD `.agent-av` (DESIGN.md §4.16). */
+    /** Two-letter monogram class: OD `.agent-av` (DESIGN.md §4.16). */
     monogram: string;
     avatarClass: string;
   }
@@ -100,7 +100,7 @@
   ];
 
   /**
-   * Plugin registries keyed by CLI agent id — DESIGN.md §11 item 9: each agent
+   * Plugin registries keyed by CLI agent id: DESIGN.md §11 item 9: each agent
    * owns its own plugin set. Switching the scope selector swaps the card grid
    * source. The `claude-opus` registry mirrors the OD `operate-plugins.html`
    * card list verbatim (caveman, codex, compound-engineering, context-mode,
@@ -267,7 +267,7 @@
     ],
   };
 
-  /** The OD filter `chip` row — All / Enabled / Disabled / Updates available / By me. */
+  /** The OD filter `chip` row: All / Enabled / Disabled / Updates available / By me. */
   type PluginFilter = "all" | "enabled" | "disabled" | "updates" | "by-me";
 
   const FILTERS: { id: PluginFilter; label: string }[] = [
@@ -287,7 +287,7 @@
 
   let scopeAgentId = $state<string>(CLI_AGENTS[0]!.id);
   let activeFilter = $state<PluginFilter>("all");
-  /** Working copy of every agent's registry — scope-switching swaps the slice. */
+  /** Working copy of every agent's registry: scope-switching swaps the slice. */
   let registries = $state<Record<string, Plugin[]>>(
     structuredClone(REGISTRY_BY_AGENT),
   );
@@ -317,7 +317,7 @@
     }),
   );
 
-  /** OD count line — `14 installed · 11 enabled · 1 update · scoped to …`. */
+  /** OD count line: `14 installed · 11 enabled · 1 update · scoped to …`. */
   const countLabel = $derived(
     `${plugins.length} installed · ${enabledCount} enabled · ${updateCount} update · scoped to ${scopeAgent.label}`,
   );
@@ -337,7 +337,7 @@
   }
 
   /**
-   * Flip a plugin's `enabled` flag — DESIGN.md §11: disabling keeps files on
+   * Flip a plugin's `enabled` flag: DESIGN.md §11: disabling keeps files on
    * disk, it does NOT uninstall. The plugin row stays in the registry; only the
    * flag changes (and the OD `last sync` line reflects the new state).
    */
@@ -348,7 +348,7 @@
     });
   }
 
-  /** Apply an available update — clears `updateVersion`, bumps `version`. */
+  /** Apply an available update: clears `updateVersion`, bumps `version`. */
   function applyUpdate(id: string): void {
     const plugin = (registries[scopeAgentId] ?? []).find((p) => p.id === id);
     if (!plugin?.updateVersion) return;
@@ -397,12 +397,12 @@
   <p data-plugins-intro class="mt-1 text-xs text-muted-foreground">
     Plugins extend Fulcrum with new commands, palette entries, and step modes.
     Plugins are installed
-    <strong class="font-semibold text-foreground">per CLI agent</strong> — switch
+    <strong class="font-semibold text-foreground">per CLI agent</strong>: switch
     the scope below to see what's installed for another agent. Disabling a plugin
     keeps its files on disk; uninstall removes them.
   </p>
 
-  <!-- Per-agent scope selector — plugins are per CLI agent (DESIGN.md §11 item 9). -->
+  <!-- Per-agent scope selector: plugins are per CLI agent (DESIGN.md §11 item 9). -->
   <div
     data-plugins-scope
     class="mt-1 flex flex-wrap items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3.5 py-2.5"
@@ -413,7 +413,7 @@
     <div
       data-plugins-scope-group
       role="radiogroup"
-      aria-label="Plugin scope — CLI agent"
+      aria-label="Plugin scope: CLI agent"
       class="inline-flex flex-wrap gap-0.5 rounded-md border border-border bg-card p-0.5"
     >
       {#each CLI_AGENTS as agent (agent.id)}
@@ -456,7 +456,7 @@
     </button>
   </div>
 
-  <!-- Filter chip row — All / Enabled / Disabled / Updates available / By me. -->
+  <!-- Filter chip row: All / Enabled / Disabled / Updates available / By me. -->
   <div data-plugins-filters role="group" aria-label="Filter plugins" class="flex flex-wrap gap-1.5">
     {#each FILTERS as filter (filter.id)}
       {@const active = filter.id === activeFilter}

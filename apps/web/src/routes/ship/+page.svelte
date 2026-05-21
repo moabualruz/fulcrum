@@ -1,24 +1,24 @@
 <script lang="ts">
   /**
-   * Ship stage workbench — OD `ship.html` fidelity surface.
+   * Ship stage workbench: OD `ship.html` fidelity surface.
    *
    * IA-MAP.md §2.5 routes the Ship stage at `/<ws>/projects/<projId>/ship`;
    * this design-e2e fixture route renders the canonical Ship workbench so the
    * OD surface is proven before the production stage route consumes it. The
-   * legacy generic `/artifacts` file manager is re-homed here — its
+   * legacy generic `/artifacts` file manager is re-homed here: its
    * `+page.svelte` 301-redirects to `/ship` (no feature loss: the bulk
    * archive/delete server action and the `/artifacts/[id]/download` endpoint
    * stay reachable at their `/artifacts/[id]` paths).
    *
    * OD components rebuilt 1:1:
-   *  - `.toolbar` — stage title `Artifacts`, mono sub-line, a segmented
+   *  - `.toolbar`: stage title `Artifacts`, mono sub-line, a segmented
    *    Channel / Sort / Filter group, and the gradient `Cut release` primary
    *    action carrying the `⌘R` (`Mod+R`) keyboard hint (DESIGN.md §356 mode
    *    affordances drive the per-row ModeRow, not this toolbar).
-   *  - `table.runs` — the release table: ribbon · Artifact · Channel · Status ·
+   *  - `table.runs`: the release table: ribbon · Artifact · Channel · Status ·
    *    Checks · Author · Promoted · Trace · Size · Modes, with `aria-current`
    *    on the focused release row and the four-mode ModeRow per row.
-   *  - `.peek` — the DESIGN.md §197 List+Detail peek-overview panel: a
+   *  - `.peek`: the DESIGN.md §197 List+Detail peek-overview panel: a
    *    right-anchored 50%-width panel on desktop / full-width sheet on mobile,
    *    opened on row click *without a route change*, with Release / Checks /
    *    Includes / Timeline sections and a Roll back / Pause rollout / Open run
@@ -28,7 +28,7 @@
    * `Promote to 100%` are reversible operational actions → the
    * destructive-without-text-confirm inline 3-2-1 countdown tier; `Roll back`
    * reverts a live rollout and is the destructive tier with an explicit inline
-   * confirm step (COPY.md §4 "destructive without text confirm" — single
+   * confirm step (COPY.md §4 "destructive without text confirm": single
    * inline confirm, `Esc` cancels, no modal because it is not irreversible).
    *
    * This is a backend-bearing surface: the release / channel / rollout domain
@@ -71,7 +71,7 @@
   };
 
   /**
-   * A Ship release. Releases — not raw files — are the Ship unit
+   * A Ship release. Releases: not raw files: are the Ship unit
    * (CLI-TUI-UX.md §Ship, `design-alignment/ship.md`). The release / channel /
    * rollout domain model is unowned scope flagged by the PRD; these rows are
    * its fixture projection.
@@ -102,7 +102,7 @@
   };
 
   /**
-   * OD `ship.html` body — seven releases, verbatim artifact names, channels,
+   * OD `ship.html` body: seven releases, verbatim artifact names, channels,
    * authors, traces, sizes. OD status strings map onto the canonical COPY.md
    * §6 / DESIGN.md §13 eight-state vocabulary: `running`→`running`,
    * `completed`→`completed`, `cancelled`→`cancelled`, `failing`→`failing`.
@@ -364,7 +364,7 @@
 
   /**
    * Confirmation-tier state. COPY.md §4 destructive-without-text-confirm: the
-   * action button reveals an inline confirm in the same spot — no modal,
+   * action button reveals an inline confirm in the same spot: no modal,
    * `Esc` cancels. `pendingConfirm` holds the action awaiting its inline
    * confirm; `confirmedAction` holds the last completed action so design-e2e
    * can assert the tier resolved.
@@ -386,12 +386,12 @@
     pendingConfirm = null;
   }
 
-  /** Stage 1 of a COPY.md §4 confirmation tier — reveal the inline confirm. */
+  /** Stage 1 of a COPY.md §4 confirmation tier: reveal the inline confirm. */
   function requestConfirm(action: typeof pendingConfirm): void {
     pendingConfirm = action;
   }
 
-  /** Stage 2 — the operator confirms; the action resolves. */
+  /** Stage 2: the operator confirms; the action resolves. */
   function resolveConfirm(): void {
     confirmedAction = pendingConfirm;
     pendingConfirm = null;
@@ -409,7 +409,7 @@
     }
   }
 
-  /** `Mod+R` cuts a release — opens the inline confirm tier (OD `⌘R` kbd). */
+  /** `Mod+R` cuts a release: opens the inline confirm tier (OD `⌘R` kbd). */
   function onWindowKeydown(event: KeyboardEvent): void {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "r") {
       event.preventDefault();
@@ -427,7 +427,7 @@
 <svelte:window onkeydown={onWindowKeydown} />
 
 <div data-route="ws-stage" data-stage="ship" class="grid h-full min-h-0 grid-rows-[auto_1fr]">
-  <!-- TOOLBAR — OD `.toolbar` -->
+  <!-- TOOLBAR: OD `.toolbar` -->
   <div
     data-ship-toolbar
     class={cn(
@@ -442,7 +442,7 @@
       </span>
     </div>
     <div class="flex flex-wrap items-center gap-2.5 lg:justify-self-end">
-      <!-- segmented Channel / Sort / Filter group — OD `.group` -->
+      <!-- segmented Channel / Sort / Filter group: OD `.group` -->
       <div
         data-ship-filter-group
         class="inline-flex overflow-hidden rounded-md border border-border bg-background"
@@ -487,7 +487,7 @@
           Filter
         </button>
       </div>
-      <!-- `Cut release` primary — OD `.cut-release` gradient action + `⌘R` -->
+      <!-- `Cut release` primary: OD `.cut-release` gradient action + `⌘R` -->
       <Button
         data-ship-cut-release
         variant="default"
@@ -510,7 +510,7 @@
     </div>
   </div>
 
-  <!-- inline confirm tier for `Cut release` — COPY.md §4 destructive-without-text-confirm -->
+  <!-- inline confirm tier for `Cut release`: COPY.md §4 destructive-without-text-confirm -->
   {#if pendingConfirm === "cut-release"}
     <div
       data-ship-confirm="cut-release"
@@ -555,7 +555,7 @@
       </EmptyState>
     </div>
   {:else}
-    <!-- RELEASE TABLE + PEEK — OD `.table-wrap` -->
+    <!-- RELEASE TABLE + PEEK: OD `.table-wrap` -->
     <div data-ship-table-wrap class="relative min-h-0 overflow-auto">
       <table data-ship-release-table class="w-full min-w-[1080px] border-collapse text-sm">
         <thead>
@@ -657,7 +657,7 @@
         </tbody>
       </table>
 
-      <!-- PEEK OVERLAY — DESIGN.md §197 peek-overview, no route change -->
+      <!-- PEEK OVERLAY: DESIGN.md §197 peek-overview, no route change -->
       {#if peekRelease}
         <div
           data-ship-peek-backdrop
@@ -677,7 +677,7 @@
             )}
             onclick={(event) => event.stopPropagation()}
           >
-            <!-- peek head — crumbs, title, status, trace pill, close -->
+            <!-- peek head: crumbs, title, status, trace pill, close -->
             <header
               data-ship-peek-head
               class={cn(
@@ -836,7 +836,7 @@
               </section>
             </div>
 
-            <!-- peek action bar — Roll back / Pause rollout / Open run feed / Promote -->
+            <!-- peek action bar: Roll back / Pause rollout / Open run feed / Promote -->
             <footer
               data-ship-peek-foot
               class={cn(
@@ -845,7 +845,7 @@
               )}
             >
               {#if pendingConfirm === "roll-back"}
-                <!-- COPY.md §4 destructive tier — inline confirm, Esc cancels -->
+                <!-- COPY.md §4 destructive tier: inline confirm, Esc cancels -->
                 <span
                   data-ship-confirm="roll-back"
                   data-confirm-tier="destructive-inline"

@@ -1,5 +1,5 @@
 /**
- * /settings/importers — gated import wizard (CSV, Linear, Jira, Plane).
+ * /settings/importers: gated import wizard (CSV, Linear, Jira, Plane).
  *
  * Gated by FULCRUM_FEATURES (C1, default OFF).
  * Per-format flags:

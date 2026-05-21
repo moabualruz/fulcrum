@@ -4,7 +4,7 @@
 import { exists } from "@platform-core/application/runtime-support/process-runner.ts";
 import { spawnSync } from "bun";
 
-const HELP = `fulcrum compress — compress markdown files with caveman
+const HELP = `fulcrum compress: compress markdown files with caveman
 
 Usage:
   fulcrum compress                     Compress default targets (see below).

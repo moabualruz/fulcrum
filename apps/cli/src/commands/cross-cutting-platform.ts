@@ -47,7 +47,7 @@ type CliOptions = {
   exit?: (code: number) => void;
   stdin?: () => Promise<string>;
   readInput?: (path: string) => Promise<string>;
-  /** Injectable factory for init-keyring — for tests. */
+  /** Injectable factory for init-keyring: for tests. */
   loaderFactory?: NativeAdapterLoader;
 };
 
@@ -334,7 +334,7 @@ export async function runTelemetry(argv: readonly string[], opts: CliOptions = {
       summary,
       consent
         ? `consent=${consent.optedIn ? "yes" : "no"} decided_at=${consent.decidedAt}`
-        : `consent=undecided — run 'fulcrum telemetry opt-in' or 'fulcrum telemetry opt-out'`,
+        : `consent=undecided: run 'fulcrum telemetry opt-in' or 'fulcrum telemetry opt-out'`,
     );
     return;
   }
@@ -470,7 +470,7 @@ function resolveFeatureFlagCaller(opts: CliOptions): Record<string, any> {
 }
 
 /**
- * runSecretsInitKeyring — `fulcrum secrets init-keyring`
+ * runSecretsInitKeyring: `fulcrum secrets init-keyring`
  *
  * Attempts to (re-)load the native OS keyring module. Prints diagnostic on
  * failure and exits with code 1. Never crashes the process on load error.

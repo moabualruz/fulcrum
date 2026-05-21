@@ -1,11 +1,11 @@
 /**
- * fulcrum mode — the CLI side of the universal per-Step ModeAffordance
+ * fulcrum mode: the CLI side of the universal per-Step ModeAffordance
  * (DESIGN.md §4.11, §4.13; CLI-TUI-UX.md §1).
  *
  * Every Step in the web shell (task card, doc block, review item, artifact
  * row, subsystem row, audit row) carries the `✋ Manual / ▶ Play / 💬 Discuss /
  * ⊞ AI Assist` mode row. `prd-web-mode-affordance-system` makes that affordance
- * universal across surfaces — this command is the CLI equivalent: a single
+ * universal across surfaces: this command is the CLI equivalent: a single
  * verb tree that applies any of the four modes to a Step from the terminal, so
  * a CLI operator shares the same Manual/Play/Discuss/AI-Assist mental model as
  * the web ModeAffordance and the TUI `ModePicker` row.
@@ -24,7 +24,7 @@
 
 import { emitResult } from "../lib/cli-output.ts";
 
-/** A canonical workflow mode — the CLI mirror of the web `WorkflowMode`. */
+/** A canonical workflow mode: the CLI mirror of the web `WorkflowMode`. */
 export type ModeVerb = "manual" | "play" | "discuss" | "ai";
 
 /**
@@ -46,14 +46,14 @@ export const MODE_AFFORDANCES: ReadonlyArray<{
   { verb: "ai", webMode: "assist", glyph: "⊞", label: "AI Assist", description: "Open an AI Assist session scoped to the step." },
 ];
 
-/** The CLI verbs that select a mode — used by help and dispatch. */
+/** The CLI verbs that select a mode: used by help and dispatch. */
 export const MODE_VERBS: readonly ModeVerb[] = MODE_AFFORDANCES.map((m) => m.verb);
 
 export interface ModeCommandOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
-  /** Process env — drives the CLI-TUI-UX §2.3 colour-disable + trace identity. */
+  /** Process env: drives the CLI-TUI-UX §2.3 colour-disable + trace identity. */
   env?: NodeJS.ProcessEnv;
 }
 
@@ -158,7 +158,7 @@ export async function run(argv: readonly string[], opts: ModeCommandOptions = {}
   const agent = flagValue(rest, "--agent");
   const note = flagValue(rest, "--note");
 
-  // Applying a mode to a Step is a trace-bearing action — the envelope + the
+  // Applying a mode to a Step is a trace-bearing action: the envelope + the
   // plain trace header carry the SAME trace id so the moded Step is followable
   // across the web ModeAffordance, the TUI ModePicker, and the audit log.
   emitResult(

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * BulkCustomFieldEdit — edit custom fields for multiple tasks at once (D-78, MEDIUM-05).
+   * BulkCustomFieldEdit: edit custom fields for multiple tasks at once (D-78, MEDIUM-05).
    * Supports all 9 CUSTOM_FIELD_TYPES: text, number, date, select, multi_select,
    * user, url, boolean, checkbox.
    */
@@ -105,7 +105,7 @@
     </Select>
   </div>
 
-  <!-- Value input — type-aware (all 9 types) -->
+  <!-- Value input: type-aware (all 9 types) -->
   {#if selectedField}
     <div class="space-y-1">
       <label class="text-xs text-muted-foreground">Value</label>
@@ -164,7 +164,7 @@
         </label>
 
       {:else}
-        <!-- json or unknown type — raw text input -->
+        <!-- json or unknown type: raw text input -->
         <Input type="text" bind:value={fieldValue} class="h-8 text-xs font-mono" placeholder="JSON value..." />
       {/if}
     </div>

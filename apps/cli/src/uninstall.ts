@@ -1,4 +1,4 @@
-// fulcrum uninstall — remove Fulcrum-managed install artifacts.
+// fulcrum uninstall: remove Fulcrum-managed install artifacts.
 //
 // Conservative by default: remove sentinel-spliced rules, managed skill
 // namespaces, hook snippets/markers, generated Gemini import lines, and MCP
@@ -233,7 +233,7 @@ async function runBestEffort(cmd: string[], label: string): Promise<void> {
   }
   const r = await runProc(cmd);
   if (r.exit !== 0) {
-    console.log(`     · ${label} failed (exit ${r.exit}): ${r.stderr.trim() || r.stdout.trim()} — continuing`);
+    console.log(`     · ${label} failed (exit ${r.exit}): ${r.stderr.trim() || r.stdout.trim()}: continuing`);
   } else {
     console.log(`     ✓ ${label}`);
   }
@@ -248,12 +248,12 @@ async function removeSkillNamespaces(home: string): Promise<void> {
   if (await exists(claudeDir) && (await which("claude"))) {
     // Marker-gated uninstall: only run `claude plugin uninstall` when Fulcrum
     // wrote the corresponding ownership marker. Without it, print the manual
-    // command and leave Claude state alone — touching plugins Fulcrum did not
+    // command and leave Claude state alone: touching plugins Fulcrum did not
     // install can log the user out of their Claude account.
     const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
     const fulcrumPluginResult = await safeClaudePluginUninstall("fulcrum@fulcrum", { dryRun: DRY_RUN });
     if (!fulcrumPluginResult.ran) {
-      console.log(`     · Claude Code fulcrum plugin: ${fulcrumPluginResult.reason ?? "skipped"} — manual: claude plugin uninstall fulcrum@fulcrum`);
+      console.log(`     · Claude Code fulcrum plugin: ${fulcrumPluginResult.reason ?? "skipped"}: manual: claude plugin uninstall fulcrum@fulcrum`);
     } else if (!fulcrumPluginResult.ok) {
       console.log(`     · Claude Code fulcrum plugin uninstall failed (exit ${fulcrumPluginResult.exit}): ${fulcrumPluginResult.stderr?.trim() ?? ""}`);
     } else {
@@ -269,12 +269,12 @@ async function removeSkillNamespaces(home: string): Promise<void> {
         if (skill.claude_plugin) {
           const r = await safeClaudePluginUninstall(skill.claude_plugin.name, { dryRun: DRY_RUN });
           if (!r.ran) {
-            console.log(`     · Claude Code ${skill.name} plugin: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${skill.claude_plugin.name}`);
+            console.log(`     · Claude Code ${skill.name} plugin: ${r.reason ?? "skipped"}: manual: claude plugin uninstall ${skill.claude_plugin.name}`);
           }
         }
       }
     } catch {
-      // lockfile may not be present in all contexts — best-effort
+      // lockfile may not be present in all contexts: best-effort
     }
   }
   for (const agent of AGENTS) {
@@ -297,7 +297,7 @@ async function removeManagedUpstreamSkills(): Promise<void> {
       lockPath: `${repoRoot()}/skills/upstream.lock`,
     });
   } catch {
-    console.log("     · upstream skills lock not available — skip vendor skill mirror removal");
+    console.log("     · upstream skills lock not available: skip vendor skill mirror removal");
   }
 }
 
@@ -451,25 +451,25 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
   const previousDryRun = DRY_RUN;
   DRY_RUN = opts.dryRun ?? DRY_RUN;
   try {
-    // W1.1: Claude Code — only invoke `claude plugin uninstall caveman@caveman`
+    // W1.1: Claude Code: only invoke `claude plugin uninstall caveman@caveman`
     // when Fulcrum has the per-plugin ownership marker. Without the marker,
     // the user installed caveman themselves and Fulcrum must not touch it.
     const claudeDir = `${home}/.claude`;
     if (await exists(claudeDir)) {
       if (!(await which("claude"))) {
-        console.log("     · Claude Code caveman: `claude` not on PATH — manual: claude plugin uninstall caveman@caveman");
+        console.log("     · Claude Code caveman: `claude` not on PATH: manual: claude plugin uninstall caveman@caveman");
       } else {
         const { safeClaudePluginUninstall, hasMarker } = await import("./claude-plugin-markers.ts");
         const r = await safeClaudePluginUninstall("caveman@caveman", { dryRun: DRY_RUN });
         if (!r.ran) {
-          console.log(`     · Claude Code caveman plugin: ${r.reason ?? "skipped"} — manual: claude plugin uninstall caveman@caveman`);
+          console.log(`     · Claude Code caveman plugin: ${r.reason ?? "skipped"}: manual: claude plugin uninstall caveman@caveman`);
         } else if (!r.ok) {
           console.log(`     · Claude Code caveman plugin uninstall failed (exit ${r.exit}): ${r.stderr?.trim() ?? ""}`);
         } else {
           console.log("     ✓ Claude Code caveman plugin uninstalled");
         }
         // Cache/marketplace dirs are owned by Fulcrum only when the marker authorised the install.
-        // Removing them blindly can drop user-installed plugin state — gate on the marker.
+        // Removing them blindly can drop user-installed plugin state: gate on the marker.
         if (await hasMarker("caveman@caveman") || r.ran) {
           await removePath(`${home}/.claude/plugins/cache/caveman`, "Claude Code caveman plugin cache");
           await removePath(`${home}/.claude/plugins/marketplaces/caveman`, "Claude Code caveman marketplace cache");
@@ -479,7 +479,7 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
       }
     }
 
-    // W1.2: Gemini CLI — call `gemini extensions uninstall caveman` when Gemini
+    // W1.2: Gemini CLI: call `gemini extensions uninstall caveman` when Gemini
     // is detected and `gemini` is on PATH. Best-effort: log + continue.
     const geminiDir = `${home}/.gemini`;
     if (await exists(geminiDir)) {
@@ -489,7 +489,7 @@ export async function removeCavemanCopies(home: string, opts: { dryRun?: boolean
           "Gemini CLI caveman extension uninstall",
         );
       } else {
-        console.log("     · Gemini CLI caveman: `gemini` not on PATH — manual: gemini extensions uninstall caveman");
+        console.log("     · Gemini CLI caveman: `gemini` not on PATH: manual: gemini extensions uninstall caveman");
       }
     }
     await removePath(`${home}/.gemini/extensions/caveman`, "Gemini CLI caveman extension");
@@ -777,7 +777,7 @@ export async function run(args: string[]): Promise<void> {
   }
 
   if (DRY_RUN) {
-    console.log("(dry-run mode — no files will be removed or written)\n");
+    console.log("(dry-run mode: no files will be removed or written)\n");
   }
 
   const home = process.env["HOME"] ?? "";

@@ -1,5 +1,5 @@
 /**
- * TDD — fulcrum symphony runs list --state ready --json.
+ * TDD: fulcrum symphony runs list --state ready --json.
  */
 
 import { afterEach, describe, expect, it } from "bun:test";
@@ -12,7 +12,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-describe("symphony.run — runs list --state ready --json", () => {
+describe("symphony.run: runs list --state ready --json", () => {
   it("prints a valid JSON array from orchestration.fetchCandidateIssues", async () => {
     const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
@@ -111,7 +111,7 @@ describe("symphony.run — runs list --state ready --json", () => {
   });
 });
 
-describe("symphony.run — runs list --state <state> --json", () => {
+describe("symphony.run: runs list --state <state> --json", () => {
   it("prints JSON from orchestration.fetchIssuesByStates for run states", async () => {
     const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
@@ -244,7 +244,7 @@ describe("symphony.run — runs list --state <state> --json", () => {
   });
 });
 
-describe("symphony.run — runs show <runId> --json", () => {
+describe("symphony.run: runs show <runId> --json", () => {
   it("prints JSON with workspacePath from orchestration.getWorkspacePath", async () => {
     const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
@@ -370,7 +370,7 @@ describe("symphony.run — runs show <runId> --json", () => {
   });
 });
 
-describe("symphony.run — runs show <runId> --verbose", () => {
+describe("symphony.run: runs show <runId> --verbose", () => {
   it("prints a rendered prompt excerpt when verbose mode is enabled", async () => {
     const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];
@@ -405,7 +405,7 @@ describe("symphony.run — runs show <runId> --verbose", () => {
   });
 });
 
-describe("symphony.run — human output and error paths", () => {
+describe("symphony.run: human output and error paths", () => {
   it("prints candidate runs as a table when --json is omitted", async () => {
     const { run } = await import("@fulcrum/cli/commands/symphony.ts");
     const printed: string[] = [];

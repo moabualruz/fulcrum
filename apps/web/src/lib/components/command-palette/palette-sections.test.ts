@@ -83,7 +83,7 @@ describe("stageNavRows (IA-MAP §6.2)", () => {
   });
 });
 
-describe("stepActionRows (IA-MAP §6.4 — Step-only)", () => {
+describe("stepActionRows (IA-MAP §6.4: Step-only)", () => {
   test("returns no rows when no Step is in scope", () => {
     expect(stepActionRows(baseScope())).toEqual([]);
   });
@@ -109,7 +109,7 @@ describe("stepActionRows (IA-MAP §6.4 — Step-only)", () => {
       "step-copy-trace",
       "step-open-audit",
     ]);
-    expect(rows[0].label).toBe("Play step 3 — Persist issuance row per kid");
+    expect(rows[0].label).toBe("Play step 3: Persist issuance row per kid");
     expect(rows[2].label).toBe("Open in AI Assist drawer");
     expect(rows.find((row) => row.id === "step-copy-trace")?.description).toBe(
       "tr_8f29a4c1b3e0d5f7",
@@ -132,7 +132,7 @@ describe("resolvePaletteSections", () => {
       "recent",
       "stage-nav",
       "project-switcher",
-      // step-actions omitted — no Step in scope
+      // step-actions omitted: no Step in scope
       "workspace-theme",
       "help",
     ]);
@@ -160,7 +160,7 @@ describe("resolvePaletteSections", () => {
     expect(recent?.rows.length).toBe(RECENT_LIMIT);
   });
 
-  test("is Scope-aware — the project switcher follows the active project", () => {
+  test("is Scope-aware: the project switcher follows the active project", () => {
     const alpha = resolvePaletteSections({ scope: baseScope({ projectId: "alpha", projectLabel: "Alpha" }) });
     const beta = resolvePaletteSections({ scope: baseScope({ projectId: "beta", projectLabel: "Beta" }) });
     const alphaCurrent = alpha

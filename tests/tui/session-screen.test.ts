@@ -159,7 +159,7 @@ describe("SessionScreen", () => {
 /**
  * Integration coverage for the TUI-native inline `:ai` AI Assist pane
  * (CLI-TUI-UX.md §6 `:ai` row, §6.1, §7.5, §10). Asserts the pane is reachable
- * three ways — `:ai` colon route, `:ai` tab, footer `[ :ai ]` segment — that
+ * three ways: `:ai` colon route, `:ai` tab, footer `[ :ai ]` segment: that
  * the footer mode pill flips to `:AI`, that `q` pops back to the previous
  * screen, and that thread state survives screen navigation.
  */

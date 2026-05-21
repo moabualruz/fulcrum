@@ -76,7 +76,7 @@
     {#if pollStatus === "pending"}
       <span>Creating backup…</span>
     {:else if pollStatus === "complete"}
-      <span data-backup-complete>Backup ready —</span>
+      <span data-backup-complete>Backup ready -</span>
       <a href="/api/backups/{createdId}/download" download data-download-link
         class={cn(buttonVariants({ variant: "link", size: "sm" }), "p-0 h-auto")}>Download</a>
     {:else}
@@ -153,7 +153,7 @@
               <td class={cn("p-2 align-middle font-mono text-xs")}>{backup.id.slice(0, 8)}</td>
               <td class={cn("p-2 align-middle")}>{backup.status}</td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>
-                {backup.size_bytes ? `${(backup.size_bytes / 1024).toFixed(1)} KB` : "—"}
+                {backup.size_bytes ? `${(backup.size_bytes / 1024).toFixed(1)} KB` : "-"}
               </td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>{backup.created_at.slice(0, 16)}</td>
             </tr>

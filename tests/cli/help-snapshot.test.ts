@@ -56,7 +56,7 @@ describe("fulcrum --help workflow-stage command tree", () => {
   });
 
   test("compatibility command names still resolve from the stage tree", () => {
-    // Existing flat command names keep working — they appear under the stage
+    // Existing flat command names keep working: they appear under the stage
     // that now owns them, so scripts that call them are not orphaned.
     expect(ROOT_HELP).toContain("fulcrum task|tasks");
     expect(ROOT_HELP).toContain("fulcrum work <create|inspect|move|link|report>");

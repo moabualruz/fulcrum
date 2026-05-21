@@ -6,7 +6,7 @@
    * Maps the run-domain `RunStatus` enum onto the canonical cross-surface
    * `WorkflowStatus` vocabulary owned by the `@fulcrum/ui-kit` StatusBadge
    * primitive. The run domain says "succeeded"; the canonical vocabulary
-   * (COPY.md §6) says "completed" — keep the translation here so the badge
+   * (COPY.md §6) says "completed": keep the translation here so the badge
    * itself stays a pure ui-kit primitive.
    */
   export function toWorkflowStatus(s: RunStatus): WorkflowStatus {

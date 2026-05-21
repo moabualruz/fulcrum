@@ -1,5 +1,5 @@
 /**
- * /settings/api — Public API settings page.
+ * /settings/api: Public API settings page.
  *
  * Gated by FULCRUM_FEATURES=public-api (C1, default OFF).
  * Flag OFF → 404. Flag ON → shows base URL, copy-token, API key management.

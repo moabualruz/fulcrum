@@ -15,6 +15,7 @@ interface BanRule {
 const BAN_RULES: BanRule[] = [
   { name: "protocol-chrome", pattern: /\bACP\b|AcpDrawer/, reason: "COPY.md §1 says visible agent affordances say AI Assist, not ACP." },
   { name: "no-em-dash", pattern: /—|\\u2014/i, reason: "COPY.md §1 bans em dashes in visible copy." },
+  { name: "no-decorative-sparkle", pattern: /✨|\\u2728/i, reason: "COPY.md §1 bans decorative sparkle glyphs in visible copy." },
   { name: "marketing-start", pattern: /\bWelcome to Fulcrum!?|\bGet started!?/i, reason: "COPY.md §1 bans marketing/onboarding CTA copy." },
   { name: "status-synonym", pattern: /\b(?:In Flight|WIP|Doing|Stuck|Done!)\b/, reason: "COPY.md §6 locks status vocabulary." },
   { name: "generic-error", pattern: /\bSomething went wrong\b|\bOops!\b|\bPlease try again\b|\bContact support\b/i, reason: "COPY.md §3 requires action-specific recovery copy." },
@@ -26,6 +27,7 @@ const SOURCE_ROOTS = [
   "apps/web/src/lib/components",
   "apps/cli/src",
   "apps/tui/src",
+  "packages/ui-kit/src",
 ];
 
 const RENDERED_OUTPUT_ROOTS = [
@@ -88,7 +90,7 @@ function quotedLiterals(line: string): string[] {
   for (const pattern of [/"([^"\\]*(?:\\.[^"\\]*)*)"/g, /'([^'\\]*(?:\\.[^'\\]*)*)'/g, /`([^`\\]*(?:\\.[^`\\]*)*)`/g]) {
     for (const match of line.matchAll(pattern)) {
       const value = match[1].replace(/\\n/g, " ").replace(/\\"/g, "\"").replace(/\\'/g, "'");
-      if (/[A-Za-z🎉]/.test(value)) out.push(value);
+      if (/[A-Za-z🎉✨—]/.test(value) || /\\u(?:2014|2728)/i.test(value)) out.push(value);
     }
   }
   return out;
@@ -103,7 +105,7 @@ function svelteText(line: string): string[] {
     .replace(/\{[^}]*\}/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return /[A-Za-z🎉]/.test(withoutTags) ? [withoutTags] : [];
+  return /[A-Za-z🎉✨—]/.test(withoutTags) || /\\u(?:2014|2728)/i.test(withoutTags) ? [withoutTags] : [];
 }
 
 function candidatesForFile(absPath: string, source: Candidate["source"]): Candidate[] {
@@ -125,8 +127,6 @@ function candidatesForFile(absPath: string, source: Candidate["source"]): Candid
 function allowed(candidate: Candidate, rule: BanRule): boolean {
   const { file, text, source } = candidate;
 
-  if (rule.name === "no-em-dash" && !isEmDashClosureSurface(candidate)) return true;
-
   // Non-visible tests may assert banned strings are absent.
   if (source === "rendered" && !file.includes("__snapshots__")) {
     if (/not\.toContain|Ban-list|banned|copy banlist|expect\(/i.test(text)) return true;
@@ -140,19 +140,19 @@ function allowed(candidate: Candidate, rule: BanRule): boolean {
     if (/acp-session\.spec\.ts$/.test(file)) return true;
   }
 
+  // The ui-kit status badge exports a banned vocabulary list so tests and
+  // fixtures can assert those labels never render.
+  if (
+    rule.name === "status-synonym" &&
+    file === "packages/ui-kit/src/components/status-badge/status-badge.svelte" &&
+    /^(?:In Flight|WIP|Doing|Stuck|Done!)$/.test(text)
+  ) {
+    return true;
+  }
+
   // The copy gate itself names banned examples so regressions are explicit.
   if (file === "scripts/check-copy-banlist.ts") return true;
 
-  return false;
-}
-
-function isEmDashClosureSurface(candidate: Candidate): boolean {
-  if (candidate.file === "apps/web/src/routes/onboarding/+page.svelte") return true;
-  if (candidate.file.startsWith("apps/web/src/routes/doctor/")) return true;
-  if (candidate.file === "apps/cli/src/commands/mode.ts") return true;
-  if (candidate.file === "apps/cli/src/index.ts") return true;
-  if (candidate.file === "apps/tui/src/widgets/StatusBar.ts") return true;
-  if (candidate.source === "rendered") return true;
   return false;
 }
 
@@ -179,11 +179,17 @@ function scan(candidates: Candidate[]): Finding[] {
 
 function runSelfTest(): void {
   const temp = join(tmpdir(), `fulcrum-copy-banlist-${process.pid}.svelte`);
-  writeFileSync(temp, `<button>Get started</button>\n<p>AI Assist</p>\n`);
+  writeFileSync(temp, `<button>Get started</button>\n<p>Trace — Run</p>\n<p>✨ AI Assist</p>\n`);
   try {
     const findings = scan(candidatesForFile(temp, "source"));
     if (!findings.some((finding) => finding.rule.name === "marketing-start")) {
       throw new Error("self-test failed: injected banned visible string was not detected");
+    }
+    if (!findings.some((finding) => finding.rule.name === "no-em-dash")) {
+      throw new Error("self-test failed: injected visible em dash was not detected");
+    }
+    if (!findings.some((finding) => finding.rule.name === "no-decorative-sparkle")) {
+      throw new Error("self-test failed: injected visible sparkle glyph was not detected");
     }
     console.log("check-copy-banlist self-test ok: injected banned visible string detected.");
   } finally {

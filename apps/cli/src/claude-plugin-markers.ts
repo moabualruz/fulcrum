@@ -143,7 +143,7 @@ export interface SafeRunResult {
  * Run `claude plugin install <plugin>` only when Fulcrum is allowed to
  * mutate Claude state for this plugin. Writes an ownership marker on success.
  *
- * Returns `{ran: false}` with a reason when the call was skipped — caller
+ * Returns `{ran: false}` with a reason when the call was skipped: caller
  * should print a manual hint, NOT escalate.
  */
 export async function safeClaudePluginInstall(

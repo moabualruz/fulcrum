@@ -1,4 +1,4 @@
-// fulcrum restore --input /path — restore PGlite from backup tarball.
+// fulcrum restore --input /path: restore PGlite from backup tarball.
 
 import { stat } from "node:fs/promises";
 import { join } from "node:path";

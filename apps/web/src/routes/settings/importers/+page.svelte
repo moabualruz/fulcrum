@@ -86,7 +86,7 @@
 
         {#if importOkForTab}
           <p data-import-success class="rounded-md border border-green-700/30 bg-green-950/20 px-3 py-2 text-sm text-green-700">
-            Import complete — {(form as { rowCount?: number }).rowCount ?? 0} tasks imported.
+            Import complete: {(form as { rowCount?: number }).rowCount ?? 0} tasks imported.
           </p>
         {/if}
 

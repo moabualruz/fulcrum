@@ -1,4 +1,4 @@
-# plan-review — mislabeled-route content migration
+# plan-review: mislabeled-route content migration
 
 > Migrated by `prd-cross-mislabeled-route-content-migration` (Design Fidelity
 > Recovery). The `plan-review` route name is freed for its OD surface; the
@@ -7,7 +7,7 @@
 
 ## What this route currently rendered (mislabeled)
 
-`<h1>Plan review path</h1>` / `<title>Workflow Review</title>` — NOT the OD Plan
+`<h1>Plan review path</h1>` / `<title>Workflow Review</title>`: NOT the OD Plan
 review approve-gate tripane. It is a Build/Operate-settings surface (1383
 lines): a six-stage workflow-status tracker (`docs/planning/execution/review/
 uat/e2e`), an automation-rule builder (`rule-existing-review`, `previewRule()`,
@@ -17,17 +17,17 @@ uat/e2e`), an automation-rule builder (`rule-existing-review`, `previewRule()`,
 
 ## Preserved artifact
 
-- `+page.svelte.preserved` — the full 1383-line route content, verbatim.
+- `+page.svelte.preserved`: the full 1383-line route content, verbatim.
 
 ## Disposition
 
 - **Disposition:** re-home (no feature loss).
 - **Re-home destination:** the Build/Operate settings clusters (per
-  `design-alignment/plan.md` §plan-review Migration notes — workflow-stage
+  `design-alignment/plan.md` §plan-review Migration notes: workflow-stage
   tracking and automation rules belong to Build/Operate; the importer/custom-
   field panels move to System/Settings per `migration-strategy.md`).
 - **Owning rebuild PRD:** `prd-web-plan-review-od-fidelity`
-  (`vertical-prds.jsonl`, status `proposed`) — it `depends_on` this PRD, and its
+  (`vertical-prds.jsonl`, status `proposed`): it `depends_on` this PRD, and its
   acceptance bullet "The mislabelled workflow-tracker/automation/import/custom-
   field content is re-homed to Build/Operate settings with no feature loss"
   lifts this artifact.

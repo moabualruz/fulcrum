@@ -6,24 +6,24 @@
  *
  * The OD `palette.html` palette is "the same surface from every frame": the
  * result set it shows is a function of the active Scope tuple
- * `(workspace, project, stage, step, trace)` — the `window.FULCRUM` context
+ * `(workspace, project, stage, step, trace)`: the `window.FULCRUM` context
  * object in the OD prototype. This module turns a `PaletteScope` into the
  * exact ordered section list IA-MAP §6 locks:
  *
- *   1. Recent              — 4 frecency-ranked entries
- *   2. Workflow stage nav  — Go to Capture / Plan / Build / Review / Ship / Operate
- *   3. Project switcher    — projects, recent, "All projects"
- *   4. Step actions        — ONLY when a Step is in scope; the ModeAffordance set
- *   5. Federated search    — docs / tasks / runs / artifacts / memory / audit
- *   6. Settings search     — every settings field by name
- *   7. Workspace + theme   — switch workspace, toggle theme, density mode
- *   8. Help                — keyboard cheatsheet, docs
+ *   1. Recent             : 4 frecency-ranked entries
+ *   2. Workflow stage nav : Go to Capture / Plan / Build / Review / Ship / Operate
+ *   3. Project switcher   : projects, recent, "All projects"
+ *   4. Step actions       : ONLY when a Step is in scope; the ModeAffordance set
+ *   5. Federated search   : docs / tasks / runs / artifacts / memory / audit
+ *   6. Settings search    : every settings field by name
+ *   7. Workspace + theme  : switch workspace, toggle theme, density mode
+ *   8. Help               : keyboard cheatsheet, docs
  *
  * Section labels are LOCKED copy: `prd-cross-copy-lock` and the palette design
  * gate assert these exact strings.
  *
  * The Step-actions section consumes the `mode-affordance-host` action set
- * (`openModePickerForStep` / `openDiscussForStep` / `openAssistForStep`) — it
+ * (`openModePickerForStep` / `openDiscussForStep` / `openAssistForStep`): it
  * never hand-rolls a parallel Play/Discuss/AI-Assist list (the
  * `prd-web-mode-affordance-system` action set is the single source).
  */
@@ -67,7 +67,7 @@ export const PALETTE_SECTION_LABEL: Record<PaletteSectionId, string> = {
 	help: "Help",
 };
 
-/** The canonical section order — `Step actions` slots between switcher and search. */
+/** The canonical section order: `Step actions` slots between switcher and search. */
 export const PALETTE_SECTION_ORDER: readonly PaletteSectionId[] = [
 	"recent",
 	"stage-nav",
@@ -79,7 +79,7 @@ export const PALETTE_SECTION_ORDER: readonly PaletteSectionId[] = [
 	"help",
 ] as const;
 
-/** A Step in palette scope — surfaces the Step-actions section (IA-MAP §6.4). */
+/** A Step in palette scope: surfaces the Step-actions section (IA-MAP §6.4). */
 export interface PaletteStepScope extends ModeStepScope {
 	/** Human Step title shown in the Step-actions section header + run actions. */
 	title: string;
@@ -90,7 +90,7 @@ export interface PaletteStepScope extends ModeStepScope {
 }
 
 /**
- * The active Scope tuple the palette resolves against — the OD `window.FULCRUM`
+ * The active Scope tuple the palette resolves against: the OD `window.FULCRUM`
  * context object (`stage`, `route`, `trace`, `runId`, `agent`, `branch`).
  * Changing any field changes the section result set, so the palette is
  * Scope-aware (DESIGN.md §4.12 "Context detector reads route + active step").
@@ -104,7 +104,7 @@ export interface PaletteScope {
 	projectLabel?: string | null;
 	/** The active WorkflowStage derived from the route. */
 	stage: WorkflowStage;
-	/** The active Step, when the palette was invoked on a Step — drives §6.4. */
+	/** The active Step, when the palette was invoked on a Step: drives §6.4. */
 	step?: PaletteStepScope | null;
 	/** The active trace id, for the `Copy trace ID` Step action. */
 	traceId?: string | null;
@@ -138,7 +138,7 @@ export interface PaletteSection {
 	rows: PaletteRow[];
 }
 
-/** The six WorkflowStage nav targets — IA-MAP §6.2 / §3 stage axis. */
+/** The six WorkflowStage nav targets: IA-MAP §6.2 / §3 stage axis. */
 const STAGE_LABEL: Record<WorkflowStage, string> = {
 	capture: "Capture",
 	plan: "Plan",
@@ -175,7 +175,7 @@ export function stageNavRows(scope: PaletteScope): PaletteRow[] {
 }
 
 /**
- * The Step-actions rows — IA-MAP §6.4. Returned ONLY when a Step is in scope;
+ * The Step-actions rows: IA-MAP §6.4. Returned ONLY when a Step is in scope;
  * an empty array otherwise (the section is then omitted entirely). The
  * Play / Discuss / AI Assist rows delegate to the `mode-affordance-host`
  * action set so the palette and the per-Step `ModeRow` share one action source.
@@ -195,7 +195,7 @@ export function stepActionRows(scope: PaletteScope): PaletteRow[] {
 	const rows: PaletteRow[] = [
 		{
 			id: "step-play",
-			label: `Play ${stepRef} — ${step.title}`,
+			label: `Play ${stepRef}: ${step.title}`,
 			section: "step-actions",
 			icon: "play",
 			description: scope.agent ? `${scope.agent} · ask-on-write` : "hand off to an agent",
@@ -246,14 +246,14 @@ export function stepActionRows(scope: PaletteScope): PaletteRow[] {
 	return rows;
 }
 
-/** Copy a trace id to the clipboard — guarded for SSR / missing clipboard. */
+/** Copy a trace id to the clipboard: guarded for SSR / missing clipboard. */
 function copyTrace(traceId: string): void {
 	if (typeof navigator === "undefined" || !navigator.clipboard) return;
 	void navigator.clipboard.writeText(traceId);
 }
 
 /**
- * The Project switcher rows — IA-MAP §6.3. Surfaces the active project, then a
+ * The Project switcher rows: IA-MAP §6.3. Surfaces the active project, then a
  * scope-wide "All projects" entry. The `recents` are passed in by the host so
  * the palette stays free of data fetching (the app shell owns the project list).
  */
@@ -294,7 +294,7 @@ export function projectSwitcherRows(
 }
 
 /**
- * The Workspace + theme rows — IA-MAP §6.7. `Toggle theme` and density flow
+ * The Workspace + theme rows: IA-MAP §6.7. `Toggle theme` and density flow
  * through the host (`onToggleTheme`); `Switch workspace` navigates to the
  * workspace switcher.
  */
@@ -331,7 +331,7 @@ export function workspaceThemeRows(
 	];
 }
 
-/** The Help rows — IA-MAP §6.8: keyboard cheatsheet + docs. */
+/** The Help rows: IA-MAP §6.8: keyboard cheatsheet + docs. */
 export function helpRows(handlers: { onShortcuts?: () => void } = {}): PaletteRow[] {
 	return [
 		{
@@ -354,7 +354,7 @@ export function helpRows(handlers: { onShortcuts?: () => void } = {}): PaletteRo
 	];
 }
 
-/** A federated-search hit row — docs / tasks / runs / artifacts / memory / audit. */
+/** A federated-search hit row: docs / tasks / runs / artifacts / memory / audit. */
 export interface FederatedHit {
 	id: string;
 	title: string;
@@ -393,7 +393,7 @@ export function federatedSearchRows(hits: ReadonlyArray<FederatedHit>): PaletteR
 export interface ResolveSectionsInput {
 	/** The active Scope tuple. */
 	scope: PaletteScope;
-	/** Recent rows (frecency-ranked) — IA-MAP §6.1; the host caps at 4. */
+	/** Recent rows (frecency-ranked): IA-MAP §6.1; the host caps at 4. */
 	recent?: ReadonlyArray<PaletteRow>;
 	/** Project recents for the switcher. */
 	projectRecents?: ReadonlyArray<{ id: string; label: string }>;
@@ -416,7 +416,7 @@ export const RECENT_LIMIT = 4;
  * Resolve the full ordered section list for a Scope. Returns sections in
  * `PALETTE_SECTION_ORDER`; the Step-actions section is present ONLY when a Step
  * is in scope. Empty sections (e.g. no recents yet) are dropped so the palette
- * never renders a bare header — but present sections always keep §6 order.
+ * never renders a bare header: but present sections always keep §6 order.
  */
 export function resolvePaletteSections(input: ResolveSectionsInput): PaletteSection[] {
 	const { scope } = input;

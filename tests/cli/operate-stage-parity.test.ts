@@ -1,11 +1,11 @@
 /**
- * Operate stage CLI verb parity — `prd-cli-operate-stage-parity`.
+ * Operate stage CLI verb parity: `prd-cli-operate-stage-parity`.
  *
  * Proves the Operate workflow stage (CLI-TUI-UX.md §1.6) is a real,
  * discoverable, dispatchable command grammar. The Operate stage host
  * (`apps/cli/src/commands/operate-plugins.ts`) dispatches the §1.6 Operate verb
- * groups — `doctor`, `mcp`, `plugin`, `hooks`, `skills`, `audit`, `trace`,
- * `route`, `agent`, `config` — and the trace resolver (`commands/trace.ts`)
+ * groups: `doctor`, `mcp`, `plugin`, `hooks`, `skills`, `audit`, `trace`,
+ * `route`, `agent`, `config`: and the trace resolver (`commands/trace.ts`)
  * owns `fulcrum trace show <id>` (CLI Issue 6 / `agent-cli-review.md`
  * A-CLI-003).
  *
@@ -14,7 +14,7 @@
  *  2. The canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX.md §3) on `--json`
  *     output of dispatched verbs (`plugin` mutations, `route`/`agent`/`config`
  *     pointers, `trace show`).
- *  3. The CLI-TUI-UX.md §1.8 per-agent scoping rule — `mcp` and `plugin`
+ *  3. The CLI-TUI-UX.md §1.8 per-agent scoping rule: `mcp` and `plugin`
  *     mutation verbs accept `--agent <id>` (repeatable) and `--all-agents`,
  *     with the resolved scope observable in the envelope.
  *
@@ -133,7 +133,7 @@ describe("Operate stage CLI verb grammar (CLI-TUI-UX.md §1.6)", () => {
   });
 });
 
-describe("Operate verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
+describe("Operate verb dispatch: canonical fulcrum.cli.v1 envelope", () => {
   test.each(["route", "agent", "config"])(
     "`fulcrum operate %s list --json` dispatches and emits the canonical envelope",
     async (noun) => {
@@ -147,7 +147,7 @@ describe("Operate verb dispatch — canonical fulcrum.cli.v1 envelope", () => {
 
   test("`fulcrum operate plugin install --json` is a real verb that emits the canonical envelope", async () => {
     const h = harness();
-    // No cross-agent plugin server is wired through the host — the verb is
+    // No cross-agent plugin server is wired through the host: the verb is
     // still a real dispatchable command and still emits the canonical
     // envelope, carrying a coded error in the always-array `errors` field.
     await runOperate(["plugin", "install", "caveman", "--json"], h.opts);
@@ -235,7 +235,7 @@ describe("per-agent scoping rule (CLI-TUI-UX.md §1.8)", () => {
   });
 });
 
-describe("fulcrum trace show <id> (CLI Issue 6 — agent-cli-review A-CLI-003)", () => {
+describe("fulcrum trace show <id> (CLI Issue 6: agent-cli-review A-CLI-003)", () => {
   test("`fulcrum trace` exposes the `show` verb and a discoverable help", async () => {
     expect([...TRACE_VERBS]).toEqual(["show"]);
     const h = harness();
@@ -287,7 +287,7 @@ describe("fulcrum trace show <id> (CLI Issue 6 — agent-cli-review A-CLI-003)",
   });
 });
 
-describe("no command removed — read-only plugin verbs preserved", () => {
+describe("no command removed: read-only plugin verbs preserved", () => {
   // `operate-plugins.ts` emits the canonical `fulcrum.cli.v1` envelope for
   // every verb's `--json` output (CLI-TUI-UX.md §3); `plugin list` carries the
   // marker rows in the envelope `result`, not as a bare top-level array.

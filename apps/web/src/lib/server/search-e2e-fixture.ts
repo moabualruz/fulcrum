@@ -5,7 +5,7 @@ import { getE2eFixtureContext } from "$lib/server/db";
  *
  * Under `FULCRUM_E2E=1` the search route falls back to the seeded fixture
  * database when the public search API returns no hits. The raw fixture query
- * lives here — in a dedicated `$lib/server` helper — rather than inside the
+ * lives here: in a dedicated `$lib/server` helper: rather than inside the
  * `search/+page.server.ts` loader, so the route loader stays free of direct
  * database access (web route loaders delegate to APIs / server helpers; see
  * `application-adapters.test.ts` boundary guards).

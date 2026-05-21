@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Operate · Doctor — system-health workbench (`prd-web-operate-doctor-od-fidelity`).
+   * Operate · Doctor: system-health workbench (`prd-web-operate-doctor-od-fidelity`).
    *
    * OD-fidelity rebuild of the Doctor surface against `operate.html`: a toolbar,
    * a 5-cell summary strip, a subsystem table (Subsystem / Status / Latency p99 /
@@ -10,11 +10,11 @@
    *
    * Auto-refresh uses SvelteKit `invalidateAll()` (not `window.location.reload`),
    * so the 30s refresh re-runs the server load WITHOUT discarding row expansion
-   * or scroll position — the regression the PRD problem statement names.
+   * or scroll position: the regression the PRD problem statement names.
    *
    * Design refs: IA-MAP.md §2.6 operate/doctor · DESIGN.md §6 (subsystem table) ·
    * DESIGN.md §10 (Doctor) · DESIGN.md §8.1 (universal mode affordances) ·
-   * COPY.md §8 (doctor copy). Composes `@fulcrum/ui-kit` primitives only —
+   * COPY.md §8 (doctor copy). Composes `@fulcrum/ui-kit` primitives only -
    * `Banner`, `Button`, `Stat`, `StatusBadge`, plus the `ModeRow` via the
    * shared `mode-affordance-host`.
    */
@@ -43,19 +43,19 @@
 
   let { data }: Props = $props();
 
-  /** Row expansion state — keyed by subsystem id; preserved across refresh. */
+  /** Row expansion state: keyed by subsystem id; preserved across refresh. */
   let expanded = $state<Record<string, boolean>>({});
   /** `HH:MM:SS` of the last completed refresh, shown in the toolbar. */
   let lastRefresh = $state(new Date().toISOString());
   /** True while an `invalidateAll()` refresh is in flight. */
   let refreshing = $state(false);
-  /** Last subsystem whose recovery command was copied — drives the copied badge. */
+  /** Last subsystem whose recovery command was copied: drives the copied badge. */
   let copiedCommand = $state<string | null>(null);
 
   /**
    * Auto-refresh via SvelteKit `invalidateAll()`. Re-running the server load
    * keeps the component instance mounted, so `expanded` and the scroll position
-   * survive — unlike the old `window.location.reload()` which tore the page
+   * survive: unlike the old `window.location.reload()` which tore the page
    * down every 30s (the PRD problem statement).
    */
   async function refreshNow(): Promise<void> {
@@ -86,7 +86,7 @@
       try {
         await navigator.clipboard.writeText(command);
       } catch {
-        // Clipboard denied — the visible command text is still selectable.
+        // Clipboard denied: the visible command text is still selectable.
       }
     }
     copiedCommand = subsystem;
@@ -104,7 +104,7 @@
     return "failed";
   }
 
-  /** `HH:MM:SS` of an ISO timestamp — the OD `Last check` column form. */
+  /** `HH:MM:SS` of an ISO timestamp: the OD `Last check` column form. */
   function hms(iso: string): string {
     return iso.slice(11, 19);
   }
@@ -135,7 +135,7 @@
 </svelte:head>
 
 <section data-route="operate-doctor" data-stage="operate" class={cn("flex min-h-[calc(100vh-8rem)] flex-col overflow-hidden")}>
-  <!-- Toolbar — OD `.toolbar` -->
+  <!-- Toolbar: OD `.toolbar` -->
   <header
     data-doctor-header
     data-slot="doctor-toolbar"
@@ -160,7 +160,7 @@
     <RouteSkeleton kind="list" />
   {:then workbench}
     {@const summary = workbench.summary}
-    <!-- Degraded / healthy banner — COPY.md §8 doctor banner -->
+    <!-- Degraded / healthy banner: COPY.md §8 doctor banner -->
     {#if summary.failing + summary.failed > 0}
       {@const firstUnhealthy = workbench.checks.find((c) => c.status !== "ok")}
       <Banner
@@ -198,7 +198,7 @@
       </Banner>
     {/if}
 
-    <!-- 5-cell summary strip — OD `.summary` -->
+    <!-- 5-cell summary strip: OD `.summary` -->
     <div
       data-doctor-summary
       data-slot="doctor-summary"
@@ -244,7 +244,7 @@
       />
     </div>
 
-    <!-- Subsystem table — OD `table.sub` -->
+    <!-- Subsystem table: OD `table.sub` -->
     <div data-slot="table-container" class={cn("flex-1 overflow-auto")}>
       <table data-doctor-table data-slot="table" class={cn("w-full border-collapse text-sm")}>
         <thead>
@@ -359,7 +359,7 @@
       </table>
     </div>
 
-    <!-- Telemetry tiles — OD `.telemetry` (DESIGN.md §10 "telemetry row mandatory") -->
+    <!-- Telemetry tiles: OD `.telemetry` (DESIGN.md §10 "telemetry row mandatory") -->
     <div
       data-doctor-telemetry
       data-slot="doctor-telemetry"

@@ -1,5 +1,5 @@
 /**
- * fulcrum project config — project configuration commands.
+ * fulcrum project config: project configuration commands.
  *
  * Usage:
  *   fulcrum project config <projectId>

@@ -1,23 +1,23 @@
 <script lang="ts">
 	/**
-	 * CaptureStageWorkbench — the Capture WorkflowStage workbench
+	 * CaptureStageWorkbench: the Capture WorkflowStage workbench
 	 * (`prd-web-capture-stage-shell`; IA-MAP.md §2.1; OD `capture.html`,
 	 * `capture-drafts.html`, `capture-promoted.html`).
 	 *
 	 * Rendered by `/<ws>/projects/<projId>/capture`. The OD prototype renders
-	 * the Capture stage as one stage shell with four sub-views — Docs (tree +
+	 * the Capture stage as one stage shell with four sub-views: Docs (tree +
 	 * editor), Drafts, Promoted, Inbox. Each is a `?view=` projection of the
 	 * single Capture stage so a sub-view never becomes a standalone route
 	 * (migration-strategy.md "mobile-* / preview routes become states").
 	 *
-	 * Every Capture Step row carries the universal `ModeAffordance` — the
-	 * `@fulcrum/ui-kit` `ModeRow` primitive via `mode-affordance-host` — because
+	 * Every Capture Step row carries the universal `ModeAffordance`: the
+	 * `@fulcrum/ui-kit` `ModeRow` primitive via `mode-affordance-host`: because
 	 * DESIGN.md §4.13 makes a Capture block a Step. Empty states render the
 	 * locked COPY.md §2 strings through the `@fulcrum/ui-kit` `EmptyState`
 	 * primitive (one sentence + one action).
 	 *
 	 * This component composes ui-kit primitives only (Button, Badge, ModeRow,
-	 * EmptyState) — it never re-implements a primitive, per the AGENTS.md
+	 * EmptyState): it never re-implements a primitive, per the AGENTS.md
 	 * ui-kit rule.
 	 */
 	import { Badge, Button, EmptyState, ModeRow } from "@fulcrum/ui-kit";
@@ -36,15 +36,15 @@
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
-		/** Workspace slug — for the sub-view tab `href`s. */
+		/** Workspace slug: for the sub-view tab `href`s. */
 		ws: string;
-		/** Project id — for the sub-view tab `href`s. */
+		/** Project id: for the sub-view tab `href`s. */
 		projId: string;
 		/** The active Capture sub-view. */
 		view: CaptureView;
 		/** Capture Step rows for the active sub-view (drafts / promoted / inbox / docs). */
 		steps: readonly CaptureStep[];
-		/** Active trace id — carried into the Plan handoff. */
+		/** Active trace id: carried into the Plan handoff. */
 		traceId?: string | null;
 	}
 
@@ -59,19 +59,19 @@
 		return `${stageRoute(ws, projId, "capture")}?view=${target}`;
 	}
 
-	/** The Capture → Plan handoff href — preserves the trace identity (IA-MAP §2.1). */
+	/** The Capture → Plan handoff href: preserves the trace identity (IA-MAP §2.1). */
 	const handoffHref = $derived(
 		captureHandoffToPlan(stageRoute(ws, projId, "plan"), traceId),
 	);
 
-	/** A per-Step ModeRow binding — the universal Capture-block mode affordance. */
+	/** A per-Step ModeRow binding: the universal Capture-block mode affordance. */
 	function modeRowFor(step: CaptureStep) {
 		return createStepModeRow({ stepId: step.id, kind: "doc-block", traceId: traceId ?? undefined, title: step.title });
 	}
 </script>
 
 <!--
-	`/<ws>/projects/<projId>/capture` — the Capture stage workbench. `data-route`
+	`/<ws>/projects/<projId>/capture`: the Capture stage workbench. `data-route`
 	and `data-stage` keep the StageRail / ScopeBar chrome synced to the route
 	(the route-resolution crawl asserts both).
 -->
@@ -103,7 +103,7 @@
 				<Button size="sm" variant="ghost" data-block-action="link">Link</Button>
 				<Button size="sm" variant="ghost" data-block-action="promote">Promote</Button>
 			</div>
-			<!-- Hand off to Plan — preserves the trace identity (IA-MAP §2.1). -->
+			<!-- Hand off to Plan: preserves the trace identity (IA-MAP §2.1). -->
 			<Button
 				href={handoffHref}
 				data-slot="capture-handoff-to-plan"
@@ -115,10 +115,10 @@
 	</header>
 
 	<!--
-		Capture sub-view tab strip — Docs / Drafts / Promoted / Inbox. Each tab is
+		Capture sub-view tab strip: Docs / Drafts / Promoted / Inbox. Each tab is
 		a `?view=` projection of the single Capture stage, never a standalone
 		route, and is a findable feature view of the stage (carries the shared
-		`stage-view-card` slot — migration value-preservation item 4).
+		`stage-view-card` slot: migration value-preservation item 4).
 		`aria-current` marks the active sub-view for assistive tech.
 	-->
 	<nav data-slot="capture-view-strip" aria-label="Capture views" class="flex flex-wrap gap-1">
@@ -144,7 +144,7 @@
 
 	{#if isEmpty}
 		<!--
-			Empty state — the locked COPY.md §2 strings, one sentence + one action,
+			Empty state: the locked COPY.md §2 strings, one sentence + one action,
 			rendered through the ui-kit `EmptyState` primitive. The first-capture
 			onboarding prompt (COPY.md §7) is rendered beneath, no marketing H1.
 		-->
@@ -168,8 +168,8 @@
 		</p>
 	{:else}
 		<!--
-			Capture Step rows. Each row carries the universal ModeAffordance — the
-			ui-kit ModeRow via `mode-affordance-host` — because a Capture block is
+			Capture Step rows. Each row carries the universal ModeAffordance: the
+			ui-kit ModeRow via `mode-affordance-host`: because a Capture block is
 			a Step (DESIGN.md §4.13). Promoted rows additionally show a stage pill
 			and the downstream `→ plan_*` / `→ run_*` link.
 		-->

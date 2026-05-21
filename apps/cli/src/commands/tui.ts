@@ -1,5 +1,5 @@
 /**
- * fulcrum tui — TUI subcommand handler.
+ * fulcrum tui: TUI subcommand handler.
  *
  * Launches the interactive terminal UI. Exits cleanly on 'q' or Ctrl+C.
  *
@@ -12,7 +12,7 @@
  *   --no-tui     Flag respected by convention; suppresses TUI mode (no-op here,
  *                for use by other commands to detect if TUI is disabled).
  *
- * Design: thin wrapper — builds the TUI caller, wires real stdin, and delegates
+ * Design: thin wrapper: builds the TUI caller, wires real stdin, and delegates
  * to TuiApp. Separated from TuiApp so tests can import TuiApp directly without
  * triggering real stdin/stdout setup.
  */
@@ -29,8 +29,8 @@ Options:
   --no-tui   Disable TUI mode (suppresses interactive session).
 
 Screens:
-  Settings › Auth           — user email, org, passkeys
-  Settings › Feature Flags  — toggle all registered feature flags
+  Settings › Auth          : user email, org, passkeys
+  Settings › Feature Flags : toggle all registered feature flags
 
 Keyboard:
   j/k or ↑/↓   navigate
@@ -62,7 +62,7 @@ export async function run(argv: readonly string[], opts: TuiRunOptions = {}): Pr
 
   const { TuiApp, buildCaller, buildTelemetrySink } = await import("@fulcrum/tui/index.ts");
 
-  // Check if we have a real TTY — if not (e.g. piped in CI), bail gracefully
+  // Check if we have a real TTY: if not (e.g. piped in CI), bail gracefully
   const isTTY = process.stdout.isTTY && process.stdin.isTTY;
 
   if (!isTTY) {

@@ -22,7 +22,7 @@
 		onCopy?: (traceId: string) => void;
 		/** Right-click "Open in audit" target (§4.10). */
 		onOpenAudit?: (traceId: string) => void;
-		/** Right-click "Open in CLI" — writes `fulcrum trace show <id>` to clipboard (§4.10). */
+		/** Right-click "Open in CLI": writes `fulcrum trace show <id>` to clipboard (§4.10). */
 		onOpenCli?: (traceId: string) => void;
 	};
 </script>

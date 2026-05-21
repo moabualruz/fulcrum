@@ -202,7 +202,7 @@ describe("hooks.server handle", () => {
   test("resolve errors propagate unchanged after request runtime is populated", async () => {
     // The request runtime is allocated before resolve runs and torn down in a
     // finally block. When resolve throws, hooks.server must surface the exact
-    // error without swallowing it — the finally cleanup must not mask failures.
+    // error without swallowing it: the finally cleanup must not mask failures.
     let contextCalls = 0;
     __setWebRuntimeForTest({
       authHandler: null,

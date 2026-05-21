@@ -155,7 +155,7 @@
     </section>
   {/if}
 
-  <!-- LLM Narrative (flag ON only — shown after completeSprint) -->
+  <!-- LLM Narrative (flag ON only: shown after completeSprint) -->
   {#if narrativeLoading && narrativeSprintId}
     <div data-narrative-loading class={cn("mb-4 flex items-center gap-2 text-sm text-muted-foreground")}>
       <span class={cn("inline-block h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent")} aria-hidden="true"></span>

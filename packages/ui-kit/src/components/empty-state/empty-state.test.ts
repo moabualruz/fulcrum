@@ -38,7 +38,7 @@ describe("EmptyState", () => {
 		expect(body).toContain('data-tone="steady"');
 	});
 
-	test("renders a keyboard hint beside the actions slot — DESIGN.md §4.8", () => {
+	test("renders a keyboard hint beside the actions slot: DESIGN.md §4.8", () => {
 		const { body } = render(EmptyStateRoot, {
 			props: { title: "No tasks yet.", keyHint: "Press c to capture." },
 		});

@@ -14,7 +14,7 @@
 	 * 118-125): label + value pair, e.g. `session run_8f29a4c`.
 	 */
 	export type AcpDrawerMetaItem = {
-		/** Stable cell id — drives `data-meta-id` for design-e2e. */
+		/** Stable cell id: drives `data-meta-id` for design-e2e. */
 		id: string;
 		/** Plain label (`session`, `step`, `policy`, `cost`, `tokens`, `cache`, `elapsed`). */
 		label: string;
@@ -27,7 +27,7 @@
 	 * agent with health + topology counts.
 	 */
 	export type AcpDrawerAgentRow = {
-		/** Stable agent id — drives `data-agent-id`. */
+		/** Stable agent id: drives `data-agent-id`. */
 		id: string;
 		/** Agent display name. */
 		name: string;
@@ -35,7 +35,7 @@
 		client: string;
 		/** Status text (`Ready`, `Paused`, `Offline`). */
 		status: string;
-		/** Status-dot tone — drives `data-status-tone`. */
+		/** Status-dot tone: drives `data-status-tone`. */
 		tone?: "ready" | "paused" | "offline";
 		/** Round-trip latency string (`0.8s`, `n/a`). */
 		latency: string;
@@ -48,7 +48,7 @@
 	};
 
 	export type AcpDrawerProps = {
-		/** Controlled open state — drives `data-open` on the drawer surface. */
+		/** Controlled open state: drives `data-open` on the drawer surface. */
 		open?: boolean;
 		side?: AcpDrawerSide;
 		/** Drawer header title (AI Assist). */
@@ -61,7 +61,7 @@
 		agents?: AcpDrawerAgentRow[];
 		/** OD `.drawer-meta` strip cells (session · step · policy · cost · tokens · cache · elapsed). */
 		meta?: AcpDrawerMetaItem[];
-		/** Header trace slot — consumer passes a `<TraceChip badge />` (CONTEXT.md: TraceBadge in AcpDrawer header). */
+		/** Header trace slot: consumer passes a `<TraceChip badge />` (CONTEXT.md: TraceBadge in AcpDrawer header). */
 		trace?: Snippet;
 		/** Live thread body slot. */
 		children?: Snippet;
@@ -70,7 +70,7 @@
 		onOpenChange?: (open: boolean) => void;
 		/** Agent-picker selection callback (agent id). */
 		onAgentSelect?: (agentId: string) => void;
-		/** Expand action — widens the drawer for protocol detail (`ai-assist.html`). */
+		/** Expand action: widens the drawer for protocol detail (`ai-assist.html`). */
 		onExpand?: () => void;
 		/** Save-thread → reusable prompt template snapshot (`ai-assist.html` line 89). */
 		onSaveThread?: () => void;
@@ -131,7 +131,7 @@
 			// `side` encodes the device: `right` is the 420px desktop overlay,
 			// `bottom` is the 92vw mobile bottom sheet (DESIGN.md §3.1). The
 			// exact width is set via inline `style` above so it is deterministic
-			// — SheetContent's base `w-3/4` / `max-w-sm` would otherwise cap it.
+			//: SheetContent's base `w-3/4` / `max-w-sm` would otherwise cap it.
 			"gap-0 border-border bg-surface-elevated p-0",
 			className,
 		)}
@@ -140,9 +140,9 @@
 			data-slot="acp-drawer-header"
 			class="grid gap-2 border-b border-border bg-surface-sunken px-4 py-3 pr-12"
 		>
-			<!-- Row 1: ✨ icon + AI Assist title / Step-scope subtitle + expand. -->
+			<!-- Row 1: AI Assist icon + title / Step-scope subtitle + expand. -->
 			<div class="flex items-center gap-2">
-				<span aria-hidden="true" class="shrink-0 text-accent">✨</span>
+				<span aria-hidden="true" class="shrink-0 text-accent">⊞</span>
 				<div class="flex min-w-0 flex-1 flex-col">
 					<h2 data-slot="acp-drawer-title" class="truncate text-sm font-semibold text-fg">
 						{title}
@@ -171,7 +171,7 @@
 			</div>
 			<!-- Row 2: agent picker + trace badge. -->
 			<div class="flex flex-wrap items-center gap-2">
-				<!-- Agent picker — opens a full panel listing every configured CLI agent (IA-MAP.md §5). -->
+				<!-- Agent picker: opens a full panel listing every configured CLI agent (IA-MAP.md §5). -->
 				<button
 					type="button"
 					data-slot="acp-drawer-agent-picker"

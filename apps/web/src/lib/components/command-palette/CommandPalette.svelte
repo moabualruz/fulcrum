@@ -7,7 +7,7 @@
    *
    * Composition: this component is a thin renderer over the `@fulcrum/ui-kit`
    * `command-palette` primitive set (Root / Input / List / Item / Empty /
-   * Group) — it never hand-rolls an overlay, input, or section header. The
+   * Group): it never hand-rolls an overlay, input, or section header. The
    * section MODEL (which sections, their order, their rows) is owned by the
    * pure `palette-sections.ts` resolver; the Scope tuple is derived by
    * `palette-scope.ts`. This file only wires the resolver output into the
@@ -17,7 +17,7 @@
    * → Project switcher → Step actions (Step-only) → Federated search →
    * Settings search → Workspace + theme → Help. The Step-actions section is
    * present only when a Step is in scope, and its Play / Discuss / AI Assist
-   * rows delegate to the `mode-affordance-host` action set — the palette never
+   * rows delegate to the `mode-affordance-host` action set: the palette never
    * forks the `prd-web-mode-affordance-system` action list.
    */
   import { onMount } from "svelte";
@@ -94,7 +94,7 @@
   });
 
   // ── Scope tuple (workspace, project, stage, step, trace) ─────────────────────
-  // Derived live from the route + the active Step event — the palette result
+  // Derived live from the route + the active Step event: the palette result
   // set changes whenever any Scope field changes (DESIGN.md §4.12).
   const scope = $derived(
     withStepScope(
@@ -138,7 +138,7 @@
   // ── Recent rows ──────────────────────────────────────────────────────────────
   // Frecency-ranked Recent (IA-MAP §6.1, 4 entries). Until a recents service
   // lands, the most-relevant navigation rows from the layout-fed `items` stand
-  // in — the section stays Scope-aware because `items` is rebuilt per project.
+  // in: the section stays Scope-aware because `items` is rebuilt per project.
   const recentRows = $derived<PaletteRow[]>(
     items.slice(0, 4).map((item) => ({
       id: `recent-${item.id}`,
@@ -220,7 +220,7 @@
     title="Command palette"
     class="w-full max-w-xl"
   >
-    <!-- Active-context chip — DESIGN.md §4.12 "menu never ambiguous" -->
+    <!-- Active-context chip: DESIGN.md §4.12 "menu never ambiguous" -->
     <div
       class="flex items-center gap-2 border-b border-border px-3 py-1.5"
       data-palette-scope-chip

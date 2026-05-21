@@ -288,7 +288,7 @@ describe("TuiApp foundation behavior", () => {
       await app.mount();
       await app.waitForStartupData();
       // OD StatusFooter renders the org name as the `profile:` segment; it
-      // drops the legacy user email — prd-tui-status-footer-od-parity.
+      // drops the legacy user email: prd-tui-status-footer-od-parity.
       expect(tty.plainText()).toContain("profile: Local");
       expect(tty.plainText()).not.toContain("admin@local");
 

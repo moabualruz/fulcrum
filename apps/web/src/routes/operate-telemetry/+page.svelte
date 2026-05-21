@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Operate · Telemetry — OD `operate-telemetry.html` fidelity surface, with the
+   * Operate · Telemetry: OD `operate-telemetry.html` fidelity surface, with the
    * "Telemetry" name overload resolved (design-alignment/operate.md
    * §operate-telemetry.html "name conflict resolution required").
    *
@@ -11,8 +11,8 @@
    * sharing one name. This route resolves the overload by splitting the surface
    * into two disambiguated sub-views selected by the `?view=` query param:
    *
-   *  - `?view=observability` (default) — the OD metrics dashboard.
-   *  - `?view=settings` — the COPY.md §13 opt-in 3-state privacy control.
+   *  - `?view=observability` (default): the OD metrics dashboard.
+   *  - `?view=settings`: the COPY.md §13 opt-in 3-state privacy control.
    *
    * `/operate/telemetry` (IA-MAP.md §2.6) is the canonical telemetry-*settings*
    * address; the observability dashboard gets the distinct non-conflicting
@@ -20,17 +20,17 @@
    * control. A two-tab strip switches between them in-place (no full reload).
    *
    * The dashboard charts use the `layerchart` library (already an
-   * `apps/web` dependency) — a p50/p99 step-latency `LineChart` and a
-   * runs-by-step `BarChart` on the canonical six-stage spine — never hand-rolled
+   * `apps/web` dependency): a p50/p99 step-latency `LineChart` and a
+   * runs-by-step `BarChart` on the canonical six-stage spine: never hand-rolled
    * SVG paths (AGENTS.md reuse-first / `goal.md` reuse-first rule, matching the
    * `DESIGN.md` §sources `04-observability-trace.md` Grafana/Honeycomb baseline).
    *
    * The dashboard header carries the universal per-Step `ModeRow` via the shared
-   * `mode-affordance-host` (DESIGN.md §4.11/§4.13) — the dashboard is a Step in
+   * `mode-affordance-host` (DESIGN.md §4.11/§4.13): the dashboard is a Step in
    * the Operate stage, its AI Assist mode routed through `operate.diagnose`
    * (the `fulcrum:open-ai-assist` shell event scoped to the diagnose Step).
    *
-   * Composes `@fulcrum/ui-kit` primitives only — `Stat`, `RadioGroup` /
+   * Composes `@fulcrum/ui-kit` primitives only: `Stat`, `RadioGroup` /
    * `RadioGroupItem`, `Button`, `Badge`, `ErrorBanner`, plus the `ModeRow` via
    * `mode-affordance-host`. No route-local charts, no new ui-kit primitives.
    *
@@ -50,7 +50,7 @@
   import { cn } from "$lib/utils.js";
 
   /* ----------------------------------------------------------------------- *
-   * View disambiguation — resolves the "Telemetry" name overload.
+   * View disambiguation: resolves the "Telemetry" name overload.
    * ----------------------------------------------------------------------- */
 
   /** The two disambiguated sub-views this route hosts. */
@@ -74,14 +74,14 @@
   }
 
   /* ----------------------------------------------------------------------- *
-   * Observability dashboard — OD `operate-telemetry.html`.
+   * Observability dashboard: OD `operate-telemetry.html`.
    * ----------------------------------------------------------------------- */
 
   /** The OD `range` selector windows (1h / 6h / 24h / 7d / 30d). */
   const RANGES = ["1h", "6h", "24h", "7d", "30d"] as const;
   type Range = (typeof RANGES)[number];
 
-  /** Active range — OD defaults to `24h` (its `.range a.active`). */
+  /** Active range: OD defaults to `24h` (its `.range a.active`). */
   let range = $state<Range>("24h");
 
   /**
@@ -91,7 +91,7 @@
    */
   const errorState = $derived($page.url.searchParams.get("state") === "error");
 
-  /** A latency sample point — one rolling bucket on the p50/p99 line chart. */
+  /** A latency sample point: one rolling bucket on the p50/p99 line chart. */
   interface LatencyPoint {
     /** Bucket label on the x-axis. */
     t: string;
@@ -101,9 +101,9 @@
     p99: number;
   }
 
-  /** Per-range telemetry roll-ups — re-bucketing the charts is a range switch. */
+  /** Per-range telemetry roll-ups: re-bucketing the charts is a range switch. */
   interface RangeBundle {
-    /** OD `.count` line — `last <range> · <n> events · <n> drops`. */
+    /** OD `.count` line: `last <range> · <n> events · <n> drops`. */
     events: string;
     drops: string;
     /** The 4-stat strip. */
@@ -122,7 +122,7 @@
   }
 
   /**
-   * The canonical six-stage spine — `capture → plan → build → review → ship →
+   * The canonical six-stage spine: `capture → plan → build → review → ship →
    * operate` (DESIGN.md §2 / IA-MAP.md §2). The runs-by-step bars are keyed on
    * this exact order; the OD file abbreviates the labels (`cap`/`ops`).
    */
@@ -135,7 +135,7 @@
     { key: "operate", short: "ops" },
   ] as const;
 
-  /** Build a rolling latency series for a range — n evenly-spaced buckets. */
+  /** Build a rolling latency series for a range: n evenly-spaced buckets. */
   function latencySeries(
     buckets: number,
     p50Base: number,
@@ -155,7 +155,7 @@
   /**
    * Per-range telemetry data. The OD reference scene is the `24h` window
    * (`last 24h · 14k events · 0 drops`, 428 runs, p50 1.84s, p99 12.7s,
-   * error 0.42%). Switching the range re-buckets every chart and stat —
+   * error 0.42%). Switching the range re-buckets every chart and stat -
    * proven by the design-e2e range-selector interaction assertion.
    */
   const RANGE_DATA: Record<Range, RangeBundle> = {
@@ -172,8 +172,8 @@
         { surface: "web shell", runs: 15, errors: 0, rate: "0.00%" },
         { surface: "CLI", runs: 4, errors: 0, rate: "0.00%" },
         { surface: "TUI", runs: 2, errors: 0, rate: "0.00%" },
-        { surface: "mobile", runs: 0, errors: 0, rate: "—" },
-        { surface: "API", runs: 0, errors: 0, rate: "—" },
+        { surface: "mobile", runs: 0, errors: 0, rate: "-" },
+        { surface: "API", runs: 0, errors: 0, rate: "-" },
       ],
       runsByStep: [
         { step: "capture", runs: 4 },
@@ -198,7 +198,7 @@
         { surface: "CLI", runs: 22, errors: 0, rate: "0.00%" },
         { surface: "TUI", runs: 6, errors: 0, rate: "0.00%" },
         { surface: "mobile", runs: 4, errors: 1, rate: "25.0%" },
-        { surface: "API", runs: 0, errors: 0, rate: "—" },
+        { surface: "API", runs: 0, errors: 0, rate: "-" },
       ],
       runsByStep: [
         { step: "capture", runs: 22 },
@@ -223,7 +223,7 @@
         { surface: "CLI", runs: 84, errors: 0, rate: "0.00%" },
         { surface: "TUI", runs: 22, errors: 0, rate: "0.00%" },
         { surface: "mobile", runs: 10, errors: 1, rate: "10.0%" },
-        { surface: "API", runs: 0, errors: 0, rate: "—" },
+        { surface: "API", runs: 0, errors: 0, rate: "-" },
       ],
       runsByStep: [
         { step: "capture", runs: 162 },
@@ -248,7 +248,7 @@
         { surface: "CLI", runs: 588, errors: 2, rate: "0.34%" },
         { surface: "TUI", runs: 156, errors: 1, rate: "0.64%" },
         { surface: "mobile", runs: 66, errors: 3, rate: "4.55%" },
-        { surface: "API", runs: 0, errors: 0, rate: "—" },
+        { surface: "API", runs: 0, errors: 0, rate: "-" },
       ],
       runsByStep: [
         { step: "capture", runs: 1080 },
@@ -273,7 +273,7 @@
         { surface: "CLI", runs: 2540, errors: 9, rate: "0.35%" },
         { surface: "TUI", runs: 680, errors: 4, rate: "0.59%" },
         { surface: "mobile", runs: 300, errors: 11, rate: "3.67%" },
-        { surface: "API", runs: 0, errors: 0, rate: "—" },
+        { surface: "API", runs: 0, errors: 0, rate: "-" },
       ],
       runsByStep: [
         { step: "capture", runs: 4600 },
@@ -286,10 +286,10 @@
     },
   };
 
-  /** The active range's roll-up — re-derived on every range switch. */
+  /** The active range's roll-up: re-derived on every range switch. */
   const bundle = $derived(RANGE_DATA[range]);
 
-  /** The OD `.count` line — `last <range> · <events> · <drops>`. */
+  /** The OD `.count` line: `last <range> · <events> · <drops>`. */
   const countLine = $derived(`last ${range} · ${bundle.events} · ${bundle.drops}`);
 
   /** Runs-by-step bars folded onto the canonical six-stage spine order. */
@@ -300,7 +300,7 @@
     }),
   );
 
-  /** Latency line-chart series — p50 + p99, OKLCH-tokened via the chart vars. */
+  /** Latency line-chart series: p50 + p99, OKLCH-tokened via the chart vars. */
   const latencySeriesDef = [
     {
       key: "p50",
@@ -328,7 +328,7 @@
   ];
 
   /**
-   * The dashboard is itself a Step in the Operate stage — it carries the
+   * The dashboard is itself a Step in the Operate stage: it carries the
    * universal `ModeRow`. Its AI Assist mode routes through `operate.diagnose`:
    * the `diagnose` Step id ties an opened AI Assist drawer to the Operate
    * diagnose surface (design-alignment/operate.md "routed via operate.diagnose").
@@ -345,14 +345,14 @@
   }
 
   /* ----------------------------------------------------------------------- *
-   * Telemetry settings — COPY.md §13 opt-in 3-state privacy control.
+   * Telemetry settings: COPY.md §13 opt-in 3-state privacy control.
    * ----------------------------------------------------------------------- */
 
-  /** The COPY.md §13 opt-in modes — `On` / `Anonymous only` / `Off`. */
+  /** The COPY.md §13 opt-in modes: `On` / `Anonymous only` / `Off`. */
   type TelemetryMode = "on" | "anon" | "off";
 
   /**
-   * The opt-in mode. DESIGN.md §11 "No telemetry without opt-in" — the default
+   * The opt-in mode. DESIGN.md §11 "No telemetry without opt-in": the default
    * is `off`; nothing leaves the machine until the operator explicitly opts in.
    */
   let telemetryMode = $state<TelemetryMode>("off");
@@ -360,24 +360,24 @@
   /** Whether the first-run opt-in prompt is still showing (DESIGN.md §11). */
   let firstRunPending = $state(true);
 
-  /** An audit-trail entry — every opt-in change is recorded (DESIGN.md §11). */
+  /** An audit-trail entry: every opt-in change is recorded (DESIGN.md §11). */
   interface AuditEntry {
     at: string;
     from: TelemetryMode;
     to: TelemetryMode;
   }
 
-  /** The opt-in change audit trail — newest first. */
+  /** The opt-in change audit trail: newest first. */
   let auditTrail = $state<AuditEntry[]>([]);
 
   /**
    * `DO_NOT_TRACK=1` in the environment hard-overrides the control to `off`
-   * (COPY.md §13 "DO_NOT_TRACK=1 is respected") — the radios are then disabled
+   * (COPY.md §13 "DO_NOT_TRACK=1 is respected"): the radios are then disabled
    * and the surface explains why. `?dnt=1` forces the scenario for design-e2e.
    */
   const doNotTrack = $derived($page.url.searchParams.get("dnt") === "1");
 
-  /** The effective mode — `DO_NOT_TRACK` clamps it to `off` regardless. */
+  /** The effective mode: `DO_NOT_TRACK` clamps it to `off` regardless. */
   const effectiveMode = $derived<TelemetryMode>(doNotTrack ? "off" : telemetryMode);
 
   /** Persist a mode change + record it in the audit trail. */
@@ -391,12 +391,12 @@
     telemetryMode = mode;
   }
 
-  /** Dismiss the first-run prompt — `Continue` (COPY.md §13). */
+  /** Dismiss the first-run prompt: `Continue` (COPY.md §13). */
   function continueFirstRun(): void {
     firstRunPending = false;
   }
 
-  /** The COPY.md §13 mode rows — copy is verbatim from the spec. */
+  /** The COPY.md §13 mode rows: copy is verbatim from the spec. */
   const TELEMETRY_OPTIONS: { value: TelemetryMode; label: string; description: string }[] = [
     {
       value: "on",
@@ -432,7 +432,7 @@
   data-state={errorState ? "error" : "populated"}
   class="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-[18px] pb-20"
 >
-  <!-- Two-tab disambiguation — resolves the "Telemetry" name overload. -->
+  <!-- Two-tab disambiguation: resolves the "Telemetry" name overload. -->
   <nav
     data-telemetry-view-tabs
     role="tablist"
@@ -470,7 +470,7 @@
   </nav>
 
   {#if activeView === "observability"}
-    <!-- ================= OBSERVABILITY DASHBOARD — OD operate-telemetry.html ================ -->
+    <!-- ================= OBSERVABILITY DASHBOARD: OD operate-telemetry.html ================ -->
     <header data-telemetry-head class="flex flex-wrap items-baseline gap-3.5">
       <h1 data-telemetry-title class="text-[22px] font-semibold tracking-tight">
         Telemetry
@@ -524,7 +524,7 @@
       />
     {/if}
 
-    <!-- 4-stat strip — OD `.grid-stats`. -->
+    <!-- 4-stat strip: OD `.grid-stats`. -->
     <div data-telemetry-stats class="grid grid-cols-2 gap-3 md:grid-cols-4">
       <Stat
         data-telemetry-stat="agent-runs"
@@ -556,9 +556,9 @@
       />
     </div>
 
-    <!-- charts grid — OD `.charts` (2fr / 1fr). -->
+    <!-- charts grid: OD `.charts` (2fr / 1fr). -->
     <div data-telemetry-charts class="grid grid-cols-1 gap-3.5 lg:grid-cols-[2fr_1fr]">
-      <!-- p50/p99 step-latency line chart — OD `svg.line`, now a LayerChart LineChart. -->
+      <!-- p50/p99 step-latency line chart: OD `svg.line`, now a LayerChart LineChart. -->
       <article
         data-telemetry-chart="step-latency"
         class="rounded-lg border border-border bg-card p-4"
@@ -587,7 +587,7 @@
         </div>
       </article>
 
-      <!-- Error-rate-by-surface rate table — OD `.rate-table`. -->
+      <!-- Error-rate-by-surface rate table: OD `.rate-table`. -->
       <article
         data-telemetry-chart="error-rate-by-surface"
         class="rounded-lg border border-border bg-card p-4"
@@ -616,7 +616,7 @@
         </table>
       </article>
 
-      <!-- Runs-by-step bar chart — OD `.bars`, six-stage spine, now a LayerChart BarChart. -->
+      <!-- Runs-by-step bar chart: OD `.bars`, six-stage spine, now a LayerChart BarChart. -->
       <article
         data-telemetry-chart="runs-by-step"
         class="rounded-lg border border-border bg-card p-4"
@@ -646,7 +646,7 @@
         </div>
       </article>
 
-      <!-- Local-resources rate table — OD `.rate-table`. -->
+      <!-- Local-resources rate table: OD `.rate-table`. -->
       <article
         data-telemetry-chart="local-resources"
         class="rounded-lg border border-border bg-card p-4"
@@ -690,7 +690,7 @@
       </article>
     </div>
   {:else}
-    <!-- ================= TELEMETRY SETTINGS — COPY.md §13 opt-in privacy control ================ -->
+    <!-- ================= TELEMETRY SETTINGS: COPY.md §13 opt-in privacy control ================ -->
     <header data-telemetry-settings-head class="flex flex-wrap items-baseline gap-3.5">
       <h1 data-telemetry-settings-title class="text-[22px] font-semibold tracking-tight">
         Telemetry settings
@@ -701,7 +701,7 @@
     </header>
 
     {#if firstRunPending}
-      <!-- First-run opt-in prompt — DESIGN.md §11, COPY.md §13. -->
+      <!-- First-run opt-in prompt: DESIGN.md §11, COPY.md §13. -->
       <section
         data-telemetry-first-run
         class="rounded-lg border border-border bg-card p-4"
@@ -715,7 +715,7 @@
           Fulcrum is local-first. All telemetry is opt-in.
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Choose one — this is the first-run prompt; you can change it any time.
+          Choose one: this is the first-run prompt; you can change it any time.
         </p>
       </section>
     {/if}
@@ -808,7 +808,7 @@
       {/if}
     </section>
 
-    <!-- Opt-in audit trail — DESIGN.md §11 "no telemetry without opt-in" is recorded. -->
+    <!-- Opt-in audit trail: DESIGN.md §11 "no telemetry without opt-in" is recorded. -->
     <section
       data-telemetry-audit
       class="rounded-lg border border-border bg-card p-4"
@@ -825,7 +825,7 @@
         <p data-telemetry-audit-empty class="mt-3 text-xs text-muted-foreground">
           No opt-in changes yet. Telemetry is
           <Badge data-telemetry-audit-current variant="outline">{effectiveMode}</Badge>
-          — the local-first default.
+         : the local-first default.
         </p>
       {:else}
         <ul data-telemetry-audit-list class="mt-3 flex flex-col gap-1.5">

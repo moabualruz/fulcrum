@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * BulkActionBar — multi-select bulk action toolbar.
+   * BulkActionBar: multi-select bulk action toolbar.
    */
   import { createEventDispatcher } from "svelte";
   import { Popover, PopoverTrigger, PopoverContent } from "@fulcrum/ui-kit";

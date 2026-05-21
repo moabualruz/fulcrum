@@ -68,7 +68,7 @@ export class RunsScreen {
     renderer.writeln(c.bold("  Runs"));
     renderer.separator();
 
-    // Error frame — `[what failed]. [why]. [next step]. trace=<id>` (CLI-TUI-UX.md §5).
+    // Error frame: `[what failed]. [why]. [next step]. trace=<id>` (CLI-TUI-UX.md §5).
     if (this.error) {
       renderWorkbenchErrorFrame(renderer, {
         what: "Runs feed failed to load.",
@@ -80,7 +80,7 @@ export class RunsScreen {
 
     renderer.writeln();
 
-    // Empty state — one sentence + one action (CLI-TUI-UX.md §5, COPY.md §2).
+    // Empty state: one sentence + one action (CLI-TUI-UX.md §5, COPY.md §2).
     if (this.visibleRuns.length === 0) {
       renderWorkbenchEmptyState(
         renderer,

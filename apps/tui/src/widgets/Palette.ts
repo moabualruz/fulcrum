@@ -1,7 +1,7 @@
 /**
- * Palette — the TUI command palette overlay.
+ * Palette: the TUI command palette overlay.
  *
- * Two grammars share one widget (CLI-TUI-UX.md §7.1, §9 — apps/tui/CONTEXT.md
+ * Two grammars share one widget (CLI-TUI-UX.md §7.1, §9: apps/tui/CONTEXT.md
  * ColonPalette):
  *
  *  - **Fuzzy mode** (default / `>` prefix): sequential-character fuzzy filter
@@ -15,7 +15,7 @@
  *    system).
  *
  * Esc closes the palette without running anything; the caller routes the
- * second key of a StageChord — the palette itself never steals `g`.
+ * second key of a StageChord: the palette itself never steals `g`.
  */
 
 import pc from "picocolors";
@@ -33,7 +33,7 @@ function fuzzyMatch(needle: string, haystack: string): boolean {
 
 // ─── CLI command tree (ColonPalette `:` grammar) ───────────────────────────
 //
-// The ColonPalette tab-completes against the CLI command tree — "anything you
+// The ColonPalette tab-completes against the CLI command tree: "anything you
 // can do in `fulcrum <cmd>` is `:<cmd>` in the TUI" (CLI-TUI-UX.md §9.1). The
 // tree below mirrors the workflow-stage command groups from
 // `apps/cli/src/index.ts` (WORKFLOW_STAGES) so the two surfaces stay dual;
@@ -42,7 +42,7 @@ function fuzzyMatch(needle: string, haystack: string): boolean {
 
 /** One CLI command: a top-level verb and its first-level subcommands. */
 export interface CliCommandNode {
-  /** Command verb — the word after `fulcrum` / `:`. */
+  /** Command verb: the word after `fulcrum` / `:`. */
   verb: string;
   /** First-level subcommands accepted after the verb. */
   subcommands: readonly string[];
@@ -152,9 +152,9 @@ export interface PaletteCommand {
   hint: string;
 }
 
-/** One OD palette section — a dimmed header plus its command rows. */
+/** One OD palette section: a dimmed header plus its command rows. */
 export interface PaletteSection {
-  /** Section header text — matches OD `tui-runs.html` exactly. */
+  /** Section header text: matches OD `tui-runs.html` exactly. */
   header: string;
   /** Command rows under the header. */
   commands: readonly PaletteCommand[];
@@ -218,7 +218,7 @@ export const PALETTE_SECTIONS: readonly PaletteSection[] = [
   },
 ];
 
-/** How the palette was opened — fuzzy item picker, or the `:` ColonPalette. */
+/** How the palette was opened: fuzzy item picker, or the `:` ColonPalette. */
 export type PaletteMode = "fuzzy" | "colon";
 
 export interface PaletteOpts {
@@ -357,7 +357,7 @@ export class Palette {
     if (this.mode === "colon") {
       const candidates = this.colonCandidates();
       const picked = candidates[this._selectedIdx];
-      // Only fire on a known command — Enter never runs an unknown command.
+      // Only fire on a known command: Enter never runs an unknown command.
       const command = picked ?? (this.hasKnownColonCommand() ? this.query.trim() : undefined);
       if (command && this.onAction) this.onAction(command);
       return;
@@ -397,7 +397,7 @@ export class Palette {
   }
 
   /**
-   * ColonPalette render — the OD `tui-runs.html` palette: a `›` prompt line,
+   * ColonPalette render: the OD `tui-runs.html` palette: a `›` prompt line,
    * then the five OD sections (stages · step actions · search ·
    * agents/MCP/plugins/routes · system). When the query is non-empty the
    * CLI-command completion candidates replace the section list so
@@ -427,7 +427,7 @@ export class Palette {
         lines.push("│ " + clip(pc.dim("  no matching command")) + " │");
       }
     } else {
-      // Empty query — render the OD section structure.
+      // Empty query: render the OD section structure.
       let used = 0;
       for (const section of PALETTE_SECTIONS) {
         if (used >= budget) break;

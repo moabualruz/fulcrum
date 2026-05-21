@@ -1,5 +1,5 @@
 /**
- * /settings/integrations/linear — Linear connector config.
+ * /settings/integrations/linear: Linear connector config.
  *
  * Gated: only functional when FULCRUM_FEATURES=connector-linear.
  * Allows setting API key, selecting team, viewing sync status.

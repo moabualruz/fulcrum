@@ -1,5 +1,5 @@
 /**
- * Screen registry for the TUI — the canonical TUI screen catalog.
+ * Screen registry for the TUI: the canonical TUI screen catalog.
  *
  * Two responsibilities:
  *  1. A lightweight in-memory registry mapping screen-key → metadata, used by
@@ -16,9 +16,9 @@
  */
 
 export interface ScreenDescriptor {
-  /** Stable screen key — used for telemetry, history stack, route lookup. */
+  /** Stable screen key: used for telemetry, history stack, route lookup. */
   key: string;
-  /** Human title — appears in status bar / breadcrumb. */
+  /** Human title: appears in status bar / breadcrumb. */
   title: string;
   /** Optional pillar attribution (e.g. "P3", "P4"). */
   pillar?: string;
@@ -54,12 +54,12 @@ export class ScreenRegistry {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Stage navigation — the six workflow stages (CLI-TUI-UX.md §6, IA-MAP.md §9)
+// Stage navigation: the six workflow stages (CLI-TUI-UX.md §6, IA-MAP.md §9)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One workflow-stage entry rendered in the root StageNav. */
 export interface StageNavEntry {
-  /** Exact stage label — locked by the snapshot test. */
+  /** Exact stage label: locked by the snapshot test. */
   label: "Capture" | "Plan" | "Build" | "Review" | "Ship" | "Operate";
   /** Default screen key opened when the stage is selected. */
   screenKey: string;
@@ -83,19 +83,19 @@ export const TUI_STAGE_NAV: readonly StageNavEntry[] = [
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Top tab strip — OD `tui-runs.html` #tui-tabs (always-visible root chrome)
+// Top tab strip: OD `tui-runs.html` #tui-tabs (always-visible root chrome)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One button in the OD top tab strip. */
 export interface TabStripEntry {
-  /** Visible tab label — exact, matches OD `#tui-tabs button` text. */
+  /** Visible tab label: exact, matches OD `#tui-tabs button` text. */
   label: string;
   /** Screen key the tab routes to. */
   screenKey: string;
 }
 
 /**
- * The OD `tui-runs.html` `#tui-tabs` strip — sixteen buttons in exact order.
+ * The OD `tui-runs.html` `#tui-tabs` strip: sixteen buttons in exact order.
  * This is always-visible root chrome; the snapshot test locks order + labels.
  *
  * OD source order: :capture :plan :runs :board :review :ship :doctor :run :ai
@@ -185,7 +185,7 @@ export function resolveColonRoute(route: string): string | undefined {
 }
 
 /**
- * Build the canonical TUI screen registry — every stage screen, every tab-strip
+ * Build the canonical TUI screen registry: every stage screen, every tab-strip
  * screen, and the system screens, each registered exactly once. The launcher
  * and router consume this so a screen is never navigable without metadata.
  */
