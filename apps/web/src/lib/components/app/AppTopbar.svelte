@@ -11,7 +11,7 @@
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
 	export type DensityMode = "compact" | "cozy" | "comfortable";
-	type SystemPanel = "command-palette" | "notifications" | "display" | "keyboard-help" | "account";
+	type SystemPanel = "notifications" | "display" | "keyboard-help" | "account";
 
 	interface Props {
 		pathname: string;
@@ -107,6 +107,12 @@
 	function isSystemPanelOpen(panel: SystemPanel) {
 		return openSystemPanel === panel;
 	}
+
+	function openCommandPalette(): void {
+		if (typeof window !== "undefined") {
+			window.dispatchEvent(new CustomEvent("fulcrum:open-command-palette"));
+		}
+	}
 </script>
 
 <ScopeBar
@@ -149,11 +155,9 @@
 		<button
 			type="button"
 			aria-label="Command palette · ⌘K"
-			aria-expanded={isSystemPanelOpen("command-palette") ? "true" : "false"}
-			aria-controls="scope-system-panel-command-palette"
-			data-open={isSystemPanelOpen("command-palette") ? "true" : "false"}
+			aria-haspopup="dialog"
 			data-scope-system-icon="command-palette"
-			onclick={() => toggleSystemPanel("command-palette")}
+			onclick={openCommandPalette}
 			class={iconButtonClass}
 		>
 			<Search class="size-4" aria-hidden="true" />
@@ -230,11 +234,6 @@
 		>
 			<UserCircle class="size-4" aria-hidden="true" />
 		</button>
-		{#if isSystemPanelOpen("command-palette")}
-			<div id="scope-system-panel-command-palette" data-scope-system-panel="command-palette" data-open="true" class={panelClass}>
-				Command palette ready
-			</div>
-		{/if}
 		{#if isSystemPanelOpen("display")}
 			<div id="scope-system-panel-display" data-scope-system-panel="display" data-open="true" class={panelClass}>
 				<div class="mb-2 font-medium">Display</div>

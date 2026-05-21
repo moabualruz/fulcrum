@@ -86,8 +86,9 @@ describe("AppTopbar component", () => {
     ]) {
       expect(body).toContain(`aria-label="${label}"`);
     }
+    expect(body).toMatch(/aria-haspopup="dialog"[^>]*data-scope-system-icon="command-palette"/);
     const expanded = body.match(/aria-expanded="false"/g) ?? [];
-    expect(expanded.length).toBeGreaterThanOrEqual(5);
+    expect(expanded.length).toBeGreaterThanOrEqual(4);
   });
 
   test("active project label reflects activeProjectId prop", () => {
