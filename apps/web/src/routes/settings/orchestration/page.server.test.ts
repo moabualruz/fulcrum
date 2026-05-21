@@ -7,6 +7,8 @@ import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.t
 import { createLocalOrg } from "@test-support/product-workspace-fixtures.ts";
 
 let scratch: string;
+let db: Awaited<ReturnType<typeof openIsolatedStore>>;
+let orgId: string;
 
 function streamedData<T>(result: unknown): Promise<T> {
   const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
@@ -14,32 +16,46 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-beforeEach(() => {
+/**
+ * The orchestration route reaches its database through `requestServiceScope`
+ * (`requestAppScope`). When `locals.em` is supplied it is used directly; with
+ * an explicit `orgId`, scope resolution short-circuits and never needs a
+ * TypeORM `EntityManager` — the route's orchestration queries only require a
+ * `{ query }` SQL executor, which the isolated store provides.
+ *
+ * The store is migrated with the raw-SQL `productStoreMigrations` set, which
+ * is what actually creates `workflow_defs` + `orchestration_config`. Those two
+ * tables are NOT present in the canonical TypeORM `application-database`
+ * schema (which only ships the differently named `workflow_definitions`), so
+ * the route cannot persist against a TypeORM-migrated database. See the
+ * PRODUCT BUG note in the W6 baseline-test repair report.
+ */
+function routeLocals() {
+  return { em: db, orgId, activeProjectId: null };
+}
+
+beforeEach(async () => {
   scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-orch-settings-"));
   process.env["FULCRUM_HOME"] = scratch;
+  const dbDir = join(scratch, "pglite.data");
+  mkdirSync(dbDir, { recursive: true });
+  db = await openIsolatedStore(dbDir);
+  await migrateIsolatedStore(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  orgId = org.id;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await db.close();
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedDb() {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  return { db, orgId: org.id };
-}
-
 describe("/settings/orchestration +page.server.ts", () => {
   test("load returns default config when none exists", async () => {
-    const { db } = await seedDb();
-    await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      locals: { activeProjectId: null },
+      locals: routeLocals(),
     } as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<{ config: { poll_interval_s: number }; workflows: unknown[] }>(result);
     expect(payload.config.poll_interval_s).toBe(5);
@@ -47,8 +63,6 @@ describe("/settings/orchestration +page.server.ts", () => {
   });
 
   test("save action creates config", async () => {
-    const { db } = await seedDb();
-    await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const formData = new FormData();
     formData.set("poll_interval_s", "10");
@@ -59,13 +73,26 @@ describe("/settings/orchestration +page.server.ts", () => {
       method: "POST",
       body: formData,
     });
-    const result = await mod.actions.save({ request } as Parameters<typeof mod.actions.save>[0]);
+    const result = await mod.actions.save({
+      request,
+      locals: routeLocals(),
+    } as Parameters<typeof mod.actions.save>[0]);
     expect(result).toBeDefined();
+    // A success result is not a SvelteKit `fail()` envelope (no 4xx status).
+    const hasFailStatus = typeof result === "object" && result !== null && "status" in result;
+    expect(hasFailStatus).toBe(false);
+
+    // The config row was persisted with the submitted values.
+    const rows = await db.query<{ poll_interval_s: number; max_concurrency: number }>(
+      "SELECT * FROM orchestration_config WHERE org_id = $1",
+      [orgId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.poll_interval_s).toBe(10);
+    expect(rows[0]?.max_concurrency).toBe(8);
   });
 
   test("save action rejects invalid poll interval", async () => {
-    const { db } = await seedDb();
-    await db.close();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const formData = new FormData();
     formData.set("poll_interval_s", "0");
@@ -75,7 +102,10 @@ describe("/settings/orchestration +page.server.ts", () => {
       method: "POST",
       body: formData,
     });
-    const result = await mod.actions.save({ request } as Parameters<typeof mod.actions.save>[0]);
+    const result = await mod.actions.save({
+      request,
+      locals: routeLocals(),
+    } as Parameters<typeof mod.actions.save>[0]);
     expect(result).toBeDefined();
     expect(
       typeof result === "object" && result !== null && "status" in result

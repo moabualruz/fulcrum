@@ -62,11 +62,14 @@ const SURFACES: Surface[] = [
     keys: ["activeProjectId", "kind", "q", "streamed", "data", "documents", "projectTree", "globalTree"],
   },
   {
+    // `/artifacts` was re-homed to the Ship stage workbench (`/ship`) — the
+    // list `load` is now a 301 redirect, while the `upload` / `bulk` mutation
+    // actions are preserved and still delegate to the `artifact-api` adapter.
     name: "artifacts",
     file: "artifacts/+page.server.ts",
     applicationModule: null,
     helperModule: "$lib/server/artifact-api",
-    keys: ["activeProjectId", "filter", "streamed", "data", "artifacts"],
+    keys: ["redirect", "createArtifactApiForEvent", "upload", "bulk"],
   },
   {
     name: "run artifacts",

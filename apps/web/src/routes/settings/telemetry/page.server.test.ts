@@ -48,10 +48,12 @@ describe("/settings/telemetry route", () => {
     }) as typeof globalThis.fetch;
     const mod = await import(`./+page.server.ts?telemetry-toggle=${Date.now()}`);
 
-    await expect(mod.actions.toggleOptIn(telemetryEvent(fetch) as never)).resolves.toEqual({
-      success: true,
-      optIn: false,
-    });
+    // The action now also persists local consent and returns that snapshot
+    // alongside the toggled state — assert the toggled state via `toMatchObject`
+    // and verify the persisted consent mirrors the new opt-in value.
+    const result = await mod.actions.toggleOptIn(telemetryEvent(fetch) as never);
+    expect(result).toMatchObject({ success: true, optIn: false });
+    expect((result as { local: { consent: { optedIn: boolean } } }).local.consent.optedIn).toBe(false);
     expect(calls.map((call) => [call.init?.method, call.url, call.init?.body ? JSON.parse(String(call.init.body)) : null])).toEqual([
       ["GET", "http://localhost/api/v1/telemetry/status?orgId=org-1&userId=user-1", null],
       ["POST", "http://localhost/api/v1/telemetry/opt-out", { orgId: "org-1", userId: "user-1" }],
