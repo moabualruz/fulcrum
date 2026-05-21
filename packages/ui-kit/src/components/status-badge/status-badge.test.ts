@@ -59,10 +59,13 @@ describe("StatusBadge: COPY.md §6 status-label lock", () => {
 	});
 
 	test("no rendered status label contains an em dash (COPY.md §1 rule 6)", () => {
+		// Em dash is U+2014 — a literal hyphen "-" is allowed (Svelte SSR emits
+		// `<!--[-->` block markers, and status labels themselves may hyphenate).
+		const EM_DASH = "—";
 		for (const status of CANONICAL_STATUS_VOCAB) {
-			expect(statusLabel(status)).not.toContain("-");
+			expect(statusLabel(status)).not.toContain(EM_DASH);
 			const { body } = render(StatusBadgeRoot, { props: { status } });
-			expect(body).not.toContain("-");
+			expect(body).not.toContain(EM_DASH);
 		}
 	});
 

@@ -30,7 +30,7 @@ export async function checkGeneratedSnapshot(options: SnapshotGateOptions): Prom
     return {
       ok: true,
       changedFiles,
-      message: "ci:codegen OK — generated snapshot matches fresh codegen",
+      message: "ci:codegen OK: generated snapshot matches fresh codegen",
     };
   }
 
@@ -60,7 +60,7 @@ async function assertCompletionScriptsNonEmpty(dir: string): Promise<void> {
     const path = join(dir, file);
     const info = await stat(path);
     if (info.size === 0) {
-      throw new Error(`ci:codegen FAIL — ${file} is empty`);
+      throw new Error(`ci:codegen FAIL: ${file} is empty`);
     }
   }
 }
@@ -100,7 +100,7 @@ async function runSchemaRegistryCheck(root: string): Promise<void> {
         resolvePromise();
         return;
       }
-      rejectPromise(new Error("ci:codegen FAIL — schema registry check failed"));
+      rejectPromise(new Error("ci:codegen FAIL: schema registry check failed"));
     });
   });
 }
