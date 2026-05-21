@@ -66,6 +66,7 @@
 		DataTable,
 		DataList,
 		TreeView,
+		ScrollArea,
 		Stat,
 		ModeRow,
 		TraceChip,
@@ -1465,6 +1466,55 @@
 			<span class="text-xs text-muted-foreground" data-design-kit-tree-selection>
 				Selected: {treeSelected ?? "—"}
 			</span>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="scroll-area"
+		>
+			<h2 class="text-lg font-semibold">ScrollArea</h2>
+			<div class="grid gap-4 lg:grid-cols-3">
+				<ScrollArea
+					orientation="vertical"
+					type="always"
+					class="h-40 rounded-md border border-border bg-surface-sunken"
+					viewportClasses="p-3"
+				>
+					<div class="grid gap-2">
+						{#each ["Capture intake", "Plan dependency graph", "Build agent run", "Review diffs", "Ship release", "Operate alerts"] as item}
+							<p class="rounded-sm border border-border bg-surface px-3 py-2 text-sm">{item}</p>
+						{/each}
+					</div>
+				</ScrollArea>
+
+				<ScrollArea
+					orientation="horizontal"
+					type="always"
+					class="w-full rounded-md border border-border bg-surface-sunken"
+					viewportClasses="p-3"
+				>
+					<div class="flex w-max gap-2 pb-2">
+						{#each ["capture", "intake", "context", "plan", "assign", "build", "review", "ship", "operate"] as stage}
+							<span class="rounded-sm border border-border bg-surface px-4 py-2 text-sm">{stage}</span>
+						{/each}
+					</div>
+				</ScrollArea>
+
+				<ScrollArea
+					orientation="both"
+					type="always"
+					class="h-40 rounded-md border border-border bg-surface-sunken"
+					viewportClasses="p-3"
+				>
+					<div class="grid w-max grid-cols-4 gap-2">
+						{#each Array.from({ length: 16 }) as _, index}
+							<span class="rounded-sm border border-border bg-surface px-4 py-2 text-sm">
+								Cell {index + 1}
+							</span>
+						{/each}
+					</div>
+				</ScrollArea>
+			</div>
 		</article>
 
 		<article
