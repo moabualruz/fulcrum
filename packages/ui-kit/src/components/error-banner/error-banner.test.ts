@@ -20,6 +20,7 @@ describe("ErrorBanner", () => {
     expect(body).toContain("Could not save the task");
     expect(body).toContain("Network request failed before reaching the server.");
     expect(body).toContain('data-slot="error-banner-trace"');
+    expect(body).toContain("trace=");
     expect(body).toContain("tr_err_5xx");
     expect(body).toContain('data-slot="error-banner-trace-copy"');
   });

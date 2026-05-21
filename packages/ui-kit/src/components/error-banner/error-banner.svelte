@@ -75,7 +75,7 @@
 
 	{#if traceId}
 		<p class={cn("flex flex-wrap items-center gap-1 font-mono text-[11px] text-muted-foreground")}>
-			<span>trace</span>
+			<span>trace=</span>
 			<span data-slot="error-banner-trace">{traceId}</span>
 			<button
 				type="button"
