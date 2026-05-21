@@ -55,19 +55,12 @@
     time,
   }: Props = $props();
 
-  const resolvedTraceId = $derived(traceId ?? requestId ?? generatedTraceId());
+  const fallbackTraceId = "trace-local-session";
+  const resolvedTraceId = $derived(traceId ?? requestId ?? fallbackTraceId);
 
   // Clock segment: live HH:MM, refreshed each minute. Server render uses the
   // provided `time` prop (or a stable placeholder) so SSR output is deterministic.
   let clock = $state(time ?? "--:--");
-
-  function generatedTraceId(): string {
-    if (typeof window === "undefined") return "trace-init";
-    if (!("crypto" in window) || typeof window.crypto.randomUUID !== "function") {
-      return `trace-${Math.random().toString(36).slice(2, 10)}`;
-    }
-    return `trace-${window.crypto.randomUUID().slice(0, 8)}`;
-  }
 
   function formatClock(date: Date): string {
     return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;

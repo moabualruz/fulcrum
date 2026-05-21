@@ -58,7 +58,6 @@
 
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let paletteOpen = $state(false);
-	let modifierChordUsed = false;
 	let shortcutHelpOpen = $state(false);
 	let inferenceStatus = $state<InferenceStatus>("unknown");
 
@@ -146,6 +145,7 @@
 	let chordPending = $state(false);
 	let chordTimer: ReturnType<typeof setTimeout> | undefined;
 	let railCollapsed = $state(false);
+	const shellTraceId = $derived(data?.traceId ?? data?.requestId ?? "trace-local-session");
 
 	/*
 	 * Shell connection banner (COPY.md §3 "Offline + queued mutation",
@@ -288,7 +288,6 @@
 
 	onMount(() => {
 		window.addEventListener("keydown", onGlobalKeydown);
-		window.addEventListener("keyup", onGlobalKeyup);
 		const openHelp = () => (shortcutHelpOpen = true);
 		window.addEventListener("fulcrum:open-shortcut-help", openHelp);
 		// The StatusFooter `✨ AI Assist` segment + every per-Step `⊞ AI Assist`
@@ -301,7 +300,6 @@
 		const teardownConnection = initConnectionMonitor();
 		return () => {
 			window.removeEventListener("keydown", onGlobalKeydown);
-			window.removeEventListener("keyup", onGlobalKeyup);
 			window.removeEventListener("fulcrum:open-shortcut-help", openHelp);
 			window.removeEventListener("fulcrum:open-ai-assist", openAiAssist);
 			teardownConnection();
@@ -313,9 +311,6 @@
 		const target = event.target as HTMLElement | null;
 		const tag = typeof target?.tagName === "string" ? target.tagName.toLowerCase() : "";
 		const inTextField = tag === "input" || tag === "textarea" || target?.isContentEditable === true;
-		if ((event.metaKey || event.ctrlKey) && event.key !== "Meta" && event.key !== "Control") {
-			modifierChordUsed = true;
-		}
 		if (event.key === "Escape" && aiAssistOpen) {
 			aiAssistOpen = false;
 			return;
@@ -368,26 +363,7 @@
 				return;
 			}
 		}
-		if (typeof event.key === "string" && event.key.toLowerCase() === "k" && tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
-			event.preventDefault();
-			paletteOpen = !paletteOpen;
-			return;
-		}
 		commandKeydownHandler(event);
-	}
-
-	function onGlobalKeyup(event: KeyboardEvent) {
-		if (event.key === "Meta" || event.key === "Control") {
-			if (modifierChordUsed) {
-				modifierChordUsed = false;
-				return;
-			}
-			const target = event.target as HTMLElement | null;
-			const tag = target?.tagName.toLowerCase();
-			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
-				paletteOpen = true;
-			}
-		}
 	}
 </script>
 
@@ -606,7 +582,7 @@
 					<TraceBadge
 						badge
 						data-mobile-trace-id
-						traceId={data?.traceId ?? data?.requestId ?? "trace-init"}
+						traceId={shellTraceId}
 						project="fulcrum"
 					/>
 				</div>
@@ -648,7 +624,7 @@
 			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
 				{@render children?.()}
 			</main>
-			<TraceFooter traceId={data?.traceId ?? null} requestId={data?.requestId ?? null} />
+			<TraceFooter traceId={shellTraceId} />
 		</div>
 	{/if}
 </div>

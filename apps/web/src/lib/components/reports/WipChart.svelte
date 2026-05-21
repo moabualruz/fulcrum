@@ -27,7 +27,7 @@
       series={[
         {
           key: "wipCount",
-          label: "WIP",
+          label: "Active work",
           value: (d: WipPoint) => d.wipCount,
           color: "hsl(var(--chart-1))",
         },
@@ -38,14 +38,14 @@
     />
     {#if wipLimit != null}
       <div class="wip-limit-note" style="font-size: 0.75rem; color: hsl(var(--chart-5)); margin-top: 0.25rem;">
-        WIP Limit: {wipLimit}
+        Active work limit: {wipLimit}
       </div>
     {/if}
   {:else if !browser}
     <div class="chart-ssr-placeholder" style="height: {height}px; background: hsl(var(--muted)); border-radius: 0.5rem;"></div>
   {:else}
     <div class="chart-empty" style="height: {height}px; display: flex; align-items: center; justify-content: center; color: hsl(var(--muted-foreground));">
-      No WIP data available
+      No active work data available
     </div>
   {/if}
 </div>

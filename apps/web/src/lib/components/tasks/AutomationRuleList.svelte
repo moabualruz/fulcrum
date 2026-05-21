@@ -368,7 +368,7 @@
   {:else if rules.length === 0}
     <div class={cn("text-center py-12 text-muted-foreground")}>
       <p class={cn("text-sm")}>No automation rules yet.</p>
-      <p class={cn("text-xs mt-1")}>Add a rule or use a template to get started.</p>
+      <p class={cn("text-xs mt-1")}>Add a rule or apply a template.</p>
     </div>
   {:else if visibleRules.length === 0}
     <div data-automation-rules-empty class={cn("rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground")}>

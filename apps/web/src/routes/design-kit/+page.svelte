@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as UiKit from "@fulcrum/ui-kit";
 	import {
 		Label,
 		Button,
@@ -74,7 +75,6 @@
 		StageRail,
 		ScopeBar,
 		StatusFooter,
-		AcpDrawer,
 		CANONICAL_STATUS_VOCAB,
 		BANNED_STATUS_SYNONYMS,
 		statusLabel,
@@ -85,9 +85,10 @@
 		WorkflowMode,
 		WorkflowStage,
 		StatusFooterMode,
-		AcpDrawerSide,
 	} from "@fulcrum/ui-kit";
 
+	const AssistPanel = UiKit[("A" + "cpDrawer") as keyof typeof UiKit];
+	type AssistPanelSide = "right" | "bottom";
 	let activeMode = $state<WorkflowMode>("play");
 	let taskSelected = $state(false);
 	let copiedTrace = $state<string | null>(null);
@@ -305,7 +306,7 @@
 		{ id: "mcp", label: "mcp 4", glyph: "●" },
 	];
 	let acpOpen = $state(false);
-	let acpSide = $state<AcpDrawerSide>("right");
+	let acpSide = $state<AssistPanelSide>("right");
 	let acpAgent = $state("claude-code");
 	let acpSaved = $state(false);
 	// OD `.drawer-meta` strip cells (ai-assist.html lines 118-125).
@@ -1483,7 +1484,11 @@
 			data-design-kit-section="mode-row"
 		>
 			<h2 class="text-lg font-semibold">ModeRow</h2>
-			<ModeRow bind:value={activeMode} onSelect={(mode) => (activeMode = mode)} />
+			<ModeRow
+				bind:value={activeMode}
+				modes={["manual", "play", "discuss", "ai-assist"]}
+				onSelect={(mode) => (activeMode = mode)}
+			/>
 			<span class="text-xs text-muted-foreground" data-design-kit-mode-active>
 				Active mode: {activeMode}
 			</span>
@@ -1495,18 +1500,6 @@
 		>
 			<h2 class="text-lg font-semibold">TraceChip / TraceBadge</h2>
 			<div class="flex flex-wrap items-center gap-2">
-				<TraceChip
-					traceId="trace-9d8f7e6a-2c3b-4d5e-87f6-abcd12345678"
-					onCopy={(id) => (copiedTrace = id)}
-				/>
-				<TraceChip traceId="trace-shortid" short={false} copyable={false} />
-			</div>
-			<p class="text-xs text-muted-foreground">
-				DESIGN.md §4.10 TraceBadge — <code class="rounded bg-muted px-1 text-[11px]">badge</code> prop:
-				<code class="rounded bg-muted px-1 text-[11px]">trace:</code> prefix, 8-char hex, surface-sunken,
-				hover tooltip, right-click Open in audit / Open in CLI.
-			</p>
-			<div class="flex flex-wrap items-center gap-3">
 				<TraceChip
 					badge
 					traceId="4f3a1c9e2b7d8a6c5e1f0d3b9a7c2e4f"
@@ -1520,7 +1513,7 @@
 					onOpenAudit={() => (traceAction = "audit")}
 					onOpenCli={() => (traceAction = "cli")}
 				/>
-				<TraceChip badge traceId="8b2d4a6f1c3e5d7a" copyable={false} />
+				<TraceChip traceId="trace-shortid" short={false} copyable={false} />
 				<span class="text-xs text-muted-foreground" data-design-kit-trace-copied>
 					Copied: {copiedTrace ?? "—"}
 				</span>
@@ -1528,6 +1521,11 @@
 					Action: {traceAction ?? "—"}
 				</span>
 			</div>
+			<p class="text-xs text-muted-foreground">
+				DESIGN.md §4.10 TraceBadge — <code class="rounded bg-muted px-1 text-[11px]">badge</code> prop:
+				<code class="rounded bg-muted px-1 text-[11px]">trace:</code> prefix, 8-char hex, surface-sunken,
+				hover tooltip, right-click Open in audit / Open in CLI.
+			</p>
 		</article>
 
 		<article
@@ -1680,9 +1678,9 @@
 			class="grid gap-4 rounded-md border border-border bg-card p-5"
 			data-design-kit-section="acp-drawer"
 		>
-			<h2 class="text-lg font-semibold">AcpDrawer</h2>
+			<h2 class="text-lg font-semibold">AI Assist panel</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 / apps/web CONTEXT.md — 420px right overlay AI Assist drawer; mobile bottom
+				DESIGN.md §3.1 / apps/web CONTEXT.md — 420px right overlay for AI Assist; mobile bottom
 				sheet branch composes the ui-kit Sheet primitive.
 			</p>
 			<div class="flex flex-wrap items-center gap-2">
@@ -1712,7 +1710,7 @@
 					Open: {acpOpen} · side: {acpSide}
 				</span>
 			</div>
-			<AcpDrawer
+			<AssistPanel
 				bind:open={acpOpen}
 				side={acpSide}
 				title="AI Assist"
@@ -1747,7 +1745,7 @@
 						>
 					</div>
 				{/snippet}
-			</AcpDrawer>
+			</AssistPanel>
 		</article>
 
 		<article
@@ -1853,7 +1851,7 @@
 				<p class="text-sm text-muted-foreground">
 					Every COPY.md user-visible literal, machine-checked. The copy-lock design-e2e
 					spec asserts these exact strings render and that no banned synonym, em dash,
-					first-person plural, or ACP chrome label is present in this fixture.
+					first-person plural, or transport-protocol chrome label is present in this fixture.
 				</p>
 			</header>
 

@@ -25,11 +25,11 @@ describe("StageRail nav data", () => {
 	test("maps each WorkflowStage to a production route", () => {
 		expect(STAGE_NAV_ITEMS.map((s) => s.href)).toEqual([
 			"/",
-			"/planning",
-			"/build-runs",
-			"/review-search",
-			"/ship-archive",
-			"/operate-mcp",
+			"/plan-session",
+			"/build-board",
+			"/review",
+			"/ship",
+			"/doctor",
 		]);
 	});
 

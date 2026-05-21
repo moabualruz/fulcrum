@@ -40,11 +40,11 @@ export default defineConfig({
 		// waits for the preview to be genuinely ready before Playwright starts
 		// (see that file's determinism contract). This entry is only the
 		// fallback for running Playwright directly: `timeout` is wide enough
-		// that a cold `vite build` is never killed mid-write, which would leave
-		// a partial `.svelte-kit/output` whose `manifest-full.js` imports
-		// `nodes/<n>.js` files that were never written.
+		// that a cold `svelte-kit sync && vite build` is never killed mid-write,
+		// which would leave a partial `.svelte-kit/output` whose
+		// `manifest-full.js` imports `nodes/<n>.js` files that were never written.
 		...skipDesignE2eServer ? [] : [{
-			command: `cd ${quotedWebRoot} && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
+			command: `cd ${quotedWebRoot} && bun run svelte-kit sync && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
 			port: designPort,
 			timeout: 180_000,
 			env: {

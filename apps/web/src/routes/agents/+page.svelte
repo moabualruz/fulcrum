@@ -41,7 +41,7 @@
     <AgentSessionWorkbench model={payload.sessionWorkbench} availableAgents={payload.profiles} />
   </div>
 
-  <!-- W2: ACP bridge → persisted planning session -->
+  <!-- Guided planning bridge to a persisted planning session. -->
   <details data-acp-planning-bridge class={cn("mb-4 rounded-lg border border-border")}>
     <summary class={cn("cursor-pointer px-4 py-2 text-sm font-medium")}>Start Guided Planning Session</summary>
     <form method="POST" action="?/startGuidedPlanning" use:enhance class={cn("grid gap-3 p-4 pt-2")}>
@@ -59,7 +59,7 @@
           <input name="modeId" value="planning" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
         </label>
         <label class={cn("grid gap-1 text-sm")}>
-          <span class={cn("text-muted-foreground")}>Model</span>
+          <span class={cn("text-muted-foreground")}>Agent route</span>
           <input name="modelId" value="" placeholder="(default)" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
         </label>
         <label class={cn("grid gap-1 text-sm")}>

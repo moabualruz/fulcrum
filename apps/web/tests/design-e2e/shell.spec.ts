@@ -356,6 +356,21 @@ test.describe("OD shell StatusFooter — populated", () => {
 		const clipboard = await page.evaluate(() => navigator.clipboard.readText());
 		expect(clipboard).toBe(traceId);
 	});
+
+	test("bare k and bare modifier release do not open the command palette", async ({ page }) => {
+		await page.goto("/");
+		await expect(page.locator("body[data-fulcrum-hydrated='true']")).toHaveCount(1);
+
+		const palette = page.locator("[data-command-palette][data-state='open']");
+		await page.keyboard.press("k");
+		await expect(palette).toHaveCount(0);
+
+		await page.keyboard.press(process.platform === "darwin" ? "Meta" : "Control");
+		await expect(palette).toHaveCount(0);
+
+		await page.keyboard.press("ControlOrMeta+k");
+		await expect(palette).toHaveCount(1);
+	});
 });
 
 test.describe("OD shell StatusFooter — mobile", () => {

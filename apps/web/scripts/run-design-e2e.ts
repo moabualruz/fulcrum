@@ -94,6 +94,7 @@ export function enumerateDesignRoutes(routesDir: string): DesignRoute[] {
 interface BootedServer {
 	url: string;
 	port: number;
+	exited: () => boolean;
 	stop: () => Promise<void>;
 }
 
@@ -206,6 +207,24 @@ function assertBuildOutputComplete(outputDir: string): void {
  * half-written build.
  */
 async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
+	let lastError: unknown;
+	for (let attempt = 1; attempt <= 2; attempt += 1) {
+		try {
+			return await bootPreviewServerOnce(webRoot);
+		} catch (error) {
+			lastError = error;
+			if (attempt < 2) {
+				console.warn(
+					`design-e2e harness: preview server failed during boot; rebuilding and retrying once — ${(error as Error).message}`,
+				);
+				buildWebAppVerified(webRoot);
+			}
+		}
+	}
+	throw lastError;
+}
+
+async function bootPreviewServerOnce(webRoot: string): Promise<BootedServer> {
 	assertBuildOutputComplete(svelteKitOutputDir(webRoot));
 
 	// Default to a freshly-allocated free port — `allocatePortBlock` proves the
@@ -237,6 +256,8 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 	server.once("exit", (code, signal) => {
 		serverExited = { code, signal };
 	});
+
+	const exited = (): boolean => server.exitCode !== null || server.signalCode !== null;
 
 	const stop = async (): Promise<void> => {
 		if (server.exitCode !== null || server.signalCode !== null) return;
@@ -272,7 +293,7 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 			if (response.status < 500) {
 				consecutiveOk += 1;
 				if (consecutiveOk >= 2) {
-					return { url, port, stop };
+					return { url, port, exited, stop };
 				}
 			} else {
 				consecutiveOk = 0;
@@ -358,9 +379,10 @@ export const ACCESSIBILITY_SPECS = [
  * shell fails the gate — the gate is real and can self-resolve.
  */
 export const SHELL_PRESENCE_SPEC = "tests/design-e2e/shell-presence.spec.ts";
+export const SHELL_FIDELITY_SPEC = "tests/design-e2e/shell.spec.ts";
 
 /** The full default spec list `test:design` runs when no specs are requested. */
-export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, SHELL_PRESENCE_SPEC, ...ACCESSIBILITY_SPECS];
+export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, SHELL_PRESENCE_SPEC, SHELL_FIDELITY_SPEC, ...ACCESSIBILITY_SPECS];
 
 /**
  * Resolve the spec list for the spec-suite phase. When specs are passed
@@ -372,7 +394,20 @@ export const DEFAULT_DESIGN_SPECS: string[] = [HARNESS_SPEC, SHELL_PRESENCE_SPEC
  * per-surface OD-fidelity spec coverage is owned by those per-surface PRDs.
  */
 function resolveSpecs(requestedSpecs: string[]): string[] {
-	return requestedSpecs.length > 0 ? requestedSpecs : [...DEFAULT_DESIGN_SPECS];
+	if (requestedSpecs.length === 0) return [...DEFAULT_DESIGN_SPECS];
+
+	const specDir = path.resolve("tests/design-e2e");
+	const availableSpecs = existsSync(specDir)
+		? readdirSync(specDir)
+			.filter((file) => file.endsWith(".spec.ts"))
+			.map((file) => `tests/design-e2e/${file}`)
+		: [];
+
+	return requestedSpecs.flatMap((requested) => {
+		if (requested.includes("/") || requested.endsWith(".spec.ts")) return [requested];
+		const matches = availableSpecs.filter((spec) => path.basename(spec).includes(requested));
+		return matches.length > 0 ? matches : [requested];
+	});
 }
 
 /**
@@ -408,35 +443,43 @@ async function runDesignSpecs(webRoot: string, requestedSpecs: string[]): Promis
 		const chunkNumber = Math.floor(index / chunkSize) + 1;
 		console.log(`design-e2e chunk ${chunkNumber}: ${chunk.join(", ")}`);
 
-		// Kill any orphaned preview server from a crashed prior run and wait for
-		// it to die — an orphan holding `.svelte-kit/output` handles would race
-		// the rebuild below.
-		sweepOrphanPreviewServers(webRoot);
+		let attempt = 0;
+		const maxAttempts = 2;
+		while (attempt < maxAttempts) {
+			attempt += 1;
+			// Kill any orphaned preview server from a crashed prior run and wait for
+			// it to die — an orphan holding `.svelte-kit/output` handles would race
+			// the rebuild below.
+			sweepOrphanPreviewServers(webRoot);
 
-		// Build to a complete, verified output before any server boots.
-		buildWebAppVerified(webRoot);
+			// Build to a complete, verified output before any server boots.
+			buildWebAppVerified(webRoot);
 
-		// The harness owns the preview server — boot it and wait until ready.
-		const { port, stop } = await bootPreviewServer(webRoot);
-		let status: number | null;
-		try {
-			const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
-				cwd: webRoot,
-				stdio: "inherit",
-				env: {
-					...process.env,
-					FULCRUM_DESIGN_E2E_PORT: String(port),
-					// Playwright must NOT start (or build for) its own design-e2e
-					// server — the harness already booted a verified-ready one.
-					FULCRUM_SKIP_DESIGN_E2E_SERVER: "1",
-					FULCRUM_SKIP_REAL_E2E_SERVERS: "1",
-				},
-			});
-			status = result.status;
-		} finally {
-			await stop();
-		}
-		if (status !== 0) {
+			// The harness owns the preview server — boot it and wait until ready.
+			const { port, exited, stop } = await bootPreviewServer(webRoot);
+			let status: number | null;
+			try {
+				const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
+					cwd: webRoot,
+					stdio: "inherit",
+					env: {
+						...process.env,
+						FULCRUM_DESIGN_E2E_PORT: String(port),
+						// Playwright must NOT start (or build for) its own design-e2e
+						// server — the harness already booted a verified-ready one.
+						FULCRUM_SKIP_DESIGN_E2E_SERVER: "1",
+						FULCRUM_SKIP_REAL_E2E_SERVERS: "1",
+					},
+				});
+				status = result.status;
+			} finally {
+				await stop();
+			}
+			if (status === 0) break;
+			if (exited() && attempt < maxAttempts) {
+				console.warn(`design-e2e chunk ${chunkNumber}: preview server exited early; rebuilding and retrying once`);
+				continue;
+			}
 			process.exit(status ?? 1);
 		}
 	}
@@ -518,7 +561,8 @@ async function main(): Promise<void> {
 
 	syncSvelteKitProjects(webRoot);
 
-	if (!specsOnly) {
+	const explicitSpecSelection = requestedSpecs.length > 0;
+	if (!specsOnly && !explicitSpecSelection) {
 		const artifacts = await captureProductionRoutes(webRoot);
 		console.log(`design-e2e harness: ${artifacts.length} screenshot artifact(s) under ${SCREENSHOT_DIR}`);
 	}
