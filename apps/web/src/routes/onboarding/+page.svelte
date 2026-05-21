@@ -1,171 +1,426 @@
 <script lang="ts">
-  type StepState = "complete" | "current" | "pending";
+	/**
+	 * `/onboarding` — the OD first-run flow (`prd-onboarding-web-first-run`).
+	 *
+	 * Proven against OD `onboarding.html`, DESIGN.md §11 (Onboarding · first-run),
+	 * COPY.md §7 (Onboarding first-run copy), and IA-MAP.md `/onboarding`.
+	 *
+	 * DESIGN.md §11 is explicit: "No multi-step wizard. No tooltip carousel. The
+	 * interface teaches itself." The first run is therefore not a stepper — it is
+	 * a short worked path that lands the operator inside the Capture surface:
+	 *
+	 *   1. boot      → workspace-name input (single field, COPY §7).
+	 *   2. project   → "What are you building?" prompt (COPY §7).
+	 *   3. capture   → the Capture doc surface (`onboarding.html` `.doc`) with a
+	 *                  `.scrim` dimming everything except one `.anchor` block, a
+	 *                  first-▶-Play coachmark anchored to it (5-dot indicator,
+	 *                  Skip tour / Got it — try Play), and the first trace ID
+	 *                  pulsing once. DESIGN §11 steps 3–5.
+	 *
+	 * The Capture surface reproduces the OD `onboarding.html` body verbatim — the
+	 * "What just happened" / "Try it on this line" / "What stays the same
+	 * everywhere" blocks, the `2 min · onboarding · step 3 / 5` meta, the
+	 * `capture · seedlings` eyebrow — and the `.anchor` block carries the
+	 * universal four-mode `ModeRow` (`✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI
+	 * Assist`, DESIGN.md §4.13). First ▶ Play dismisses the coachmark + scrim;
+	 * "Skip tour" exits the same way. DESIGN.md §12 anti-references are honored —
+	 * no hero illustration, no persistent welcome banner; the scrim + coachmark
+	 * are removed after first Play and never re-appear (CONTEXT.md OnboardingFlow:
+	 * "subsequent sessions never re-enter it").
+	 *
+	 * Composes `@fulcrum/ui-kit` primitives only — `Button`, `Card`, `Input`,
+	 * `Kbd`, `ModeRow`, `TraceChip` — never re-implements a primitive (AGENTS.md
+	 * ui-kit rule). The coachmark popover is a positioned `Card` (an existing
+	 * primitive); no hand-rolled overlay component is added.
+	 *
+	 * The `?step=` query param forces a specific phase so the design-e2e
+	 * contract can render `workspace` / `project` / `capture` directly; it
+	 * mirrors hydrated markup and is never re-forced once the operator advances.
+	 */
+	import { Button, Card, Input, Kbd, ModeRow, TraceChip } from "@fulcrum/ui-kit";
+	import type { WorkflowMode } from "@fulcrum/ui-kit";
+	import { goto } from "$app/navigation";
+	import { page } from "$app/state";
 
-  const steps: Array<{ label: string; state: StepState; detail: string }> = [
-    { label: "Account", state: "complete", detail: "Email and password accepted" },
-    { label: "Verify email", state: "current", detail: "Check inbox before workspace activation" },
-    { label: "Workspace", state: "pending", detail: "Create workspace and invite operators" },
-  ];
+	/** The three first-run phases. `capture` is the OD `onboarding.html` state. */
+	type FirstRunPhase = "workspace" | "project" | "capture";
 
-  const invites = [
-    { email: "pm@local", role: "Admin", status: "queued" },
-    { email: "agent-ops@local", role: "Operator", status: "draft" },
-  ];
+	/** The first-run trace — one trace stitches signup through Capture (DESIGN §11). */
+	const FIRST_RUN_TRACE = "tr_onb_first_play_01";
 
-  const checks = [
-    "Verification email sent to ada@local",
-    "Workspace slug reserved as fulcrum-lab",
-    "Default project will be created after email verification",
-    "Audit trace trace-onboard-1842 will link signup and workspace setup",
-  ];
+	/**
+	 * `?step=` lands the design-e2e contract on a specific phase. The empty
+	 * data-state is the `workspace` phase (zero workspace yet); the populated
+	 * data-state is the `capture` phase (the OD `onboarding.html` frame).
+	 */
+	const STEP_PARAM = page.url.searchParams.get("step");
+	const initialPhase: FirstRunPhase =
+		STEP_PARAM === "project" || STEP_PARAM === "capture" ? STEP_PARAM : "workspace";
 
-  let workspaceName = $state("Fulcrum Lab");
-  let workspaceSlug = $state("fulcrum-lab");
-  let email = $state("ada@local");
-  let role = $state("Owner");
+	let phase = $state<FirstRunPhase>(initialPhase);
+	let workspaceName = $state("");
+	let projectPrompt = $state("");
 
-  const slugPreview = $derived(workspaceSlug.trim().toLowerCase() || "workspace-slug");
+	/** The coachmark + scrim are shown once, on the first capture phase. */
+	let coachmarkOpen = $state(initialPhase === "capture");
+	/** The first trace pulse fires once, when Capture first renders (DESIGN §11 step 5). */
+	let tracePulsed = $state(false);
+	/** Whichever mode the operator picks on the `.anchor` ModeRow. */
+	let anchorMode = $state<WorkflowMode>("manual");
+
+	const workspaceLabel = $derived(workspaceName.trim() || "local");
+
+	/** Advance boot → project once a workspace name is committed (COPY §7). */
+	function continueFromWorkspace(): void {
+		phase = "project";
+	}
+
+	/** Advance project → capture; the OD `onboarding.html` first-run surface. */
+	function createProject(): void {
+		phase = "capture";
+		// DESIGN §11 step 4–5: the coachmark + first trace pulse fire once Capture opens.
+		coachmarkOpen = true;
+		queueTracePulse();
+	}
+
+	/** DESIGN §11 step 5 — the first trace ID surface pulses exactly once. */
+	function queueTracePulse(): void {
+		tracePulsed = false;
+		requestAnimationFrame(() => {
+			tracePulsed = true;
+		});
+	}
+
+	$effect(() => {
+		if (phase === "capture" && !tracePulsed) queueTracePulse();
+	});
+
+	/** First ▶ Play — dismiss the coachmark + scrim, then hand off to Plan. */
+	function tryFirstPlay(): void {
+		anchorMode = "play";
+		dismissCoachmark();
+		void goto("/plan-session");
+	}
+
+	/** "Skip tour" / Esc — exit the coachmark without re-entering it. */
+	function dismissCoachmark(): void {
+		coachmarkOpen = false;
+	}
+
+	/** Esc dismisses the coachmark — the OD coachmark documents `Esc` to stop. */
+	function onKeydown(event: KeyboardEvent): void {
+		if (event.key === "Escape" && coachmarkOpen) {
+			event.preventDefault();
+			dismissCoachmark();
+		}
+	}
 </script>
 
 <svelte:head>
-  <title>Onboarding | Fulcrum</title>
+	<title>Onboarding · first Play | Fulcrum</title>
 </svelte:head>
 
-<main data-onboarding-page class="min-h-screen bg-background text-foreground">
-  <section class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-    <header data-onboarding-header class="flex flex-col gap-3 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
-      <div class="space-y-2">
-        <p class="text-xs font-medium uppercase text-muted-foreground">Identity access</p>
-        <h1 class="text-2xl font-semibold tracking-tight">User signup and workspace setup</h1>
-        <p class="max-w-2xl text-sm text-muted-foreground">
-          Create the user, verify email ownership, reserve the workspace, then open the first project with the same trace.
-        </p>
-      </div>
-      <div data-onboarding-trace class="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-        trace=trace-onboard-1842
-      </div>
-    </header>
+<svelte:window onkeydown={onKeydown} />
 
-    <div data-onboarding-steps class="grid gap-3 md:grid-cols-3">
-      {#each steps as step}
-        <article
-          data-onboarding-step={step.label}
-          class={[
-            "rounded-md border bg-card p-4",
-            step.state === "current" ? "border-primary/50 ring-1 ring-primary/20" : "border-border",
-          ]}
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-sm font-semibold">{step.label}</h2>
-            <span
-              data-step-state
-              class={[
-                "rounded-sm px-2 py-0.5 text-xs font-medium",
-                step.state === "complete" ? "bg-success/10 text-success" : "",
-                step.state === "current" ? "bg-primary/10 text-primary" : "",
-                step.state === "pending" ? "bg-muted text-muted-foreground" : "",
-              ]}
-            >{step.state}</span>
-          </div>
-          <p class="mt-2 text-sm text-muted-foreground">{step.detail}</p>
-        </article>
-      {/each}
-    </div>
+<!--
+	`data-onboarding-page` + `data-state` expose the design-e2e contract:
+	`empty` = the workspace-name phase (no workspace yet), `populated` = the
+	OD `onboarding.html` capture surface. `data-phase` carries the exact phase.
+-->
+<main
+	data-onboarding-page
+	data-state={phase === "capture" ? "populated" : "empty"}
+	data-phase={phase}
+	class="relative min-h-screen bg-background text-foreground"
+>
+	{#if phase === "workspace"}
+		<!--
+			DESIGN §11 step 1 — the single workspace-name field. COPY §7 verbatim:
+			"What's your workspace called?" / "Use anything. You can rename later.
+			`local` works fine." / [ Continue ].
+		-->
+		<section
+			class="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center gap-6 px-6 py-12"
+		>
+			<div class="space-y-1">
+				<p
+					data-onboarding-eyebrow
+					class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground"
+				>
+					first run · 1 of 2
+				</p>
+				<h1 data-onboarding-heading class="text-2xl font-semibold tracking-tight">
+					What's your workspace called?
+				</h1>
+			</div>
+			<Card class="flex flex-col gap-4 p-5">
+				<form
+					class="flex flex-col gap-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						continueFromWorkspace();
+					}}
+				>
+					<label class="flex flex-col gap-1.5 text-sm font-medium" for="onboarding-workspace-name">
+						Workspace name
+						<Input
+							id="onboarding-workspace-name"
+							data-workspace-name
+							bind:value={workspaceName}
+							placeholder="local"
+							autocomplete="off"
+						/>
+					</label>
+					<p data-workspace-hint class="text-sm text-muted-foreground">
+						Use anything. You can rename later. <Kbd>local</Kbd> works fine.
+					</p>
+					<div class="flex justify-end">
+						<Button type="submit" data-workspace-continue>Continue</Button>
+					</div>
+				</form>
+			</Card>
+		</section>
+	{:else if phase === "project"}
+		<!--
+			DESIGN §11 step 2 — "What are you building?". COPY §7 verbatim:
+			"One sentence. Become the project description." / [ Create project ].
+		-->
+		<section
+			class="mx-auto flex min-h-screen w-full max-w-xl flex-col justify-center gap-6 px-6 py-12"
+		>
+			<div class="space-y-1">
+				<p
+					data-onboarding-eyebrow
+					class="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground"
+				>
+					first run · 2 of 2 · workspace {workspaceLabel}
+				</p>
+				<h1 data-onboarding-heading class="text-2xl font-semibold tracking-tight">
+					What are you building?
+				</h1>
+			</div>
+			<Card class="flex flex-col gap-4 p-5">
+				<form
+					class="flex flex-col gap-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						createProject();
+					}}
+				>
+					<label class="flex flex-col gap-1.5 text-sm font-medium" for="onboarding-project-prompt">
+						Project
+						<Input
+							id="onboarding-project-prompt"
+							data-project-prompt
+							bind:value={projectPrompt}
+							placeholder="A first-run onboarding flow that teaches itself."
+							autocomplete="off"
+						/>
+					</label>
+					<p data-project-hint class="text-sm text-muted-foreground">
+						One sentence. Become the project description.
+					</p>
+					<div class="flex justify-between">
+						<Button variant="ghost" data-onboarding-back onclick={() => (phase = "workspace")}>
+							Back
+						</Button>
+						<Button type="submit" data-project-create>Create project</Button>
+					</div>
+				</form>
+			</Card>
+		</section>
+	{:else}
+		<!--
+			DESIGN §11 steps 3–5 — the OD `onboarding.html` Capture surface. The
+			`.doc` reproduces the OD body verbatim; the `.scrim` dims everything
+			except the `.anchor`; the coachmark teaches the first ▶ Play.
+		-->
+		{#if coachmarkOpen}
+			<!--
+				The scrim — OD `onboarding.html` `.scrim`. Dims the Capture doc so
+				the lit `.anchor` block is the only thing the eye lands on. It is
+				`pointer-events-none` so the lit anchor stays interactive.
+			-->
+			<div
+				data-onboarding-scrim
+				class="pointer-events-none fixed inset-0 z-40 bg-foreground/55"
+			></div>
+		{/if}
 
-    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <section data-workspace-setup class="rounded-md border border-border bg-card p-5">
-        <div class="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <h2 class="text-base font-semibold">Workspace setup</h2>
-            <p class="text-sm text-muted-foreground">Reserve the workspace before opening the first project.</p>
-          </div>
-          <span data-verification-status class="rounded-sm bg-warn/10 px-2 py-1 text-xs font-medium text-warn">
-            Email verification pending
-          </span>
-        </div>
+		<article
+			data-capture-surface
+			class="relative z-[1] mx-auto w-full max-w-[760px] px-6 pb-32 pt-12"
+		>
+			<p
+				data-onboarding-eyebrow
+				class="mb-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground"
+			>
+				capture · seedlings
+			</p>
+			<h1 class="text-[28px] font-semibold tracking-tight">
+				Welcome to Fulcrum — your first run
+			</h1>
+			<p data-onboarding-meta class="mb-6 mt-1.5 font-mono text-[11px] text-muted-foreground">
+				2 min · onboarding · step 3 / 5
+			</p>
 
-        <form class="grid gap-4 md:grid-cols-2">
-          <label class="flex flex-col gap-1.5 text-sm font-medium">
-            User email
-            <input
-              data-user-email
-              bind:value={email}
-              type="email"
-              class="h-9 rounded-sm border border-input bg-background px-3 text-sm"
-            />
-          </label>
+			<h2 class="mt-6 text-xl font-semibold">What just happened</h2>
+			<p class="mt-3 text-sm leading-relaxed text-foreground">
+				You captured a thought. Fulcrum doesn't treat docs as special; every paragraph here can be
+				handed to an agent the same way a task can. The four affordances at the right of every block
+				are <strong>Manual / Play / Discuss / AI Assist</strong>. They are the same affordances
+				you'll see on every step of every stage.
+			</p>
 
-          <label class="flex flex-col gap-1.5 text-sm font-medium">
-            Initial role
-            <select data-user-role bind:value={role} class="h-9 rounded-sm border border-input bg-background px-3 text-sm">
-              <option>Owner</option>
-              <option>Admin</option>
-              <option>Operator</option>
-            </select>
-          </label>
+			<h2 class="mt-6 text-xl font-semibold">Try it on this line</h2>
 
-          <label class="flex flex-col gap-1.5 text-sm font-medium">
-            Workspace name
-            <input
-              data-workspace-name
-              bind:value={workspaceName}
-              class="h-9 rounded-sm border border-input bg-background px-3 text-sm"
-            />
-          </label>
+			<!--
+				The lit `.anchor` block — OD `onboarding.html` `.anchor`. It carries
+				the universal four-mode `ModeRow` (DESIGN §4.13). `z-50` lifts it
+				above the scrim; the accent ring + glow reproduce the OD treatment.
+			-->
+			<div
+				data-coach-anchor
+				class={[
+					"relative z-50 my-3 flex flex-wrap items-center gap-3 rounded-md border bg-card p-4 leading-relaxed",
+					coachmarkOpen
+						? "border-primary shadow-[0_0_0_8px_var(--color-ring)] ring-1 ring-primary"
+						: "border-border",
+				]}
+			>
+				<span class="min-w-0 flex-1 text-sm leading-relaxed">
+					Hand this paragraph to an agent and watch it bounce back with a one-paragraph rewrite.
+				</span>
+				<ModeRow
+					class="ml-auto flex-wrap"
+					bind:value={anchorMode}
+					ariaLabel="Step modes"
+					onSelect={(mode) => {
+						if (mode === "play") tryFirstPlay();
+					}}
+				/>
+			</div>
 
-          <label class="flex flex-col gap-1.5 text-sm font-medium">
-            Workspace slug
-            <input
-              data-workspace-slug
-              bind:value={workspaceSlug}
-              class="h-9 rounded-sm border border-input bg-background px-3 text-sm"
-            />
-          </label>
-        </form>
+			{#if coachmarkOpen}
+				<!--
+					The first-▶-Play coachmark — OD `onboarding.html` `.coach-fixed`.
+					A positioned `Card` (an existing ui-kit primitive — no hand-rolled
+					overlay): uppercase step eyebrow, the Play teaching copy, a 5-dot
+					progress indicator (dot 3 active), a ghost "Skip tour" and a primary
+					"Got it — try Play" action. `role="dialog"` + `aria-label` make it a
+					discrete keyboard target; Esc dismisses it.
+				-->
+				<Card
+					data-onboarding-coachmark
+					role="dialog"
+					aria-label="First-run coachmark · step 3 of 5"
+					class="relative z-[60] my-3 w-full max-w-[340px] border-primary bg-primary p-4 text-primary-foreground shadow-lg sm:ml-8"
+				>
+					<p
+						data-coachmark-step
+						class="text-[11px] font-medium uppercase tracking-[0.06em] opacity-85"
+					>
+						Tip · step 3 of 5
+					</p>
+					<p data-coachmark-body class="mt-1 text-sm leading-relaxed">
+						<strong>▶ Play</strong> hands this step to an agent. The plan keeps streaming while it
+						runs, and pauses for your approval before any file write. You can stop it at any time
+						with <Kbd>Esc</Kbd>.
+					</p>
+					<div class="mt-3 flex items-center gap-2">
+						<span data-coachmark-dots class="inline-flex gap-1" aria-hidden="true">
+							{#each [1, 2, 3, 4, 5] as dot (dot)}
+								<span
+									data-coachmark-dot
+									data-active={dot === 3 ? "true" : undefined}
+									class={[
+										"size-1.5 rounded-full",
+										dot === 3 ? "bg-primary-foreground" : "bg-primary-foreground/40",
+									]}
+								></span>
+							{/each}
+						</span>
+						<span class="flex-1"></span>
+						<Button
+							data-coachmark-skip
+							size="sm"
+							variant="ghost"
+							class="text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+							onclick={dismissCoachmark}
+						>
+							Skip tour
+						</Button>
+						<Button
+							data-coachmark-confirm
+							size="sm"
+							class="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+							onclick={tryFirstPlay}
+						>
+							Got it — try Play
+						</Button>
+					</div>
+				</Card>
+			{/if}
 
-        <div data-slug-preview class="mt-4 rounded-md border border-border bg-muted p-3 text-sm">
-          <span class="text-muted-foreground">Reserved URL</span>
-          <span class="ml-2 font-mono">/{slugPreview}</span>
-        </div>
+			<p class="mt-3 text-sm leading-relaxed text-foreground">
+				After you try it, you'll land in the <strong>Plan</strong> stage with a live AI session
+				running. Every step there has the same Play / Discuss row.
+			</p>
 
-        <div class="mt-5 flex flex-wrap gap-2">
-          <button data-resend-verification type="button" class="rounded-sm border border-border px-3 py-2 text-sm font-medium">
-            Resend verification
-          </button>
-          <button data-create-workspace type="button" class="rounded-sm bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
-            Create workspace
-          </button>
-        </div>
-      </section>
+			<h2 class="mt-6 text-xl font-semibold">What stays the same everywhere</h2>
+			<ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-foreground">
+				<li>
+					The status footer at the bottom mirrors the TUI exactly — same vocabulary across web,
+					CLI, mobile.
+				</li>
+				<li>Trace IDs appear on every surface. Click any pill to copy.</li>
+				<li>
+					<Kbd>⌘K</Kbd> opens the command palette; <Kbd>⌘/</Kbd> toggles AI Assist;
+					<Kbd>?</Kbd> opens the keyboard map.
+				</li>
+			</ol>
 
-      <aside class="flex flex-col gap-4">
-        <section data-invite-queue class="rounded-md border border-border bg-card p-4">
-          <h2 class="text-sm font-semibold">Invite queue</h2>
-          <div class="mt-3 divide-y divide-border">
-            {#each invites as invite}
-              <div data-invite-row class="flex items-center justify-between gap-3 py-2 text-sm">
-                <div>
-                  <p class="font-medium">{invite.email}</p>
-                  <p class="text-xs text-muted-foreground">{invite.role}</p>
-                </div>
-                <span class="rounded-sm bg-muted px-2 py-0.5 text-xs text-muted-foreground">{invite.status}</span>
-              </div>
-            {/each}
-          </div>
-        </section>
-
-        <section data-setup-checklist class="rounded-md border border-border bg-card p-4">
-          <h2 class="text-sm font-semibold">Setup checklist</h2>
-          <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
-            {#each checks as check}
-              <li data-check-row class="flex gap-2">
-                <span class="mt-1 size-1.5 rounded-full bg-primary"></span>
-                <span>{check}</span>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      </aside>
-    </div>
-  </section>
+			<!--
+				DESIGN §11 step 5 — the first trace ID surface pulses once. The
+				`TraceChip` primitive carries the trace; `data-trace-pulsed` flips
+				once on first render and drives the one-shot pulse animation.
+			-->
+			<div class="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+				<span>First trace</span>
+				<span
+					data-onboarding-trace
+					data-trace-pulsed={tracePulsed ? "true" : undefined}
+					class={["inline-flex rounded-sm", tracePulsed && "onboarding-trace-pulse"]}
+				>
+					<TraceChip traceId={FIRST_RUN_TRACE} short />
+				</span>
+			</div>
+		</article>
+	{/if}
 </main>
+
+<style>
+	/*
+	 * DESIGN §11 step 5 — the first trace ID surface pulses exactly once. A
+	 * one-shot keyframe (no `infinite`); `prefers-reduced-motion: reduce`
+	 * suppresses it entirely (DESIGN.md §1.6 reduced-motion guarantee).
+	 */
+	.onboarding-trace-pulse {
+		animation: onboarding-trace-pulse 900ms ease-out 1;
+	}
+
+	@keyframes onboarding-trace-pulse {
+		0% {
+			box-shadow: 0 0 0 0 var(--color-ring);
+		}
+		100% {
+			box-shadow: 0 0 0 10px transparent;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.onboarding-trace-pulse {
+			animation: none;
+		}
+	}
+</style>

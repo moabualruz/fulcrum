@@ -101,8 +101,8 @@ A workspace-scope route with no active Project — Dashboard, Projects list, Glo
 _Avoid_: Home, overview, global page.
 
 **OnboardingFlow**:
-The first-run boot path: user signup → email verification → workspace name/slug reservation → first project prompt → Capture editor with cursor on blank doc, plus the two coachmarks (first Play, first TraceBadge pulse). Not a tutorial overlay system.
-_Avoid_: Tour, walkthrough, getting started, wizard.
+The first-run boot path at `/onboarding`, rendered to the OD `onboarding.html` design (DESIGN.md §11, COPY.md §7). Three phases, no multi-step wizard: a single workspace-name field → a one-sentence project prompt → the Capture-stage doc surface. The Capture phase is the OD `onboarding.html` state itself — a `.doc` body with a `.scrim` dimming everything except one lit `.anchor` block, the **first-run coachmark** (the one-time `▶ Play` teaching popover with a 5-dot indicator, Skip-tour and Got-it actions), and the **first TraceBadge pulse** (the first trace ID surfaces and pulses once). The `.anchor` carries the universal four-mode **ModeAffordance** row; first `▶ Play` dismisses the coachmark + scrim and hands off to Plan. Honors DESIGN.md §12 anti-references — no hero illustration, no persistent welcome banner. Not a tutorial overlay system; subsequent sessions never re-enter it.
+_Avoid_: Tour, walkthrough, getting started, wizard, signup stepper.
 
 ## Relationships
 
@@ -116,7 +116,7 @@ _Avoid_: Tour, walkthrough, getting started, wizard.
 - **AndroidSafeArea** reserves wrap mobile shell chrome; **StatusFooter**, mobile bottom navigation, and sheets render above gesture zones.
 - The **TraceBadge** appears in **ScopeBar**, **StatusFooter**, **AcpDrawer** header, every error inline, every audit row — same id, four surfaces.
 - A **PortfolioSurface** has no Project Scope; the **StageRail** collapses or swaps to portfolio nav when active.
-- The **OnboardingFlow** starts at `/onboarding`, keeps one trace through signup and workspace setup, then terminates at the Capture **Workbench**; subsequent sessions never re-enter it.
+- The **OnboardingFlow** starts at `/onboarding`, keeps one trace through workspace + project setup into the Capture surface, where the first-run **coachmark** teaches the first `▶ Play` and the first TraceBadge pulse fires once; subsequent sessions never re-enter it.
 - Every **Workbench**, **AcpDrawer** action, and **CommandPalette** entry calls a service (tRPC client → NestJS service in `services/**`); this app holds no domain state beyond ephemeral UI state in `$lib/stores`.
 
 ## Example dialogue
