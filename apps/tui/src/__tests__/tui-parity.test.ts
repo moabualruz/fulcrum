@@ -290,6 +290,31 @@ describe("TUI root navigation — OD stage launcher parity", () => {
     app.stop();
   });
 
+  test("stage chords open canonical capture, plan, and review workbenches", async () => {
+    const cases = [
+      { chord: "c", heading: "Capture", chrome: "fulcrum · :capture", mode: "CAPTURE" },
+      { chord: "p", heading: "Plan", chrome: "fulcrum · :plan", mode: "PLAN" },
+      { chord: "r", heading: "Review", chrome: "fulcrum · :review", mode: "REVIEW" },
+    ] as const;
+
+    for (const expected of cases) {
+      const tty = new FakeTTY({ columns: 120, rows: 32 });
+      const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
+      await app.mount();
+
+      await app.handleKey("g");
+      await app.handleKey(expected.chord);
+
+      const rendered = tty.plainText();
+      expect(rendered).toContain(expected.heading);
+      expect(rendered).toContain(expected.chrome);
+      expect(rendered).toContain(expected.mode);
+      expect(rendered).toContain("Manual [m a]");
+
+      app.stop();
+    }
+  });
+
   test("palette and help are visible from the root launcher", async () => {
     const tty = new FakeTTY({ columns: 120, rows: 40 });
     const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });

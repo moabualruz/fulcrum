@@ -339,11 +339,11 @@ describe("chord-prefix latch — g / y two-key sequencing", () => {
 
 describe("FulcrumTui live shell StageChord wiring", () => {
   for (const [secondKey, expectedText] of [
-    ["c", "NOTIFICATIONS"],
-    ["p", "PLANNING"],
+    ["c", "fulcrum · :capture"],
+    ["p", "fulcrum · :plan"],
     ["b", "RUNS"],
     ["B", "BUILD BOARD"],
-    ["r", "Stage: Review"],
+    ["r", "fulcrum · :review"],
     ["s", "ARTIFACTS"],
     ["o", "DOCTOR"],
   ] as const) {

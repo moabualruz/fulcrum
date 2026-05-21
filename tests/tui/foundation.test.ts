@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -25,10 +25,14 @@ import {
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
-import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createTestContainer } from "@test-support/application-container.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
+
+afterAll(async () => {
+  await destroyTestOrm();
+});
 
 function mockSession() {
   return {
