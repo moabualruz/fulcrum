@@ -83,6 +83,36 @@ function fakeCaller(
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("TuiApp — headless mount", () => {
+  it("renders the first frame within the startup budget before slow data resolves", async () => {
+    const tty = new FakeTTY();
+    const caller = fakeCaller();
+    const slow = () => new Promise((resolve) => setTimeout(resolve, 250));
+    caller.auth.whoami = async () => {
+      await slow();
+      return { userId: "u1", email: "admin@local", orgId: "local", orgName: "local", role: "owner" };
+    };
+    caller.inference = {
+      health: async () => {
+        await slow();
+        return { status: "ok" };
+      },
+    };
+    caller.notify = {
+      unreadCount: async () => {
+        await slow();
+        return { count: 3 };
+      },
+    };
+
+    const started = performance.now();
+    const app = await launchTui({ output: tty, caller });
+    const firstFrameMs = performance.now() - started;
+
+    expect(firstFrameMs).toBeLessThan(100);
+    expect(tty.plainText()).toContain("Fulcrum TUI");
+    app.stop();
+  });
+
   it("mounts without throwing", async () => {
     const tty = new FakeTTY();
     const caller = fakeCaller();
@@ -122,6 +152,7 @@ describe("TuiApp — headless mount", () => {
 
     const app = new TuiApp({ output: tty, caller });
     await app.mount();
+    await app.waitForStartupData();
 
     const text = tty.plainText();
     expect(text).toContain("acme-corp");
