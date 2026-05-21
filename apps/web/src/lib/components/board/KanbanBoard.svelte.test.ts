@@ -46,10 +46,12 @@ describe("KanbanBoard component (SSR)", () => {
     expect(body).toMatch(/data-kanban-board/);
     expect(body).toMatch(/data-status="pending"/);
     expect(body).toMatch(/data-status="completed"/);
-    expect(body).toMatch(/data-board-card-label[^>]*>frontend</);
-    expect(body).toMatch(/data-board-card-blocked/);
-    expect(body).toMatch(/data-board-card-points[^>]*>5 pts</);
-    expect(body).toMatch(/data-board-card-assignee[^>]*>M</);
+    expect(body).toMatch(/data-board-card-title[^>]*>A very long task title/);
+    expect(body).toMatch(/data-board-card-priority[^>]*>P3</);
+    expect(body).toMatch(/data-board-card-priority[^>]*>P5</);
+    expect(body).toMatch(/data-board-card-assignee[^>]*>Maya</);
+    expect(body).toMatch(/data-board-card-due-date/);
+    expect(body).toMatch(/data-board-card-estimate/);
   });
 
   test("renders sprint filter and swimlane controls", () => {

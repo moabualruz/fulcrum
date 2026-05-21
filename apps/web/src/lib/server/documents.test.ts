@@ -69,6 +69,20 @@ async function readSearch(
   return rows[0];
 }
 
+// `search_documents.labels` is a Postgres `text[]` column. Depending on the
+// driver path, a `SELECT *` returns it either as a parsed JS array or as the
+// raw array literal string (e.g. `{a,b}`). Production consumers normalize both
+// forms (see search/query-service.ts); mirror that here.
+function normalizeLabels(raw: unknown): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw.map(String);
+  return String(raw)
+    .replace(/^\{|\}$/g, "")
+    .split(",")
+    .map((s) => s.replace(/^"|"$/g, "").trim())
+    .filter(Boolean);
+}
+
 async function readEventsForSubject(db: TestStore, subjectId: string): Promise<EventRow[]> {
   return db.query<EventRow>(
     `SELECT * FROM events WHERE subject_id = $1 ORDER BY created_at ASC, id ASC`,
@@ -210,7 +224,7 @@ describe("server actions: documents", () => {
       expect(updated?.payload).toEqual({ changed: ["frontmatter"] });
 
       const search = await readSearch(db, id);
-      expect(search?.labels).toEqual(["a", "b"]);
+      expect(normalizeLabels(search?.labels)).toEqual(["a", "b"]);
     } finally {
       await db.close();
     }
