@@ -26,7 +26,7 @@
  * `shell-presence.spec.ts`, which this harness runs as part of the default
  * `test:design` spec list (`DEFAULT_DESIGN_SPECS`).
  */
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { chromium, type Page } from "@playwright/test";
@@ -93,6 +93,7 @@ export function enumerateDesignRoutes(routesDir: string): DesignRoute[] {
 
 interface BootedServer {
 	url: string;
+	port: number;
 	stop: () => Promise<void>;
 }
 
@@ -112,19 +113,110 @@ function syncSvelteKitProjects(webRoot: string): void {
 	syncSvelteKitProject(path.resolve(webRoot, "../../packages/ui-kit"));
 }
 
-/** Build the web app and boot a real preview server on an allocated port. */
-async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
+/** Absolute path to the SvelteKit `vite build` server output directory. */
+function svelteKitOutputDir(webRoot: string): string {
+	return path.join(webRoot, ".svelte-kit/output");
+}
+
+/**
+ * Build the web app to a *complete, verified* `.svelte-kit/output` directory.
+ *
+ * The build is the single source of design-gate non-determinism the closure
+ * review flagged: when `vite build` is run inside Playwright's `webServer`
+ * command it competes with Playwright's own `webServer.timeout`, and an
+ * interrupted build leaves a partial `.svelte-kit/output` whose
+ * `manifest-full.js` imports `nodes/<n>.js` files that were never written —
+ * the `ERR_MODULE_NOT_FOUND` the review saw. So the harness owns the build:
+ *
+ *   1. `syncSvelteKitProjects` regenerates the SvelteKit `.svelte-kit` project
+ *      files for web + ui-kit so the build never reads stale generated input.
+ *   2. `rmSync` the stale output dir so no prior partial build can be reused.
+ *   3. Run `vite build` to completion synchronously (`spawnSync`), fail-fast
+ *      on any non-zero exit — a failed build is a hard error, never a partial
+ *      directory handed to `vite preview`.
+ *   4. Verify the produced server manifest is internally consistent — every
+ *      `nodes/<n>.js` the manifest enumerates must exist on disk before any
+ *      preview server is allowed to serve it.
+ *
+ * Building once here (not inside the Playwright `webServer` command) removes
+ * the race entirely: the build is complete and verified before a server boots.
+ */
+function buildWebAppVerified(webRoot: string): void {
 	syncSvelteKitProjects(webRoot);
+
+	const outputDir = svelteKitOutputDir(webRoot);
+	// Always start from a clean slate — a leftover partial build from a killed
+	// prior run must never survive into a `vite preview` startup.
+	rmSync(outputDir, { recursive: true, force: true });
+
 	const build = spawnSync("bun", ["run", "build"], { cwd: webRoot, stdio: "inherit", env: process.env });
 	if (build.status !== 0) {
 		throw new Error(`design-e2e harness: web build failed (exit ${build.status ?? "unknown"})`);
 	}
 
+	assertBuildOutputComplete(outputDir);
+}
+
+/**
+ * Fail loudly if `vite build` produced an inconsistent server bundle.
+ *
+ * `manifest-full.js` enumerates every route node as `() => import('./nodes/N.js')`.
+ * A complete build has every referenced `nodes/N.js` on disk; a partial build
+ * (the closure-review failure mode) is missing one. Verifying here turns a
+ * downstream `vite preview` `ERR_MODULE_NOT_FOUND` at request time into an
+ * immediate, attributable harness error before any server or browser starts.
+ */
+function assertBuildOutputComplete(outputDir: string): void {
+	const serverDir = path.join(outputDir, "server");
+	const manifestPath = path.join(serverDir, "manifest-full.js");
+	if (!existsSync(manifestPath)) {
+		throw new Error(
+			`design-e2e harness: web build incomplete — ${manifestPath} missing after build`,
+		);
+	}
+
+	const manifest = readFileSync(manifestPath, "utf8");
+	const referencedNodes = new Set<string>();
+	for (const match of manifest.matchAll(/['"`]\.\/nodes\/(\d+)\.js['"`]/g)) {
+		referencedNodes.add(match[1]);
+	}
+
+	const missing: string[] = [];
+	for (const node of referencedNodes) {
+		if (!existsSync(path.join(serverDir, "nodes", `${node}.js`))) {
+			missing.push(`nodes/${node}.js`);
+		}
+	}
+
+	if (missing.length > 0) {
+		throw new Error(
+			`design-e2e harness: web build incomplete — manifest-full.js references ` +
+				`missing server node file(s): ${missing.join(", ")}. Re-run after a clean build.`,
+		);
+	}
+}
+
+/**
+ * Boot a real `vite preview` server on an allocated port, against an
+ * already-built, already-verified `.svelte-kit/output`.
+ *
+ * The build is NOT done here — `buildWebAppVerified` must have run first. This
+ * keeps "produce the bundle" and "serve the bundle" as two ordered, observable
+ * steps with no overlap, so the preview server can never start against a
+ * half-written build.
+ */
+async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
+	assertBuildOutputComplete(svelteKitOutputDir(webRoot));
+
+	// Default to a freshly-allocated free port — `allocatePortBlock` proves the
+	// port is actually free before returning it, so `vite preview` cannot lose
+	// an `EADDRINUSE` race. An explicit base is honored only when a caller pins
+	// one (capture vs spec phase share this contract).
+	const preferredBaseRaw =
+		process.env.FULCRUM_DESIGN_E2E_CAPTURE_PORT_BASE ?? process.env.FULCRUM_DESIGN_E2E_PORT_BASE;
 	const [port] = await allocatePortBlock({
 		count: 1,
-		preferredBase: process.env.FULCRUM_DESIGN_E2E_CAPTURE_PORT_BASE
-			? Number(process.env.FULCRUM_DESIGN_E2E_CAPTURE_PORT_BASE)
-			: undefined,
+		preferredBase: preferredBaseRaw ? Number(preferredBaseRaw) : undefined,
 	});
 	const url = `http://127.0.0.1:${port}`;
 
@@ -136,6 +228,14 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 		cwd: webRoot,
 		stdio: "inherit",
 		env: { ...process.env, FULCRUM_E2E: "1" },
+	});
+
+	// Track early death so the readiness loop fails fast instead of polling a
+	// dead port for the full deadline (a crashed preview is a hard error, not a
+	// "not ready yet").
+	let serverExited: { code: number | null; signal: NodeJS.Signals | null } | null = null;
+	server.once("exit", (code, signal) => {
+		serverExited = { code, signal };
 	});
 
 	const stop = async (): Promise<void> => {
@@ -153,16 +253,33 @@ async function bootPreviewServer(webRoot: string): Promise<BootedServer> {
 		});
 	};
 
-	// Poll until the preview server answers, then the harness can navigate it.
+	// Poll until the preview server answers. Require two consecutive successful
+	// probes before declaring ready, so a server that answers once and then
+	// crashes (or is still warming up) is never handed to Playwright as ready —
+	// the closure-review `ERR_CONNECTION_REFUSED` failure mode.
 	const deadline = Date.now() + 60_000;
+	let consecutiveOk = 0;
 	while (Date.now() < deadline) {
+		if (serverExited) {
+			await stop();
+			throw new Error(
+				`design-e2e harness: preview server exited before becoming ready at ${url} ` +
+					`(code ${serverExited.code ?? "null"}, signal ${serverExited.signal ?? "null"})`,
+			);
+		}
 		try {
 			const response = await fetch(url, { signal: AbortSignal.timeout(2_000) });
 			if (response.status < 500) {
-				return { url, stop };
+				consecutiveOk += 1;
+				if (consecutiveOk >= 2) {
+					return { url, port, stop };
+				}
+			} else {
+				consecutiveOk = 0;
 			}
 		} catch {
 			/* not up yet — retry */
+			consecutiveOk = 0;
 		}
 		await new Promise((resolve) => setTimeout(resolve, 500));
 	}
@@ -181,6 +298,9 @@ async function captureProductionRoutes(webRoot: string): Promise<string[]> {
 	rmSync(SCREENSHOT_DIR, { recursive: true, force: true });
 	mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
+	// Build once, verified, before any server boots — same ordered contract the
+	// spec phase uses.
+	buildWebAppVerified(webRoot);
 	const { url, stop } = await bootPreviewServer(webRoot);
 	const browser = await chromium.launch();
 	const artifacts: string[] = [];
@@ -255,36 +375,69 @@ function resolveSpecs(requestedSpecs: string[]): string[] {
 	return requestedSpecs.length > 0 ? requestedSpecs : [...DEFAULT_DESIGN_SPECS];
 }
 
-/** Spec-suite phase: run the design-e2e Playwright specs in chunks. */
-function runDesignSpecs(webRoot: string, requestedSpecs: string[], designPorts: number[]): void {
+/**
+ * Spec-suite phase: run the design-e2e Playwright specs in chunks.
+ *
+ * Determinism contract (the closure-review `ERR_CONNECTION_REFUSED` /
+ * `ERR_MODULE_NOT_FOUND` fix): the harness owns the build and the preview
+ * server, Playwright does not. For each chunk:
+ *
+ *   1. `sweepOrphanPreviewServers` kills any preview process left by a crashed
+ *      prior run and waits for it to die, so no orphan holds
+ *      `.svelte-kit/output` handles during the rebuild.
+ *   2. `buildWebAppVerified` produces a complete, verified `.svelte-kit/output`.
+ *   3. `bootPreviewServer` starts `vite preview` and waits — with consecutive
+ *      successful probes — until it is genuinely ready.
+ *   4. Playwright runs with `FULCRUM_SKIP_DESIGN_E2E_SERVER=1`, so its
+ *      `webServer` config skips its own `bun run build && bun run preview`
+ *      entirely. Playwright never builds and never starts a server — it only
+ *      connects to the harness-owned, already-verified-ready preview on the
+ *      port the harness chose. That removes the build-vs-`webServer.timeout`
+ *      race and the connect-before-ready race in one move.
+ *   5. The harness tears its own preview down before the next chunk builds.
+ */
+async function runDesignSpecs(webRoot: string, requestedSpecs: string[]): Promise<void> {
 	const playwrightCli = path.join(webRoot, "node_modules/@playwright/test/cli.js");
-	const svelteKitOutputDir = path.join(webRoot, ".svelte-kit/output");
 
 	const specs = resolveSpecs(requestedSpecs);
 
 	const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "10");
-	const chunkCount = Math.ceil(specs.length / chunkSize);
 
 	for (let index = 0; index < specs.length; index += chunkSize) {
 		const chunk = specs.slice(index, index + chunkSize);
 		const chunkNumber = Math.floor(index / chunkSize) + 1;
-		const designPort = String(designPorts[chunkNumber - 1]);
 		console.log(`design-e2e chunk ${chunkNumber}: ${chunk.join(", ")}`);
-		if (chunkCount > 1) stopDesignProcesses(webRoot, designPort);
-		rmSync(svelteKitOutputDir, { recursive: true, force: true });
-		syncSvelteKitProjects(webRoot);
-		const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
-			cwd: webRoot,
-			stdio: "inherit",
-			env: {
-				...process.env,
-				FULCRUM_DESIGN_E2E_PORT: designPort,
-				FULCRUM_SKIP_REAL_E2E_SERVERS: "1",
-			},
-		});
-		stopDesignProcesses(webRoot, designPort);
-		if (result.status !== 0) {
-			process.exit(result.status ?? 1);
+
+		// Kill any orphaned preview server from a crashed prior run and wait for
+		// it to die — an orphan holding `.svelte-kit/output` handles would race
+		// the rebuild below.
+		sweepOrphanPreviewServers(webRoot);
+
+		// Build to a complete, verified output before any server boots.
+		buildWebAppVerified(webRoot);
+
+		// The harness owns the preview server — boot it and wait until ready.
+		const { port, stop } = await bootPreviewServer(webRoot);
+		let status: number | null;
+		try {
+			const result = spawnSync("node", [playwrightCli, "test", "--project=design-e2e", ...chunk], {
+				cwd: webRoot,
+				stdio: "inherit",
+				env: {
+					...process.env,
+					FULCRUM_DESIGN_E2E_PORT: String(port),
+					// Playwright must NOT start (or build for) its own design-e2e
+					// server — the harness already booted a verified-ready one.
+					FULCRUM_SKIP_DESIGN_E2E_SERVER: "1",
+					FULCRUM_SKIP_REAL_E2E_SERVERS: "1",
+				},
+			});
+			status = result.status;
+		} finally {
+			await stop();
+		}
+		if (status !== 0) {
+			process.exit(status ?? 1);
 		}
 	}
 }
@@ -319,13 +472,41 @@ function runSourceContractTests(webRoot: string): void {
 	}
 }
 
-function stopDesignProcesses(webRoot: string, port?: string): void {
-	const patterns = [
-		port ? `${webRoot}.*bun run preview.*${port}` : `${webRoot}.*bun run preview`,
-		port ? `${webRoot}.*vite preview.*${port}` : `${webRoot}.*vite preview`,
-	].filter((pattern): pattern is string => Boolean(pattern));
+/**
+ * Sweep any orphaned `vite preview` process left behind by a *crashed prior
+ * harness run* for this web root, and wait until it is actually gone.
+ *
+ * An orphan that survives into the next run can hold open file handles inside
+ * `.svelte-kit/output` while the new run's `rmSync` + `vite build` execute —
+ * exactly the interleaving that produces a `manifest-full.js` referencing a
+ * `nodes/<n>.js` the new build had not finished writing. `pkill` alone is
+ * fire-and-forget; this helper sends SIGTERM, then SIGKILL, then polls
+ * `pgrep` so the caller never starts a build against a live orphan.
+ */
+function sweepOrphanPreviewServers(webRoot: string): void {
+	const patterns = [`${webRoot}.*bun run preview`, `${webRoot}.*vite preview`];
+	const anyAlive = (): boolean =>
+		patterns.some((pattern) => spawnSync("pgrep", ["-f", pattern], { stdio: "ignore" }).status === 0);
+
+	if (!anyAlive()) return;
+
 	for (const pattern of patterns) {
 		spawnSync("pkill", ["-TERM", "-f", pattern], { stdio: "ignore" });
+	}
+
+	// Wait up to 5s for graceful exit, then escalate to SIGKILL and confirm.
+	const deadline = Date.now() + 5_000;
+	while (Date.now() < deadline && anyAlive()) {
+		spawnSync("sleep", ["0.2"], { stdio: "ignore" });
+	}
+	if (anyAlive()) {
+		for (const pattern of patterns) {
+			spawnSync("pkill", ["-KILL", "-f", pattern], { stdio: "ignore" });
+		}
+		const killDeadline = Date.now() + 2_000;
+		while (Date.now() < killDeadline && anyAlive()) {
+			spawnSync("sleep", ["0.2"], { stdio: "ignore" });
+		}
 	}
 }
 
@@ -348,15 +529,9 @@ async function main(): Promise<void> {
 		runSourceContractTests(webRoot);
 
 		console.log("design-e2e VISUAL DESIGN phase: rendered Playwright specs");
-		const specCount = resolveSpecs(requestedSpecs).length;
-		const chunkSize = Number(process.env.FULCRUM_DESIGN_E2E_CHUNK_SIZE ?? "10");
-		const designPorts = await allocatePortBlock({
-			count: Math.max(1, Math.ceil(specCount / chunkSize)),
-			preferredBase: process.env.FULCRUM_DESIGN_E2E_PORT_BASE
-				? Number(process.env.FULCRUM_DESIGN_E2E_PORT_BASE)
-				: undefined,
-		});
-		runDesignSpecs(webRoot, requestedSpecs, designPorts);
+		// The harness owns build + preview per chunk; `runDesignSpecs` allocates
+		// a fresh port for each chunk's `vite preview` inside `bootPreviewServer`.
+		await runDesignSpecs(webRoot, requestedSpecs);
 	}
 }
 

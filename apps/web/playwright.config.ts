@@ -34,9 +34,19 @@ export default defineConfig({
 		trace: "retain-on-failure",
 	},
 	webServer: [
+		// Design-e2e preview server. The `run-design-e2e.ts` harness sets
+		// `FULCRUM_SKIP_DESIGN_E2E_SERVER=1` because it owns build + preview
+		// itself — it builds to a verified-complete `.svelte-kit/output` and
+		// waits for the preview to be genuinely ready before Playwright starts
+		// (see that file's determinism contract). This entry is only the
+		// fallback for running Playwright directly: `timeout` is wide enough
+		// that a cold `vite build` is never killed mid-write, which would leave
+		// a partial `.svelte-kit/output` whose `manifest-full.js` imports
+		// `nodes/<n>.js` files that were never written.
 		...skipDesignE2eServer ? [] : [{
 			command: `cd ${quotedWebRoot} && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
 			port: designPort,
+			timeout: 180_000,
 			env: {
 				FULCRUM_HOME: fulcrumHome,
 				FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
