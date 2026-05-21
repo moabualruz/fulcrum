@@ -76,10 +76,11 @@ function harness() {
 /** Assert a JSON line is the canonical 12-key `fulcrum.cli.v1` envelope. */
 function expectCanonicalEnvelope(line: string, command: string): Record<string, unknown> {
   const parsed = JSON.parse(line) as Record<string, unknown>;
+  const expectedCommand = command.startsWith("fulcrum ") ? command : `fulcrum ${command}`;
   expect(isCanonicalEnvelope(parsed)).toBe(true);
   expect(Object.keys(parsed).sort()).toEqual([...CANONICAL_KEYS]);
   expect(parsed["schema"]).toBe(ENVELOPE_SCHEMA);
-  expect(parsed["command"]).toBe(command);
+  expect(parsed["command"]).toBe(expectedCommand);
   expect(typeof parsed["trace_id"]).toBe("string");
   expect((parsed["trace_id"] as string).length).toBe(32);
   expect(typeof parsed["span_id"]).toBe("string");

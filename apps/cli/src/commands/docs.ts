@@ -83,6 +83,11 @@ export async function run(
   };
   const [sub = "help", ...rest] = argv;
 
+  if (argv.includes("--help") || argv.includes("-h")) {
+    resolved.print(HELP);
+    return;
+  }
+
   switch (sub) {
     case "list":
       return withErrors("list", resolved, async () => {
@@ -467,10 +472,10 @@ async function withErrors(
         args: {},
         error: {
           code: "FUL_DOCS_ERROR",
-          message: `fulcrum docs ${command}: ${message}`,
+          message: `fulcrum doc ${command}: ${message}`,
           fix: "Configure the Fulcrum public API environment, then retry.",
         },
-        renderHuman: () => opts.printErr(`fulcrum docs ${command}: ${message}`),
+        renderHuman: () => opts.printErr(`fulcrum doc ${command}: ${message}`),
       },
       { print: opts.print, printErr: opts.printErr },
     );

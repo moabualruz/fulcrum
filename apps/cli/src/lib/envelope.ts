@@ -85,6 +85,11 @@ export interface EnvelopeInput<TResult> {
   now?: () => number;
 }
 
+function canonicalCommandName(command: string): string {
+  const trimmed = command.trim().replace(/\s+/g, " ");
+  return trimmed.startsWith("fulcrum ") ? trimmed : `fulcrum ${trimmed}`;
+}
+
 const CROCKFORD32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 function hexId(bytes: number): string {
@@ -149,7 +154,7 @@ export function wrapEnvelope<TResult>(input: EnvelopeInput<TResult>): CliEnvelop
     span_id: identity.span_id,
     run_id: identity.run_id,
     project_id: identity.project_id,
-    command: input.command,
+    command: canonicalCommandName(input.command),
     args: input.args ?? {},
     result: input.result,
     errors: input.errors ?? [],

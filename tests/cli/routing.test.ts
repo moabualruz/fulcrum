@@ -31,6 +31,7 @@ type RoutingEnrichedDecision = {
 type RoutingCaller = {
   routing: {
     list: (input?: Record<string, unknown>) => Promise<RoutingRule[]>;
+    show?: (input: { action: string; projectId?: string }) => Promise<RoutingRule | null>;
     create: (input: Record<string, unknown>) => Promise<RoutingRule>;
     update: (input: Record<string, unknown>) => Promise<RoutingRule | null>;
     delete: (input: { id: string }) => Promise<{ ok: true }>;
@@ -93,6 +94,10 @@ function fakeCaller(): RoutingCaller & { calls: Array<{ operation: string; input
       list: async (input = {}) => {
         calls.push({ operation: "routing.list", input });
         return rows;
+      },
+      show: async (input) => {
+        calls.push({ operation: "routing.show", input });
+        return rows[0] ?? null;
       },
       create: async (input) => {
         calls.push({ operation: "routing.create", input });
@@ -162,6 +167,49 @@ async function runRoutingWithOptions(
 }
 
 describe("routing rules CLI", () => {
+  test("route show calls routing service and emits canonical envelope command", async () => {
+    const caller = fakeCaller();
+    const { stdout, exitCode } = await runRoutingWithOptions(
+      ["show", "bug", "--project", PROJECT_ID, "--json"],
+      { caller, commandRoot: "route" },
+    );
+
+    expect(exitCode).toBeUndefined();
+    expect(caller.calls[0]).toEqual({
+      operation: "routing.show",
+      input: { action: "bug", projectId: PROJECT_ID },
+    });
+    const parsed = JSON.parse(stdout[0]!) as Record<string, unknown>;
+    expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+    expect(parsed["command"]).toBe("fulcrum route show");
+    expect(parsed["result"]).toMatchObject({ id: RULE_ID, actionAgent: "codex" });
+  });
+
+  test("route unknown --json emits envelope instead of raw stderr", async () => {
+    const result = await runRoutingWithOptions(
+      ["missing", "--json"],
+      { caller: fakeCaller(), commandRoot: "route" },
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toEqual([]);
+    const parsed = JSON.parse(result.stdout[0]!) as Record<string, unknown>;
+    expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+    expect(parsed["command"]).toBe("fulcrum route missing");
+    expect(JSON.stringify(parsed["errors"])).toContain("FUL_ROUTING_UNKNOWN_COMMAND");
+  });
+
+  test("route set --help is handled before argument parsing", async () => {
+    const result = await runRoutingWithOptions(
+      ["set", "--help"],
+      { caller: fakeCaller(), commandRoot: "route" },
+    );
+
+    expect(result.exitCode).toBeUndefined();
+    expect(result.stderr).toEqual([]);
+    expect(result.stdout.join("\n")).toContain("fulcrum route show <action>");
+  });
+
   test("list --json calls routing.list and prints RoutingRule array", async () => {
     const { caller, stdout, exitCode } = await runRouting([
       "rules",
