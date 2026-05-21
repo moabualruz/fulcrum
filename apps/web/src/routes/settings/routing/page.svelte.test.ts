@@ -98,6 +98,24 @@ describe("/settings/routing RoutingPage.svelte", () => {
     expect(body).toContain("data-routing-settings");
   });
 
+  test("composes routing controls from ui-kit primitives", () => {
+    const rules = render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body;
+    expect(rules).toContain('data-slot="tabs"');
+    expect(rules).toContain('data-slot="tabs-list"');
+    expect(rules).toContain('data-slot="tabs-trigger"');
+    expect(rules).toContain('data-slot="button"');
+    expect(rules).toContain('data-slot="input"');
+    expect(rules).toContain('data-slot="textarea"');
+    const buttons = rules.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons.every((button) => button.includes('data-slot="button"') || button.includes('data-slot="tabs-trigger"'))).toBe(true);
+
+    setRoutingTab("test");
+    expect(render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body).toContain('data-slot="card"');
+
+    setRoutingTab("llm-gate");
+    expect(render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body).toContain('data-slot="switch"');
+  });
+
   test("create panel is open when no rules", () => {
     const { body } = render(Page, { props: { data: makeData([]) } });
     expect(body).toContain("data-routing-create-panel");

@@ -204,11 +204,9 @@
 			{@const active = current === item.stage}
 			<svelte:element
 				this={item.href ? "a" : "button"}
-				role={item.href ? undefined : "tab"}
 				href={item.href}
 				type={item.href ? undefined : "button"}
 				aria-current={active ? "page" : undefined}
-				aria-selected={item.href ? undefined : active}
 				aria-label={STAGE_LABEL[item.stage]}
 				title={collapsed ? STAGE_LABEL[item.stage] : undefined}
 				data-slot="stage-rail-item"

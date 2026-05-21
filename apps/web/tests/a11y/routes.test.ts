@@ -13,6 +13,7 @@ const stableRoutes = [
   "/notifications-empty",
   "/sessions-empty",
   "/settings/api",
+  "/design-kit",
 ] as const;
 
 test.describe("Surface route accessibility sweep", () => {

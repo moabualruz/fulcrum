@@ -40,8 +40,7 @@ describe("BoardSheet (SSR)", () => {
 
   test("renders a closed shell with no form when task is null", () => {
     const { body } = render(BoardSheet, { props: { open: false, task: null } });
-    expect(body).toMatch(/data-board-sheet\b[^>]*data-state="closed"/);
-    expect(body).toMatch(/data-board-sheet\b[^>]*aria-hidden="true"/);
+    expect(body).not.toMatch(/data-slot="sheet-content"/);
     expect(body).not.toMatch(/data-board-sheet-form/);
   });
 
@@ -49,6 +48,9 @@ describe("BoardSheet (SSR)", () => {
     const { body } = render(BoardSheet, { props: { open: true, task: sampleTask } });
     expect(body).toMatch(/data-board-sheet\b[^>]*data-state="open"/);
     expect(body).toMatch(/data-board-sheet\b[^>]*aria-hidden="false"/);
+    expect(body).toContain('data-slot="sheet-content"');
+    expect(body).toContain('data-slot="sheet-overlay"');
+    expect(body).not.toMatch(/<aside\b/);
     expect(body).toMatch(/data-board-sheet-form/);
     expect(body).toMatch(/data-board-sheet-title/);
     expect(body).toMatch(/data-board-sheet-status/);
@@ -60,7 +62,7 @@ describe("BoardSheet (SSR)", () => {
 
   test("title input value reflects the task title", () => {
     const { body } = render(BoardSheet, { props: { open: true, task: sampleTask } });
-    expect(body).toMatch(/data-board-sheet-title[^>]*value="Wire UI"/);
+    expect(body).toMatch(/data-board-sheet-title[^>]*value="Wire UI"|value="Wire UI"[^>]*data-board-sheet-title/);
   });
 
   test("status select marks the task's current status as selected", () => {
