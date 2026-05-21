@@ -57,7 +57,7 @@ export interface ModeCommandOptions {
   env?: NodeJS.ProcessEnv;
 }
 
-const HELP = `fulcrum mode — apply a per-step mode affordance
+const HELP = `fulcrum mode: apply a per-step mode affordance
 
 The CLI side of the universal Step ModeAffordance (DESIGN.md §4.11, §4.13).
 Mode labels: ✋ Manual · ▶ Play · 💬 Discuss · ⊞ AI Assist.
@@ -130,7 +130,7 @@ export async function run(argv: readonly string[], opts: ModeCommandOptions = {}
         renderHuman: (modes) => {
           io.print("Step mode affordances (DESIGN.md §4.13):");
           for (const m of modes) {
-            io.print(`  ${m.glyph} ${m.label.padEnd(10)} fulcrum mode ${m.verb.padEnd(8)} — ${m.description}`);
+            io.print(`  ${m.glyph} ${m.label.padEnd(10)} fulcrum mode ${m.verb.padEnd(8)}: ${m.description}`);
           }
         },
       },
@@ -141,7 +141,7 @@ export async function run(argv: readonly string[], opts: ModeCommandOptions = {}
 
   const affordance = MODE_AFFORDANCES.find((m) => m.verb === verb);
   if (!affordance) {
-    io.printErr(`fulcrum mode: unknown mode '${verb}' — expected one of ${MODE_VERBS.join(", ")}`);
+    io.printErr(`fulcrum mode: unknown mode '${verb}'. Expected one of ${MODE_VERBS.join(", ")}`);
     io.printErr(HELP);
     io.exit(2);
     return;
@@ -177,7 +177,7 @@ export async function run(argv: readonly string[], opts: ModeCommandOptions = {}
       env,
       traceLine: true,
       renderHuman: (applied) => {
-        io.print(`${applied.glyph} ${applied.label} — step ${applied.step}`);
+        io.print(`${applied.glyph} ${applied.label}: step ${applied.step}`);
         if (applied.agent) io.print(`  agent: ${applied.agent}`);
         if (applied.note) io.print(`  note: ${applied.note}`);
       },

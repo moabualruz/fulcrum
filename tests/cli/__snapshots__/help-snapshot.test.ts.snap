@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`fulcrum --help workflow-stage command tree root help snapshot is stable 1`] = `
-"fulcrum — local-first CLI Agent OS
+"fulcrum: local-first CLI Agent OS
 
 Commands are grouped by workflow stage so the CLI shares one mental model with
 the web and TUI surfaces (Capture · Plan · Build · Review · Ship · Operate).
@@ -11,7 +11,7 @@ Usage:
   fulcrum help <stage>             Show commands and examples for one stage.
 
 CAPTURE
-  Intake — docs, notes, captures, and search before planning.
+  Intake: docs, notes, captures, and search before planning.
   fulcrum capture <review|status|action>      Review mobile captures, set status, run quick actions.
   fulcrum docs <template list>                 Browse and template capture documents.
   fulcrum search query <query>                 Full-text search across captured content.
@@ -27,7 +27,7 @@ PLAN
                                                Manage sprints and sprint membership.
 
 BUILD
-  Execute the plan — tasks, agent runs, work items, and routing.
+  Execute the plan: tasks, agent runs, work items, and routing.
   fulcrum task|tasks <list|get|new|create|update|delete>
                                                Create and manage build tasks.
   fulcrum work <create|inspect|move|link|report>
@@ -39,7 +39,7 @@ BUILD
   fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
 
 REVIEW
-  Quality gates — UAT, code review, and final-handoff decisions.
+  Quality gates: UAT, code review, and final-handoff decisions.
   fulcrum review <list|view|approve|request-changes>
                                                Review queue and approval decisions.
   fulcrum qa <run|report>                      Run QA checks and report artifacts.
@@ -47,7 +47,7 @@ REVIEW
   fulcrum e2e <run|report>                     Run or inspect end-to-end review suites.
 
 SHIP
-  Release outputs — artifacts, repositories, and promoted memory.
+  Release outputs: artifacts, repositories, and promoted memory.
   fulcrum ship <list|view>                     Inspect release list and detail surfaces.
   fulcrum release <cut|roll-back|pause|promote>
                                                Operate release rollout actions.
@@ -60,7 +60,7 @@ SHIP
                                                Manage and promote persistent memory.
 
 OPERATE
-  Run the system — health, installs, MCP, hooks, config, and audit.
+  Run the system: health, installs, MCP, hooks, config, and audit.
   fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
                                                Report environment and policy health.
   fulcrum install [--profile minimal|rules-only|full] [--dry-run]
@@ -94,7 +94,7 @@ OPERATE
   fulcrum theme <list|set>                     Manage theme.
 
 AI ASSIST
-  Step-scoped agent sessions — the CLI side of the AI Assist drawer.
+  Step-scoped agent sessions: the CLI side of the AI Assist drawer.
   fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.
   fulcrum ai start --task <id> --title <title> Start a step-scoped AI Assist session.
   fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>
@@ -125,9 +125,9 @@ Run \`fulcrum help <stage>\` (e.g. \`fulcrum help build\`) for stage detail.
 `;
 
 exports[`fulcrum help <stage> per-stage detail build stage help snapshot is stable 1`] = `
-"fulcrum — Build stage
+"fulcrum: Build stage
 
-Execute the plan — tasks, agent runs, work items, and routing.
+Execute the plan: tasks, agent runs, work items, and routing.
 
 Commands:
   fulcrum task|tasks <list|get|new|create|update|delete>

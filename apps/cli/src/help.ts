@@ -24,7 +24,7 @@ interface StageHelp {
 const WORKFLOW_STAGES: readonly StageHelp[] = [
   {
     label: "Capture",
-    summary: "Intake — docs, notes, captures, and search before planning.",
+    summary: "Intake: docs, notes, captures, and search before planning.",
     commands: [
       "fulcrum capture <review|status|action>      Review mobile captures, set status, run quick actions.",
       "fulcrum docs <template list>                 Browse and template capture documents.",
@@ -57,7 +57,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
   },
   {
     label: "Build",
-    summary: "Execute the plan — tasks, agent runs, work items, and routing.",
+    summary: "Execute the plan: tasks, agent runs, work items, and routing.",
     commands: [
       "fulcrum task|tasks <list|get|new|create|update|delete>",
       "                                             Create and manage build tasks.",
@@ -77,7 +77,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
   },
   {
     label: "Review",
-    summary: "Quality gates — UAT, code review, and final-handoff decisions.",
+    summary: "Quality gates: UAT, code review, and final-handoff decisions.",
     commands: [
       "fulcrum review <list|view|approve|request-changes>",
       "                                             Review queue and approval decisions.",
@@ -94,7 +94,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
   },
   {
     label: "Ship",
-    summary: "Release outputs — artifacts, repositories, and promoted memory.",
+    summary: "Release outputs: artifacts, repositories, and promoted memory.",
     commands: [
       "fulcrum ship <list|view>                     Inspect release list and detail surfaces.",
       "fulcrum release <cut|roll-back|pause|promote>",
@@ -117,7 +117,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
   },
   {
     label: "Operate",
-    summary: "Run the system — health, installs, MCP, hooks, config, and audit.",
+    summary: "Run the system: health, installs, MCP, hooks, config, and audit.",
     commands: [
       "fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]",
       "                                             Report environment and policy health.",
@@ -159,7 +159,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
   },
   {
     label: "AI Assist",
-    summary: "Step-scoped agent sessions — the CLI side of the AI Assist drawer.",
+    summary: "Step-scoped agent sessions: the CLI side of the AI Assist drawer.",
     commands: [
       "fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.",
       "fulcrum ai start --task <id> --title <title> Start a step-scoped AI Assist session.",
@@ -219,7 +219,7 @@ function renderStageGroup(stage: StageHelp): string {
 }
 
 /** Root `fulcrum --help` — workflow-stage organized command tree. */
-const ROOT_HELP = `fulcrum — local-first CLI Agent OS
+const ROOT_HELP = `fulcrum: local-first CLI Agent OS
 
 Commands are grouped by workflow stage so the CLI shares one mental model with
 the web and TUI surfaces (Capture · Plan · Build · Review · Ship · Operate).
@@ -252,7 +252,7 @@ function renderStageHelp(topic: string): string | null {
   if (!stage) return null;
   const commands = stage.commands.map((line) => `  ${line}`).join("\n");
   const examples = stage.examples.map((line) => `  ${line}`).join("\n");
-  return `fulcrum — ${stage.label} stage
+  return `fulcrum: ${stage.label} stage
 
 ${stage.summary}
 

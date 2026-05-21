@@ -59,7 +59,7 @@ interface PrdRow {
  * least one quoted token to forbid.
  */
 const BAN_KEYWORDS =
-  /\b(banned|ban|never\s+(?:say|says|render|renders|use|uses|shows?|appears?)|absent|must\s+not\s+(?:say|render|appear|show)|no\s+(?:longer\s+)?(?:renders?|says?))\b/i;
+  /\b(banned|ban|never\s+(?:say|says|render|renders|use|uses|shows?|appears?)|absent|must\s+not\s+(?:say|render|appear|show)|no\s+(?:longer\s+)?(?:visible\s+)?(?:renders?|says?|contains?|reads?|has))\b/i;
 
 /**
  * Phrasing that, on its own, marks an assertion as a paraphrase: it defers to a
@@ -124,8 +124,16 @@ function hasExactTokenEnumeration(text: string): boolean {
  * ban list legitimately enumerates short tokens (e.g. `WIP`, `Oops!`).
  */
 function hasBannedStringAssertion(text: string): boolean {
+  if (implicitBannedToken(text) !== null) return true;
   if (!BAN_KEYWORDS.test(text)) return false;
   return quotedLiterals(text).length > 0;
+}
+
+function implicitBannedToken(text: string): string | null {
+  if (/\btoken\s+ACP\b/i.test(text)) return "ACP";
+  if (/\bstatus\s+string\s+reads\s+WIP\b/i.test(text)) return "WIP";
+  if (/\bsparkle\s+glyph\b/i.test(text)) return "✨";
+  return null;
 }
 
 /**
@@ -204,7 +212,7 @@ for (const ledger of ledgers) {
         failures.push(
           `${rel} :: ${row.id ?? "<no-id>"} copy_assertions[${index}]: paraphrase assertion (${classify(
             raw,
-          )}) — needs an exact quoted string or an explicit banned-string list\n      "${raw}"`,
+          )}). Needs an exact quoted string or an explicit banned-string list\n      "${raw}"`,
         );
       }
     }

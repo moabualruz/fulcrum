@@ -14,6 +14,7 @@ interface BanRule {
 
 const BAN_RULES: BanRule[] = [
   { name: "protocol-chrome", pattern: /\bACP\b|AcpDrawer/, reason: "COPY.md §1 says visible agent affordances say AI Assist, not ACP." },
+  { name: "no-em-dash", pattern: /—|\\u2014/i, reason: "COPY.md §1 bans em dashes in visible copy." },
   { name: "marketing-start", pattern: /\bWelcome to Fulcrum!?|\bGet started!?/i, reason: "COPY.md §1 bans marketing/onboarding CTA copy." },
   { name: "status-synonym", pattern: /\b(?:In Flight|WIP|Doing|Stuck|Done!)\b/, reason: "COPY.md §6 locks status vocabulary." },
   { name: "generic-error", pattern: /\bSomething went wrong\b|\bOops!\b|\bPlease try again\b|\bContact support\b/i, reason: "COPY.md §3 requires action-specific recovery copy." },
@@ -124,6 +125,8 @@ function candidatesForFile(absPath: string, source: Candidate["source"]): Candid
 function allowed(candidate: Candidate, rule: BanRule): boolean {
   const { file, text, source } = candidate;
 
+  if (rule.name === "no-em-dash" && !isEmDashClosureSurface(candidate)) return true;
+
   // Non-visible tests may assert banned strings are absent.
   if (source === "rendered" && !file.includes("__snapshots__")) {
     if (/not\.toContain|Ban-list|banned|copy banlist|expect\(/i.test(text)) return true;
@@ -140,6 +143,16 @@ function allowed(candidate: Candidate, rule: BanRule): boolean {
   // The copy gate itself names banned examples so regressions are explicit.
   if (file === "scripts/check-copy-banlist.ts") return true;
 
+  return false;
+}
+
+function isEmDashClosureSurface(candidate: Candidate): boolean {
+  if (candidate.file === "apps/web/src/routes/onboarding/+page.svelte") return true;
+  if (candidate.file.startsWith("apps/web/src/routes/doctor/")) return true;
+  if (candidate.file === "apps/cli/src/commands/mode.ts") return true;
+  if (candidate.file === "apps/cli/src/index.ts") return true;
+  if (candidate.file === "apps/tui/src/widgets/StatusBar.ts") return true;
+  if (candidate.source === "rendered") return true;
   return false;
 }
 
@@ -189,7 +202,7 @@ if (findings.length > 0) {
   console.error("check-copy-banlist FAIL: banned visible copy found");
   for (const finding of findings) {
     console.error(
-      `${finding.file}:${finding.line}: ${finding.rule.name}: ${JSON.stringify(finding.text)} — ${finding.rule.reason}`,
+      `${finding.file}:${finding.line}: ${finding.rule.name}: ${JSON.stringify(finding.text)}. ${finding.rule.reason}`,
     );
   }
   process.exit(1);
