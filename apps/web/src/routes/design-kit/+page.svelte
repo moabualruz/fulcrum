@@ -707,6 +707,20 @@
 
 		<article
 			class="grid gap-4 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="button"
+		>
+			<h2 class="text-lg font-semibold">Button</h2>
+			<div class="flex flex-wrap items-center gap-2">
+				<Button variant="primary" size="md" data-design-kit-button="primary-md">Primary md</Button>
+				<Button variant="danger" size="md" data-design-kit-button="danger-md">Danger md</Button>
+				<Button variant="outline" size="md" data-design-kit-button="outline-md">Outline md</Button>
+				<Button variant="ghost" size="sm" data-design-kit-button="ghost-sm">Ghost sm</Button>
+				<Button variant="secondary" size="xs" data-design-kit-button="secondary-xs">Secondary xs</Button>
+			</div>
+		</article>
+
+		<article
+			class="grid gap-4 rounded-md border border-border bg-card p-5"
 			data-design-kit-section="avatar"
 		>
 			<h2 class="text-lg font-semibold">Avatar</h2>
@@ -1301,6 +1315,8 @@
 						</div>
 						<DialogFooter class="flex-wrap gap-2">
 							<Button
+								variant="primary"
+								size="md"
 								data-design-kit-skill-conflict-confirm-alt
 								onclick={() => (skillConflictChoice = `alt:${skillConflictAltVersion}`)}
 							>

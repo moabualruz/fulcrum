@@ -115,9 +115,9 @@
       </label>
 
       <div class="flex items-center gap-2">
-        <button type="submit" data-board-sheet-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+        <button type="submit" data-board-sheet-save class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
         <button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} class={cn(buttonVariants({ variant: "outline" }))}>Run</button>
-        <button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
+        <button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} class={cn(buttonVariants({ variant: "danger" }))}>Delete</button>
       </div>
     </form>
 

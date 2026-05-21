@@ -37,7 +37,7 @@
 				{/each}
 			</select>
 		</label>
-		<button type="submit" name="intent" value="create" class={cn(buttonVariants({ variant: "default" }), "self-end")}>Create</button>
+		<button type="submit" name="intent" value="create" class={cn(buttonVariants({ variant: "primary" }), "self-end")}>Create</button>
 		<label class={cn("md:col-span-3 flex flex-col gap-1 text-sm")}>
 			<span class={cn("font-medium")}>Body</span>
 			<textarea name="bodyTemplate" rows="5" class={cn("border-input bg-background rounded-md border px-3 py-2 text-sm")}></textarea>
@@ -69,7 +69,7 @@
 							<div class={cn("flex flex-row gap-2 md:flex-col")}>
 								<button type="submit" name="intent" value="update" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Save</button>
 								<button type="submit" name="intent" value="setDefault" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Set default</button>
-								<button type="submit" name="intent" value="delete" disabled={!template.projectId} class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Delete</button>
+								<button type="submit" name="intent" value="delete" disabled={!template.projectId} class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Delete</button>
 							</div>
 						</form>
 					{:else}

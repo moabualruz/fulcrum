@@ -361,7 +361,7 @@
 
     <!-- Delete -->
     <Button
-      variant="destructive"
+      variant="danger"
       size="sm"
       disabled={isOverLimit || loading}
       class="h-8 text-xs"

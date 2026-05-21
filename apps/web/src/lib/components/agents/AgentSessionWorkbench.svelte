@@ -328,7 +328,7 @@
             type="submit"
             data-manual-reconnect
             disabled={!model.controls.canReconnect || model.connection.status === "reconnecting"}
-            class={cn(buttonVariants({ variant: "default", size: "sm" }), "manual-reconnect-btn")}
+            class={cn(buttonVariants({ variant: "primary", size: "sm" }), "manual-reconnect-btn")}
           >
             Reconnect {reconnectAgentName}
           </button>
@@ -348,7 +348,7 @@
         <h3 class={cn("text-sm font-semibold")}>No saved sessions yet.</h3>
         <p class={cn("mt-1 text-sm text-muted-foreground")}>Create a new session to Begin.</p>
       </div>
-      <a href="#agent-connect-form" class={cn(buttonVariants({ variant: "default", size: "sm" }), "empty-create-btn")}>
+      <a href="#agent-connect-form" class={cn(buttonVariants({ variant: "primary", size: "sm" }), "empty-create-btn")}>
         Create Session
       </a>
     </div>
@@ -460,12 +460,12 @@
       {#if cwdPickerError}
         <p data-cwd-picker-error class={cn("text-xs text-destructive")}>{cwdPickerError}</p>
       {/if}
-      <button type="submit" disabled={availableAgents.length === 0} class={cn(buttonVariants({ variant: "default", size: "sm" }), "w-fit")}>Connect</button>
+      <button type="submit" disabled={availableAgents.length === 0} class={cn(buttonVariants({ variant: "primary", size: "sm" }), "w-fit")}>Connect</button>
     </form>
   {/if}
 
   <div data-session-controls class={cn("mt-4 flex flex-wrap gap-2")}>
-    <button type="button" disabled={!model.controls.canPrompt} class={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+    <button type="button" disabled={!model.controls.canPrompt} class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>
       Prompt
     </button>
     <button type="button" disabled={!model.controls.canCancel} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
@@ -474,7 +474,7 @@
     <button type="button" disabled={!model.controls.canDisconnect} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
       Disconnect
     </button>
-    <button type="button" disabled={!model.controls.canAbort} onclick={requestAbort} class={cn(buttonVariants({ variant: "destructive", size: "sm" }), "abort-btn")}>
+    <button type="button" disabled={!model.controls.canAbort} onclick={requestAbort} class={cn(buttonVariants({ variant: "danger", size: "sm" }), "abort-btn")}>
       Abort
     </button>
     {#if model.controls.canPauseSession}
@@ -486,7 +486,7 @@
     {/if}
     {#if model.controls.canResumeSession}
       <form method="POST" action="?/resumeSession">
-        <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }), "resume-btn")}>
+        <button type="submit" class={cn(buttonVariants({ variant: "primary", size: "sm" }), "resume-btn")}>
           Resume
         </button>
       </form>
@@ -530,7 +530,7 @@
             <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
               Keep running
             </button>
-            <button type="submit" data-abort-confirm class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>
+            <button type="submit" data-abort-confirm class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>
               Abort session
             </button>
           </div>
@@ -713,7 +713,7 @@
                           {/if}
                         </div>
                         <div class={cn("flex items-center gap-1")}>
-                          <button type="button" class={cn(buttonVariants({ variant: "default", size: "sm" }), "diff-accept-btn h-7 px-2 text-xs")}>
+                          <button type="button" class={cn(buttonVariants({ variant: "primary", size: "sm" }), "diff-accept-btn h-7 px-2 text-xs")}>
                             Accept
                           </button>
                           <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "diff-reject-btn h-7 px-2 text-xs")}>
@@ -811,7 +811,7 @@
           </button>
           <form method="POST" action="?/forkFromCheckpoint">
             <input type="hidden" name="checkpointId" value={forkCheckpoint.id} />
-            <button type="submit" data-fork-confirm class={cn(buttonVariants({ variant: "default", size: "sm" }))}>
+            <button type="submit" data-fork-confirm class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>
               Fork session
             </button>
           </form>
@@ -934,7 +934,7 @@
           </button>
           <form method="POST" action="?/deleteSavedSession">
             <input type="hidden" name="savedSessionId" value={deleteSessionId} />
-            <button type="submit" data-delete-session-confirm class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>
+            <button type="submit" data-delete-session-confirm class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>
               Delete session
             </button>
           </form>
