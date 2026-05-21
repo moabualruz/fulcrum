@@ -20,11 +20,24 @@ afterEach(() => {
 describe("/doctor +page.server.ts", () => {
   test("load() returns streamed.checks promise", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = mod.load();
-    expect(result.streamed.checks).toBeInstanceOf(Promise);
-    const checks = await result.streamed.checks;
-    expect(Array.isArray(checks)).toBe(true);
-    expect(checks.length).toBe(17);
+    const result = mod.load({ url: new URL("http://localhost/doctor") });
+    expect(result.streamed.workbench).toBeInstanceOf(Promise);
+    const workbench = await result.streamed.workbench;
+    expect(Array.isArray(workbench.checks)).toBe(true);
+    expect(workbench.checks.length).toBe(17);
+    expect(workbench.summary.subsystems).toBe(17);
+    expect(workbench.telemetry.length).toBe(2);
+  });
+
+  test("load() with ?fixture=degraded returns the OD degraded reference scene", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 100}`);
+    const result = mod.load({ url: new URL("http://localhost/doctor?fixture=degraded") });
+    const workbench = await result.streamed.workbench;
+    expect(workbench.summary.failing).toBeGreaterThan(0);
+    expect(workbench.summary.failed).toBeGreaterThan(0);
+    const cron = workbench.checks.find((c: { subsystem: string }) => c.subsystem === "scheduler.cron");
+    expect(cron?.recoveryActionKind).toBe("catch-up");
+    expect(cron?.probeTrace?.traceId).toContain("tr_");
   });
 
   test("all 17 subsystems present in correct order", async () => {
@@ -48,6 +61,11 @@ describe("/doctor +page.server.ts", () => {
       expect(check).toHaveProperty("message");
       expect(check).toHaveProperty("recovery");
       expect(check).toHaveProperty("checked_at");
+      expect(check).toHaveProperty("latencyP99Ms");
+      expect(check).toHaveProperty("recoveryCopy");
+      expect(check).toHaveProperty("recoveryCommand");
+      expect(check).toHaveProperty("recoveryActionKind");
+      expect(check).toHaveProperty("probeTrace");
       expect(["ok", "warn", "fail"]).toContain(check.status);
       // checked_at must be a valid ISO timestamp
       expect(() => new Date(check.checked_at)).not.toThrow();
