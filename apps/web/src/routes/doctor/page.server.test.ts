@@ -130,24 +130,33 @@ describe("/doctor +page.server.ts", () => {
     expect(memory?.status).toBe("ok");
   });
 
-  test("sandcastle check: sandbox-docker flag with absent docker yields fail/warn status", async () => {
-    // Set sandbox-docker flag but docker is unavailable in CI
+  test("sandcastle check surfaces a well-formed subsystem status when sandbox-docker is enabled", async () => {
+    // The deterministic docker-absent/-present matrix lives in
+    // services/execution-orchestration/.../sandbox-runner.test.ts, where
+    // commandExists is injected ("doctor check for sandbox-docker yields error
+    // status when docker absent" / "...ok when docker present"). This
+    // route-level test only verifies the _runAll integration: the sandcastle
+    // subsystem is present and reports a well-formed status. The concrete
+    // status depends on whether a docker daemon happens to be reachable on the
+    // host — asserting it would pass in CI yet fail on a dev box with Docker
+    // Desktop installed, so the shape is asserted, not the host-dependent value.
     const origFeatures = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "sandbox-docker";
-    // The check calls commandExists internally; in CI docker is absent → error status
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
-    const checks = await mod._runAll();
-    const sandcastle = checks.find((c: { subsystem: string }) => c.subsystem === "sandcastle");
-    // Status is fail when sandbox-docker is enabled but docker daemon is absent
-    expect(sandcastle?.status).toMatch(/fail|warn/);
-    // Must mention sandbox-docker in the message or recovery
-    const combined = `${sandcastle?.message ?? ""} ${sandcastle?.recovery ?? ""}`;
-    expect(combined).toContain("sandbox-docker");
-    // Restore
-    if (origFeatures === undefined) {
-      delete process.env["FULCRUM_FEATURES"];
-    } else {
-      process.env["FULCRUM_FEATURES"] = origFeatures;
+    try {
+      const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
+      const checks = await mod._runAll();
+      const sandcastle = checks.find((c: { subsystem: string }) => c.subsystem === "sandcastle");
+      expect(sandcastle).toBeDefined();
+      expect(sandcastle?.status).toMatch(/ok|warn|fail/);
+      expect(sandcastle?.label).toBe("Sandcastle");
+      expect(typeof sandcastle?.message).toBe("string");
+      expect((sandcastle?.message ?? "").length).toBeGreaterThan(0);
+    } finally {
+      if (origFeatures === undefined) {
+        delete process.env["FULCRUM_FEATURES"];
+      } else {
+        process.env["FULCRUM_FEATURES"] = origFeatures;
+      }
     }
   });
 });
