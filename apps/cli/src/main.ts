@@ -2,7 +2,7 @@
 // fulcrum — local-first CLI Agent OS. Binary entry-point.
 
 import { installCliLogRedaction } from "./log.ts";
-import { ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import { CLI_RESULT_SCHEMA, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
 import { serializeEnvelope, wrapEnvelope } from "./lib/envelope.ts";
 
 installCliLogRedaction();
@@ -182,6 +182,7 @@ async function main() {
     case "repos":
     case "repo":
     case "docs":
+    case "report":
     case "symphony":
     case "runs":
     case "session":
@@ -209,6 +210,10 @@ async function main() {
     case "--help":
     case "-h": {
       const [topic] = rest;
+      if (rest.includes("--json-schema")) {
+        console.log(JSON.stringify(CLI_RESULT_SCHEMA));
+        return;
+      }
       if (topic) {
         const stageHelp = renderStageHelp(topic);
         if (stageHelp) {

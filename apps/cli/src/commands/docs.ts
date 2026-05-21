@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { formatApiError } from "../api-errors.ts";
-import { emitResult } from "../lib/cli-output.ts";
+import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 import {
   createDocumentApiCallerFromEnv,
   type DocumentApiEnvironment,
@@ -37,6 +37,7 @@ export interface DocsRunOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
+  currentArgv?: readonly string[];
 }
 
 const HELP = `fulcrum docs
@@ -78,6 +79,7 @@ export async function run(
     print: opts.print ?? console.log,
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
+    currentArgv: argv,
   };
   const [sub = "help", ...rest] = argv;
 
@@ -458,7 +460,20 @@ async function withErrors(
     await fn();
   } catch (err) {
     const message = formatApiError(err);
-    if (opts.printErr) opts.printErr(`fulcrum docs ${command}: ${message}`);
+    emitErrorResult(
+      {
+        argv: opts.currentArgv ?? [],
+        command: `fulcrum docs ${command}`,
+        args: {},
+        error: {
+          code: "FUL_DOCS_ERROR",
+          message: `fulcrum docs ${command}: ${message}`,
+          fix: "Configure the Fulcrum public API environment, then retry.",
+        },
+        renderHuman: () => opts.printErr(`fulcrum docs ${command}: ${message}`),
+      },
+      { print: opts.print, printErr: opts.printErr },
+    );
     opts.exit(1);
   }
 }

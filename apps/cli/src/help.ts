@@ -212,6 +212,65 @@ const GLOBAL_FLAGS_NOTE =
   "Every command accepts --json for the machine-readable fulcrum.cli.v1 envelope\n" +
   "(CLI-TUI-UX.md §3). Add --jq <expr> to filter, --no-color to disable color.";
 
+const CLI_RESULT_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  title: "fulcrum.cli.v1",
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "schema",
+    "trace_id",
+    "span_id",
+    "run_id",
+    "project_id",
+    "command",
+    "args",
+    "result",
+    "errors",
+    "next_actions",
+    "duration_ms",
+    "timestamp",
+  ],
+  properties: {
+    schema: { const: "fulcrum.cli.v1" },
+    trace_id: { type: "string" },
+    span_id: { type: "string" },
+    run_id: { type: ["string", "null"] },
+    project_id: { type: ["string", "null"] },
+    command: { type: "string" },
+    args: { type: "object" },
+    result: true,
+    errors: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["code", "message"],
+        properties: {
+          code: { type: "string" },
+          message: { type: "string" },
+          fix: { type: "string" },
+          doc: { type: "string" },
+          trace_id: { type: "string" },
+          context: { type: "object" },
+        },
+      },
+    },
+    next_actions: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["label", "command"],
+        properties: {
+          label: { type: "string" },
+          command: { type: "string" },
+        },
+      },
+    },
+    duration_ms: { type: "number" },
+    timestamp: { type: "string", format: "date-time" },
+  },
+} as const;
+
 function renderStageGroup(stage: StageHelp): string {
   const heading = stage.label.toUpperCase();
   const body = stage.commands.map((line) => `  ${line}`).join("\n");
@@ -268,6 +327,7 @@ ${GLOBAL_FLAGS_NOTE}
 
 export {
   HELP,
+  CLI_RESULT_SCHEMA,
   ROOT_HELP,
   STAGE_HELP_TOPICS,
   renderStageHelp,

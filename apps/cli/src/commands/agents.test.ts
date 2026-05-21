@@ -51,6 +51,34 @@ describe("fulcrum agents list", () => {
   });
 });
 
+describe("fulcrum agent canonical grammar", () => {
+  test.each([
+    ["add", ["add", "codex", "--client", "codex", "--json"]],
+    ["remove", ["remove", "codex", "--json"]],
+    ["edit", ["edit", "codex", "--client", "codex", "--json"]],
+    ["status", ["status", "codex", "--json"]],
+    ["defaults", ["defaults", "--json"]],
+    ["set-default", ["set-default", "codex", "--action", "build.run.step", "--json"]],
+  ] as const)("%s emits canonical envelope", async (_name, argv) => {
+    const { captured, exitCode } = await runAgents([...argv]);
+    expect(exitCode).toBe(0);
+    const envelope = JSON.parse(captured.join(""));
+    expect(isCanonicalEnvelope(envelope)).toBe(true);
+    expect(envelope.command).toBe(`fulcrum agent ${argv[0]}`);
+    expect(envelope.errors).toEqual([]);
+  });
+
+  test("unknown subcommand envelope preserves invoked command", async () => {
+    const { captured, exitCode } = await runAgents(["bogus", "--json"]);
+    expect(exitCode).toBe(2);
+    const envelope = JSON.parse(captured.join(""));
+    expect(isCanonicalEnvelope(envelope)).toBe(true);
+    expect(envelope.command).toBe("fulcrum agent bogus");
+    expect(envelope.args.subcommand).toBe("bogus");
+    expect(envelope.errors[0].code).toBe("FUL_AGENT_UNKNOWN_COMMAND");
+  });
+});
+
 describe("fulcrum agent view", () => {
   test("--json returns single profile inside canonical envelope", async () => {
     const { captured, exitCode } = await runAgents(["view", "claude-code", "--json"]);
