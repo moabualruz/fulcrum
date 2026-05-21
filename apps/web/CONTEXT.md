@@ -80,6 +80,10 @@ _Avoid_: Trace pill, trace label, run id badge.
 The inline `[▶ Play] [💬 Discuss] [⊞ Drawer] [⋮ More]` row attached to every Step header that switches between manual / Play / Discuss / AI Assist execution modes.
 _Avoid_: Mode buttons, action row, agent buttons.
 
+**TypeRole**:
+The DESIGN.md §2 semantic web typography roles: `type-display`, `type-h1`, `type-h2`, `type-h3`, `type-body`, `type-caption`, and `type-code`. These map to the Tailwind v4 text tokens in `apps/web/src/app.css` and are the only source of truth for font size, line-height, weight, font family, and zero letter spacing in OD-referenced surfaces.
+_Avoid_: raw heading utilities (`text-lg`, `text-xl`, `text-2xl`) used as hierarchy in new Workbench or shell code.
+
 **StagePeek**:
 The overlay used to open any entity by id (`/<ws>/browse/<id>`) without leaving the current Stage — surfaces a Step's detail without losing list/board context.
 _Avoid_: Modal, preview, sidebar peek, detail flyout.
@@ -115,6 +119,7 @@ _Avoid_: Tour, walkthrough, getting started, wizard, signup stepper.
 - The **StatusFooter**'s right-most segment also opens the **AcpDrawer** (`⌘/` from anywhere); both entry points share one drawer instance.
 - **AndroidSafeArea** reserves wrap mobile shell chrome; **StatusFooter**, mobile bottom navigation, and sheets render above gesture zones.
 - The **TraceBadge** appears in **ScopeBar**, **StatusFooter**, **AcpDrawer** header, every error inline, every audit row — same id, four surfaces.
+- Every **Workbench**, **StageRail**, **ScopeBar**, **StatusFooter**, **TraceBadge**, and **AcpDrawer** renders hierarchy through **TypeRole** tokens so dense operator screens preserve the OD type scale across desktop, mobile, and forced-colors modes.
 - A **PortfolioSurface** has no Project Scope; the **StageRail** collapses or swaps to portfolio nav when active.
 - The **OnboardingFlow** starts at `/onboarding`, keeps one trace through workspace + project setup into the Capture surface, where the first-run **coachmark** teaches the first `▶ Play` and the first TraceBadge pulse fires once; subsequent sessions never re-enter it.
 - Every **Workbench**, **AcpDrawer** action, and **CommandPalette** entry calls a service (tRPC client → NestJS service in `services/**`); this app holds no domain state beyond ephemeral UI state in `$lib/stores`.
@@ -137,3 +142,4 @@ _Avoid_: Tour, walkthrough, getting started, wizard, signup stepper.
 - "Mode" (UI mode) vs "Mode" (vim-style NORMAL/INSERT in **StatusFooter**) — resolved: **ModeAffordance** refers to manual / Play / Discuss / AI Assist execution mode; the **StatusFooter** mode pill is the input mode (NORMAL/INSERT/FILTER/COMMAND) inherited from the TUI. Two unrelated concepts; never conflated.
 - "Step" vs "Task" vs "Item" — resolved: **Step** is the universal mode-bearing unit across every Stage. A Build Task is one Step type; a Capture Doc is another Step type. "Item" is avoided; "task" is reserved for Build-stage tasks only.
 - "Timeline" vs "Gantt" — resolved: they name the same Build layout from two angles. **Timeline** is the user-facing layout name in the Build view switcher (OD `build-timeline.html`, TUI `:timeline` screen); `gantt` is the canonical route segment (`IA-MAP.md §2.3` — `/<ws>/projects/<projId>/build/gantt`). The Workbench that renders it is the **BuildTimelineWorkbench**. The route folder `build-timeline` keeps its name (it is the pre-canonical-routing flat preview path, mapped to the `build` stage in `route-map.ts`); the canonical project-scoped URL uses `gantt`. Not to be confused with **DocVersionReview** — the document-history "version timeline" — which is a Capture/docs surface and was the content this route previously rendered before `prd-cross-mislabeled-route-content-migration` re-homed it to `/docs`.
+- "Heading size" vs "component size" — resolved: **TypeRole** owns hierarchy (`type-h1`, `type-h2`, etc.). Component-local sizing utilities such as `text-sm` or `text-xs` are acceptable inside mature ui-kit primitives, but new OD-referenced Workbench and shell slices must not use raw `text-lg` / `text-xl` / `text-2xl` as page hierarchy.

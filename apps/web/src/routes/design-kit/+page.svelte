@@ -206,6 +206,79 @@
 		priorityOptions.find((option) => option.value === selectValue)?.label ?? "Choose priority",
 	);
 
+	const typographyRoles = [
+		{
+			id: "display",
+			role: "Display",
+			className: "type-display",
+			size: "40px",
+			line: "1.2",
+			weight: "600",
+			sample: "Operate at 1am",
+			use: "Large marketing-free page display only",
+		},
+		{
+			id: "h1",
+			role: "H1",
+			className: "type-h1",
+			size: "32px",
+			line: "1.3",
+			weight: "600",
+			sample: "Plan workbench",
+			use: "Page title",
+		},
+		{
+			id: "h2",
+			role: "H2",
+			className: "type-h2",
+			size: "24px",
+			line: "1.4",
+			weight: "600",
+			sample: "Active runs",
+			use: "Section title",
+		},
+		{
+			id: "h3",
+			role: "H3",
+			className: "type-h3",
+			size: "20px",
+			line: "1.4",
+			weight: "600",
+			sample: "Auth rewrite",
+			use: "Card or panel title",
+		},
+		{
+			id: "body",
+			role: "Body",
+			className: "type-body",
+			size: "16px",
+			line: "1.5",
+			weight: "400",
+			sample: "Default body copy stays compact but readable across work surfaces.",
+			use: "Default body",
+		},
+		{
+			id: "caption",
+			role: "Caption",
+			className: "type-caption",
+			size: "14px",
+			line: "1.4",
+			weight: "500",
+			sample: "queued · 2m ago",
+			use: "Captions, labels, metadata, badge text",
+		},
+		{
+			id: "code",
+			role: "Mono",
+			className: "type-code",
+			size: "14px",
+			line: "1.6",
+			weight: "400",
+			sample: "trace:4f3a1c9e…",
+			use: "Trace IDs, code, JSON, shell snippets",
+		},
+	];
+
 	// Shell primitive fixtures.
 	let railStage = $state<WorkflowStage>("build");
 	let railCollapsed = $state(false);
@@ -468,6 +541,40 @@
 				renders with OKLCH semantic tokens and exposes data-* hooks for design-e2e.
 			</p>
 		</header>
+
+		<article
+			class="grid gap-5 rounded-md border border-border bg-card p-5"
+			data-design-kit-section="typography"
+			data-typography-source="DESIGN.md §2"
+		>
+			<header class="grid gap-1">
+				<p class="type-caption text-muted-foreground">DESIGN.md §2 typography</p>
+				<h2 class="type-h2">OD type scale</h2>
+				<p class="type-body max-w-[72ch] text-muted-foreground">
+					Inter Variable carries UI text. Fira Code carries trace IDs, code, JSON, and
+					shell snippets. Hierarchy uses semantic type roles, 400 / 500 / 600 weights,
+					and zero letter spacing.
+				</p>
+			</header>
+			<div class="grid gap-3" data-typography-roles>
+				{#each typographyRoles as role (role.id)}
+					<section
+						class="grid gap-3 rounded-md border border-border bg-surface-sunken p-4 sm:grid-cols-[minmax(9rem,12rem)_1fr_minmax(14rem,18rem)] sm:items-center"
+						data-type-role={role.id}
+						data-font-size={role.size}
+						data-line-height={role.line}
+						data-font-weight={role.weight}
+					>
+						<div class="grid gap-1">
+							<span class="type-caption text-muted-foreground">{role.role}</span>
+							<span class="type-code text-fg-subtle">{role.size} · line {role.line} · w{role.weight}</span>
+						</div>
+						<p class={role.className} data-type-sample={role.id}>{role.sample}</p>
+						<p class="type-caption text-muted-foreground">{role.use}</p>
+					</section>
+				{/each}
+			</div>
+		</article>
 
 		<article
 			class="grid gap-4 rounded-md border border-border bg-card p-5"
