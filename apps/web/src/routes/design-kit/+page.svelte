@@ -713,9 +713,11 @@
 			<div class="flex flex-wrap items-center gap-2">
 				<Button variant="primary" size="md" data-design-kit-button="primary-md">Primary md</Button>
 				<Button variant="danger" size="md" data-design-kit-button="danger-md">Danger md</Button>
-				<Button variant="outline" size="md" data-design-kit-button="outline-md">Outline md</Button>
+				<Button variant="secondary" size="md" data-design-kit-button="secondary-md">Secondary md</Button>
 				<Button variant="ghost" size="sm" data-design-kit-button="ghost-sm">Ghost sm</Button>
 				<Button variant="secondary" size="xs" data-design-kit-button="secondary-xs">Secondary xs</Button>
+				<Button variant="primary" size="sm" loading data-design-kit-button="loading-sm">Loading sm</Button>
+				<Button variant="ghost" size="sm" selected data-design-kit-button="selected-sm">Selected sm</Button>
 			</div>
 		</article>
 
