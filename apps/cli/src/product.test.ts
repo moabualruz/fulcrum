@@ -1813,7 +1813,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: Brief",
             },
-            prompt: "ACP prompt with submit_plan",
+            prompt: "AI Assist prompt with submit_plan",
           };
         },
         startFreeformWorkFromDocs: async (input: unknown) => {
@@ -1832,7 +1832,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: CLI freeform brief",
             },
-            prompt: "ACP start prompt with submit_plan",
+            prompt: "AI Assist start prompt with submit_plan",
           };
         },
         startGuidedAcpPlanningSession: async (input: unknown) => {
@@ -1860,7 +1860,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: Brief",
             },
-            prompt: "ACP guided session with submit_plan",
+            prompt: "AI Assist guided session with submit_plan",
           };
         },
         restartPlanningCycleFromUpdates: async (input: unknown) => {
@@ -1976,7 +1976,7 @@ describe("fulcrum product CLI", () => {
       "--cwd",
       "/repo",
       "--prompt",
-      "Plan with guided ACP",
+      "Plan with guided AI Assist",
       "--template",
       "prototype-first",
       "--source-docs",
@@ -2084,7 +2084,7 @@ describe("fulcrum product CLI", () => {
       acpSessionId: "acp-guided-cli",
       agentName: "codex",
       cwd: "/repo",
-      userPrompt: "Plan with guided ACP",
+      userPrompt: "Plan with guided AI Assist",
       promptTemplateId: "prototype-first",
       selectedDocIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
       projectId: "99999999-9999-4999-8999-999999999999",
@@ -2123,13 +2123,13 @@ describe("fulcrum product CLI", () => {
       successCriteria: ["Prototype and boilerplate artifacts are visible before approval."],
     }]);
     expect(JSON.parse(io.out[0] ?? "{}")).toMatchObject({
-      prompt: "ACP prompt with submit_plan",
+      prompt: "AI Assist prompt with submit_plan",
       context: { sourceRefs: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }] },
     });
     expect(JSON.parse(startIo.out[0] ?? "{}")).toMatchObject({
       status: "ready_for_planning",
       document: { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
-      prompt: "ACP start prompt with submit_plan",
+      prompt: "AI Assist start prompt with submit_plan",
     });
     expect(JSON.parse(guidedIo.out[0] ?? "{}")).toMatchObject({
       status: "ready_for_acp_prompt",

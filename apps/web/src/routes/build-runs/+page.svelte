@@ -135,7 +135,7 @@
     run: "bg-[var(--accent)]",
   };
 
-  /** ACP `tool_call` transcript shape (DESIGN.md §4.5). */
+  /** Protocol `tool_call` transcript shape (DESIGN.md §4.5). */
   type DiffLine = { kind: "ctx" | "add" | "del"; n: string; text: string };
   type ToolCall = {
     id: string;

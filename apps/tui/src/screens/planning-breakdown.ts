@@ -392,7 +392,7 @@ export class PlanningBreakdownScreen {
 
     if (this.guidedAcpStart) {
       renderer.writeln();
-      renderer.writeln(c.bold("  Guided ACP session"));
+      renderer.writeln(c.bold("  AI Assist session"));
       renderer.infoRow("Status", this.guidedAcpStart.status);
       if (this.guidedAcpStart.session) {
         renderer.infoRow(
@@ -417,7 +417,7 @@ export class PlanningBreakdownScreen {
 
     if (this.guidedAcpSessionAction) {
       renderer.writeln();
-      renderer.writeln(c.bold("  Guided ACP action"));
+      renderer.writeln(c.bold("  Planning session action"));
       renderer.infoRow("Status", this.guidedAcpSessionAction.status);
       renderer.infoRow("Session", this.guidedAcpSessionAction.session?.acpSessionId ?? "(none)");
       renderer.infoRow("Action", this.guidedAcpSessionAction.action?.method ?? "(none)");
@@ -432,7 +432,7 @@ export class PlanningBreakdownScreen {
       renderer.writeln(c.bold("  Continuous update"));
       renderer.infoRow("Status", this.continuousUpdate.status);
       renderer.infoRow("Trace", this.continuousUpdate.traceId ?? this.continuousUpdate.context?.traceId ?? "(none)");
-      renderer.infoRow("ACP", this.continuousUpdate.acpSessionId ?? "(none)");
+      renderer.infoRow("Protocol session", this.continuousUpdate.acpSessionId ?? "(none)");
       for (const doc of this.continuousUpdate.changedDocs ?? []) {
         renderer.writeln(`  doc ${doc.title ?? doc.id}`);
       }
@@ -515,7 +515,7 @@ export class PlanningBreakdownScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  r refresh  a acp  p acp action  n new freeform  u update  g generate  e execute artifact  x run cycle  m materialize  c context  q back"));
+    renderer.writeln(c.dim("  r refresh  a assist  p session action  n new freeform  u update  g generate  e execute artifact  x run cycle  m materialize  c context  q back"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -619,11 +619,11 @@ export class PlanningBreakdownScreen {
   private async startGuidedAcpPlanning(): Promise<void> {
     const start = this.opts.caller.planning.startGuidedAcpPlanningSession;
     if (!start) {
-      this.error = "Planning guided ACP caller unavailable.";
+      this.error = "Planning AI Assist session caller unavailable.";
       return;
     }
     if (!this.opts.guidedAcpInput) {
-      this.error = "Planning guided ACP input unavailable.";
+      this.error = "Planning AI Assist session input unavailable.";
       return;
     }
     try {
@@ -638,12 +638,12 @@ export class PlanningBreakdownScreen {
   private async recordGuidedAcpSessionAction(): Promise<void> {
     const record = this.opts.caller.planning.recordGuidedAcpSessionAction;
     if (!record) {
-      this.error = "Planning guided ACP session action caller unavailable.";
+      this.error = "Planning session action caller unavailable.";
       return;
     }
     const input = this.guidedAcpSessionActionInput();
     if (!input) {
-      this.error = "Planning guided ACP session action input unavailable.";
+      this.error = "Planning session action input unavailable.";
       return;
     }
     try {

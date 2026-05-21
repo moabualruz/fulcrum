@@ -1,8 +1,8 @@
 <script lang="ts">
 	/**
-	 * `/<ws>/projects/<projId>/plan/<sessionId>` — the Plan-stage Live ACP session
+	 * `/<ws>/projects/<projId>/plan/<sessionId>` — the Plan-stage live protocol session
 	 * workbench (`prd-web-plan-session-od-fidelity`; OD `plan-session.html`;
-	 * IA-MAP.md §2.2 "Live ACP session"; DESIGN.md §8 Live Session Pane).
+	 * IA-MAP.md §2.2 "Live protocol session"; DESIGN.md §8 Live Session Pane).
 	 *
 	 * The OD prototype renders the Plan live session as the verbatim DESIGN.md §8
 	 * three-column Live Session Pane:
@@ -45,8 +45,8 @@
 	import { page } from "$app/state";
 
 	/**
-	 * ACP `session/update` notification kinds that drive the transcript
-	 * (DESIGN.md §8: "ACP `session/update` notifications drive transcript").
+	 * Protocol `session/update` notification kinds that drive the transcript
+	 * (DESIGN.md §8: "`session/update` notifications drive transcript").
 	 */
 	type TrafficKind =
 		| "session/update"
@@ -55,7 +55,7 @@
 		| "tool_call_update"
 		| "trace_link";
 
-	/** One transcript / traffic row — an ACP session event. */
+	/** One transcript / traffic row — a protocol session event. */
 	type TrafficRow = { id: string; kind: TrafficKind; at: string; summary: string; payload: string };
 
 	/** A resumable planning session in the left sessions list. */
@@ -92,7 +92,7 @@
 	 * — the guided session shape the Plan dock summarizes (value-preservation
 	 * item 1: the typed mutation contract is not dropped by the migration).
 	 */
-	type AcpSession = {
+	type ACPSession = {
 		acpSessionId?: string;
 		projectId?: string;
 		traceId?: string;
@@ -109,8 +109,8 @@
 	const SESSION_ID = "plan_sess_auth_rewrite";
 	const SOURCE_DOC_ID = "doc_auth_rewrite";
 
-	/** The guided AI Assist session the dock summarizes (preserved AcpSession typing). */
-	const ACP_SESSION: AcpSession = {
+	/** The guided AI Assist session the dock summarizes (preserved protocol typing). */
+	const PROTOCOL_SESSION: ACPSession = {
 		acpSessionId: SESSION_ID,
 		traceId: TRACE_ID,
 		agentName: "codex",
@@ -234,7 +234,7 @@
 	});
 
 	/**
-	 * Submit the prompt — appends ACP stream traffic, or surfaces the COPY.md §3
+	 * Submit the prompt — appends protocol stream traffic, or surfaces the COPY.md §3
 	 * error. `error` holds only the `[why]. [exact next step]. trace=<id>`
 	 * remainder; the `[what failed]` sentence is the ErrorBanner title.
 	 */
@@ -514,7 +514,7 @@
 			</div>
 		</form>
 
-		<!-- Transcript — the ACP traffic stream + selected-event raw tool-call detail. -->
+		<!-- Transcript — the protocol traffic stream + selected-event raw tool-call detail. -->
 		<div class="grid min-h-0 flex-1 2xl:grid-cols-[minmax(0,1fr)_minmax(17rem,22rem)]">
 			<div
 				data-slot="transcript-stream"
@@ -643,10 +643,10 @@
 						</li>
 					{/each}
 				</ul>
-				<Card class="grid gap-1 p-3" data-acp-session={ACP_SESSION.acpSessionId}>
+				<Card class="grid gap-1 p-3" data-acp-session={PROTOCOL_SESSION.acpSessionId}>
 					<span class="text-xs font-semibold text-foreground">Guided session</span>
 					<span class="font-mono text-[11px] text-muted-foreground">
-						{ACP_SESSION.agentName} · {ACP_SESSION.modeId} · {ACP_SESSION.permissionMode}
+						{PROTOCOL_SESSION.agentName} · {PROTOCOL_SESSION.modeId} · {PROTOCOL_SESSION.permissionMode}
 					</span>
 				</Card>
 			</TabsContent>

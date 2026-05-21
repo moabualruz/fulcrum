@@ -43,7 +43,7 @@
           class={cn("h-9 rounded-md border border-input bg-background px-3 py-1 text-sm")}
         >
           <option value="manual_doc_edit">Manual doc edit</option>
-          <option value="acp_session_update">ACP session update</option>
+          <option value="acp_session_update">Protocol session update</option>
         </select>
       </label>
       <label class={cn("grid gap-1 text-sm")}>

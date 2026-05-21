@@ -15,7 +15,7 @@
  *     permission prompts. It is a screen swap, NOT a web-style overlay drawer
  *     (CLI-TUI-UX.md §6.1).
  *
- * Both keep the copy as "AI Assist" — never the raw "ACP" acronym.
+ * Both keep the copy as "AI Assist" instead of the raw protocol acronym.
  */
 
 import type { TaskAiAssistSessionInput } from "@agent-client-protocol/application/task-ai-assist-session.ts";

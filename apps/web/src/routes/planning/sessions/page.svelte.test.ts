@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 
-// `prd-web-plan-session-od-fidelity` folded the guided/freeform ACP session
+// `prd-web-plan-session-od-fidelity` folded the guided/freeform AI Assist session
 // controls into the canonical `/plan-session` workbench. `/planning/sessions`
 // is now a 200 redirect stub that keeps resolving (migration-strategy.md
 // value-preservation item 2). The guided/freeform action surface lives on in
