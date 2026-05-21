@@ -16,6 +16,15 @@ action.
 ## Preserved artifact
 
 - `+page.svelte.preserved` — the full route content, verbatim.
+- `operate-alerts.spec.ts.preserved` — the original login-sessions design-e2e
+  spec, verbatim (device/browser/IP session list, current-session marker,
+  revoke-with-confirmation, bulk revoke-other-sessions, audit entries).
+  Preserved by `prd-web-operate-alerts-console-od-fidelity` when it rebuilt
+  `apps/web/tests/design-e2e/operate-alerts.spec.ts` as the OD Alerts console
+  spec. The account-security PRD lifts this spec into the Settings
+  active-sessions panel coverage, renaming `data-operate-alerts-*` /
+  `data-session-*` / `data-revoke-*` hooks to `data-account-sessions-*` — no
+  session-management test coverage is lost.
 
 ## Disposition
 
