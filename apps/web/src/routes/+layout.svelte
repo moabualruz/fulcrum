@@ -58,6 +58,7 @@
 
 	let mobile = $state(isMobileViewport(browserDriver()));
 	let paletteOpen = $state(false);
+	let modifierChordUsed = false;
 	let shortcutHelpOpen = $state(false);
 	let inferenceStatus = $state<InferenceStatus>("unknown");
 
@@ -73,6 +74,7 @@
 	let aiSessionActive = $state(true);
 	let aiSelectedAgent = $state("claude-code");
 	let aiSavedNotice = $state("");
+	let aiComposerTextarea = $state<HTMLTextAreaElement | null>(null);
 	const aiDrawerSide = $derived<AcpDrawerSide>(mobile ? "bottom" : "right");
 	const activeMobileStage = $derived(stageForNavPath(page.url.pathname));
 
@@ -277,6 +279,13 @@
 		};
 	});
 
+	$effect(() => {
+		if (!aiAssistOpen || typeof window === "undefined") return;
+		requestAnimationFrame(() => {
+			aiComposerTextarea?.focus();
+		});
+	});
+
 	onMount(() => {
 		window.addEventListener("keydown", onGlobalKeydown);
 		window.addEventListener("keyup", onGlobalKeyup);
@@ -304,6 +313,13 @@
 		const target = event.target as HTMLElement | null;
 		const tag = typeof target?.tagName === "string" ? target.tagName.toLowerCase() : "";
 		const inTextField = tag === "input" || tag === "textarea" || target?.isContentEditable === true;
+		if ((event.metaKey || event.ctrlKey) && event.key !== "Meta" && event.key !== "Control") {
+			modifierChordUsed = true;
+		}
+		if (event.key === "Escape" && aiAssistOpen) {
+			aiAssistOpen = false;
+			return;
+		}
 		// ⌘/ (or Ctrl+/) toggles the AI Assist drawer from any route. The meta/ctrl
 		// modifier makes it a deliberate chord, so it fires inside text fields too
 		// without stealing a literal "/" keystroke (IA-MAP.md §5 "⌘/ from anywhere").
@@ -362,6 +378,10 @@
 
 	function onGlobalKeyup(event: KeyboardEvent) {
 		if (event.key === "Meta" || event.key === "Control") {
+			if (modifierChordUsed) {
+				modifierChordUsed = false;
+				return;
+			}
 			const target = event.target as HTMLElement | null;
 			const tag = target?.tagName.toLowerCase();
 			if (tag !== "input" && tag !== "textarea" && target?.isContentEditable !== true) {
@@ -468,6 +488,7 @@
 	{#snippet composer()}
 		<div class="grid gap-2" data-ai-assist-composer>
 			<textarea
+				bind:this={aiComposerTextarea}
 				class="min-h-16 resize-y rounded-sm border border-border bg-surface p-2 text-sm text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				aria-label="AI Assist composer"
 				placeholder="type or paste; @ to mention scope…"
