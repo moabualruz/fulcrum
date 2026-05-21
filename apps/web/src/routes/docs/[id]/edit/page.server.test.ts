@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 interface DocPayload {
   id: string;
@@ -34,6 +34,18 @@ const DOC: DocPayload = {
   bodyMd: "the body\n",
   frontmatter: { title: "EditMe", kind: "spec", labels: ["x", "y"] },
 };
+
+// The route resolves its public-API base URL from FULCRUM_SERVER_URL and only
+// takes the HTTP/public-API path when that env var is set. Pin it to the host
+// the mock fetch responds on so the route exercises the public document API.
+const PREVIOUS_SERVER_URL = process.env["FULCRUM_SERVER_URL"];
+beforeAll(() => {
+  process.env["FULCRUM_SERVER_URL"] = "http://localhost";
+});
+afterAll(() => {
+  if (PREVIOUS_SERVER_URL === undefined) delete process.env["FULCRUM_SERVER_URL"];
+  else process.env["FULCRUM_SERVER_URL"] = PREVIOUS_SERVER_URL;
+});
 
 describe("/docs/[id]/edit +page.server.ts", () => {
   test("server route uses the document public API instead of direct application scope", () => {
