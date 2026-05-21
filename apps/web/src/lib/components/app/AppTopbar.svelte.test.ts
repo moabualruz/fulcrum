@@ -124,6 +124,7 @@ describe("AppTopbar component", () => {
     });
 
     expect(body).toMatch(/<button\b[^>]*data-notification-bell/);
+    expect(body).toMatch(/<button\b[^>]*data-notification-bell[^>]*aria-expanded="false"/);
     expect(body).toMatch(/<span\b[^>]*data-notification-badge[^>]*>3<\/span>/);
     expect(body).toContain("Task assigned");
     expect(body).toContain("Doc mentioned");
