@@ -147,7 +147,9 @@ describe("StatusFooter (StatusBarWidget)", () => {
       mcpHealth: "7/7",
       traceId: "4f3a1c9e8b2d4a6f",
       time: "14:02",
-      width: 120,
+      // Wide enough that no segment is ellipsized — this test exercises the
+      // full segment set; the width-starved ellipsis path has its own test.
+      width: 160,
     });
     const line = stripAnsi(sb.render());
     expect(line).toContain("CAPTURE");
