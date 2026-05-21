@@ -1,6 +1,7 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { TuiSubscription, SubscriptionBridge } from "../subscriptions.ts";
+import { StatusBarWidget } from "../widgets/StatusBar.ts";
 import {
   renderStatusBadge,
   renderWorkbenchEmptyState,
@@ -16,6 +17,8 @@ export interface TuiRun {
   projectName?: string | null;
   startedAt?: string | Date | null;
   logLines?: string[];
+  traceId?: string | null;
+  spanId?: string | null;
   observability?: TuiRunObservability;
 }
 
@@ -168,6 +171,8 @@ export interface RunDetailScreenOptions {
   };
   /** caller subscription path: TuiCaller.runsSubscriptions -> EventBus-backed runsSubscriptions. */
   subscriptions?: SubscriptionBridge;
+  traceId?: string | null;
+  spanId?: string | null;
 }
 
 export interface RunUpdatePayload {
@@ -180,6 +185,7 @@ export class RunDetailScreen {
   private run: TuiRun | null = null;
   private logLines: string[] = [];
   private subscriptions: TuiSubscription[] = [];
+  private activeDock: RunDockTab = "shell";
 
   constructor(private readonly opts: RunDetailScreenOptions) {}
 
@@ -205,7 +211,8 @@ export class RunDetailScreen {
     }
 
     renderer.writeln(`  ${renderStatusBadge(this.run.status)} agent:${this.run.agent}  ${this.run.projectName ?? "no project"}  ${this.run.taskTitle ?? ""}`);
-    renderer.writeln(c.dim("  Shell  Files  Browser  Plan  Cost"));
+    this.renderDockTabs(renderer);
+    this.renderDockPane(renderer);
     if (resolveStatusBadgeState(this.run.status) === "complete") {
       renderer.writeln();
       renderer.writeln(c.green("  Run completed"));
@@ -216,11 +223,18 @@ export class RunDetailScreen {
     for (const line of this.logLines) renderer.writeln(`  ${line}`);
     this.renderObservability(renderer, this.run.observability);
     renderer.writeln();
-    renderer.writeln(c.dim("  x cancel  q back"));
+    renderer.writeln(c.dim("  s/f/b/p/c dock tabs  x cancel  q back"));
+    this.renderFooter(renderer);
   }
 
   async handleKey(key: string): Promise<boolean> {
-    if (key !== "x" || !this.run) return false;
+    if (!this.run) return false;
+    const dock = RUN_DOCK_KEYS[key];
+    if (dock) {
+      this.activeDock = dock;
+      return true;
+    }
+    if (key !== "x") return false;
     await this.opts.caller.agent_runs.cancel({ id: this.run.id });
     this.run = { ...this.run, status: "cancelled" };
     return true;
@@ -278,4 +292,81 @@ export class RunDetailScreen {
       );
     }
   }
+
+  private renderDockTabs(renderer: Renderer): void {
+    const tabs = RUN_DOCK_TABS.map((tab) => {
+      const label = tab === this.activeDock ? c.inverse(` ${dockLabel(tab)} `) : ` ${dockLabel(tab)} `;
+      return label;
+    });
+    renderer.writeln(`  ${tabs.join(" ")}`);
+  }
+
+  private renderDockPane(renderer: Renderer): void {
+    renderer.writeln();
+    renderer.writeln(c.bold(`  ${dockLabel(this.activeDock)} dock`));
+    const run = this.run;
+    if (!run) return;
+    switch (this.activeDock) {
+      case "shell":
+        renderer.writeln(`  ${run.agent} shell attached to ${run.id}`);
+        renderer.writeln(`  ${this.logLines.length} transcript lines available.`);
+        return;
+      case "files":
+        for (const artifact of run.observability?.artifacts ?? []) {
+          renderer.writeln(`  ${artifact.filename ?? artifact.title ?? "artifact"}  ${artifact.lifecycleState ?? ""}`);
+        }
+        if ((run.observability?.artifacts ?? []).length === 0) renderer.writeln("  No file artifacts yet.");
+        return;
+      case "browser":
+        renderer.writeln(`  Browser preview scoped to ${run.projectName ?? "project"}.`);
+        return;
+      case "plan":
+        for (const task of run.observability?.followUpTasks ?? []) {
+          renderer.writeln(`  ${String(task["title"] ?? task["id"] ?? "task")}`);
+        }
+        if ((run.observability?.followUpTasks ?? []).length === 0) renderer.writeln(`  Plan strip follows ${run.taskTitle ?? run.id}.`);
+        return;
+      case "cost":
+        renderer.writeln(`  agent:${run.agent}  status:${run.status}`);
+        return;
+    }
+  }
+
+  private renderFooter(renderer: Renderer): void {
+    if (!this.run) return;
+    const footer = new StatusBarWidget({
+      currentScreen: "RUN",
+      orgName: this.run.projectName ?? "dev",
+      branch: "dev/v1.0",
+      run: this.run.id,
+      runId: this.run.id,
+      traceId: this.run.traceId ?? this.opts.traceId ?? null,
+      spanId: this.run.spanId ?? this.opts.spanId ?? null,
+      agent: this.run.agent,
+      mcpHealth: "0/0",
+      width: renderer.width,
+    });
+    renderer.writeln(footer.render());
+  }
+}
+
+type RunDockTab = "shell" | "files" | "browser" | "plan" | "cost";
+
+const RUN_DOCK_TABS: readonly RunDockTab[] = ["shell", "files", "browser", "plan", "cost"];
+
+const RUN_DOCK_KEYS: Record<string, RunDockTab> = {
+  s: "shell",
+  f: "files",
+  b: "browser",
+  p: "plan",
+  c: "cost",
+  "1": "shell",
+  "2": "files",
+  "3": "browser",
+  "4": "plan",
+  "5": "cost",
+};
+
+function dockLabel(tab: RunDockTab): string {
+  return tab[0]!.toUpperCase() + tab.slice(1);
 }

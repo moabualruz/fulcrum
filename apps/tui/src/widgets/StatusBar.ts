@@ -176,7 +176,10 @@ export class StatusBarWidget {
    * layer can yank each id with `y t` / `y r` / `y s`.
    */
   segments(): StatusFooterSegment[] {
-    const trace = this.traceId ? `trace:${traceBadge(this.traceId)}` : "trace:unavailable";
+    const trace = [
+      this.traceId ? `trace:${traceBadge(this.traceId)}` : "trace:unavailable",
+      this.spanId ? `span:${this.spanId}` : null,
+    ].filter(Boolean).join(" ");
     const help = this.bellCount > 0 ? `? 🔔${this.bellCount}` : "?";
     return [
       { id: "mode", label: this.currentScreen.toUpperCase() },

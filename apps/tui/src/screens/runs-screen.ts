@@ -24,8 +24,7 @@
  *   R      : retry failed run
  *   P      : preview dependency tree
  *   A      : reassign agent
- *   m …    : Step mode picker chord: m a ✋ Manual / m p ▶ Play /
- *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
+ *   m/p/d/a: Step mode picker: ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist
  *   j/k    : navigate
  *   Enter  : open run detail
  *   q      : go back
@@ -67,6 +66,10 @@ export interface StageWorkbenchScope {
   mcp?: string | null;
   /** Current trace id (OD footer `trace tr_8f29a4c…`). */
   traceId?: string | null;
+  /** Focused run id for footer identity (`y r`). */
+  runId?: string | null;
+  /** Focused span id for footer identity (`y s`). */
+  spanId?: string | null;
   /** Active workspace profile (OD footer `profile: dev`). */
   profile?: string | null;
 }
@@ -90,7 +93,7 @@ export function renderStageWorkbenchHeader(renderer: Renderer, scope: StageWorkb
 /**
  * Render the workbench footer: the OD `tui-runs.html` `.term-foot` strip.
  * Segment order mirrors `StatusBar` / the web `StatusFooter`:
- *   MODE · profile · branch · agent · mcp ···· trace · ? · :
+ *   MODE · profile · branch · run · agent · mcp ···· trace · span · ? · :
  * The MODE pill is the upper-cased stage name so each workbench is identifiable.
  *
  * The strip is a single line and never collapses (CONTEXT.md StatusFooter). On
@@ -101,11 +104,17 @@ export function renderStageWorkbenchHeader(renderer: Renderer, scope: StageWorkb
 export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkbenchScope): void {
   const width = Math.max(20, renderer.width);
   const mode = c.inverse(` ${scope.stage.toUpperCase()} `);
-  const right = [`trace ${shortTrace(scope.traceId)}`, "?", ":"];
+  const right = [
+    `trace ${shortIdentity(scope.traceId)}`,
+    `span ${shortIdentity(scope.spanId)}`,
+    "?",
+    ":",
+  ];
   const rightPlain = right.join("  ");
   // Left segments in priority order; drop trailing ones (agent, mcp) first.
   const prioritized = [
     `profile: ${scope.profile ?? "dev"}`,
+    `run: ${scope.runId ?? "-"}`,
     scope.project ?? "-",
     `agent: ${scope.agent ?? "any"}`,
     `mcp ${scope.mcp ?? "0/0"}`,
@@ -125,10 +134,10 @@ export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkb
   renderer.writeln(truncateWide(line, width));
 }
 
-/** Short-form trace id for the footer (OD `tr_8f29a4c…`). */
-function shortTrace(traceId?: string | null): string {
-  if (!traceId) return "-";
-  return traceId.length > 10 ? `${traceId.slice(0, 9)}…` : traceId;
+/** Short-form identity id for the footer (OD `tr_8f29a4c…`). */
+function shortIdentity(id?: string | null): string {
+  if (!id) return "-";
+  return id.length > 10 ? `${id.slice(0, 9)}…` : id;
 }
 
 /**
@@ -391,6 +400,8 @@ export class RunsControlScreen {
       agent: focused?.agent ?? null,
       mcp: this.opts.mcp ?? null,
       traceId: this.opts.traceId ?? null,
+      runId: focused?.id ?? null,
+      spanId: focused ? `span:${focused.id}` : null,
     };
   }
 
@@ -514,16 +525,16 @@ export class RunsControlScreen {
       return true;
     }
 
-    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`) selects a
-    // mode on the focused run Step without shadowing the action keys below.
-    if (this.modePicker.handleChordKey(key)) return true;
+    // Lowercase p/d/m/a are owned by the focused Step ModePicker. Uppercase
+    // action keys keep the workbench commands addressable.
+    if (this.modePicker.handleKey(key)) return true;
 
-    if (key === "D" || key === "d") {
+    if (key === "D") {
       this.overlay = "dispatch";
       return true;
     }
 
-    if (key === "A" || key === "a") {
+    if (key === "A") {
       const run = this.runs[this.cursor];
       this.overlay = "reassign";
       if (run) {
@@ -560,7 +571,7 @@ export class RunsControlScreen {
       return true;
     }
 
-    if (key === "P" || key === "p") {
+    if (key === "P") {
       const run = this.runs[this.cursor];
       if (!run) return false;
       try {
