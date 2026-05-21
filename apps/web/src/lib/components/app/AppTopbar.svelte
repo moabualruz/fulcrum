@@ -23,6 +23,7 @@
 		traceId?: string | null;
 		bellCount?: number;
 		bellItems?: Array<{ id: string; kind: string; title: string }>;
+		mobile?: boolean;
 	}
 
 	let {
@@ -35,6 +36,7 @@
 		traceId = null,
 		bellCount = 0,
 		bellItems = [],
+		mobile = false,
 	}: Props = $props();
 
 	const densityModes: Array<{ id: DensityMode; label: string }> = [
@@ -112,6 +114,7 @@
 <ScopeBar
 	data-app-topbar
 	brand="Fulcrum"
+	variant={mobile ? "mobile" : "desktop"}
 	workspacePath={workspacePath}
 	activeStage={activeStage}
 	onSelectStage={selectStage}

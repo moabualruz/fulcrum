@@ -92,13 +92,13 @@
 		</div>
 		<div class="flex items-center gap-2">
 			<Badge data-slot="capture-count">{steps.length} captures</Badge>
-			<div
-				role="group"
-				aria-label="Block actions"
-				data-slot="capture-block-actions"
-				data-safe-area-reserve="bottom"
-				class="fixed inset-x-3 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom)+0.75rem)] z-20 flex justify-center gap-1 rounded-sm border border-border bg-surface/95 p-1 shadow-sm sm:static sm:inset-auto sm:bg-transparent sm:p-0 sm:shadow-none"
-			>
+				<div
+					role="group"
+					aria-label="Block actions"
+					data-slot="capture-block-actions"
+					data-safe-area-reserve="bottom"
+					class="fixed right-3 left-3 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom)+0.75rem)] z-20 flex max-w-[calc(100vw-1.5rem)] justify-center gap-1 rounded-sm border border-border bg-surface/95 p-1 shadow-sm sm:static sm:inset-auto sm:max-w-none sm:bg-transparent sm:p-0 sm:shadow-none"
+				>
 				<Button size="sm" variant="ghost" data-block-action="write">Write</Button>
 				<Button size="sm" variant="ghost" data-block-action="link">Link</Button>
 				<Button size="sm" variant="ghost" data-block-action="promote">Promote</Button>
