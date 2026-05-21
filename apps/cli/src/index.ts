@@ -462,12 +462,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "operate": {
       const { run: runOperate } = await import("./commands/operate-plugins.ts");
-      await runOperate(rest);
+      await runOperate(rest, { invocationRoot: "operate" });
       return;
     }
     case "plugin": {
+      // `fulcrum plugin …` is the CLI-TUI-UX.md §1.6 root alias for
+      // `fulcrum operate plugin …`. It reaches the same Operate plugin host;
+      // `invocationRoot: "plugin"` keeps the `fulcrum.cli.v1` envelope honest
+      // about which canonical grammar the operator used.
       const { run: runOperate } = await import("./commands/operate-plugins.ts");
-      await runOperate(rest);
+      await runOperate(["plugin", ...rest], { invocationRoot: "plugin" });
       return;
     }
     case "ai": {

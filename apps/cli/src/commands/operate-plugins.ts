@@ -37,6 +37,16 @@ import { ALL_AGENT_IDS, type AgentId } from "../mcp-registry.ts";
 import { listMarkers } from "../claude-plugin-markers.ts";
 import { run as runTrace } from "./trace.ts";
 
+/**
+ * How the plugin grammar was reached. `fulcrum operate plugin …` is the
+ * canonical Operate-stage spelling; `fulcrum plugin …` is the equally-canonical
+ * root alias listed in CLI-TUI-UX.md §1.6. Both reach this host; the value is
+ * echoed into the `fulcrum.cli.v1` envelope `command` field so the envelope is
+ * honest about which grammar the operator used (closure review: both
+ * `operate plugin list` and `plugin list` must be reachable + envelope-safe).
+ */
+export type PluginInvocationRoot = "operate" | "plugin";
+
 /** Options accepted by the Operate-stage host. */
 export interface OperatePluginsOptions {
   print?: (line: string) => void;
@@ -46,6 +56,13 @@ export interface OperatePluginsOptions {
   loadPlugins?: () => Promise<readonly ClaudePluginMarker[]>;
   /** Process env — drives the `fulcrum.cli.v1` envelope colour/trace context. */
   env?: NodeJS.ProcessEnv;
+  /**
+   * The root the invocation entered through. `"operate"` (default) is the
+   * canonical Operate-stage grammar; `"plugin"` is the CLI-TUI-UX.md §1.6 root
+   * alias. Drives the `command` prefix in the canonical envelope so a root
+   * `fulcrum plugin list` reports `plugin list`, not `operate plugin list`.
+   */
+  invocationRoot?: PluginInvocationRoot;
 }
 
 /** A Claude plugin marker row, as surfaced by `plugin list` / `plugin show`. */
@@ -168,6 +185,28 @@ function isHelpVerb(verb: string | undefined): boolean {
 }
 
 /**
+ * The `command` prefix for a plugin verb's `fulcrum.cli.v1` envelope.
+ *
+ * `fulcrum operate plugin list` reports `operate plugin <verb>`; the
+ * CLI-TUI-UX.md §1.6 root alias `fulcrum plugin list` reports `plugin <verb>`.
+ * The envelope is therefore honest about which canonical grammar produced it,
+ * so a parity test can assert both spellings are envelope-safe.
+ */
+function pluginCommandPrefix(root: PluginInvocationRoot): string {
+  return root === "plugin" ? "plugin" : "operate plugin";
+}
+
+/**
+ * Pre-envelope raw-array compatibility: a `--json` invocation may opt back into
+ * the bare result payload (no `fulcrum.cli.v1` wrapper) with `--json-raw`. This
+ * is the documented one-release compatibility flag (apps/cli CONTEXT.md). The
+ * default `--json` path always emits the canonical envelope.
+ */
+function wantsRawJson(args: readonly string[]): boolean {
+  return args.includes("--json-raw");
+}
+
+/**
  * Resolved per-agent scope for a mutation (CLI-TUI-UX.md §1.8).
  * `"all"` means `--all-agents`; an array means explicit `--agent` ids; an empty
  * array means the default active-agent-only scope.
@@ -220,37 +259,41 @@ function scopeAgentIds(scope: AgentScope): AgentId[] {
 }
 
 /**
- * `fulcrum operate plugin list` — the read-only plugin-marker listing.
- * Preserved verbatim from the original `operate-plugins.ts` `list` verb so the
- * existing co-located test contract holds; `--agent` is accepted (CLI-TUI-UX.md
- * §1.8) and recorded but the marker source is agent-spanning today.
+ * `fulcrum operate plugin list` / `fulcrum plugin list` — the read-only
+ * plugin-marker listing. `--agent` is accepted (CLI-TUI-UX.md §1.8) and recorded
+ * but the marker source is agent-spanning today.
+ *
+ * `--json` always emits the canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX.md
+ * §3) — never a bare array — regardless of whether a test loader is injected.
+ * `--json-raw` opts back into the pre-envelope array payload (the documented
+ * one-release compatibility flag). The closure review found `plugin list`
+ * emitting a raw array; that path is now envelope-safe on every root.
  */
 async function runPluginList(
   rest: readonly string[],
   io: OperateIo,
   opts: OperatePluginsOptions,
 ): Promise<void> {
-  const injectedLoader = typeof opts.loadPlugins === "function";
   const plugins = await loadOrFail({ printErr: io.printErr, exit: io.exit, ...opts });
   if (!plugins) return;
-  if (rest.includes("--json") && !injectedLoader) {
+  const root = opts.invocationRoot ?? "operate";
+  if (rest.includes("--json")) {
+    if (wantsRawJson(rest)) {
+      io.print(JSON.stringify(plugins));
+      return;
+    }
+    const scope = parseAgentScope(rest).scope;
     emitResult(
       {
         argv: rest,
-        command: "operate plugin list",
+        command: `${pluginCommandPrefix(root)} list`,
         result: plugins,
-        args: {
-          agents: parseAgentScope(rest).scope.kind === "all" ? ALL_AGENT_IDS : scopeAgentIds(parseAgentScope(rest).scope),
-        },
+        args: { agents: scopeAgentIds(scope) },
         env: opts.env,
         renderHuman: () => {},
       },
       io,
     );
-    return;
-  }
-  if (rest.includes("--json")) {
-    io.print(JSON.stringify(plugins));
     return;
   }
   if (plugins.length === 0) {
@@ -264,17 +307,41 @@ async function runPluginList(
 }
 
 /**
- * `fulcrum operate plugin show <id>` — the read-only plugin-marker detail.
- * Preserved verbatim from the original `show` verb (compatibility contract).
+ * `fulcrum operate plugin show <id>` / `fulcrum plugin show <id>` — the
+ * read-only plugin-marker detail.
+ *
+ * `--json` emits the canonical `fulcrum.cli.v1` envelope; `--json-raw` opts
+ * back into the bare marker payload (the documented one-release compatibility
+ * flag). An unknown id emits a coded canonical error envelope under `--json`.
  */
 async function runPluginShow(
   rest: readonly string[],
   io: OperateIo,
   opts: OperatePluginsOptions,
 ): Promise<void> {
+  const root = opts.invocationRoot ?? "operate";
+  const commandPrefix = pluginCommandPrefix(root);
   const id = rest.find((arg) => !arg.startsWith("--"));
   if (!id) {
-    io.printErr("fulcrum operate plugins show: missing required argument <id>");
+    if (rest.includes("--json")) {
+      emitErrorResult(
+        {
+          argv: rest,
+          command: `${commandPrefix} show`,
+          error: {
+            code: "FUL_OPERATE_PLUGIN_MISSING_NAME",
+            message: `\`fulcrum ${commandPrefix} show\` requires a plugin id.`,
+            fix: `Pass a plugin id: \`fulcrum ${commandPrefix} show <id>\`.`,
+            doc: "CLI-TUI-UX.md §1.6",
+          },
+          env: opts.env,
+          renderHuman: () => {},
+        },
+        io,
+      );
+      return;
+    }
+    io.printErr(`fulcrum ${commandPrefix} show: missing required argument <id>`);
     io.exit(2);
     return;
   }
@@ -282,12 +349,44 @@ async function runPluginShow(
   if (!plugins) return;
   const target = plugins.find((plugin) => plugin.id === id);
   if (!target) {
-    io.printErr(`fulcrum operate plugins show: unknown plugin id '${id}'`);
+    if (rest.includes("--json")) {
+      emitErrorResult(
+        {
+          argv: rest,
+          command: `${commandPrefix} show`,
+          error: {
+            code: "FUL_OPERATE_PLUGIN_UNKNOWN_ID",
+            message: `'${id}' is not a known plugin id.`,
+            fix: `List installed markers with \`fulcrum ${commandPrefix} list\`.`,
+            doc: "CLI-TUI-UX.md §1.6",
+          },
+          env: opts.env,
+          renderHuman: () => {},
+        },
+        io,
+      );
+      return;
+    }
+    io.printErr(`fulcrum ${commandPrefix} show: unknown plugin id '${id}'`);
     io.exit(1);
     return;
   }
   if (rest.includes("--json")) {
-    io.print(JSON.stringify(target));
+    if (wantsRawJson(rest)) {
+      io.print(JSON.stringify(target));
+      return;
+    }
+    emitResult(
+      {
+        argv: rest,
+        command: `${commandPrefix} show`,
+        result: target,
+        args: { id },
+        env: opts.env,
+        renderHuman: () => {},
+      },
+      io,
+    );
     return;
   }
   io.print(`${target.id} ${target.enabled ? "enabled" : "disabled"} via ${target.source}`);
@@ -311,17 +410,19 @@ function runPluginMutation(
   io: OperateIo,
   opts: OperatePluginsOptions,
 ): void {
+  const root = opts.invocationRoot ?? "operate";
+  const commandPrefix = pluginCommandPrefix(root);
   const name = rest.find((arg) => !arg.startsWith("-"));
   const wantsAll = verb === "update" && rest.includes("--all");
   if (!name && !wantsAll) {
     emitErrorResult(
       {
         argv: rest,
-        command: `plugin ${verb}`,
+        command: `${commandPrefix} ${verb}`,
         error: {
           code: "FUL_OPERATE_PLUGIN_MISSING_NAME",
-          message: `\`fulcrum operate plugin ${verb}\` requires a plugin name.`,
-          fix: `Pass a plugin name: \`fulcrum operate plugin ${verb} <name>\`.`,
+          message: `\`fulcrum ${commandPrefix} ${verb}\` requires a plugin name.`,
+          fix: `Pass a plugin name: \`fulcrum ${commandPrefix} ${verb} <name>\`.`,
           doc: "CLI-TUI-UX.md §1.6",
         },
         env: opts.env,
@@ -337,7 +438,7 @@ function runPluginMutation(
     emitErrorResult(
       {
         argv: rest,
-        command: `plugin ${verb}`,
+        command: `${commandPrefix} ${verb}`,
         error: {
           code: "FUL_OPERATE_PLUGIN_UNKNOWN_AGENT",
           message: parsed.invalidAgent
@@ -358,7 +459,7 @@ function runPluginMutation(
   emitErrorResult(
     {
       argv: rest,
-      command: `plugin ${verb}`,
+      command: `${commandPrefix} ${verb}`,
       args: {
         plugin: name ?? (wantsAll ? "--all" : null),
         // The resolved §1.8 scope — observable in the envelope for parity tests.
@@ -369,7 +470,7 @@ function runPluginMutation(
       error: {
         code: "FUL_OPERATE_PLUGIN_UNAVAILABLE",
         message:
-          `\`fulcrum operate plugin ${verb}\` (scope: ${describeScope(scope)}) is not ` +
+          `\`fulcrum ${commandPrefix} ${verb}\` (scope: ${describeScope(scope)}) is not ` +
           "available — no cross-agent plugin server is configured.",
         fix:
           "Cross-agent plugin install is staged behind the plugins.cross_agent feature " +
@@ -389,6 +490,8 @@ async function runPluginGroup(
   io: OperateIo,
   opts: OperatePluginsOptions,
 ): Promise<void> {
+  const root = opts.invocationRoot ?? "operate";
+  const commandPrefix = pluginCommandPrefix(root);
   const [verb = "help", ...verbRest] = rest;
 
   if (isHelpVerb(verb)) {
@@ -396,7 +499,25 @@ async function runPluginGroup(
     return;
   }
   if (!PLUGIN_VERBS.includes(verb as PluginVerb)) {
-    io.printErr(`fulcrum operate plugin: unknown command '${verb}'`);
+    if (rest.includes("--json")) {
+      emitErrorResult(
+        {
+          argv: rest,
+          command: `${commandPrefix} ${verb}`,
+          error: {
+            code: "FUL_OPERATE_PLUGIN_UNKNOWN_VERB",
+            message: `\`${verb}\` is not a known \`fulcrum ${commandPrefix}\` verb.`,
+            fix: `Use one of: ${PLUGIN_VERBS.join(", ")}.`,
+            doc: "CLI-TUI-UX.md §1.6",
+          },
+          env: opts.env,
+          renderHuman: () => {},
+        },
+        io,
+      );
+      return;
+    }
+    io.printErr(`fulcrum ${commandPrefix}: unknown command '${verb}'`);
     io.printErr(PLUGIN_HELP);
     io.exit(2);
     return;

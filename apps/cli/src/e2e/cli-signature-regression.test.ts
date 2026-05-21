@@ -142,6 +142,71 @@ describe("CLI-TUI-UX canonical bin dispatch contract", () => {
   });
 });
 
+/**
+ * CLI-TUI-UX.md §1.6: `fulcrum operate plugin …` and the root alias
+ * `fulcrum plugin …` must BOTH be reachable through the actual bin and BOTH
+ * emit the canonical `fulcrum.cli.v1` envelope — never a raw array. This block
+ * is the consumed-by proof for `prd-cli-operate-plugin-envelope-and-root-plugin`:
+ * a parity check fails if the host exists but the bin does not dispatch it, or
+ * if a live `--json` path falls back to a bare payload.
+ */
+describe("operate plugin envelope + root plugin alias", () => {
+  function runBin(args: readonly string[]) {
+    return spawnSync("bun", ["apps/cli/src/main.ts", ...args], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+  }
+
+  test("`operate plugin list --json` emits the canonical envelope, not a raw array", () => {
+    const proc = runBin(["operate", "plugin", "list", "--json"]);
+    expect(proc.status).toBe(0);
+    const parsed = JSON.parse(proc.stdout) as Record<string, unknown>;
+    expect(Array.isArray(parsed)).toBe(false);
+    expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+    expect(parsed["command"]).toBe("operate plugin list");
+    expect(Array.isArray(parsed["result"])).toBe(true);
+    expect(Array.isArray(parsed["errors"])).toBe(true);
+  }, 20_000);
+
+  test("root `plugin list --json` is reachable and reports the root grammar", () => {
+    const proc = runBin(["plugin", "list", "--json"]);
+    expect(`${proc.stdout}\n${proc.stderr}`).not.toContain("unknown command 'plugin'");
+    expect(proc.status).toBe(0);
+    const parsed = JSON.parse(proc.stdout) as Record<string, unknown>;
+    expect(Array.isArray(parsed)).toBe(false);
+    expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+    expect(parsed["command"]).toBe("plugin list");
+  }, 20_000);
+
+  test("`operate plugin enable --agent codex --json` emits a coded error envelope", () => {
+    const proc = runBin(["operate", "plugin", "enable", "caveman", "--agent", "codex", "--json"]);
+    const envelope = JSON.parse(proc.stdout) as {
+      schema: string;
+      command: string;
+      result: unknown;
+      errors: Array<{ code: string }>;
+    };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.command).toBe("operate plugin enable");
+    expect(envelope.result).toBeNull();
+    expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+  }, 20_000);
+
+  test("root `plugin enable --agent codex --json` emits the same coded error envelope", () => {
+    const proc = runBin(["plugin", "enable", "caveman", "--agent", "codex", "--json"]);
+    expect(`${proc.stdout}\n${proc.stderr}`).not.toContain("unknown command 'plugin'");
+    const envelope = JSON.parse(proc.stdout) as {
+      schema: string;
+      command: string;
+      errors: Array<{ code: string }>;
+    };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.command).toBe("plugin enable");
+    expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+  }, 20_000);
+});
+
 function capture() {
   const out: string[] = [];
   const err: string[] = [];
