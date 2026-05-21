@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { readdirSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import {
+	CURRENT_ROUTE_COVERAGE,
 	LEGACY_ROUTE_MAP,
 	STAGE_ORDER,
 	canonicalStageFor,
@@ -90,6 +92,32 @@ test.describe("route model — old-path resolution crawl (no 404)", () => {
 		for (const [folder, stage] of Object.entries(LEGACY_ROUTE_MAP)) {
 			if (stage === null) continue;
 			expect(STAGE_ORDER).toContain(stage);
+		}
+	});
+
+	test("every current route folder has an explicit route resolution classification", () => {
+		const routesDir = path.resolve(process.cwd(), "src/routes");
+		const currentRouteFolders = readdirSync(routesDir, { withFileTypes: true })
+			.filter((entry) => entry.isDirectory())
+			.map((entry) => entry.name)
+			.filter((name) => name !== "api" && name !== "[ws]")
+			.sort();
+
+		const classified = new Set(Object.keys(CURRENT_ROUTE_COVERAGE));
+		const missing = currentRouteFolders.filter((folder) => !classified.has(folder));
+		const stale = [...classified].filter((folder) => !currentRouteFolders.includes(folder));
+
+		expect(missing, `current route folders missing route resolution classification: ${missing.join(", ")}`).toEqual([]);
+		expect(stale, `route resolution classifications without a current route folder: ${stale.join(", ")}`).toEqual([]);
+
+		for (const [folder, coverage] of Object.entries(CURRENT_ROUTE_COVERAGE)) {
+			if (coverage.classification === "legacy-map") {
+				expect(LEGACY_ROUTE_MAP, `${folder} is classified legacy-map but missing from LEGACY_ROUTE_MAP`).toHaveProperty(folder);
+			}
+			if (coverage.stage !== null) {
+				expect(STAGE_ORDER, `${folder} has unknown WorkflowStage ${coverage.stage}`).toContain(coverage.stage);
+			}
+			expect(coverage.reason.trim().length, `${folder} needs a kept/migration reason`).toBeGreaterThan(12);
 		}
 	});
 });

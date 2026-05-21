@@ -277,6 +277,127 @@ export const LEGACY_ROUTE_MAP: Readonly<Record<string, WorkflowStage | null>> = 
 	"wave-0a-foundation": null,
 };
 
+export type RouteCoverageKind =
+	| "legacy-map"
+	| "canonical-current"
+	| "internal"
+	| "server-endpoint"
+	| "deferred/kept-with-reason";
+
+export interface CurrentRouteCoverageEntry {
+	/** How the current top-level route folder is accounted for by the migration crawl. */
+	classification: RouteCoverageKind;
+	/** Owning WorkflowStage when the route participates in the project-stage model. */
+	stage: WorkflowStage | null;
+	/** Human-readable reason; kept in source so the route crawl is replayable. */
+	reason: string;
+}
+
+/**
+ * Exhaustive route-tree coverage manifest for the current `apps/web/src/routes`
+ * folders. `LEGACY_ROUTE_MAP` remains the old-alias resolution layer; this
+ * manifest separately proves every current top-level UI route is either covered
+ * by that legacy map, a canonical survivor, internal tooling, a server endpoint,
+ * or an explicitly deferred/kept route with a reason.
+ */
+export const CURRENT_ROUTE_COVERAGE = {
+	"account-2fa-setup": { classification: "legacy-map", stage: null, reason: "account security setup route kept outside project WorkflowStage scope" },
+	"agent-cost-meter": { classification: "legacy-map", stage: "build", reason: "legacy agent-run cost preview resolves under Build run observability" },
+	"agent-dependency-board": { classification: "legacy-map", stage: "build", reason: "legacy dependency board preview resolves under Build work management" },
+	"agent-keyboard-shortcuts": { classification: "legacy-map", stage: null, reason: "system shortcut preview kept outside project WorkflowStage scope" },
+	"agent-notifications": { classification: "legacy-map", stage: null, reason: "notification preview kept as workspace/system route until notifications PRD re-homes it" },
+	"agent-session-export": { classification: "legacy-map", stage: "build", reason: "legacy session export surface resolves under Build run detail" },
+	"agent-session-fork": { classification: "legacy-map", stage: "build", reason: "legacy session fork surface resolves under Build run detail" },
+	"agent-session-timeline": { classification: "legacy-map", stage: "build", reason: "legacy session timeline resolves under Build live-session pane" },
+	"agent-token-chart": { classification: "legacy-map", stage: "build", reason: "legacy token chart resolves under Build run observability" },
+	"agent-tool-inspector": { classification: "legacy-map", stage: "build", reason: "legacy tool inspector resolves under Build run observability" },
+	"agent-window-controls": { classification: "legacy-map", stage: null, reason: "desktop/window control preview kept outside project WorkflowStage scope" },
+	"agents": { classification: "legacy-map", stage: "operate", reason: "legacy agents route resolves under Operate agent management" },
+	"ai-assist": { classification: "legacy-map", stage: null, reason: "global AI Assist surface kept as shell/system route" },
+	"api-tokens": { classification: "legacy-map", stage: null, reason: "settings/security route kept outside project WorkflowStage scope" },
+	"artifacts": { classification: "legacy-map", stage: "ship", reason: "legacy artifact manager resolves under Ship release/archive work" },
+	"audit": { classification: "legacy-map", stage: "operate", reason: "legacy audit route resolves under Operate doctor/audit work" },
+	"auth": { classification: "legacy-map", stage: null, reason: "auth layout route renders through /auth/login and stays pre-shell" },
+	"auth-2fa-verify": { classification: "legacy-map", stage: null, reason: "auth verification route stays pre-shell" },
+	"auth-flows": { classification: "legacy-map", stage: null, reason: "auth-flow preview stays pre-shell" },
+	"boards": { classification: "legacy-map", stage: "build", reason: "legacy board route resolves under Build board" },
+	"build-board": { classification: "legacy-map", stage: "build", reason: "flat Build board OD preview resolves under Build" },
+	"build-graph": { classification: "legacy-map", stage: "build", reason: "flat Build graph OD preview resolves under Build" },
+	"build-list": { classification: "canonical-current", stage: "build", reason: "current Build list survivor route; not an old alias" },
+	"build-runs": { classification: "legacy-map", stage: "build", reason: "flat Build runs OD preview resolves under Build" },
+	"build-timeline": { classification: "legacy-map", stage: "build", reason: "flat Build timeline OD preview resolves under Build" },
+	"comments": { classification: "legacy-map", stage: "review", reason: "legacy comments route resolves under Review annotation work" },
+	"comments-block-thread": { classification: "legacy-map", stage: "review", reason: "legacy anchored-thread preview resolves under Review" },
+	"context": { classification: "legacy-map", stage: "operate", reason: "layout-only route renders through /context/preview and resolves under Operate" },
+	"cross-cutting-mobile": { classification: "legacy-map", stage: null, reason: "mobile safe-area preview retained as cross-cutting design proof" },
+	"cross-cutting-motion": { classification: "legacy-map", stage: null, reason: "motion-contract preview retained as cross-cutting design proof" },
+	"cross-cutting-offline": { classification: "legacy-map", stage: null, reason: "offline-state preview retained until shell connection state owns it" },
+	"cross-cutting-perf": { classification: "legacy-map", stage: "operate", reason: "performance preview resolves under Operate telemetry/diagnostics" },
+	"design-kit": { classification: "internal", stage: null, reason: "ui-kit fixture route for design-e2e, not product navigation" },
+	"doc-labels": { classification: "legacy-map", stage: "capture", reason: "legacy doc labels route resolves under Capture docs" },
+	"docs": { classification: "legacy-map", stage: "capture", reason: "legacy docs route resolves under Capture" },
+	"doctor": { classification: "legacy-map", stage: "operate", reason: "legacy doctor route resolves under Operate" },
+	"editor-blockquote": { classification: "legacy-map", stage: "capture", reason: "editor block preview resolves under Capture editor work" },
+	"inbox": { classification: "legacy-map", stage: "capture", reason: "legacy inbox path resolves under Capture intake until notification re-home completes" },
+	"inference": { classification: "legacy-map", stage: "operate", reason: "legacy inference route resolves under Operate model management" },
+	"inference-models": { classification: "legacy-map", stage: "operate", reason: "legacy inference model route resolves under Operate model management" },
+	"member-remove": { classification: "legacy-map", stage: null, reason: "member management route kept as workspace/system route" },
+	"members": { classification: "legacy-map", stage: null, reason: "member management route kept as workspace/system route" },
+	"memory": { classification: "legacy-map", stage: null, reason: "portfolio Memory route has no active project stage" },
+	"mobile-capture": { classification: "legacy-map", stage: null, reason: "mobile capture preview deferred as responsive Capture state" },
+	"mobile-observability": { classification: "legacy-map", stage: "operate", reason: "mobile observability preview resolves under Operate" },
+	"mobile-runs": { classification: "legacy-map", stage: "build", reason: "mobile runs preview resolves under Build" },
+	"notifications-empty": { classification: "legacy-map", stage: null, reason: "empty notification state retained until notifications PRD owns it" },
+	"notifications-inbox": { classification: "legacy-map", stage: null, reason: "workspace notifications inbox kept outside project stage scope" },
+	"notifications-settings": { classification: "legacy-map", stage: null, reason: "workspace notifications settings kept outside project stage scope" },
+	"offline": { classification: "legacy-map", stage: null, reason: "offline route kept until shell connection banner owns the state" },
+	"onboarding": { classification: "legacy-map", stage: null, reason: "first-run route is pre-shell and outside project WorkflowStage scope" },
+	"operate-alerts": { classification: "legacy-map", stage: "operate", reason: "flat Operate alerts OD preview resolves under Operate" },
+	"operate-mcp": { classification: "legacy-map", stage: "operate", reason: "flat Operate MCP OD preview resolves under Operate" },
+	"operate-plugins": { classification: "legacy-map", stage: "operate", reason: "flat Operate plugin OD preview resolves under Operate" },
+	"operate-telemetry": { classification: "canonical-current", stage: "operate", reason: "current Operate telemetry survivor route; not an old alias" },
+	"orchestration": { classification: "legacy-map", stage: "build", reason: "legacy orchestration route resolves under Build" },
+	"palette": { classification: "legacy-map", stage: null, reason: "global CommandPalette route kept as shell/system preview" },
+	"palette-cmd-k": { classification: "legacy-map", stage: null, reason: "global CommandPalette shortcut preview kept as shell/system route" },
+	"plan-prompts": { classification: "legacy-map", stage: "plan", reason: "flat Plan prompts OD preview resolves under Plan" },
+	"plan-prototypes": { classification: "legacy-map", stage: "plan", reason: "flat Plan prototypes OD preview resolves under Plan" },
+	"plan-review": { classification: "legacy-map", stage: "plan", reason: "flat Plan review OD preview resolves under Plan" },
+	"plan-session": { classification: "legacy-map", stage: "plan", reason: "flat Plan session OD preview resolves under Plan" },
+	"plan-templates": { classification: "canonical-current", stage: "plan", reason: "current Plan templates survivor route; not an old alias" },
+	"planning": { classification: "legacy-map", stage: "plan", reason: "legacy planning route resolves under Plan" },
+	"project-settings": { classification: "legacy-map", stage: null, reason: "project settings route kept as workspace/project system route" },
+	"projects": { classification: "legacy-map", stage: null, reason: "portfolio project list has no active project stage" },
+	"repos": { classification: "legacy-map", stage: null, reason: "repository management route kept as workspace/system route" },
+	"review": { classification: "canonical-current", stage: "review", reason: "current Review queue/workbench survivor route; not an old alias" },
+	"review-search": { classification: "legacy-map", stage: "review", reason: "legacy review search route resolves under Review" },
+	"review-templates": { classification: "legacy-map", stage: "review", reason: "legacy review templates route resolves under Review" },
+	"run-cancel": { classification: "legacy-map", stage: "build", reason: "legacy run cancel route resolves under Build run operations" },
+	"run-cost-tracking": { classification: "legacy-map", stage: "build", reason: "legacy run cost route resolves under Build run operations" },
+	"run-detail": { classification: "legacy-map", stage: "build", reason: "legacy run detail route resolves under Build run operations" },
+	"run-fork": { classification: "legacy-map", stage: "build", reason: "legacy run fork route resolves under Build run operations" },
+	"run-rate-limits": { classification: "legacy-map", stage: "build", reason: "legacy run rate-limit route resolves under Build run operations" },
+	"run-retry-policy": { classification: "legacy-map", stage: "build", reason: "legacy retry-policy route resolves under Build run operations" },
+	"run-retry-prompt": { classification: "legacy-map", stage: "build", reason: "legacy retry-prompt route resolves under Build run operations" },
+	"runs": { classification: "legacy-map", stage: "build", reason: "legacy runs route resolves under Build" },
+	"search": { classification: "legacy-map", stage: null, reason: "portfolio Search route has no active project stage" },
+	"sessions-empty": { classification: "legacy-map", stage: null, reason: "empty sessions state retained until stage workbenches own it" },
+	"settings": { classification: "legacy-map", stage: null, reason: "workspace SettingsSystemSurface has no active project stage" },
+	"ship": { classification: "canonical-current", stage: "ship", reason: "current Ship survivor route; not an old alias" },
+	"ship-archive": { classification: "legacy-map", stage: "ship", reason: "legacy ship archive route resolves under Ship" },
+	"skill-detail": { classification: "legacy-map", stage: "operate", reason: "legacy skill detail route resolves under Operate" },
+	"skill-registry": { classification: "legacy-map", stage: "operate", reason: "legacy skill registry route resolves under Operate" },
+	"space-permissions": { classification: "legacy-map", stage: null, reason: "workspace permissions route kept as workspace/system route" },
+	"streamed-message": { classification: "legacy-map", stage: "build", reason: "legacy streamed-message preview resolves under Build" },
+	"task-filters": { classification: "legacy-map", stage: "build", reason: "legacy task filters route resolves under Build" },
+	"tasks": { classification: "legacy-map", stage: "build", reason: "layout-only route renders through /tasks/seed-task and resolves under Build" },
+	"theme-picker": { classification: "legacy-map", stage: null, reason: "theme picker preview kept as workspace/system route" },
+	"view-controls": { classification: "legacy-map", stage: "build", reason: "legacy view controls route resolves under Build" },
+	"views-custom-fields": { classification: "legacy-map", stage: "build", reason: "legacy custom-fields route resolves under Build" },
+	"watch-list": { classification: "legacy-map", stage: "build", reason: "legacy watch list route resolves under Build" },
+	"wave-0a-foundation": { classification: "internal", stage: null, reason: "internal recovery preview route, not product navigation" },
+	"workspace": { classification: "deferred/kept-with-reason", stage: null, reason: "workspace-scoped survivor kept outside project WorkflowStage scope until portfolio routing PRD owns it" },
+} as const satisfies Readonly<Record<string, CurrentRouteCoverageEntry>>;
+
 /**
  * Resolve any live pathname — a canonical `/<ws>/projects/<projId>/<stage>`
  * URL or a legacy feature-bucket / preview path — to the WorkflowStage the
