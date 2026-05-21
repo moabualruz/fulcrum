@@ -225,6 +225,33 @@ test.describe("OD shell ScopeBar — populated", () => {
 			await expect(activeTab).toHaveAttribute("aria-current", "page");
 		}
 	});
+
+	test("wires system icon expanded state to the opened menu", async ({ page }) => {
+		await page.goto("/");
+
+		const scopeBar = page.locator("[data-slot='scope-bar']").first();
+		const display = scopeBar.locator("button[data-scope-system-icon='display']");
+		const account = scopeBar.locator("button[data-scope-system-icon='account']");
+
+		await expect(display).toHaveAttribute("aria-expanded", "false");
+		await expect(account).toHaveAttribute("aria-expanded", "false");
+		await expect(scopeBar.locator("[data-scope-system-panel='display']")).toHaveCount(0);
+
+		await display.click();
+		await expect(display).toHaveAttribute("aria-expanded", "true");
+		await expect(account).toHaveAttribute("aria-expanded", "false");
+		await expect(scopeBar.locator("[data-scope-system-panel='display']")).toBeVisible();
+		await expect(scopeBar.locator("[data-scope-system-panel='display']")).toHaveAttribute(
+			"data-open",
+			"true",
+		);
+
+		await account.click();
+		await expect(display).toHaveAttribute("aria-expanded", "false");
+		await expect(account).toHaveAttribute("aria-expanded", "true");
+		await expect(scopeBar.locator("[data-scope-system-panel='account']")).toBeVisible();
+		await expect(scopeBar.locator("[data-scope-system-panel='display']")).toHaveCount(0);
+	});
 });
 
 /**

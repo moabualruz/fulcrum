@@ -11,6 +11,7 @@
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
 	export type DensityMode = "compact" | "cozy" | "comfortable";
+	type SystemPanel = "command-palette" | "notifications" | "display" | "keyboard-help" | "account";
 
 	interface Props {
 		pathname: string;
@@ -89,10 +90,23 @@
 	const workspacePath = $derived(`${workspaceFromPath(pathname)} / ${effectiveProjectId ?? "all-projects"}`);
 	const notificationLabel = $derived(`Notifications · ${bellCount} unread`);
 	const traceBadgeId = $derived(traceId ?? "4f3a1c9e2b7d8a6c");
+	let openSystemPanel = $state<SystemPanel | null>(null);
 	const iconButtonClass = cn(
 		"grid size-7 place-items-center rounded-md text-fg-subtle transition-colors",
 		"hover:bg-surface-sunken hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 	);
+	const panelClass = cn(
+		"absolute right-0 top-9 z-30 w-64 rounded-md border border-border bg-surface-elevated p-3 text-xs text-fg shadow-lg",
+		"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+	);
+
+	function toggleSystemPanel(panel: SystemPanel) {
+		openSystemPanel = openSystemPanel === panel ? null : panel;
+	}
+
+	function isSystemPanelOpen(panel: SystemPanel) {
+		return openSystemPanel === panel;
+	}
 </script>
 
 <ScopeBar
@@ -111,31 +125,35 @@
 			/>
 		{/snippet}
 		{#snippet systemCluster()}
-		<div
-			data-density-switch
-			data-density-mode={densityMode}
-			class={cn("hidden h-7 overflow-hidden rounded-md border border-border lg:inline-flex")}
-			aria-label="density mode"
-		>
-			{#each densityModes as mode (mode.id)}
-				<button
-					type="button"
-					aria-label="{mode.label} density"
-					aria-pressed={densityMode === mode.id}
-					data-density-option={mode.id}
-					onclick={() => onDensityModeChange(mode.id)}
-					class={cn(
-						"px-2 text-xs text-fg-subtle",
-						densityMode === mode.id && "bg-surface-sunken text-fg",
-					)}
-				>{mode.label}</button>
-			{/each}
-		</div>
+		<div class="relative flex items-center gap-1">
+			<div
+				data-density-switch
+				data-density-mode={densityMode}
+				class={cn("hidden h-7 overflow-hidden rounded-md border border-border lg:inline-flex")}
+				aria-label="density mode"
+			>
+				{#each densityModes as mode (mode.id)}
+					<button
+						type="button"
+						aria-label="{mode.label} density"
+						aria-pressed={densityMode === mode.id}
+						data-density-option={mode.id}
+						onclick={() => onDensityModeChange(mode.id)}
+						class={cn(
+							"px-2 text-xs text-fg-subtle",
+							densityMode === mode.id && "bg-surface-sunken text-fg",
+						)}
+					>{mode.label}</button>
+				{/each}
+			</div>
 		<button
 			type="button"
 			aria-label="Command palette · ⌘K"
-			aria-expanded="false"
+			aria-expanded={isSystemPanelOpen("command-palette") ? "true" : "false"}
+			aria-controls="scope-system-panel-command-palette"
+			data-open={isSystemPanelOpen("command-palette") ? "true" : "false"}
 			data-scope-system-icon="command-palette"
+			onclick={() => toggleSystemPanel("command-palette")}
 			class={iconButtonClass}
 		>
 			<Search class="size-4" aria-hidden="true" />
@@ -144,8 +162,11 @@
 			type="button"
 			data-notification-bell
 			aria-label={notificationLabel}
-			aria-expanded={bellItems.length > 0 ? "true" : "false"}
+			aria-expanded={isSystemPanelOpen("notifications") ? "true" : "false"}
+			aria-controls="scope-system-panel-notifications"
+			data-open={isSystemPanelOpen("notifications") ? "true" : "false"}
 			data-scope-system-icon="notifications"
+			onclick={() => toggleSystemPanel("notifications")}
 			class={cn(iconButtonClass, "relative")}
 		>
 			<Bell class="size-4" aria-hidden="true" />
@@ -156,20 +177,31 @@
 				>{bellCount}</span>
 			{/if}
 		</button>
-		{#if bellItems.length > 0}
-			<div data-notification-menu class={cn("sr-only")}>
+		<div
+			id="scope-system-panel-notifications"
+			data-notification-menu
+			data-scope-system-panel="notifications"
+			data-open={isSystemPanelOpen("notifications") ? "true" : "false"}
+			class={isSystemPanelOpen("notifications") ? panelClass : "sr-only"}
+			hidden={!isSystemPanelOpen("notifications")}
+		>
+			{#if bellItems.length > 0}
 				{#each bellItems.slice(0, 5) as item (item.id)}
 					<div>{item.title}</div>
 				{/each}
 				<a href="/inbox">See all</a>
-			</div>
-		{/if}
+			{:else}
+				<div>No unread notifications</div>
+			{/if}
+		</div>
 		<button
 			type="button"
 			aria-label="Display, density, mode, theme"
-			aria-expanded="false"
+			aria-expanded={isSystemPanelOpen("display") ? "true" : "false"}
+			aria-controls="scope-system-panel-display"
+			data-open={isSystemPanelOpen("display") ? "true" : "false"}
 			data-scope-system-icon="display"
-			onclick={onThemeToggle}
+			onclick={() => toggleSystemPanel("display")}
 			class={iconButtonClass}
 		>
 			<Settings2 class="size-4" aria-hidden="true" />
@@ -177,8 +209,11 @@
 		<button
 			type="button"
 			aria-label="Keyboard shortcuts · ?"
-			aria-expanded="false"
+			aria-expanded={isSystemPanelOpen("keyboard-help") ? "true" : "false"}
+			aria-controls="scope-system-panel-keyboard-help"
+			data-open={isSystemPanelOpen("keyboard-help") ? "true" : "false"}
 			data-scope-system-icon="keyboard-help"
+			onclick={() => toggleSystemPanel("keyboard-help")}
 			class={iconButtonClass}
 		>
 			<CircleHelp class="size-4" aria-hidden="true" />
@@ -186,14 +221,54 @@
 		<button
 			type="button"
 			aria-label="Account · sign out, switch workspace"
-			aria-expanded="false"
+			aria-expanded={isSystemPanelOpen("account") ? "true" : "false"}
+			aria-controls="scope-system-panel-account"
+			data-open={isSystemPanelOpen("account") ? "true" : "false"}
 			data-scope-system-icon="account"
+			onclick={() => toggleSystemPanel("account")}
 			class={iconButtonClass}
 		>
 			<UserCircle class="size-4" aria-hidden="true" />
 		</button>
+		{#if isSystemPanelOpen("command-palette")}
+			<div id="scope-system-panel-command-palette" data-scope-system-panel="command-palette" data-open="true" class={panelClass}>
+				Command palette ready
+			</div>
+		{/if}
+		{#if isSystemPanelOpen("display")}
+			<div id="scope-system-panel-display" data-scope-system-panel="display" data-open="true" class={panelClass}>
+				<div class="mb-2 font-medium">Display</div>
+				<div class="mb-2 flex overflow-hidden rounded-md border border-border">
+					{#each densityModes as mode (mode.id)}
+						<button
+							type="button"
+							aria-label="{mode.label} density"
+							aria-pressed={densityMode === mode.id}
+							data-density-option-panel={mode.id}
+							onclick={() => onDensityModeChange(mode.id)}
+							class={cn(
+								"flex-1 px-2 py-1 text-xs text-fg-subtle",
+								densityMode === mode.id && "bg-surface-sunken text-fg",
+							)}
+						>{mode.label}</button>
+					{/each}
+				</div>
+				<button type="button" class={cn(iconButtonClass, "w-full justify-start px-2")} onclick={onThemeToggle}>Toggle theme</button>
+			</div>
+		{/if}
+		{#if isSystemPanelOpen("keyboard-help")}
+			<div id="scope-system-panel-keyboard-help" data-scope-system-panel="keyboard-help" data-open="true" class={panelClass}>
+				Keyboard shortcuts
+			</div>
+		{/if}
+		{#if isSystemPanelOpen("account")}
+			<div id="scope-system-panel-account" data-scope-system-panel="account" data-open="true" class={panelClass}>
+				Account and workspace
+			</div>
+		{/if}
 		<span data-inference-status={inferenceStatus} class="sr-only">
 			Inference backend status: {inferenceStatus}
 		</span>
+		</div>
 		{/snippet}
 </ScopeBar>
