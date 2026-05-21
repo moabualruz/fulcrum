@@ -1,6 +1,6 @@
 import type { ServerLoad, Actions } from "@sveltejs/kit";
 import { createSearchApiForEvent } from "$lib/server/search-api";
-import { getE2eFixtureContext } from "$lib/server/db";
+import { queryE2eFixtureSearch } from "$lib/server/search-e2e-fixture";
 
 export interface SearchHit {
   id: string;
@@ -115,40 +115,6 @@ function normalizeSavedSearches(rows: SavedSearchRow[]): SavedSearch[] {
     id: row.id,
     name: row.name,
     params: normalizeSavedSearchParams(row.query_json),
-  }));
-}
-
-async function queryE2eFixtureSearch(input: { q: string; kinds: string[] }): Promise<SearchHit[]> {
-  const { db, orgId } = await getE2eFixtureContext();
-  const params: unknown[] = [orgId, `%${input.q.toLowerCase()}%`];
-  const kindSql = input.kinds.length > 0
-    ? `AND entry.source_kind = ANY($${params.push(input.kinds)}::text[])`
-    : "";
-  const rows = await db.em.query(
-    `SELECT
-       entry.id,
-       entry.source_kind,
-       entry.page_id AS source_id,
-       entry.title,
-       entry.search_text AS body,
-       entry.updated_at
-     FROM fulcrum_doc_search_entries entry
-     INNER JOIN fulcrum_projects project ON project.id = entry.project_id
-     WHERE project.workspace_id = $1
-       AND lower(entry.title || ' ' || entry.search_text) LIKE $2
-       ${kindSql}
-     ORDER BY entry.updated_at DESC, entry.id ASC
-     LIMIT 50`,
-    params,
-  ) as Array<Omit<SearchHit, "score" | "updated_at"> & { updated_at: Date | string }>;
-  return rows.map((row) => ({
-    id: row.id,
-    source_kind: row.source_kind,
-    source_id: row.source_id,
-    title: row.title,
-    body: row.body,
-    score: 1,
-    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   }));
 }
 

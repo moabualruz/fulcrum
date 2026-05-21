@@ -87,27 +87,27 @@ describe("/settings/flags load", () => {
     });
   });
 
-  test("fails closed when scoped API callers are unavailable", async () => {
+  test("fails soft with fallback flags when the feature flag API is unreachable", async () => {
+    // `load` no longer throws when the API is down — it degrades gracefully,
+    // returning a fallback flag set plus a `loadError` banner string that
+    // points the operator at /settings/api. The route stays usable instead
+    // of erroring the whole page.
     const mod = await import(`./+page.server.ts?t=${Date.now() + 2}`);
 
-    let thrown: unknown;
-    try {
-      await mod.load({
-        locals: { session: { userId: "user-1" } },
-        fetch: async () => {
-          throw new Error("unexpected API call");
-        },
-        request: { headers: { get: () => null } },
-        url: new URL("http://localhost/settings/flags"),
-      });
-    } catch (cause) {
-      thrown = cause;
-    }
+    const result = await mod.load({
+      locals: { session: { userId: "user-1" } },
+      fetch: async () => {
+        throw new Error("unexpected API call");
+      },
+      request: { headers: { get: () => null } },
+      url: new URL("http://localhost/settings/flags"),
+    });
 
-    expect((thrown as { status?: number; body?: { message?: string } }).status).toBe(503);
-    expect((thrown as { status?: number; body?: { message?: string } }).body?.message).toBe(
-      "Feature flag API caller is not configured.",
-    );
+    expect(Array.isArray(result.flags)).toBe(true);
+    expect(result.flags.length).toBeGreaterThan(0);
+    expect(typeof result.loadError).toBe("string");
+    expect(result.loadError).toContain("Feature flag API");
+    expect(result.loadError).toContain("/settings/api");
   });
 });
 
