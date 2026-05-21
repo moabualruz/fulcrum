@@ -24,12 +24,12 @@ describe("StageRail nav data", () => {
 
 	test("maps each WorkflowStage to a production route", () => {
 		expect(STAGE_NAV_ITEMS.map((s) => s.href)).toEqual([
-			"/",
-			"/plan-session",
-			"/build-board",
-			"/review",
-			"/ship",
-			"/doctor",
+			"/mkh/projects/fulcrum/capture",
+			"/mkh/projects/fulcrum/plan",
+			"/mkh/projects/fulcrum/build",
+			"/mkh/projects/fulcrum/review",
+			"/mkh/projects/fulcrum/ship",
+			"/mkh/projects/fulcrum/operate",
 		]);
 	});
 

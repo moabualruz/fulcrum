@@ -175,20 +175,25 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 
 	test("[ toggles the StageRail collapsed state", async ({ page }) => {
 		await page.goto(stageRoute(WS, PROJ, "build"), { waitUntil: "load" });
-		const rail = page.locator("[data-shell-region='stage-rail']");
-		if (!(await rail.isVisible({ timeout: 1_000 }).catch(() => false))) {
+		const railRegion = page.locator("[data-shell-region='stage-rail']");
+		const rail = page.locator("[data-slot='stage-rail']");
+		if (!(await railRegion.isVisible({ timeout: 1_000 }).catch(() => false))) {
 			await expect(page.locator("body")).toBeVisible();
 			console.log("route model: stage rail not visible; backend data unavailable in design-e2e preview");
 			return;
 		}
-		await expect(rail).toHaveAttribute("data-rail-collapsed", "false");
+		await expect(railRegion).toHaveAttribute("data-rail-collapsed", "false");
+		await expect(rail).toHaveAttribute("data-collapsed", "false");
 
 		await page.locator("body").click();
 		await page.keyboard.press("[");
-		await expect(rail).toHaveAttribute("data-rail-collapsed", "true");
+		await expect(railRegion).toHaveAttribute("data-rail-collapsed", "true");
+		await expect(rail).toHaveAttribute("data-collapsed", "true");
+		await expect(rail).toHaveCSS("width", "56px");
 
 		await page.keyboard.press("[");
-		await expect(rail).toHaveAttribute("data-rail-collapsed", "false");
+		await expect(railRegion).toHaveAttribute("data-rail-collapsed", "false");
+		await expect(rail).toHaveAttribute("data-collapsed", "false");
 	});
 
 	test("g <letter> chord navigates between the six stages, preserving trace", async ({ page }) => {
