@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -37,6 +37,15 @@ async function pressToggleChord(page: Page): Promise<void> {
 	await page.keyboard.press(`${modifier}+Slash`);
 }
 
+async function expectDrawerInsideViewport(drawer: Locator, viewport: { width: number; height: number }) {
+	const box = await drawer.boundingBox();
+	expect(box).not.toBeNull();
+	expect(box?.x ?? Number.NEGATIVE_INFINITY).toBeGreaterThanOrEqual(0);
+	expect(box?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThanOrEqual(0);
+	expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
+	expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
+}
+
 test.describe("global AI Assist drawer — populated", () => {
 	test("⌘/ opens the single shell drawer from a production route", async ({ page }) => {
 		await page.goto("/", { waitUntil: "load" });
@@ -62,6 +71,7 @@ test.describe("global AI Assist drawer — populated", () => {
 		// 420px desktop overlay width (DESIGN.md §3.1).
 		const box = await drawer.boundingBox();
 		expect(Math.round(box?.width ?? 0)).toBe(420);
+		await expectDrawerInsideViewport(drawer, { width: 1280, height: 720 });
 
 		const shot = await page.screenshot({ fullPage: false });
 		await test.info().attach("ai-assist-drawer-open", {
@@ -210,6 +220,7 @@ test.describe("global AI Assist drawer — mobile", () => {
 		const drawer = page.locator(DRAWER);
 		await expect(drawer).toBeVisible();
 		await expect(drawer).toHaveAttribute("data-side", "bottom");
+		await expectDrawerInsideViewport(drawer, { width: 390, height: 844 });
 
 		const shot = await page.screenshot({ fullPage: false });
 		await test.info().attach("ai-assist-drawer-mobile", {
