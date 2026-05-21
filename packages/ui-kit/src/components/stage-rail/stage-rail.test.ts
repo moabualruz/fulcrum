@@ -117,6 +117,18 @@ describe("StageRail", () => {
 		expect(body).toContain('data-active="true"');
 	});
 
+	test("legacy stage buttons use navigation ARIA instead of tab roles", () => {
+		const { body } = render(StageRailRoot, {
+			props: {
+				current: "build",
+				stages: WORKFLOW_STAGES.map((stage) => ({ stage })),
+			},
+		});
+		expect(body).toContain('aria-current="page"');
+		expect(body).not.toContain('role="tab"');
+		expect(body).not.toContain("aria-selected");
+	});
+
 	test("legacy `stages` prop is suppressed when substages are present", () => {
 		const { body } = render(StageRailRoot, {
 			props: {

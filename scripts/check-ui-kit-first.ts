@@ -208,6 +208,44 @@ function importsUiKit(source: string): boolean {
   return /from\s+["']@fulcrum\/ui-kit["']/.test(source);
 }
 
+function importedUiKitNames(source: string): Set<string> {
+  const names = new Set<string>();
+  const importPattern = /import\s*\{([^}]*)\}\s*from\s+["']@fulcrum\/ui-kit["']/g;
+  for (const match of source.matchAll(importPattern)) {
+    for (const specifier of match[1].split(",")) {
+      const imported = specifier.trim().split(/\s+as\s+/i)[0]?.trim();
+      if (imported) names.add(imported);
+    }
+  }
+  return names;
+}
+
+function missingUiKitImports(source: string, required: readonly string[]): string[] {
+  const imported = importedUiKitNames(source);
+  return required.filter((name) => !imported.has(name));
+}
+
+const REQUIRED_PRIMITIVE_COMPOSITION: Record<string, readonly string[]> = {
+  "apps/web/src/lib/components/board/BoardSheet.svelte": [
+    "Sheet",
+    "SheetContent",
+    "SheetHeader",
+    "SheetTitle",
+    "SheetFooter",
+  ],
+  "apps/web/src/routes/settings/routing/RoutingPage.svelte": [
+    "Tabs",
+    "TabsList",
+    "TabsTrigger",
+    "Button",
+    "Input",
+    "Textarea",
+    "Switch",
+    "Card",
+    "Badge",
+  ],
+};
+
 function absorbedPrimitiveResponsibility(
   source: string,
 ): AbsorbedPrimitiveResponsibility | undefined {
@@ -242,6 +280,33 @@ for (const rootRel of SURFACE_ROOTS) {
 
     // ── RULE 2: route/feature-local primitive re-implementation ──
     if (abs.endsWith(".svelte")) {
+      const requiredPrimitives = REQUIRED_PRIMITIVE_COMPOSITION[rel];
+      if (requiredPrimitives) {
+        const missing = missingUiKitImports(source, requiredPrimitives);
+        if (missing.length > 0) {
+          violations.push({
+            file: rel,
+            rule: "incomplete-ui-kit-composition",
+            detail: `must compose ui-kit primitive responsibilities: missing ${missing.join(", ")}`,
+          });
+        }
+      }
+      if (rel.endsWith("BoardSheet.svelte")) {
+        if (!source.includes("<SheetContent")) {
+          violations.push({
+            file: rel,
+            rule: "sheet-content-composition",
+            detail: "sheet surfaces must render SheetContent, not only import a root Sheet state primitive",
+          });
+        }
+        if (/<aside\b/.test(source)) {
+          violations.push({
+            file: rel,
+            rule: "sheet-panel-reimplementation",
+            detail: "sheet surfaces must not hand-roll an <aside> drawer panel; use ui-kit SheetContent",
+          });
+        }
+      }
       const s = stem(abs);
       if (UI_KIT_PRIMITIVE_STEMS.has(s) && !ALLOWLIST.has(rel)) {
         if (!importsUiKit(source)) {

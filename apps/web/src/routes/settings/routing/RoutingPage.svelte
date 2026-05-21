@@ -1,6 +1,20 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import { Badge } from "@fulcrum/ui-kit";
+  import {
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    Input,
+    Switch,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+    Textarea,
+  } from "@fulcrum/ui-kit";
   import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
 
   interface Props {
@@ -99,44 +113,15 @@
     </p>
   {/if}
 
-  <!-- Tabs -->
-  <div data-routing-tabs class="flex max-w-full gap-1 overflow-x-auto border-b border-border pb-px">
-    <a
-      href="?tab=rules"
-      data-tab="rules"
-      class="px-4 py-2 text-sm font-medium {activeTab === 'rules' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-      onpointerdown={() => (activeTab = "rules")}
-      onclick={() => (activeTab = "rules")}
-    >Rules</a>
-    <a
-      href="?tab=drafts"
-      data-tab="drafts"
-      class="px-4 py-2 text-sm font-medium {activeTab === 'drafts' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-      onpointerdown={() => (activeTab = "drafts")}
-      onclick={() => (activeTab = "drafts")}
-    >Drafts</a>
-    <a
-      href="?tab=test"
-      data-tab="test"
-      class="px-4 py-2 text-sm font-medium {activeTab === 'test' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-      onpointerdown={() => (activeTab = "test")}
-      onclick={() => (activeTab = "test")}
-    >Test</a>
-    <a
-      href="?tab=llm-gate"
-      data-tab="llm-gate"
-      class="px-4 py-2 text-sm font-medium {activeTab === 'llm-gate' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-      onpointerdown={() => (activeTab = "llm-gate")}
-      onclick={() => (activeTab = "llm-gate")}
-    >LLM Gate</a>
-    <a
-      href="?tab=evidence"
-      data-tab="evidence"
-      class="px-4 py-2 text-sm font-medium {activeTab === 'evidence' ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-      onpointerdown={() => (activeTab = "evidence")}
-      onclick={() => (activeTab = "evidence")}
-    >Evidence</a>
-  </div>
+  <Tabs bind:value={activeTab}>
+    <TabsList data-routing-tabs class="max-w-full overflow-x-auto">
+      <TabsTrigger value="rules" data-tab="rules" data-routing-rules-tab={activeTab === "rules" ? "true" : undefined}>Rules</TabsTrigger>
+      <TabsTrigger value="drafts" data-tab="drafts">Drafts</TabsTrigger>
+      <TabsTrigger value="test" data-tab="test">Test</TabsTrigger>
+      <TabsTrigger value="llm-gate" data-tab="llm-gate">LLM Gate</TabsTrigger>
+      <TabsTrigger value="evidence" data-tab="evidence">Evidence</TabsTrigger>
+    </TabsList>
+  </Tabs>
 
   <!-- ==================== RULES TAB ==================== -->
   {#if activeTab === "rules"}
@@ -145,51 +130,53 @@
         <div class="flex flex-wrap items-center gap-3">
           <p class="text-sm text-muted-foreground">{rules.length} rule{rules.length !== 1 ? "s" : ""}</p>
           <div class="flex items-center gap-1 rounded-md border border-border p-0.5 text-xs">
-            <button
+            <Button
               type="button"
-              class="rounded px-2 py-1 {editorMode === 'builder' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}"
+              variant={editorMode === "builder" ? "primary" : "ghost"}
+              size="xs"
               onclick={() => (editorMode = "builder")}
-            >Builder</button>
-            <button
+            >Builder</Button>
+            <Button
               type="button"
-              class="rounded px-2 py-1 {editorMode === 'raw' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}"
+              variant={editorMode === "raw" ? "primary" : "ghost"}
+              size="xs"
               onclick={() => (editorMode = "raw")}
-            >Raw JSON</button>
+            >Raw JSON</Button>
           </div>
         </div>
         <details data-routing-create-panel class="rounded-md border border-border p-2" open={rules.length === 0}>
           <summary class="cursor-pointer text-sm font-medium">
-            <button type="button" class="pointer-events-none rounded-md border border-border px-3 py-1.5 text-sm">New rule</button>
+            <Button type="button" class="pointer-events-none" variant="outline">New rule</Button>
           </summary>
           <form method="POST" action="?/create" class="mt-4 grid gap-3 md:grid-cols-2">
-            <input type="hidden" name="enabled" value="true" />
+              <Input type="hidden" name="enabled" value="true" />
             <label class="grid gap-1 text-sm">
               Rule name
-              <input name="name" aria-label="Rule name" class="rounded-md border border-input bg-background px-3 py-2" required />
+              <Input name="name" aria-label="Rule name" required />
             </label>
             <label class="grid gap-1 text-sm">
               Agent
-              <input name="actionAgent" aria-label="Agent" class="rounded-md border border-input bg-background px-3 py-2" required />
+              <Input name="actionAgent" aria-label="Agent" required />
             </label>
             <label class="grid gap-1 text-sm">
               Skill set
-              <input name="actionSkillSet" aria-label="Skill set" class="rounded-md border border-input bg-background px-3 py-2" />
+              <Input name="actionSkillSet" aria-label="Skill set" />
             </label>
             <label class="grid gap-1 text-sm">
               Priority
-              <input name="priority" aria-label="Priority" type="number" value="100" class="rounded-md border border-input bg-background px-3 py-2" />
+              <Input name="priority" aria-label="Priority" type="number" value="100" />
             </label>
             <label class="grid gap-1 text-sm md:col-span-2">
               Conditions JSON
-              <textarea
+              <Textarea
                 name="conditionsJson"
                 aria-label="Conditions JSON"
                 rows="5"
-                class="rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-              >{defaultConditionsJson}</textarea>
+                class="font-mono text-xs"
+              >{defaultConditionsJson}</Textarea>
             </label>
             <div class="md:col-span-2">
-              <button type="submit" class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Save rule</button>
+              <Button type="submit">Save rule</Button>
             </div>
           </form>
         </details>
@@ -244,24 +231,24 @@
                     <details>
                       <summary class="cursor-pointer rounded-md border border-border px-2 py-1 text-xs">Edit</summary>
                       <form method="POST" action="?/update" class="mt-2 grid min-w-72 gap-2">
-                        <input type="hidden" name="id" value={rule.id} />
-                        <input name="name" aria-label={`Edit name ${rule.name}`} value={rule.name} class="rounded-md border border-input px-2 py-1 text-sm" />
-                        <input name="actionAgent" aria-label={`Edit agent ${rule.name}`} value={rule.actionAgent} class="rounded-md border border-input px-2 py-1 text-sm" />
-                        <textarea name="conditionsJson" aria-label={`Edit conditions ${rule.name}`} class="rounded-md border border-input px-2 py-1 font-mono text-xs">{JSON.stringify(rule.conditionsJson)}</textarea>
-                        <button type="submit" class="rounded-md border border-border px-2 py-1 text-sm">Save</button>
+                        <Input type="hidden" name="id" value={rule.id} />
+                        <Input name="name" aria-label={`Edit name ${rule.name}`} value={rule.name} />
+                        <Input name="actionAgent" aria-label={`Edit agent ${rule.name}`} value={rule.actionAgent} />
+                        <Textarea name="conditionsJson" aria-label={`Edit conditions ${rule.name}`} class="font-mono text-xs">{JSON.stringify(rule.conditionsJson)}</Textarea>
+                        <Button type="submit" variant="outline">Save</Button>
                       </form>
                     </details>
                     <form method="POST" action="?/reorder">
-                      <input type="hidden" name="orderedIds" value={[rule.id, ...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id)].join(",")} />
-                      <button type="submit" data-routing-reorder-up disabled={index === 0} class="rounded-md border border-border px-2 py-1 text-xs">Up</button>
+                      <Input type="hidden" name="orderedIds" value={[rule.id, ...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id)].join(",")} />
+                      <Button type="submit" data-routing-reorder-up disabled={index === 0} variant="outline" size="xs">Up</Button>
                     </form>
                     <form method="POST" action="?/reorder">
-                      <input type="hidden" name="orderedIds" value={[...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id), rule.id].join(",")} />
-                      <button type="submit" data-routing-reorder-down disabled={index === rules.length - 1} class="rounded-md border border-border px-2 py-1 text-xs">Down</button>
+                      <Input type="hidden" name="orderedIds" value={[...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id), rule.id].join(",")} />
+                      <Button type="submit" data-routing-reorder-down disabled={index === rules.length - 1} variant="outline" size="xs">Down</Button>
                     </form>
                     <form method="POST" action="?/delete">
-                      <input type="hidden" name="id" value={rule.id} />
-                      <button type="submit" data-routing-delete={rule.id} class="rounded-md border border-destructive/50 px-2 py-1 text-xs text-destructive">Delete</button>
+                      <Input type="hidden" name="id" value={rule.id} />
+                      <Button type="submit" data-routing-delete={rule.id} variant="danger" size="xs">Delete</Button>
                     </form>
                   </div>
                 </td>
@@ -353,13 +340,13 @@
                   <div class="flex flex-wrap gap-1">
                     {#if draft.conflictState === "review_needed"}
                       <form method="POST" action="?/draftApprove">
-                        <input type="hidden" name="draftId" value={draft.id} />
-                        <button type="submit" data-approve-draft={draft.id} class="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground">Approve draft</button>
+                        <Input type="hidden" name="draftId" value={draft.id} />
+                        <Button type="submit" data-approve-draft={draft.id} size="xs">Approve draft</Button>
                       </form>
                     {/if}
                     <form method="POST" action="?/draftDelete">
-                      <input type="hidden" name="draftId" value={draft.id} />
-                      <button type="submit" data-delete-draft={draft.id} class="rounded-md border border-destructive/50 px-2 py-1 text-xs text-destructive">Delete</button>
+                      <Input type="hidden" name="draftId" value={draft.id} />
+                      <Button type="submit" data-delete-draft={draft.id} variant="danger" size="xs">Delete</Button>
                     </form>
                   </div>
                 </td>
@@ -381,8 +368,11 @@
   <!-- ==================== TEST TAB ==================== -->
   {#if activeTab === "test"}
     <div data-routing-test-tab>
-      <section aria-label="Test routing" class="rounded-md border border-border p-4">
-        <h2 class="text-base font-semibold">Test routing</h2>
+      <Card aria-label="Test routing" size="sm">
+        <CardHeader>
+          <CardTitle>Test routing</CardTitle>
+        </CardHeader>
+        <CardContent>
         {#if form?.dryRunError}
           <p data-routing-dry-run-error class="mt-2 text-sm text-destructive">{form.dryRunError}</p>
         {/if}
@@ -400,16 +390,17 @@
         <form method="POST" action="?/dryRun" class="mt-3 grid gap-3">
           <label class="grid gap-1 text-sm">
             Task JSON
-            <textarea
+            <Textarea
               name="taskJson"
               aria-label="Task JSON"
               rows="5"
-              class="rounded-md border border-input bg-background px-3 py-2 font-mono text-xs"
-            >{defaultTaskJson}</textarea>
+              class="font-mono text-xs"
+            >{defaultTaskJson}</Textarea>
           </label>
-          <button type="submit" class="w-fit rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Test routing</button>
+          <Button type="submit" class="w-fit">Test routing</Button>
         </form>
-      </section>
+        </CardContent>
+      </Card>
 
       {#if enrichedResult}
         <section data-routing-enriched-result class="mt-4 rounded-md border border-border p-4">
@@ -423,19 +414,20 @@
   <!-- ==================== LLM GATE TAB ==================== -->
   {#if activeTab === "llm-gate"}
     <div data-routing-llm-gate-tab>
-      <section class="rounded-md border border-border p-4">
-        <h2 class="text-base font-semibold">LLM Gate Configuration</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Configure LLM fallback routing behavior.</p>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>LLM Gate Configuration</CardTitle>
+          <p class="mt-1 text-sm text-muted-foreground">Configure LLM fallback routing behavior.</p>
+        </CardHeader>
+        <CardContent>
 
         <form method="POST" action="?/updateLlmGate" class="mt-4 grid max-w-md gap-4">
           <label class="flex items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              name="enabled"
-              value="true"
+            <Input type="hidden" name="enabled" value={llmEnabled ? "true" : "false"} />
+            <Switch
               checked={llmEnabled}
               onchange={() => (llmEnabled = !llmEnabled)}
-              class="h-4 w-4 rounded border-border"
+              aria-label="Enable LLM routing fallback"
             />
             <span>Enable LLM routing fallback</span>
           </label>
@@ -457,9 +449,10 @@
             <p class="text-xs text-muted-foreground">LLM routing is disabled. Rules will use deterministic matching only.</p>
           {/if}
 
-          <button type="submit" class="w-fit rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">Save configuration</button>
+          <Button type="submit" class="w-fit">Save configuration</Button>
         </form>
-      </section>
+        </CardContent>
+      </Card>
     </div>
   {/if}
 
