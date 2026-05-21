@@ -159,6 +159,11 @@ export function wrapEnvelope<TResult>(input: EnvelopeInput<TResult>): CliEnvelop
   };
 }
 
+/** Compatibility name locked by CLI parity PRDs; delegates to the canonical wrapper. */
+export function createCliEnvelope<TResult>(input: EnvelopeInput<TResult>): CliEnvelope<TResult> {
+  return wrapEnvelope(input);
+}
+
 /** Build the JSONL end-of-stream sentinel for a streaming command. */
 export function streamSentinel(traceId: string): EnvelopeStreamSentinel {
   return { schema: ENVELOPE_SCHEMA, result: null, end: true, trace_id: traceId };

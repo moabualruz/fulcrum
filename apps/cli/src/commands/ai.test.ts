@@ -30,4 +30,25 @@ describe("fulcrum ai", () => {
       workspacePath: "/workspace/fulcrum",
     });
   });
+
+  test("accepts root --step/--thread grammar as an AI Assist session alias", async () => {
+    const out: string[] = [];
+    await run(["--step", "step-7", "--thread", "thread-9", "--json"], {
+      print: (line) => out.push(line),
+      exit: (code) => {
+        throw new Error(`exit ${code}`);
+      },
+    });
+
+    const envelope = JSON.parse(out[0] ?? "{}") as {
+      schema: string;
+      command: string;
+      args: { task: string; step: string };
+      result: { taskId: string; stepScope: string };
+    };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.command).toBe("fulcrum ai start");
+    expect(envelope.args).toMatchObject({ task: "thread-9", step: "step-7" });
+    expect(envelope.result).toMatchObject({ taskId: "thread-9", stepScope: "step-7" });
+  });
 });

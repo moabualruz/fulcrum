@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	ABORT_REASONS,
 	CLI_ENVELOPE_KIND,
+	SESSION_HELP,
 	runSessionCommand,
 	type CheckpointSummary,
 	type SessionCommandHost,
@@ -107,6 +108,12 @@ function lastJsonLine<T>(text: string): SessionEnvelope<T> {
 	return JSON.parse(last) as SessionEnvelope<T>;
 }
 
+function lastCanonicalEnvelope<T>(text: string): { schema: string; command: string; result: T; errors: unknown[] } {
+	const trimmed = text.trim().split("\n").filter(Boolean);
+	const last = trimmed[trimmed.length - 1] ?? "";
+	return JSON.parse(last) as { schema: string; command: string; result: T; errors: unknown[] };
+}
+
 describe("fulcrum session command", () => {
 	test("rejects unknown verb with exit code 2", async () => {
 		const host = fakeHost();
@@ -120,11 +127,24 @@ describe("fulcrum session command", () => {
 		const host = fakeHost();
 		const harness = makeIo();
 		await runSessionCommand(["list", "--json"], host, harness.io);
-		const env = lastJsonLine<SessionSummary[]>(harness.stdout());
-		expect(env.kind).toBe(CLI_ENVELOPE_KIND);
-		expect(env.verb).toBe("list");
-		expect(env.ok).toBe(true);
-		expect(env.data?.[0]?.id).toBe("s1");
+		const env = lastCanonicalEnvelope<SessionSummary[]>(harness.stdout());
+		expect(env.schema).toBe(CLI_ENVELOPE_KIND);
+		expect(env.command).toBe("fulcrum session list");
+		expect(env.errors).toEqual([]);
+		expect(env.result[0]?.id).toBe("s1");
+	});
+
+	test("help exits before daemon health checks or spawning", async () => {
+		const host = fakeHost({
+			async isDaemonHealthy() {
+				throw new Error("daemon check should not run for help");
+			},
+		});
+		const harness = makeIo();
+		const out = await runSessionCommand(["--help"], host, harness.io);
+		expect(out.exitCode).toBe(0);
+		expect(harness.stdout()).toBe(SESSION_HELP);
+		expect(host.calls).toEqual([]);
 	});
 
 	test("pause defaults to the active session when id omitted", async () => {
@@ -187,8 +207,8 @@ describe("fulcrum session command", () => {
 		const host = fakeHost();
 		const harness = makeIo();
 		await runSessionCommand(["checkpoints", "s1", "--json"], host, harness.io);
-		const env = lastJsonLine<CheckpointSummary[]>(harness.stdout());
-		expect(env.data?.[0]?.sessionId).toBe("s1");
+		const env = lastCanonicalEnvelope<CheckpointSummary[]>(harness.stdout());
+		expect(env.result[0]?.sessionId).toBe("s1");
 	});
 
 	test("watch invokes sink for each event in --json mode", async () => {

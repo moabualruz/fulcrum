@@ -19,8 +19,19 @@ import { AcpSession } from "@agent-client-protocol/infrastructure/database/entit
 import { AcpSessionRepository } from "@agent-client-protocol/infrastructure/database/repositories/AcpSessionRepository.ts";
 import { buildLocalApplicationContainer } from "@platform-core/application/runtime/local-application-container.ts";
 import { parseArgs } from "../arg-parser.ts";
+import { emitResult } from "../lib/cli-output.ts";
 
 export const CLI_ENVELOPE_KIND = "fulcrum.cli.v1" as const;
+
+export const SESSION_HELP = `fulcrum session — persisted AI Assist sessions
+
+Usage:
+  fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch> [--json] [--no-spawn]
+
+Options:
+  --json      Canonical fulcrum.cli.v1 JSON envelope
+  --no-spawn  Do not auto-start fulcrumd before running the command
+`;
 
 export type SessionVerb =
 	| "list"
@@ -148,6 +159,10 @@ export async function runSessionCommand(
 ): Promise<RunSessionResult> {
 	const parsed = parseArgs(argv, SESSION_BOOLEAN_FLAGS);
 	const [verb, ...positionals] = parsed.positionals;
+	if (!verb || verb === "help" || verb === "--help" || verb === "-h") {
+		io.stdout.write(SESSION_HELP);
+		return { exitCode: 0 };
+	}
 	if (!verb || !SESSION_VERBS.has(verb as SessionVerb)) {
 		writeError(io, `unknown session verb: '${verb ?? ""}'`);
 		writeError(io, `verbs: ${[...SESSION_VERBS].join(", ")}`);
@@ -198,7 +213,7 @@ export async function runSessionCommand(
 async function runList(host: SessionCommandHost, io: CommandIO, opts: { json: boolean }): Promise<RunSessionResult> {
 	const sessions = await host.listSessions();
 	if (opts.json) {
-		io.stdout.write(`${JSON.stringify(envelope("list", sessions))}\n`);
+		emit(io, "list", sessions, opts);
 	} else {
 		if (sessions.length === 0) io.stdout.write("(no sessions)\n");
 		for (const s of sessions) {
@@ -310,7 +325,7 @@ async function runCheckpoints(
 	if (!id) throw new Error("usage: fulcrum session checkpoints <id>");
 	const checkpoints = await host.listCheckpoints(id);
 	if (opts.json) {
-		io.stdout.write(`${JSON.stringify(envelope("checkpoints", checkpoints))}\n`);
+		emit(io, "checkpoints", checkpoints, opts);
 	} else {
 		if (checkpoints.length === 0) io.stdout.write("(no checkpoints)\n");
 		for (const c of checkpoints) {
@@ -344,7 +359,19 @@ async function runWatch(
 
 function emit<T>(io: CommandIO, verb: SessionVerb, data: T, opts: { json: boolean }): void {
 	if (opts.json) {
-		io.stdout.write(`${JSON.stringify(envelope(verb, data))}\n`);
+		emitResult(
+			{
+				argv: ["--json"],
+				command: `fulcrum session ${verb}`,
+				args: { verb },
+				result: data,
+				renderHuman: () => {},
+			},
+			{
+				print: (line) => io.stdout.write(`${line}\n`),
+				printErr: (line) => io.stderr.write(`${line}\n`),
+			},
+		);
 	} else {
 		io.stdout.write(`${verb} ok\n${JSON.stringify(data, null, 2)}\n`);
 	}

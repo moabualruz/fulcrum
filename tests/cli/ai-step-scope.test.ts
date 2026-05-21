@@ -71,9 +71,10 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
       io.opts,
     );
 
-    // The CLI analog of the OD drawer header `Step 3 / 8 · …` — the resolved
-    // Step scope is echoed before the session object.
-    expect(io.lines[0]).toBe("AI Assist scoped to step step-3");
+    // The trace spine prints first; then the CLI analog of the OD drawer header
+    // `Step 3 / 8 · …` echoes the resolved Step scope before the session object.
+    expect(io.lines[0]).toMatch(/^trace: [0-9a-f]{8}…/);
+    expect(io.lines[1]).toBe("AI Assist scoped to step step-3");
     expect(io.exitCode).toBeUndefined();
   });
 
@@ -194,7 +195,8 @@ describe("fulcrum ai — Step scope + trace continuity", () => {
     const io = captureLines();
     await runAi(["start", "--task", "task-9", "--title", "Persist issuance row"], io.opts);
 
-    expect(io.lines[0]).toBe("AI Assist scoped to step task-9");
+    expect(io.lines[0]).toMatch(/^trace: [0-9a-f]{8}…/);
+    expect(io.lines[1]).toBe("AI Assist scoped to step task-9");
     expect(io.exitCode).toBeUndefined();
   });
 });

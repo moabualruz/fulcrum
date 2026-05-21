@@ -23,6 +23,7 @@ import {
   setEnabled,
   unregisterServer,
 } from "./mcp-registry.ts";
+import { emitErrorResult, emitResult } from "./lib/cli-output.ts";
 
 function pad(s: string, n: number): string {
   return s.length >= n ? s : s + " ".repeat(n - s.length);
@@ -49,7 +50,16 @@ async function cmdList(args: string[]): Promise<void> {
         ALL_AGENT_IDS.map((id) => [id, disabledConfigSupport(s, id)]),
       ),
     }));
-    console.log(JSON.stringify(out, null, 2));
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum mcp list",
+        args: { subcommand: "list" },
+        result: out,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
     return;
   }
 
@@ -226,6 +236,23 @@ export async function run(args: string[]): Promise<void> {
     case "enable":      return cmdEnable(args.slice(1));
     case "disable":     return cmdDisable(args.slice(1));
     default:
+      if (args.includes("--json")) {
+        emitErrorResult(
+          {
+            argv: args,
+            command: `fulcrum mcp ${sub}`,
+            args: { subcommand: sub },
+            error: {
+              code: "FUL_MCP_UNKNOWN_SUBCOMMAND",
+              message: `fulcrum mcp: unknown subcommand '${sub}'`,
+              fix: "Run `fulcrum mcp list --json` or `fulcrum mcp --help`.",
+            },
+            renderHuman: () => {},
+          },
+          { print: console.log, printErr: console.error },
+        );
+        process.exit(2);
+      }
       console.error(`fulcrum mcp: unknown subcommand '${sub}'`);
       console.error("Available: list, register, unregister, enable, disable");
       process.exit(2);

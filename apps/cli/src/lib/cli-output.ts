@@ -24,10 +24,10 @@ import {
   type EnvelopeInput,
   type EnvelopeNextAction,
   type EnvelopeStreamSentinel,
+  createCliEnvelope,
   resolveTraceIdentity,
   serializeEnvelope,
   streamSentinel,
-  wrapEnvelope,
 } from "./envelope.ts";
 import { formatErrorRecovery, formatTraceLine } from "./trace-line.ts";
 
@@ -153,16 +153,16 @@ export class JqExpressionError extends Error {
 export function emitResult<TResult>(input: EmitResultInput<TResult>, io: OutputIo): void {
   const mode = parseJsonOutputMode(input.argv);
   if (!mode.json) {
-    input.renderHuman(input.result);
     const lineOpts = traceLineOptions(input.traceLine);
     if (lineOpts) printTraceLine(input, io, lineOpts);
+    input.renderHuman(input.result);
     return;
   }
   if (mode.raw) {
     io.print(JSON.stringify(input.result));
     return;
   }
-  const envelope = wrapEnvelope({
+  const envelope = createCliEnvelope({
     command: input.command,
     args: input.args,
     result: input.result,
@@ -195,7 +195,7 @@ export function emitStreamEnvelope<TResult>(input: EmitResultInput<TResult>, io:
     io.print(JSON.stringify(input.result));
     return;
   }
-  const envelope = wrapEnvelope({
+  const envelope = createCliEnvelope({
     command: input.command,
     args: input.args,
     result: input.result,
@@ -299,7 +299,7 @@ export function emitErrorResult(
     io.print(JSON.stringify({ error: { code: input.error.code, message: input.error.message } }));
     return;
   }
-  const envelope = wrapEnvelope({
+  const envelope = createCliEnvelope({
     command: input.command,
     args: input.args,
     result: null,
