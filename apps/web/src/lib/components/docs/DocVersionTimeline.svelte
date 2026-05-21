@@ -1,7 +1,6 @@
 <script lang="ts">
   import { cn } from "$lib/utils.js";
-  import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
-  import * as ScrollArea from "$lib/components/ui/scroll-area";
+  import { Sheet, SheetContent, SheetHeader, SheetTitle, ScrollArea } from "@fulcrum/ui-kit";
   import { buttonVariants } from "@fulcrum/ui-kit";
   import HistoryIcon from "@lucide/svelte/icons/history";
   import UserIcon from "@lucide/svelte/icons/user";
@@ -99,8 +98,7 @@
       </SheetTitle>
     </SheetHeader>
 
-    <ScrollArea.Root class={cn("h-[calc(100vh-60px)]")}>
-      <ScrollArea.Viewport class={cn("px-0 py-2")}>
+    <ScrollArea class={cn("h-[calc(100vh-60px)]")} viewportClasses={cn("px-0 py-2")}>
         {#if versions.length === 0}
           <p class={cn("px-4 py-8 text-sm text-muted-foreground text-center")}>No versions yet.</p>
         {:else}
@@ -227,8 +225,6 @@
             {/each}
           </ol>
         {/if}
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="vertical" />
-    </ScrollArea.Root>
+    </ScrollArea>
   </SheetContent>
 </Sheet>

@@ -446,3 +446,14 @@ export type {
 	AcpDrawerMetaItem,
 	AcpDrawerAgentRow,
 } from "./components/acp-drawer/index.js";
+export {
+	ScrollArea,
+	ScrollAreaScrollbar,
+	Root as ScrollAreaRoot,
+	Scrollbar as ScrollAreaScrollbarRoot,
+} from "./components/scroll-area/index.js";
+export type {
+	ScrollAreaProps,
+	ScrollAreaOrientation,
+	ScrollAreaScrollbarProps,
+} from "./components/scroll-area/index.js";
