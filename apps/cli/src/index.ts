@@ -17,7 +17,7 @@ import {
   type LocalApplicationContainer,
 } from "@platform-core/application/runtime/local-application-container.ts";
 
-import { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import { CLI_RESULT_SCHEMA, HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
 import { emitResult } from "./lib/cli-output.ts";
 
 export { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp };
@@ -356,12 +356,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "routing": {
       const { run: runRouting } = await import("./commands/routing.ts");
-      await runRouting(rest);
+      await runRouting(rest, { commandRoot: "routing" });
       return;
     }
     case "route": {
       const { run: runRouting } = await import("./commands/routing.ts");
-      await runRouting(rest);
+      await runRouting(rest, { commandRoot: "route" });
       return;
     }
     case "review":
@@ -385,6 +385,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "docs": {
       const { run: runDocsCommand } = await import("./commands/docs.ts");
       await runDocsCommand(rest);
+      return;
+    }
+    case "report": {
+      const { run: runReport } = await import("./commands/report.ts");
+      await runReport(rest);
       return;
     }
     case "memory": {
@@ -675,6 +680,10 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "--help":
     case "-h": {
       const [topic] = rest;
+      if (rest.includes("--json-schema")) {
+        console.log(JSON.stringify(CLI_RESULT_SCHEMA));
+        return;
+      }
       if (topic) {
         const stageHelp = renderStageHelp(topic);
         if (stageHelp) {

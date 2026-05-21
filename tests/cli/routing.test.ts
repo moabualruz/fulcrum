@@ -52,6 +52,19 @@ const RULE_ID = "00000000-0000-4000-8000-000000000001";
 const PROJECT_ID = "00000000-0000-4000-8000-000000000010";
 const TASK_ID = "00000000-0000-4000-8000-000000000020";
 
+function envelopeResult(line: string): unknown {
+  const parsed = JSON.parse(line) as Record<string, unknown>;
+  expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+  expect(typeof parsed["trace_id"]).toBe("string");
+  return parsed["result"];
+}
+
+function envelopeErrors(line: string): unknown[] {
+  const parsed = JSON.parse(line) as { schema: string; errors: unknown[] };
+  expect(parsed.schema).toBe("fulcrum.cli.v1");
+  return parsed.errors;
+}
+
 function rule(overrides: Partial<RoutingRule> = {}): RoutingRule {
   return {
     id: RULE_ID,
@@ -163,7 +176,7 @@ describe("routing rules CLI", () => {
       operation: "routing.list",
       input: { projectId: PROJECT_ID },
     });
-    const parsed = JSON.parse(stdout[0]!) as RoutingRule[];
+    const parsed = envelopeResult(stdout[0]!) as RoutingRule[];
     expect(parsed[0]).toMatchObject({
       id: RULE_ID,
       name: "Bug triage",
@@ -226,7 +239,7 @@ describe("routing rules CLI", () => {
       operation: "routing.update",
       input: { id: RULE_ID, name: "Renamed", actionAgent: "codex", enabled: false },
     });
-    expect(JSON.parse(stdout[0]!).name).toBe("Renamed");
+    expect((envelopeResult(stdout[0]!) as RoutingRule).name).toBe("Renamed");
   });
 
   test("delete calls routing.delete and prints confirmation", async () => {
@@ -266,7 +279,7 @@ describe("routing rules CLI", () => {
       operation: "routing.dryRun",
       input: { taskJson: { title: "Fix auth", kind: "bug", priority: "high", tags: ["auth"] } },
     });
-    const parsed = JSON.parse(stdout[0]!);
+    const parsed = envelopeResult(stdout[0]!) as RoutingEnrichedDecision;
     expect(parsed.status).toBe("matched");
     expect(parsed.matchedRuleId).toBe(RULE_ID);
   });
@@ -327,10 +340,10 @@ describe("routing rules CLI", () => {
     const gate = await runRoutingWithOptions(["llm-gate", "set", "--input-mode", "task_facts", "--enabled", "true", "--json"], options);
 
     expect([list, assign, approve, gate].every((result) => result.exitCode === undefined)).toBe(true);
-    expect(JSON.parse(list.stdout[0] as string)[0].id).toBe(RULE_ID);
-    expect(JSON.parse(assign.stdout[0] as string)).toMatchObject({ status: "matched", matchedRuleId: RULE_ID });
-    expect(JSON.parse(approve.stdout[0] as string)).toEqual({ ok: true });
-    expect(JSON.parse(gate.stdout[0] as string)).toEqual({ ok: true });
+    expect((envelopeResult(list.stdout[0] as string) as RoutingRule[])[0]!.id).toBe(RULE_ID);
+    expect(envelopeResult(assign.stdout[0] as string)).toMatchObject({ status: "matched", matchedRuleId: RULE_ID });
+    expect(envelopeResult(approve.stdout[0] as string)).toEqual({ ok: true });
+    expect(envelopeResult(gate.stdout[0] as string)).toEqual({ ok: true });
     expect(requests).toEqual([
       ["GET", `http://127.0.0.1:3210/api/v1/routing/rules?orgId=org-1&userId=user-1&projectId=${PROJECT_ID}`, undefined],
       ["POST", "http://127.0.0.1:3210/api/v1/routing/test", { orgId: "org-1", userId: "user-1", taskId: TASK_ID }],
@@ -343,7 +356,7 @@ describe("routing rules CLI", () => {
     const result = await runRoutingWithOptions(["rules", "list", "--json"]);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stdout).toEqual([]);
-    expect(result.stderr.join("\n")).toContain("Routing API caller is not configured");
+    expect(result.stderr).toEqual([]);
+    expect(JSON.stringify(envelopeErrors(result.stdout[0] as string))).toContain("Routing API caller is not configured");
   });
 });

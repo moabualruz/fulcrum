@@ -246,6 +246,43 @@ describe("operate plugin envelope + root plugin alias", () => {
     expect(envelope.command).toBe("plugin enable");
     expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
   }, 20_000);
+
+  test.each([
+    ["help capture --json-schema"],
+    ["help agent --json-schema"],
+    ["help route --json-schema"],
+  ])("`fulcrum %s` prints result schema", (command) => {
+    const proc = runBin(command.split(" "));
+    expect(proc.status).toBe(0);
+    const schema = JSON.parse(proc.stdout) as Record<string, unknown>;
+    expect(schema["$schema"]).toBe("https://json-schema.org/draft/2020-12/schema");
+    expect(schema["title"]).toBe("fulcrum.cli.v1");
+    expect(JSON.stringify(schema)).toContain("trace_id");
+    expect(JSON.stringify(schema)).toContain("result");
+  });
+
+  test.each([
+    ["agent", ["add", "remove", "edit", "status", "defaults", "set-default"]],
+    ["route", ["list", "set"]],
+    ["report", ["list"]],
+  ] as const)("`fulcrum %s --help` advertises canonical verbs", (root, verbs) => {
+    const proc = runBin([root, "--help"]);
+    expect(proc.status).toBe(0);
+    for (const verb of verbs) expect(proc.stdout).toContain(verb);
+  });
+
+  test("root report command dispatches to explicit not-implemented envelope for list", () => {
+    const proc = runBin(["report", "list", "--json"]);
+    expect(proc.status).toBe(1);
+    const envelope = JSON.parse(proc.stdout) as {
+      schema: string;
+      command: string;
+      errors: Array<{ code: string }>;
+    };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.command).toBe("fulcrum report list");
+    expect(envelope.errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
+  });
 });
 
 function capture() {

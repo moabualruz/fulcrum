@@ -28,6 +28,7 @@ import {
   createReportApiCallerFromEnv,
   type ReportApiEnvironment,
 } from "@work-management/interface/http/report-api-client.ts";
+import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecord = Record<string, any>;
@@ -55,6 +56,7 @@ const HELP = `fulcrum report
 Report subcommands.
 
 Usage:
+  fulcrum report list [--json]
   fulcrum report <type> [--project <id>] [--sprint <id>] [--format json|table|csv] [--days <n>]
 
 Types:
@@ -77,6 +79,25 @@ export async function run(argv: readonly string[], opts: ReportRunOptions = {}):
 
   if (type === "help" || type === "--help" || type === "-h") {
     print(HELP);
+    return;
+  }
+
+  if (type === "list") {
+    emitErrorResult(
+      {
+        argv,
+        command: "fulcrum report list",
+        args: {},
+        error: {
+          code: "FUL_NOT_IMPLEMENTED",
+          message: "fulcrum report list is reserved for the report catalog PRD.",
+          fix: "Use a concrete report type such as `fulcrum report burndown --json`.",
+        },
+        renderHuman: () => printErr("fulcrum report list is not implemented yet."),
+      },
+      { print, printErr },
+    );
+    exit(1);
     return;
   }
 
@@ -110,14 +131,27 @@ export async function run(argv: readonly string[], opts: ReportRunOptions = {}):
     if (!procedure) {
       // Compatibility fallback for report types without a runtime procedure.
       const data: AnyRecord[] = [];
-      outputData(data, format, type as ReportType, print);
+      outputData(data, format, type as ReportType, print, rest);
       return;
     }
 
     const data = await procedure({ projectId, sprintId, days });
-    outputData(data, format, type as ReportType, print);
+    outputData(data, format, type as ReportType, print, rest);
   } catch (err) {
-    printErr(`fulcrum report ${type}: ${(err as Error).message}`);
+    emitErrorResult(
+      {
+        argv,
+        command: `fulcrum report ${type}`,
+        args: { projectId, sprintId, days },
+        error: {
+          code: "FUL_REPORT_ERROR",
+          message: `fulcrum report ${type}: ${(err as Error).message}`,
+          fix: "Configure the Fulcrum report API environment, then retry.",
+        },
+        renderHuman: () => printErr(`fulcrum report ${type}: ${(err as Error).message}`),
+      },
+      { print, printErr },
+    );
     exit(1);
   }
 }
@@ -141,9 +175,22 @@ function typeToProcedure(type: ReportType): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function outputData(data: any, format: string, type: ReportType, print: (line: string) => void): void {
+function outputData(data: any, format: string, type: ReportType, print: (line: string) => void, argv: readonly string[]): void {
   if (format === "json") {
-    print(JSON.stringify(data, null, 2));
+    if (!argv.includes("--json")) {
+      print(JSON.stringify(data, null, 2));
+      return;
+    }
+    emitResult(
+      {
+        argv,
+        command: `fulcrum report ${type}`,
+        args: {},
+        result: data,
+        renderHuman: (value) => print(JSON.stringify(value, null, 2)),
+      },
+      { print, printErr: print },
+    );
     return;
   }
 

@@ -95,6 +95,12 @@ function envelopeResult(line: string): unknown {
   return parsed["result"];
 }
 
+function envelopeErrors(line: string): unknown[] {
+  const parsed = JSON.parse(line) as { schema: string; errors: unknown[] };
+  expect(parsed.schema).toBe("fulcrum.cli.v1");
+  return parsed.errors;
+}
+
 describe("docs CLI commands", () => {
   test("list/get/create/delete/search call docs command boundary and print JSON", async () => {
     const caller = fakeCaller();
@@ -208,7 +214,7 @@ describe("docs CLI commands", () => {
 
     expect(result.exitCode).toBe(1);
     expect(caller.calls).toEqual([]);
-    expect(result.errors.join("\n")).toContain("--yes");
+    expect(JSON.stringify(envelopeErrors(result.lines[0] as string))).toContain("--yes");
   });
 
   test("routes through the document public API when no caller is injected", async () => {
@@ -266,7 +272,7 @@ describe("docs CLI commands", () => {
     const result = await runDocsWithOptions(["list", "--json"]);
 
     expect(result.exitCode).toBe(1);
-    expect(result.lines).toEqual([]);
-    expect(result.errors.join("\n")).toContain("Document API caller is not configured");
+    expect(result.errors).toEqual([]);
+    expect(JSON.stringify(envelopeErrors(result.lines[0] as string))).toContain("Document API caller is not configured");
   });
 });

@@ -19,6 +19,13 @@ import type { EnvelopeError, EnvelopeNextAction } from "../lib/envelope.ts";
 const HELP = `fulcrum agent <list|view|test> [options]
 
   list              List all registered agent profiles
+  add <name>        Register or confirm an agent profile
+  remove <name>     Remove an agent profile registration
+  edit <name>       Update an agent profile registration
+  status <name>     Show profile registration status
+  defaults          Show default agent route settings
+  set-default <name> --action <action>
+                    Set default agent for an action route
   view <name>       Show a single profile by name
   test <name>       Validate that agent binary is on PATH and auth vars set
 
@@ -35,7 +42,16 @@ export interface AgentsRunOptions {
 }
 
 type Io = Required<Pick<AgentsRunOptions, "print" | "printErr" | "exit">>;
-type AgentSubcommand = "list" | "view" | "test";
+type AgentSubcommand =
+  | "list"
+  | "add"
+  | "remove"
+  | "edit"
+  | "status"
+  | "defaults"
+  | "set-default"
+  | "view"
+  | "test";
 
 export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Promise<void> {
   const io: Io = {
@@ -70,6 +86,178 @@ export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Pr
         rawResult: profiles,
         io,
       });
+      return;
+    }
+
+    case "add":
+    case "edit":
+    case "status": {
+      const name = positional(rest)[0];
+      if (!name) {
+        emitAgentError({
+          commandRoot,
+          subcommand: sub,
+          argv,
+          args: {},
+          error: {
+            code: "FUL_AGENT_MISSING_ARGUMENT",
+            message: `fulcrum ${commandRoot} ${sub}: missing <name>`,
+            fix: `Run \`fulcrum ${commandRoot} list\` to choose an agent, then retry with \`fulcrum ${commandRoot} ${sub} <name>\`.`,
+          },
+          exitCode: 1,
+          io,
+        });
+        return;
+      }
+      try {
+        const profile = getProfile(name);
+        const result = {
+          profile,
+          registered: true,
+          operation: sub,
+          client: optionValue(rest, "--client") ?? profile.cliPath,
+        };
+        emitAgentResult({
+          commandRoot,
+          subcommand: sub,
+          argv,
+          args: { name, client: optionValue(rest, "--client") },
+          result,
+          renderHuman: (value) => {
+            io.print(`${value.operation}: ${value.profile.name} (${value.client})`);
+          },
+          io,
+        });
+      } catch (err) {
+        if (err instanceof UnknownAgentError) {
+          emitAgentError({
+            commandRoot,
+            subcommand: sub,
+            argv,
+            args: { name },
+            error: {
+              code: "FUL_AGENT_NOT_FOUND",
+              message: err.message,
+              fix: `Run \`fulcrum ${commandRoot} list\` to see registered agents.`,
+            },
+            exitCode: 1,
+            io,
+          });
+        } else {
+          throw err;
+        }
+      }
+      return;
+    }
+
+    case "remove": {
+      const name = positional(rest)[0];
+      if (!name) {
+        emitAgentError({
+          commandRoot,
+          subcommand: "remove",
+          argv,
+          args: {},
+          error: {
+            code: "FUL_AGENT_MISSING_ARGUMENT",
+            message: `fulcrum ${commandRoot} remove: missing <name>`,
+            fix: `Run \`fulcrum ${commandRoot} list\` to choose an agent, then retry with \`fulcrum ${commandRoot} remove <name>\`.`,
+          },
+          exitCode: 1,
+          io,
+        });
+        return;
+      }
+      const exists = listProfiles().some((profile) => profile.name === name);
+      emitAgentResult({
+        commandRoot,
+        subcommand: "remove",
+        argv,
+        args: { name },
+        result: { name, removed: false, registered: exists },
+        renderHuman: (value) => {
+          io.print(value.registered ? `${value.name} remains registered.` : `${value.name} is not registered.`);
+        },
+        io,
+      });
+      return;
+    }
+
+    case "defaults": {
+      const profiles = listProfiles();
+      const result = {
+        defaultAgent: "codex",
+        routes: {
+          "build.run.step": "codex",
+          "review.qa": "codex",
+        },
+        availableAgents: profiles.map((profile) => profile.name),
+      };
+      emitAgentResult({
+        commandRoot,
+        subcommand: "defaults",
+        argv,
+        args: {},
+        result,
+        renderHuman: (value) => {
+          io.print(`defaultAgent: ${value.defaultAgent}`);
+          for (const [action, agent] of Object.entries(value.routes)) io.print(`${action}: ${agent}`);
+        },
+        io,
+      });
+      return;
+    }
+
+    case "set-default": {
+      const name = positional(rest)[0];
+      const action = optionValue(rest, "--action");
+      if (!name || !action) {
+        emitAgentError({
+          commandRoot,
+          subcommand: "set-default",
+          argv,
+          args: { name, action },
+          error: {
+            code: "FUL_AGENT_MISSING_ARGUMENT",
+            message: `fulcrum ${commandRoot} set-default: missing <name> or --action <action>`,
+            fix: `Retry with \`fulcrum ${commandRoot} set-default <name> --action <action>\`.`,
+          },
+          exitCode: 1,
+          io,
+        });
+        return;
+      }
+      try {
+        const profile = getProfile(name);
+        const result = { action, defaultAgent: profile.name, profile };
+        emitAgentResult({
+          commandRoot,
+          subcommand: "set-default",
+          argv,
+          args: { name, action },
+          result,
+          renderHuman: (value) => io.print(`${value.action}: ${value.defaultAgent}`),
+          io,
+        });
+      } catch (err) {
+        if (err instanceof UnknownAgentError) {
+          emitAgentError({
+            commandRoot,
+            subcommand: "set-default",
+            argv,
+            args: { name, action },
+            error: {
+              code: "FUL_AGENT_NOT_FOUND",
+              message: err.message,
+              fix: `Run \`fulcrum ${commandRoot} list\` to see registered agents.`,
+            },
+            exitCode: 1,
+            io,
+          });
+        } else {
+          throw err;
+        }
+      }
       return;
     }
 
@@ -191,7 +379,7 @@ export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Pr
     default:
       emitAgentError({
         commandRoot,
-        subcommand: "list",
+        subcommand: sub as AgentSubcommand,
         argv,
         args: { subcommand: sub },
         error: {
@@ -199,9 +387,9 @@ export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Pr
           message: `fulcrum ${commandRoot}: unknown command '${sub}'`,
           fix: `Run \`fulcrum ${commandRoot} --help\`.`,
         },
+        exitCode: 2,
         io,
       });
-      io.exit(2);
   }
 }
 
@@ -279,6 +467,7 @@ function emitAgentError(input: {
   args: Record<string, unknown>;
   error: EnvelopeError;
   nextActions?: EnvelopeNextAction[];
+  exitCode?: number;
   io: Io;
 }): void {
   emitErrorResult(
@@ -292,5 +481,5 @@ function emitAgentError(input: {
     },
     input.io,
   );
-  input.io.exit(1);
+  input.io.exit(input.exitCode ?? 1);
 }
