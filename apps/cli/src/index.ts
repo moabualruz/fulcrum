@@ -277,12 +277,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "agents": {
       const { run: runAgents } = await import("./commands/agents.ts");
-      await runAgents(rest);
+      await runAgents(rest, { commandRoot: "agents" });
       return;
     }
     case "agent": {
       const { run: runAgents } = await import("./commands/agents.ts");
-      await runAgents(rest);
+      await runAgents(rest, { commandRoot: "agent" });
       return;
     }
     case "projects": {
