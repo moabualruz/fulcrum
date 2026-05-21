@@ -1,5 +1,45 @@
-import { describe, expect, test, mock, beforeEach } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test, mock, beforeEach } from "bun:test";
 import type { OrchestrationDashboardData } from "$lib/server/orchestration";
+import { orchestrationMock } from "$lib/test/orchestration-mock";
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
+
+// `mock.module` is process-global; these seams answer only while this suite
+// runs and otherwise delegate to the real implementations for foreign suites.
+let suiteActive = false;
+let suiteDispatches: unknown[] = [];
+let suiteProjects: unknown[] = [];
+
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock((_locals, projectId) =>
+    suiteActive
+      ? { em: { kind: "mock-em" }, ctx: { orgId: "org1", userId: "user1", projectId: projectId ?? null } }
+      : null,
+  ),
+);
+
+// `$lib/server/orchestration` is a barrel; `orchestrationMock` keeps a complete
+// export set (real `loadOrchestrationConfig` / `upsertOrchestrationConfig` / …)
+// and only overrides the two functions this suite drives, while it is active.
+mock.module("$lib/server/orchestration", () =>
+  orchestrationMock(() =>
+    suiteActive
+      ? {
+          loadOrchestrationDashboard: async (...args: unknown[]) => {
+            const projectId = args[2] as string | undefined;
+            return {
+              ...EMPTY_DASHBOARD,
+              dispatches: projectId
+                ? (suiteDispatches as Array<{ project_id: string | null }>).filter(
+                    (d) => d.project_id === projectId,
+                  )
+                : suiteDispatches,
+            };
+          },
+          listOrchestrationProjectOptions: async () => suiteProjects,
+        }
+      : null,
+  ),
+);
 
 function mockUrl(params: Record<string, string> = {}): URL {
   const u = new URL("http://localhost:5173/orchestration");
@@ -26,44 +66,31 @@ const EMPTY_DASHBOARD: OrchestrationDashboardData = {
 };
 
 function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
-  // The route resolves its data through `requestServiceScope`; it no longer
-  // touches `$lib/server/db` directly. Stub the service scope it actually uses.
-  mock.module("$lib/server/request-service-scope", () => ({
-    requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
-      em: { kind: "mock-em" },
-      ctx: { orgId: "org1", userId: "user1", projectId },
-    }),
-  }));
-  mock.module("$lib/server/orchestration", () => ({
-    loadOrchestrationDashboard: async (
-      _db: unknown,
-      _orgId: string,
-      projectId?: string,
-    ) => ({
-      ...EMPTY_DASHBOARD,
-      dispatches: projectId
-        ? (dispatches as Array<{ project_id: string | null }>).filter(
-            (d) => d.project_id === projectId,
-          )
-        : dispatches,
-    }),
-    // `+page.server.ts` also imports listOrchestrationProjectOptions; the
-    // mock must declare it or the route load() fails to resolve the import.
-    listOrchestrationProjectOptions: async () => projects,
-    SYMPHONY_COLORS: {},
-  }));
+  // The route resolves its data through `requestServiceScope` and
+  // `$lib/server/orchestration` — both stubbed at the top of this file via the
+  // shared complete-export factories. Here we only seed the suite-scoped data
+  // the orchestration dashboard mock reads.
+  suiteDispatches = dispatches;
+  suiteProjects = projects;
   mock.module("$lib/server/runs", () => ({
     dispatchRunAction: async () => ({ id: "run-dispatched" }),
     cancelRunAction: async () => {},
     retryRunAction: async () => {},
   }));
-  mock.module("$lib/feedback/action-result", () => ({
-    actionOk: (msg: string) => ({ success: true, message: msg }),
-  }));
+  // `$lib/feedback/action-result` is a pure module; the route's `actionOk`
+  // result is never asserted by this load()-only suite. Mocking it here froze
+  // a process-global, wrong-shaped (`success` vs `ok`) export set that broke
+  // every sibling suite importing the real module — left unmocked on purpose.
   return { projects };
 }
 
 describe("/orchestration +page.server.ts load()", () => {
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
   beforeEach(() => {
     mockDb();
   });

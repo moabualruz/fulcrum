@@ -59,15 +59,21 @@ let profilePayload = () => ({
   tasks: [],
 });
 
+// Only `agent-profile-pages.ts` is mocked — the `/agents` route imports
+// `listAgentProfilesPageData` / `testProfile` from it, and the stub below
+// carries that module's complete export set. The underlying
+// `agents/queries.ts` is intentionally NOT mocked: `mock.module` is
+// process-global, so a partial 3-of-12 mock of `queries.ts` froze its
+// export-name set and broke sibling suites (`api/trpc/[...path]`) that import
+// the real `queries.ts` and need `testProfileAction` / `upsertProfileAction` /
+// `getAgentProfilePageData`. Replacing `agent-profile-pages.ts` wholesale
+// already short-circuits its lazy `import("agents/queries.ts")`, so mocking
+// `queries.ts` was both unnecessary and contaminating.
 const AGENT_QUERY_MODULES = [
   "@execution-orchestration/interface/agent-profile-pages.ts",
   "services/execution-orchestration/src/interface/agent-profile-pages.ts",
   "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/agent-profile-pages.ts",
   "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/interface/agent-profile-pages.ts",
-  "@execution-orchestration/application/agents/queries.ts",
-  "services/execution-orchestration/src/application/agents/queries.ts",
-  "/Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
-  "file:///Users/mkh/workspace/fulcrum/services/execution-orchestration/src/application/agents/queries.ts",
 ] as const;
 
 const RUN_COMMAND_MODULES = [

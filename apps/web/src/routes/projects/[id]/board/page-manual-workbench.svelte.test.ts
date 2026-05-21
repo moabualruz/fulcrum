@@ -1,10 +1,11 @@
 import type { Component } from "svelte";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { svelteTiptapMock } from "$lib/test/svelte-tiptap-mock";
 
-mock.module("svelte-tiptap", () => ({
-  createEditor: () => ({ subscribe: () => () => {} }),
-  EditorContent: "div",
-}));
+// `mock.module` freezes a module's export-name set on first registration.
+// `svelteTiptapMock()` carries every real `svelte-tiptap` export so sibling
+// suites that import other names (`NodeViewWrapper`, …) are not frozen out.
+mock.module("svelte-tiptap", () => svelteTiptapMock());
 
 mock.module("$app/state", () => ({
   page: {

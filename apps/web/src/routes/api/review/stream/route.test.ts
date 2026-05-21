@@ -1,14 +1,20 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { planningReviewMock } from "$lib/test/planning-review-mock";
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 
 const calls: string[] = [];
 
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async (_locals: unknown, projectId: string | null) => {
+// `mock.module` is process-global; the seam answers only while this suite runs
+// and otherwise delegates to the real resolver for foreign suites.
+let suiteActive = false;
+
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock((_locals, projectId) => {
+    if (!suiteActive) return null;
     calls.push(`scope:${projectId ?? ""}`);
-    return { em: {}, ctx: { orgId: "org-1", userId: "user-1", projectId } };
-  },
-}));
+    return { em: {}, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } };
+  }),
+);
 
 mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
   buildReviewWorkbenchModel: async (input: { projectId?: string; traceId?: string; reviewId?: string; selectedFilePath?: string }) => {
@@ -42,6 +48,13 @@ beforeEach(() => {
 });
 
 describe("/api/review/stream", () => {
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
+
   test("streams persisted review sessions through the planning-review interface", async () => {
     const mod = await import(`./+server.ts?cachebust=${Date.now()}`);
     const response = await mod.GET({

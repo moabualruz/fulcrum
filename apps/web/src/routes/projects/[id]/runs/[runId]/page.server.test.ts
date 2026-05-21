@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
+import { projectApiMock } from "$lib/test/project-api-mock";
+import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 
 const calls: string[] = [];
 
@@ -47,12 +50,17 @@ const mockPageData = {
   approvalQueue: [],
 };
 
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `mock.module` is process-global; both seams answer only while this suite
+// runs and otherwise delegate to the real implementations for foreign suites.
+let suiteActive = false;
+
+mock.module("$lib/server/request-service-scope", () =>
+  requestServiceScopeMock((_locals, projectId) =>
+    suiteActive
+      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
+      : null,
+  ),
+);
 
 // Complete `run-pages.ts` surface — `mock.module` freezes export names on
 // first registration, so `loadRunsPageData` is stubbed even though unused.
@@ -87,14 +95,17 @@ mock.module("@execution-orchestration/interface/run-actions.ts", () => ({
   },
 }));
 
-mock.module("$lib/server/project-api", () => ({
-  ensureProjectExists: async () => {},
-}));
+// `projectApiMock` keeps a complete export set (real `createProjectApiForEvent`
+// / `activeOrgId` / `currentUserId`) and only routes `ensureProjectExists` to
+// this suite's no-op stub while the suite is active.
+mock.module("$lib/server/project-api", () =>
+  projectApiMock(() => (suiteActive ? ((async () => {}) as never) : null)),
+);
 
-mock.module("$lib/feedback/action-result", () => ({
-  actionOk: (msg: string) => ({ ok: true, message: msg }),
-  actionFail: (msg: string) => ({ ok: false, message: msg }),
-}));
+// `$lib/feedback/action-result` is a pure module; the real `actionOk` already
+// returns `{ ok: true, message }` — exactly what this suite asserts. Mocking it
+// only froze a process-global export set that broke sibling suites, so the real
+// module is used directly.
 
 beforeEach(() => {
   calls.splice(0, calls.length);
@@ -107,6 +118,13 @@ function form(data: Record<string, string>): Request {
 }
 
 describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
+
   test("server route imports from service interface boundaries, not application layer", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("@execution-orchestration/interface/run-pages");

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { pmStructureMock, usePmStructureOverrides } from "$lib/test/pm-structure-mock";
+import { projectRequestScopeMock, useProjectRequestScope } from "$lib/test/project-request-scope-mock";
 
 const calls: string[] = [];
 const intake = [{ id: "intake-1", title: "Import request", status: "open", traceId: "trace-intake-1" }];
@@ -11,35 +13,49 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/intake", { method: "POST", body: fd });
 }
 
-mock.module("../project-request-scope", () => ({
-  requestProjectScope: async (_locals: unknown, projectId: string) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `mock.module` is process-wide and only one factory closure survives per
+// path. The complete-export factories read a shared `globalThis` slot; this
+// suite publishes its stubs while active (beforeAll/afterAll) so sibling
+// suites that mock the same paths are never hijacked.
+mock.module("../../project-request-scope", () => projectRequestScopeMock());
+mock.module("@work-management/interface/pm-structure.ts", () => pmStructureMock());
 
-mock.module("@work-management/interface/pm-structure.ts", () => ({
-  listIntakeRequests: async (_em: unknown, ctx: { projectId: string }) => {
-    calls.push(`list:${ctx.projectId}`);
-    return intake;
-  },
-  createIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { title: string; source: string }) => {
-    calls.push(`create:${ctx.projectId}:${input.title}:${input.source}`);
-    return { id: "intake-new" };
-  },
-  updateIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { intakeId: string; title?: string; status?: string }) => {
-    calls.push(`update:${ctx.projectId}:${input.intakeId}:${input.title ?? ""}:${input.status ?? ""}`);
-    return { ok: true };
-  },
-  deleteIntakeRequest: async (_em: unknown, ctx: { projectId: string }, intakeId: string) => {
-    calls.push(`delete:${ctx.projectId}:${intakeId}`);
-    return { ok: true };
-  },
-  listProjectModules: async () => [],
-  createProjectModule: async () => ({ id: "module-new" }),
-  updateProjectModule: async () => ({ ok: true }),
-  deleteProjectModule: async () => ({ ok: true }),
-}));
+let disposeScope: (() => void) | undefined;
+let disposePm: (() => void) | undefined;
+
+beforeAll(() => {
+  disposeScope = useProjectRequestScope((_locals, projectId) => ({
+    em: { kind: "mock-em" },
+    ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
+  }));
+  disposePm = usePmStructureOverrides({
+    listIntakeRequests: async (_em: unknown, ctx: { projectId: string }) => {
+      calls.push(`list:${ctx.projectId}`);
+      return intake;
+    },
+    createIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { title: string; source: string }) => {
+      calls.push(`create:${ctx.projectId}:${input.title}:${input.source}`);
+      return { id: "intake-new" };
+    },
+    updateIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { intakeId: string; title?: string; status?: string }) => {
+      calls.push(`update:${ctx.projectId}:${input.intakeId}:${input.title ?? ""}:${input.status ?? ""}`);
+      return { ok: true };
+    },
+    deleteIntakeRequest: async (_em: unknown, ctx: { projectId: string }, intakeId: string) => {
+      calls.push(`delete:${ctx.projectId}:${intakeId}`);
+      return { ok: true };
+    },
+    listProjectModules: async () => [],
+    createProjectModule: async () => ({ id: "module-new" }),
+    updateProjectModule: async () => ({ ok: true }),
+    deleteProjectModule: async () => ({ ok: true }),
+  });
+});
+
+afterAll(() => {
+  disposeScope?.();
+  disposePm?.();
+});
 
 beforeEach(() => {
   calls.splice(0, calls.length);
