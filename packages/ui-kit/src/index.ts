@@ -407,11 +407,14 @@ export type {
 	AgentCapability,
 } from "./components/agent-identity-card/index.js";
 export {
+	MobileStageTabs,
 	StageRail,
 	Root as StageRailRoot,
 	WORKFLOW_STAGES,
 } from "./components/stage-rail/index.js";
 export type {
+	MobileStageTabItem,
+	MobileStageTabsProps,
 	StageRailProps,
 	StageRailItem,
 	StageRailSubnavItem,

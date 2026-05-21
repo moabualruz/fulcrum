@@ -21,16 +21,13 @@
 		Banner,
 		Chip,
 		Kbd,
-		Sheet,
-		SheetContent,
-		SheetTrigger,
+		MobileStageTabs,
 		TraceBadge,
 		TraceChip,
 		type AcpDrawerAgentRow,
 		type AcpDrawerMetaItem,
 		type AcpDrawerSide,
 	} from "@fulcrum/ui-kit";
-	import { buttonVariants } from "@fulcrum/ui-kit";
 	import {
 		connectionState,
 		hasQueuedMutations,
@@ -45,7 +42,7 @@
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
 	import { withTrace, type WorkflowStage } from "$lib/components/app/route-map.ts";
-	import { STAGE_NAV_ITEMS } from "$lib/components/app/nav-data.ts";
+	import { STAGE_NAV_ITEMS, stageForPath as stageForNavPath } from "$lib/components/app/nav-data.ts";
 
 	import type { InferenceStatus } from "$lib/components/app/AppTopbar.svelte";
 
@@ -60,7 +57,6 @@
 	let { data, children }: Props = $props();
 
 	let mobile = $state(isMobileViewport(browserDriver()));
-	let sheetOpen = $state(false);
 	let paletteOpen = $state(false);
 	let shortcutHelpOpen = $state(false);
 	let inferenceStatus = $state<InferenceStatus>("unknown");
@@ -78,6 +74,7 @@
 	let aiSelectedAgent = $state("claude-code");
 	let aiSavedNotice = $state("");
 	const aiDrawerSide = $derived<AcpDrawerSide>(mobile ? "bottom" : "right");
+	const activeMobileStage = $derived(stageForNavPath(page.url.pathname));
 
 	/*
 	 * The AI Assist drawer auto-scopes to the current Step. Static OD-backed
@@ -208,6 +205,10 @@
 		const destination = chordDestination(key);
 		if (!destination) return;
 		void goto(withTrace(destination, page.url));
+	}
+
+	function navigateMobileStage(_stage: WorkflowStage, href: string): void {
+		void goto(withTrace(href, page.url));
 	}
 
 	function toggleRailCollapsed(): void {
@@ -544,75 +545,59 @@
 
 <div class={cn("flex min-h-screen bg-background text-foreground")}>
 	{#if mobile}
-		<Sheet bind:open={sheetOpen}>
-			<!-- Mobile shell region for the StageRail; width matches the 220px expanded rail. -->
-			<SheetContent
-				side="left"
-				class="w-[220px] p-0"
-				aria-label="Navigation menu"
-				data-shell-region="stage-rail"
-			>
-				<AppSidebar activeProjectId={data.activeProjectId} />
-			</SheetContent>
-			<div class={cn("flex min-w-0 flex-1 flex-col")}>
-				<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
-					<SheetTrigger
-						data-mobile-sheet-trigger
-						aria-label="Open navigation menu"
-						aria-expanded={sheetOpen}
-						class={cn(
-							buttonVariants({ variant: "ghost", size: "icon" }),
-							"ml-2",
-						)}
-					>
-						<span aria-hidden="true">☰</span>
-					</SheetTrigger>
-					<div class="flex-1">
-						<AppTopbar
-							pathname={page.url.pathname}
-							activeProjectId={data.activeProjectId}
-							onThemeToggle={toggleMode}
-						/>
-					</div>
+		<div class={cn("flex min-w-0 flex-1 flex-col")}>
+			<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
+				<div class="flex-1">
+					<AppTopbar
+						pathname={page.url.pathname}
+						activeProjectId={data.activeProjectId}
+						onThemeToggle={toggleMode}
+					/>
 				</div>
-				{@render connectionBanner()}
-				<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(1.5rem+var(--fulcrum-gesture-zone-bottom))]")}>
-					{@render children?.()}
-				</main>
-				<!--
-					Mobile (DESIGN.md §3.2): the 44px StatusFooter is hidden; the trace
-					id stays reachable through a swipe-down quick panel — a disclosure
-					carrying the shared DESIGN.md §4.10 TraceBadge.
-				-->
-				<details
-					data-mobile-trace-panel
+			</div>
+			{@render connectionBanner()}
+			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(6rem+var(--fulcrum-gesture-zone-bottom))]")}>
+				{@render children?.()}
+			</main>
+			<!--
+				Mobile shell bottom stage tabs replace the old hamburger SheetTrigger.
+				AI Assist remains right-most and shares the global drawer with Cmd+/.
+			-->
+			<details
+				data-mobile-trace-panel
+				class={cn(
+					"fixed inset-x-0 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom))] z-50 border-y border-border",
+					"bg-surface-elevated text-xs text-fg-subtle shadow-[0_-6px_18px_rgba(0,0,0,0.12)]",
+				)}
+			>
+				<summary
+					data-mobile-trace-summary
+					aria-label="Show trace id"
 					class={cn(
-						"border-t border-border bg-surface-elevated text-xs text-fg-subtle",
-						"pb-[var(--fulcrum-gesture-zone-bottom)]",
+						"flex cursor-pointer list-none items-center justify-center gap-1.5 px-4 py-2",
+						"font-mono text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 					)}
 				>
-					<summary
-						data-mobile-trace-summary
-						aria-label="Show trace id"
-						class={cn(
-							"flex cursor-pointer list-none items-center justify-center gap-1.5 px-4 py-2",
-							"font-mono text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-						)}
-					>
-						<span aria-hidden="true">⌃</span>
-						<span>Trace</span>
-					</summary>
-					<div class="flex items-center gap-2 px-4 pb-3">
-						<TraceBadge
-							badge
-							data-mobile-trace-id
-							traceId={data?.traceId ?? data?.requestId ?? "trace-init"}
-							project="fulcrum"
-						/>
-					</div>
-				</details>
-			</div>
-		</Sheet>
+					<span aria-hidden="true">⌃</span>
+					<span>Trace</span>
+				</summary>
+				<div class="flex items-center gap-2 px-4 pb-3">
+					<TraceBadge
+						badge
+						data-mobile-trace-id
+						traceId={data?.traceId ?? data?.requestId ?? "trace-init"}
+						project="fulcrum"
+					/>
+				</div>
+			</details>
+			<MobileStageTabs
+				items={STAGE_NAV_ITEMS}
+				current={activeMobileStage}
+				aiAssistOpen={aiAssistOpen}
+				onNavigate={navigateMobileStage}
+				onAiAssist={openAiAssist}
+			/>
+		</div>
 	{:else}
 		<!--
 			Desktop shell region for the StageRail (DESIGN.md §3.1 chrome left rail).

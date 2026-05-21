@@ -3,6 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { captureScreenshot, DESKTOP_VIEWPORT } from "../../scripts/run-design-e2e.ts";
 
+const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
+
 /**
  * Wave-2 shell-presence design gate (`prd-design-gate-shell-assertions`).
  *
@@ -60,6 +62,8 @@ const STATUS_FOOTER = "[data-slot='status-footer']";
 const TRACE_BADGE = "[data-slot='trace-chip'][data-variant='badge']";
 const AI_ASSIST_SEGMENT = "[data-slot='status-footer-ai-assist']";
 const ACP_DRAWER = "[data-slot='acp-drawer']";
+const MOBILE_STAGE_TABS = "[data-slot='mobile-stage-tabs']";
+const MOBILE_AI_ASSIST_TAB = "[data-slot='mobile-stage-tab-ai-assist']";
 
 /** The exact six workflow stage labels — never the legacy `Dashboard` bucket. */
 const WORKFLOW_STAGE_LABELS = ["Capture", "Plan", "Build", "Review", "Ship", "Operate"];
@@ -219,6 +223,55 @@ test.describe("OD shell presence — global AI Assist drawer (⌘/)", () => {
 		const drawer = page.locator(ACP_DRAWER);
 		await expect(drawer).toBeVisible();
 		await expect(drawer).toHaveAttribute("data-open", "true");
+	});
+});
+
+test.describe("OD shell presence — mobile bottom stage tabs", () => {
+	for (const route of REQUIRED_ROUTES) {
+		test(`mobile bottom stage tabs render on ${route.path}`, async ({ page }) => {
+			await page.setViewportSize({ ...MOBILE_VIEWPORT });
+			await page.goto(route.path, { waitUntil: "load" });
+
+			await expect(page.locator(STATUS_FOOTER)).toHaveCount(0);
+			await expect(page.locator("[data-mobile-sheet-trigger]")).toHaveCount(0);
+
+			const tabs = page.locator(MOBILE_STAGE_TABS);
+			await expect(tabs).toBeVisible();
+			await expect(tabs.locator("[data-slot='mobile-stage-tab-label']")).toHaveText([
+				"Capture",
+				"Plan",
+				"Build",
+				"Review",
+				"Ship",
+				"Operate",
+				"AI Assist",
+			]);
+			await expect(tabs.locator(MOBILE_AI_ASSIST_TAB)).toBeVisible();
+
+			if ((await page.locator(ACP_DRAWER).count()) === 0) {
+				await tabs.locator(MOBILE_AI_ASSIST_TAB).click();
+			}
+			const drawer = page.locator(ACP_DRAWER);
+			await expect(drawer).toBeVisible();
+			await expect(drawer).toHaveAttribute("data-open", "true");
+			await expect(drawer.locator("[data-slot='acp-drawer-title']")).toHaveText("AI Assist");
+
+			await writeEvidenceShot(`shell-mobile-bottom-tabs-${route.slug}.png`, await page.screenshot({ fullPage: true }));
+		});
+	}
+
+	test("mobile Cmd+/ opens the same global AI Assist bottom sheet", async ({ page }) => {
+		await page.setViewportSize({ ...MOBILE_VIEWPORT });
+		await page.goto("/operate-mcp", { waitUntil: "load" });
+		await expect(page.locator(ACP_DRAWER)).toHaveCount(0);
+
+		await pressAiAssistChord(page);
+
+		const drawer = page.locator(ACP_DRAWER);
+		await expect(drawer).toBeVisible();
+		await expect(drawer).toHaveAttribute("data-side", "bottom");
+		await expect(drawer.locator("[data-slot='acp-drawer-title']")).toHaveText("AI Assist");
+		await writeEvidenceShot("shell-mobile-ai-assist-bottom-sheet.png", await page.screenshot({ fullPage: true }));
 	});
 });
 

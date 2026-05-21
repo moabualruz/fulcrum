@@ -359,7 +359,7 @@ test.describe("OD shell StatusFooter — populated", () => {
 });
 
 test.describe("OD shell StatusFooter — mobile", () => {
-	test("hides the footer and exposes the trace id through a swipe-down quick panel", async ({
+	test("hides the footer and exposes bottom stage tabs, AI Assist, and trace", async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 390, height: 844 });
@@ -367,6 +367,41 @@ test.describe("OD shell StatusFooter — mobile", () => {
 
 		// DESIGN.md §3.2: the 44px StatusFooter is hidden on mobile.
 		await expect(page.locator("[data-slot='status-footer']")).toHaveCount(0);
+		await expect(page.locator("[data-mobile-sheet-trigger]")).toHaveCount(0);
+
+		const bottomStageTabs = page.locator("[data-slot='mobile-stage-tabs']");
+		await expect(bottomStageTabs).toBeVisible();
+		await expect(bottomStageTabs.locator("[data-slot='mobile-stage-tab-label']")).toHaveText([
+			"Capture",
+			"Plan",
+			"Build",
+			"Review",
+			"Ship",
+			"Operate",
+			"AI Assist",
+		]);
+		await expect(bottomStageTabs.locator("[data-slot='mobile-stage-tab'][data-active='true']")).toHaveAttribute(
+			"data-stage",
+			"capture",
+		);
+
+		const aiAssistTab = bottomStageTabs.locator("[data-slot='mobile-stage-tab-ai-assist']");
+		await expect(aiAssistTab).toBeVisible();
+		await expect(aiAssistTab).toContainText("AI Assist");
+		await expect(page.locator("[data-slot='acp-drawer']")).toHaveCount(0);
+		await aiAssistTab.click();
+		await expect(page.locator("[data-slot='acp-drawer']")).toBeVisible();
+		await expect(page.locator("[data-slot='acp-drawer']")).toHaveAttribute("data-open", "true");
+
+		await page.keyboard.press(process.platform === "darwin" ? "Meta+Slash" : "Control+Slash");
+		await expect(page.locator("[data-slot='acp-drawer']")).toHaveCount(0);
+		await page.keyboard.press(process.platform === "darwin" ? "Meta+Slash" : "Control+Slash");
+		await expect(page.locator("[data-slot='acp-drawer']")).toBeVisible();
+		await page.keyboard.press(process.platform === "darwin" ? "Meta+Slash" : "Control+Slash");
+		await expect(page.locator("[data-slot='acp-drawer']")).toHaveCount(0);
+		await page.reload({ waitUntil: "load" });
+		await expect(page.locator("[data-slot='status-footer']")).toHaveCount(0);
+		await expect(page.locator("[data-slot='mobile-stage-tabs']")).toBeVisible();
 
 		// The trace id stays reachable through the mobile quick panel.
 		const panel = page.locator("[data-mobile-trace-panel]");
@@ -390,7 +425,7 @@ test.describe("OD shell StatusFooter — mobile", () => {
 			body: mobileShot,
 			contentType: "image/png",
 		});
-		await writeEvidenceShot("status-footer-mobile.png", mobileShot);
+		await writeEvidenceShot("mobile-bottom-stage-tabs.png", mobileShot);
 	});
 });
 
