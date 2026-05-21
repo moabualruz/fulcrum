@@ -277,7 +277,7 @@
                 <StatusBadge data-doctor-status-badge={check.subsystem} status={badgeStatus(check.status)} />
               </td>
               <td data-doctor-latency class={cn("px-3 py-2 font-mono text-xs text-fg-subtle")}>
-                {check.latencyP99Ms === null ? "— ms" : `${check.latencyP99Ms} ms`}
+                {check.latencyP99Ms === null ? "not checked" : `${check.latencyP99Ms} ms`}
               </td>
               <td class={cn("px-3 py-2 font-mono text-xs text-fg-subtle")}>{hms(check.checked_at)}</td>
               <td data-doctor-recovery class={cn("max-w-[28rem] px-3 py-2 leading-relaxed text-fg-subtle")}>
@@ -296,7 +296,7 @@
                     </div>
                   {/if}
                 {:else}
-                  <span class={cn("text-fg-muted")}>—</span>
+                  <span class={cn("text-fg-muted")}>none</span>
                 {/if}
               </td>
               <td class={cn("px-3 py-2")}>

@@ -402,7 +402,7 @@ export function _deriveSummary(checks: SubsystemCheckResult[]): DoctorSummary {
   const lastGreen =
     okChecks.length > 0
       ? hhmm(okChecks.map((c) => c.checked_at).sort().at(-1) ?? checks[0]?.checked_at ?? now())
-      : "—";
+      : "not checked";
   return {
     subsystems: checks.length,
     passing,
@@ -485,9 +485,9 @@ export function _degradedFixtureChecks(): SubsystemCheckResult[] {
       probeTrace: {
         lines: [
           { tone: "command", text: "$ doctor probe db.prisma.shadow" },
-          { tone: "retry", text: "↻ reconnect 1/3 — peer reset (errno 54)" },
-          { tone: "retry", text: "↻ reconnect 2/3 — peer reset (errno 54)" },
-          { tone: "ok", text: "✓ connected — version 16.2" },
+          { tone: "retry", text: "↻ reconnect 1/3: peer reset (errno 54)" },
+          { tone: "retry", text: "↻ reconnect 2/3: peer reset (errno 54)" },
+          { tone: "ok", text: "✓ connected: version 16.2" },
         ],
         traceId: "tr_07f2e1d9b2 · 11:54:09 · 412 ms",
       },
@@ -501,13 +501,13 @@ export function _degradedFixtureChecks(): SubsystemCheckResult[] {
       checked_at: at("11:53:48"),
       latencyP99Ms: 186,
       recoveryCopy:
-        "OTLP receive queue at 78% (warn at 70%). Backed up because a contract test rejected auth.session.issued events — see the ship rollout PR. Next step: drop unknown-schema events or land the schema migration.",
+        "OTLP receive queue at 78% (warn at 70%). Backed up because a contract test rejected auth.session.issued events. See the ship rollout PR. Next step: drop unknown-schema events or land the schema migration.",
       recoveryCommand: "fulcrum ship pr view 4218",
       recoveryActionKind: "open-pr",
       probeTrace: {
         lines: [
           { tone: "command", text: "$ doctor probe obs.collector" },
-          { tone: "retry", text: "↻ queue depth 78% — rejecting auth.session.issued" },
+          { tone: "retry", text: "↻ queue depth 78%: rejecting auth.session.issued" },
           { tone: "trace", text: "blocked by ship rollout PR #4218" },
         ],
         traceId: "tr_3a9c01ee47 · 11:53:48 · 186 ms",
@@ -529,8 +529,8 @@ export function _degradedFixtureChecks(): SubsystemCheckResult[] {
       probeTrace: {
         lines: [
           { tone: "command", text: "$ doctor probe scheduler.cron" },
-          { tone: "retry", text: "↻ restart 1/1 — oom kill at 11:52:14 (1.2 GB peak)" },
-          { tone: "ok", text: "✓ worker back up — catch-up run queued" },
+          { tone: "retry", text: "↻ restart 1/1: oom kill at 11:52:14 (1.2 GB peak)" },
+          { tone: "ok", text: "✓ worker back up: catch-up run queued" },
         ],
         traceId: "tr_5e1b88aa90 · 11:54:09 · 902 ms",
       },

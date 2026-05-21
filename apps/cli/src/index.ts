@@ -613,7 +613,7 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "web":
       if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
-        console.log("fulcrum web — open the web shell. Build first with `bun --cwd apps/web run build`.");
+        console.log("fulcrum web: open the web shell. Build first with `bun --cwd apps/web run build`.");
         return;
       }
       await runWeb(rest);

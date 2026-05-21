@@ -88,7 +88,7 @@ describe("fulcrum mode — per-step mode affordance verbs", () => {
     expect(io.errors).toEqual([]);
     expect(io.exitCodes).toEqual([]);
     const text = io.lines.join("\n");
-    expect(text).toContain("💬 Discuss — step REV-7");
+    expect(text).toContain("💬 Discuss: step REV-7");
     expect(text).toContain("note: needs another pass");
     // DESIGN.md §4.10 plain trace header line.
     expect(text).toContain("trace:");

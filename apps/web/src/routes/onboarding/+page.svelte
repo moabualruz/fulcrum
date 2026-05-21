@@ -307,7 +307,7 @@
 					A positioned `Card` (an existing ui-kit primitive — no hand-rolled
 					overlay): uppercase step eyebrow, the Play teaching copy, a 5-dot
 					progress indicator (dot 3 active), a ghost "Skip tour" and a primary
-					"Got it — try Play" action. `role="dialog"` + `aria-label` make it a
+					"Got it: try Play" action. `role="dialog"` + `aria-label` make it a
 					discrete keyboard target; Esc dismisses it.
 				-->
 				<Card
@@ -356,7 +356,7 @@
 							class="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
 							onclick={tryFirstPlay}
 						>
-							Got it — try Play
+							Got it: try Play
 						</Button>
 					</div>
 				</Card>
@@ -370,7 +370,7 @@
 			<h2 class="mt-6 text-xl font-semibold">What stays the same everywhere</h2>
 			<ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-foreground">
 				<li>
-					The status footer at the bottom mirrors the TUI exactly — same vocabulary across web,
+					The status footer at the bottom mirrors the TUI exactly: same vocabulary across web,
 					CLI, mobile.
 				</li>
 				<li>Trace IDs appear on every surface. Click any pill to copy.</li>
