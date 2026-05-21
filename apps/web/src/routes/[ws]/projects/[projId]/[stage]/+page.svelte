@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { page } from "$app/state";
 	import type { PageData } from "./$types";
 
-	import { Badge } from "@fulcrum/ui-kit";
+	import { Badge, LoadingState } from "@fulcrum/ui-kit";
 	import { WORKFLOW_STAGES, type WorkflowStage, traceFromHash } from "$lib/components/app/route-map.ts";
 	import CaptureStageWorkbench from "$lib/components/app/CaptureStageWorkbench.svelte";
 	import { cn } from "$lib/utils.js";
@@ -76,13 +77,23 @@
 		WORKFLOW_STAGES.find((entry) => entry.stage === data.stage)?.label ?? data.stage,
 	);
 	const views = $derived(STAGE_VIEWS[data.stage]);
+	const loadingState = $derived(page.url.searchParams.get("state") === "loading");
 </script>
 
 <svelte:head>
 	<title>{stageLabel} · {data.projId}</title>
 </svelte:head>
 
-{#if data.stage === "capture" && data.captureView}
+{#if loadingState}
+	<section data-route="ws-stage" data-stage={data.stage} data-state="loading" class="grid gap-4">
+		<LoadingState
+			title={`Loading ${stageLabel}`}
+			description="Fetching project scope, stage chrome, and workbench rows."
+			shape="feed"
+			rows={views.length}
+		/>
+	</section>
+{:else if data.stage === "capture" && data.captureView}
 	<!--
 		`/<ws>/projects/<projId>/capture` — the Capture WorkflowStage workbench
 		(`prd-web-capture-stage-shell`; OD `capture.html`, `capture-drafts.html`,

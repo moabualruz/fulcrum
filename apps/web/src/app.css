@@ -185,6 +185,33 @@
   }
 }
 
+.fulcrum-loading-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--surface-sunken) 45%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: fulcrum-loading-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes fulcrum-loading-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fulcrum-loading-skeleton {
+    animation: none !important;
+    background: var(--muted);
+  }
+}
+
 /* DESIGN.md §1.6 forced-colors guard. In Windows High Contrast / forced-colors
    mode the OKLCH palette is overridden by the OS, so border tokens are
    re-declared directly on :root with CSS system keywords — CanvasText for the

@@ -175,6 +175,15 @@ export {
 } from "./components/empty-state/index.js";
 export type { EmptyStateProps, EmptyStateTone } from "./components/empty-state/index.js";
 export {
+	LoadingState,
+	Root as LoadingStateRoot,
+} from "./components/loading-state/index.js";
+export type {
+	LoadingStateDensity,
+	LoadingStateProps,
+	LoadingStateShape,
+} from "./components/loading-state/index.js";
+export {
 	ToastRegion,
 	Region as ToastRegionRoot,
 	ToastStore,

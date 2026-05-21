@@ -33,6 +33,7 @@
 		Chip,
 		EmptyState,
 		ErrorBanner,
+		LoadingState,
 		StatusBadge,
 		Tabs,
 		TabsContent,
@@ -41,6 +42,7 @@
 		Textarea,
 		TraceChip,
 	} from "@fulcrum/ui-kit";
+	import { page } from "$app/state";
 
 	/**
 	 * ACP `session/update` notification kinds that drive the transcript
@@ -178,6 +180,7 @@
 	const activeSession = $derived(sessions.find((s) => s.id === activeSessionId) ?? null);
 	const selectedEvent = $derived(traffic.find((row) => row.id === selectedEventId) ?? traffic[0] ?? null);
 	const isEmpty = $derived(sessions.length === 0);
+	const loadingState = $derived(page.url.searchParams.get("state") === "loading");
 
 	onMount(() => {
 		const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -317,9 +320,19 @@
 	data-route="plan-session"
 	data-stage="plan"
 	data-plan-session-page
-	data-state={isEmpty ? "empty" : "populated"}
+	data-state={loadingState ? "loading" : isEmpty ? "empty" : "populated"}
 	class="grid min-h-[36rem] gap-4 lg:grid-cols-[220px_minmax(0,1fr)_320px]"
 >
+	{#if loadingState}
+		<div class="lg:col-span-3">
+			<LoadingState
+				title="Loading Plan session"
+				description="Fetching sessions, transcript events, and workspace dock state."
+				shape="feed"
+				rows={4}
+			/>
+		</div>
+	{:else}
 	<!-- ── Column 1 — sessions list (220px) ───────────────────────────── -->
 	<aside
 		data-slot="session-list"
@@ -647,4 +660,5 @@
 			</TabsContent>
 		</Tabs>
 	</aside>
+	{/if}
 </section>

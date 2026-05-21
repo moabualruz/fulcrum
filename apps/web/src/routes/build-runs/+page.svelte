@@ -19,6 +19,7 @@
     Badge,
     Button,
     EmptyState,
+    LoadingState,
     ModeRow,
     RunFeedItem,
     StatusBadge,
@@ -261,6 +262,7 @@
 
   // --- live UI state -------------------------------------------------------
   const emptyState = $derived($page.url.searchParams.get("state") === "empty");
+  const loadingState = $derived($page.url.searchParams.get("state") === "loading");
 
   let live = $state(true);
   let selectedRunId = $state(feedRuns[0]?.runId ?? "");
@@ -333,7 +335,16 @@
       </button>
     </div>
 
-    {#if emptyState}
+    {#if loadingState}
+      <div data-runs-loading class="p-4">
+        <LoadingState
+          title="Loading Build runs"
+          description="Fetching run feed, selected transcript, and live dock state."
+          shape="feed"
+          rows={5}
+        />
+      </div>
+    {:else if emptyState}
       <div data-runs-empty class="p-6">
         <EmptyState
           title="No runs yet in this project."
@@ -428,7 +439,15 @@
     data-live-session-pane
     class="flex min-h-0 min-w-0 flex-col overflow-y-auto bg-background"
   >
-    {#if emptyState}
+    {#if loadingState}
+      <div data-live-session-loading class="flex flex-1 items-center justify-center p-8">
+        <LoadingState
+          title="Loading live session"
+          description="Fetching tool calls, checkpoints, and workspace context."
+          shape="panel"
+        />
+      </div>
+    {:else if emptyState}
       <div class="flex flex-1 items-center justify-center p-8">
         <p class="text-sm text-muted-foreground">
           Select or dispatch a run to open its live session.

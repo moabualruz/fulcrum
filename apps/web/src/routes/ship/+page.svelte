@@ -39,6 +39,7 @@
   import {
     Button,
     EmptyState,
+    LoadingState,
     ModeRow,
     StatusBadge,
     TraceChip,
@@ -350,6 +351,7 @@
 
   /** `?state=empty` renders the COPY.md §129 Ship empty state. */
   const emptyState = $derived(page.url.searchParams.get("state") === "empty");
+  const loadingState = $derived(page.url.searchParams.get("state") === "loading");
 
   /** The release whose peek-overview panel is open; `null` = panel closed. */
   let peekId = $state<string | null>(null);
@@ -531,7 +533,16 @@
     </div>
   {/if}
 
-  {#if emptyState}
+  {#if loadingState}
+    <div data-ship-loading class="p-6">
+      <LoadingState
+        title="Loading Ship releases"
+        description="Fetching artifacts, rollout checks, and promotion timeline."
+        shape="table"
+        rows={5}
+      />
+    </div>
+  {:else if emptyState}
     <!-- COPY.md §129 Ship empty state -->
     <div data-ship-empty class="flex items-center justify-center p-10">
       <EmptyState
