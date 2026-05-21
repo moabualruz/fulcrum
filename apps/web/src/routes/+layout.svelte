@@ -540,9 +540,9 @@
 	{/if}
 {/snippet}
 
-<div class={cn("flex min-h-screen bg-background text-foreground")}>
+<div class={cn("flex h-screen min-h-0 overflow-hidden bg-background text-foreground")}>
 	{#if mobile}
-		<div class={cn("flex min-w-0 flex-1 flex-col")}>
+		<div class={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden")}>
 			<div class={cn("flex items-center pt-[var(--fulcrum-safe-area-top)]")}>
 				<div class="flex-1">
 					<AppTopbar
@@ -553,7 +553,11 @@
 				</div>
 			</div>
 			{@render connectionBanner()}
-			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 pt-6 pb-[calc(6rem+var(--fulcrum-gesture-zone-bottom))]")}>
+			<main
+				id="main-content"
+				tabindex="-1"
+				class={cn("min-h-0 flex-1 overflow-y-auto px-6 pt-6 pb-[calc(6rem+var(--fulcrum-gesture-zone-bottom))]")}
+			>
 				{@render children?.()}
 			</main>
 			<!--
@@ -609,7 +613,7 @@
 		>
 			<AppSidebar activeProjectId={data.activeProjectId} />
 		</div>
-		<div class={cn("flex min-w-0 flex-1 flex-col")}>
+		<div class={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden")}>
 			<div class={cn("flex items-center")}>
 				<div class="flex-1">
 					<AppTopbar
@@ -621,7 +625,7 @@
 				</div>
 			</div>
 			{@render connectionBanner()}
-			<main id="main-content" tabindex="-1" class={cn("flex-1 px-6 py-6")}>
+			<main id="main-content" tabindex="-1" class={cn("min-h-0 flex-1 overflow-y-auto px-6 py-6")}>
 				{@render children?.()}
 			</main>
 			<TraceFooter traceId={shellTraceId} />
