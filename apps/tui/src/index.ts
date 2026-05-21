@@ -656,6 +656,7 @@ export class TuiApp {
   private inferenceEmbedError: string | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private bellPoll: ReturnType<typeof setInterval> | null = null;
+  private startupHydration: Promise<void> | null = null;
   private bellCount = 0;
   private running = false;
 
@@ -744,21 +745,10 @@ export class TuiApp {
     this.running = true;
     renderBootSplash(this.renderer);
 
-    // Load status bar data
-    await this._loadStatusBar();
-    await this._loadInferenceBadge();
-    await this._loadBellCount();
-    this.inferencePoll = setInterval(() =>
-      this._loadInferenceBadge().then(() => {
-        if (this.running) return this._renderCurrentScreen();
-      }), 30_000);
-    this.bellPoll = setInterval(() =>
-      this._loadBellCount().then(() => {
-        if (this.running) return this._renderCurrentScreen();
-      }), 60_000);
-
-    // Initial render
+    // CLI-TUI-UX.md §16: paint the first frame before API/database-backed
+    // startup data can delay terminal feedback.
     await this._renderCurrentScreen();
+    this.startupHydration = this._hydrateStartupData();
 
     // Attach keyboard listener (no-op in headless mode)
     if (this.input) {
@@ -790,9 +780,30 @@ export class TuiApp {
     void this.openTuiRenderer?.dispose();
   }
 
+  private async _hydrateStartupData(): Promise<void> {
+    await this._loadStatusBar();
+    await this._loadInferenceBadge();
+    await this._loadBellCount();
+    if (!this.running) return;
+    await this._renderCurrentScreen();
+    if (!this.running) return;
+    this.inferencePoll = setInterval(() =>
+      this._loadInferenceBadge().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 30_000);
+    this.bellPoll = setInterval(() =>
+      this._loadBellCount().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 60_000);
+  }
+
   /** Whether the TUI is currently running. */
   get isRunning(): boolean {
     return this.running;
+  }
+
+  async waitForStartupData(): Promise<void> {
+    await this.startupHydration;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
