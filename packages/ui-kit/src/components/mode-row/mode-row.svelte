@@ -3,11 +3,11 @@
 	import { cn, type WithElementRef } from "../../utils.js";
 
 	/**
-	 * ModeRow — the universal per-Step mode affordance row (DESIGN.md §4.11, §4.13).
+	 * ModeRow: the universal per-Step mode affordance row (DESIGN.md §4.11, §4.13).
 	 *
 	 * Every Step (task card, doc block, review item, artifact row, subsystem row,
 	 * audit row) carries one ModeRow. It exposes the four canonical execution
-	 * modes — Manual / Play / Discuss / AI Assist — as a single `role="toolbar"`
+	 * modes: Manual / Play / Discuss / AI Assist: as a single `role="toolbar"`
 	 * group so a keyboard user reaches every mode with one Tab stop and the arrow
 	 * keys, exactly like the OD `.mode-row` markup.
 	 *
@@ -56,14 +56,14 @@
 		trace: "◷",
 	};
 
-	/** Per-action `title`/tooltip text — DESIGN.md §4.13 requires every mode carries one. */
+	/** Per-action `title`/tooltip text: DESIGN.md §4.13 requires every mode carries one. */
 	const MODE_TITLE: Record<WorkflowMode, string> = {
-		manual: "Manual — work this step yourself",
-		play: "▶ Play — hand off to an AI agent",
-		discuss: "💬 Discuss — open the comment thread",
-		assist: "⊞ AI Assist — open the AI Assist drawer scoped to this step",
-		"ai-assist": "⊞ AI Assist — open the AI Assist drawer scoped to this step",
-		trace: "◷ Trace — inspect the run trace and timeline",
+		manual: "Manual: work this step yourself",
+		play: "▶ Play: hand off to an AI agent",
+		discuss: "💬 Discuss: open the comment thread",
+		assist: "⊞ AI Assist: open the AI Assist drawer scoped to this step",
+		"ai-assist": "⊞ AI Assist: open the AI Assist drawer scoped to this step",
+		trace: "◷ Trace: inspect the run trace and timeline",
 	};
 
 	export type ModeRowProps = WithElementRef<HTMLAttributes<HTMLDivElement>> & {
@@ -73,7 +73,7 @@
 		onSelect?: (mode: WorkflowMode) => void;
 		/** The modes rendered, in order. Defaults to the canonical four. */
 		modes?: WorkflowMode[];
-		/** Density form — `long` labelled, `compact` icon-only, `tight` Suggest/Discuss. */
+		/** Density form: `long` labelled, `compact` icon-only, `tight` Suggest/Discuss. */
 		density?: ModeRowDensity;
 		/** Toolbar `aria-label`. DESIGN.md §4.13 canonical value is `Step modes`. */
 		ariaLabel?: string;
@@ -82,15 +82,15 @@
 	/** The canonical four workflow modes (DESIGN.md §4.13). */
 	export const WORKFLOW_MODES: WorkflowMode[] = ["manual", "play", "discuss", "assist"];
 
-	/** The `tight`-form mode subset — Suggest + Discuss only (DESIGN.md §4.13). */
+	/** The `tight`-form mode subset: Suggest + Discuss only (DESIGN.md §4.13). */
 	export const TIGHT_MODES: WorkflowMode[] = ["play", "discuss"];
 
-	/** Stable resolution of a mode to its canonical glyph — exported for sibling surfaces. */
+	/** Stable resolution of a mode to its canonical glyph: exported for sibling surfaces. */
 	export function modeGlyph(mode: WorkflowMode): string {
 		return MODE_GLYPH[mode];
 	}
 
-	/** Stable resolution of a mode to its long-form label — exported for sibling surfaces. */
+	/** Stable resolution of a mode to its long-form label: exported for sibling surfaces. */
 	export function modeLabel(mode: WorkflowMode): string {
 		return MODE_LABEL[mode];
 	}

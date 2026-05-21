@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * ScopeChart.svelte — Scope creep line chart (workflow milestone, D-46).
+   * ScopeChart.svelte: Scope creep line chart (workflow milestone, D-46).
    *
    * Shows original scope vs current scope vs completed over time.
    * Visualizes scope added vs completed per week.

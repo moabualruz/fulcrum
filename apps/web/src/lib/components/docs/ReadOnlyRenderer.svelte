@@ -27,7 +27,7 @@
         .use(rehypeStringify)
         .process(md);
 
-      // T-06-13: DOMPurify sanitizes all HTML output — strips script/onerror/etc.
+      // T-06-13: DOMPurify sanitizes all HTML output: strips script/onerror/etc.
       html = DOMPurify.sanitize(String(result));
       renderError = null;
     } catch (err) {
@@ -52,7 +52,7 @@
       Render error: {renderError}
     </div>
   {:else if html}
-    <!-- eslint-disable-next-line svelte/no-at-html-tags — sanitized by DOMPurify (T-06-13) -->
+    <!-- eslint-disable-next-line svelte/no-at-html-tags: sanitized by DOMPurify (T-06-13) -->
     {@html html}
   {:else}
     <div class="text-muted-foreground italic">No content</div>

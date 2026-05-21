@@ -1,12 +1,12 @@
 /**
- * `fulcrum plan|mission|prototype <verb>` — the Plan-stage command tree.
+ * `fulcrum plan|mission|prototype <verb>`: the Plan-stage command tree.
  *
  * `CLI-TUI-UX.md` §1.2 specifies a top-level Plan-stage grammar; until this
  * file the only Plan surface in the CLI was nested under `fulcrum product
  * planning …`. This handler exposes the canonical `fulcrum plan`,
  * `fulcrum mission`, and `fulcrum prototype` verbs. The existing
- * `fulcrum product planning …` commands keep working as documented aliases —
- * `product.ts` is unchanged and re-uses the same planning caller — so no
+ * `fulcrum product planning …` commands keep working as documented aliases -
+ * `product.ts` is unchanged and re-uses the same planning caller: so no
  * command name is removed (migration-strategy.md CLI path).
  *
  * Every verb routes its result through the shared `fulcrum.cli.v1` envelope
@@ -41,7 +41,7 @@ export type PlanNamespace = "plan" | "mission" | "prototype";
 /**
  * Backend seam for every Plan-stage verb. The production resolver wires these
  * to the workflow / planning API; tests inject a fake caller. This is the same
- * "required caller, no inline mock" pattern `product.ts` uses — a verb whose
+ * "required caller, no inline mock" pattern `product.ts` uses: a verb whose
  * caller is absent throws a configuration error, it is never silently faked.
  */
 export interface PlanStageCaller {
@@ -65,7 +65,7 @@ export interface PlanStageCaller {
   prototype: {
     // `create` backs the `fulcrum prototype new` verb. The method is not named
     // `new` because `new(...)` in an interface is a TS *construct signature*,
-    // not a method — the user-facing verb stays `new`.
+    // not a method: the user-facing verb stays `new`.
     create(input: Record<string, unknown>): Promise<unknown>;
     view(input: Record<string, unknown>): Promise<unknown>;
     attach(input: Record<string, unknown>): Promise<unknown>;
@@ -155,21 +155,21 @@ function namespaceHelp(namespace: PlanNamespace): string {
 }
 
 /**
- * `fulcrum plan …` entry point — namespace is fixed to `plan`.
+ * `fulcrum plan …` entry point: namespace is fixed to `plan`.
  */
 export async function run(argv: readonly string[], opts: PlanStageRunOptions = {}): Promise<void> {
   await runNamespace("plan", argv, opts);
 }
 
 /**
- * `fulcrum mission …` entry point — namespace is fixed to `mission`.
+ * `fulcrum mission …` entry point: namespace is fixed to `mission`.
  */
 export async function runMission(argv: readonly string[], opts: PlanStageRunOptions = {}): Promise<void> {
   await runNamespace("mission", argv, opts);
 }
 
 /**
- * `fulcrum prototype …` entry point — namespace is fixed to `prototype`.
+ * `fulcrum prototype …` entry point: namespace is fixed to `prototype`.
  */
 export async function runPrototype(argv: readonly string[], opts: PlanStageRunOptions = {}): Promise<void> {
   await runNamespace("prototype", argv, opts);
@@ -442,7 +442,7 @@ async function dispatchPrototype(
  * Resolve the production Plan-stage caller. Every verb maps onto the existing
  * Plan / workflow API surface; the same `/api/v1/plan*` routes back the
  * `fulcrum product planning …` aliases, so the two command grammars stay in
- * sync. No caller method is faked — an unconfigured caller throws.
+ * sync. No caller method is faked: an unconfigured caller throws.
  */
 async function resolveCaller(opts: PlanStageRunOptions): Promise<PlanStageCaller> {
   if (opts.caller) return opts.caller;

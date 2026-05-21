@@ -225,7 +225,7 @@
                   {#if rule.actionSkillSet.length > 0}
                     {rule.actionSkillSet.join(", ")}
                   {:else}
-                    <span class="text-muted-foreground">—</span>
+                    <span class="text-muted-foreground">-</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3">
@@ -322,7 +322,7 @@
                   {#if draft.confidence !== null}
                     <span>{(draft.confidence * 100).toFixed(0)}%</span>
                   {:else}
-                    <span class="text-muted-foreground">—</span>
+                    <span class="text-muted-foreground">-</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3">
@@ -342,7 +342,7 @@
                       {/each}
                     </div>
                   {:else}
-                    <span class="text-muted-foreground">—</span>
+                    <span class="text-muted-foreground">-</span>
                   {/if}
                 </td>
                 <td class="px-4 py-3 text-xs text-muted-foreground">

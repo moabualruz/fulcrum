@@ -183,7 +183,7 @@ function defaultArtifacts(): PublicArtifactRow[] {
  * actions are preserved verbatim so bulk archive/delete and upload carry
  * forward with no feature loss.
  */
-describe("/artifacts +page.server.ts load() — re-home redirect", () => {
+describe("/artifacts +page.server.ts load(): re-home redirect", () => {
   test("server route still uses the artifact public API for the preserved actions", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("createArtifactApiForEvent");
@@ -219,7 +219,7 @@ describe("/artifacts +page.server.ts load() — re-home redirect", () => {
   });
 });
 
-describe("/artifacts +page.server.ts actions — preserved with no feature loss", () => {
+describe("/artifacts +page.server.ts actions: preserved with no feature loss", () => {
   test("bulk action archives selected artifacts through public API", async () => {
     const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);

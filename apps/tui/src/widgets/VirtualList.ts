@@ -1,5 +1,5 @@
 /**
- * VirtualList — renders a window of items from a large list.
+ * VirtualList: renders a window of items from a large list.
  * Only renders visibleRows items at a time for <16ms/frame performance.
  */
 
@@ -60,7 +60,7 @@ export class VirtualList<T = string> {
     }
   }
 
-  /** Render visible window — returns exactly visibleRows lines. */
+  /** Render visible window: returns exactly visibleRows lines. */
   render(): string[] {
     const end = Math.min(this.scrollOffset + this.visibleRows, this.items.length);
     const lines: string[] = [];

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Ship archive — OD `ship-archive.html` fidelity surface.
+   * Ship archive: OD `ship-archive.html` fidelity surface.
    *
    * IA-MAP.md §2.5 routes the Ship stage at `/<ws>/projects/<projId>/ship`;
    * CLI-TUI-UX.md §484 (`:archive`) defines the release archive as a
@@ -10,27 +10,27 @@
    * stage route consumes it.
    *
    * Route-name history (see `_migrated-content/MIGRATION.md`): the
-   * `ship-archive` folder was a *mislabelled* route — it rendered an
+   * `ship-archive` folder was a *mislabelled* route: it rendered an
    * account-deletion + data-export page, not a Ship archive. The mislabelled
    * content was preserved verbatim by `prd-cross-mislabeled-route-content-migration`
    * under `_migrated-content/+page.svelte.preserved`. This file now rebuilds
    * the route as its real OD surface: the release-history timeline. The
    * preserved account-deletion flow re-homes to Settings · Danger
-   * (`/settings/account/delete`), owned by `prd-web-system-account-security` —
+   * (`/settings/account/delete`), owned by `prd-web-system-account-security` -
    * no feature loss, only relocation.
    *
    * OD components rebuilt 1:1:
-   *  - `.page-head` — title `Ship archive` + a mono `.count` sub-line.
-   *  - `.empty-state` — the `data-empty-for="ship-archive"` slot, copy
-   *    reconciled to COPY.md §72 (`No releases shipped.`) — the OD frame's
+   *  - `.page-head`: title `Ship archive` + a mono `.count` sub-line.
+   *  - `.empty-state`: the `data-empty-for="ship-archive"` slot, copy
+   *    reconciled to COPY.md §72 (`No releases shipped.`): the OD frame's
    *    `No releases yet.` loses to COPY.md, the language contract.
-   *  - `.tl` — a vertical timeline of `.tl-bucket` date groups; each bucket is
+   *  - `.tl`: a vertical timeline of `.tl-bucket` date groups; each bucket is
    *    a `.date` rail (connector dot + line drawn via pseudo-elements) plus a
    *    `.stack` of `.rel` release cards.
-   *  - `.rel` — a release card: a heading with a semver `.tag-pill`
+   *  - `.rel`: a release card: a heading with a semver `.tag-pill`
    *    (maj / min / patch variants), a one-line `.desc`, a mono `.meta` row
    *    (commit · PRs · LOC · authors), and a compact ModeRow (DESIGN.md §4.11
-   *    per-step mode affordance — the release card is a Step).
+   *    per-step mode affordance: the release card is a Step).
    *
    * The semver pill variant is *derived*, not hard-coded: each release is
    * classified maj / min / patch by comparing its version to the next-older
@@ -53,16 +53,16 @@
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
-  /** Semver class of a release — drives the OD `.tag-pill` variant. */
+  /** Semver class of a release: drives the OD `.tag-pill` variant. */
   type SemverClass = "maj" | "min" | "patch";
 
-  /** A single archived release — one OD `.rel` card. */
+  /** A single archived release: one OD `.rel` card. */
   type ArchivedRelease = {
     id: string;
     /** Semver tag shown in the `.tag-pill` (OD `v0.18.0`). */
     version: string;
     /**
-     * The release type the OD `.tag-pill` colours by — `maj` (headline /
+     * The release type the OD `.tag-pill` colours by: `maj` (headline /
      * breaking), `min` (feature), `patch` (fix). On the future Release domain
      * model this is a stored channel decision, not always a strict version-
      * string parse (a `0.x` headline feature release ships as `min` numerically
@@ -84,7 +84,7 @@
     authors: string;
   };
 
-  /** A date-bucket group — one OD `.tl-bucket`. */
+  /** A date-bucket group: one OD `.tl-bucket`. */
   type DateBucket = {
     /** Bucket date label (OD `Mar 21`). */
     date: string;
@@ -95,7 +95,7 @@
   };
 
   /**
-   * OD `ship-archive.html` body — five date buckets, verbatim versions,
+   * OD `ship-archive.html` body: five date buckets, verbatim versions,
    * commits, PR counts, LOC, and authors. Buckets are newest-first; the
    * timeline reads top-to-bottom as a chronological release log.
    */
@@ -210,7 +210,7 @@
   /**
    * Derive the semver class of a release from its version delta to the
    * next-older release: a changed major component → `maj`, a changed minor →
-   * `min`, otherwise → `patch`. The oldest release has no predecessor — a
+   * `min`, otherwise → `patch`. The oldest release has no predecessor: a
    * non-zero minor → `min`, else `maj`. This is the fallback used when a
    * release carries no explicit `releaseType`.
    */
@@ -227,7 +227,7 @@
 
   /**
    * Resolve the semver class the OD `.tag-pill` colours by. The release's own
-   * `releaseType` wins when present — the future Release domain model stores
+   * `releaseType` wins when present: the future Release domain model stores
    * it as a channel decision (a `0.x` headline release is editorially `maj`
    * even though its version delta reads `min`). When absent, the class is
    * derived from the version delta. Either way the class is a property *of the
@@ -241,7 +241,7 @@
   /** Flat newest-first list of every release, used to find each predecessor. */
   const orderedReleases = $derived(buckets.flatMap((bucket) => bucket.releases));
 
-  /** `releaseId → semver class` — the stored `releaseType` or the derived class. */
+  /** `releaseId → semver class`: the stored `releaseType` or the derived class. */
   const semverClassById = $derived(
     Object.fromEntries(
       orderedReleases.map((release, index) => {
@@ -279,7 +279,7 @@
   class="h-full min-h-0 overflow-y-auto"
 >
   <div class="mx-auto max-w-[1400px] px-6 pb-20 pt-[18px]">
-    <!-- PAGE HEAD — OD `.page-head` -->
+    <!-- PAGE HEAD: OD `.page-head` -->
     <div data-ship-archive-head class="mb-1 flex items-baseline gap-3.5">
       <h1 class="text-[22px] font-semibold tracking-[-0.01em]">Ship archive</h1>
       <span data-ship-archive-count class="font-mono text-xs text-muted-foreground">
@@ -288,7 +288,7 @@
     </div>
 
     {#if emptyState}
-      <!-- COPY.md §72 ship-archive empty state — the `data-empty-for`
+      <!-- COPY.md §72 ship-archive empty state: the `data-empty-for`
            slot contract is preserved for design-e2e. -->
       <div class="mt-6 flex items-center justify-center">
         <EmptyState
@@ -317,11 +317,11 @@
         />
       </div>
 
-      <!-- TIMELINE — OD `.tl` vertical date-bucket timeline -->
+      <!-- TIMELINE: OD `.tl` vertical date-bucket timeline -->
       <div data-ship-archive-timeline class="mt-[18px]">
         {#each buckets as bucket (bucket.date)}
           <div data-ship-archive-bucket class="mb-7 flex gap-4">
-            <!-- date rail — OD `.date`; connector dot + line via pseudo-elements -->
+            <!-- date rail: OD `.date`; connector dot + line via pseudo-elements -->
             <div
               data-ship-archive-date
               class={cn(
@@ -338,7 +338,7 @@
               {/if}
             </div>
 
-            <!-- release-card stack — OD `.stack` -->
+            <!-- release-card stack: OD `.stack` -->
             <div data-ship-archive-stack class="flex flex-1 flex-col gap-2.5">
               {#each bucket.releases as release (release.id)}
                 {@const semver = semverClassById[release.id] ?? "patch"}
@@ -365,7 +365,7 @@
                   >
                     {release.desc}
                   </p>
-                  <!-- mono meta row — OD `.meta` -->
+                  <!-- mono meta row: OD `.meta` -->
                   <div
                     data-ship-archive-meta
                     class={cn(
@@ -383,7 +383,7 @@
                     <span data-ship-archive-loc>{release.loc} LOC</span>
                     <span data-ship-archive-authors class="ml-auto">{release.authors}</span>
                   </div>
-                  <!-- compact ModeRow — DESIGN.md §4.11 per-step affordance -->
+                  <!-- compact ModeRow: DESIGN.md §4.11 per-step affordance -->
                   <div class="mt-2">
                     <ModeRow density="compact" bind:value={cardModes[release.id]} />
                   </div>

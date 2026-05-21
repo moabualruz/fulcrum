@@ -136,7 +136,7 @@
 <!--
   `/boards` is the older standalone production board. The canonical Build-stage
   board is the OD `build-board.html` workbench at `/build-board` (`IA-MAP.md
-  §2.3`, `design-alignment/build.md` route-disposition: "Reconcile — one
+  §2.3`, `design-alignment/build.md` route-disposition: "Reconcile: one
   canonical Build board"). `/boards` still resolves and keeps its tRPC-backed
   load + actions (no 404, no feature loss); the pointer below reconciles the
   duplication by naming the one canonical Build board.

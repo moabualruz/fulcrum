@@ -1,5 +1,5 @@
 /**
- * fulcrum symphony — orchestration CLI commands.
+ * fulcrum symphony: orchestration CLI commands.
  */
 
 import {

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AutomationRuleList — CRUD UI for project automation rules.
+   * AutomationRuleList: CRUD UI for project automation rules.
    */
   import { onMount } from "svelte";
   import { cn } from "$lib/utils.js";

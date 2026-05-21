@@ -17,7 +17,7 @@
 
 	/**
 	 * COPY.md §6 canonical 8-state status vocabulary. These eight strings are the
-	 * cross-surface (web / CLI / TUI) status invariant — DESIGN.md §13 invariant 5.
+	 * cross-surface (web / CLI / TUI) status invariant: DESIGN.md §13 invariant 5.
 	 * Locked here so no surface can ship a non-canonical synonym and still pass the
 	 * design gate. Order matches the COPY.md §6 closing line verbatim.
 	 */

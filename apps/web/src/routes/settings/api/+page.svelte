@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-  <title>API Settings — Fulcrum</title>
+  <title>API Settings: Fulcrum</title>
 </svelte:head>
 
 <section data-settings-api class="flex flex-col gap-6">

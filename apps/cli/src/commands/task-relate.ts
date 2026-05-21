@@ -1,5 +1,5 @@
 /**
- * fulcrum task relate — task relationship commands.
+ * fulcrum task relate: task relationship commands.
  *
  * Usage:
  *   fulcrum task relate <taskId> <type> <otherTaskId>

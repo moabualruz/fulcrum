@@ -16,7 +16,7 @@
  * test order. The component tests do not exercise the placeholder exports.
  */
 
-/** Inert component placeholder — rendered as a bare `<div>` by the test renderer. */
+/** Inert component placeholder: rendered as a bare `<div>` by the test renderer. */
 const EDITOR_CONTENT_STUB = "div";
 
 function noopComponent() {
@@ -28,7 +28,7 @@ export function svelteTiptapMock(): Record<string, unknown> {
     // Stubs the three component tests rely on.
     createEditor: () => ({ subscribe: () => () => {} }),
     EditorContent: EDITOR_CONTENT_STUB,
-    // Remaining real export names — present so the set is never frozen short.
+    // Remaining real export names: present so the set is never frozen short.
     Editor: class EditorStub {},
     SvelteRenderer: class SvelteRendererStub {},
     SvelteNodeViewRenderer: () => noopComponent(),

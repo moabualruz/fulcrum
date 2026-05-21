@@ -206,7 +206,7 @@ describe("computeSubpathSha256", () => {
   test("dir skill: file ordering is deterministic (lexicographic)", async () => {
     const dir = join(TMP, "skill-order");
     await mkdir(dir, { recursive: true });
-    // Write in reverse alphabetical order — hash must still be same as forward order.
+    // Write in reverse alphabetical order: hash must still be same as forward order.
     await writeFile(join(dir, "zzz.md"), "zzz\n");
     await writeFile(join(dir, "aaa.md"), "aaa\n");
     await writeFile(join(dir, "mmm.md"), "mmm\n");
@@ -283,7 +283,7 @@ describe("subpath integrity in syncUpstreamSkills", () => {
       // Instead, we use the `skills` opt to inject a pre-loaded skill and a mocked
       // repoDirs mapping by pointing FULCRUM_HOME so the slug resolves correctly.
       const skills = await loadUpstreamSkills(lockPath);
-      // Verify hash matches — this is the pure unit test of integrity logic.
+      // Verify hash matches: this is the pure unit test of integrity logic.
       const computed = await computeSubpathSha256(skillSrc, "dir");
       expect(computed.sha256).toEqual(sha256);
       expect(logs).toHaveLength(0); // no logs from pure hash computation
@@ -382,7 +382,7 @@ describe("subpath integrity in syncUpstreamSkills", () => {
 
   test("--update-pins: lockfile with pre-written pins loads subpath_sha256", async () => {
     // Verify that a lockfile containing subpath_sha256 is correctly parsed and
-    // surfaced on the loaded skill — confirming the schema round-trip works.
+    // surfaced on the loaded skill: confirming the schema round-trip works.
     const expectedHash = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234";
     const lockPath = await writeLock([
       "[meta]",
@@ -411,7 +411,7 @@ describe("subpath integrity in syncUpstreamSkills", () => {
 });
 
 // ---------------------------------------------------------------------------
-// W1.5 — wrangler entry: lockfile loads correctly
+// W1.5: wrangler entry: lockfile loads correctly
 // ---------------------------------------------------------------------------
 
 describe("W1.5 wrangler lockfile entry", () => {
@@ -450,7 +450,7 @@ describe("W1.5 wrangler lockfile entry", () => {
 });
 
 // ---------------------------------------------------------------------------
-// W1.6 — ast-grep claude_plugin: lockfile schema + install path
+// W1.6: ast-grep claude_plugin: lockfile schema + install path
 // ---------------------------------------------------------------------------
 
 describe("W1.6 ast-grep claude_plugin schema", () => {

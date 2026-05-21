@@ -2,7 +2,7 @@
   /*
    * OD StatusFooter consumer (DESIGN.md §3.1, IA-MAP.md §3, desktop-shell.html
    * `.foot-rep`, tui-runs.html `.term-foot`). This route component is a thin
-   * data supplier — it owns NO footer chrome markup. The 44px dense operator
+   * data supplier: it owns NO footer chrome markup. The 44px dense operator
    * footer is the `@fulcrum/ui-kit` `StatusFooter` primitive; this file maps
    * shell data (input mode, profile, branch, run progress, agent, MCP health,
    * trace) onto the primitive's segment + right-cluster contract.
@@ -23,7 +23,7 @@
     requestId?: string | null;
     /** Footer density (DESIGN.md §3.1: compact 38 / base 44 / comfortable 50). */
     mode?: StatusFooterMode;
-    /** Input mode pill — vim-style NORMAL/INSERT/FILTER/COMMAND (apps/web CONTEXT.md). */
+    /** Input mode pill: vim-style NORMAL/INSERT/FILTER/COMMAND (apps/web CONTEXT.md). */
     inputMode?: string;
     /** Workspace profile (OD `.foot-rep`: `[PRO]`; tui-runs `profile: dev`). */
     profile?: string;
@@ -35,7 +35,7 @@
     agent?: string;
     /** MCP server health, e.g. `7/7`. */
     mcpHealth?: string;
-    /** Whether MCP health is degraded — flips the segment glyph tone. */
+    /** Whether MCP health is degraded: flips the segment glyph tone. */
     mcpDegraded?: boolean;
     /** Wall-clock time string for the time segment (OD `.term-foot`: `14:02`). */
     time?: string;
@@ -117,7 +117,7 @@
   onAiAssist={openAiAssist}
 >
   {#snippet rightCluster()}
-    <!-- Trace: shared DESIGN.md §4.10 TraceBadge — copy + audit/CLI menu. -->
+    <!-- Trace: shared DESIGN.md §4.10 TraceBadge: copy + audit/CLI menu. -->
     <TraceBadge
       badge
       data-trace-footer-id

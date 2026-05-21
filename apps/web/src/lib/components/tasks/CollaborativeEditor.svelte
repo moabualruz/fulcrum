@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * CollaborativeEditor.svelte — TipTap + Yjs real-time collaborative editor (workflow milestone, D-97).
+   * CollaborativeEditor.svelte: TipTap + Yjs real-time collaborative editor (workflow milestone, D-97).
    *
    * - Uses @tiptap/extension-collaboration (Yjs doc) for CRDT-based editing
    * - Uses @tiptap/extension-collaboration-cursor for user cursor presence
@@ -89,7 +89,7 @@
         },
       });
     } catch (_e) {
-      // Graceful fallback: WebSocket unavailable — continue without collaboration
+      // Graceful fallback: WebSocket unavailable: continue without collaboration
       // Editor still works for single-user editing
       console.warn("[CollaborativeEditor] WebSocket unavailable, falling back to non-collab mode");
     }
@@ -139,7 +139,7 @@
     <div class="connection-status absolute top-1 right-1 flex items-center gap-1 text-xs">
       <span
         class="status-dot h-2 w-2 rounded-full {connected ? 'bg-green-500' : 'bg-amber-400'}"
-        title={connected ? 'Connected — syncing with other editors' : 'Connecting…'}
+        title={connected ? 'Connected: syncing with other editors' : 'Connecting…'}
       ></span>
       <span class="text-muted-foreground">{connected ? 'Live' : 'Connecting…'}</span>
     </div>

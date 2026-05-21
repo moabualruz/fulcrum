@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// fulcrum — local-first CLI Agent OS. Binary entry-point.
+// fulcrum: local-first CLI Agent OS. Binary entry-point.
 
 import { installCliLogRedaction } from "./log.ts";
 import { CLI_RESULT_SCHEMA, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";

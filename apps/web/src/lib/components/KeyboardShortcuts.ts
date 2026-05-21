@@ -1,5 +1,5 @@
 /**
- * KeyboardShortcuts — task workflow (D-67).
+ * KeyboardShortcuts: task workflow (D-67).
  *
  * Registers all global keyboard shortcuts using tinykeys.
  * Returns a cleanup function for use in onMount/onDestroy.
@@ -64,7 +64,7 @@ function guard(cb: (() => void) | undefined, allowInEditable = false) {
  * Register all global keyboard shortcuts.
  *
  * @param callbacks - Context-aware handlers from the mounting component.
- * @returns Cleanup function — call in onDestroy or effect cleanup.
+ * @returns Cleanup function: call in onDestroy or effect cleanup.
  */
 export function setupKeyboardShortcuts(
   callbacks: ShortcutCallbacks,

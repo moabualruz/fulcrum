@@ -12,7 +12,7 @@ import {
 } from "./ModePicker.ts";
 
 /**
- * ModePicker — the TUI per-Step mode affordance row
+ * ModePicker: the TUI per-Step mode affordance row
  * (`prd-web-mode-affordance-system`, `prd-tui-step-modepicker-006`,
  * DESIGN.md §4.13, CLI-TUI-UX.md §7.4).
  *
@@ -22,7 +22,7 @@ import {
  * collision-free `m` chord. These tests are the TUI snapshot proof for the
  * universal Step affordance.
  */
-describe("ModePicker — TUI Step mode row", () => {
+describe("ModePicker: TUI Step mode row", () => {
   test("declares the four canonical modes with OD glyphs and chord selectors", () => {
     expect(MODE_AFFORDANCES.map((m) => m.mode)).toEqual([
       "manual",
@@ -37,7 +37,7 @@ describe("ModePicker — TUI Step mode row", () => {
     expect(MODE_CHORD_KEYBINDINGS).toEqual(["m a", "m p", "m d", "m i"]);
   });
 
-  test("renders the compact row — four labelled modes, selected reverse-video", () => {
+  test("renders the compact row: four labelled modes, selected reverse-video", () => {
     const picker = new ModePicker({ stepId: "AUTH-42", value: "manual" });
     const line = stripAnsi(picker.render());
 
@@ -79,12 +79,12 @@ describe("ModePicker — TUI Step mode row", () => {
   test("an unbound key after the `m` chord disarms and is NOT consumed", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
     expect(picker.handleChordKey("m")).toBe(true);
-    // `x` is not a mode selector — the chord disarms and the screen handles `x`.
+    // `x` is not a mode selector: the chord disarms and the screen handles `x`.
     expect(picker.handleChordKey("x")).toBe(false);
     expect(picker.isChordArmed).toBe(false);
   });
 
-  test("a non-`m` key while not armed is ignored — the screen keeps its keys", () => {
+  test("a non-`m` key while not armed is ignored: the screen keeps its keys", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
     // Without the `m` prefix the picker never steals `a` / `d` / `p` / `j`.
     expect(picker.handleChordKey("a")).toBe(false);
@@ -137,7 +137,7 @@ describe("ModePicker — TUI Step mode row", () => {
     ]);
   });
 
-  test("defaults to the manual mode — the OD default-pressed mode", () => {
+  test("defaults to the manual mode: the OD default-pressed mode", () => {
     const picker = new ModePicker();
     expect(picker.value).toBe("manual");
   });

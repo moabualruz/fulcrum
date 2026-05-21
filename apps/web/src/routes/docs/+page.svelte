@@ -22,7 +22,7 @@
 	}
 
 	function projectLabel(id: string | null): string {
-		return id ? id : "—";
+		return id ? id : "-";
 	}
 
 	function autoSubmit(event: Event): void {
@@ -130,7 +130,7 @@
 		<div
 			data-empty-docs
 			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-		>No documents yet — create one.</div>
+		>No documents yet: create one.</div>
 	{:else if payload.documents.length === 0}
 		<div
 			data-empty-filter

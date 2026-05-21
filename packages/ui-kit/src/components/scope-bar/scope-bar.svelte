@@ -26,7 +26,7 @@
 		activeStage?: WorkflowStage;
 		stages?: WorkflowStage[];
 		onSelectStage?: (stage: WorkflowStage) => void;
-		/** TraceBadge slot - the consumer passes a `<TraceChip badge />`. */
+		/** TraceBadge slot: the consumer passes a `<TraceChip badge />`. */
 		trace?: Snippet;
 		/** System icon cluster slot (palette, notifications, display, help, avatar). */
 		systemCluster?: Snippet;
@@ -107,13 +107,11 @@
 			>
 		{/if}
 
-		<nav data-slot="scope-bar-stages" aria-label="Stage tabs" class="flex items-center gap-1">
+		<nav data-slot="scope-bar-stages" aria-label="Stages" class="flex items-center gap-1">
 			{#each stages as stage (stage)}
 				{@const active = activeStage === stage}
 				<button
 					type="button"
-					role="tab"
-					aria-selected={active}
 					aria-current={active ? "page" : undefined}
 					data-slot="scope-bar-tab"
 					data-stage={stage}
@@ -134,31 +132,6 @@
 
 		<span class="flex-1"></span>
 	{/if}
-
-	<nav data-slot="scope-bar-stages" aria-label="Stages" class="flex items-center gap-1">
-		{#each stages as stage (stage)}
-			{@const active = activeStage === stage}
-			<button
-				type="button"
-				aria-current={active ? "page" : undefined}
-				data-slot="scope-bar-tab"
-				data-stage={stage}
-				data-active={active ? "true" : undefined}
-				class={cn(
-					"h-7 rounded-md px-3 text-xs font-medium transition-colors",
-					active
-						? "bg-accent text-primary-foreground"
-						: "text-fg-subtle hover:bg-surface-sunken hover:text-fg",
-					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-				)}
-				onclick={() => pick(stage)}
-			>
-				{STAGE_LABEL[stage]}
-			</button>
-		{/each}
-	</nav>
-
-	<span class="flex-1"></span>
 
 	{#if trace && variant !== "mobile"}
 		<span data-slot="scope-bar-trace">{@render trace()}</span>

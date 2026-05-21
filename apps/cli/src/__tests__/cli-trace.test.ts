@@ -4,7 +4,7 @@
  * Proves the `DESIGN.md` §4.10 cross-surface trace spine in CLI plain output:
  *
  *  - run-bearing commands print a stable `trace: …  run: …  project: …` header
- *    line in plain (non-`--json`) mode — asserted for one command per stage;
+ *    line in plain (non-`--json`) mode: asserted for one command per stage;
  *  - the trace id printed in plain mode is the SAME id the `fulcrum.cli.v1`
  *    JSON envelope carries for the same invocation (trace continuity);
  *  - error output prints the `COPY.md` §3 recovery block (`Fix:` + `trace=<id>`);
@@ -97,7 +97,7 @@ function runsCaller() {
   };
 }
 
-describe("trace-line module — DESIGN.md §4.10 plain header", () => {
+describe("trace-line module: DESIGN.md §4.10 plain header", () => {
   test("formatTraceLine renders trace/run/project with an 8-char truncated id", () => {
     const line = formatTraceLine(
       { trace_id: FIXED_TRACE, span_id: "8b2d4a6f9c1e3a5b", run_id: "01HXYZ123ABC", project_id: "fulcrum" },
@@ -123,7 +123,7 @@ describe("trace-line module — DESIGN.md §4.10 plain header", () => {
     expect(line).toBe("trace: 01234567…  span: 8b2d4a6f…");
   });
 
-  test("trace line is plain ASCII apart from the ellipsis — copy-pasteable", () => {
+  test("trace line is plain ASCII apart from the ellipsis: copy-pasteable", () => {
     const line = formatTraceLine(
       { trace_id: FIXED_TRACE, span_id: "abc", run_id: "run-9", project_id: "fulcrum" },
       { env: {}, isTty: false } as never,
@@ -133,7 +133,7 @@ describe("trace-line module — DESIGN.md §4.10 plain header", () => {
   });
 });
 
-describe("colour-disable conditions — CLI-TUI-UX.md §2.3", () => {
+describe("colour-disable conditions: CLI-TUI-UX.md §2.3", () => {
   test("non-TTY disables colour", () => {
     expect(isColorEnabled({ env: {}, isTty: false })).toBe(false);
   });
@@ -176,7 +176,7 @@ describe("colour-disable conditions — CLI-TUI-UX.md §2.3", () => {
   });
 });
 
-describe("error recovery block — COPY.md §3 / CLI-TUI-UX.md §5", () => {
+describe("error recovery block: COPY.md §3 / CLI-TUI-UX.md §5", () => {
   test("formatErrorRecovery prints message, Fix, and trace=<id>", () => {
     const block = formatErrorRecovery(
       { code: "FUL_AUTH_REQUIRED", message: "Authentication required.", fix: "fulcrum auth login" },
@@ -196,8 +196,8 @@ describe("error recovery block — COPY.md §3 / CLI-TUI-UX.md §5", () => {
   });
 });
 
-describe("plain trace line per stage — run-bearing commands", () => {
-  test("Capture stage — `fulcrum capture status` prints a plain trace line", async () => {
+describe("plain trace line per stage: run-bearing commands", () => {
+  test("Capture stage: `fulcrum capture status` prints a plain trace line", async () => {
     const io = captureLines();
     await runCapture(["status", "cap-1", "--status", "approved", "--no-color"], {
       caller: captureCaller(),
@@ -210,7 +210,7 @@ describe("plain trace line per stage — run-bearing commands", () => {
     expect(line).toBe("trace: 01234567…");
   });
 
-  test("Build stage — `fulcrum runs list` prints a plain trace line", async () => {
+  test("Build stage: `fulcrum runs list` prints a plain trace line", async () => {
     const io = captureLines();
     await runPillar14Command("runs", ["list", "--no-color"], {
       caller: runsCaller(),
@@ -220,7 +220,7 @@ describe("plain trace line per stage — run-bearing commands", () => {
     expect(traceLineOf(io.lines)).toBe("trace: 01234567…");
   });
 
-  test("Operate stage — `fulcrum flags list` prints a plain trace line", async () => {
+  test("Operate stage: `fulcrum flags list` prints a plain trace line", async () => {
     const io = captureLines();
     await runPillar14Command("flags", ["list", "--no-color"], {
       caller: runsCaller(),
@@ -230,7 +230,7 @@ describe("plain trace line per stage — run-bearing commands", () => {
     expect(traceLineOf(io.lines)).toBe("trace: 01234567…");
   });
 
-  test("AI Assist stage — `fulcrum ai start` prints a plain trace line", async () => {
+  test("AI Assist stage: `fulcrum ai start` prints a plain trace line", async () => {
     const io = captureLines();
     await runAi(["start", "--task", "task-1", "--title", "Ship drawer", "--no-color"], {
       env: { FULCRUM_TRACE_ID: FIXED_TRACE } as never,
@@ -240,8 +240,8 @@ describe("plain trace line per stage — run-bearing commands", () => {
   });
 });
 
-describe("trace continuity — plain line matches the JSON envelope", () => {
-  test("Build stage — plain trace line carries the same trace id as `--json`", async () => {
+describe("trace continuity: plain line matches the JSON envelope", () => {
+  test("Build stage: plain trace line carries the same trace id as `--json`", async () => {
     const jsonIo = captureLines();
     const plainIo = captureLines();
     await runPillar14Command("runs", ["list", "--json"], {
@@ -260,7 +260,7 @@ describe("trace continuity — plain line matches the JSON envelope", () => {
     expect(envelope.trace_id).toBe(FIXED_TRACE);
   });
 
-  test("Capture stage — plain line and envelope share the result trace id", async () => {
+  test("Capture stage: plain line and envelope share the result trace id", async () => {
     const jsonIo = captureLines();
     const plainIo = captureLines();
     await runCapture(["status", "cap-1", "--status", "review", "--json"], {
@@ -279,7 +279,7 @@ describe("trace continuity — plain line matches the JSON envelope", () => {
   });
 });
 
-describe("error path — recovery copy plus trace reference", () => {
+describe("error path: recovery copy plus trace reference", () => {
   test("`fulcrum runs show <missing>` plain error prints recovery copy + trace=<id>", async () => {
     const io = captureLines();
     await runPillar14Command("runs", ["show", "missing"], {

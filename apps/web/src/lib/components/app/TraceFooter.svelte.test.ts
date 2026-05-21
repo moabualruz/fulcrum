@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
  * `TraceFooter.svelte` is the route-side data supplier for the OD StatusFooter
  * (DESIGN.md §3.1, IA-MAP.md §3). These tests prove it consumes the
  * `@fulcrum/ui-kit` `StatusFooter` primitive and maps the full operator
- * segment set onto it — it must NOT re-implement footer chrome route-locally.
+ * segment set onto it: it must NOT re-implement footer chrome route-locally.
  */
 
 type TraceFooterProps = {
@@ -22,7 +22,7 @@ type TraceFooterProps = {
 	time?: string;
 };
 
-describe("TraceFooter — OD StatusFooter consumer", () => {
+describe("TraceFooter: OD StatusFooter consumer", () => {
 	let render: typeof import("svelte/server").render;
 	let TraceFooter: Component<TraceFooterProps>;
 
@@ -40,7 +40,7 @@ describe("TraceFooter — OD StatusFooter consumer", () => {
 		expect(body).toMatch(/<footer\b[^>]*data-slot="status-footer"/);
 		// data-footer-mode state attribute comes from the primitive.
 		expect(body).toMatch(/data-footer-mode="base"/);
-		// This component is a thin consumer — it tags the footer for tests.
+		// This component is a thin consumer: it tags the footer for tests.
 		expect(body).toContain("data-trace-footer");
 	});
 
@@ -109,7 +109,7 @@ describe("TraceFooter — OD StatusFooter consumer", () => {
 
 	test("right-most segment is the keyboard-accessible AI Assist trigger with ⌘/ hint", () => {
 		const { body } = render(TraceFooter, { props: { traceId: "tr_8f29a4c1" } });
-		// The AI Assist segment is a real <button> — keyboard reachable + focusable.
+		// The AI Assist segment is a real <button>: keyboard reachable + focusable.
 		expect(body).toMatch(
 			/<button\b[^>]*data-slot="status-footer-ai-assist"/,
 		);

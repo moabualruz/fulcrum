@@ -2,11 +2,11 @@
  * Complete `mock.module` factory for `$lib/server/application-scope`.
  *
  * Bun's `mock.module` is process-global in two ways that bite here:
- *  1. It freezes a module's *export-name set* on first registration — a later,
+ *  1. It freezes a module's *export-name set* on first registration: a later,
  *     fuller mock cannot add names the first one omitted.
  *  2. Only the *first-registered factory closure* survives; every later
  *     `mock.module(samePath, …)` is ignored. So a per-file `suiteActive`
- *     boolean or a per-file seam closure is invisible to the losing file —
+ *     boolean or a per-file seam closure is invisible to the losing file -
  *     fourteen route server tests mock this module, but only one file's seam
  *     would ever be consulted.
  *
@@ -17,7 +17,7 @@
  *  - While a suite is active its seam answers `requestAppScope`.
  *  - With no suite active (or the seam returns `null`) the call falls through
  *    to the real `resolveApplicationScope`, honouring any scope injected via
- *    `__setApplicationScopeForTest` — mirroring the production module so
+ *    `__setApplicationScopeForTest`: mirroring the production module so
  *    foreign suites (e.g. `tasks/[id]/run-preview`) keep working.
  */
 

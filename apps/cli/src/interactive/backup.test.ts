@@ -15,7 +15,7 @@ async function freshDb(): Promise<{ db: TestStore; dir: string }> {
   return { db, dir };
 }
 
-describe("backup — PGlite dump + artifacts manifest tarball", () => {
+describe("backup: PGlite dump + artifacts manifest tarball", () => {
   let db: TestStore;
   let dir: string;
 

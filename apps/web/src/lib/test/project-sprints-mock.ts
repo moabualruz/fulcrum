@@ -6,7 +6,7 @@
  * set* on its first registration; only the first-registered factory closure
  * survives. The `/projects/[id]/sprints` route test mocks this module with all
  * eight exports, `/projects/[id]/sprint/[sprintId]` with only five. Whichever
- * registered first hijacked the other suite — if the five-export mock won,
+ * registered first hijacked the other suite: if the five-export mock won,
  * `loadProjectSprints` / `createProjectSprint` / `startProjectSprint` were
  * frozen out and the sprints-list suite broke.
  *

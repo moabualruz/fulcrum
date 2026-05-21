@@ -103,7 +103,7 @@ describe("stageForPath route mapping", () => {
 		expect(stageForPath("/acme/projects/fulcrum/operate/doctor")).toBe("operate");
 	});
 
-	test("maps old feature-bucket routes to their owning stage — no destination dropped", () => {
+	test("maps old feature-bucket routes to their owning stage: no destination dropped", () => {
 		expect(stageForPath("/docs")).toBe("capture");
 		expect(stageForPath("/boards")).toBe("build");
 		expect(stageForPath("/runs")).toBe("build");

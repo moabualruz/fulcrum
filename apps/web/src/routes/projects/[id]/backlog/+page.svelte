@@ -141,7 +141,7 @@
 
 <header class="mb-4 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">
-    {data.project.name} — Sprint Planning
+    {data.project.name}: Sprint Planning
   </h1>
   {#if data.sprints.length > 0}
     <select

@@ -176,7 +176,7 @@ describe("fulcrum hooks enable/disable (detection-aware default)", () => {
   });
 
   test("enable with no agent dirs → no config files written", async () => {
-    // No agent dirs created — none should be detected.
+    // No agent dirs created: none should be detected.
     await run(["enable", "index-check"]);
 
     // Marker is still written (intent recorded regardless of detection).
@@ -253,7 +253,7 @@ describe("fulcrum hooks enable/disable (detection-aware default)", () => {
 
     // Codex hooks.json still exists (was not in targetAgents, so not touched).
     // Note: the file physically exists because we only removed the dir after enable.
-    // After rm of .codex dir, the file no longer exists either — that's fine.
+    // After rm of .codex dir, the file no longer exists either: that's fine.
     // The key assertion is the marker is cleared.
     expect(
       await Bun.file(join(TMP, ".fulcrum", "hooks", "enabled", "index-check")).exists(),

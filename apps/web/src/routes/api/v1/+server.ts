@@ -1,5 +1,5 @@
 /**
- * /api/v1 — Public REST API gateway.
+ * /api/v1: Public REST API gateway.
  *
  * Gated by FULCRUM_FEATURES=public-api (C1, default OFF).
  * OFF → 404 for all requests under /api/v1.

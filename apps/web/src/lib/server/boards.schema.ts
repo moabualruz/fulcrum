@@ -14,14 +14,14 @@ const IdField = v.pipe(v.string(), v.minLength(1, "id is required"));
 
 const NullableString = v.union([v.string(), v.null_()]);
 
-/** `?/create` — `{title, status?, projectId?}`. */
+/** `?/create`: `{title, status?, projectId?}`. */
 export const BoardCreateSchema = v.object({
   title: TitleField,
   status: v.optional(StatusEnum),
   projectId: v.optional(NullableString),
 });
 
-/** `?/update` — partial edit; at least one of {title,description,status,priority}. */
+/** `?/update`: partial edit; at least one of {title,description,status,priority}. */
 export const BoardUpdateSchema = v.object({
   id: IdField,
   title: v.optional(TitleField),
@@ -30,10 +30,10 @@ export const BoardUpdateSchema = v.object({
   priority: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(20))),
 });
 
-/** `?/delete` — `{id}`. */
+/** `?/delete`: `{id}`. */
 export const BoardDeleteSchema = v.object({ id: IdField });
 
-/** `?/move` — `{id, from, to}` for the optimistic-status DnD. */
+/** `?/move`: `{id, from, to}` for the optimistic-status DnD. */
 export const BoardMoveSchema = v.object({
   id: IdField,
   from: StatusEnum,

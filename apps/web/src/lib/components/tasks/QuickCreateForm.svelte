@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * QuickCreateForm — task workflow (D-113).
+   * QuickCreateForm: task workflow (D-113).
    *
    * Compact floating form for rapid task creation.
    * Triggered by the `c` keyboard shortcut or a + button.
@@ -90,7 +90,7 @@
           title: title.trim(),
         });
       } catch {
-        // silently ignore — duplicate detection is best-effort
+        // silently ignore: duplicate detection is best-effort
       }
     }, 500);
   }

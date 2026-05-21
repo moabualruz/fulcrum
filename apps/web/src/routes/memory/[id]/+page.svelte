@@ -116,7 +116,7 @@
 
 			<div class={cn("rounded-lg border border-border p-4 text-xs text-muted-foreground space-y-1")}>
 				<div>ID: <code>{mem.id}</code></div>
-				<div data-memory-source-ref>Source: {mem.source ?? "—"}</div>
+				<div data-memory-source-ref>Source: {mem.source ?? "-"}</div>
 				<div data-memory-links hidden></div>
 				<div>Created: {mem.created_at}</div>
 				<div>Updated: {mem.updated_at}</div>

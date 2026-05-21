@@ -1,10 +1,10 @@
 /**
- * ChatPaneScreen — the TUI-native inline `:ai` AI Assist pane screen
+ * ChatPaneScreen: the TUI-native inline `:ai` AI Assist pane screen
  * (CLI-TUI-UX.md §6 `:ai` row, §6.1, §7.5 pane keys, §10 layout).
  *
  * This screen is the terminal-side parity for the web AI Assist drawer
  * (`prd-web-global-ai-assist-drawer`) and the CLI step-scope command
- * (`prd-cli-ai-assist-step-scope`). It is NOT a drawer — the web slides AI
+ * (`prd-cli-ai-assist-step-scope`). It is NOT a drawer: the web slides AI
  * Assist in as an overlay; the TUI keeps the terminal a terminal and renders
  * AI Assist as a first-class inline screen reached by a screen swap
  * (CLI-TUI-UX.md §6.1). Invoking `:ai` (colon route, `:ai` tab, or footer
@@ -17,7 +17,7 @@
  *    `Shift+Enter` newline, `↑`/`↓` history, `Ctrl-l` clear, `Ctrl-s` save
  *    thread, `Esc` blur, `q` pop back.
  *  - Render the §10.2 pane layout at 80×24 and 120×32 (snapshot-fidelity).
- *  - Preserve thread state across screen navigation — the same screen
+ *  - Preserve thread state across screen navigation: the same screen
  *    instance is reused so the transcript and composer draft survive a swap.
  *
  * The screen delegates message dispatch and permission decisions to a
@@ -61,7 +61,7 @@ export interface ChatPaneCaller {
 /** Construction input for the `:ai` ChatPaneScreen. */
 export interface ChatPaneScreenOptions {
   caller: ChatPaneCaller;
-  /** Thread name (CLI-TUI-UX.md §10.3 — reopens with the last thread). */
+  /** Thread name (CLI-TUI-UX.md §10.3: reopens with the last thread). */
   threadName?: string;
   /** Routed agent id (CLI-TUI-UX.md §10.4). */
   agent?: string;
@@ -76,7 +76,7 @@ function clock(): string {
 }
 
 export class ChatPaneScreen {
-  /** The thread/composer/scope state — survives screen navigation. */
+  /** The thread/composer/scope state: survives screen navigation. */
   readonly pane: ChatPane;
   private readonly caller: ChatPaneCaller;
   private readonly threadName: string;
@@ -123,28 +123,28 @@ export class ChatPaneScreen {
     this.pane.backspaceComposer();
   }
 
-  /** `Shift+Enter` — insert a newline into the composer without submitting. */
+  /** `Shift+Enter`: insert a newline into the composer without submitting. */
   newline(): void {
     this.pane.appendToComposer("\n");
   }
 
-  /** `↑`/`↓` — recall previous / next submitted message. */
+  /** `↑`/`↓`: recall previous / next submitted message. */
   history(direction: -1 | 1): void {
     this.pane.recallHistory(direction);
   }
 
-  /** `Ctrl-l` — clear the composer draft. */
+  /** `Ctrl-l`: clear the composer draft. */
   clearComposer(): void {
     this.pane.clearComposer();
     this.flash = "Composer cleared.";
   }
 
-  /** `Esc` — blur the composer (keeps the thread; does not pop the screen). */
+  /** `Esc`: blur the composer (keeps the thread; does not pop the screen). */
   blur(): void {
     this.composerFocused = false;
   }
 
-  /** `Enter` — submit the composer draft and stream the agent reply. */
+  /** `Enter`: submit the composer draft and stream the agent reply. */
   async submit(): Promise<void> {
     const message = this.pane.submit(clock());
     if (message === null) {
@@ -166,7 +166,7 @@ export class ChatPaneScreen {
     });
   }
 
-  /** `Ctrl-s` — save the current thread as a reusable prompt template. */
+  /** `Ctrl-s`: save the current thread as a reusable prompt template. */
   async saveThread(): Promise<void> {
     await this.caller.saveThread({ threadName: this.threadName });
     this.flash = "Thread saved.";

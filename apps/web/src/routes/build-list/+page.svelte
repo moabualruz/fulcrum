@@ -5,9 +5,9 @@
   import { cn } from "$lib/utils.js";
 
   /**
-   * Build · List — the `☰ List` layout of the Build workbench.
+   * Build · List: the `☰ List` layout of the Build workbench.
    *
-   * OD reference: `build-list.html` — a dense (12px body / 20px row) work-item
+   * OD reference: `build-list.html`: a dense (12px body / 20px row) work-item
    * table with columns ID · Title · Status · Progress · Module · Owner ·
    * Updated · Modes. Sticky header, monospace id pills, `DESIGN.md §4.9`
    * status badges, a per-row 60px progress bar, an avatar, and a `DESIGN.md
@@ -32,7 +32,7 @@
   };
 
   /**
-   * The OD `build-list.html` body — eight work items, verbatim ids/titles/
+   * The OD `build-list.html` body: eight work items, verbatim ids/titles/
    * modules/owners/updated. OD status strings map onto the canonical
    * `DESIGN.md §4.9` / COPY.md §6 vocabulary: `complete`→`completed`,
    * `awaiting`→`waiting-input`, `pending`→`queued`.
@@ -48,7 +48,7 @@
     { id: "FUL-1261", title: "Plan templates library + seeding", status: "running", progress: 42, module: "plan", owner: "s", updated: "3d ago", mode: "manual" },
   ];
 
-  /** The five Build layouts — one switcher shared across board / list / timeline / graph / runs. */
+  /** The five Build layouts: one switcher shared across board / list / timeline / graph / runs. */
   const layouts = [
     { id: "board", label: "Board", href: "/build-board" },
     { id: "graph", label: "Graph", href: "/build-graph" },
@@ -75,7 +75,7 @@
   ];
   let activeFilter = $state<FilterId>("all");
 
-  /** The signed-in operator — used by the `Mine` filter. */
+  /** The signed-in operator: used by the `Mine` filter. */
   const currentOwner = "m";
 
   const visibleItems = $derived(
@@ -104,12 +104,12 @@
   /**
    * The two declared data states (`populated` | `empty`). `populated` is the
    * default; `?state=empty` renders the COPY.md build-list empty state. This
-   * is a design-surface state selector, not a production data source — the
+   * is a design-surface state selector, not a production data source: the
    * real list will derive its empty state from a zero-length task query.
    */
   const isEmptyState = $derived(page.url.searchParams.get("state") === "empty");
 
-  /** Header count — OD `42 work items · 12 running`, recomputed from the data. */
+  /** Header count: OD `42 work items · 12 running`, recomputed from the data. */
   const totalCount = workItems.length;
   const runningCount = $derived(workItems.filter((item) => item.status === "running").length);
 

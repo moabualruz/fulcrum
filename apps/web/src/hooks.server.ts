@@ -59,7 +59,7 @@ async function getAuthHandler(): Promise<((req: Request) => Promise<Response>) |
   try {
     return (await getWebRuntime()).authHandler;
   } catch {
-    // ORM not available (e.g. running web-only tests without DB) — degrade gracefully
+    // ORM not available (e.g. running web-only tests without DB): degrade gracefully
     return null;
   }
 }
@@ -124,7 +124,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   let i18nEnabled = isI18nEnabled();
 
   try {
-    // 1. Active project cookie (existing behaviour — must stay first for test compat)
+    // 1. Active project cookie (existing behaviour: must stay first for test compat)
     event.locals.activeProjectId = getActiveProject(event.cookies);
 
     // 2. Defaults for new locals
@@ -167,7 +167,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
       // In local/dev mode, auto-create a session so users don't need to log in.
       // Production (SaaS) mode requires real auth via Better-Auth.
-      // Auth guard — only active when FULCRUM_REQUIRE_AUTH is set (SaaS mode).
+      // Auth guard: only active when FULCRUM_REQUIRE_AUTH is set (SaaS mode).
       if (
         !event.locals.session &&
         !url.pathname.startsWith("/auth") &&

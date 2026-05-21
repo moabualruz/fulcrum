@@ -62,7 +62,7 @@ mock.module("$lib/server/request-service-scope", () =>
   ),
 );
 
-// Complete `run-pages.ts` surface — `mock.module` freezes export names on
+// Complete `run-pages.ts` surface: `mock.module` freezes export names on
 // first registration, so `loadRunsPageData` is stubbed even though unused.
 mock.module("@execution-orchestration/interface/run-pages.ts", () => ({
   loadRunsPageData: async () => ({ runs: [], projects: [], agents: [] }),
@@ -103,7 +103,7 @@ mock.module("$lib/server/project-api", () =>
 );
 
 // `$lib/feedback/action-result` is a pure module; the real `actionOk` already
-// returns `{ ok: true, message }` — exactly what this suite asserts. Mocking it
+// returns `{ ok: true, message }`: exactly what this suite asserts. Mocking it
 // only froze a process-global export set that broke sibling suites, so the real
 // module is used directly.
 

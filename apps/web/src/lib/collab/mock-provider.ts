@@ -1,5 +1,5 @@
 /**
- * MockCollabProvider — used in tests and when real Hocuspocus is unavailable.
+ * MockCollabProvider: used in tests and when real Hocuspocus is unavailable.
  * Implements the CollabProvider interface without any network calls.
  */
 import type { CollabProvider, CollabUser, CursorState, PresenceState } from "./types.js";
@@ -58,13 +58,13 @@ export class MockCollabProvider implements CollabProvider {
 		this._emitCursors();
 	}
 
-	/** Test helper — simulate a remote user joining */
+	/** Test helper: simulate a remote user joining */
 	simulateUserJoin(user: CollabUser): void {
 		this._users.set(user.id, user);
 		this._emitPresence();
 	}
 
-	/** Test helper — simulate a remote user leaving */
+	/** Test helper: simulate a remote user leaving */
 	simulateUserLeave(userId: string): void {
 		this._users.delete(userId);
 		this._cursors.delete(userId);
@@ -72,7 +72,7 @@ export class MockCollabProvider implements CollabProvider {
 		this._emitCursors();
 	}
 
-	/** Test helper — simulate a remote cursor update */
+	/** Test helper: simulate a remote cursor update */
 	simulateRemoteCursor(cursor: CursorState): void {
 		this._cursors.set(cursor.userId, cursor);
 		this._emitCursors();

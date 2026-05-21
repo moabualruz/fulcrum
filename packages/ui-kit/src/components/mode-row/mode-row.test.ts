@@ -4,16 +4,16 @@ import ModeRowRoot from "./mode-row.svelte";
 import { TIGHT_MODES, WORKFLOW_MODES, modeGlyph, modeLabel } from "./index.ts";
 
 /**
- * ModeRow — the universal per-Step mode affordance row.
+ * ModeRow: the universal per-Step mode affordance row.
  *
  * Rendered design proof for `prd-web-mode-affordance-system`: every assertion
- * pins the primitive to DESIGN.md §4.13 — the canonical four modes, the OD
+ * pins the primitive to DESIGN.md §4.13: the canonical four modes, the OD
  * glyphs, the `role="toolbar" aria-label="Step modes"` semantics, per-action
  * titles, and the three density forms. A Step row that drops a mode hook is
  * caught by the `data-slot` assertions here.
  */
-describe("ModeRow — universal Step mode affordance (DESIGN.md §4.13)", () => {
-	test("renders the four canonical modes — Manual / Play / Discuss / AI Assist", () => {
+describe("ModeRow: universal Step mode affordance (DESIGN.md §4.13)", () => {
+	test("renders the four canonical modes: Manual / Play / Discuss / AI Assist", () => {
 		const { body } = render(ModeRowRoot, {});
 
 		// §4.13: the long form renders all four buttons with labels.
@@ -36,7 +36,7 @@ describe("ModeRow — universal Step mode affordance (DESIGN.md §4.13)", () => 
 		expect(body).toContain("⊞");
 	});
 
-	test("uses toolbar semantics — role=toolbar, aria-label, per-action titles", () => {
+	test("uses toolbar semantics: role=toolbar, aria-label, per-action titles", () => {
 		const { body } = render(ModeRowRoot, {});
 
 		// §4.13: every form uses `role="toolbar" aria-label="Step modes"`.
@@ -44,11 +44,11 @@ describe("ModeRow — universal Step mode affordance (DESIGN.md §4.13)", () => 
 		expect(body).toContain('aria-label="Step modes"');
 
 		// Interaction assertion: every mode button carries a `title`/tooltip.
-		expect(body).toContain('title="Manual — work this step yourself"');
-		expect(body).toContain('title="▶ Play — hand off to an AI agent"');
-		expect(body).toContain('title="💬 Discuss — open the comment thread"');
+		expect(body).toContain('title="Manual: work this step yourself"');
+		expect(body).toContain('title="▶ Play: hand off to an AI agent"');
+		expect(body).toContain('title="💬 Discuss: open the comment thread"');
 		expect(body).toContain(
-			'title="⊞ AI Assist — open the AI Assist drawer scoped to this step"',
+			'title="⊞ AI Assist: open the AI Assist drawer scoped to this step"',
 		);
 
 		// Toolbar buttons expose pressed state, not radio state.
@@ -84,7 +84,7 @@ describe("ModeRow — universal Step mode affordance (DESIGN.md §4.13)", () => 
 	test("tight density renders Suggest / Discuss only", () => {
 		const { body } = render(ModeRowRoot, { props: { density: "tight" } });
 
-		// §4.13 tight: `▶ Suggest / 💬 Discuss` only — Manual + Assist dropped.
+		// §4.13 tight: `▶ Suggest / 💬 Discuss` only: Manual + Assist dropped.
 		expect(body).toContain('data-density="tight"');
 		expect(body).toContain('data-mode="play"');
 		expect(body).toContain('data-mode="discuss"');

@@ -7,7 +7,7 @@ export type CompletionShell = "bash" | "zsh" | "fish" | "powershell";
 
 export type CompletionScripts = Record<CompletionShell, string>;
 
-/** The four shells `fulcrum completion` supports — `CLI-TUI-UX.md` §4. */
+/** The four shells `fulcrum completion` supports: `CLI-TUI-UX.md` §4. */
 export const COMPLETION_SHELLS: readonly CompletionShell[] = ["bash", "zsh", "fish", "powershell"];
 
 export type GenerateCompletionScriptsOptions = {
@@ -85,7 +85,7 @@ export function completionInstallGuidance(shell: CompletionShell): readonly stri
  * the install-guidance comment header.
  *
  * The bare script bodies emitted by {@link emitCompletionScripts} stay byte-for
- * byte identical to the committed `scripts/cli/completions.*` codegen output —
+ * byte identical to the committed `scripts/cli/completions.*` codegen output -
  * the header is added only here, on the command path, so a user who runs
  * `fulcrum completion zsh` sees how to install it.
  */
@@ -115,15 +115,15 @@ const HELP = [
   "Shells: bash, zsh, fish, powershell",
   "",
   "Install examples (CLI-TUI-UX.md §4):",
-  "  # zsh — add to ~/.zshrc:",
+  "  # zsh: add to ~/.zshrc:",
   "  source <(fulcrum completion zsh)",
-  "  # zsh — or install to fpath:",
+  "  # zsh: or install to fpath:",
   "  fulcrum completion zsh > /usr/local/share/zsh/site-functions/_fulcrum",
-  "  # bash — add to ~/.bashrc:",
+  "  # bash: add to ~/.bashrc:",
   "  source <(fulcrum completion bash)",
-  "  # fish — install to fish completions:",
+  "  # fish: install to fish completions:",
   "  fulcrum completion fish > ~/.config/fish/completions/fulcrum.fish",
-  "  # powershell — add to your profile:",
+  "  # powershell: add to your profile:",
   "  fulcrum completion powershell | Out-String | Invoke-Expression",
   "",
   "Options:",
@@ -138,7 +138,7 @@ export function resolveCompletionShell(argv: readonly string[]): {
 } {
   // Compatibility alias: `--shell <shell>` / `-s <shell>` is still accepted.
   const flagValue = valueAfter(argv, "--shell") ?? valueAfter(argv, "-s");
-  // Spec form (`CLI-TUI-UX.md` §4): `fulcrum completion zsh` — first positional.
+  // Spec form (`CLI-TUI-UX.md` §4): `fulcrum completion zsh`: first positional.
   const positional = argv.find((token) => !token.startsWith("-"));
   const raw = positional ?? flagValue;
   if (isCompletionShell(raw)) return { shell: raw, raw };
@@ -150,7 +150,7 @@ function isCompletionShell(value: unknown): value is CompletionShell {
 }
 
 /**
- * `fulcrum completion <shell>` — print a shell completion script.
+ * `fulcrum completion <shell>`: print a shell completion script.
  *
  * Output paths (`CLI-TUI-UX.md` §3 / §4):
  *  - plain: the install-guidance comment header followed by the completion script.
@@ -166,7 +166,7 @@ export async function run(argv: readonly string[]): Promise<void> {
     printErr: (line) => process.stderr.write(`${line}\n`),
   };
 
-  // `CLI-TUI-UX.md` §2 — `--help` always works, even after other flags.
+  // `CLI-TUI-UX.md` §2: `--help` always works, even after other flags.
   if (wantsHelp(argv)) {
     io.print(HELP);
     return;

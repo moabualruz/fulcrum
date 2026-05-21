@@ -31,7 +31,7 @@ beforeEach(() => {
  * contract the design gate filters on, and the AI Assist event the four-mode
  * row dispatches.
  */
-describe("ModeAffordance host — universal per-Step mode row", () => {
+describe("ModeAffordance host: universal per-Step mode row", () => {
 	test("locks the four canonical mode labels (DESIGN.md §4.13)", () => {
 		expect(MODE_AFFORDANCE_LABELS).toEqual({
 			manual: "Manual",
@@ -133,15 +133,15 @@ describe("ModeAffordance host — universal per-Step mode row", () => {
 		expect(seen).toEqual(["manual", "play", "discuss", "assist"]);
 	});
 
-	test("openAssistForStep is SSR-safe — no throw without a window", () => {
-		// @ts-expect-error — simulate the server (no window global).
+	test("openAssistForStep is SSR-safe: no throw without a window", () => {
+		// @ts-expect-error: simulate the server (no window global).
 		delete globalThis.window;
 		expect(() => openAssistForStep({ stepId: "x", kind: "task-card" })).not.toThrow();
 	});
 });
 
 afterEach(() => {
-	// Restore the original `window` descriptor — each test gets a fresh stub.
+	// Restore the original `window` descriptor: each test gets a fresh stub.
 	if (windowDescriptor) {
 		Object.defineProperty(globalThis, "window", windowDescriptor);
 	} else {

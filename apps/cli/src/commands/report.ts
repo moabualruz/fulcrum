@@ -1,5 +1,5 @@
 /**
- * fulcrum report — report subcommands.
+ * fulcrum report: report subcommands.
  *
  * Usage:
  *   fulcrum report burndown --project <id> [--format json|table|csv]

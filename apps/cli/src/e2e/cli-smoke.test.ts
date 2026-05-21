@@ -61,7 +61,7 @@ describe("CLI E2E smoke with application callers", () => {
       }) as unknown as typeof fetch,
     });
 
-    // Under `--json` the failure stays inside the canonical envelope — the coded
+    // Under `--json` the failure stays inside the canonical envelope: the coded
     // error lives in `errors[]`, not stderr (prd-cli-build-stage-parity).
     const envelope = JSON.parse(io.out[0]!) as { schema: string; errors: Array<{ message: string }> };
     expect(envelope.schema).toBe("fulcrum.cli.v1");

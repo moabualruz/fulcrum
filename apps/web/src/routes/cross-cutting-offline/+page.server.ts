@@ -7,7 +7,7 @@ import type { PageServerLoad } from "./$types";
  * `design-alignment/cross-states.md` §error.html).
  *
  * Its `offline | syncing | online` connection state machine was the keeper
- * logic — it now lives in `apps/web/src/lib/stores/connection.ts` and drives a
+ * logic: it now lives in `apps/web/src/lib/stores/connection.ts` and drives a
  * single `Banner` in `+layout.svelte`, so the offline + queued-mutation state
  * is shown on every route instead of behind a standalone preview route.
  *

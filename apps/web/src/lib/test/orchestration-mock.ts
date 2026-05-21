@@ -15,7 +15,7 @@
  * `orchestrationMock(suiteSeam)` carries *every* real export name. Each call to
  * a function export consults `suiteSeam`: while the owning suite is active it
  * may return per-export overrides; otherwise (or for un-overridden exports) the
- * call delegates to the real `orchestration-settings` interface — imported here
+ * call delegates to the real `orchestration-settings` interface: imported here
  * directly, never via `$lib/server/orchestration`, which would resolve back to
  * this mock and recurse.
  */

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * `/<ws>/projects/<projId>/plan/prompts` — the Plan-stage prompt library
+   * `/<ws>/projects/<projId>/plan/prompts`: the Plan-stage prompt library
    * (`prd-web-plan-prompts-od-fidelity`; OD `plan-prompts.html`; IA-MAP.md §3
    * `:prompts` "prompt library · tag filter"; CLI-TUI-UX.md §1 line 466;
    * DESIGN.md §4.11/§4.13 per-step mode row; COPY.md §2 empty-state shape).
@@ -12,21 +12,21 @@
    *
    * Each prompt row is an icon tile + title + monospace preview + tag pills +
    * usage count + author·age, with a four-button ModeRow underneath (Manual /
-   * Play / Discuss / AI Assist) — prompts feed any ▶ Play step in any stage.
+   * Play / Discuss / AI Assist): prompts feed any ▶ Play step in any stage.
    *
    * Before this rebuild `plan-prompts/+page.svelte` rendered a Build/Operate
    * "Workflow states" config editor (`<title>Project States</title>`,
-   * `<h1>Workflow states</h1>`) — the wrong surface entirely. That workflow-
+   * `<h1>Workflow states</h1>`): the wrong surface entirely. That workflow-
    * state editor has a canonical home that already ships: the `WorkflowEditor`
    * component mounted at `/projects/<projId>/settings/workflow`. Re-homing the
-   * mislabelled content therefore strands no feature — the canonical Workflow
+   * mislabelled content therefore strands no feature: the canonical Workflow
    * settings route already owns state groups, the create-state form, the
    * palette, default-state selection, and the delete-with-usage guard. This
    * file is now the rendered prompt-library target; the `/plan-prompts` route
    * path keeps resolving (no 404).
    *
-   * Composes `@fulcrum/ui-kit` primitives only — `Badge`, `Button`, `Chip`,
-   * `EmptyState`, `Input`, `ModeRow` — never re-implements a primitive
+   * Composes `@fulcrum/ui-kit` primitives only: `Badge`, `Button`, `Chip`,
+   * `EmptyState`, `Input`, `ModeRow`: never re-implements a primitive
    * (AGENTS.md ui-kit rule). The OD shell chrome (StageRail / ScopeBar /
    * StatusFooter / AcpDrawer) is provided by the root `+layout.svelte`; this
    * route renders the prompt-library page only.
@@ -38,7 +38,7 @@
 
   /**
    * A workflow stage a prompt is tagged for. `mine` is the synthetic "My
-   * prompts" facet — author-owned rather than a real stage. Matches the OD
+   * prompts" facet: author-owned rather than a real stage. Matches the OD
    * toolbar chip set (All / Capture / Plan / Build / Review / Ship / Operate /
    * My prompts) and CLI-TUI-UX.md §1 stage vocabulary.
    */
@@ -53,14 +53,14 @@
     | "mine";
 
   /**
-   * Prompt provenance — where a prompt was synced from. Mirrors the
+   * Prompt provenance: where a prompt was synced from. Mirrors the
    * `session > user > org > built-in` resolution model documented in
    * `apps/web/CONTEXT.md` (AiAssistSettingsRoute). A project-scoped prompt
    * shadows a global one of the same title; the higher-precedence source wins.
    */
   type PromptSource = "session" | "user" | "org" | "built-in";
 
-  /** Resolution precedence — first match wins. Higher index = lower priority. */
+  /** Resolution precedence: first match wins. Higher index = lower priority. */
   const SOURCE_PRECEDENCE: PromptSource[] = ["session", "user", "org", "built-in"];
 
   /** One reusable agent-handoff prompt in the library. */
@@ -69,32 +69,32 @@
     /** OD icon glyph (the prototype uses lucide ids; here a stable glyph). */
     glyph: string;
     title: string;
-    /** Monospace preview — the first line of the prompt body. */
+    /** Monospace preview: the first line of the prompt body. */
     preview: string;
     /** Tag pills: `[step, model]` in OD (`plan` / `opus`, `review` / `sonnet`). */
     tags: string[];
-    /** Usage telemetry — OD `used 47×`. */
+    /** Usage telemetry: OD `used 47×`. */
     usage: number;
     author: string;
-    /** Relative age — OD `3d`. */
+    /** Relative age: OD `3d`. */
     age: string;
     /** The stages this prompt is tagged for (drives the chip filter). */
     stages: StageFilter[];
-    /** Sync provenance — drives the session>user>org>built-in precedence. */
+    /** Sync provenance: drives the session>user>org>built-in precedence. */
     source: PromptSource;
     /** True when the current operator authored it (the "My prompts" facet). */
     authoredByMe: boolean;
   };
 
-  /** The current operator — the "My prompts" facet keys off this. */
+  /** The current operator: the "My prompts" facet keys off this. */
   const CURRENT_USER = "mkh";
 
   /**
-   * The library — project + global prompts synced together (OD count
+   * The library: project + global prompts synced together (OD count
    * "34 prompts · synced from project + global"). Seven exemplars match the OD
    * rows verbatim; the rest cover every stage so the filter chips narrow a
    * non-empty list. This is design-surface fixture data, not a production
-   * source — the real library derives from a prompt-sync query.
+   * source: the real library derives from a prompt-sync query.
    */
   const library: Prompt[] = [
     {
@@ -219,7 +219,7 @@
   /**
    * Apply the `session > user > org > built-in` precedence: when two prompts
    * share a title, the higher-precedence source shadows the lower. Returns the
-   * resolved, deduplicated library — the same model `apps/web/CONTEXT.md`
+   * resolved, deduplicated library: the same model `apps/web/CONTEXT.md`
    * documents for skill/route resolution.
    */
   function resolveLibrary(prompts: Prompt[]): Prompt[] {
@@ -252,13 +252,13 @@
 
   let activeStage = $state<StageFilter>("all");
   let query = $state("");
-  /** Per-row selected mode — keyed by prompt id, defaults to `manual`. */
+  /** Per-row selected mode: keyed by prompt id, defaults to `manual`. */
   let rowModes = $state<Record<string, WorkflowMode>>({});
 
   /**
    * Declared data states (`populated` | `empty`). `populated` is the default;
    * `?state=empty` renders the COPY.md §2 prompts empty state. This is a
-   * design-surface state selector, not a production data source — the real
+   * design-surface state selector, not a production data source: the real
    * library derives its empty state from a zero-length prompt-sync query.
    */
   const isEmptyState = $derived(page.url.searchParams.get("state") === "empty");
@@ -279,7 +279,7 @@
     }),
   );
 
-  /** The OD page-head count — recomputed from the resolved library. */
+  /** The OD page-head count: recomputed from the resolved library. */
   const promptCount = resolvedLibrary.length;
   /** True when the filtered view is empty but the library itself is not. */
   const noMatches = $derived(!isEmptyState && visiblePrompts.length === 0);

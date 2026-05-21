@@ -11,13 +11,13 @@
  *
  * Every verb routes through `emitResult` so `--json` wraps the same underlying
  * result data in the canonical `fulcrum.cli.v1` envelope, and plain output
- * prints the `DESIGN.md` §4.10 trace header line — the printed `trace_id` is
+ * prints the `DESIGN.md` §4.10 trace header line: the printed `trace_id` is
  * the SAME identity the envelope carries, so a Review action started here is
  * followable across web / CLI / TUI by one id.
  *
  * The verbs delegate to an injectable {@link ReviewStageCaller}; with no caller
  * a real API client is resolved from `FULCRUM_SERVER_URL` /
- * `FULCRUM_PUBLIC_API_URL`. Tests pass `opts.caller` — there are no production
+ * `FULCRUM_PUBLIC_API_URL`. Tests pass `opts.caller`: there are no production
  * mocks in this module.
  */
 
@@ -106,12 +106,12 @@ export interface ReviewListItem {
 export interface ReviewStageResult {
   domain: ReviewDomain;
   verb: string;
-  /** Subject id — review id, task id, project id, or run id by verb. */
+  /** Subject id: review id, task id, project id, or run id by verb. */
   subjectId: string | null;
   status: ReviewStatus | "pending";
   traceId: string;
   message: string;
-  /** Verb-specific payload — queue rows for `review list`, report path, etc. */
+  /** Verb-specific payload: queue rows for `review list`, report path, etc. */
   details?: Record<string, unknown>;
 }
 
@@ -144,7 +144,7 @@ export interface ReviewStageApiEnvironment {
   FULCRUM_PUBLIC_API_URL?: string;
 }
 
-/** Options for {@link run} — injectable caller, env, IO sinks, fetch seam. */
+/** Options for {@link run}: injectable caller, env, IO sinks, fetch seam. */
 export interface ReviewStageRunOptions {
   caller?: ReviewStageCaller;
   env?: ReviewStageApiEnvironment;
@@ -156,7 +156,7 @@ export interface ReviewStageRunOptions {
 
 const HELP = `fulcrum <review|qa|uat|e2e> <verb> [options]
 
-Review stage — quality gates mirroring the web Review workbench (CLI-TUI-UX §1.4).
+Review stage: quality gates mirroring the web Review workbench (CLI-TUI-UX §1.4).
 
 Usage:
   fulcrum review list             [--status open|approved|rejected] [--reviewer <id>]
@@ -180,7 +180,7 @@ Options:
   --json-raw        Pre-envelope JSON payload (compatibility, removed next release)
 `;
 
-/** The verbs each Review-stage domain accepts — used by help + dispatch. */
+/** The verbs each Review-stage domain accepts: used by help + dispatch. */
 export const REVIEW_STAGE_VERBS: Readonly<Record<ReviewDomain, readonly string[]>> = {
   review: ["list", "view", "approve", "request-changes"],
   qa: ["run", "report"],
@@ -457,7 +457,7 @@ function printOutput(
 ): void {
   // `--json` wraps this same `result` in the canonical `fulcrum.cli.v1`
   // envelope; plain output renders the same fields plus the DESIGN.md §4.10
-  // trace header line — the result's trace id propagates into both surfaces.
+  // trace header line: the result's trace id propagates into both surfaces.
   emitResult(
     {
       argv,

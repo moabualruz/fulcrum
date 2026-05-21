@@ -106,7 +106,7 @@
             })}>P{task.priority ?? 4}</span>
           </td>
           <td class={cn("px-3 py-2 text-xs text-muted-foreground")}>
-            {task.created_at ? new Date(task.created_at).toLocaleDateString() : "—"}
+            {task.created_at ? new Date(task.created_at).toLocaleDateString() : "-"}
           </td>
         </tr>
       {/each}

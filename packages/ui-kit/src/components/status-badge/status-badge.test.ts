@@ -7,7 +7,7 @@ import StatusBadgeRoot, {
 	type CanonicalStatus,
 } from "./status-badge.svelte";
 
-describe("StatusBadge — COPY.md §6 status-label lock", () => {
+describe("StatusBadge: COPY.md §6 status-label lock", () => {
 	test("canonical 8-state vocab is exactly the COPY.md §6 closing line", () => {
 		// COPY.md §6: "Canonical 8-state vocab: queued / running / waiting-input /
 		// passing / failing / completed / cancelled / blocked." DESIGN.md §13
@@ -60,9 +60,9 @@ describe("StatusBadge — COPY.md §6 status-label lock", () => {
 
 	test("no rendered status label contains an em dash (COPY.md §1 rule 6)", () => {
 		for (const status of CANONICAL_STATUS_VOCAB) {
-			expect(statusLabel(status)).not.toContain("—");
+			expect(statusLabel(status)).not.toContain("-");
 			const { body } = render(StatusBadgeRoot, { props: { status } });
-			expect(body).not.toContain("—");
+			expect(body).not.toContain("-");
 		}
 	});
 
@@ -72,7 +72,7 @@ describe("StatusBadge — COPY.md §6 status-label lock", () => {
 		expect(body).toContain('aria-label="Running"');
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		for (const status of CANONICAL_STATUS_VOCAB) {
 			const { body } = render(StatusBadgeRoot, { props: { status } });
 			expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);

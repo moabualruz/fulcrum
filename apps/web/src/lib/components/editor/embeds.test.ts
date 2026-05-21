@@ -47,13 +47,13 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // Destroy every editor before restoring globals — a leaked ProseMirror view
+  // Destroy every editor before restoring globals: a leaked ProseMirror view
   // would otherwise fire a deferred focus timer against a torn-down document.
   for (const editor of liveEditors.splice(0)) {
     try {
       editor.destroy();
     } catch {
-      // Already destroyed or never mounted — nothing to clean up.
+      // Already destroyed or never mounted: nothing to clean up.
     }
   }
   // Restore the globals so later test files do not inherit a happy-dom window.

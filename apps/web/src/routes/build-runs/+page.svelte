@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Build runs feed + live session pane — OD `build-runs.html` fidelity surface.
+   * Build runs feed + live session pane: OD `build-runs.html` fidelity surface.
    *
    * DESIGN.md §9 (run feed), §8 (Live Session Pane: list / sticky plan strip /
    * transcript / workspace dock), §4.5 (tool-call cards), §4.6 (inline diff),
@@ -10,7 +10,7 @@
    * (scrollable feed + selected-run live session pane) so the OD surface is
    * proven before the production stage route consumes it.
    *
-   * Absorbs the six legacy `run-*` fixture routes — pause/stop, retry policy,
+   * Absorbs the six legacy `run-*` fixture routes: pause/stop, retry policy,
    * retry prompt, fork-from-turn, rate limits, and the cost strip are inline
    * states of this one pane, not separate routes.
    */
@@ -304,7 +304,7 @@
     "grid-cols-1 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]",
   )}
 >
-  <!-- LEFT — runs feed (DESIGN.md §9) -->
+  <!-- LEFT: runs feed (DESIGN.md §9) -->
   <aside
     class={cn(
       "flex min-h-0 min-w-0 flex-col border-b border-border bg-muted/20",
@@ -434,7 +434,7 @@
     {/if}
   </aside>
 
-  <!-- RIGHT — live session pane (DESIGN.md §8) -->
+  <!-- RIGHT: live session pane (DESIGN.md §8) -->
   <section
     data-live-session-pane
     class="flex min-h-0 min-w-0 flex-col overflow-y-auto bg-background"
@@ -502,7 +502,7 @@
           )}
         >
           <span aria-hidden="true">⏸</span>
-          <span>Paused · 2 prompts queued — resume to continue the session.</span>
+          <span>Paused · 2 prompts queued: resume to continue the session.</span>
         </div>
       {/if}
 
@@ -547,7 +547,7 @@
       >
         <Badge variant="secondary">Plan</Badge>
         <span class="text-muted-foreground">
-          Issuance tracking — step 3 of 8 · 2 done · 1 running · 5 queued
+          Issuance tracking: step 3 of 8 · 2 done · 1 running · 5 queued
         </span>
       </div>
 
@@ -834,7 +834,7 @@
   </section>
 </div>
 
-<!-- abort modal — irreversible Stop (DESIGN.md §8) -->
+<!-- abort modal: irreversible Stop (DESIGN.md §8) -->
 {#if abortOpen}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"

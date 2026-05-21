@@ -48,7 +48,7 @@ export function renderAiAssistSettingsScreen(input: AiAssistSettingsScreenInput)
 	lines.push("  Flat snapshot");
 	lines.push(`    ${JSON.stringify(flat)}`);
 	lines.push("");
-	lines.push("  :set <key> <value>   — write to current scope");
-	lines.push("  :scope user|org      — toggle save scope");
+	lines.push("  :set <key> <value>  : write to current scope");
+	lines.push("  :scope user|org     : toggle save scope");
 	return lines.join("\n");
 }

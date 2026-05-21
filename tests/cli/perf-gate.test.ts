@@ -1,5 +1,5 @@
 /**
- * P14#13 — CLI Performance Gate.
+ * P14#13: CLI Performance Gate.
  *
  * Verifies startup latency and codegen timing gates from the issue:
  *   - `fulcrum tasks list --json` cold p95 <300ms, warm <150ms (with 1k task fixture)
@@ -39,7 +39,7 @@ async function spawnTimed(cmd: string[], cwd: string): Promise<{ exitCode: numbe
 
 // ─── 1. Codegen timing gate ──────────────────────────────────────────────────
 
-describe("P14 perf gate — codegen", () => {
+describe("P14 perf gate: codegen", () => {
   it(
     "bun run scripts/ci/codegen.ts completes in <8s",
     async () => {
@@ -50,18 +50,18 @@ describe("P14 perf gate — codegen", () => {
         ROOT,
       );
       expect(exitCode, `codegen failed: ${stderr}`).toBe(0);
-      expect(elapsedMs, `codegen took ${elapsedMs.toFixed(0)}ms — exceeds 8s gate`).toBeLessThan(
+      expect(elapsedMs, `codegen took ${elapsedMs.toFixed(0)}ms: exceeds 8s gate`).toBeLessThan(
         EIGHT_SECONDS,
       );
     },
-    // 20s timeout — gate is 8s but allow headroom for slow CI
+    // 20s timeout: gate is 8s but allow headroom for slow CI
     { timeout: 20_000 },
   );
 });
 
 // ─── 2. CLI module import latency ────────────────────────────────────────────
 
-describe("P14 perf gate — CLI module cold import", () => {
+describe("P14 perf gate: CLI module cold import", () => {
   it("importing apps/cli/src/index.ts in a fresh Bun subprocess takes <1s", async () => {
     // A 1-second guard on cold import is generous; real target is 300ms for full
     // `fulcrum tasks list --json` invocation once binary is compiled.
@@ -77,13 +77,13 @@ describe("P14 perf gate — CLI module cold import", () => {
     expect(exitCode, `import failed: ${stderr}`).toBe(0);
     expect(
       elapsedMs,
-      `cold CLI import took ${elapsedMs.toFixed(0)}ms — exceeds 1s guard`,
+      `cold CLI import took ${elapsedMs.toFixed(0)}ms: exceeds 1s guard`,
     ).toBeLessThan(ONE_SECOND);
   });
 
   it("generated-domains.ts imports synchronously with no side effects", () => {
     const start = performance.now();
-    // require() is synchronous — verifies no async top-level work
+    // require() is synchronous: verifies no async top-level work
     const mod = require("../../apps/cli/src/generated-domains.ts");
     const elapsedMs = performance.now() - start;
 
@@ -96,7 +96,7 @@ describe("P14 perf gate — CLI module cold import", () => {
 
 // ─── 3. Domain coverage count gate ──────────────────────────────────────────
 
-describe("P14 perf gate — domain coverage completeness", () => {
+describe("P14 perf gate: domain coverage completeness", () => {
   it("GENERATED_DOMAIN_COMMANDS contains all 15 P14 domains", () => {
     const { GENERATED_DOMAIN_COMMANDS } = require("../../apps/cli/src/generated-domains.ts");
     const domains = GENERATED_DOMAIN_COMMANDS as readonly string[];
@@ -136,18 +136,18 @@ describe("P14 perf gate — domain coverage completeness", () => {
 
 // ─── 4. Binary artifact gate (reference) ────────────────────────────────────
 
-describe("P14 perf gate — binary artifact", () => {
+describe("P14 perf gate: binary artifact", () => {
   it("dist/fulcrum exists and is under 150MB if already built", () => {
     const binary = join(ROOT, "dist", "fulcrum");
     if (!existsSync(binary)) {
-      // Binary not yet built in this environment — skip size check.
+      // Binary not yet built in this environment: skip size check.
       // build.test.ts owns the full build + size gate; this test gates CI runs
       // where the binary was pre-built in a prior step.
-      console.log("dist/fulcrum not found — skipping size gate (not built yet)");
+      console.log("dist/fulcrum not found: skipping size gate (not built yet)");
       return;
     }
     const file = Bun.file(binary);
     const MAX_BYTES = 150 * 1024 * 1024; // 150 MB
-    expect(file.size, `binary is ${(file.size / 1024 / 1024).toFixed(1)}MB — exceeds 150MB gate`).toBeLessThan(MAX_BYTES);
+    expect(file.size, `binary is ${(file.size / 1024 / 1024).toFixed(1)}MB: exceeds 150MB gate`).toBeLessThan(MAX_BYTES);
   });
 });

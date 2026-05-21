@@ -466,7 +466,7 @@
               class={cn("flex w-full items-center justify-between px-3 py-1.5 text-xs hover:bg-muted/50")}
             >
               <span class={cn("flex items-center gap-2")}>
-                <span class={cn("font-mono text-muted-foreground")}>{entry.timestamp || "—"}</span>
+                <span class={cn("font-mono text-muted-foreground")}>{entry.timestamp || "-"}</span>
                 <span class={cn("rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase")}>{entry.stream}</span>
               </span>
               <span class={cn("text-muted-foreground")}>{expandedTurns.has(i) ? "▼" : "▶"}</span>

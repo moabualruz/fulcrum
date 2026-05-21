@@ -1,5 +1,5 @@
 /**
- * CLI artifacts command tests — P10#10.
+ * CLI artifacts command tests: P10#10.
  * Each verb unit-tested with mock tRPC client.
  * --json output validated against Zod schema.
  * prune confirm gate tested (>100 files → requires --confirm).

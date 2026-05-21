@@ -19,7 +19,7 @@
 </svelte:head>
 
 <!--
-	`/<ws>/projects` — the canonical workspace-scoped project list (IA-MAP §1).
+	`/<ws>/projects`: the canonical workspace-scoped project list (IA-MAP §1).
 	A PortfolioSurface: no active project, every row links to that project's
 	canonical home `/<ws>/projects/<projId>`, which lands on the Capture stage.
 -->
@@ -27,7 +27,7 @@
 	<header class="grid gap-1">
 		<h1 class="text-lg font-semibold text-fg">Projects</h1>
 		<p class="text-sm text-fg-subtle">
-			Workspace <span class="font-mono text-fg">{data.ws}</span> — pick a project to enter its workflow stages.
+			Workspace <span class="font-mono text-fg">{data.ws}</span>: pick a project to enter its workflow stages.
 		</p>
 	</header>
 

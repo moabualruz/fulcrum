@@ -1,5 +1,5 @@
 /**
- * createCollabProvider — returns MockCollabProvider when flag OFF or in test env,
+ * createCollabProvider: returns MockCollabProvider when flag OFF or in test env,
  * and a HocuspocusProvider adapter when flag ON.
  *
  * Real Hocuspocus is imported dynamically so it is NEVER bundled when flag is OFF.
@@ -35,16 +35,16 @@ export async function createCollabProvider(options: ProviderOptions): Promise<Co
 	const { docId, user, featuresEnv, hocuspocusUrl } = options;
 
 	if (!isCollabEnabled(featuresEnv)) {
-		// Flag OFF — return a disconnected mock that is never connected
+		// Flag OFF: return a disconnected mock that is never connected
 		return new MockCollabProvider();
 	}
 
 	if (isWebRTCFallbackEnabled(featuresEnv)) {
-		// WebRTC P2P fallback — no Hocuspocus server required
+		// WebRTC P2P fallback: no Hocuspocus server required
 		return createWebRTCProvider(docId, user);
 	}
 
-	// Flag ON — dynamic import so Hocuspocus is tree-shaken when OFF
+	// Flag ON: dynamic import so Hocuspocus is tree-shaken when OFF
 	const url = resolveHocuspocusUrl(hocuspocusUrl);
 	try {
 		const providerModule = "@hocuspocus/provider";
@@ -86,7 +86,7 @@ export function resolveHocuspocusUrl(explicitUrl?: string): string {
 
 function createWebRTCProvider(docId: string, user: CollabUser): CollabProvider {
 	// Same mock-based structure; real impl would use y-webrtc dynamic import
-	console.warn("[collab] WebRTC P2P fallback — using mock provider (y-webrtc not installed)");
+	console.warn("[collab] WebRTC P2P fallback: using mock provider (y-webrtc not installed)");
 	const mock = new MockCollabProvider();
 	mock.setUser(user);
 	return mock;

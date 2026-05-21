@@ -75,7 +75,7 @@
         visibleColIds = columns;
       }
     } catch {
-      // non-fatal — use default columns
+      // non-fatal: use default columns
     }
   }
 

@@ -17,7 +17,7 @@
  *    real `project-request-scope` performs: a dynamic import of
  *    `$lib/server/request-service-scope` (itself the suite's mocked factory)
  *    followed by `requestServiceScope`. The real module is intentionally NOT
- *    imported here — a static import of the mocked path resolves back to this
+ *    imported here: a static import of the mocked path resolves back to this
  *    factory and recurses forever.
  */
 

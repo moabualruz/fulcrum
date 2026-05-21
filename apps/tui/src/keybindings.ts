@@ -11,7 +11,7 @@ export async function createTuiKeybindingMap(options: {
   return resolveKeybindings(options);
 }
 
-// ─── StageChord — the `g _` stage-jump key map (CLI-TUI-UX.md §7.2) ─────────
+// ─── StageChord: the `g _` stage-jump key map (CLI-TUI-UX.md §7.2) ─────────
 //
 // A StageChord is a two-key navigation chord that jumps between the six
 // workflow stages (apps/tui/CONTEXT.md StageChord). The first key is always
@@ -21,14 +21,14 @@ export async function createTuiKeybindingMap(options: {
 //   g B → Build · board view        g r → Review
 //   g s → Ship      g o → Operate / doctor
 //
-// `g B` is a distinct second key from `g b` — uppercase opens the Build board,
+// `g B` is a distinct second key from `g b`: uppercase opens the Build board,
 // lowercase the runs feed (CLI-TUI-UX.md §7.2, OD tui-runs.html:1148-1154).
 // agent-tui-review.md Critical finding 3 names the absent `g`-chord state
 // machine a critical gap; this module owns it so the navigation key model has
 // a real, FakeTTY-testable owner.
 
 /**
- * The StageChord map — the second key of each `g _` chord, mapped to the colon
+ * The StageChord map: the second key of each `g _` chord, mapped to the colon
  * route of the stage screen it opens. Routes resolve through
  * `screen-registry.ts` `resolveColonRoute()`; the lower/upper `b`/`B` split is
  * intentional and matches CLI-TUI-UX.md §7.2.
@@ -49,7 +49,7 @@ export type StageChordKey = keyof typeof STAGE_CHORDS;
 /** The chord prefix that opens a StageChord (`g`, then a stage key). */
 export const STAGE_CHORD_PREFIX = "g" as const;
 
-/** A resolved StageChord — the second key plus the colon route it opens. */
+/** A resolved StageChord: the second key plus the colon route it opens. */
 export interface StageChordResult {
   /** Second key pressed (`c`/`p`/`b`/`B`/`r`/`s`/`o`). */
   key: StageChordKey;
@@ -73,7 +73,7 @@ export interface StageChordHandler {
 }
 
 /**
- * Build a StageChord handler. Stateless — the caller owns the `g`-prefix
+ * Build a StageChord handler. Stateless: the caller owns the `g`-prefix
  * latch (see {@link createChordLatch}); this resolves the second key only.
  */
 export function createStageChordHandler(): StageChordHandler {
@@ -88,13 +88,13 @@ export function createStageChordHandler(): StageChordHandler {
   };
 }
 
-// ─── Chord-prefix latch — collision-free `g` / `y` two-key sequencing ───────
+// ─── Chord-prefix latch: collision-free `g` / `y` two-key sequencing ───────
 //
 // Two chord families share a single keystroke stream: `g _` StageChords and
 // `y _` trace yanks (§7.6). A ChordLatch is a one-key-deep state machine: feed
 // it every key; when it sees a registered prefix it latches and the *next* key
 // is reported as the chord's second key. This keeps `g`/`y` from colliding
-// with bare list-navigation keys — a bare `g` only arms the latch, it never
+// with bare list-navigation keys: a bare `g` only arms the latch, it never
 // itself navigates, and any non-second-key press (including `Esc`) disarms it.
 
 /** Outcome of feeding one key to a {@link ChordLatch}. */
@@ -106,10 +106,10 @@ export type ChordLatchOutcome =
 
 /**
  * A one-key-deep chord-prefix latch. `feed()` returns:
- *  - `armed` — `key` was a prefix; the latch now waits for the second key.
- *  - `chord` — the latch was armed and `key` completes a `<prefix> <key>` chord.
- *  - `cancelled` — the latch was armed but `key` is `Esc`; the chord is dropped.
- *  - `passthrough` — `key` is neither a prefix nor a latched second key.
+ *  - `armed`: `key` was a prefix; the latch now waits for the second key.
+ *  - `chord`: the latch was armed and `key` completes a `<prefix> <key>` chord.
+ *  - `cancelled`: the latch was armed but `key` is `Esc`; the chord is dropped.
+ *  - `passthrough`: `key` is neither a prefix nor a latched second key.
  */
 export interface ChordLatch {
   /** Feed one key; advances the latch and reports the outcome. */
@@ -124,10 +124,10 @@ export interface ChordLatch {
 
 /**
  * Build a chord latch that recognises the given chord `prefixes` (`["g","y"]`
- * for the TUI — StageChord + trace-yank). When armed, the very next key is the
+ * for the TUI: StageChord + trace-yank). When armed, the very next key is the
  * chord's second key; `Esc` while armed cancels. A second prefix press while
  * armed re-arms on the new prefix rather than emitting a chord, so `g g` (which
- * §7.1 maps to "jump to first") is reported as a `g g` chord — the caller
+ * §7.1 maps to "jump to first") is reported as a `g g` chord: the caller
  * decides whether `g`-as-second-key means anything.
  */
 export function createChordLatch(prefixes: readonly string[]): ChordLatch {
@@ -181,10 +181,10 @@ export const TUI_CHORD_PREFIXES: readonly string[] = [STAGE_CHORD_PREFIX, "y"];
 // exact trace/run/span identity it renders via `copyKeybinds()`; this module
 // owns the actual `y _` key handler so the footer PRD's "copy-keybind
 // addressable" acceptance has a real, testable owner (agent-tui-review.md
-// Critical finding 2 — TraceYank absent from the key model).
+// Critical finding 2: TraceYank absent from the key model).
 
 /**
- * The trace-yank chord set — the second key of each `y _` chord, mapped to the
+ * The trace-yank chord set: the second key of each `y _` chord, mapped to the
  * identity it copies. Bare ids only, no decoration (DESIGN.md §4.10).
  */
 export const TRACE_YANK_CHORDS = {
@@ -203,7 +203,7 @@ export type TraceYankTarget = (typeof TRACE_YANK_CHORDS)[TraceYankKey];
 /**
  * Keys that own list navigation / stage chords (CLI-TUI-UX.md §7.2 stage
  * chords, §7.3 list navigation). The trace-yank prefix `y` must never collide
- * with any of these — `y` is unused by both, so the `y` family is collision
+ * with any of these: `y` is unused by both, so the `y` family is collision
  * free. The set is asserted by `traceYankCollides()` so a future binding that
  * steals `y` is caught by the FakeTTY tests.
  */
@@ -216,7 +216,7 @@ const RESERVED_NAVIGATION_KEYS: ReadonlySet<string> = new Set([
   "e",
   "x",
   "V",
-  // §7.2 stage chords — the `g _` go-to-stage prefix
+  // §7.2 stage chords: the `g _` go-to-stage prefix
   "g",
 ]);
 
@@ -231,7 +231,7 @@ export function traceYankCollides(key: string): boolean {
 /**
  * The identity source a trace yank reads. `copyKeybinds()` is the same map
  * `StatusBarWidget.copyKeybinds()` returns (`{"y t": <trace>, "y r": <run>,
- * "y s": <span>}`) — the yank copies exactly the identity the footer renders.
+ * "y s": <span>}`): the yank copies exactly the identity the footer renders.
  * `projectPath` backs `y p`, which the footer does not carry as a segment.
  */
 export interface TraceYankSource {
@@ -244,7 +244,7 @@ export interface TraceYankSource {
 /**
  * Clipboard sink for trace yanks. Injected so the FakeTTY tests can assert the
  * exact payload without coupling to the OS clipboard; the production default
- * (`osc52Clipboard`) writes the OSC 52 terminal-clipboard escape sequence —
+ * (`osc52Clipboard`) writes the OSC 52 terminal-clipboard escape sequence -
  * the dependency-free clipboard primitive tmux / Helix / k9s use.
  */
 export interface TraceYankClipboard {
@@ -260,7 +260,7 @@ function toBase64(text: string): string {
 /**
  * Production clipboard sink: writes the OSC 52 escape sequence to a terminal
  * writer so the host terminal copies `text` to the system clipboard. No OS
- * shell-out, no dependency — `\x1b]52;c;<base64>\x07`.
+ * shell-out, no dependency: `\x1b]52;c;<base64>\x07`.
  */
 export function osc52Clipboard(writer: { write(data: string): void }): TraceYankClipboard {
   return {
@@ -281,7 +281,7 @@ export interface TraceYankResult {
 /**
  * A trace-yank handler: feed it the second key of a `y _` chord and it copies
  * the matching identity to the clipboard, returning what it yanked. The chord
- * prefix `y` is owned by the caller — once `y` is seen, the next key is routed
+ * prefix `y` is owned by the caller: once `y` is seen, the next key is routed
  * here. Returns `null` when the key is not a trace-yank key or the identity is
  * absent (e.g. `y s` with no active span).
  */
@@ -300,7 +300,7 @@ export interface TraceYankHandler {
  * Build a trace-yank handler bound to `source` (the StatusFooter identity) and
  * `clipboard` (the sink). The yank payloads are read straight from
  * `source.copyKeybinds()` so a yank can never drift from the footer segment it
- * mirrors; `y p` reads `source.projectPath`. Payloads are bare ids — no
+ * mirrors; `y p` reads `source.projectPath`. Payloads are bare ids: no
  * `trace:` prefix, no decoration (DESIGN.md §4.10, copy_assertions).
  */
 export function createTraceYankHandler(

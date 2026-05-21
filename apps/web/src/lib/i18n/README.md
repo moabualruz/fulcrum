@@ -1,4 +1,4 @@
-# i18n — Fulcrum internationalisation
+# i18n: Fulcrum internationalisation
 
 ## Adapter
 
@@ -8,7 +8,7 @@ Current: plain JSON catalog with `t()` function (no runtime dependency).
 
 1. `bun add @inlang/paraglide-sveltekit`
 2. Replace the body of `src/lib/i18n/index.ts` with paraglide exports.
-3. Keep the same `t(key)` signature — all consumers import from `$lib/i18n`.
+3. Keep the same `t(key)` signature: all consumers import from `$lib/i18n`.
 4. CI gate (`i18n:extract`) continues to work unchanged.
 
 ### Fallback: svelte-i18n

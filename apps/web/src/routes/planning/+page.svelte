@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * `/planning` — legacy Plan-stage feature-bucket route.
+	 * `/planning`: legacy Plan-stage feature-bucket route.
 	 *
 	 * `prd-web-plan-session-od-fidelity` consolidated the two parallel Plan
 	 * live-session implementations: this service-wired forms route and the
@@ -14,7 +14,7 @@
 	 * workbench; the `planning/+page.server.ts` action surface (`preview`,
 	 * `materialize`, `freeformStart`, `freeformPrompt`, `guidedAcpStart`,
 	 * `guidedAcpSessionAction`, `continuousUpdate`, `generate`,
-	 * `runArtifactExecution`, `workflowCycle`) is preserved untouched — every
+	 * `runArtifactExecution`, `workflowCycle`) is preserved untouched: every
 	 * `ActionForm` mode is summarized under the Plan dock tab of the new pane.
 	 */
 	import { onMount } from "svelte";

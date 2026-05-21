@@ -218,7 +218,7 @@ describe("root CLI source dispatch", () => {
     process.chdir(scratch);
 
     // buildLocalApplicationContainer auto-runs migrations, so pending state
-    // is never reached. The next gate — missing build artifacts — fires instead.
+    // is never reached. The next gate: missing build artifacts: fires instead.
     await expect(run(["web"])).rejects.toThrow(
       "web build missing",
     );

@@ -2,7 +2,7 @@
  * Complete `mock.module` factory for `@planning-review/interface/project-review-reports.ts`.
  *
  * Bun's `mock.module` is process-global and freezes a module's *export-name
- * set* on its first registration — a later, fuller mock of the same path
+ * set* on its first registration: a later, fuller mock of the same path
  * cannot add names the first one omitted. Several route tests mock this module
  * with only the handful of exports they exercise; whichever test ran first
  * stripped the rest, so a sibling test importing e.g. `buildReviewWorkbenchModel`

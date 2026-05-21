@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * Operate · MCP servers — OD `operate-mcp.html` fidelity surface.
+   * Operate · MCP servers: OD `operate-mcp.html` fidelity surface.
    *
-   * Canonical route: `/<ws>/projects/<projId>/operate/mcp` (IA-MAP.md §2.6 —
+   * Canonical route: `/<ws>/projects/<projId>/operate/mcp` (IA-MAP.md §2.6 -
    * "MCP servers → operate-mcp.html (per-agent scope)", §2.6 screen table
    * `Operate | :mcp | per-agent MCP scope | scope chip switches CLI agent`).
-   * The live `operate-mcp` route folder is the migration alias — `route-map.ts`
+   * The live `operate-mcp` route folder is the migration alias: `route-map.ts`
    * `LEGACY_ROUTE_MAP` maps `operate-mcp → operate`, so the old `/operate-mcp`
    * path keeps resolving (no 404) while presenting as the Operate stage.
    *
@@ -21,9 +21,9 @@
    * is retired.
    *
    * Each server row carries the universal compact `ModeRow` (DESIGN.md §4.11 /
-   * §4.13 — "every step header … subsystem row" — an MCP server row is a Step).
+   * §4.13: "every step header … subsystem row": an MCP server row is a Step).
    * Probe, show-tools, and the `CredentialInput`-based credential field carry
-   * forward from the pre-migration route — no feature loss.
+   * forward from the pre-migration route: no feature loss.
    */
   import { page } from "$app/stores";
   import {
@@ -39,10 +39,10 @@
 
   type Protocol = "http" | "stdio";
 
-  /** OD `operate-mcp.html` health vocabulary — mapped onto the locked StatusBadge set. */
+  /** OD `operate-mcp.html` health vocabulary: mapped onto the locked StatusBadge set. */
   type McpHealth = "healthy" | "degraded" | "down";
 
-  /** OD Auth column values (`token` / `oauth` / `—`). */
+  /** OD Auth column values (`token` / `oauth` / `-`). */
   type McpAuth = "token" | "oauth" | "none";
 
   interface McpTool {
@@ -74,7 +74,7 @@
     /** p99 round-trip time, OD `p99 RTT` column. */
     rttP99Ms: number;
     auth: McpAuth;
-    /** OD `Last probe` column — relative-time string. */
+    /** OD `Last probe` column: relative-time string. */
     lastProbe: string;
     url?: string;
     command?: string;
@@ -87,11 +87,11 @@
     mode?: WorkflowMode;
   }
 
-  /** A configurable CLI agent — DESIGN.md §11 item 9 multi-CLI agent registry. */
+  /** A configurable CLI agent: DESIGN.md §11 item 9 multi-CLI agent registry. */
   interface CliAgent {
     id: string;
     label: string;
-    /** Two-letter monogram class — OD `.agent-av` (DESIGN.md §4.16). */
+    /** Two-letter monogram class: OD `.agent-av` (DESIGN.md §4.16). */
     monogram: string;
     avatarClass: string;
   }
@@ -135,7 +135,7 @@
   }
 
   /**
-   * MCP registries keyed by CLI agent id — DESIGN.md §11 item 9: each agent owns
+   * MCP registries keyed by CLI agent id: DESIGN.md §11 item 9: each agent owns
    * its own MCP server set. Switching the scope selector swaps the table source.
    */
   const REGISTRY_BY_AGENT: Record<string, McpServer[]> = {
@@ -279,7 +279,7 @@
         auth: "oauth",
         lastProbe: "5m ago",
         url: "https://api.deepwiki.com",
-        error: "handshake refused — oauth token expired",
+        error: "handshake refused: oauth token expired",
       },
     ],
     pi: [],
@@ -307,7 +307,7 @@
   const errorState = $derived($page.url.searchParams.get("state") === "error");
 
   let scopeAgentId = $state<string>(CLI_AGENTS[0]!.id);
-  /** Working copy of every agent's registry — scope-switching swaps the slice. */
+  /** Working copy of every agent's registry: scope-switching swaps the slice. */
   let registries = $state<Record<string, McpServer[]>>(
     structuredClone(REGISTRY_BY_AGENT),
   );
@@ -340,7 +340,7 @@
     return "failed";
   }
 
-  /** OD Status badge label — `passing` / `failing` / `down`. */
+  /** OD Status badge label: `passing` / `failing` / `down`. */
   function healthLabel(health: McpHealth): string {
     if (health === "healthy") return "passing";
     if (health === "degraded") return "failing";
@@ -349,12 +349,12 @@
 
   /** OD Auth column label. */
   function authLabel(auth: McpAuth): string {
-    return auth === "none" ? "—" : auth;
+    return auth === "none" ? "-" : auth;
   }
 
-  /** OD `p50/p99 RTT` column — milliseconds rendered as `120 ms` / `6.4 s`. */
+  /** OD `p50/p99 RTT` column: milliseconds rendered as `120 ms` / `6.4 s`. */
   function formatRtt(ms: number): string {
-    if (ms <= 0) return "—";
+    if (ms <= 0) return "-";
     if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`;
     return `${ms} ms`;
   }
@@ -527,7 +527,7 @@
     </div>
   </header>
 
-  <!-- Per-agent scope selector — MCP config is per CLI agent (DESIGN.md §11 item 9). -->
+  <!-- Per-agent scope selector: MCP config is per CLI agent (DESIGN.md §11 item 9). -->
   <div
     data-mcp-scope
     class="flex flex-wrap items-center gap-2.5 rounded-md border border-border bg-muted/40 px-3.5 py-2.5"
@@ -538,7 +538,7 @@
     <div
       data-mcp-scope-group
       role="radiogroup"
-      aria-label="MCP server scope — CLI agent"
+      aria-label="MCP server scope: CLI agent"
       class="inline-flex flex-wrap gap-0.5 rounded-md border border-border bg-card p-0.5"
     >
       {#each CLI_AGENTS as agent (agent.id)}

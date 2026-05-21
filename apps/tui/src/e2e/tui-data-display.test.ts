@@ -31,7 +31,7 @@ describe("TUI E2E data display", () => {
     const text = tty.plainText();
 
     // OD StatusFooter: the `trace` segment renders the 8-char trace badge
-    // (the `trace[-_:]?` prefix is stripped — DESIGN.md §4.10 TraceBadge); the
+    // (the `trace[-_:]?` prefix is stripped: DESIGN.md §4.10 TraceBadge); the
     // `run` segment carries the run id; `projectId` feeds the `branch` segment.
     // Span identity is yank-only (`y s` copy keybind, exercised in
     // apps/tui/src/widgets/widgets.test.ts), not a standalone footer segment.

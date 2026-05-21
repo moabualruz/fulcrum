@@ -1,35 +1,35 @@
 /**
- * `fulcrum operate <verb>` — the Operate workflow-stage command host
+ * `fulcrum operate <verb>`: the Operate workflow-stage command host
  * (CLI-TUI-UX.md §1.6).
  *
  * Operate is stage 6 of 6 (Capture · Plan · Build · Review · Ship · Operate).
  * Before this host the Operate nouns existed but were scattered across the root
  * dispatcher with no Operate-stage `help`, and the plugin surface here was
- * read-only — `list` / `show` only, no per-agent scoping
+ * read-only: `list` / `show` only, no per-agent scoping
  * (design-alignment/operate.md §"Route / command / screen disposition":
  * "`operate-plugins.ts` is read-only; extend to full
  * install|enable|disable|update|remove + --agent/--all-agents").
  *
  * This host gives the Operate stage:
  *
- *   operate           — Operate-stage help (the discoverable command group).
- *   plugin / plugins  — agent-plugin verbs: list · show · install · enable ·
+ *   operate          : Operate-stage help (the discoverable command group).
+ *   plugin / plugins : agent-plugin verbs: list · show · install · enable ·
  *                       disable · update · remove, each with `--agent` /
  *                       `--all-agents` per-agent scoping (CLI-TUI-UX.md §1.8).
- *   doctor mcp hooks  — the remaining §1.6 Operate noun groups, dispatched
+ *   doctor mcp hooks : the remaining §1.6 Operate noun groups, dispatched
  *   skills audit        through this host so `fulcrum operate <noun>` is a real
  *   trace route         grammar; backed nouns delegate to their command host,
  *   config agent        the rest emit the canonical envelope honestly.
  *
  * Every verb's `--json` output is the canonical `fulcrum.cli.v1` envelope
  * (CLI-TUI-UX.md §3). The plugin mutation verbs (`install` / `update` /
- * `remove`) have no cross-agent plugin server wired through here — they are
+ * `remove`) have no cross-agent plugin server wired through here: they are
  * real dispatchable verbs that emit a canonical *error* envelope rather than
  * fabricate a result (AGENTS.md "no production mocks"); the verb grammar and
  * the `--agent` / `--all-agents` scoping contract are complete and tested.
  *
  * `OperatePluginsOptions`, `ClaudePluginMarker`, and the original `list` /
- * `show` plugin behaviour are preserved verbatim — no command is removed.
+ * `show` plugin behaviour are preserved verbatim: no command is removed.
  */
 
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
@@ -52,9 +52,9 @@ export interface OperatePluginsOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
-  /** Injected Claude plugin-marker loader — test seam for `list` / `show`. */
+  /** Injected Claude plugin-marker loader: test seam for `list` / `show`. */
   loadPlugins?: () => Promise<readonly ClaudePluginMarker[]>;
-  /** Process env — drives the `fulcrum.cli.v1` envelope colour/trace context. */
+  /** Process env: drives the `fulcrum.cli.v1` envelope colour/trace context. */
   env?: NodeJS.ProcessEnv;
   /**
    * The root the invocation entered through. `"operate"` (default) is the
@@ -116,10 +116,10 @@ const PLUGIN_MUTATION_VERBS: readonly PluginVerb[] = [
 ];
 
 /**
- * Operate-stage help — the discoverable command group (CLI-TUI-UX.md §1.6).
+ * Operate-stage help: the discoverable command group (CLI-TUI-UX.md §1.6).
  * Lists every Operate noun with examples and mentions the `--json` envelope.
  */
-export const OPERATE_HELP = `fulcrum operate — Operate workflow stage (CLI-TUI-UX.md §1.6)
+export const OPERATE_HELP = `fulcrum operate: Operate workflow stage (CLI-TUI-UX.md §1.6)
 
 Run the system: health, MCP, plugins, hooks, skills, audit, trace, routing,
 agents, and config. Every command's \`--json\` output is the canonical
@@ -158,8 +158,8 @@ Examples:
   fulcrum operate trace show 4f3a1c9e --json
   fulcrum operate audit list --trace 4f3a1c9e --json`;
 
-/** Legacy `fulcrum operate plugins` usage — preserved for compatibility. */
-const PLUGIN_HELP = `fulcrum operate plugin — agent plugins (CLI-TUI-UX.md §1.6)
+/** Legacy `fulcrum operate plugins` usage: preserved for compatibility. */
+const PLUGIN_HELP = `fulcrum operate plugin: agent plugins (CLI-TUI-UX.md §1.6)
 
 Usage:
   fulcrum operate plugin list [--json] [--agent <id>]
@@ -216,7 +216,7 @@ export type AgentScope = { kind: "all" } | { kind: "agents"; ids: AgentId[] };
 /** Result of parsing `--agent` / `--all-agents` flags from an argv slice. */
 export interface AgentScopeParse {
   scope: AgentScope;
-  /** An unknown agent id, when one was passed — caller turns this into an error. */
+  /** An unknown agent id, when one was passed: caller turns this into an error. */
   invalidAgent?: string;
 }
 
@@ -259,12 +259,12 @@ function scopeAgentIds(scope: AgentScope): AgentId[] {
 }
 
 /**
- * `fulcrum operate plugin list` / `fulcrum plugin list` — the read-only
+ * `fulcrum operate plugin list` / `fulcrum plugin list`: the read-only
  * plugin-marker listing. `--agent` is accepted (CLI-TUI-UX.md §1.8) and recorded
  * but the marker source is agent-spanning today.
  *
  * `--json` always emits the canonical `fulcrum.cli.v1` envelope (CLI-TUI-UX.md
- * §3) — never a bare array — regardless of whether a test loader is injected.
+ * §3): never a bare array: regardless of whether a test loader is injected.
  * `--json-raw` opts back into the pre-envelope array payload (the documented
  * one-release compatibility flag). The closure review found `plugin list`
  * emitting a raw array; that path is now envelope-safe on every root.
@@ -307,7 +307,7 @@ async function runPluginList(
 }
 
 /**
- * `fulcrum operate plugin show <id>` / `fulcrum plugin show <id>` — the
+ * `fulcrum operate plugin show <id>` / `fulcrum plugin show <id>`: the
  * read-only plugin-marker detail.
  *
  * `--json` emits the canonical `fulcrum.cli.v1` envelope; `--json-raw` opts
@@ -394,11 +394,11 @@ async function runPluginShow(
 }
 
 /**
- * `fulcrum operate plugin <install|enable|disable|update|remove>` — the plugin
+ * `fulcrum operate plugin <install|enable|disable|update|remove>`: the plugin
  * mutation verbs with per-agent scoping (CLI-TUI-UX.md §1.6 + §1.8).
  *
  * No cross-agent plugin server is wired through this host (AGENTS.md "Where we
- * are going" — `fulcrum plugins …` is a placeholder layer). Rather than
+ * are going": `fulcrum plugins …` is a placeholder layer). Rather than
  * fabricate a mutation result, each verb emits the canonical envelope: a coded
  * error in the always-array `errors` field, with the *resolved* `--agent` /
  * `--all-agents` scope echoed in `args` so the §1.8 scoping contract is
@@ -444,7 +444,7 @@ function runPluginMutation(
           message: parsed.invalidAgent
             ? `'${parsed.invalidAgent}' is not a known agent id.`
             : "`--agent` requires an agent id.",
-          fix: `Use one of: ${ALL_AGENT_IDS.join(", ")} — or --all-agents.`,
+          fix: `Use one of: ${ALL_AGENT_IDS.join(", ")}: or --all-agents.`,
           doc: "CLI-TUI-UX.md §1.8",
         },
         env: opts.env,
@@ -462,7 +462,7 @@ function runPluginMutation(
       command: `${commandPrefix} ${verb}`,
       args: {
         plugin: name ?? (wantsAll ? "--all" : null),
-        // The resolved §1.8 scope — observable in the envelope for parity tests.
+        // The resolved §1.8 scope: observable in the envelope for parity tests.
         all_agents: scope.kind === "all",
         agents: scopeAgentIds(scope),
         scope: describeScope(scope),
@@ -471,7 +471,7 @@ function runPluginMutation(
         code: "FUL_OPERATE_PLUGIN_UNAVAILABLE",
         message:
           `\`fulcrum ${commandPrefix} ${verb}\` (scope: ${describeScope(scope)}) is not ` +
-          "available — no cross-agent plugin server is configured.",
+          "available: no cross-agent plugin server is configured.",
         fix:
           "Cross-agent plugin install is staged behind the plugins.cross_agent feature " +
           "flag. Until it lands, manage plugin markers with `fulcrum operate plugin list`.",
@@ -623,12 +623,12 @@ function runPointerNoun(
  * Dispatch a `fulcrum operate` invocation.
  *
  * `argv[0]` is the verb group. The host is invoked two ways, both landing here:
- *  - `fulcrum operate <noun> <verb>` — the canonical Operate-stage grammar.
- *  - `fulcrum operate plugins <verb>` / `fulcrum operate plugin <verb>` — the
+ *  - `fulcrum operate <noun> <verb>`: the canonical Operate-stage grammar.
+ *  - `fulcrum operate plugins <verb>` / `fulcrum operate plugin <verb>`: the
  *    legacy and canonical plugin-group spellings (no command removed).
  *
  * A missing or help verb prints the Operate-stage help. The original
- * `operate-plugins.ts` entry — `run(["list"|"show"|"help"], opts)` — is still
+ * `operate-plugins.ts` entry: `run(["list"|"show"|"help"], opts)`: is still
  * honoured: a bare `list` / `show` verb is treated as a plugin verb so the
  * pre-existing co-located test contract holds unchanged.
  */

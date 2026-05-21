@@ -65,7 +65,7 @@ export class TuiRouter {
    * Resolve a colon route (`:capture`, `:plan`, `:runs`, `:board`, `:review`,
    * `:ship`, `:doctor`, `:ai`, …) to a registered screen key. Returns the
    * screen key when the colon route maps to a known screen, otherwise
-   * `undefined` — the caller renders a not-found screen rather than crashing.
+   * `undefined`: the caller renders a not-found screen rather than crashing.
    */
   resolveColon(route: string): string | undefined {
     const screenKey = resolveColonRoute(route);

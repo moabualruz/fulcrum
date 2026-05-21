@@ -10,25 +10,25 @@
  * where `<stage>` is one of the six WorkflowStages (Capture, Plan, Build,
  * Review, Ship, Operate). Before this module the live web app routed by
  * feature buckets (`/boards`, `/planning`, `/runs`, `/artifacts`, `/doctor`)
- * and isolated preview pages — there was no route grammar the StageRail,
+ * and isolated preview pages: there was no route grammar the StageRail,
  * ScopeBar, and trace links could share.
  *
  * This module is the single source of truth for:
  *
- *  1. `STAGE_ORDER` / `WORKFLOW_STAGES` — the six canonical WorkflowStages.
- *  2. `stageRoute()` / `projectHomeRoute()` / `workspaceHomeRoute()` — builders
+ *  1. `STAGE_ORDER` / `WORKFLOW_STAGES`: the six canonical WorkflowStages.
+ *  2. `stageRoute()` / `projectHomeRoute()` / `workspaceHomeRoute()`: builders
  *     that compose canonical IA-MAP §1 paths, so no surface hand-writes a
  *     stage URL.
- *  3. `LEGACY_ROUTE_MAP` — every pre-shell feature-bucket / preview route folder
+ *  3. `LEGACY_ROUTE_MAP`: every pre-shell feature-bucket / preview route folder
  *     mapped to the WorkflowStage that now owns it. Old paths keep resolving
- *     (no 404 — migration-strategy.md value-preservation item 2); this map is
+ *     (no 404: migration-strategy.md value-preservation item 2); this map is
  *     the alias layer that lets the StageRail and ScopeBar present an old route
  *     as its canonical stage, and lets a redirect resolve an old path to its
  *     canonical stage home without breaking the still-rendering feature route.
- *  4. `canonicalStageFor()` — resolve any live pathname (canonical or legacy) to
+ *  4. `canonicalStageFor()`: resolve any live pathname (canonical or legacy) to
  *     its WorkflowStage, so the shell chrome always shows an accurate stage.
- *  5. `STAGE_DEFAULT_SUB` — each stage's default sub-view, per IA-MAP §1.
- *  6. `withTrace()` — carry the `#trace=<id>` hash + filter query across a
+ *  5. `STAGE_DEFAULT_SUB`: each stage's default sub-view, per IA-MAP §1.
+ *  6. `withTrace()`: carry the `#trace=<id>` hash + filter query across a
  *     stage navigation (IA-MAP §1 "Trace ID survives as URL hash").
  *
  * Portfolio surfaces (`/projects`, `/search`, `/memory`, `/inbox`,
@@ -54,7 +54,7 @@ export const STAGE_ORDER = [
 	"operate",
 ] as const satisfies readonly WorkflowStage[];
 
-/** A WorkflowStage with its human label — the canonical stage vocabulary. */
+/** A WorkflowStage with its human label: the canonical stage vocabulary. */
 export interface WorkflowStageEntry {
 	/** Canonical stage slug used in `/<ws>/projects/<projId>/<stage>`. */
 	stage: WorkflowStage;
@@ -79,8 +79,8 @@ export function isWorkflowStage(value: string): value is WorkflowStage {
 
 /**
  * Each stage's default sub-view (IA-MAP §1: "Build (default: board)",
- * "Operate (doctor default)", …). `stageRoute()` does not append these — they
- * are the canonical landing the stage workbench renders — but the StageRail
+ * "Operate (doctor default)", …). `stageRoute()` does not append these: they
+ * are the canonical landing the stage workbench renders: but the StageRail
  * sub-nav and any redirect target reference them.
  */
 export const STAGE_DEFAULT_SUB: Record<WorkflowStage, string> = {
@@ -142,23 +142,23 @@ const LEGACY_CANONICAL_TARGETS: Readonly<Record<string, StageSubroute>> = {
 
 /* ── Canonical route builders (IA-MAP §1) ──────────────────────────────── */
 
-/** `/<ws>` — workspace home. */
+/** `/<ws>`: workspace home. */
 export function workspaceHomeRoute(ws: string): string {
 	return `/${encodeURIComponent(ws)}`;
 }
 
-/** `/<ws>/projects` — the project list (Linear-style), a portfolio surface. */
+/** `/<ws>/projects`: the project list (Linear-style), a portfolio surface. */
 export function projectListRoute(ws: string): string {
 	return `/${encodeURIComponent(ws)}/projects`;
 }
 
-/** `/<ws>/projects/<projId>` — project home (Capture stage default). */
+/** `/<ws>/projects/<projId>`: project home (Capture stage default). */
 export function projectHomeRoute(ws: string, projId: string): string {
 	return `/${encodeURIComponent(ws)}/projects/${encodeURIComponent(projId)}`;
 }
 
 /**
- * `/<ws>/projects/<projId>/<stage>` — the canonical stage workbench route.
+ * `/<ws>/projects/<projId>/<stage>`: the canonical stage workbench route.
  * This is the one grammar the StageRail, ScopeBar, and trace deep links share.
  */
 export function stageRoute(ws: string, projId: string, stage: WorkflowStage): string {
@@ -186,7 +186,7 @@ export function canonicalRouteForLegacyPath(
 	return target.sub ? stageSubroute(ws, projId, target.stage, target.sub) : stageRoute(ws, projId, target.stage);
 }
 
-/* ── Portfolio surfaces — workspace scope, never project-scoped ─────────── */
+/* ── Portfolio surfaces: workspace scope, never project-scoped ─────────── */
 
 /**
  * Workspace-scoped routes that have NO active project. They hang off the
@@ -206,7 +206,7 @@ export const PORTFOLIO_ROUTES = [
  * True when `pathname` is a portfolio (workspace-scope, no-project) surface.
  *
  * A portfolio surface has NO active project: `/<ws>/projects` (the project
- * list) is portfolio, but `/<ws>/projects/<projId>/...` is project-scoped — it
+ * list) is portfolio, but `/<ws>/projects/<projId>/...` is project-scoped: it
  * has a project, so it is not portfolio. The canonical project-scoped form is
  * therefore excluded explicitly.
  */
@@ -214,11 +214,11 @@ export function isPortfolioPath(pathname: string): boolean {
 	const trimmed = pathname.replace(/^\/+|\/+$/g, "");
 	const segments = trimmed.split("/");
 
-	// `/<ws>/projects/<projId>[/...]` — project-scoped, never portfolio.
+	// `/<ws>/projects/<projId>[/...]`: project-scoped, never portfolio.
 	if (segments[1] === "projects" && segments.length >= 3) {
 		return false;
 	}
-	// `/<ws>/<portfolio>` — second segment is a known portfolio surface
+	// `/<ws>/<portfolio>`: second segment is a known portfolio surface
 	// (`/<ws>/projects` with no projId, `/<ws>/dashboard`, `/<ws>/inbox`, …).
 	if (segments.length >= 2 && (PORTFOLIO_ROUTES as readonly string[]).includes(segments[1] ?? "")) {
 		return true;
@@ -235,13 +235,13 @@ export function isPortfolioPath(pathname: string): boolean {
 /**
  * Every pre-shell route folder under `apps/web/src/routes/` mapped to the
  * WorkflowStage that now owns it. The migration keeps each old path resolving
- * (the feature route still renders — no 404, no test breakage); this map is the
+ * (the feature route still renders: no 404, no test breakage); this map is the
  * alias layer the shell chrome reads so an old path presents as its canonical
  * stage, and the `[ws]` route tree can redirect a bare project/stage path to a
  * concrete workbench.
  *
  * `null` means the route is workspace-scoped (portfolio / system / auth /
- * error / preview-tooling) and has no owning WorkflowStage — it is intentionally
+ * error / preview-tooling) and has no owning WorkflowStage: it is intentionally
  * outside project scope. The route-classification dispositions live in
  * `design-alignment/<cluster>.md` (owned by
  * `prd-cross-route-classification-completeness`); this map is the runtime
@@ -312,7 +312,7 @@ export const LEGACY_ROUTE_MAP: Readonly<Record<string, WorkflowStage | null>> = 
 	"mobile-observability": "operate",
 	context: "operate",
 	"cross-cutting-perf": "operate",
-	// ── Workspace scope — no owning stage (portfolio / system / auth / preview) ──
+	// ── Workspace scope: no owning stage (portfolio / system / auth / preview) ──
 	projects: null,
 	search: null,
 	memory: null,
@@ -472,13 +472,13 @@ export const CURRENT_ROUTE_COVERAGE = {
 } as const satisfies Readonly<Record<string, CurrentRouteCoverageEntry>>;
 
 /**
- * Resolve any live pathname — a canonical `/<ws>/projects/<projId>/<stage>`
- * URL or a legacy feature-bucket / preview path — to the WorkflowStage the
+ * Resolve any live pathname: a canonical `/<ws>/projects/<projId>/<stage>`
+ * URL or a legacy feature-bucket / preview path: to the WorkflowStage the
  * shell chrome should mark active. Returns `null` for workspace-scope routes
  * with no owning stage (portfolio / system / auth / error). Order:
  *
- *   1. Canonical `/<ws>/projects/<projId>/<stage>` — read the `<stage>` segment.
- *   2. Legacy path — first segment looked up in `LEGACY_ROUTE_MAP`.
+ *   1. Canonical `/<ws>/projects/<projId>/<stage>`: read the `<stage>` segment.
+ *   2. Legacy path: first segment looked up in `LEGACY_ROUTE_MAP`.
  *   3. Otherwise `null`.
  */
 export function canonicalStageFor(pathname: string): WorkflowStage | null {
@@ -493,7 +493,7 @@ export function canonicalStageFor(pathname: string): WorkflowStage | null {
 		return null;
 	}
 
-	// Legacy flat path — first segment owns the lookup.
+	// Legacy flat path: first segment owns the lookup.
 	const head = segments[0] ?? "";
 	if (head in LEGACY_ROUTE_MAP) return LEGACY_ROUTE_MAP[head] ?? null;
 	return null;
@@ -512,8 +512,8 @@ export function canonicalStageFor(pathname: string): WorkflowStage | null {
  * active trace must not be dropped. `currentUrl` may be a `URL`, a `Location`,
  * or any `{ search, hash }`-shaped object (so it works in SSR and the browser).
  *
- * The URL fragment (`#trace=…`) is never transmitted to the server — SvelteKit
- * throws on `event.url.hash` for that reason — and the browser already carries
+ * The URL fragment (`#trace=…`) is never transmitted to the server: SvelteKit
+ * throws on `event.url.hash` for that reason: and the browser already carries
  * a fragment forward across a redirect when the destination has none. So hash
  * access is guarded: server-side it is simply skipped (the browser preserves
  * it); client-side `location.hash` is read normally. Only the query string,
@@ -525,7 +525,7 @@ export function withTrace(
 ): string {
 	if (!currentUrl) return targetPath;
 	const search = currentUrl.search ?? "";
-	// Hash access throws on a SvelteKit server `event.url` — read it defensively.
+	// Hash access throws on a SvelteKit server `event.url`: read it defensively.
 	let hash = "";
 	try {
 		hash = currentUrl.hash ?? "";
@@ -550,7 +550,7 @@ export function traceFromHash(hash: string | null | undefined): string | null {
 }
 
 /**
- * A few legacy folders are layout-only — their renderable surface lives at a
+ * A few legacy folders are layout-only: their renderable surface lives at a
  * sub-path, so the route-resolution crawl drives the sub-path rather than the
  * bare folder (driving the bare folder would 404, which is correct for a
  * layout-only folder but not a regression). Keyed by folder name.
@@ -564,7 +564,7 @@ const LEGACY_RENDERABLE_PATH: Readonly<Record<string, string>> = {
 /**
  * The list of pre-existing route paths the route-resolution crawl drives.
  * Every key of `LEGACY_ROUTE_MAP` contributes one path the crawl asserts
- * resolves `200|301|308` — never 404. Layout-only folders contribute their
+ * resolves `200|301|308`: never 404. Layout-only folders contribute their
  * renderable sub-path (`LEGACY_RENDERABLE_PATH`). Kept as a function so the
  * crawl spec and any disposition audit derive the same set from one map.
  */

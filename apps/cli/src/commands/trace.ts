@@ -1,18 +1,18 @@
 /**
- * `fulcrum trace show <id>` — the CLI trace resolver (CLI-TUI-UX.md §1.6).
+ * `fulcrum trace show <id>`: the CLI trace resolver (CLI-TUI-UX.md §1.6).
  *
  * The trace id is the cross-surface primitive (DESIGN.md §4.10): the same id a
  * `--json` envelope carries, the web Trace-ID badge shows, and the TUI status
  * footer prints. `agent-cli-review.md` A-CLI-003 flagged that there was *no*
  * `fulcrum trace show <id>` anywhere in CLI dispatch despite CLI-TUI-UX.md:197
- * and IA-MAP.md §11 specifying it. This file owns that command — single
+ * and IA-MAP.md §11 specifying it. This file owns that command: single
  * placement, not also in `prd-cli-trace-spine-v1` (which owns the trace-line
  * formatter, not the `trace` verb).
  *
  * `fulcrum trace show <id>` resolves a trace id into the run / span / audit
  * surfaces it links so an operator (or agent) can jump between web, TUI, audit
  * log, and CLI by one id. The trace store / span index is a placeholder layer
- * (AGENTS.md "Where we are going" — agent runs are not built yet), so this
+ * (AGENTS.md "Where we are going": agent runs are not built yet), so this
  * command does not fabricate run/span rows: it emits the canonical
  * `fulcrum.cli.v1` envelope whose `result` names the resolved trace identity
  * and the canonical cross-surface links (`fulcrum audit list --trace <id>`,
@@ -22,7 +22,7 @@
 
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
-/** Output sink — defaults bind to the process streams. */
+/** Output sink: defaults bind to the process streams. */
 interface TraceIo {
   print: (line: string) => void;
   printErr: (line: string) => void;
@@ -40,7 +40,7 @@ export interface TraceRunOptions {
 export const TRACE_VERBS = ["show"] as const;
 export type TraceVerb = (typeof TRACE_VERBS)[number];
 
-export const TRACE_HELP = `fulcrum trace — cross-surface trace resolver (CLI-TUI-UX.md §1.6)
+export const TRACE_HELP = `fulcrum trace: cross-surface trace resolver (CLI-TUI-UX.md §1.6)
 
 A trace id ties one run together across web, TUI, audit log, and CLI
 (DESIGN.md §4.10). \`trace show\` resolves an id to the surfaces it links.
@@ -59,7 +59,7 @@ function isHelpVerb(verb: string | undefined): boolean {
 
 /**
  * The canonical cross-surface links a resolved trace id points at. These are
- * the *real* surfaces — the audit log is backed today; the web/TUI routes are
+ * the *real* surfaces: the audit log is backed today; the web/TUI routes are
  * the documented IA-MAP.md §2.6 / §11 destinations a trace id resolves into.
  */
 function traceLinks(traceId: string): {
@@ -87,7 +87,7 @@ function traceLinks(traceId: string): {
 }
 
 /**
- * `fulcrum trace show <id>` — resolve a trace id to its run / span / audit
+ * `fulcrum trace show <id>`: resolve a trace id to its run / span / audit
  * links and emit the canonical envelope.
  */
 function runTraceShow(rest: readonly string[], io: TraceIo, opts: TraceRunOptions): void {
@@ -137,7 +137,7 @@ function runTraceShow(rest: readonly string[], io: TraceIo, opts: TraceRunOption
       command: "trace show",
       // The envelope's own `trace_id` stays the canonical 32-char invocation
       // id (honouring `FULCRUM_TRACE_ID`); the *resolved* trace id the operator
-      // asked about is reported in `result.trace_id` — they are distinct ids.
+      // asked about is reported in `result.trace_id`: they are distinct ids.
       result: {
         stage: "operate",
         surface: "trace",
@@ -150,7 +150,7 @@ function runTraceShow(rest: readonly string[], io: TraceIo, opts: TraceRunOption
         links,
         message:
           "Trace resolved to its cross-surface links. The run/span index is not yet " +
-          "available locally — inspect this trace's recorded events via the audit log.",
+          "available locally: inspect this trace's recorded events via the audit log.",
       },
       next_actions: [
         { label: "Show audit events for this trace", command: `fulcrum audit list --trace ${normalized}` },

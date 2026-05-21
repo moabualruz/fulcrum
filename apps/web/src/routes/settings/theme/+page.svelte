@@ -236,7 +236,7 @@
         ></div>
         <div class="rounded-lg border border-border bg-background p-3 text-xs" style="border-radius: {settings.radius}rem;">
           <p class="font-medium" style="font-family: {settings.fontFamily === 'mono' ? 'monospace' : settings.fontFamily === 'system' ? 'system-ui, sans-serif' : 'Inter Variable, sans-serif'};">
-            Aa — {settings.fontFamily}
+            Aa: {settings.fontFamily}
           </p>
           <p class="text-muted-foreground mt-1">The quick brown fox jumps over the lazy dog.</p>
         </div>

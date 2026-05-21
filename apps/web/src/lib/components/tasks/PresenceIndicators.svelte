@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * PresenceIndicators.svelte — Yjs awareness-based user presence (workflow milestone, D-99).
+   * PresenceIndicators.svelte: Yjs awareness-based user presence (workflow milestone, D-99).
    *
    * Shows avatar dots for active users on the current document.
    * Uses y-websocket awareness protocol with heartbeat-based presence.

@@ -110,7 +110,7 @@ export class OptimisticStore<T> {
 /**
  * Tracks deletion intents with a configurable undo window. Pending deletions
  * expose a remaining-time readout that surfaces the inline undo affordance in
- * the same row that triggered the delete — never a toast.
+ * the same row that triggered the delete: never a toast.
  */
 export interface PendingDeletion<TKey> {
   readonly key: TKey;

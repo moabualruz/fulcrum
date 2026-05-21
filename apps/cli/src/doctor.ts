@@ -1,4 +1,4 @@
-// fulcrum doctor — environment health check.
+// fulcrum doctor: environment health check.
 // Reports: bun version, agent dirs detected, tool presence (which hooks fail-open),
 // policy file location + size, skill count, managed MCPs.
 
@@ -83,7 +83,7 @@ interface DoctorReport {
       // native config to confirm the Authorization header (or codex's
       // bearer_token_env_var) is actually present. "n/a" when no auth needed.
       wiring: Record<string, "ok" | "missing" | "n/a">;
-      // MCP initialize handshake — only populated when `--probe` ran.
+      // MCP initialize handshake: only populated when `--probe` ran.
       // "ok" = server replied with a valid initialize result; "fail" = error
       // or timeout; "skipped" = probe disabled or transport not supported.
       handshake: "ok" | "fail" | "skipped";
@@ -358,7 +358,7 @@ async function probeMcpInitialize(
       const res = await fetch(server.url, { method: "POST", headers, body, signal: ctrl.signal });
       clearTimeout(timer);
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-      // We don't strictly need to parse the response — a 2xx + non-empty body
+      // We don't strictly need to parse the response: a 2xx + non-empty body
       // is enough to confirm the MCP endpoint is alive and authed. Streaming
       // SSE responses count too.
       return { ok: true };
@@ -368,7 +368,7 @@ async function probeMcpInitialize(
   }
 
   // stdio: spawn, send `initialize`, read first JSON-RPC line, kill.
-  // Stdin stays open (some MCP servers — dart, semgrep — exit immediately
+  // Stdin stays open (some MCP servers: dart, semgrep: exit immediately
   // on EOF before responding). The reader pulls *one* response chunk and
   // moves on; we don't drain to EOF.
   if (!server.command) return { ok: false, error: "no command" };
@@ -622,7 +622,7 @@ async function buildMcpReport(home: string, opts: { probe?: boolean }): Promise<
         ...(handshake_error ? { handshake_error } : {}),
       });
     }
-  } catch { /* Registry not yet initialised — no entries to report */ }
+  } catch { /* Registry not yet initialised: no entries to report */ }
   return { mcp, warnings };
 }
 
@@ -732,7 +732,7 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {
-  console.log("fulcrum doctor — environment health check\n");
+  console.log("fulcrum doctor: environment health check\n");
 
   // Bun
   console.log(`bun       ${report.bun}`);
@@ -748,7 +748,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     }
     const rulesNote = agent.rulesSpliced
       ? "rules spliced"
-      : "rules NOT spliced — run: fulcrum install";
+      : "rules NOT spliced: run: fulcrum install";
     console.log(`  ${pad(agent.label, 14)} ✓  ${rulesNote}`);
   }
   console.log();
@@ -763,11 +763,11 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       const isRequired = toolDef?.required ?? false;
       if (isRequired) {
         console.log(
-          `  ${pad(tool.cmd, 22)} ✗  MISSING — required by ${tool.usedBy}`
+          `  ${pad(tool.cmd, 22)} ✗  MISSING: required by ${tool.usedBy}`
         );
       } else {
         console.log(
-          `  ${pad(tool.cmd, 22)} ·  not installed — ${tool.usedBy} will fail-open`
+          `  ${pad(tool.cmd, 22)} ·  not installed: ${tool.usedBy} will fail-open`
         );
       }
     }
@@ -780,7 +780,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     console.log(`  size=${report.policy.size}B  mtime=${report.policy.mtime}`);
   } else {
     console.log(
-      "  · not present — run: fulcrum install (seeds default policy)"
+      "  · not present: run: fulcrum install (seeds default policy)"
     );
   }
   console.log();
@@ -904,7 +904,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   if (report.errors > 0) {
     console.log(`✗ ${report.errors} error(s), ${report.warnings} warning(s)`);
   } else if (report.warnings > 0) {
-    console.log(`⚠ ${report.warnings} warning(s) — see above`);
+    console.log(`⚠ ${report.warnings} warning(s): see above`);
   } else {
     console.log("✓ all checks passed");
   }

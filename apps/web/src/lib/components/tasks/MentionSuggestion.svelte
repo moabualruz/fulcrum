@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * MentionSuggestion — dual-source mention popup (users + teams).
+   * MentionSuggestion: dual-source mention popup (users + teams).
    */
 
   interface Props {

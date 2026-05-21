@@ -198,10 +198,10 @@
 	let selectValue = $state<string | undefined>(undefined);
 
 	const priorityOptions = [
-		{ value: "p0", label: "P0 — critical" },
-		{ value: "p1", label: "P1 — high" },
-		{ value: "p2", label: "P2 — medium" },
-		{ value: "p3", label: "P3 — low" },
+		{ value: "p0", label: "P0: critical" },
+		{ value: "p1", label: "P1: high" },
+		{ value: "p2", label: "P2: medium" },
+		{ value: "p3", label: "P3: low" },
 	];
 
 	const selectedPriorityLabel = $derived(
@@ -329,7 +329,7 @@
 	let traceCopied = $state<string | null>(null);
 	let traceAction = $state<string | null>(null);
 
-	// Empty / error state fixtures — COPY.md §2 + §3.
+	// Empty / error state fixtures: COPY.md §2 + §3.
 	// The eight OD empty-states.html stages, each carrying the COPY.md §2 verbatim
 	// H2 / paragraph and a one-primary-plus-one-ghost action pair (never three).
 	type EmptyStateFixture = {
@@ -472,11 +472,11 @@
 	// surface cannot ship non-canonical copy and still pass the design gate.
 	// The scan is SCOPED to this OD-referenced fixture, not raw app source.
 
-	// COPY.md §6 — the canonical 8-state status vocabulary, rendered as literals.
+	// COPY.md §6: the canonical 8-state status vocabulary, rendered as literals.
 	const copyLockStatusVocab = CANONICAL_STATUS_VOCAB;
 	const copyLockBannedStatus = BANNED_STATUS_SYNONYMS;
 
-	// COPY.md §4 — confirmation copy literals.
+	// COPY.md §4: confirmation copy literals.
 	type CopyLockEntry = { id: string; label: string };
 	const copyLockConfirmations: CopyLockEntry[] = [
 		{ id: "saved", label: "Saved 8s ago" },
@@ -485,7 +485,7 @@
 		{ id: "session-choice", label: "Session choice saved" },
 	];
 
-	// COPY.md §10 — permission prompt buttons (three, never two) + abort reasons.
+	// COPY.md §10: permission prompt buttons (three, never two) + abort reasons.
 	const copyLockPermissionButtons: CopyLockEntry[] = [
 		{ id: "allow-once", label: "Allow once" },
 		{ id: "allow-always", label: "Allow always for `claude` in this project" },
@@ -499,7 +499,7 @@
 	];
 	const copyLockAbortTitle = "Abort active work?";
 
-	// COPY.md §11 — notification template strings.
+	// COPY.md §11: notification template strings.
 	const copyLockNotifications: CopyLockEntry[] = [
 		{ id: "mention", label: '@you mentioned in "Plan: auth refactor"' },
 		{ id: "review-requested", label: "Review requested by claude on TASK-471" },
@@ -510,14 +510,14 @@
 		{ id: "cycle-ending", label: 'Cycle "May sprint" ends in 2 days. 4 tasks in progress.' },
 	];
 
-	// COPY.md §12 — settings inheritance chip labels.
+	// COPY.md §12: settings inheritance chip labels.
 	const copyLockSettingsChips: CopyLockEntry[] = [
 		{ id: "inherited", label: "Inherited" },
 		{ id: "overridden", label: "Overridden" },
 		{ id: "locked", label: "Locked" },
 	];
 
-	// COPY.md §13 — telemetry first-run prompt options.
+	// COPY.md §13: telemetry first-run prompt options.
 	const copyLockTelemetryOptions: CopyLockEntry[] = [
 		{ id: "on", label: "On" },
 		{ id: "anonymous-only", label: "Anonymous only" },
@@ -665,7 +665,7 @@
 					</SelectContent>
 				</Select>
 				<p class="text-xs text-muted-foreground" data-design-kit-select-value>
-					Selected: {selectValue ?? "—"}
+					Selected: {selectValue ?? "-"}
 				</p>
 			</div>
 		</article>
@@ -876,7 +876,7 @@
 				The eight <code class="rounded bg-muted px-1 text-[11px]">empty-states.html</code> stages.
 				Each carries the COPY.md §2 verbatim H2 and paragraph, one primary verb action, and one
 				ghost escape hatch. The Operate card uses the
-				<code class="rounded bg-muted px-1 text-[11px]">steady</code> tone — empty is a healthy
+				<code class="rounded bg-muted px-1 text-[11px]">steady</code> tone: empty is a healthy
 				steady state, not an absence.
 			</p>
 			<div class="flex flex-wrap items-center gap-1">
@@ -940,7 +940,7 @@
 								class="grid place-items-center rounded-md border border-dashed border-border bg-card px-6 py-10 text-sm text-muted-foreground"
 								data-design-kit-empty-populated={fixture.id}
 							>
-								{fixture.stage} has data — the populated branch renders here.
+								{fixture.stage} has data: the populated branch renders here.
 							</div>
 						{/if}
 					</div>
@@ -959,7 +959,7 @@
 				>
 			</div>
 			<p class="text-sm text-muted-foreground">
-				Errors live inline at the surface where they happen — never as toasts. Every failure
+				Errors live inline at the surface where they happen: never as toasts. Every failure
 				carries a copyable trace id and an imperative recovery action. The COPY.md §3 hard-ban
 				list (generic apology copy, vague reassurance) is enforced by design-e2e.
 			</p>
@@ -996,7 +996,7 @@
 								class="rounded-md border border-dashed border-border bg-surface-sunken px-4 py-6 text-sm text-muted-foreground"
 								data-design-kit-error-populated={fixture.id}
 							>
-								This surface is healthy — the populated branch renders here.
+								This surface is healthy: the populated branch renders here.
 							</div>
 						{/if}
 					</div>
@@ -1255,7 +1255,7 @@
 					</AlertDialogContent>
 				</AlertDialog>
 				<span class="text-xs text-muted-foreground" data-design-kit-alert-state>
-					Choice: {alertDialogChoice || "—"}
+					Choice: {alertDialogChoice || "-"}
 				</span>
 			</div>
 		</article>
@@ -1333,7 +1333,7 @@
 					</DialogContent>
 				</Dialog>
 				<span class="text-xs text-muted-foreground" data-design-kit-skill-conflict-state>
-					Choice: {skillConflictChoice || "—"}
+					Choice: {skillConflictChoice || "-"}
 				</span>
 			</div>
 		</article>
@@ -1353,7 +1353,7 @@
 					Open palette
 				</button>
 				<span class="text-xs text-muted-foreground" data-design-kit-palette-choice>
-					Last: {paletteChoice ?? "—"}
+					Last: {paletteChoice ?? "-"}
 				</span>
 			</div>
 			<CommandPalette bind:open={paletteOpen}>
@@ -1480,7 +1480,7 @@
 				bind:selectedId={treeSelected}
 			/>
 			<span class="text-xs text-muted-foreground" data-design-kit-tree-selection>
-				Selected: {treeSelected ?? "—"}
+				Selected: {treeSelected ?? "-"}
 			</span>
 		</article>
 
@@ -1581,14 +1581,14 @@
 				/>
 				<TraceChip traceId="trace-shortid" short={false} copyable={false} />
 				<span class="text-xs text-muted-foreground" data-design-kit-trace-copied>
-					Copied: {copiedTrace ?? "—"}
+					Copied: {copiedTrace ?? "-"}
 				</span>
 				<span class="text-xs text-muted-foreground" data-design-kit-trace-action>
-					Action: {traceAction ?? "—"}
+					Action: {traceAction ?? "-"}
 				</span>
 			</div>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §4.10 TraceBadge — <code class="rounded bg-muted px-1 text-[11px]">badge</code> prop:
+				DESIGN.md §4.10 TraceBadge: <code class="rounded bg-muted px-1 text-[11px]">badge</code> prop:
 				<code class="rounded bg-muted px-1 text-[11px]">trace:</code> prefix, 8-char hex, surface-sunken,
 				hover tooltip, right-click Open in audit / Open in CLI.
 			</p>
@@ -1600,7 +1600,7 @@
 		>
 			<h2 class="text-lg font-semibold">StageRail</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 — 220px expanded / 56px collapsed left rail; six WorkflowStages, then a
+				DESIGN.md §3.1: 220px expanded / 56px collapsed left rail; six WorkflowStages, then a
 				persistent Workspace (Portfolio) group, then a System group.
 			</p>
 			<div class="flex flex-wrap items-center gap-2">
@@ -1641,7 +1641,7 @@
 		>
 			<h2 class="text-lg font-semibold">ScopeBar</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 — 48px top chrome: brand · workspace · stage tabs · trace · system cluster.
+				DESIGN.md §3.1: 48px top chrome: brand · workspace · stage tabs · trace · system cluster.
 			</p>
 			<div class="overflow-hidden rounded-md border border-border">
 				<ScopeBar
@@ -1695,7 +1695,7 @@
 		>
 			<h2 class="text-lg font-semibold">StatusFooter</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 / IA-MAP.md §3 — 44px bottom strip; compact 38 / base 44 / comfortable 50.
+				DESIGN.md §3.1 / IA-MAP.md §3: 44px bottom strip; compact 38 / base 44 / comfortable 50.
 				Left segments mode · profile · branch · run x/y · agent · MCP; right segments trace ·
 				time · ? · ⌘K, then the right-most AI Assist segment with accent left-border.
 			</p>
@@ -1746,7 +1746,7 @@
 		>
 			<h2 class="text-lg font-semibold">AI Assist panel</h2>
 			<p class="text-xs text-muted-foreground">
-				DESIGN.md §3.1 / apps/web CONTEXT.md — 420px right overlay for AI Assist; mobile bottom
+				DESIGN.md §3.1 / apps/web CONTEXT.md: 420px right overlay for AI Assist; mobile bottom
 				sheet branch composes the ui-kit Sheet primitive.
 			</p>
 			<div class="flex flex-wrap items-center gap-2">
@@ -1921,7 +1921,7 @@
 				</p>
 			</header>
 
-			<!-- COPY.md §6 — canonical 8-state status vocabulary. -->
+			<!-- COPY.md §6: canonical 8-state status vocabulary. -->
 			<section class="grid gap-2" data-copy-lock-group="status-labels">
 				<h3 class="text-sm font-semibold">Status labels · COPY.md §6</h3>
 				<div class="flex flex-wrap items-center gap-2">
@@ -1939,7 +1939,7 @@
 				</p>
 			</section>
 
-			<!-- COPY.md §4 — confirmation copy. -->
+			<!-- COPY.md §4: confirmation copy. -->
 			<section class="grid gap-2" data-copy-lock-group="confirmations">
 				<h3 class="text-sm font-semibold">Confirmations · COPY.md §4</h3>
 				<ul class="grid gap-1">
@@ -1949,7 +1949,7 @@
 				</ul>
 			</section>
 
-			<!-- COPY.md §10 — permission prompt buttons + abort reasons. -->
+			<!-- COPY.md §10: permission prompt buttons + abort reasons. -->
 			<section class="grid gap-2" data-copy-lock-group="permission">
 				<h3 class="text-sm font-semibold">Permission prompt · COPY.md §10</h3>
 				<div class="flex flex-wrap gap-2">
@@ -1971,7 +1971,7 @@
 				</div>
 			</section>
 
-			<!-- COPY.md §11 — notification templates. -->
+			<!-- COPY.md §11: notification templates. -->
 			<section class="grid gap-2" data-copy-lock-group="notifications">
 				<h3 class="text-sm font-semibold">Notifications · COPY.md §11</h3>
 				<ul class="grid gap-1">
@@ -1981,7 +1981,7 @@
 				</ul>
 			</section>
 
-			<!-- COPY.md §12 — settings inheritance chips. -->
+			<!-- COPY.md §12: settings inheritance chips. -->
 			<section class="grid gap-2" data-copy-lock-group="settings">
 				<h3 class="text-sm font-semibold">Settings chips · COPY.md §12</h3>
 				<div class="flex flex-wrap gap-2">
@@ -1991,7 +1991,7 @@
 				</div>
 			</section>
 
-			<!-- COPY.md §13 — telemetry first-run options. -->
+			<!-- COPY.md §13: telemetry first-run options. -->
 			<section class="grid gap-2" data-copy-lock-group="telemetry">
 				<h3 class="text-sm font-semibold">Telemetry options · COPY.md §13</h3>
 				<div class="flex flex-wrap gap-2">

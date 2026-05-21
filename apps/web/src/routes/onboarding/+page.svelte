@@ -1,12 +1,12 @@
 <script lang="ts">
 	/**
-	 * `/onboarding` — the OD first-run flow (`prd-onboarding-web-first-run`).
+	 * `/onboarding`: the OD first-run flow (`prd-onboarding-web-first-run`).
 	 *
 	 * Proven against OD `onboarding.html`, DESIGN.md §11 (Onboarding · first-run),
 	 * COPY.md §7 (Onboarding first-run copy), and IA-MAP.md `/onboarding`.
 	 *
 	 * DESIGN.md §11 is explicit: "No multi-step wizard. No tooltip carousel. The
-	 * interface teaches itself." The first run is therefore not a stepper — it is
+	 * interface teaches itself." The first run is therefore not a stepper: it is
 	 * a short worked path that lands the operator inside the Capture surface:
 	 *
 	 *   1. boot      → workspace-name input (single field, COPY §7).
@@ -14,22 +14,22 @@
 	 *   3. capture   → the Capture doc surface (`onboarding.html` `.doc`) with a
 	 *                  `.scrim` dimming everything except one `.anchor` block, a
 	 *                  first-▶-Play coachmark anchored to it (5-dot indicator,
-	 *                  Skip tour / Got it — try Play), and the first trace ID
+	 *                  Skip tour / Got it: try Play), and the first trace ID
 	 *                  pulsing once. DESIGN §11 steps 3–5.
 	 *
-	 * The Capture surface reproduces the OD `onboarding.html` body verbatim — the
+	 * The Capture surface reproduces the OD `onboarding.html` body verbatim: the
 	 * "What just happened" / "Try it on this line" / "What stays the same
 	 * everywhere" blocks, the `2 min · onboarding · step 3 / 5` meta, the
-	 * `capture · seedlings` eyebrow — and the `.anchor` block carries the
+	 * `capture · seedlings` eyebrow: and the `.anchor` block carries the
 	 * universal four-mode `ModeRow` (`✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI
 	 * Assist`, DESIGN.md §4.13). First ▶ Play dismisses the coachmark + scrim;
-	 * "Skip tour" exits the same way. DESIGN.md §12 anti-references are honored —
+	 * "Skip tour" exits the same way. DESIGN.md §12 anti-references are honored -
 	 * no hero illustration, no persistent welcome banner; the scrim + coachmark
 	 * are removed after first Play and never re-appear (CONTEXT.md OnboardingFlow:
 	 * "subsequent sessions never re-enter it").
 	 *
-	 * Composes `@fulcrum/ui-kit` primitives only — `Button`, `Card`, `Input`,
-	 * `Kbd`, `ModeRow`, `TraceChip` — never re-implements a primitive (AGENTS.md
+	 * Composes `@fulcrum/ui-kit` primitives only: `Button`, `Card`, `Input`,
+	 * `Kbd`, `ModeRow`, `TraceChip`: never re-implements a primitive (AGENTS.md
 	 * ui-kit rule). The coachmark popover is a positioned `Card` (an existing
 	 * primitive); no hand-rolled overlay component is added.
 	 *
@@ -45,7 +45,7 @@
 	/** The three first-run phases. `capture` is the OD `onboarding.html` state. */
 	type FirstRunPhase = "workspace" | "project" | "capture";
 
-	/** The first-run trace — one trace stitches signup through Capture (DESIGN §11). */
+	/** The first-run trace: one trace stitches signup through Capture (DESIGN §11). */
 	const FIRST_RUN_TRACE = "tr_onb_first_play_01";
 
 	/**
@@ -83,7 +83,7 @@
 		queueTracePulse();
 	}
 
-	/** DESIGN §11 step 5 — the first trace ID surface pulses exactly once. */
+	/** DESIGN §11 step 5: the first trace ID surface pulses exactly once. */
 	function queueTracePulse(): void {
 		tracePulsed = false;
 		requestAnimationFrame(() => {
@@ -95,19 +95,19 @@
 		if (phase === "capture" && !tracePulsed) queueTracePulse();
 	});
 
-	/** First ▶ Play — dismiss the coachmark + scrim, then hand off to Plan. */
+	/** First ▶ Play: dismiss the coachmark + scrim, then hand off to Plan. */
 	function tryFirstPlay(): void {
 		anchorMode = "play";
 		dismissCoachmark();
 		void goto("/plan-session");
 	}
 
-	/** "Skip tour" / Esc — exit the coachmark without re-entering it. */
+	/** "Skip tour" / Esc: exit the coachmark without re-entering it. */
 	function dismissCoachmark(): void {
 		coachmarkOpen = false;
 	}
 
-	/** Esc dismisses the coachmark — the OD coachmark documents `Esc` to stop. */
+	/** Esc dismisses the coachmark: the OD coachmark documents `Esc` to stop. */
 	function onKeydown(event: KeyboardEvent): void {
 		if (event.key === "Escape" && coachmarkOpen) {
 			event.preventDefault();
@@ -135,7 +135,7 @@
 >
 	{#if phase === "workspace"}
 		<!--
-			DESIGN §11 step 1 — the single workspace-name field. COPY §7 verbatim:
+			DESIGN §11 step 1: the single workspace-name field. COPY §7 verbatim:
 			"What's your workspace called?" / "Use anything. You can rename later.
 			`local` works fine." / [ Continue ].
 		-->
@@ -182,7 +182,7 @@
 		</section>
 	{:else if phase === "project"}
 		<!--
-			DESIGN §11 step 2 — "What are you building?". COPY §7 verbatim:
+			DESIGN §11 step 2: "What are you building?". COPY §7 verbatim:
 			"One sentence. Become the project description." / [ Create project ].
 		-->
 		<section
@@ -231,13 +231,13 @@
 		</section>
 	{:else}
 		<!--
-			DESIGN §11 steps 3–5 — the OD `onboarding.html` Capture surface. The
+			DESIGN §11 steps 3–5: the OD `onboarding.html` Capture surface. The
 			`.doc` reproduces the OD body verbatim; the `.scrim` dims everything
 			except the `.anchor`; the coachmark teaches the first ▶ Play.
 		-->
 		{#if coachmarkOpen}
 			<!--
-				The scrim — OD `onboarding.html` `.scrim`. Dims the Capture doc so
+				The scrim: OD `onboarding.html` `.scrim`. Dims the Capture doc so
 				the lit `.anchor` block is the only thing the eye lands on. It is
 				`pointer-events-none` so the lit anchor stays interactive.
 			-->
@@ -275,7 +275,7 @@
 			</p>
 
 			<!--
-				The lit `.anchor` block — OD `onboarding.html` `.anchor`. It carries
+				The lit `.anchor` block: OD `onboarding.html` `.anchor`. It carries
 				the universal four-mode `ModeRow` (DESIGN §4.13). `z-50` lifts it
 				above the scrim; the accent ring + glow reproduce the OD treatment.
 			-->
@@ -303,8 +303,8 @@
 
 			{#if coachmarkOpen}
 				<!--
-					The first-▶-Play coachmark — OD `onboarding.html` `.coach-fixed`.
-					A positioned `Card` (an existing ui-kit primitive — no hand-rolled
+					The first-▶-Play coachmark: OD `onboarding.html` `.coach-fixed`.
+					A positioned `Card` (an existing ui-kit primitive: no hand-rolled
 					overlay): uppercase step eyebrow, the Play teaching copy, a 5-dot
 					progress indicator (dot 3 active), a ghost "Skip tour" and a primary
 					"Got it: try Play" action. `role="dialog"` + `aria-label` make it a
@@ -381,7 +381,7 @@
 			</ol>
 
 			<!--
-				DESIGN §11 step 5 — the first trace ID surface pulses once. The
+				DESIGN §11 step 5: the first trace ID surface pulses once. The
 				`TraceChip` primitive carries the trace; `data-trace-pulsed` flips
 				once on first render and drives the one-shot pulse animation.
 			-->
@@ -401,7 +401,7 @@
 
 <style>
 	/*
-	 * DESIGN §11 step 5 — the first trace ID surface pulses exactly once. A
+	 * DESIGN §11 step 5: the first trace ID surface pulses exactly once. A
 	 * one-shot keyframe (no `infinite`); `prefers-reduced-motion: reduce`
 	 * suppresses it entirely (DESIGN.md §1.6 reduced-motion guarantee).
 	 */

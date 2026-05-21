@@ -1,5 +1,5 @@
 /**
- * fulcrum import — import tasks from external sources.
+ * fulcrum import: import tasks from external sources.
  *
  * Usage:
  *   fulcrum import csv --project <id> --file <path> [--dry-run] [--json]
@@ -106,7 +106,7 @@ export async function run(argv: readonly string[], opts: ImportRunOptions = {}):
       const csv = readFileSync(filePath, "utf-8");
       tasks = parseCsvContent(csv);
     } else {
-      // API-based sources — prompt user or read from env
+      // API-based sources: prompt user or read from env
       const tokenEnvKey = `FULCRUM_${source.toUpperCase()}_TOKEN`;
       const token = process.env[tokenEnvKey];
       if (!token) {
@@ -129,7 +129,7 @@ export async function run(argv: readonly string[], opts: ImportRunOptions = {}):
       if (jsonMode) {
         print(JSON.stringify({ dryRun: true, count: tasks.length, tasks }, null, 2));
       } else {
-        print(`\nDry run — would import ${tasks.length} tasks into ${projectId}:`);
+        print(`\nDry run: would import ${tasks.length} tasks into ${projectId}:`);
         for (const task of tasks.slice(0, 10)) {
           print(`  - ${task.title} [${task.status ?? "todo"}]`);
         }

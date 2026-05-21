@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * QuickFilters — sidebar preset filter buttons.
+   * QuickFilters: sidebar preset filter buttons.
    * Presets: My Work, Due Today, Overdue, Unassigned, Blocked.
    */
   import { createEventDispatcher } from "svelte";
@@ -66,7 +66,7 @@
       id: "blocked",
       label: "Blocked",
       query: () => SavedViewQuerySchema.parse({
-        // Blocked tasks have a blocking relationship — filter by dependencies
+        // Blocked tasks have a blocking relationship: filter by dependencies
         filters: [{ field: "custom_fields.blocked", op: "is_not_empty" }],
         facets: {},
       }),

@@ -1,5 +1,5 @@
 <svelte:head>
-  <title>Billing — Settings | Fulcrum</title>
+  <title>Billing: Settings | Fulcrum</title>
 </svelte:head>
 
 <section data-settings-billing class="flex flex-col gap-6">

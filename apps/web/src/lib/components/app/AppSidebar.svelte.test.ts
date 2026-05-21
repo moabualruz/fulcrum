@@ -62,7 +62,7 @@ describe("AppSidebar component", () => {
 
   test("does NOT render the six-stage workflow axis as rail items", () => {
     // Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
-    // Capture→Operate axis belongs to the ScopeBar tab strip — the rail must
+    // Capture→Operate axis belongs to the ScopeBar tab strip: the rail must
     // render zero six-stage list items.
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
@@ -120,11 +120,11 @@ describe("AppSidebar component", () => {
     expect(body).toContain('href="/mkh/projects/fulcrum/operate/plugins"');
   });
 
-  test("placeholder shows '—' when activeProjectId is null", () => {
+  test("placeholder shows '-' when activeProjectId is null", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
-    expect(body).toContain("—");
+    expect(body).toContain("-");
   });
 
   test("placeholder shows the slug when activeProjectId is provided", () => {

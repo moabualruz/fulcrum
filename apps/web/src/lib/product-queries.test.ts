@@ -128,7 +128,7 @@ describe("web product-queries", () => {
 
   test("listBacklogTasks returns only unassigned tasks", async () => {
     const { project } = await seed();
-    // seed has 2 tasks with no sprint_id — both should appear
+    // seed has 2 tasks with no sprint_id: both should appear
     const backlog = await listBacklogTasks(project.id);
     expect(backlog.length).toBeGreaterThanOrEqual(2);
     for (const t of backlog) {

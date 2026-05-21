@@ -129,7 +129,7 @@ export function writeDriftReport(
   mkdirSync(reportsDir, { recursive: true });
   const date = new Date().toISOString().slice(0, 10);
   const reportPath = join(reportsDir, `symphony-drift-${date}.md`);
-  const content = `# Symphony SPEC Drift Report — ${date}
+  const content = `# Symphony SPEC Drift Report: ${date}
 
 ## Hashes
 - Previous: \`${oldHash}\`
@@ -229,7 +229,7 @@ export async function run(args: string[]): Promise<void> {
   } else if (!result.driftDetected) {
     console.log("symphony sync: no drift detected");
   } else {
-    console.log(`symphony sync: drift detected — report at ${result.reportPath}`);
+    console.log(`symphony sync: drift detected: report at ${result.reportPath}`);
     if (!result.conformancePassed) {
       console.log("symphony sync: conformance suite FAILED");
     }

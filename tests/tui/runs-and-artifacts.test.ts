@@ -19,7 +19,7 @@ function renderPlain(render: (renderer: Renderer) => void): string {
   return tty.plainText();
 }
 
-/** Render a screen at an exact terminal geometry — for stage-workbench snapshots. */
+/** Render a screen at an exact terminal geometry: for stage-workbench snapshots. */
 function renderAt(
   cols: number,
   rows: number,
@@ -55,7 +55,7 @@ describe("RunsScreen", () => {
 
     await screen.load();
     const listing = renderPlain((renderer) => screen.render(renderer));
-    // Canonical 8-state vocabulary (CLI-TUI-UX.md §11) — glyph + exact label,
+    // Canonical 8-state vocabulary (CLI-TUI-UX.md §11): glyph + exact label,
     // never the legacy `[running]` ad hoc bracket labels.
     for (const badge of ["● RUNNING", "✓ COMPLETE", "✗ FAILED", "⊘ CANCELLED"]) {
       expect(listing).toContain(badge);
@@ -113,11 +113,11 @@ describe("RunsScreen", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-status-empty-error-contract — the shared 8-state status vocabulary.
+// prd-tui-status-empty-error-contract: the shared 8-state status vocabulary.
 //
 // CLI-TUI-UX.md §11 / DESIGN.md §4.9 lock one universal status vocabulary:
 // 8 states, glyph + UPPERCASE label, never colour-only. These tests assert the
-// EXACT label and glyph for every state — not substring presence.
+// EXACT label and glyph for every state: not substring presence.
 // ───────────────────────────────────────────────────────────────────────────
 
 describe("Shared TUI status badge vocabulary (CLI-TUI-UX.md §11)", () => {
@@ -162,7 +162,7 @@ describe("Shared TUI status badge vocabulary (CLI-TUI-UX.md §11)", () => {
   });
 
   test("raw service status strings fold onto the 8 canonical states", () => {
-    // `complete` vs `completed` drift is gone — both resolve to COMPLETE.
+    // `complete` vs `completed` drift is gone: both resolve to COMPLETE.
     expect(statusBadgeLabel("completed")).toBe("COMPLETE");
     expect(statusBadgeLabel("complete")).toBe("COMPLETE");
     expect(statusBadgeLabel("succeeded")).toBe("COMPLETE");
@@ -415,7 +415,7 @@ describe("ArtifactsScreen", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-stage-workbenches-set — Build & Ship stage workbench OD parity.
+// prd-tui-stage-workbenches-set: Build & Ship stage workbench OD parity.
 //
 // The Build (`:runs`) and Ship (`:ship`) workbenches must render the OD
 // `tui-runs.html` stage chrome: a `fulcrum · :<route> · <purpose>` header
@@ -424,7 +424,7 @@ describe("ArtifactsScreen", () => {
 // 120x32 so the dense layout holds at both the minimum and a wide terminal.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("Build stage workbench (:runs) — OD parity", () => {
+describe("Build stage workbench (:runs): OD parity", () => {
   function buildScreen(runs: TuiManagedRunFixture[] = sampleRuns()) {
     return new RunsControlScreen({
       projectId: "auth/rewrite",
@@ -491,7 +491,7 @@ describe("Build stage workbench (:runs) — OD parity", () => {
   });
 });
 
-describe("Ship stage workbench (:ship) — OD parity", () => {
+describe("Ship stage workbench (:ship): OD parity", () => {
   function shipScreen(list: () => Promise<unknown[]>) {
     return new ArtifactsScreen({
       projectLabel: "auth/rewrite",

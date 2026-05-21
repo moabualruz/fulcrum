@@ -12,7 +12,7 @@
 </script>
 
 <svelte:head>
-  <title>Linear Integration — Fulcrum</title>
+  <title>Linear Integration: Fulcrum</title>
 </svelte:head>
 
 <div class="page">

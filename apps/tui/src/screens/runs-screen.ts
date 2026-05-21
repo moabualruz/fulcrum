@@ -1,10 +1,10 @@
 /**
- * Build stage workbench — the TUI `:runs` workbench (DESIGN.md §3.1,
+ * Build stage workbench: the TUI `:runs` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `build-runs` screen).
  *
  * This file owns two things:
  *
- *  1. `StageWorkbench` — the shared per-stage workbench shell every stage
+ *  1. `StageWorkbench`: the shared per-stage workbench shell every stage
  *     screen (Plan / Build / Review / Ship / Operate) renders through. It is
  *     the TUI mirror of the OD `tui-runs.html` `.term` frame: a `term-head`
  *     line (`fulcrum · :<route> · <purpose>` + scope), a primary workbench
@@ -12,23 +12,23 @@
  *     empty-state and error-frame contract (one sentence + one action; errors
  *     carry `trace=<id>`) so every stage workbench renders states identically.
  *
- *  2. `RunsControlScreen` — the Build stage workbench. A dense runs feed with
+ *  2. `RunsControlScreen`: the Build stage workbench. A dense runs feed with
  *     status summary, dependency-tree preview, dispatch / cancel / retry /
  *     reassign actions, and a focused-run ModePicker row. Re-homed under the
  *     `StageWorkbench` shell so it carries the same scope chrome and footer as
  *     every other stage.
  *
  * Keybindings:
- *   D       — dispatch new run
- *   C       — cancel selected run
- *   R       — retry failed run
- *   P       — preview dependency tree
- *   A       — reassign agent
- *   m …     — Step mode picker chord: m a ✋ Manual / m p ▶ Play /
+ *   D      : dispatch new run
+ *   C      : cancel selected run
+ *   R      : retry failed run
+ *   P      : preview dependency tree
+ *   A      : reassign agent
+ *   m …    : Step mode picker chord: m a ✋ Manual / m p ▶ Play /
  *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
- *   j/k     — navigate
- *   Enter   — open run detail
- *   q       — go back
+ *   j/k    : navigate
+ *   Enter  : open run detail
+ *   q      : go back
  */
 
 import type { Renderer } from "../renderer.ts";
@@ -37,7 +37,7 @@ import { truncateWide } from "../utils/truncate.ts";
 import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StageWorkbench shell — shared per-stage workbench chrome
+// StageWorkbench shell: shared per-stage workbench chrome
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -51,7 +51,7 @@ export type StageWorkbenchStage = "Plan" | "Build" | "Review" | "Ship" | "Operat
  * StatusFooter. Mirrors the OD `tui-runs.html` term-head + term-foot segments.
  */
 export interface StageWorkbenchScope {
-  /** Exact stage name — rendered verbatim in the header (`Plan`, `Build`, …). */
+  /** Exact stage name: rendered verbatim in the header (`Plan`, `Build`, …). */
   stage: StageWorkbenchStage;
   /** Canonical colon route for the stage (`:plan`, `:runs`, `:board`, …). */
   route: string;
@@ -72,7 +72,7 @@ export interface StageWorkbenchScope {
 }
 
 /**
- * Render the workbench header — the OD `tui-runs.html` `.term-head` line.
+ * Render the workbench header: the OD `tui-runs.html` `.term-head` line.
  * Form: `fulcrum · :<route> · <purpose>` on the left, scope on the right.
  * The exact stage name is always present so the snapshot test can lock it.
  */
@@ -88,14 +88,14 @@ export function renderStageWorkbenchHeader(renderer: Renderer, scope: StageWorkb
 }
 
 /**
- * Render the workbench footer — the OD `tui-runs.html` `.term-foot` strip.
+ * Render the workbench footer: the OD `tui-runs.html` `.term-foot` strip.
  * Segment order mirrors `StatusBar` / the web `StatusFooter`:
  *   MODE · profile · branch · agent · mcp ···· trace · ? · :
  * The MODE pill is the upper-cased stage name so each workbench is identifiable.
  *
  * The strip is a single line and never collapses (CONTEXT.md StatusFooter). On
  * a narrow terminal the lower-priority `agent` / `mcp` segments are dropped
- * before the high-priority `trace` segment is — an operator must always be able
+ * before the high-priority `trace` segment is: an operator must always be able
  * to read the trace id off the footer regardless of width.
  */
 export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkbenchScope): void {
@@ -106,7 +106,7 @@ export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkb
   // Left segments in priority order; drop trailing ones (agent, mcp) first.
   const prioritized = [
     `profile: ${scope.profile ?? "dev"}`,
-    scope.project ?? "—",
+    scope.project ?? "-",
     `agent: ${scope.agent ?? "any"}`,
     `mcp ${scope.mcp ?? "0/0"}`,
   ];
@@ -127,7 +127,7 @@ export function renderStageWorkbenchFooter(renderer: Renderer, scope: StageWorkb
 
 /** Short-form trace id for the footer (OD `tr_8f29a4c…`). */
 function shortTrace(traceId?: string | null): string {
-  if (!traceId) return "—";
+  if (!traceId) return "-";
   return traceId.length > 10 ? `${traceId.slice(0, 9)}…` : traceId;
 }
 
@@ -161,7 +161,7 @@ export function renderWorkbenchErrorFrame(
   renderer.writeln(`  ${c.dim(`next: ${failure.next}`)}  ${c.dim(`trace=${traceId}`)}`);
 }
 
-/** Plain-text form of the error frame — used by tests and snapshot fixtures. */
+/** Plain-text form of the error frame: used by tests and snapshot fixtures. */
 export function workbenchErrorFrameText(failure: {
   what: string;
   next: string;
@@ -171,12 +171,12 @@ export function workbenchErrorFrameText(failure: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// StatusBadge — the shared 8-state TUI status vocabulary
+// StatusBadge: the shared 8-state TUI status vocabulary
 //
 // CLI-TUI-UX.md §11 / DESIGN.md §4.9 lock one universal status vocabulary:
 // 8 states, each rendered as glyph + UPPERCASE label, never colour-only
 // (WCAG 1.4.1). Every TUI list/header status badge renders through this
-// module so the vocabulary cannot drift screen to screen — no more ad hoc
+// module so the vocabulary cannot drift screen to screen: no more ad hoc
 // bracket labels, no more `complete` vs `completed` divergence.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -195,14 +195,14 @@ export type StatusBadgeState =
 interface StatusBadgeToken {
   /** Single-cell glyph from CLI-TUI-UX.md §11. */
   glyph: string;
-  /** Exact UPPERCASE label string — asserted verbatim by parity tests. */
+  /** Exact UPPERCASE label string: asserted verbatim by parity tests. */
   label: string;
   /** Colour function applied to the rendered badge. */
   tone: (s: string) => string;
 }
 
 /**
- * The canonical 8-state table — glyph + label + tone exactly as CLI-TUI-UX.md
+ * The canonical 8-state table: glyph + label + tone exactly as CLI-TUI-UX.md
  * §11 / DESIGN.md §4.9 specify. `running` uses accent, `blocked`/`awaiting`/
  * `degraded` use warn, `failed` uses danger, `cancelled` is muted.
  */
@@ -230,7 +230,7 @@ export const STATUS_BADGE_STATES: readonly StatusBadgeState[] = [
 ];
 
 /**
- * Alias map — folds the many raw status strings the services emit onto the 8
+ * Alias map: folds the many raw status strings the services emit onto the 8
  * canonical states. `succeeded`/`ok`/`passed` → `complete`; `in_progress` →
  * `running`; `error` → `failed`; `archived` → `cancelled`; review/planning
  * lifecycle strings map onto the nearest canonical state. An unmapped string
@@ -286,7 +286,7 @@ export function resolveStatusBadgeState(status: string): StatusBadgeState {
 }
 
 /**
- * Render a status badge — `glyph LABEL`, toned per the canonical table. Every
+ * Render a status badge: `glyph LABEL`, toned per the canonical table. Every
  * TUI status badge in a list row or header renders through this one helper.
  */
 export function renderStatusBadge(status: string): string {
@@ -294,13 +294,13 @@ export function renderStatusBadge(status: string): string {
   return token.tone(`${token.glyph} ${token.label}`);
 }
 
-/** Plain-text `glyph LABEL` form — used by tests and snapshot fixtures. */
+/** Plain-text `glyph LABEL` form: used by tests and snapshot fixtures. */
 export function statusBadgeText(status: string): string {
   const token = STATUS_BADGE_TABLE[resolveStatusBadgeState(status)];
   return `${token.glyph} ${token.label}`;
 }
 
-/** The exact UPPERCASE label for a status — `PENDING`, `RUNNING`, … */
+/** The exact UPPERCASE label for a status: `PENDING`, `RUNNING`, … */
 export function statusBadgeLabel(status: string): string {
   return STATUS_BADGE_TABLE[resolveStatusBadgeState(status)].label;
 }
@@ -351,7 +351,7 @@ export interface RunsControlScreenOptions {
 type RunsOverlay = "none" | "dispatch" | "deps" | "reassign";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RunsControlScreen — the Build stage workbench
+// RunsControlScreen: the Build stage workbench
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class RunsControlScreen {
@@ -420,7 +420,7 @@ export class RunsControlScreen {
       return;
     }
 
-    // Status summary — canonical 8-state vocabulary (CLI-TUI-UX.md §11).
+    // Status summary: canonical 8-state vocabulary (CLI-TUI-UX.md §11).
     const counts = statusCounts(this.runs);
     renderer.writeln(
       `  ${c.dim("PENDING")} ${counts.pending}  ${c.cyan("RUNNING")} ${counts.running}  ${c.green("COMPLETE")} ${counts.complete}  ${c.yellow("BLOCKED")} ${counts.blocked}  ${c.red("FAILED")} ${counts.failed}`,
@@ -428,7 +428,7 @@ export class RunsControlScreen {
     renderer.writeln();
     renderer.writeln(c.bold("  Run list"));
 
-    // Run list — or the shared empty-state contract.
+    // Run list: or the shared empty-state contract.
     if (this.runs.length === 0) {
       renderWorkbenchEmptyState(
         renderer,
@@ -514,7 +514,7 @@ export class RunsControlScreen {
       return true;
     }
 
-    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`) selects a
+    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`) selects a
     // mode on the focused run Step without shadowing the action keys below.
     if (this.modePicker.handleChordKey(key)) return true;
 

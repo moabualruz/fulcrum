@@ -1,5 +1,5 @@
 /**
- * Build · Board stage workbench — the TUI `:board` workbench (DESIGN.md §3.1,
+ * Build · Board stage workbench: the TUI `:board` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `build-board` screen).
  *
  * The Build stage's task-board layout, re-homed under the shared
@@ -173,7 +173,7 @@ export class TaskBoardScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
-    // Step mode picker — the collision-free `m` chord (`m a/p/d/i`). Checked
+    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`). Checked
     // before list nav so an armed selector key is not stolen by h/l/j/k.
     if (this.modePicker.handleChordKey(key)) return true;
 

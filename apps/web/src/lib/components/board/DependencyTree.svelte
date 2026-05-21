@@ -47,7 +47,7 @@
     <div
       data-dependency-blocked
       class={cn("mb-2 rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive")}
-    >Blocked — resolve issues before dispatching.</div>
+    >Blocked: resolve issues before dispatching.</div>
   {/if}
 
   {#if warnings.length > 0}

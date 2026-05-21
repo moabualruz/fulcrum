@@ -1,5 +1,5 @@
 /**
- * Plan stage workbench — the TUI `:plan` workbench (DESIGN.md §3.1,
+ * Plan stage workbench: the TUI `:plan` workbench (DESIGN.md §3.1,
  * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `plan` screen).
  *
  * The Plan stage's planning-sessions surface, re-homed under the shared
@@ -9,12 +9,12 @@
  * sessions, and displays session status with traffic info.
  *
  * Keybindings:
- *   G       — start guided AI Assist session
- *   F       — start freeform planning
- *   R       — refresh state
- *   j/k     — navigate sessions
- *   Enter   — open session detail
- *   q       — go back
+ *   G      : start guided AI Assist session
+ *   F      : start freeform planning
+ *   R      : refresh state
+ *   j/k    : navigate sessions
+ *   Enter  : open session detail
+ *   q      : go back
  */
 
 import type { Renderer } from "../renderer.ts";

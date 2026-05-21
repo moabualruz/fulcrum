@@ -8,10 +8,10 @@
  * object; production has no such global, so the palette reconstructs the same
  * tuple from two live sources:
  *
- *  1. The route — `stageForPath` maps the current pathname to a WorkflowStage,
+ *  1. The route: `stageForPath` maps the current pathname to a WorkflowStage,
  *     and the `/projects/<id>` segment yields the active project id. This is
  *     always available, so the palette is Scope-aware on every route.
- *  2. The active Step — surfaced by a `fulcrum:palette-step-scope` window
+ *  2. The active Step: surfaced by a `fulcrum:palette-step-scope` window
  *     CustomEvent, the same window-event pattern the `mode-affordance-host`
  *     uses for `fulcrum:open-ai-assist`. A Step-bearing surface dispatches it
  *     when a Step gains focus and dispatches a `null`-detail event when the
@@ -50,7 +50,7 @@ export function projectIdFromPath(pathname: string): string | null {
 }
 
 /**
- * Build the route-derived half of the Scope tuple — stage + project + workspace.
+ * Build the route-derived half of the Scope tuple: stage + project + workspace.
  * The Step half is layered on by `withStepScope` once a Step event arrives.
  */
 export function deriveRouteScope(input: RouteScopeInput): PaletteScope {
@@ -69,7 +69,7 @@ export function deriveRouteScope(input: RouteScopeInput): PaletteScope {
 
 /**
  * Merge a Step scope (from the `fulcrum:palette-step-scope` event) onto a
- * route-derived Scope. A `null` step returns the base Scope unchanged — the
+ * route-derived Scope. A `null` step returns the base Scope unchanged: the
  * palette then omits the Step-actions section.
  */
 export function withStepScope(

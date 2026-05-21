@@ -1,8 +1,8 @@
-// MCP registry — shared infrastructure for Wave 2 and Wave 3.
+// MCP registry: shared infrastructure for Wave 2 and Wave 3.
 //
 // Owns a TOML-formatted registry at ~/.fulcrum/state/global/mcp-registry.toml.
 // Provides load/save, register/unregister, enable/disable, and applyToAgents /
-// removeFromAgents — which push entries into each agent's native MCP config.
+// removeFromAgents: which push entries into each agent's native MCP config.
 //
 // The canonical list of managed servers lives in mcp-builtins.ts (BUILTIN_MCPS).
 // DEFAULT_GITHUB_SERVER is re-exported from there for backward compatibility
@@ -37,7 +37,7 @@ export interface McpServerSpec {
   transport: "http" | "stdio";
   /** Present when transport=http */
   url?: string;
-  /** Present when transport=stdio — raw command string. */
+  /** Present when transport=stdio: raw command string. */
   command?: string;
   description: string;
   vendor: string;
@@ -102,7 +102,7 @@ async function writeCodexToml(p: string, body: string): Promise<void> {
   }
 }
 
-// ── TOML serialiser (minimal — no dep needed for our schema) ───────────────
+// ── TOML serialiser (minimal: no dep needed for our schema) ───────────────
 
 function serializeRegistry(reg: Registry): string {
   const lines: string[] = [
@@ -348,7 +348,7 @@ function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, u
     // Per-agent env-interpolation syntax for Authorization Bearer header.
     // Gemini, Claude Code: `${VAR}` form (settings.json interpolation).
     // OpenCode:            `{env:VAR}` form (per opencode.json schema).
-    // Codex doesn't use a `headers` field — it has `bearer_token_env_var`
+    // Codex doesn't use a `headers` field: it has `bearer_token_env_var`
     // emitted by `applyToCodex` in TOML, not here.
     const envVar = server.auth_env_vars.length === 1 ? server.auth_env_vars[0] : null;
     const bearer = (form: "dollar" | "envcurly") =>
@@ -379,7 +379,7 @@ function mcpValueForAgent(server: McpServer, agentId: AgentId): Record<string, u
   const args = parts.slice(1);
   if (agentId === "gemini") return { command: cmd, args };
   // OpenCode `McpLocalConfig.command` is an array of strings (bin + args),
-  // not a single command line. Confirmed against sst/opencode schema —
+  // not a single command line. Confirmed against sst/opencode schema -
   // a string value triggers `Invalid input mcp.<name>` at startup.
   if (agentId === "opencode") return { type: "local", command: [cmd, ...args] };
   if (agentId === "pi") return { command: cmd, args, directTools: piDirectToolsFor(server) };
@@ -681,8 +681,8 @@ async function applyToClaudeCode(server: McpServer, home: string, dryRun = false
       })();
 
   // Wire bearer auth via `--header` for HTTP servers with a declared
-  // env var. claude mcp add does NOT interpolate ${VAR} at runtime — the
-  // header value is stored verbatim — so we expand the env var here.
+  // env var. claude mcp add does NOT interpolate ${VAR} at runtime: the
+  // header value is stored verbatim: so we expand the env var here.
   // Without this step, claude.json gets the URL but no Authorization,
   // and doctor flags `wiring:missing[claude-code]` even after install.
   if (server.transport === "http" && server.auth_env_vars.length === 1) {
@@ -703,7 +703,7 @@ async function applyToClaudeCode(server: McpServer, home: string, dryRun = false
 async function removeFromClaudeCode(server: McpServer, home: string, dryRun = false): Promise<void> {
   if (!(await exists(`${home}/.claude`))) return;
   if (!(await which("claude"))) {
-    console.log(`     · Claude Code ${server.name}: claude not on PATH — manual: claude mcp remove -s user ${server.name}`);
+    console.log(`     · Claude Code ${server.name}: claude not on PATH: manual: claude mcp remove -s user ${server.name}`);
     return;
   }
   const args = ["claude", "mcp", "remove", "-s", "user", server.name];
@@ -746,7 +746,7 @@ export async function applyToAgents(name: string, opts: { dryRun?: boolean; agen
   }
 }
 
-/** Undo applyToAgents — remove from every agent's native MCP config regardless of enabled state. */
+/** Undo applyToAgents: remove from every agent's native MCP config regardless of enabled state. */
 export async function removeFromAgents(
   name: string,
   opts: { dryRun?: boolean; agents?: readonly AgentId[]; includeHidden?: boolean } = {},

@@ -1,4 +1,4 @@
-/** Render TUI state to string lines — pure functions, no terminal I/O. */
+/** Render TUI state to string lines: pure functions, no terminal I/O. */
 
 import type { TuiState } from "./types.ts";
 

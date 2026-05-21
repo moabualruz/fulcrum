@@ -2,7 +2,7 @@
  * Complete `mock.module` factory for `$lib/server/project-api`.
  *
  * Bun's `mock.module` is process-global and freezes a module's *export-name
- * set* on its first registration — a later, fuller mock of the same path
+ * set* on its first registration: a later, fuller mock of the same path
  * cannot add names the first one omitted, and the first mock's *values* win
  * for every later importer. Several route server tests mock this module with
  * only `ensureProjectExists`; whichever test ran first both stripped

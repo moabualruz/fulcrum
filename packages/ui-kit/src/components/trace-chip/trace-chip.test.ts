@@ -46,7 +46,7 @@ describe("TraceChip", () => {
 		expect(body).toContain('data-menu-open="false"');
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		const { body } = render(TraceChipRoot, { props: { traceId: FULL_ID, badge: true } });
 		expect(body).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
 		expect(body).not.toMatch(/\bhsl\(/);

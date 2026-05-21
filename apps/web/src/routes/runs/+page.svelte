@@ -85,7 +85,7 @@
   )}
 >
   <span aria-hidden="true">⏵</span>
-  <span>Open the live Build runs feed — runs feed, transcript, tool-call cards, and inline diffs.</span>
+  <span>Open the live Build runs feed: runs feed, transcript, tool-call cards, and inline diffs.</span>
 </a>
 
 {#await data.streamed.data}

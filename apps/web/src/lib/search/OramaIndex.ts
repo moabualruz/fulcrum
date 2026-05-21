@@ -1,5 +1,5 @@
 /**
- * OramaIndex — client-side Orama full-text search with SSR hydration.
+ * OramaIndex: client-side Orama full-text search with SSR hydration.
  *
  * T-06-15: snapshot is generated per-org server-side; client only receives
  * documents belonging to the authenticated org.
@@ -85,7 +85,7 @@ export class OramaIndex {
     const result = await oramaSearch(this.db, {
       term,
       limit: options.limit ?? 20,
-      // Facets only when requested — avoids cost on plain command palette queries
+      // Facets only when requested: avoids cost on plain command palette queries
       facets: options.facets
         ? { kind: {}, project: {}, status: {} }
         : undefined,

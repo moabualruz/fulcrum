@@ -1,5 +1,5 @@
 /**
- * CLI trace spine — the plain-text counterpart of the `fulcrum.cli.v1` JSON
+ * CLI trace spine: the plain-text counterpart of the `fulcrum.cli.v1` JSON
  * envelope.
  *
  * `DESIGN.md` §4.10 makes the trace identity a *cross-surface* primitive: web
@@ -10,10 +10,10 @@
  * same id.
  *
  * Two surfaces, one identity:
- *  - `formatTraceLine` — the `DESIGN.md` §4.10 plain-text header line
+ *  - `formatTraceLine`: the `DESIGN.md` §4.10 plain-text header line
  *    (`trace: 4f3a1c9e…  run: 01HXYZ…  project: fulcrum`), printed on stdout for
  *    run-bearing commands.
- *  - `formatErrorRecovery` — the `COPY.md` §3 / `CLI-TUI-UX.md` §5 error
+ *  - `formatErrorRecovery`: the `COPY.md` §3 / `CLI-TUI-UX.md` §5 error
  *    template (`[what failed]. [fix]. trace=<id>`), printed on stderr so a
  *    failure carries its recovery action *and* the trace reference.
  *
@@ -24,20 +24,20 @@
 
 import type { EnvelopeError, TraceIdentity } from "./envelope.ts";
 
-/** ANSI dim/reset — applied only when colour is enabled. */
+/** ANSI dim/reset: applied only when colour is enabled. */
 const DIM = "[2m";
 const RESET = "[0m";
 
 /** How many hex chars of `trace_id` / `run_id` the plain header line shows. */
 const ID_PREFIX_LEN = 8;
-/** Ellipsis appended after a truncated id — matches the `DESIGN.md` §4.10 badge. */
+/** Ellipsis appended after a truncated id: matches the `DESIGN.md` §4.10 badge. */
 const ELLIPSIS = "…";
 
 /** Inputs that decide whether ANSI colour is emitted. */
 export interface ColorContext {
-  /** Process env — read for `NO_COLOR`, `FULCRUM_NO_COLOR`, `TERM`. */
+  /** Process env: read for `NO_COLOR`, `FULCRUM_NO_COLOR`, `TERM`. */
   env?: NodeJS.ProcessEnv;
-  /** Raw argv — `--no-color` is honoured when present. */
+  /** Raw argv: `--no-color` is honoured when present. */
   argv?: readonly string[];
   /**
    * Whether the destination stream is a TTY. Non-TTY always disables colour.
@@ -58,7 +58,7 @@ export interface ColorContext {
 export function isColorEnabled(ctx: ColorContext = {}): boolean {
   const env = ctx.env ?? process.env;
   const argv = ctx.argv ?? [];
-  // Non-TTY (pipe, file, CI) never gets colour — auto-detect when unspecified.
+  // Non-TTY (pipe, file, CI) never gets colour: auto-detect when unspecified.
   const isTty = ctx.isTty ?? Boolean(process.stdout.isTTY);
   if (!isTty) return false;
   if (argv.includes("--no-color")) return false;
@@ -69,7 +69,7 @@ export function isColorEnabled(ctx: ColorContext = {}): boolean {
   return true;
 }
 
-/** Apply dim ANSI only when colour is enabled — otherwise return the bare text. */
+/** Apply dim ANSI only when colour is enabled: otherwise return the bare text. */
 function dim(text: string, colour: boolean): string {
   return colour ? `${DIM}${text}${RESET}` : text;
 }
@@ -85,7 +85,7 @@ function shortId(value: string): string {
 
 /** Options for {@link formatTraceLine}. */
 export interface TraceLineOptions extends ColorContext {
-  /** Include `span:<id>` after `run:` — the TUI footer shows span; CLI may too. */
+  /** Include `span:<id>` after `run:`: the TUI footer shows span; CLI may too. */
   withSpan?: boolean;
 }
 
@@ -114,13 +114,13 @@ export function formatTraceLine(identity: TraceIdentity, options: TraceLineOptio
   if (identity.project_id) {
     segments.push(`${dim("project:", colour)} ${identity.project_id}`);
   }
-  // Two spaces between segments — the DESIGN.md §4.10 header spacing.
+  // Two spaces between segments: the DESIGN.md §4.10 header spacing.
   return segments.join("  ");
 }
 
 /** Options for {@link formatErrorRecovery}. */
 export interface ErrorRecoveryOptions extends ColorContext {
-  /** Trace id the failure belongs to — printed as `trace=<id>` for follow-up. */
+  /** Trace id the failure belongs to: printed as `trace=<id>` for follow-up. */
   traceId: string;
 }
 
@@ -131,12 +131,12 @@ export interface ErrorRecoveryOptions extends ColorContext {
  *       Fix: <exact next step>
  *       trace=<id>
  *
- * The pattern is `[what failed]. [why]. [fix]. trace=<id>` — the recovery action
+ * The pattern is `[what failed]. [why]. [fix]. trace=<id>`: the recovery action
  * and the trace reference are mandatory so the failure is followable in web /
  * TUI by the same id. `fix` and `doc` come straight from the envelope error
  * (`CLI-TUI-UX.md` §3.1); when the error names no `fix`, the `Fix:` line is
  * omitted but `trace=` is always present. The full (untruncated) trace id is
- * printed here — it is the value a user copies into `fulcrum trace show`.
+ * printed here: it is the value a user copies into `fulcrum trace show`.
  */
 export function formatErrorRecovery(error: EnvelopeError, options: ErrorRecoveryOptions): string {
   const colour = isColorEnabled(options);
@@ -147,7 +147,7 @@ export function formatErrorRecovery(error: EnvelopeError, options: ErrorRecovery
   if (error.doc) {
     lines.push(`  ${dim("Doc:", colour)} ${error.doc}`);
   }
-  // `trace=<id>` is the COPY.md §3 template tail — always last, always present.
+  // `trace=<id>` is the COPY.md §3 template tail: always last, always present.
   lines.push(`  ${dim(`trace=${options.traceId}`, colour)}`);
   return lines.join("\n");
 }

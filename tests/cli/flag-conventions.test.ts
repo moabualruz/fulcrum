@@ -1,5 +1,5 @@
 /**
- * CLI flag conventions tests — proves `CLI-TUI-UX.md` §2 is codified in the
+ * CLI flag conventions tests: proves `CLI-TUI-UX.md` §2 is codified in the
  * shared `apps/cli/src/lib/flag-conventions.ts` module and enforced.
  *
  * PRD `prd-cli-flag-conventions`. Acceptance:
@@ -10,7 +10,7 @@
  *      secrets in errors or JSON.
  *   4. Help works even after other flags and the JSON envelope stays canonical.
  *
- * `done_mode: json-envelope` — the final test asserts the canonical
+ * `done_mode: json-envelope`: the final test asserts the canonical
  * `fulcrum.cli.v1` envelope is unaffected by global-flag splitting.
  */
 
@@ -42,10 +42,10 @@ import {
 import { emitResult } from "../../apps/cli/src/lib/cli-output.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Acceptance 1 — documented global flags exist with one grammar
+// Acceptance 1: documented global flags exist with one grammar
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("acceptance 1 — documented global flags", () => {
+describe("acceptance 1: documented global flags", () => {
   it("registers every CLI-TUI-UX.md §2 global flag the PRD names", () => {
     for (const flag of ["--help", "--json", "--no-color", "--profile", "--agent", "--all-agents"]) {
       expect(isGlobalFlag(flag)).toBe(true);
@@ -99,10 +99,10 @@ describe("acceptance 1 — documented global flags", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Acceptance 2 — flag > env > config > default precedence
+// Acceptance 2: flag > env > config > default precedence
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("acceptance 2 — config precedence (CLI-TUI-UX.md §2.2)", () => {
+describe("acceptance 2: config precedence (CLI-TUI-UX.md §2.2)", () => {
   it("orders layers flag > env > project > user > system > default", () => {
     expect(PRECEDENCE_ORDER).toEqual([
       "flag",
@@ -158,10 +158,10 @@ describe("acceptance 2 — config precedence (CLI-TUI-UX.md §2.2)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Acceptance 3 — secrets never leak; agent scoping respected
+// Acceptance 3: secrets never leak; agent scoping respected
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("acceptance 3 — secrets handling (CLI-TUI-UX.md §2.1)", () => {
+describe("acceptance 3: secrets handling (CLI-TUI-UX.md §2.1)", () => {
   it("classifies every forbidden secret flag", () => {
     for (const flag of FORBIDDEN_SECRET_FLAGS) {
       expect(isSecretFlag(flag)).toBe(true);
@@ -213,7 +213,7 @@ describe("acceptance 3 — secrets handling (CLI-TUI-UX.md §2.1)", () => {
   });
 
   it("respects --agent scoping as a documented global flag", () => {
-    // Agent scoping is part of the §1.8/§2 global grammar — a command can read
+    // Agent scoping is part of the §1.8/§2 global grammar: a command can read
     // it uniformly via splitGlobalFlags.
     const split = splitGlobalFlags(["set", "key", "value", "--agent", "codex"]);
     expect(split.global).toEqual(["--agent", "codex"]);
@@ -222,10 +222,10 @@ describe("acceptance 3 — secrets handling (CLI-TUI-UX.md §2.1)", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Acceptance 4 — help works after other flags; envelope stays canonical
+// Acceptance 4: help works after other flags; envelope stays canonical
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("acceptance 4 — help after flags + canonical envelope", () => {
+describe("acceptance 4: help after flags + canonical envelope", () => {
   it("wantsHelp detects --help anywhere in argv, even last", () => {
     expect(wantsHelp(["whoami", "--json", "--help"])).toBe(true);
     expect(wantsHelp(["-h"])).toBe(true);

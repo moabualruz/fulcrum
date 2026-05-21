@@ -1,7 +1,7 @@
 /**
  * TUI Settings → i18n screen.
  *
- * WHY: C1 / Q-flag-granularity — i18n feature gated behind
+ * WHY: C1 / Q-flag-granularity: i18n feature gated behind
  * FULCRUM_FEATURES=i18n.  When OFF: screen route hidden; nav attempt renders
  * "Feature disabled" banner.  When ON: locale list rendered; Enter selects →
  * stored via SettingsService → TUI labels re-render from paraglide catalog.
@@ -29,7 +29,7 @@ export interface I18nScreenOptions {
   env?: Record<string, string | undefined>;
 }
 
-/** Render the i18n screen (read-only view — returns state for rendering). */
+/** Render the i18n screen (read-only view: returns state for rendering). */
 export async function renderI18nScreen(
   opts: I18nScreenOptions,
 ): Promise<I18nScreenResult> {

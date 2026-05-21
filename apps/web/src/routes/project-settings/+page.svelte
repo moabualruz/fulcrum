@@ -850,7 +850,7 @@
             bind:value={bulkEstimate}
             class="h-9 rounded-md border border-input bg-background px-2 text-sm"
           >
-            <option value="">—</option>
+            <option value="">-</option>
             {#each effectiveScale() as value (value)}
               <option value={value}>{value}</option>
             {/each}
@@ -879,7 +879,7 @@
               onchange={(event) => setTaskEstimate(task.id, (event.target as HTMLSelectElement).value === "" ? null : Number((event.target as HTMLSelectElement).value))}
               class="h-8 rounded border border-border bg-background px-1 text-xs"
             >
-              <option value="">—</option>
+              <option value="">-</option>
               {#each effectiveScale() as value (value)}
                 <option value={value}>{value}</option>
               {/each}
@@ -965,7 +965,7 @@
               <span data-module-lead-tag={module.id} class="text-xs text-muted-foreground">lead: {module.lead}</span>
             </div>
             <div data-module-progress={module.id} class="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>{module.completed}/{module.total || "—"}</span>
+              <span>{module.completed}/{module.total || "-"}</span>
               <div class="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   data-module-progress-bar={module.id}

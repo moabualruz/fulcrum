@@ -5,7 +5,7 @@
  * registered first wins for every later importer, regardless of which suite is
  * running. Six route server tests mock this module, each with a suite-specific
  * stub. Whichever registered first hijacked the scope resolver for every
- * sibling suite — e.g. `/runs/[id]` (which only mocks
+ * sibling suite: e.g. `/runs/[id]` (which only mocks
  * `$lib/server/application-scope`, relying on the real `requestServiceScope`
  * delegating into it) instead got another suite's `{ em: { kind: "mock-em" } }`
  * and failed with "Run not found" / `em.query is not a function`.
@@ -18,7 +18,7 @@
  *    real `request-service-scope` performs: a dynamic import of
  *    `$lib/server/application-scope` (which itself is the suite's mocked
  *    `application-scope` factory) followed by `requestAppScope`. The real
- *    module is intentionally NOT imported here — a static import of the mocked
+ *    module is intentionally NOT imported here: a static import of the mocked
  *    path resolves back to this factory and recurses forever.
  */
 

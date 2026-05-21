@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 
 // Tests for saas-auth feature flag gate on login page.
 
-describe("/auth/login — _isSaasAuthEnabled()", () => {
+describe("/auth/login: _isSaasAuthEnabled()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
   const origFlag = process.env["FULCRUM_FLAG_SAAS_AUTH"];
 
@@ -82,7 +82,7 @@ describe("/auth/login — _isSaasAuthEnabled()", () => {
         url: new URL("http://localhost/auth/login"),
       });
     } catch {
-      // redirect if session set — won't happen here
+      // redirect if session set: won't happen here
     }
     expect((result as { saasAuthEnabled: boolean }).saasAuthEnabled).toBe(true);
   });

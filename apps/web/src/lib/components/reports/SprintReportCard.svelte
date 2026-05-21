@@ -38,12 +38,12 @@
   }
 
   function fmt(val: number | undefined | null, suffix = ""): string {
-    if (val == null) return "—";
+    if (val == null) return "-";
     return `${val}${suffix}`;
   }
 
   function fmtDate(d: string | null | undefined): string {
-    if (!d) return "—";
+    if (!d) return "-";
     return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -97,7 +97,7 @@
 
     {#if sprint.status !== "completed"}
       <div class={cn("bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-md")}>
-        Sprint in progress — stats are live and not yet frozen.
+        Sprint in progress: stats are live and not yet frozen.
       </div>
     {/if}
 
@@ -176,12 +176,12 @@
                 <td class={cn("px-3 py-2")}>
                   <span class={cn("text-xs px-1.5 py-0.5 rounded bg-muted")}>{task.status}</span>
                 </td>
-                <td class={cn("px-3 py-2 text-right tabular-nums")}>{task.storyPoints ?? "—"}</td>
+                <td class={cn("px-3 py-2 text-right tabular-nums")}>{task.storyPoints ?? "-"}</td>
                 <td class={cn("px-3 py-2 text-xs text-muted-foreground")}>
                   {#if task.statusHistory && task.statusHistory.length > 0}
                     {task.statusHistory.map((h) => `${h.status} ${new Date(h.enteredAt).toLocaleDateString()}`).join(" → ")}
                   {:else}
-                    —
+                    -
                   {/if}
                 </td>
               </tr>

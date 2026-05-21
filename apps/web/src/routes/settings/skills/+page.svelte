@@ -320,7 +320,7 @@
               </td>
               <td data-slot="table-cell" data-skill-version class={cn("p-2 align-middle font-mono text-xs")}>{skill.version}</td>
               <td data-slot="table-cell" class={cn("p-2 align-middle text-muted-foreground")}>{skill.source}</td>
-              <td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{skill.content_hash ?? "—"}</td>
+              <td data-slot="table-cell" class={cn("p-2 align-middle font-mono text-xs text-muted-foreground")}>{skill.content_hash ?? "-"}</td>
               <td data-slot="table-cell" class={cn("p-2 align-middle")}>
                 <div class="flex flex-wrap gap-1">
                   {#each AGENTS as agent (agent)}

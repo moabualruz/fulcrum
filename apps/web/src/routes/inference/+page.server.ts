@@ -129,7 +129,7 @@ export const load: PageServerLoad = () => {
 
 export const actions: Actions = {
   start: async () => {
-    // Spawn sidecar process — stubbed; real impl calls inference CLI
+    // Spawn sidecar process: stubbed; real impl calls inference CLI
     try {
       const { execSync } = await import("node:child_process");
       execSync("fulcrum inference start --detach", { timeout: 5000 });
@@ -156,7 +156,7 @@ export const actions: Actions = {
     const apiUrl = (form.get("api_url") as string | null) ?? "";
     const apiKey = (form.get("api_key") as string | null) ?? "";
     if (!backend) return { success: false, message: "backend required" };
-    // Persist via sidecar API — stubbed until sidecar has /backends/config endpoint
+    // Persist via sidecar API: stubbed until sidecar has /backends/config endpoint
     const payload: Record<string, string> = { backend };
     if (host) payload["host"] = host;
     if (apiUrl) payload["api_url"] = apiUrl;

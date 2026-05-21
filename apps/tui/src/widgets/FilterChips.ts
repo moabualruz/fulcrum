@@ -1,5 +1,5 @@
 /**
- * FilterChips — add/remove facet chips, Tab cycle, Enter apply.
+ * FilterChips: add/remove facet chips, Tab cycle, Enter apply.
  */
 
 import pc from "picocolors";

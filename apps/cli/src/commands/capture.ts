@@ -26,7 +26,7 @@ export interface CaptureQuickActionInput {
   traceId?: string;
 }
 
-/** Freeform intake — `fulcrum capture text|url|file <value>` (`CLI-TUI-UX.md` §1.1). */
+/** Freeform intake: `fulcrum capture text|url|file <value>` (`CLI-TUI-UX.md` §1.1). */
 export interface CaptureIntakeInput {
   kind: CaptureIntakeKind;
   value: string;
@@ -34,14 +34,14 @@ export interface CaptureIntakeInput {
   traceId?: string;
 }
 
-/** Intake-queue triage — `fulcrum capture inbox [--snooze|--accept|--decline] <id>`. */
+/** Intake-queue triage: `fulcrum capture inbox [--snooze|--accept|--decline] <id>`. */
 export interface CaptureInboxInput {
   captureId: string;
   action: CaptureInboxAction;
   traceId?: string;
 }
 
-/** Short-form note intake — `fulcrum capture note new <text>` / `note list`. */
+/** Short-form note intake: `fulcrum capture note new <text>` / `note list`. */
 export interface CaptureNoteCreateInput {
   text: string;
   projectId?: string;
@@ -61,7 +61,7 @@ export interface CaptureCommandResult {
   message: string;
 }
 
-/** Result of an intake / inbox / note write — carries the trace for cross-surface follow. */
+/** Result of an intake / inbox / note write: carries the trace for cross-surface follow. */
 export interface CaptureIntakeResult {
   captureId: string;
   kind: CaptureIntakeKind | "note" | CaptureInboxAction;
@@ -107,7 +107,7 @@ export interface CaptureRunOptions {
 
 const HELP = `fulcrum capture <verb> [options]
 
-Capture stage — intake, triage, and review of mobile/inbox captures
+Capture stage: intake, triage, and review of mobile/inbox captures
 (CLI-TUI-UX.md §1.1).
 
 Usage:
@@ -234,7 +234,7 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
   }
 }
 
-/** `fulcrum capture note <new|list>` — short-form intake (`CLI-TUI-UX.md` §1.1). */
+/** `fulcrum capture note <new|list>`: short-form intake (`CLI-TUI-UX.md` §1.1). */
 async function runNote(
   argv: readonly string[],
   opts: CaptureRunOptions,

@@ -522,12 +522,12 @@ async function runReview(caller: ProductCaller, argv: readonly string[], io: Io)
 }
 
 /**
- * `fulcrum product planning …` — the Plan-stage commands' documented aliases.
+ * `fulcrum product planning …`: the Plan-stage commands' documented aliases.
  *
  * The canonical Plan-stage grammar is `fulcrum plan|mission|prototype <verb>`
  * (`CLI-TUI-UX.md` §1.2, `apps/cli/src/commands/plan-stage.ts`). These
  * `product planning …` verbs are kept working unchanged as compatibility
- * aliases per migration-strategy.md — no Plan command name is removed.
+ * aliases per migration-strategy.md: no Plan command name is removed.
  */
 async function runPlanning(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
   const [sub, ...rest] = argv;

@@ -87,7 +87,7 @@ async function runFulcrum(args: readonly string[], fulcrumHome: string) {
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("auth.run — whoami --json", () => {
+describe("auth.run: whoami --json", () => {
   it("prints JSON with userId, orgId, email, role and exits 0", async () => {
     const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
@@ -207,7 +207,7 @@ describe("auth.run — whoami --json", () => {
   });
 });
 
-describe("root entrypoint — auth", () => {
+describe("root entrypoint: auth", () => {
   it("lists auth in root help", async () => {
     await withFulcrumHome(async (home) => {
       const result = await runFulcrum(["help"], home);
@@ -255,7 +255,7 @@ describe("root entrypoint — auth", () => {
   }, 15_000);
 });
 
-describe("auth.run — invite", () => {
+describe("auth.run: invite", () => {
   it("invite creates an invitation and prints JSON", async () => {
     const { run } = await import("@fulcrum/cli/commands/auth.ts");
 
@@ -276,7 +276,7 @@ describe("auth.run — invite", () => {
   });
 });
 
-describe("auth.run — login / logout not implemented", () => {
+describe("auth.run: login / logout not implemented", () => {
   it("login --non-interactive exits 1", async () => {
     const { run } = await import("@fulcrum/cli/commands/auth.ts");
 

@@ -70,7 +70,7 @@ describe("TUI widgets", () => {
     expect(line).toContain("trace:4f3a1c9e");
     expect(line).toContain("14:02");
     expect(line).toContain(":ai");
-    expect(line).not.toContain("✨");
+    expect(line).not.toContain("⊞");
   });
 
   test("StatusBar never drops a segment in a width-starved terminal", () => {
@@ -87,7 +87,7 @@ describe("TUI widgets", () => {
     });
     const line = stripAnsi(status.render());
     expectWithinWidth(line, 120);
-    // CLI-TUI-UX §8: the footer never collapses — every segment stays present,
+    // CLI-TUI-UX §8: the footer never collapses: every segment stays present,
     // only the long agent value is ellipsized.
     expect(line).toContain("BUILD");
     expect(line).toContain("profile:");
@@ -235,25 +235,25 @@ describe("TUI widgets", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-step-modepicker-006 — the shared TUI per-Step ModePicker row.
+// prd-tui-step-modepicker-006: the shared TUI per-Step ModePicker row.
 //
 // Every Step-bearing TUI screen (runs / review / board / artifacts / doctor)
-// renders one ModePicker row exposing the four canonical modes — ✋ Manual /
-// ▶ Play / 💬 Discuss / ⊞ AI Assist — the same action set as the web
+// renders one ModePicker row exposing the four canonical modes: ✋ Manual /
+// ▶ Play / 💬 Discuss / ⊞ AI Assist: the same action set as the web
 // `@fulcrum/ui-kit` `ModeRow` primitive. The modes are reached through a
 // collision-free `m` chord so they never shadow the palette (`:`), help (`?`),
 // or navigation chords. These snapshot tests lock the row labels + key hints.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("ModePicker — TUI per-Step mode affordance row", () => {
+describe("ModePicker: TUI per-Step mode affordance row", () => {
   test("snapshot: the compact row renders all four mode labels + `m`-chord hints", () => {
     const line = stripAnsi(new ModePicker({ stepId: "run" }).render());
-    // Mode labels — copy_assertion: Manual / Play / Discuss / AI Assist.
+    // Mode labels: copy_assertion: Manual / Play / Discuss / AI Assist.
     expect(line).toContain("✋ Manual");
     expect(line).toContain("▶ Play");
     expect(line).toContain("💬 Discuss");
     expect(line).toContain("⊞ AI Assist");
-    // Key hints — every mode shows its full `m`-chord keybinding.
+    // Key hints: every mode shows its full `m`-chord keybinding.
     expect(line).toContain("[m a]");
     expect(line).toContain("[m p]");
     expect(line).toContain("[m d]");

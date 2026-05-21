@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * WorkloadChart.svelte — Per-assignee stacked bar chart (workflow milestone, D-48).
+   * WorkloadChart.svelte: Per-assignee stacked bar chart (workflow milestone, D-48).
    *
    * Shows task count per assignee broken down by status category.
    * Helps identify who's overloaded vs underutilized.

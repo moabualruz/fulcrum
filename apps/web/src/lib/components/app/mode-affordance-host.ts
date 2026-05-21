@@ -4,8 +4,8 @@
  * The shared web host for the universal per-Step ModeAffordance row
  * (DESIGN.md §4.11, §4.13; apps/web/CONTEXT.md "ModeAffordance").
  *
- * Every Step — a task card, doc block, review item, artifact row, subsystem
- * row, audit row — carries one ModeAffordance: the `✋ Manual / ▶ Play /
+ * Every Step: a task card, doc block, review item, artifact row, subsystem
+ * row, audit row: carries one ModeAffordance: the `✋ Manual / ▶ Play /
  * 💬 Discuss / ⊞ AI Assist` row rendered by the `@fulcrum/ui-kit` `ModeRow`
  * primitive. Before this module each Step-bearing route hand-wired its own
  * `ModeRow` props, glyphs, density choice, and `⊞` click handler, so the
@@ -19,14 +19,14 @@
  *  2. produces the stable `data-*` hooks a Step row MUST carry so the design
  *     gate can prove the affordance is present (`data-mode-affordance`,
  *     `data-mode-step-kind`, `data-mode-step-id`);
- *  3. owns the four mode actions — Manual selects in place, Play opens the
+ *  3. owns the four mode actions: Manual selects in place, Play opens the
  *     agent mode picker, Discuss opens the step thread, AI Assist opens the
  *     ONE shell `AcpDrawer` scoped to the Step via the `fulcrum:open-ai-assist`
  *     window event (the same event the StatusFooter AI Assist segment and the
- *     `⌘/` chord dispatch — one drawer, many entry points).
+ *     `⌘/` chord dispatch: one drawer, many entry points).
  *
  * It re-exports the `ModeRow` primitive and its `WorkflowMode` vocabulary so a
- * route imports the affordance from one host module, never the bare primitive —
+ * route imports the affordance from one host module, never the bare primitive -
  * keeping the `@fulcrum/ui-kit` "one primitive source" rule and the universal
  * coverage gate honest at the same time.
  */
@@ -61,7 +61,7 @@ export type StepKind =
 
 /**
  * The canonical mode-affordance label (DESIGN.md §4.13). The labels are LOCKED
- * copy — `prd-cross-copy-lock` and the design gate assert these exact strings.
+ * copy: `prd-cross-copy-lock` and the design gate assert these exact strings.
  */
 export const MODE_AFFORDANCE_LABELS: Record<"manual" | "play" | "discuss" | "assist", string> = {
 	manual: "Manual",
@@ -75,9 +75,9 @@ export const MODE_AFFORDANCE_TOOLBAR_LABEL = "Step modes";
 
 /**
  * Which `ModeRow` density a Step kind renders in (DESIGN.md §4.13):
- *  - `compact` — dense board cards / timeline lanes (icon-only, 24×24);
- *  - `tight`   — settings + doc surfaces where Manual/Assist would be noise;
- *  - `long`    — everything else: per-row primary affordance with labels.
+ *  - `compact`: dense board cards / timeline lanes (icon-only, 24×24);
+ *  - `tight`  : settings + doc surfaces where Manual/Assist would be noise;
+ *  - `long`   : everything else: per-row primary affordance with labels.
  */
 const STEP_KIND_DENSITY: Record<StepKind, ModeRowDensity> = {
 	"task-card": "compact",
@@ -96,7 +96,7 @@ export function densityForStepKind(kind: StepKind): ModeRowDensity {
 }
 
 /**
- * The scope a ModeAffordance action carries — the `(stage, stepId, traceId)`
+ * The scope a ModeAffordance action carries: the `(stage, stepId, traceId)`
  * tuple the AI Assist drawer and the agent picker bind to (apps/web/CONTEXT.md
  * "Scope"). `stepId` is the addressable Step id; `traceId` ties an opened
  * drawer or run to the trace spine (DESIGN.md §4.10).
@@ -104,7 +104,7 @@ export function densityForStepKind(kind: StepKind): ModeRowDensity {
 export interface ModeStepScope {
 	/** The Step's stable addressable id (e.g. `AUTH-42`, `doc_8f29`). */
 	stepId: string;
-	/** The Step kind — selects density, labels `data-mode-step-kind`. */
+	/** The Step kind: selects density, labels `data-mode-step-kind`. */
 	kind: StepKind;
 	/** Optional trace id the AI Assist session / run should join. */
 	traceId?: string;
@@ -124,7 +124,7 @@ export interface ModeAssistDetail {
  * The stable `data-*` hook set every Step row MUST spread so the design gate
  * (`mode-affordance.spec.ts`) can prove the affordance is present. A Step list
  * or card row that omits `data-mode-affordance` fails the universal-coverage
- * gate — that is the PRD acceptance "design tests fail if a Step row lacks mode
+ * gate: that is the PRD acceptance "design tests fail if a Step row lacks mode
  * affordance data hooks".
  */
 export interface ModeAffordanceHooks {
@@ -160,17 +160,17 @@ export interface ModeRowBinding {
 
 /** Handlers a route can supply to override the default mode actions. */
 export interface ModeActionHandlers {
-	/** Manual — work the Step yourself. Default: no-op (selection only). */
+	/** Manual: work the Step yourself. Default: no-op (selection only). */
 	onManual?: (scope: ModeStepScope) => void;
-	/** Play — hand off to an AI agent. Default: dispatch the mode-picker event. */
+	/** Play: hand off to an AI agent. Default: dispatch the mode-picker event. */
 	onPlay?: (scope: ModeStepScope) => void;
-	/** Discuss — open the Step's comment thread. Default: dispatch the thread event. */
+	/** Discuss: open the Step's comment thread. Default: dispatch the thread event. */
 	onDiscuss?: (scope: ModeStepScope) => void;
-	/** AI Assist — open the shell drawer scoped to the Step. Default: `fulcrum:open-ai-assist`. */
+	/** AI Assist: open the shell drawer scoped to the Step. Default: `fulcrum:open-ai-assist`. */
 	onAssist?: (scope: ModeStepScope) => void;
 }
 
-/** Dispatch a window CustomEvent — guarded for SSR (no `window` on the server). */
+/** Dispatch a window CustomEvent: guarded for SSR (no `window` on the server). */
 function dispatch(name: string, detail: unknown): void {
 	if (typeof window === "undefined") return;
 	window.dispatchEvent(new CustomEvent(name, { detail }));
@@ -179,7 +179,7 @@ function dispatch(name: string, detail: unknown): void {
 /**
  * The default AI Assist action: open the ONE shell `AcpDrawer` scoped to the
  * Step. Identical entry point to the StatusFooter AI Assist segment and the
- * `⌘/` chord — `fulcrum:open-ai-assist` — but carrying a Step scope detail so
+ * `⌘/` chord: `fulcrum:open-ai-assist`: but carrying a Step scope detail so
  * the drawer can bind its session to the Step + trace.
  */
 export function openAssistForStep(scope: ModeStepScope): void {

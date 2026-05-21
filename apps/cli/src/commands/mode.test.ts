@@ -18,11 +18,11 @@ function capture() {
 }
 
 /**
- * fulcrum mode — the CLI side of the universal Step ModeAffordance
+ * fulcrum mode: the CLI side of the universal Step ModeAffordance
  * (`prd-web-mode-affordance-system`, DESIGN.md §4.13, CLI-TUI-UX.md §1).
  */
-describe("fulcrum mode — per-step mode affordance verbs", () => {
-  test("exposes one verb per canonical mode — manual / play / discuss / ai", () => {
+describe("fulcrum mode: per-step mode affordance verbs", () => {
+  test("exposes one verb per canonical mode: manual / play / discuss / ai", () => {
     expect(MODE_VERBS).toEqual(["manual", "play", "discuss", "ai"]);
     expect(MODE_AFFORDANCES.map((m) => m.label)).toEqual([
       "Manual",

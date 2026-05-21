@@ -17,7 +17,7 @@
 </svelte:head>
 
 <!--
-	Root `/` with no active project — the portfolio Dashboard PortfolioSurface
+	Root `/` with no active project: the portfolio Dashboard PortfolioSurface
 	(`prd-web-root-default-screen`, IA-MAP §3, `apps/web/CONTEXT.md`
 	PortfolioSurface). With an active project the server `load` redirects to
 	that project's Capture stage workbench instead; this surface only renders
@@ -26,7 +26,7 @@
 	This replaces the retired metric-dashboard root (`00-executive-review.md`
 	failure 5): there is no `<h1>Dashboard</h1>` over four zero-metric cards.
 	The OD `desktop-shell.html` `.canvas-rep` shape is a hero row + a dense
-	card grid — a portfolio landing, not a metric report. The run counts, sync
+	card grid: a portfolio landing, not a metric report. The run counts, sync
 	(inbox) status, project tiles, and recent runs/docs/tasks the old root
 	carried are re-homed here as a workspace overview, not deleted
 	(`migration-strategy.md` value-preservation item 4).
@@ -35,7 +35,7 @@
 	<header data-slot="portfolio-hero" class="grid gap-1">
 		<h1 class="text-lg font-semibold text-fg">Portfolio</h1>
 		<p class="text-sm text-fg-subtle">
-			No project is in scope — pick a project to enter its workflow stages, or review the
+			No project is in scope: pick a project to enter its workflow stages, or review the
 			workspace below.
 		</p>
 	</header>
@@ -45,7 +45,7 @@
 	{:then dashboard}
 		{@const payload = dashboard as DashboardPayload}
 		<!--
-			Workspace overview — the run counts re-homed from the retired metric
+			Workspace overview: the run counts re-homed from the retired metric
 			dashboard, now a Scope summary rather than the page's identity.
 			Composed from the `@fulcrum/ui-kit` `Stat` primitive (AGENTS.md
 			ui-kit rule), not hand-rolled MetricCards.

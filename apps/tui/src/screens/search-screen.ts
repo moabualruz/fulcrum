@@ -1,8 +1,8 @@
-// @ts-nocheck — new file, type fixes deferred to gate review
+// @ts-nocheck: new file, type fixes deferred to gate review
 /**
  * TUI full-screen search with optional semantic toggle.
  *
- * WHY: Q17 / C1 — FTS is always-on; hybrid BM25+cosine (embeddings) gated
+ * WHY: Q17 / C1: FTS is always-on; hybrid BM25+cosine (embeddings) gated
  * behind FULCRUM_FEATURES=embeddings.  When OFF: "Semantic" toggle chip
  * hidden, all queries use mode='fts'.  When ON: chip visible; selecting
  * toggles mode to 'hybrid'.

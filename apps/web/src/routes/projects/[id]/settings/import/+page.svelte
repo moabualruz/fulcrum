@@ -252,7 +252,7 @@
         {/each}
       </div>
     {:else}
-      <p class={cn("text-sm text-muted-foreground")}>No fields to map (non-CSV source — auto-mapped).</p>
+      <p class={cn("text-sm text-muted-foreground")}>No fields to map (non-CSV source: auto-mapped).</p>
     {/if}
 
     <div class={cn("flex gap-2 justify-between mt-2")}>

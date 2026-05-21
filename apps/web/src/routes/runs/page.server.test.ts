@@ -6,7 +6,7 @@ import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 // The `/runs` route resolves its data through `requestServiceScope` and then
 // `loadRunsPageData`, which mixes raw-SQL run queries with TypeORM entity
 // queries (`listOpenTaskOptions` → `em.find(Task, ...)`). It therefore needs a
-// real TypeORM EntityManager — not a raw product-store handle. This test seeds
+// real TypeORM EntityManager: not a raw product-store handle. This test seeds
 // a TypeORM-backed store and mocks the scope to return its EntityManager.
 
 let orm: TestOrm | null = null;

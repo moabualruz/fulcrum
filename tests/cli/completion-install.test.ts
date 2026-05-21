@@ -5,7 +5,7 @@ import { run as runRoot } from "../../apps/cli/src/index.ts";
 import { isCanonicalEnvelope } from "../../apps/cli/src/lib/envelope.ts";
 
 /**
- * `fulcrum completion <shell>` — CLI completion install (`CLI-TUI-UX.md` §4).
+ * `fulcrum completion <shell>`: CLI completion install (`CLI-TUI-UX.md` §4).
  *
  * Covers the `prd-cli-completion-install` acceptance contract:
  *  - bash|zsh|fish|powershell each emit a shell-specific completion script;
@@ -64,7 +64,7 @@ const SHELL_SIGNATURE: Record<(typeof COMPLETION_SHELLS)[number], string> = {
   powershell: "Register-ArgumentCompleter",
 };
 
-describe("fulcrum completion — shell-specific scripts", () => {
+describe("fulcrum completion: shell-specific scripts", () => {
   for (const shell of COMPLETION_SHELLS) {
     test(`completion ${shell} emits a ${shell}-specific script with install guidance`, async () => {
       const { stdout, exitCode } = await captureCompletion([shell]);
@@ -73,7 +73,7 @@ describe("fulcrum completion — shell-specific scripts", () => {
       // Acceptance: CLI-TUI-UX.md §4 install-guidance header is printed.
       expect(stdout).toContain(`# Fulcrum ${shell} completion`);
       expect(stdout).toContain(`fulcrum completion ${shell}`);
-      // Success: no error exit code (0 / undefined — bun may default it to 0).
+      // Success: no error exit code (0 / undefined: bun may default it to 0).
       expect(exitCode ?? 0).toBe(0);
     });
   }
@@ -102,12 +102,12 @@ describe("fulcrum completion --json envelope", () => {
     expect(envelope.result.shell).toBe("zsh");
     expect(envelope.result.script).toContain("#compdef fulcrum");
     expect(Array.isArray(envelope.result.install)).toBe(true);
-    // Success: no error exit code (0 / undefined — bun may default it to 0).
+    // Success: no error exit code (0 / undefined: bun may default it to 0).
     expect(exitCode ?? 0).toBe(0);
   });
 });
 
-describe("fulcrum completion — unsupported shell", () => {
+describe("fulcrum completion: unsupported shell", () => {
   test("unsupported shell --json returns the canonical fulcrum.cli.v1 error envelope", async () => {
     const { stdout, exitCode } = await captureCompletion(["powersh", "--json"]);
     const envelope = JSON.parse(stdout.trim());
@@ -148,7 +148,7 @@ describe("fulcrum completion --help", () => {
   });
 });
 
-describe("fulcrum completion — consumed-by the root dispatcher", () => {
+describe("fulcrum completion: consumed-by the root dispatcher", () => {
   test("root `completion` command dispatches to the completion module", async () => {
     let stdout = "";
     const restore = process.stdout.write;

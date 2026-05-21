@@ -1,24 +1,24 @@
 <script lang="ts">
   /**
-   * System · Settings — the OD `settings.html` surface.
+   * System · Settings: the OD `settings.html` surface.
    *
    * The workspace-scoped settings surface (`IA-MAP.md §"System (workspace
    * scope)"`, canonical route `/settings`): a sticky section-nav rail plus
-   * nine stacked panels — General, Appearance, Keyboard, Privacy & safety,
-   * AI agents, Default routes, Integrations, Account, Danger zone — matching
+   * nine stacked panels: General, Appearance, Keyboard, Privacy & safety,
+   * AI agents, Default routes, Integrations, Account, Danger zone: matching
    * the OD `settings.html` IA anchors `#general · #appearance · #keyboard ·
    * #privacy · #agents · #routes · #integrations · #account · #danger`
    * (`IA-MAP.md §3` line 280). Every panel header carries the universal tight
-   * mode affordance row (`DESIGN.md §4.13` — `▶ Suggest / 💬 Discuss` only on
+   * mode affordance row (`DESIGN.md §4.13`: `▶ Suggest / 💬 Discuss` only on
    * settings rows). Section labels are copy-locked against IA-MAP/COPY.md.
    *
-   * Composes `@fulcrum/ui-kit` primitives only — Avatar / Badge / Button /
-   * Input / Kbd / Switch / AlertDialog — plus the shared `mode-affordance-host`
+   * Composes `@fulcrum/ui-kit` primitives only: Avatar / Badge / Button /
+   * Input / Kbd / Switch / AlertDialog: plus the shared `mode-affordance-host`
    * ModeRow. No route-local re-implementations of a ui-kit primitive.
    *
    * Value preservation (`migration-strategy.md` checklist): the pre-existing
    * `/settings/*` sub-routes (theme, routing, connectors, api, flags, secrets,
-   * …) are NOT removed — they remain reachable as deep links from the relevant
+   * …) are NOT removed: they remain reachable as deep links from the relevant
    * panels, so every old path still resolves and no feature is lost. Safe
    * edits still persist to `localStorage`.
    */
@@ -96,7 +96,7 @@
 
   type SectionId = (typeof navSections)[number]["id"];
 
-  /** Deep links into the pre-existing `/settings/*` sub-routes — value preservation. */
+  /** Deep links into the pre-existing `/settings/*` sub-routes: value preservation. */
   const subRouteLinks: Partial<Record<SectionId, { href: string; label: string }[]>> = {
     appearance: [{ href: "/settings/theme", label: "Theme & display defaults" }],
     routes: [{ href: "/settings/routing", label: "Advanced routing rules & dry-run" }],
@@ -112,7 +112,7 @@
 
   type AgentHealth = "ready" | "paused" | "failing";
 
-  /** Configured CLI agents — OD `#agents` panel registry. */
+  /** Configured CLI agents: OD `#agents` panel registry. */
   const agents: ReadonlyArray<{
     id: string;
     initials: string;
@@ -130,7 +130,7 @@
     { id: "gpt-5.4", initials: "GP", name: "GPT-5.4", client: "codex", status: "ready", latency: "210ms", mcp: 4, plugins: 6, ring: "stable", isDefault: false },
     { id: "gemini-3-pro", initials: "GE", name: "Gemini 3 Pro", client: "gemini-cli", status: "ready", latency: "124ms", mcp: 5, plugins: 3, ring: "stable", isDefault: false },
     { id: "opencode-llama-3", initials: "OC", name: "OpenCode · Llama-3 70B", client: "opencode", status: "ready", latency: "305ms", mcp: 3, plugins: 0, ring: "experimental", isDefault: false },
-    { id: "pi-cli-mistral", initials: "PI", name: "pi-cli · Mistral Large", client: "pi-cli", status: "paused", latency: "—", mcp: 2, plugins: 0, ring: "experimental", isDefault: false },
+    { id: "pi-cli-mistral", initials: "PI", name: "pi-cli · Mistral Large", client: "pi-cli", status: "paused", latency: "-", mcp: 2, plugins: 0, ring: "experimental", isDefault: false },
     { id: "codex-gpt-4o", initials: "CX", name: "Codex · GPT-4o", client: "codex", status: "failing", latency: "540ms", mcp: 4, plugins: 6, ring: "stable", isDefault: false },
   ];
 
@@ -140,14 +140,14 @@
     failing: "text-destructive",
   };
 
-  /** Default-route rules — OD `#routes` action-kind → agent table. */
+  /** Default-route rules: OD `#routes` action-kind → agent table. */
   const routeRules = [
     { action: "plan.draft", agent: "Claude Opus 4.7", initials: "CL", why: "high-context planning" },
-    { action: "plan.refactor", agent: "Claude Opus 4.7", initials: "CL", why: "—" },
+    { action: "plan.refactor", agent: "Claude Opus 4.7", initials: "CL", why: "-" },
     { action: "build.run.step", agent: "Claude Sonnet 4.6", initials: "CL", why: "fast iteration" },
-    { action: "build.test.write", agent: "GPT-5.4", initials: "GP", why: "—" },
+    { action: "build.test.write", agent: "GPT-5.4", initials: "GP", why: "-" },
     { action: "review.suggest", agent: "Gemini 3 Pro", initials: "GE", why: "second opinion" },
-    { action: "ship.changelog", agent: "Claude Sonnet 4.6", initials: "CL", why: "—" },
+    { action: "ship.changelog", agent: "Claude Sonnet 4.6", initials: "CL", why: "-" },
     { action: "operate.probe", agent: "OpenCode · Llama-3", initials: "OC", why: "local only · no cloud calls" },
   ] as const;
 
@@ -159,12 +159,12 @@
 
   /**
    * The signed-in operator's settings permission. A `member` cannot mutate the
-   * Danger zone — the panel renders a read-only permission notice instead.
+   * Danger zone: the panel renders a read-only permission notice instead.
    * Resolved from the `permission` query param for the design-e2e permission
    * state.
    */
   let canAdminister = $state(true);
-  /** True when the workspace has no configured CLI agents — OD empty state. */
+  /** True when the workspace has no configured CLI agents: OD empty state. */
   let agentsEmpty = $state(false);
 
   let draft = $state<SettingsDraft>({ ...defaultDraft });
@@ -244,7 +244,7 @@
   }
 
   function deleteWorkspace(): void {
-    // Destructive action stub — the AlertDialog confirmation is the gate the
+    // Destructive action stub: the AlertDialog confirmation is the gate the
     // PRD interaction assertion proves. Wiring to the platform mutation lands
     // with the operate-stage workbench PRD.
     savedAt = null;
@@ -616,7 +616,7 @@
 
           <div class="px-4.5 py-3.5">
             <p class="type-caption mb-3.5 text-muted-foreground">
-              Connect any number of CLI agents — Claude Code, Codex, Gemini, OpenCode, pi-cli, or anything that
+              Connect any number of CLI agents: Claude Code, Codex, Gemini, OpenCode, pi-cli, or anything that
               speaks the agent protocol. Each agent runs locally with its own MCP server set and plugin selection.
               Use the picker in any chat to pick one for that thread; use
               <a href="#routes" class="text-primary hover:underline" onclick={(e) => { e.preventDefault(); selectSection("routes"); }}>Default routes</a>
@@ -832,7 +832,7 @@
             <div data-settings-danger-permission class="px-4.5 py-6">
               <p class="type-body font-medium">Workspace owner permission required.</p>
               <p class="type-caption mt-1 text-muted-foreground">
-                Destructive actions — reset local state, delete workspace — are restricted to the workspace owner.
+                Destructive actions: reset local state, delete workspace: are restricted to the workspace owner.
                 Ask an owner to make these changes.
               </p>
             </div>

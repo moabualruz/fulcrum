@@ -1,5 +1,5 @@
 /**
- * Global widgets TDD tests — P15#02.
+ * Global widgets TDD tests: P15#02.
  *
  * RED phase: all tests written against not-yet-existing widget implementations.
  * Covers: Palette, VirtualList, StatusBar, HelpOverlay, FilterChips, AsciiChart, wcwidth truncate.
@@ -147,7 +147,7 @@ describe("StatusFooter (StatusBarWidget)", () => {
       mcpHealth: "7/7",
       traceId: "4f3a1c9e8b2d4a6f",
       time: "14:02",
-      // Wide enough that no segment is ellipsized — this test exercises the
+      // Wide enough that no segment is ellipsized: this test exercises the
       // full segment set; the width-starved ellipsis path has its own test.
       width: 160,
     });
@@ -426,7 +426,7 @@ import {
 } from "@fulcrum/tui/keybindings.ts";
 
 /**
- * In-memory clipboard recorder — a real `TraceYankClipboard` sink (dependency
+ * In-memory clipboard recorder: a real `TraceYankClipboard` sink (dependency
  * injection, not a production mock) so a FakeTTY test can assert the exact
  * payload the yank wrote.
  */
@@ -482,7 +482,7 @@ describe("TraceYank (y t / y r / y s / y p clipboard)", () => {
       clip,
     );
     // The yank reads straight from the same `copyKeybinds()` the footer
-    // renders — trace/run/span can never drift from the footer segments.
+    // renders: trace/run/span can never drift from the footer segments.
     const footerKeybinds = footer.copyKeybinds();
     expect(yank.yank("t")?.value).toBe(footerKeybinds["y t"]);
     expect(yank.yank("r")?.value).toBe(footerKeybinds["y r"]);
@@ -556,7 +556,7 @@ describe("TraceYank (y t / y r / y s / y p clipboard)", () => {
     for (const key of Object.keys(TRACE_YANK_CHORDS)) {
       expect(traceYankCollides(key)).toBe(false);
     }
-    // The reserved keys themselves still register as collisions — proves the
+    // The reserved keys themselves still register as collisions: proves the
     // guard is load-bearing, not vacuously true.
     for (const reserved of ["j", "k", "o", "c", "e", "x", "V", "g"]) {
       expect(traceYankCollides(reserved)).toBe(true);
@@ -576,7 +576,7 @@ describe("TraceYank (y t / y r / y s / y p clipboard)", () => {
     // Not a yank second-key.
     expect(yank.isYankKey("z")).toBe(false);
     expect(yank.yank("z")).toBeNull();
-    // No active span / run / project — nothing to copy, clipboard untouched.
+    // No active span / run / project: nothing to copy, clipboard untouched.
     expect(yank.yank("s")).toBeNull();
     expect(yank.yank("r")).toBeNull();
     expect(yank.yank("p")).toBeNull();

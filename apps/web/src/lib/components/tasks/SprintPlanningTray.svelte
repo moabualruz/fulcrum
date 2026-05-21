@@ -14,7 +14,7 @@
     projectId: string;
     orgId?: string;
     sprintId: string;
-    /** All tasks — tray shows ones with no sprint assigned */
+    /** All tasks: tray shows ones with no sprint assigned */
     allTasks: TaskCardTask[];
     onAssign: (taskId: string) => Promise<void>;
   }
@@ -76,7 +76,7 @@
 
   async function handleDndFinalize(e: CustomEvent<DndEvent<TaskCardTask>>) {
     trayItems = e.detail.items;
-    // Nothing dropped from tray to here — handled by board
+    // Nothing dropped from tray to here: handled by board
   }
 
   // When a task is dragged OUT of the tray to the board, the board calls onAssign

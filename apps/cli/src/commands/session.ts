@@ -1,5 +1,5 @@
 /**
- * `fulcrum session <verb>` — pause / resume / abort / checkpoint / restore /
+ * `fulcrum session <verb>`: pause / resume / abort / checkpoint / restore /
  * checkpoints / list / watch.
  *
  * Verbs delegate to the in-process AcpSessionRepository + AcpSessionManager
@@ -23,7 +23,7 @@ import { emitResult } from "../lib/cli-output.ts";
 
 export const CLI_ENVELOPE_KIND = "fulcrum.cli.v1" as const;
 
-export const SESSION_HELP = `fulcrum session — persisted AI Assist sessions
+export const SESSION_HELP = `fulcrum session: persisted AI Assist sessions
 
 Usage:
   fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch> [--json] [--no-spawn]

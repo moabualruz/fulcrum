@@ -88,7 +88,7 @@ describe("/settings/flags load", () => {
   });
 
   test("fails soft with fallback flags when the feature flag API is unreachable", async () => {
-    // `load` no longer throws when the API is down — it degrades gracefully,
+    // `load` no longer throws when the API is down: it degrades gracefully,
     // returning a fallback flag set plus a `loadError` banner string that
     // points the operator at /settings/api. The route stays usable instead
     // of erroring the whole page.

@@ -1,5 +1,5 @@
 /**
- * Orama search benchmark — validates <100ms at 10k documents.
+ * Orama search benchmark: validates <100ms at 10k documents.
  *
  * Run: cd apps/web && bun run src/lib/search/orama.bench.ts
  */
@@ -55,12 +55,12 @@ async function bench() {
     const avg = times.reduce((a, b) => a + b, 0) / times.length;
     const max = Math.max(...times);
     allMs.push(...times);
-    console.log(`  "${q}" — avg ${avg.toFixed(2)}ms, max ${max.toFixed(2)}ms`);
+    console.log(`  "${q}": avg ${avg.toFixed(2)}ms, max ${max.toFixed(2)}ms`);
   }
 
   const overallAvg = allMs.reduce((a, b) => a + b, 0) / allMs.length;
   const overallMax = Math.max(...allMs);
-  console.log(`\nOverall — avg ${overallAvg.toFixed(2)}ms, max ${overallMax.toFixed(2)}ms`);
+  console.log(`\nOverall: avg ${overallAvg.toFixed(2)}ms, max ${overallMax.toFixed(2)}ms`);
 
   // Assert < 100ms
   if (overallMax >= 100) {

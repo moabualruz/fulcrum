@@ -59,7 +59,7 @@ let profilePayload = () => ({
   tasks: [],
 });
 
-// Only `agent-profile-pages.ts` is mocked — the `/agents` route imports
+// Only `agent-profile-pages.ts` is mocked: the `/agents` route imports
 // `listAgentProfilesPageData` / `testProfile` from it, and the stub below
 // carries that module's complete export set. The underlying
 // `agents/queries.ts` is intentionally NOT mocked: `mock.module` is

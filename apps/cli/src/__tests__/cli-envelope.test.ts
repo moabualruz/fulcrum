@@ -1,8 +1,8 @@
 /**
  * Canonical `fulcrum.cli.v1` envelope contract test.
  *
- * Proves that real CLI commands — one representative per implemented workflow
- * stage — emit the canonical JSON envelope defined in `CLI-TUI-UX.md` §3, with
+ * Proves that real CLI commands: one representative per implemented workflow
+ * stage: emit the canonical JSON envelope defined in `CLI-TUI-UX.md` §3, with
  * exactly the twelve documented keys and the array invariants on `errors` and
  * `next_actions`. Also exercises the streaming JSONL contract, the `--jq`
  * `.result` filter, and the one-release `--json-raw` compatibility shape.
@@ -44,7 +44,7 @@ const CANONICAL_KEYS = [
 function expectCanonicalEnvelope(parsed: unknown, command: string): Record<string, unknown> {
   expect(typeof parsed === "object" && parsed !== null).toBe(true);
   const envelope = parsed as Record<string, unknown>;
-  // Exactly the CLI-TUI-UX §3 keys — no more, no fewer.
+  // Exactly the CLI-TUI-UX §3 keys: no more, no fewer.
   expect(Object.keys(envelope).sort()).toEqual([...CANONICAL_KEYS].sort());
   expect(envelope["schema"]).toBe(ENVELOPE_SCHEMA);
   expect(envelope["command"]).toBe(command);
@@ -127,7 +127,7 @@ function runsCaller() {
 }
 
 describe("canonical fulcrum.cli.v1 JSON envelope", () => {
-  test("Capture stage — `fulcrum capture status --json` emits the canonical envelope", async () => {
+  test("Capture stage: `fulcrum capture status --json` emits the canonical envelope", async () => {
     const io = captureLines();
     await runCapture(["status", "cap-1", "--status", "approved", "--json"], {
       caller: captureCaller(),
@@ -144,7 +144,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
     expect(envelope["trace_id"]).toBe("abcdef0123456789abcdef0123456789");
   });
 
-  test("Build stage — `fulcrum runs list --json` emits the canonical envelope", async () => {
+  test("Build stage: `fulcrum runs list --json` emits the canonical envelope", async () => {
     const io = captureLines();
     await runPillar14Command("runs", ["list", "--json"], { caller: runsCaller(), ...io.opts });
 
@@ -156,7 +156,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
     expect(io.exitCode).toBeUndefined();
   });
 
-  test("Operate stage — `fulcrum audit query --json` emits the canonical envelope", async () => {
+  test("Operate stage: `fulcrum audit query --json` emits the canonical envelope", async () => {
     const io = captureLines();
     await runPillar14Command("audit", ["query", "--json"], { caller: runsCaller(), ...io.opts });
 
@@ -164,7 +164,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
     expect(envelope["result"]).toEqual([{ id: "evt-1", kind: "task" }]);
   });
 
-  test("Operate stage — `fulcrum flags list --json` emits the canonical envelope", async () => {
+  test("Operate stage: `fulcrum flags list --json` emits the canonical envelope", async () => {
     const io = captureLines();
     await runPillar14Command("flags", ["list", "--json"], { caller: runsCaller(), ...io.opts });
 
@@ -172,7 +172,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
     expect(envelope["result"]).toEqual([{ name: "router-llm", enabled: false }]);
   });
 
-  test("AI Assist stage — `fulcrum ai start --json` emits the canonical envelope", async () => {
+  test("AI Assist stage: `fulcrum ai start --json` emits the canonical envelope", async () => {
     const io = captureLines();
     await runAi(
       ["start", "--task", "task-1", "--title", "Ship drawer", "--route", "plan", "--json"],
@@ -181,7 +181,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
 
     const envelope = expectCanonicalEnvelope(JSON.parse(io.lines[0]!), "fulcrum ai start");
     expect(envelope["result"]).toMatchObject({ taskId: "task-1", taskTitle: "Ship drawer" });
-    // `next_actions` is populated for AI Assist — still an array, never null.
+    // `next_actions` is populated for AI Assist: still an array, never null.
     expect(envelope["next_actions"]).toEqual([
       { label: "Open in TUI", command: "fulcrum tui :ai" },
     ]);
@@ -227,7 +227,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
     expect(io.exitCode).toBe(1);
   });
 
-  test("streaming command emits JSONL — one envelope per line plus an end sentinel", async () => {
+  test("streaming command emits JSONL: one envelope per line plus an end sentinel", async () => {
     const io = captureLines();
     await runPillar14Command("runs", ["watch", "run-1", "--json"], {
       caller: {
@@ -278,7 +278,7 @@ describe("canonical fulcrum.cli.v1 JSON envelope", () => {
       ...io.opts,
     });
 
-    // The legacy direct array — no envelope wrapper.
+    // The legacy direct array: no envelope wrapper.
     expect(JSON.parse(io.lines[0]!)).toEqual([
       { id: "run-1", status: "running" },
       { id: "run-2", status: "succeeded" },

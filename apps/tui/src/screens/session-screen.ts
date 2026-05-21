@@ -1,5 +1,5 @@
 /**
- * SessionScreen — TUI surface for the AI Assist session lifecycle.
+ * SessionScreen: TUI surface for the AI Assist session lifecycle.
  *
  * Mirrors `fulcrum session …` CLI verbs. Palette commands (`:pause`,
  * `:resume`, `:abort`, `:checkpoint [label]`, `:restore <id>`) and a

@@ -36,7 +36,7 @@ export interface TasksRunOptions {
  * Canonical verbs:    new · list · view · edit · move · bulk · run-preview · run · qa-review
  * Documented aliases: get → view · create → new · update → edit · delete (kept, no command removed)
  */
-const HELP = `fulcrum task — Build-stage task grammar (CLI-TUI-UX §1.3)
+const HELP = `fulcrum task: Build-stage task grammar (CLI-TUI-UX §1.3)
 
 Usage:
   fulcrum task new          --title <t> --project <id> [--parent <id>] [--depends-on <id,id>] [--cycle <id>] [--module <id>] [--recurrence <rule>] [--json]
@@ -501,7 +501,7 @@ function buildRunPreview(id: string, task: unknown): Record<string, unknown> {
 }
 
 /**
- * Resolve the `fulcrum task run` dispatch descriptor — the agent / model /
+ * Resolve the `fulcrum task run` dispatch descriptor: the agent / model /
  * prompt the run would use (`CLI-TUI-UX.md` §1.3 `task run`). The descriptor
  * names `fulcrum runs feed` as the follow-on so a run is followable across
  * surfaces by its `--task` id.

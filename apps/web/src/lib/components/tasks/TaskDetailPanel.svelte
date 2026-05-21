@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * TaskDetailPanel — right side panel for task detail.
+   * TaskDetailPanel: right side panel for task detail.
    * D-16: panel opens as right side panel preserving list context
    * D-17: section layout (ID badge, status bar, description, custom fields, deps, subtasks, tabs, watchers)
    * D-18: J/K/Esc keyboard handlers
@@ -452,7 +452,7 @@
         {/if}
       </section>
 
-      <!-- SECTION 3: Description (TipTap placeholder — full collab wiring in workflow milestone) -->
+      <!-- SECTION 3: Description (TipTap placeholder: full collab wiring in workflow milestone) -->
       <section class="task-detail-panel__section">
         <h2 class="task-detail-panel__section-title">Description</h2>
         <div class="task-detail-panel__description" data-testid="task-detail-description">
@@ -569,7 +569,7 @@
         </section>
       {/if}
 
-      <!-- SECTION 8: Tabbed area — Comments + Activity -->
+      <!-- SECTION 8: Tabbed area: Comments + Activity -->
       <section class="task-detail-panel__section task-detail-panel__tabs-section">
         <div class="task-detail-panel__tabs" role="tablist">
           <button

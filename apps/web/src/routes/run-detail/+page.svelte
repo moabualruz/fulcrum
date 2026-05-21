@@ -53,7 +53,7 @@
   </header>
 
   <!--
-    The OD live session pane (DESIGN.md §8 — list / plan strip / transcript /
+    The OD live session pane (DESIGN.md §8: list / plan strip / transcript /
     workspace dock, tool-call cards, inline diffs, permission prompts,
     checkpoint timeline, abort modal) is delivered on the canonical Build runs
     surface. This fixture is preserved for its existing coverage but defers the

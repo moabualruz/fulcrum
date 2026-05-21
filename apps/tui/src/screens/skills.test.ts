@@ -200,7 +200,7 @@ describe("Skills browser screen", () => {
     await screen.handleKey("j");
     await screen.handleKey("u");
     // should upgrade "ruff" (index 1)
-    // verify via caller mock — but we need calls
+    // verify via caller mock: but we need calls
     // Let's just test cursor position via render
     const v = renderer();
     screen.render(v.renderer);

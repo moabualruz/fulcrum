@@ -108,7 +108,7 @@ describe("+page.server load contract", () => {
   });
 
   test("load returns activeProjectId and streamed.dashboard Promise", async () => {
-    // Simulate the shape load() returns — test the structure/types, not the live DB call
+    // Simulate the shape load() returns: test the structure/types, not the live DB call
     const locals = { activeProjectId: "alpha" };
     const projectId = locals.activeProjectId ?? null;
 

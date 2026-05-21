@@ -3,14 +3,14 @@
    * AI Assist reference route (ai-assist.html).
    *
    * Per DESIGN.md §3.1, IA-MAP.md §5 and cross-states.md §ai-assist.html, AI
-   * Assist is NOT its own screen — it is a shell-level overlay drawer that opens
+   * Assist is NOT its own screen: it is a shell-level overlay drawer that opens
    * with `⌘/` from any frame. The OD `ai-assist.html` comment block says it
    * outright: "This page just lands you with it open."
    *
    * So `/ai-assist` survives only as a reference/deeplink route: on mount it
    * dispatches `fulcrum:open-ai-assist`, which the ONE shell `AcpDrawer`
    * instance in `+layout.svelte` listens for. There is NO route-local drawer
-   * copy here — that violated the AGENTS.md ui-kit rule and the OD intent. The
+   * copy here: that violated the AGENTS.md ui-kit rule and the OD intent. The
    * underlay below explains the surface and reproduces the `.anchor` mode row.
    */
   import { onMount } from "svelte";
@@ -84,7 +84,7 @@
         <p class="mt-2 max-w-2xl leading-6">
           Anchored to <code class="font-mono text-xs">run_8f29a4c</code>. The
           <strong class="text-foreground">⊞ AI Assist</strong> mode opens the same shell drawer
-          this page just opened — one instance, every frame.
+          this page just opened: one instance, every frame.
         </p>
       </div>
       <ModeRow
@@ -100,7 +100,7 @@
     The drawer carries a session/policy/cost/cache meta strip, an agent picker that swaps the
     agent in-flight while the trace ID stays bound, and a
     <strong class="text-foreground">Save thread to prompt template</strong> action. Open it from
-    Build runs, Review, or Operate — the entry point lives in the status footer
+    Build runs, Review, or Operate: the entry point lives in the status footer
     (<kbd class="rounded-sm border border-border px-1 font-mono text-xs">⌘ /</kbd>) on every
     screen.
   </p>
@@ -111,6 +111,6 @@
     class="justify-self-start rounded-md border border-accent bg-surface-elevated px-3 py-2 text-sm font-medium text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     onclick={openAssist}
   >
-    ✨ Open AI Assist drawer
+    ⊞ Open AI Assist drawer
   </button>
 </section>

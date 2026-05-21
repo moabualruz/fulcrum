@@ -1,5 +1,5 @@
 /**
- * CLI caller factory — session resolution utilities for CLI commands.
+ * CLI caller factory: session resolution utilities for CLI commands.
  *
  * CLI commands now use per-service HTTP API clients directly.
  * This module provides session resolution through the local application context

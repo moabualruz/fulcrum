@@ -197,7 +197,7 @@ describe("Surface TUI parity inventory", () => {
     expect(rendered).toMatch(/mcp \S+/);
     expect(rendered).toContain("trace:4f3a1c9e");
     expect(rendered).toContain(":ai");
-    // The legacy footer rendered a raw user email — the OD footer never does.
+    // The legacy footer rendered a raw user email: the OD footer never does.
     expect(rendered).not.toContain("operator@fulcrum.local");
 
     app.stop();
@@ -218,10 +218,10 @@ describe("Surface TUI parity inventory", () => {
 // The TUI root must launch the six workflow-stage screens (Capture / Plan /
 // Build / Review / Ship / Operate) and render the OD `tui-runs.html` #tui-tabs
 // strip as always-visible root chrome, and colon routes must resolve. These
-// tests compare CONCRETE labels and order against OD — not placeholder text.
+// tests compare CONCRETE labels and order against OD: not placeholder text.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("TUI root navigation — OD stage launcher parity", () => {
+describe("TUI root navigation: OD stage launcher parity", () => {
   test("root renders the six-stage nav with exact OD stage labels in order", async () => {
     const tty = new FakeTTY({ columns: 120, rows: 40 });
     const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
@@ -252,7 +252,7 @@ describe("TUI root navigation — OD stage launcher parity", () => {
     await app.mount();
     const rendered = tty.plainText();
 
-    // OD tui-runs.html #tui-tabs — sixteen buttons, exact order.
+    // OD tui-runs.html #tui-tabs: sixteen buttons, exact order.
     const odTabOrder = [
       ":capture", ":plan", ":runs", ":board", ":review", ":ship", ":doctor",
       ":run", ":ai", ":agents", ":mcp", ":plugins", ":routes", ":settings",
@@ -447,9 +447,9 @@ describe("TUI root navigation — OD stage launcher parity", () => {
     expect(routerSrc).toContain("resolveColonRoute");
   });
 
-  test("old-path resolution crawl — every tab-strip route and legacy nav entry resolves", async () => {
+  test("old-path resolution crawl: every tab-strip route and legacy nav entry resolves", async () => {
     // Migration value-preservation: enumerate the full route surface this PRD
-    // reshapes and assert each resolves — never a not-found / unknown screen.
+    // reshapes and assert each resolves: never a not-found / unknown screen.
     const { TUI_TAB_STRIP, buildTuiScreenRegistry, resolveColonRoute } =
       await import("../screen-registry.ts");
     const { TuiRouter } = await import("../router.ts");
@@ -473,7 +473,7 @@ describe("TUI root navigation — OD stage launcher parity", () => {
       expect(resolveColonRoute(alias)).toBeDefined();
     }
 
-    // 3. The legacy Domain nav (24 feature buckets) is preserved, not removed —
+    // 3. The legacy Domain nav (24 feature buckets) is preserved, not removed -
     //    the stage nav is additive root chrome above it.
     const legacy = listTuiNavigationEntries();
     expect(legacy.length).toBeGreaterThanOrEqual(24);
@@ -551,7 +551,7 @@ function createCaller(subscriptions = createSubscriptionHarness()): TuiCaller {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-stage-workbenches-set — Plan / Review / Board stage workbenches.
+// prd-tui-stage-workbenches-set: Plan / Review / Board stage workbenches.
 //
 // Each stage colon route opens a dense workbench rendering the OD
 // `tui-runs.html` stage chrome: a `fulcrum · :<route> · <purpose>` header
@@ -560,7 +560,7 @@ function createCaller(subscriptions = createSubscriptionHarness()): TuiCaller {
 // 120x32 so the layout holds at the minimum and a wide terminal.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("TUI stage workbenches — Plan / Review / Board OD parity", () => {
+describe("TUI stage workbenches: Plan / Review / Board OD parity", () => {
   async function snapshot(
     cols: number,
     rows: number,
@@ -724,17 +724,17 @@ describe("TUI stage workbenches — Plan / Review / Board OD parity", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-status-empty-error-contract — the shared 8-state status vocabulary
+// prd-tui-status-empty-error-contract: the shared 8-state status vocabulary
 // and empty/error contract on the runs / planning / review screens.
 //
 // CLI-TUI-UX.md §11 locks an 8-state status badge vocabulary (glyph + label,
 // never colour-only); CLI-TUI-UX.md §5 + COPY.md §2/§3 lock the empty-state
 // (one sentence + one action) and error-frame (`trace=<id>`) contracts. These
-// tests assert the EXACT badge labels and copy shape — not substrings — so the
+// tests assert the EXACT badge labels and copy shape: not substrings: so the
 // vocabulary cannot drift screen to screen.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("TUI status vocabulary + empty/error contract — runs/planning/review", () => {
+describe("TUI status vocabulary + empty/error contract: runs/planning/review", () => {
   async function snapshotScreen(
     cols: number,
     rows: number,
@@ -762,7 +762,7 @@ describe("TUI status vocabulary + empty/error contract — runs/planning/review"
       },
     });
     const snap = await snapshotScreen(120, 32, screen);
-    // Exact glyph + UPPERCASE label — `succeeded` folds onto COMPLETE.
+    // Exact glyph + UPPERCASE label: `succeeded` folds onto COMPLETE.
     expect(snap).toContain("● RUNNING");
     expect(snap).toContain("✓ COMPLETE");
     expect(snap).toContain("✗ FAILED");
@@ -853,20 +853,20 @@ describe("TUI status vocabulary + empty/error contract — runs/planning/review"
       },
     });
     const snap = await snapshotScreen(120, 32, screen);
-    // QA criteria — `pass` → COMPLETE, `fail` → FAILED, `pending` → PENDING.
+    // QA criteria: `pass` → COMPLETE, `fail` → FAILED, `pending` → PENDING.
     expect(snap).toContain("✓ COMPLETE");
     expect(snap).toContain("✗ FAILED");
     expect(snap).toContain("◌ PENDING");
-    // Session status — `changes_requested` → BLOCKED.
+    // Session status: `changes_requested` → BLOCKED.
     expect(snap).toContain("⏸ BLOCKED");
   });
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// prd-tui-step-modepicker-006 — the shared per-Step ModePicker row.
+// prd-tui-step-modepicker-006: the shared per-Step ModePicker row.
 //
 // Every Step-bearing TUI screen renders one ModePicker row carrying the four
-// canonical modes — ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist — the same
+// canonical modes: ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist: the same
 // action set as the web `@fulcrum/ui-kit` ModeRow. The modes are reached
 // through a collision-free `m` chord. These tests are the terminal-snapshot
 // proof that the row + its key hints render on the representative screens
@@ -874,7 +874,7 @@ describe("TUI status vocabulary + empty/error contract — runs/planning/review"
 // `m` chord drives a mode selection without colliding with screen keys.
 // ───────────────────────────────────────────────────────────────────────────
 
-describe("TUI per-Step ModePicker — runs / review / board / artifacts / doctor", () => {
+describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", () => {
   async function renderAsync(
     cols: number,
     rows: number,
@@ -1005,13 +1005,13 @@ describe("TUI per-Step ModePicker — runs / review / board / artifacts / doctor
     });
     await screen.load();
 
-    // Bare `m` arms the chord; the selector commits the mode — `m d` → Discuss.
+    // Bare `m` arms the chord; the selector commits the mode: `m d` → Discuss.
     expect(await screen.handleKey("m")).toBe(true);
     expect(await screen.handleKey("d")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
 
     // Without the `m` prefix a bare `d` is the screen's own dispatch action,
-    // never a mode selection — the chord does not shadow screen keys.
+    // never a mode selection: the chord does not shadow screen keys.
     expect(screen.currentStepMode).toBe("discuss");
     expect(await screen.handleKey("d")).toBe(true); // dispatch overlay, not a mode
     expect(screen.currentStepMode).toBe("discuss");

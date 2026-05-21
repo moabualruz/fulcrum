@@ -1,9 +1,9 @@
 /**
- * StatusBar widget — the TUI StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1).
+ * StatusBar widget: the TUI StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1).
  *
  * This widget mirrors the web `@fulcrum/ui-kit` `StatusFooter` primitive
  * (apps/web TraceFooter.svelte) exactly: a single always-on bottom strip whose
- * segments render in one stable left→right order —
+ * segments render in one stable left→right order -
  *
  *   mode · profile · branch · run · agent · mcp ···· trace · time · help · palette · AI Assist
  *
@@ -12,7 +12,7 @@
  * widget exposes `copyKeybinds()` so the keyboard layer can wire the yanks
  * against the exact ids the footer renders.
  *
- * `FOOTER_SEGMENT_ORDER` is the single shared web↔TUI parity matrix — the web
+ * `FOOTER_SEGMENT_ORDER` is the single shared web↔TUI parity matrix: the web
  * footer (TraceFooter.svelte) and this widget are both checked against it so
  * the two surfaces can never drift out of segment order.
  */
@@ -45,7 +45,7 @@ export type FooterSegmentId = (typeof FOOTER_SEGMENT_ORDER)[number];
 
 /** A rendered footer segment: stable id + visible text + render hints. */
 export interface StatusFooterSegment {
-  /** Stable segment id — one of `FOOTER_SEGMENT_ORDER`. */
+  /** Stable segment id: one of `FOOTER_SEGMENT_ORDER`. */
   id: FooterSegmentId;
   /** Visible label text rendered into the strip. */
   label: string;
@@ -56,16 +56,16 @@ export interface StatusFooterSegment {
 }
 
 /**
- * StatusFooter input — the shell data the footer maps onto OD segments.
+ * StatusFooter input: the shell data the footer maps onto OD segments.
  * `orgName`/`userEmail`/`currentScreen` from the legacy StatusBar are preserved
  * only where they map onto OD segments: `currentScreen` feeds the `mode` pill,
  * `orgName` feeds the workspace `profile`, `userEmail` is dropped (it has no OD
- * footer home — the OD footer carries `profile`, not a user identity).
+ * footer home: the OD footer carries `profile`, not a user identity).
  */
 export interface StatusBarOpts {
   /** Workflow-stage mode shown reverse-video in the `mode` pill (CAPTURE/RUNS/:AI…). */
   currentScreen: string;
-  /** Active workspace profile (work / oss / home) — OD `profile:` segment. */
+  /** Active workspace profile (work / oss / home): OD `profile:` segment. */
   orgName: string;
   /** @deprecated No OD footer home; accepted for compatibility, not rendered. */
   userEmail?: string;
@@ -77,17 +77,17 @@ export interface StatusBarOpts {
   agent?: string;
   /** Healthy/total MCP servers, e.g. `5/5` (OD `mcp:5/5`). */
   mcpHealth?: string;
-  /** Whether MCP health is degraded — flips the `mcp` segment glyph + tone. */
+  /** Whether MCP health is degraded: flips the `mcp` segment glyph + tone. */
   mcpDegraded?: boolean;
-  /** Current trace id (DESIGN.md §4.10) — rendered mono, `y t` copyable. */
+  /** Current trace id (DESIGN.md §4.10): rendered mono, `y t` copyable. */
   traceId?: string | null;
-  /** Current run id for the trace spine — rendered mono, `y r` copyable. */
+  /** Current run id for the trace spine: rendered mono, `y r` copyable. */
   runId?: string | null;
-  /** Current span id for the trace spine — rendered mono, `y s` copyable. */
+  /** Current span id for the trace spine: rendered mono, `y s` copyable. */
   spanId?: string | null;
   /** Wall-clock `HH:MM` string (OD `14:02`). */
   time?: string;
-  /** Notification bell count — folded into the `help` hint when > 0. */
+  /** Notification bell count: folded into the `help` hint when > 0. */
   bellCount?: number;
   /** Terminal width the footer must fill. */
   width: number;
@@ -197,7 +197,7 @@ export class StatusBarWidget {
   }
 
   /**
-   * Copy keybinds for the identity segments — `y t` trace, `y r` run, `y s`
+   * Copy keybinds for the identity segments: `y t` trace, `y r` run, `y s`
    * span (CLI-TUI-UX.md §7.6). The keyboard layer reads this so the yank keys
    * copy exactly the identity the footer displays.
    */
@@ -224,7 +224,7 @@ export class StatusBarWidget {
     let left = leftSegs.join("  ");
     if (stringWidth(`${left}  ${right}`) > inner) {
       // Width-starved terminal: the footer never drops a segment (CLI-TUI-UX
-      // §8). Instead the longest left segment — the agent label — is
+      // §8). Instead the longest left segment: the agent label: is
       // ellipsized so every segment label stays visible.
       const overflow = stringWidth(`${left}  ${right}`) - inner;
       const agentIdx = leftSegs.length - 2;
@@ -235,7 +235,7 @@ export class StatusBarWidget {
     const pad = inner - stringWidth(left) - stringWidth(right);
     let body = `${left}${" ".repeat(Math.max(1, pad))}${right}`;
     // Final safety clamp: an extremely narrow terminal physically cannot show
-    // every segment — never let the strip overflow the terminal width.
+    // every segment: never let the strip overflow the terminal width.
     if (stringWidth(body) > inner) body = truncateWide(body, inner);
     return pc.bgBlue(pc.white(` ${body} `));
   }

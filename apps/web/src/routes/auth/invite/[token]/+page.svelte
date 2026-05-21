@@ -30,7 +30,7 @@
   {/if}
 
   {#if data.error}
-    <!-- Token missing/invalid at load time — show only the error, no form. -->
+    <!-- Token missing/invalid at load time: show only the error, no form. -->
     <p class="text-sm text-muted-foreground">
       The invitation link is invalid or has expired. Please request a new one.
     </p>

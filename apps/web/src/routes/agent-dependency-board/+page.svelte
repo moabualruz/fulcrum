@@ -5,12 +5,12 @@
   import { cn } from "$lib/utils.js";
 
   /**
-   * `agent-dependency-board` — absorbed into the Build graph.
+   * `agent-dependency-board`: absorbed into the Build graph.
    *
    * The former "Multi-agent dependency board" was a parallel, non-Build-routed
    * dependency surface (`design-alignment/build.md` §build-graph). Per
-   * `prd-web-build-graph-od-fidelity` acceptance — "agent-dependency-board
-   * behavior is absorbed so there is one Build graph, not two" — its
+   * `prd-web-build-graph-od-fidelity` acceptance: "agent-dependency-board
+   * behavior is absorbed so there is one Build graph, not two": its
    * dependency-graph, status, and agent-assignment responsibilities now live in
    * the OD Sugiyama `/build-graph` layout.
    *
@@ -35,7 +35,7 @@
 >
   <h1 class={cn("text-h2 font-semibold")}>Multi-agent dependency board has moved</h1>
   <p data-agent-board-redirect-note class={cn("text-sm text-muted-foreground")}>
-    The dependency board is now the Build graph — one Sugiyama dependency layout with
+    The dependency board is now the Build graph: one Sugiyama dependency layout with
     status-colored nodes and per-node agent assignment.
   </p>
   <Button href="/build-graph" data-agent-board-redirect-link>Open the Build graph</Button>

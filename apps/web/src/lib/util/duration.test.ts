@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { formatDuration } from "./duration.ts";
 
 describe("formatDuration", () => {
-  test("returns '—' when end is null", () => {
-    expect(formatDuration("2026-01-01T00:00:00Z", null)).toBe("—");
+  test("returns '-' when end is null", () => {
+    expect(formatDuration("2026-01-01T00:00:00Z", null)).toBe("-");
   });
 
   test("formats sub-minute durations as <s>s", () => {

@@ -1,11 +1,11 @@
 /**
- * TUI inference dashboard — smoke & behaviour tests.
+ * TUI inference dashboard: smoke & behaviour tests.
  *
  * Verifies: backend status badge, model list, in-flight ops counter,
  * throughput gauge, cache stats, per-feature routing dropdowns,
  * download progress bar overlay. All headless via FakeTTY.
  *
- * P2#14 — TUI inference dashboard.
+ * P2#14: TUI inference dashboard.
  */
 
 import { describe, expect, test } from "bun:test";

@@ -1,4 +1,4 @@
-// Collab types — shared by real and mock providers
+// Collab types: shared by real and mock providers
 
 export interface CollabUser {
 	id: string;

@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * `/<ws>/projects/<projId>/plan/templates` — the Plan-stage **plan-template
+	 * `/<ws>/projects/<projId>/plan/templates`: the Plan-stage **plan-template
 	 * library** (`prd-web-plan-templates-od-fidelity`; OD `plan-templates.html`;
 	 * IA-MAP.md §3 `:templates`; CLI-TUI-UX.md §1 "Plan template library";
 	 * COPY.md §2 templates empty state; DESIGN.md §4.11 per-step mode row).
@@ -12,7 +12,7 @@
 	 * icon tile, a title, a one-line description naming the template skeleton,
 	 * monospace meta (`used 7× · updated 3d ago`), and a per-card four-mode row.
 	 *
-	 * Before this build no `plan-templates` route existed on web — the surface
+	 * Before this build no `plan-templates` route existed on web: the surface
 	 * was entirely unbuilt (PRD `current_evidence`). This file is the rendered
 	 * fidelity target; `prd-web-stage-route-model` resolves the legacy/canonical
 	 * route segments and `prd-web-mode-affordance-system` owns the ModeRow shell.
@@ -23,11 +23,11 @@
 	 * CLI root help. The two never collide: this surface is keyed
 	 * `data-route="plan-templates"` / `data-template-kind="plan-template"` and is
 	 * the cold-start branch of the COPY.md §2 "Plan (no sessions yet)" empty
-	 * state — picking a template seeds a new planning session, it does not create
+	 * state: picking a template seeds a new planning session, it does not create
 	 * a recurring task shape.
 	 *
-	 * Composes `@fulcrum/ui-kit` primitives only — `Badge`, `Button`, `Card`,
-	 * `Chip`, `EmptyState`, `ModeRow` — never re-implements a primitive
+	 * Composes `@fulcrum/ui-kit` primitives only: `Badge`, `Button`, `Card`,
+	 * `Chip`, `EmptyState`, `ModeRow`: never re-implements a primitive
 	 * (AGENTS.md ui-kit rule). The OD shell chrome (StageRail / ScopeBar /
 	 * StatusFooter / AcpDrawer) is provided by the root `+layout.svelte`; this
 	 * route renders the template-library page only.
@@ -42,7 +42,7 @@
 		type WorkflowMode,
 	} from "@fulcrum/ui-kit";
 
-	/** A Category facet — the OD sidebar's first facet group. */
+	/** A Category facet: the OD sidebar's first facet group. */
 	type Category =
 		| "all"
 		| "refactor"
@@ -51,11 +51,11 @@
 		| "migration"
 		| "spike-prototype";
 
-	/** An Owner facet — the OD sidebar's second facet group. */
+	/** An Owner facet: the OD sidebar's second facet group. */
 	type Owner = "mine" | "team";
 
 	/**
-	 * One plan template — a seed plan structure. `category` keys the Category
+	 * One plan template: a seed plan structure. `category` keys the Category
 	 * facet; `owner` keys the Owner facet; `mode` is the per-card ModeRow value.
 	 */
 	type PlanTemplate = {
@@ -69,12 +69,12 @@
 		owner: Owner;
 		usedCount: number;
 		updatedAgo: string;
-		/** Per-card ModeRow selection — Manual is the OD default (`aria-pressed`). */
+		/** Per-card ModeRow selection: Manual is the OD default (`aria-pressed`). */
 		mode: WorkflowMode;
 	};
 
 	/**
-	 * The 12 seed plan templates — the OD `plan-templates.html` card grid plus
+	 * The 12 seed plan templates: the OD `plan-templates.html` card grid plus
 	 * the four templates implied by its `12 templates` count and the Category
 	 * facet tallies (Refactor 4 / New feature 3 / Bug investigation 2 /
 	 * Migration 2 / Spike-prototype 1). Each description names the skeleton the
@@ -247,14 +247,14 @@
 
 	let templates = $state<PlanTemplate[]>(INITIAL_TEMPLATES);
 	let activeCategory = $state<Category>("all");
-	/** `null` = no Owner facet applied (the OD default — neither Mine nor Team active). */
+	/** `null` = no Owner facet applied (the OD default: neither Mine nor Team active). */
 	let activeOwner = $state<Owner | null>(null);
 	/** The template selected for create-from-template confirmation. */
 	let pendingTemplateId = $state<string | null>(null);
 	/** The seeded planning session, set once create-from-template confirms. */
 	let seededSession = $state<{ templateTitle: string; sessionId: string } | null>(null);
 
-	/** Templates after the active Category + Owner facets — the OD card grid. */
+	/** Templates after the active Category + Owner facets: the OD card grid. */
 	const visibleTemplates = $derived(
 		templates.filter(
 			(t) =>
@@ -263,14 +263,14 @@
 		),
 	);
 
-	/** Live Category counts — drives the OD sidebar `.count` chips. */
+	/** Live Category counts: drives the OD sidebar `.count` chips. */
 	function categoryCount(key: Category): number {
 		return key === "all"
 			? templates.length
 			: templates.filter((t) => t.category === key).length;
 	}
 
-	/** Live Owner counts — drives the OD sidebar `.count` chips. */
+	/** Live Owner counts: drives the OD sidebar `.count` chips. */
 	function ownerCount(key: Owner): number {
 		return templates.filter((t) => t.owner === key).length;
 	}
@@ -283,12 +283,12 @@
 		templates.find((t) => t.id === pendingTemplateId) ?? null,
 	);
 
-	/** Apply a Category facet — narrows the card grid (OD sidebar `.item.active`). */
+	/** Apply a Category facet: narrows the card grid (OD sidebar `.item.active`). */
 	function pickCategory(key: Category): void {
 		activeCategory = key;
 	}
 
-	/** Toggle an Owner facet — clicking the active one clears it (OD two-state). */
+	/** Toggle an Owner facet: clicking the active one clears it (OD two-state). */
 	function pickOwner(key: Owner): void {
 		activeOwner = activeOwner === key ? null : key;
 	}
@@ -305,7 +305,7 @@
 	}
 
 	/**
-	 * Confirm create-from-template — seeds a new planning session from the
+	 * Confirm create-from-template: seeds a new planning session from the
 	 * staged template. This is the cold-start branch of COPY.md §2 "Plan (no
 	 * sessions yet)": the seeded session id is the handoff the `plan-session`
 	 * New-session path receives (PRD acceptance: "seeds a new planning session
@@ -329,14 +329,14 @@
 		pendingTemplateId = null;
 	}
 
-	/** Empty the library — drives the COPY.md §2 templates empty state. */
+	/** Empty the library: drives the COPY.md §2 templates empty state. */
 	function clearTemplates(): void {
 		templates = [];
 		pendingTemplateId = null;
 		seededSession = null;
 	}
 
-	/** Re-seed the library — the empty-state "New template" action. */
+	/** Re-seed the library: the empty-state "New template" action. */
 	function restoreTemplates(): void {
 		templates = INITIAL_TEMPLATES;
 		activeCategory = "all";
@@ -350,7 +350,7 @@
 
 <!--
 	The OD `plan-templates.html` page: a head row + subtitle, then the `.lib`
-	two-column grid — a 220px Category/Owner facet sidebar beside the template
+	two-column grid: a 220px Category/Owner facet sidebar beside the template
 	card grid. `data-state` exposes the populated / empty branch to design-e2e
 	(DESIGN.md §4.15 empty-state pattern).
 -->
@@ -362,7 +362,7 @@
 	data-state={isEmpty ? "empty" : "populated"}
 	class="grid gap-4"
 >
-	<!-- ── Page head — title + count + New template action ──────────────── -->
+	<!-- ── Page head: title + count + New template action ──────────────── -->
 	<header class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
 		<h1 class="text-xl font-semibold tracking-tight text-foreground">Plan templates</h1>
 		<span class="font-mono text-xs text-muted-foreground" data-templates-count>
@@ -379,7 +379,7 @@
 
 	{#if seededSession}
 		<!--
-			Create-from-template result — the seeded planning session handoff.
+			Create-from-template result: the seeded planning session handoff.
 			A `data-seeded-session` panel so design-e2e proves the interaction
 			assertion "selecting a template and confirming opens a pre-seeded
 			planning session".
@@ -427,9 +427,9 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<!-- ── The OD `.lib` two-column grid — facet sidebar + card grid ──── -->
+		<!-- ── The OD `.lib` two-column grid: facet sidebar + card grid ──── -->
 		<div class="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-			<!-- Column 1 — Category + Owner facet sidebar (OD `.side`). -->
+			<!-- Column 1: Category + Owner facet sidebar (OD `.side`). -->
 			<aside
 				data-slot="template-facets"
 				data-template-facets
@@ -483,7 +483,7 @@
 				{/each}
 			</aside>
 
-			<!-- Column 2 — the responsive template card grid (OD `.grid`). -->
+			<!-- Column 2: the responsive template card grid (OD `.grid`). -->
 			<div
 				data-slot="template-grid"
 				data-template-grid
@@ -496,7 +496,7 @@
 						data-template-category={tpl.category}
 						data-template-owner={tpl.owner}
 					>
-						<!-- Icon tile — OD `.ic-wrap`. -->
+						<!-- Icon tile: OD `.ic-wrap`. -->
 						<span
 							data-slot="template-icon"
 							aria-hidden="true"
@@ -509,7 +509,7 @@
 						</h3>
 						<p class="text-[11px] leading-relaxed text-muted-foreground">{tpl.description}</p>
 
-						<!-- Monospace meta — OD `.meta` (`used N× · updated …`). -->
+						<!-- Monospace meta: OD `.meta` (`used N× · updated …`). -->
 						<div
 							data-slot="template-meta"
 							class="flex gap-2 border-t border-border/60 pt-2 font-mono text-[10px] text-muted-foreground"
@@ -519,7 +519,7 @@
 							<span>updated {tpl.updatedAgo}</span>
 						</div>
 
-						<!-- Per-card mode row — DESIGN.md §4.11 / §4.13 universal affordance. -->
+						<!-- Per-card mode row: DESIGN.md §4.11 / §4.13 universal affordance. -->
 						<ModeRow
 							class="mt-1 w-max"
 							density="compact"
@@ -528,7 +528,7 @@
 							onSelect={(mode) => setMode(tpl.id, mode)}
 						/>
 
-						<!-- Create-from-template — staged confirm, then seeded session. -->
+						<!-- Create-from-template: staged confirm, then seeded session. -->
 						{#if pendingTemplateId === tpl.id}
 							<div
 								class="grid gap-2 rounded-md border border-primary/40 bg-primary/5 p-2.5"
@@ -570,7 +570,7 @@
 				{/each}
 
 				{#if visibleTemplates.length === 0}
-					<!-- Facet-narrowed-to-nothing — not a zero-data empty state. -->
+					<!-- Facet-narrowed-to-nothing: not a zero-data empty state. -->
 					<div
 						data-template-facet-empty
 						class="col-span-full rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
@@ -582,7 +582,7 @@
 			</div>
 		</div>
 
-		<!-- Demo affordance — empties the library to exercise the empty state. -->
+		<!-- Demo affordance: empties the library to exercise the empty state. -->
 		<div>
 			<Button
 				size="sm"

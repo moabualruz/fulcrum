@@ -1,20 +1,20 @@
 <script lang="ts">
   /**
-   * Mobile Build runs feed + bottom-sheet run detail — OD `mobile-runs.html`
+   * Mobile Build runs feed + bottom-sheet run detail: OD `mobile-runs.html`
    * fidelity surface.
    *
-   * IA-MAP.md §617 (six-icon bottom tab bar — Capture/Plan/Build/Review/Ship/
+   * IA-MAP.md §617 (six-icon bottom tab bar: Capture/Plan/Build/Review/Ship/
    * Operate, Build current), DESIGN.md §4.7 (Sheet (mobile): full width × 60vh
    * draggable, the mobile equivalent of drawer/peek), DESIGN.md §8 (inline
-   * permission prompts — one button per option, never modal except for
+   * permission prompts: one button per option, never modal except for
    * irreversible ops), DESIGN.md §4.10 (trace badge), DESIGN.md §3.1 (container
-   * queries — no horizontal overflow at 390px).
+   * queries: no horizontal overflow at 390px).
    *
    * IA-MAP.md §2.3 routes the Build runs feed at
    * `/<ws>/projects/<projId>/build/runs` (mobile viewport); this design-e2e
-   * fixture route renders the canonical mobile stage shell — a 390px phone
+   * fixture route renders the canonical mobile stage shell: a 390px phone
    * frame with the `scope-m` header, a scrollable run feed, a bottom-sheet run
-   * detail, and the six-stage bottom tab bar — so the OD surface is proven
+   * detail, and the six-stage bottom tab bar: so the OD surface is proven
    * before the production stage route consumes it.
    *
    * The mobile feed reads the same canonical runs data shape as the desktop
@@ -59,7 +59,7 @@
 
   /**
    * Canonical runs data layer (DESIGN.md §9 run feed). Same row shape the
-   * desktop `build-runs` feed renders — the mobile sheet is one responsive
+   * desktop `build-runs` feed renders: the mobile sheet is one responsive
    * presentation of this data, not a separate fragmented run path.
    */
   const feedRuns: FeedRun[] = [
@@ -156,7 +156,7 @@
     run: "bg-accent",
   };
 
-  /** Six workflow stages — the OD bottom `.tab-bar` (IA-MAP.md §617). */
+  /** Six workflow stages: the OD bottom `.tab-bar` (IA-MAP.md §617). */
   type StageTab = {
     key: string;
     label: string;
@@ -236,7 +236,7 @@
   const TRACE_ID = "tr_8f29a4c1b3e0d5f7";
 
   /**
-   * `?state=empty` renders the no-runs branch — the design-e2e harness drives
+   * `?state=empty` renders the no-runs branch: the design-e2e harness drives
    * the empty-state matrix through this query, mirroring the desktop runs
    * feed's state switch (DESIGN.md §4.8 / COPY.md Build runs feed).
    */
@@ -264,7 +264,7 @@
   const sheetOpen = $derived(selectedRun !== null);
 
   /**
-   * Sheet height — DESIGN.md §4.7 "full width × 60vh draggable". The grabber
+   * Sheet height: DESIGN.md §4.7 "full width × 60vh draggable". The grabber
    * resizes the sheet between a collapsed peek and a near-full expansion; the
    * default 60vh matches the OD frame's default sheet height.
    */
@@ -332,7 +332,7 @@
 
 <!--
   The mobile stage shell. A 390px phone frame so the OD `mobile-runs.html`
-  layout is reproduced verbatim — status notch, scope-m header, scrollable
+  layout is reproduced verbatim: status notch, scope-m header, scrollable
   feed, bottom sheet, and the six-stage bottom tab bar. `overflow-hidden`
   plus the explicit 390px frame width guarantee zero horizontal overflow
   (DESIGN.md §3.1 container-query rule).
@@ -390,7 +390,7 @@
         aria-label="Open AI Assist"
         class="h-9 w-9 shrink-0"
       >
-        <span aria-hidden="true" class="text-base">✨</span>
+        <span aria-hidden="true" class="text-base">⊞</span>
       </Button>
     </header>
 
@@ -426,7 +426,7 @@
       </div>
 
       {#if visibleRuns.length === 0}
-        <!-- empty state — COPY.md Build runs feed template -->
+        <!-- empty state: COPY.md Build runs feed template -->
         <div data-mobile-runs-empty class="p-6">
           <EmptyState
             title="No runs yet in this project."
@@ -502,14 +502,14 @@
       {/if}
     </div>
 
-    <!-- bottom sheet — DESIGN.md §4.7 (full width × 60vh draggable) -->
+    <!-- bottom sheet: DESIGN.md §4.7 (full width × 60vh draggable) -->
     {#if sheetOpen && selectedRun}
       <div
         data-mobile-runs-sheet-backdrop
         class="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/50"
       >
         <!--
-          The exposed backdrop above the sheet is the dismiss target — it grows
+          The exposed backdrop above the sheet is the dismiss target: it grows
           to fill the space the sheet does not cover, so tapping outside the
           sheet closes it without the sheet intercepting the click.
         -->
@@ -533,7 +533,7 @@
           )}
           style={`grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; height: ${sheetHeightVh}vh; max-height: ${SHEET_MAX_VH}vh; animation: mobile-sheet-up var(--fulcrum-dur-slow, 240ms) ease;`}
         >
-          <!-- draggable grabber — DESIGN.md §4.7 -->
+          <!-- draggable grabber: DESIGN.md §4.7 -->
           <div
             data-mobile-runs-sheet-grabber
             role="slider"
@@ -594,7 +594,7 @@
           >
             {#if selectedDetail.permission}
               <!--
-                Inline permission prompt — DESIGN.md §8: one button per
+                Inline permission prompt: DESIGN.md §8: one button per
                 option, never modal except for irreversible ops. The action
                 bar below carries one button per option.
               -->
@@ -670,7 +670,7 @@
 
             {#if !selectedDetail.permission && selectedDetail.tools.length === 0}
               <p data-mobile-runs-sheet-quiet class="text-xs text-muted-foreground">
-                No pending approvals — this run is streaming without operator input.
+                No pending approvals: this run is streaming without operator input.
               </p>
             {/if}
           </div>
@@ -718,7 +718,7 @@
       </div>
     {/if}
 
-    <!-- six-icon bottom tab bar — IA-MAP.md §617 -->
+    <!-- six-icon bottom tab bar: IA-MAP.md §617 -->
     <nav
       data-mobile-runs-tab-bar
       aria-label="Workflow stages"

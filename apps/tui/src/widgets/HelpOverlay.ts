@@ -1,5 +1,5 @@
 /**
- * HelpOverlay — renders keybinding map for current screen context.
+ * HelpOverlay: renders keybinding map for current screen context.
  * Triggered by `?` key.
  */
 
@@ -32,7 +32,7 @@ export class HelpOverlay {
     const inner = Math.max(8, this.width - 4);
 
     lines.push("┌" + "─".repeat(inner + 2) + "┐");
-    lines.push("│ " + pc.bold(fit(`${this.screenName} — Keybindings`, inner)).padEnd(inner) + " │");
+    lines.push("│ " + pc.bold(fit(`${this.screenName}: Keybindings`, inner)).padEnd(inner) + " │");
     lines.push("│" + "─".repeat(inner + 2) + "│");
 
     for (const b of this.bindings) {

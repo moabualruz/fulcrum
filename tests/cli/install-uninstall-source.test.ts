@@ -139,7 +139,7 @@ describe("install source helpers", () => {
     await stripVendorRuleBlocks(noVendor, false);
     expect(await text(noVendor)).toBe("# user heading\nkeep me\n");
 
-    // Dry-run on a missing file is a no-op — the function returns early and
+    // Dry-run on a missing file is a no-op: the function returns early and
     // logs nothing (no vendor headings registered to detect changes).
     const dryRunTarget = join(scratch, "dry-run-vendor.md");
     const logs = await captureLogs(() => stripVendorRuleBlocks(dryRunTarget, true));

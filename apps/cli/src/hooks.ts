@@ -131,7 +131,7 @@ export const HOOK_RECIPE_CONTRACTS: Record<RecipeName, HookRecipeContract> = {
 
 const LABELS: Map<string, string> = new Map(AGENTS.map((agent) => [agent.id, agent.label]));
 
-/** All 5 supported agent IDs — used when `--all` is passed. */
+/** All 5 supported agent IDs: used when `--all` is passed. */
 const ALL_AGENT_IDS: Set<AgentId> = new Set(AGENTS.map((a) => a.id as AgentId));
 
 /**
@@ -146,7 +146,7 @@ async function detectedAgents(home: string): Promise<Set<AgentId>> {
       await stat(agent.rootDir(home));
       detected.add(agent.id as AgentId);
     } catch {
-      // dir absent — agent not installed
+      // dir absent: agent not installed
     }
   }
   return detected;
@@ -860,7 +860,7 @@ async function cmdList(args: string[] = []): Promise<void> {
     const mark = enabled.has(name) ? "✓" : " ";
     const contract = HOOK_RECIPE_CONTRACTS[name];
     const mode = contract.blocking ? "blocking" : "nonblocking";
-    console.log(`  ${mark} ${name} — ${contract.inputSource}; ${contract.outputPolicy}; ${mode}`);
+    console.log(`  ${mark} ${name}: ${contract.inputSource}; ${contract.outputPolicy}; ${mode}`);
   }
   console.log(`\n${enabled.size} of ${RECIPE_NAMES.length} marked enabled. Marker dir: ${homeFulcrum()}/hooks/enabled/`);
   console.log("`enable <name>` applies the per-agent registration and prints the snippet.");
@@ -890,7 +890,7 @@ async function cmdEnable(name: string | undefined, allAgents: boolean): Promise<
     }
   }
   if (!snippet) {
-    console.log("(no registration snippet documented — see docs/hooks.md §6 for the cross-agent mapping)");
+    console.log("(no registration snippet documented: see docs/hooks.md §6 for the cross-agent mapping)");
     return;
   }
   console.log("\n── Registration snippet (paste into each agent's config) ──");

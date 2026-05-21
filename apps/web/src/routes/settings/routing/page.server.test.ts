@@ -144,7 +144,7 @@ describe("routing actions.delete()", () => {
   });
 });
 
-describe("routing actions.test() — enriched test output", () => {
+describe("routing actions.test(): enriched test output", () => {
   test("calls routing.test and returns enriched decision", async () => {
     const mod = await import(`./+page.server.ts?t=${Date.now() + 8}`);
     const enriched: EnrichedDecisionRow = {

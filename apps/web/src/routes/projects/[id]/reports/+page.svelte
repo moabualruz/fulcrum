@@ -580,7 +580,7 @@
 		<div data-chart-forecast data-testid="chart-forecast" class={cn("space-y-3")}>
 			<div>
 				<h2 class={cn("text-lg font-semibold")}>Forecast</h2>
-				<p class={cn("text-sm text-muted-foreground")}>Monte Carlo simulation — P50/P75/P85/P95 completion dates</p>
+				<p class={cn("text-sm text-muted-foreground")}>Monte Carlo simulation: P50/P75/P85/P95 completion dates</p>
 			</div>
 			<ForecastChart
 				remaining={remainingPoints}

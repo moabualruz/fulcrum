@@ -63,7 +63,7 @@ describe("fulcrum init", () => {
   }, 15_000);
 
   test.skip("initializes migration ledger so db commands agree on local state", async () => {
-    // Skip: `db status` depends on DI container resolving MigratorService — pre-existing wiring gap
+    // Skip: `db status` depends on DI container resolving MigratorService: pre-existing wiring gap
     const fulcrumHome = join(scratch, ".fulcrum");
 
     const init = await runInit(fulcrumHome, scratch);

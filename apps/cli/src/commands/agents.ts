@@ -1,5 +1,5 @@
 /**
- * fulcrum agent — CLI surface for agent profile registry (P4#15).
+ * fulcrum agent: CLI surface for agent profile registry (P4#15).
  *
  * Commands:
  *   fulcrum agent list [--json]

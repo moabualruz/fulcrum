@@ -83,7 +83,7 @@ describe("CommentThread", () => {
 		expect(body).toContain('role="alert"');
 	});
 
-	test("permission state is read-only — no composer", () => {
+	test("permission state is read-only: no composer", () => {
 		const { body } = render(CommentThreadRoot, {
 			props: { threadId: "t", anchorLabel: "a", comments: COMMENTS, threadState: "permission" },
 		});
@@ -91,7 +91,7 @@ describe("CommentThread", () => {
 		expect(body).not.toContain('data-slot="comment-thread-composer"');
 	});
 
-	test("uses OKLCH-tokened utilities only — no raw hex/hsl in markup", () => {
+	test("uses OKLCH-tokened utilities only: no raw hex/hsl in markup", () => {
 		const { body } = render(CommentThreadRoot, {
 			props: { threadId: "t", anchorLabel: "a", comments: COMMENTS },
 		});

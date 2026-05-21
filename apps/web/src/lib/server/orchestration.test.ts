@@ -20,9 +20,9 @@ import {
 } from "./orchestration.ts";
 
 // `$lib/server/orchestration` re-exports the execution-orchestration service
-// surface. That surface takes `(em, ctx)` — `ctx` is an
+// surface. That surface takes `(em, ctx)`: `ctx` is an
 // `OrchestrationApplicationContext` ({ orgId, userId, projectId? }), not a raw
-// org-id string — and reads the `agent_runs` / `orchestration_config` /
+// org-id string: and reads the `agent_runs` / `orchestration_config` /
 // `workflow_defs` tables from the isolated product store. The previous test
 // called it with the legacy `(db, orgId)` shape and imported a `loadProjectRuns`
 // helper that the module never exported; project-scoped run listing is now

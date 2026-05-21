@@ -21,11 +21,11 @@ import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface
  * Generated public-API command domains.
  *
  * The Build-stage grammar (`CLI-TUI-UX.md` §1.3) is split across:
- *  - `runs`    — the runs feed: `list`/`feed`/`tail`/`show`/`logs`/`attach` plus dispatch/preview.
- *  - `run`     — a single agent run: `new`/`view`/`cancel`/`retry --from-step`/`attach`.
- *  - `cycle`   — Build cycles: `list`/`activate`/`complete` (Plane cycles, `IA-MAP.md` §2.3).
- *  - `module`  — Build modules: `list`/`new`/`view` (Plane modules, `IA-MAP.md` §2.3).
- *  - `context` — per-task run context: `pack`/`inspect`/`diff` (`CLI-TUI-UX.md` §1.3).
+ *  - `runs`   : the runs feed: `list`/`feed`/`tail`/`show`/`logs`/`attach` plus dispatch/preview.
+ *  - `run`    : a single agent run: `new`/`view`/`cancel`/`retry --from-step`/`attach`.
+ *  - `cycle`  : Build cycles: `list`/`activate`/`complete` (Plane cycles, `IA-MAP.md` §2.3).
+ *  - `module` : Build modules: `list`/`new`/`view` (Plane modules, `IA-MAP.md` §2.3).
+ *  - `context`: per-task run context: `pack`/`inspect`/`diff` (`CLI-TUI-UX.md` §1.3).
  */
 export type Pillar14Domain =
   | "runs"
@@ -55,9 +55,9 @@ export interface Pillar14RunOptions {
 interface EnvelopeContext {
   command: string;
   argv: readonly string[];
-  /** Stable trace id for the whole invocation — shared by every envelope line. */
+  /** Stable trace id for the whole invocation: shared by every envelope line. */
   traceId: string;
-  /** Process env — drives the CLI-TUI-UX §2.3 colour-disable conditions. */
+  /** Process env: drives the CLI-TUI-UX §2.3 colour-disable conditions. */
   env: NodeJS.ProcessEnv;
 }
 
@@ -68,7 +68,7 @@ type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">> & {
 const HELP: Record<Pillar14Domain, string> = {
   runs: `fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|tail|worker-tick|logs|attach> [--json]
 
-Subcommands (Build-stage runs feed — CLI-TUI-UX §1.3, IA-MAP §2.3):
+Subcommands (Build-stage runs feed: CLI-TUI-UX §1.3, IA-MAP §2.3):
   list [--status <status>] [--cycle <id>]           List runs
   feed [--project <id>] [--run <id>] [--task <id>] [--watch]
                                                     Live feedback from running dependency executions
@@ -91,7 +91,7 @@ Options:
   --json-raw                                        Pre-envelope JSON payload (compatibility, removed next release)`,
   run: `fulcrum run <new|view|cancel|retry|attach> [--json]
 
-Subcommands (a single agent run — CLI-TUI-UX §1.3):
+Subcommands (a single agent run: CLI-TUI-UX §1.3):
   new --task <id> [--agent <a>] [--model <m>] [--policy review_each_tool|auto_approve_safe|danger_zone]
                                                     Dispatch a new run for a task
   view <run-id>                                     Show run detail
@@ -103,7 +103,7 @@ Options:
   --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
   cycle: `fulcrum cycle <list|activate|complete> [--json]
 
-Subcommands (Build cycles — CLI-TUI-UX §1.3, IA-MAP §2.3 Plane cycles):
+Subcommands (Build cycles: CLI-TUI-UX §1.3, IA-MAP §2.3 Plane cycles):
   list [--project <id>]                             List cycles (tasks grouped by cycle)
   activate <cycle-id>                               Activate a cycle
   complete <cycle-id>                               Complete a cycle
@@ -112,7 +112,7 @@ Options:
   --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
   module: `fulcrum module <list|new|view> [--json]
 
-Subcommands (Build modules — CLI-TUI-UX §1.3, IA-MAP §2.3 Plane modules):
+Subcommands (Build modules: CLI-TUI-UX §1.3, IA-MAP §2.3 Plane modules):
   list [--project <id>]                             List modules (tasks grouped by module)
   new --name <n> [--project <id>]                   Create a module
   view <module-id>                                  Show a module's tasks
@@ -121,7 +121,7 @@ Options:
   --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
   context: `fulcrum context <pack|inspect|diff> [--json]
 
-Subcommands (per-task run context — CLI-TUI-UX §1.3):
+Subcommands (per-task run context: CLI-TUI-UX §1.3):
   pack --task <id> [--include-docs] [--include-runs] [--budget <tokens>]
                                                     Pack the run context for a task
   inspect --task <id>                               Inspect the assembled context for a task
@@ -369,7 +369,7 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     return;
   }
   if (sub === "tail") {
-    // `fulcrum runs tail <id> [--lines <n>]` — the last <n> transcript lines of a
+    // `fulcrum runs tail <id> [--lines <n>]`: the last <n> transcript lines of a
     // run, emitted in the canonical envelope (CLI-TUI-UX §1.3 `runs tail`).
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs tail: missing run id");
@@ -388,7 +388,7 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
 }
 
 /**
- * `fulcrum run <verb>` — single-agent-run grammar (`CLI-TUI-UX.md` §1.3).
+ * `fulcrum run <verb>`: single-agent-run grammar (`CLI-TUI-UX.md` §1.3).
  * Routes through the same agent-run caller as `fulcrum runs`; `retry` honours
  * `--from-step <n>` so a run can resume from a checkpoint.
  */
@@ -448,7 +448,7 @@ async function runRun(sub: string, argv: readonly string[], caller: any, io: Io)
 }
 
 /**
- * `fulcrum cycle <verb>` — Build cycles (`CLI-TUI-UX.md` §1.3, `IA-MAP.md` §2.3
+ * `fulcrum cycle <verb>`: Build cycles (`CLI-TUI-UX.md` §1.3, `IA-MAP.md` §2.3
  * Plane cycles). `list` groups the project's tasks by their `cycleId`;
  * `activate`/`complete` record the cycle lifecycle transition.
  */
@@ -476,7 +476,7 @@ async function runCycle(sub: string, argv: readonly string[], caller: any, io: I
 }
 
 /**
- * `fulcrum module <verb>` — Build modules (`CLI-TUI-UX.md` §1.3, `IA-MAP.md`
+ * `fulcrum module <verb>`: Build modules (`CLI-TUI-UX.md` §1.3, `IA-MAP.md`
  * §2.3 Plane modules). `list`/`view` group the project's tasks by `moduleId`;
  * `new` records a module definition.
  */
@@ -511,7 +511,7 @@ async function runModule(sub: string, argv: readonly string[], caller: any, io: 
 }
 
 /**
- * `fulcrum context <verb>` — per-task run context (`CLI-TUI-UX.md` §1.3).
+ * `fulcrum context <verb>`: per-task run context (`CLI-TUI-UX.md` §1.3).
  * `pack`/`inspect` resolve the dependency tree the run would see;
  * `diff` compares it against a prior run via the dependency-execution caller.
  */
@@ -583,7 +583,7 @@ function groupTasksBy(tasks: unknown, keys: string[], label: string): Record<str
 
 /**
  * Read the last `lines` transcript lines of a run for `fulcrum runs tail`.
- * Returns the run identity plus the tail slice — no streaming, one envelope.
+ * Returns the run identity plus the tail slice: no streaming, one envelope.
  */
 async function tailRunLogs(
   runId: string,
@@ -944,7 +944,7 @@ function emitError(error: unknown, jsonMode: boolean, io: Io): void {
   io.exit(1);
 }
 
-/** The `Fix:` action surfaced in a plain-mode error — the command's own help. */
+/** The `Fix:` action surfaced in a plain-mode error: the command's own help. */
 function recoveryFix(command: string): string {
   const domain = command.split(/\s+/)[1] ?? "runs";
   return `fulcrum ${domain} --help`;
@@ -980,7 +980,7 @@ function optionValue(argv: readonly string[], flag: string): string | undefined 
   return value && !value.startsWith("-") ? value : undefined;
 }
 
-/** Boolean flags that take no value — kept out of the flag+value skip in `positional`. */
+/** Boolean flags that take no value: kept out of the flag+value skip in `positional`. */
 const BOOLEAN_FLAGS = new Set([
   "--json",
   "--json-raw",

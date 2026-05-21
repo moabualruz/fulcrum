@@ -1,5 +1,5 @@
 /**
- * CLI flag conventions — the one shared codification of `CLI-TUI-UX.md` §2.
+ * CLI flag conventions: the one shared codification of `CLI-TUI-UX.md` §2.
  *
  * `CLI-TUI-UX.md` §2 locks the cross-command flag grammar: a fixed set of
  * global flags every command accepts where applicable, a strict
@@ -8,19 +8,19 @@
  * module is the single source of truth for that grammar so no individual
  * command re-invents flag names, precedence, or secret handling.
  *
- * Scope — what lives here:
- *  - {@link GLOBAL_FLAGS} — the §2 cross-cutting flag registry (name, behavior).
- *  - {@link isGlobalFlag} / {@link splitGlobalFlags} — recognise §2 flags in argv.
- *  - {@link resolveWithPrecedence} — the §2.2 flag > env > config > default chain.
- *  - {@link isSecretFlag} / {@link assertNoSecretInArgv} — §2.1 secrets handling:
+ * Scope: what lives here:
+ *  - {@link GLOBAL_FLAGS}: the §2 cross-cutting flag registry (name, behavior).
+ *  - {@link isGlobalFlag} / {@link splitGlobalFlags}: recognise §2 flags in argv.
+ *  - {@link resolveWithPrecedence}: the §2.2 flag > env > config > default chain.
+ *  - {@link isSecretFlag} / {@link assertNoSecretInArgv}: §2.1 secrets handling:
  *    secrets never come from argv; the safe carriers are env / `--token-file` /
  *    `--token-stdin`.
- *  - {@link isColorDisabled} — the §2.3 colour-disable conditions.
- *  - {@link CTRL_C_FIRST_INTERRUPT_MESSAGE} — the §2.4 first-INT copy.
- *  - {@link redactArgvForJson} — make an `args` map safe for the `--json`
+ *  - {@link isColorDisabled}: the §2.3 colour-disable conditions.
+ *  - {@link CTRL_C_FIRST_INTERRUPT_MESSAGE}: the §2.4 first-INT copy.
+ *  - {@link redactArgvForJson}: make an `args` map safe for the `--json`
  *    envelope and for error text, so a secret value can never leak.
  *
- * Colour detection re-exports `isColorEnabled` from `trace-line.ts` — that
+ * Colour detection re-exports `isColorEnabled` from `trace-line.ts`: that
  * module already implements the §2.3 list; this module is its sibling for the
  * non-colour parts of §2 and keeps the two in one import surface.
  */
@@ -30,7 +30,7 @@ import { REDACTED_PLACEHOLDER } from "@platform-core/application/log-redaction/r
 import { isColorEnabled } from "./trace-line.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2 — global flag registry
+// §2: global flag registry
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One entry of the `CLI-TUI-UX.md` §2 cross-cutting flag table. */
@@ -108,11 +108,11 @@ export const GLOBAL_BOOLEAN_FLAGS: ReadonlySet<string> = new Set(
   GLOBAL_FLAGS.filter((flag) => !flag.takesValue).map((flag) => flag.long),
 );
 
-/** Result of {@link splitGlobalFlags} — §2 global flags vs the command's own argv. */
+/** Result of {@link splitGlobalFlags}: §2 global flags vs the command's own argv. */
 export interface SplitArgv {
   /** Tokens recognised as §2 global flags (and their values). */
   global: string[];
-  /** Every remaining token — the command's own positionals and flags. */
+  /** Every remaining token: the command's own positionals and flags. */
   rest: string[];
 }
 
@@ -121,7 +121,7 @@ export interface SplitArgv {
  *
  * Every command can hand its argv through this and get a uniform read of the
  * global flags without re-listing them. A `--` token stops global-flag parsing,
- * matching `arg-parser.ts` — everything after `--` is a positional.
+ * matching `arg-parser.ts`: everything after `--` is a positional.
  */
 export function splitGlobalFlags(argv: readonly string[]): SplitArgv {
   const global: string[] = [];
@@ -159,7 +159,7 @@ export function splitGlobalFlags(argv: readonly string[]): SplitArgv {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2.2 — config precedence
+// §2.2: config precedence
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -202,7 +202,7 @@ export function resolveWithPrecedence<T>(candidates: PrecedenceCandidates<T>): P
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2.1 — secrets handling
+// §2.1: secrets handling
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -212,7 +212,7 @@ export function resolveWithPrecedence<T>(candidates: PrecedenceCandidates<T>): P
  */
 export const FORBIDDEN_SECRET_FLAGS: readonly string[] = ["--token", "--password", "--secret", "--api-key"] as const;
 
-/** The §2.1 safe secret carriers — used in the recovery message. */
+/** The §2.1 safe secret carriers: used in the recovery message. */
 export const SAFE_SECRET_CARRIERS: readonly string[] = [
   "FULCRUM_TOKEN env var",
   "--token-file <path>",
@@ -225,7 +225,7 @@ export function isSecretFlag(token: string): boolean {
   return FORBIDDEN_SECRET_FLAGS.includes(bare as (typeof FORBIDDEN_SECRET_FLAGS)[number]);
 }
 
-/** Thrown when a secret is passed on argv — the §2.1 violation. */
+/** Thrown when a secret is passed on argv: the §2.1 violation. */
 export class SecretInArgvError extends Error {
   /** Namespaced code for the `fulcrum.cli.v1` error envelope (`CLI-TUI-UX.md` §3.1). */
   readonly code = "FUL_CLI_SECRET_IN_ARGV";
@@ -251,7 +251,7 @@ export class SecretInArgvError extends Error {
 export function assertNoSecretInArgv(argv: readonly string[]): void {
   for (const token of argv) {
     if (isSecretFlag(token)) {
-      // Use only the flag *name* in the error — never the value after `=`.
+      // Use only the flag *name* in the error: never the value after `=`.
       const flagName = token.startsWith("-") ? (token.split("=")[0] as string) : token;
       throw new SecretInArgvError(flagName);
     }
@@ -263,7 +263,7 @@ export function assertNoSecretInArgv(argv: readonly string[]): void {
  *
  * Any key that names a secret flag (`--token`, `--password`, …) has its value
  * replaced with the redaction placeholder. This guards the envelope `args`
- * field — even if a command echoes its argv, a secret value never serialises.
+ * field: even if a command echoes its argv, a secret value never serialises.
  */
 export function redactArgvForJson(args: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -274,7 +274,7 @@ export function redactArgvForJson(args: Record<string, unknown>): Record<string,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2.3 — colour disable
+// §2.3: colour disable
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Re-export the §2.3 colour resolver so all of §2 is one import surface. */
@@ -282,7 +282,7 @@ export { isColorEnabled };
 
 /**
  * The inverse of {@link isColorEnabled}: true when colour MUST be disabled per
- * `CLI-TUI-UX.md` §2.3 — any of: stdout/stderr not a TTY, `--no-color`,
+ * `CLI-TUI-UX.md` §2.3: any of: stdout/stderr not a TTY, `--no-color`,
  * `NO_COLOR` set (any value), `FULCRUM_NO_COLOR` set, or `TERM=dumb`.
  */
 export function isColorDisabled(ctx: Parameters<typeof isColorEnabled>[0] = {}): boolean {
@@ -290,7 +290,7 @@ export function isColorDisabled(ctx: Parameters<typeof isColorEnabled>[0] = {}):
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// §2.4 — Ctrl-C
+// §2.4: Ctrl-C
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -304,17 +304,17 @@ export const CTRL_C_FIRST_INTERRUPT_MESSAGE =
 export interface InterruptOutcome {
   /** The message to print on this interrupt, or `undefined` on the force exit. */
   message: string | undefined;
-  /** `true` once a second INT has been seen — the caller should force-exit. */
+  /** `true` once a second INT has been seen: the caller should force-exit. */
   force: boolean;
 }
 
 /**
  * Stateful Ctrl-C handler implementing `CLI-TUI-UX.md` §2.4.
  *
- * First SIGINT: returns the graceful-stop message, `force: false` — the command
+ * First SIGINT: returns the graceful-stop message, `force: false`: the command
  * should begin a fast, best-effort cleanup (a watching command also sends a
  * `session/cancel` notification). Second SIGINT: returns `force: true`, no
- * message — the command should exit immediately, skipping cleanup.
+ * message: the command should exit immediately, skipping cleanup.
  */
 export function createInterruptHandler(): { onInterrupt: () => InterruptOutcome } {
   let interrupts = 0;
@@ -334,7 +334,7 @@ export function createInterruptHandler(): { onInterrupt: () => InterruptOutcome 
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Render the `CLI-TUI-UX.md` §2 global-flags help block — the shared text any
+ * Render the `CLI-TUI-UX.md` §2 global-flags help block: the shared text any
  * command's `--help` can append so the global flag grammar reads identically
  * everywhere. `--help` must work even after other flags (the §2 invariant);
  * callers check {@link wantsHelp} first.
@@ -350,7 +350,7 @@ export function renderGlobalFlagsHelp(): string {
 }
 
 /**
- * True when argv requests help — `-h` / `--help` anywhere in argv.
+ * True when argv requests help: `-h` / `--help` anywhere in argv.
  *
  * `CLI-TUI-UX.md` §2 locks "`--help` always works, even after other flags", so
  * this scans the WHOLE argv, not just the first token.
@@ -362,7 +362,7 @@ export function wantsHelp(argv: readonly string[]): boolean {
   });
 }
 
-/** True when argv requests the version — `-V` / `--version` anywhere in argv. */
+/** True when argv requests the version: `-V` / `--version` anywhere in argv. */
 export function wantsVersion(argv: readonly string[]): boolean {
   return argv.some((token) => token === "--version" || token === "-V");
 }
