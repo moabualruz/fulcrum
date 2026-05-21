@@ -194,14 +194,14 @@ const GLOBAL_HELP: StageHelp = {
     "fulcrum auth <whoami|invite|login|logout>    Manage CLI authentication.",
     "fulcrum web                                  Open the web shell in a browser.",
     "fulcrum tui                                  Open the keyboard-first TUI workbench.",
-    "fulcrum completion --shell <bash|zsh|fish|powershell>",
-    "                                             Print shell completion script.",
+    "fulcrum completion <bash|zsh|fish|powershell>",
+    "                                             Print a shell completion script with install guidance.",
     "fulcrum version                              Print the CLI version.",
     "fulcrum help [stage]                         This message, or per-stage detail.",
   ],
   examples: [
     "fulcrum help build",
-    "fulcrum completion --shell zsh",
+    "fulcrum completion zsh",
     "fulcrum tui",
   ],
 };
