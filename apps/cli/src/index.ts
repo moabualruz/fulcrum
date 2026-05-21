@@ -301,6 +301,21 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runCapture(rest);
       return;
     }
+    case "plan": {
+      const { run: runPlan } = await import("./commands/plan-stage.ts");
+      await runPlan(rest);
+      return;
+    }
+    case "mission": {
+      const { runMission } = await import("./commands/plan-stage.ts");
+      await runMission(rest);
+      return;
+    }
+    case "prototype": {
+      const { runPrototype } = await import("./commands/plan-stage.ts");
+      await runPrototype(rest);
+      return;
+    }
     case "task":
     case "tasks": {
       const { run: runTasks } = await import("./commands/tasks.ts");
@@ -349,14 +364,22 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runRouting(rest);
       return;
     }
+    case "review":
+    case "qa":
+    case "uat":
+    case "e2e": {
+      const { run: runReviewStage } = await import("./commands/review-stage.ts");
+      await runReviewStage(cmd, rest);
+      return;
+    }
     case "repos": {
       const { run: runRepos } = await import("./commands/repos.ts");
       await runRepos(rest);
       return;
     }
     case "repo": {
-      const { run: runRepos } = await import("./commands/repos.ts");
-      await runRepos(rest);
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["repo", ...rest]);
       return;
     }
     case "docs": {
@@ -391,8 +414,13 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "artifact": {
-      const { run: runArtifacts } = await import("./commands/artifacts.ts");
-      await runArtifacts(rest);
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["artifact", ...rest]);
+      return;
+    }
+    case "ship": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["ship", ...rest]);
       return;
     }
     case "db": {
@@ -601,23 +629,28 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runContext(rest);
       return;
     }
-    case "branch":
+    case "branch": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["branch", ...rest]);
+      return;
+    }
+    case "pr": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["pr", ...rest]);
+      return;
+    }
+    case "release": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["release", ...rest]);
+      return;
+    }
     case "config":
     case "cycle":
     case "doc":
-    case "e2e":
-    case "mission":
     case "module":
     case "note":
-    case "plan":
-    case "pr":
     case "profile":
-    case "prototype":
-    case "qa":
-    case "release":
-    case "review":
     case "run":
-    case "uat":
     case "workspace":
       runCanonicalPointer(cmd, rest);
       return;

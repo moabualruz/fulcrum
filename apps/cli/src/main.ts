@@ -32,6 +32,7 @@ const INDEX_DISPATCH_ROOTS = new Set([
   "repo",
   "review",
   "run",
+  "ship",
   "trace",
   "uat",
   "workspace",
@@ -181,6 +182,7 @@ async function main() {
     case "sprints":
     case "memory":
     case "search":
+    case "ship":
     case "artifacts":
     case "artifact":
     case "repos":

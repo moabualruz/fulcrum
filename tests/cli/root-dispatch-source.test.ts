@@ -290,7 +290,7 @@ describe("root CLI source dispatch", () => {
   });
 
   test.each([
-    ["agents", ["agents", "--help"], "fulcrum agents"],
+    ["agents", ["agents", "--help"], "fulcrum agent"],
     ["init", ["init", "--help"], "fulcrum init [DIR]"],
     ["projects", ["projects", "--help"], "fulcrum projects"],
     ["tasks", ["tasks", "--help"], "fulcrum tasks"],

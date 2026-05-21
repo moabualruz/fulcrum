@@ -199,6 +199,7 @@ describe("Surface CLI JSON parity", () => {
   test("completion rejects unsupported shells", async () => {
     const result = await runCli("fulcrum completion --shell elvish");
     expect(result.exitCode).toBe(2);
-    expect(result.stderr).toContain("bash|zsh|fish|powershell");
+    expect(result.stderr).toContain("fulcrum completion supports: bash, zsh, fish, powershell");
+    expect(result.stderr).toContain("trace=");
   });
 });
