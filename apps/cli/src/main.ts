@@ -87,6 +87,7 @@ async function main() {
       await run([cmd, ...rest]);
       return;
     }
+    case "parity":
     case "auth":
     case "flags":
     case "routing":

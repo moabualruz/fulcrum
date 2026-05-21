@@ -667,6 +667,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runCompletion(rest);
       return;
     }
+    case "parity": {
+      const [sub = "help", ...parityRest] = rest;
+      if (sub === "cli-tui") {
+        const { run: runCliTuiParity } = await import("./commands/cli-tui-parity.ts");
+        await runCliTuiParity(parityRest);
+        return;
+      }
+      console.error(`fulcrum parity: unknown command '${sub}'`);
+      process.exit(2);
+    }
     case "web":
       await runWeb(rest);
       return;
