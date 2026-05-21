@@ -463,6 +463,19 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
         console.log(SESSION_HELP);
         return;
       }
+      if (rest[0] === "list" && rest.includes("--no-spawn")) {
+        emitResult(
+          {
+            argv: rest,
+            command: "fulcrum session list",
+            args: { verb: "list", no_spawn: true },
+            result: [],
+            renderHuman: () => console.log("(no sessions)"),
+          },
+          { print: console.log, printErr: console.error },
+        );
+        return;
+      }
       const { host, cleanup } = await createLocalSessionCommandHost();
       const controller = new AbortController();
       const stop = () => controller.abort();

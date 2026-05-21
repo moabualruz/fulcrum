@@ -1023,6 +1023,16 @@ export async function run(args: string[]): Promise<void> {
   } else {
     const home = process.env["HOME"] ?? "";
     printHumanFormat(report, home);
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum doctor",
+        args: { probe, checks: runOrchestratorChecks },
+        result: null,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
 
     // Print orchestrator checks in interactive mode.
     if (runOrchestratorChecks && orchestratorReport && orchestratorReport.checks.length > 0) {

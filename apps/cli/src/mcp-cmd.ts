@@ -34,54 +34,54 @@ async function cmdList(args: string[]): Promise<void> {
   const reg = await loadRegistry();
   const servers = Object.values(reg.servers);
 
-  if (asJson) {
-    const out = servers.map((s) => ({
-      name: s.name,
-      transport: s.transport,
-      vendor: s.vendor,
-      default_enabled: s.default_enabled,
-      agent_state: Object.fromEntries(
-        ALL_AGENT_IDS.map((id) => [
-          id,
-          !s.agent_visibility[id] ? "hidden" : isEnabled(s, id) ? "enabled" : "disabled",
-        ])
-      ),
-      disabled_config: Object.fromEntries(
-        ALL_AGENT_IDS.map((id) => [id, disabledConfigSupport(s, id)]),
-      ),
-    }));
-    emitResult(
-      {
-        argv: args,
-        command: "fulcrum mcp list",
-        args: { subcommand: "list" },
-        result: out,
-        renderHuman: () => {},
+  const out = servers.map((s) => ({
+    name: s.name,
+    transport: s.transport,
+    vendor: s.vendor,
+    default_enabled: s.default_enabled,
+    agent_state: Object.fromEntries(
+      ALL_AGENT_IDS.map((id) => [
+        id,
+        !s.agent_visibility[id] ? "hidden" : isEnabled(s, id) ? "enabled" : "disabled",
+      ])
+    ),
+    disabled_config: Object.fromEntries(
+      ALL_AGENT_IDS.map((id) => [id, disabledConfigSupport(s, id)]),
+    ),
+    description: s.description,
+    url: s.url,
+    command_line: s.command,
+    agent_visibility: s.agent_visibility,
+  }));
+  emitResult(
+    {
+      argv: args,
+      command: "fulcrum mcp list",
+      args: { subcommand: "list" },
+      result: out,
+      renderHuman: (value) => {
+        if (value.length === 0) {
+          console.log("No MCP servers registered. Run: fulcrum mcp register <name> ...");
+          return;
+        }
+
+        console.log("Managed MCPs:\n");
+        for (const s of value) {
+          const transport = s.transport === "http" ? `http  ${s.url ?? ""}` : `stdio ${s.command_line ?? ""}`;
+          console.log(`  ${pad(s.name, 16)}  ${s.vendor}  [${transport}]`);
+          console.log(`    ${s.description}`);
+          for (const id of ALL_AGENT_IDS) {
+            const state = s.agent_state[id];
+            const visible = s.agent_visibility[id];
+            const disabledConfig = state === "disabled" && visible ? `  ${s.disabled_config[id]}` : "";
+            console.log(`    ${pad(id, 14)}  ${state}${disabledConfig}`);
+          }
+          console.log();
+        }
       },
-      { print: console.log, printErr: console.error },
-    );
-    return;
-  }
-
-  if (servers.length === 0) {
-    console.log("No MCP servers registered. Run: fulcrum mcp register <name> ...");
-    return;
-  }
-
-  console.log("Managed MCPs:\n");
-  for (const s of servers) {
-    const transport = s.transport === "http" ? `http  ${s.url ?? ""}` : `stdio ${s.command ?? ""}`;
-    console.log(`  ${pad(s.name, 16)}  ${s.vendor}  [${transport}]`);
-    console.log(`    ${s.description}`);
-    for (const id of ALL_AGENT_IDS) {
-      const enabled = isEnabled(s, id);
-      const vis = s.agent_visibility[id];
-      const state = !vis ? "hidden" : enabled ? "enabled" : "disabled";
-      const disabledConfig = !enabled && vis ? `  ${disabledConfigSupport(s, id)}` : "";
-      console.log(`    ${pad(id, 14)}  ${state}${disabledConfig}`);
-    }
-    console.log();
-  }
+    },
+    { print: console.log, printErr: console.error },
+  );
 }
 
 async function cmdRegister(args: string[]): Promise<void> {
