@@ -1,12 +1,10 @@
-import { error, redirect } from "@sveltejs/kit";
+import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import {
 	isWorkflowStage,
 	STAGE_DEFAULT_SUB,
-	STAGE_WORKBENCH_ROUTE,
 	traceFromHash,
 	type WorkflowStage,
-	withTrace,
 } from "$lib/components/app/route-map.ts";
 import { resolveCaptureView, type CaptureStep, type CaptureView } from "$lib/components/app/capture-stage.ts";
 import { createDocumentApiForEvent } from "$lib/server/document-api.ts";
@@ -118,17 +116,18 @@ export const load: PageServerLoad = async (event) => {
 		defaultSub: STAGE_DEFAULT_SUB[typed],
 	};
 
+	// The trace hash never reaches the server; the client hydrates it. The
+	// query form `?trace=<id>` is accepted as a server-readable fallback.
+	const traceId =
+		event.url.searchParams.get("trace") ?? traceFromHash(event.url.searchParams.get("trace"));
+
 	if (typed !== "capture") {
-		throw redirect(308, withTrace(STAGE_WORKBENCH_ROUTE[typed], event.url));
+		return { ...base, captureView: null, captureSteps: [], traceId };
 	}
 
 	// Capture stage — resolve the `?view=` sub-view and load real captures.
 	const captureView = resolveCaptureView(event.url.searchParams.get("view"));
 	const captureSteps = await loadCaptureSteps(event, captureView);
-	// The trace hash never reaches the server; the client hydrates it. The
-	// query form `?trace=<id>` is accepted as a server-readable fallback.
-	const traceId =
-		event.url.searchParams.get("trace") ?? traceFromHash(event.url.searchParams.get("trace"));
 
 	return { ...base, captureView, captureSteps, traceId };
 };

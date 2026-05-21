@@ -52,10 +52,11 @@
 			{ id: "prompts", label: "Prompts", summary: "Prompt templates", href: "/plan-prompts" },
 		],
 		build: [
-			{ id: "board", label: "Board", summary: "Task board", href: "/build-board" },
-			{ id: "graph", label: "Graph", summary: "Dependency graph", href: "/build-graph" },
-			{ id: "runs", label: "Runs", summary: "Agent runs feed", href: "/build-runs" },
-			{ id: "timeline", label: "Timeline", summary: "Version timeline", href: "/build-timeline" },
+			{ id: "board", label: "Board", summary: "Task board", href: `/${data.ws}/projects/${data.projId}/build/board` },
+			{ id: "list", label: "List", summary: "Task list", href: `/${data.ws}/projects/${data.projId}/build/list` },
+			{ id: "graph", label: "Graph", summary: "Dependency graph", href: `/${data.ws}/projects/${data.projId}/build/graph` },
+			{ id: "runs", label: "Runs", summary: "Agent runs feed", href: `/${data.ws}/projects/${data.projId}/build/runs` },
+			{ id: "gantt", label: "Timeline", summary: "14-day Gantt", href: `/${data.ws}/projects/${data.projId}/build/gantt` },
 		],
 		review: [
 			{ id: "queue", label: "Workbench", summary: "Review workbench", href: "/review-search" },
@@ -66,10 +67,12 @@
 			{ id: "artifacts", label: "Artifacts", summary: "Release artifacts", href: "/ship-archive" },
 		],
 		operate: [
-			{ id: "doctor", label: "Doctor", summary: "Subsystem health", href: "/doctor" },
-			{ id: "alerts", label: "Alerts", summary: "Alerts console", href: "/operate-alerts" },
+			{ id: "doctor", label: "Doctor", summary: "Subsystem health", href: `/${data.ws}/projects/${data.projId}/operate/doctor` },
+			{ id: "alerts", label: "Alerts", summary: "Alerts console", href: `/${data.ws}/projects/${data.projId}/operate/alerts` },
 			{ id: "audit", label: "Audit", summary: "Audit log", href: "/audit" },
-			{ id: "mcp", label: "MCP", summary: "MCP server scope", href: "/operate-mcp" },
+			{ id: "mcp", label: "MCP", summary: "MCP server scope", href: `/${data.ws}/projects/${data.projId}/operate/mcp` },
+			{ id: "plugins", label: "Plugins", summary: "Plugin registry", href: `/${data.ws}/projects/${data.projId}/operate/plugins` },
+			{ id: "telemetry", label: "Telemetry", summary: "Observability", href: `/${data.ws}/projects/${data.projId}/operate/telemetry` },
 		],
 	};
 
