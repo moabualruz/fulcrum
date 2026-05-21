@@ -71,6 +71,7 @@
 		(`prd-web-capture-stage-shell`; OD `capture.html`, `capture-drafts.html`,
 		`capture-promoted.html`). The Capture stage renders its own OD-fidelity
 		docs/drafts/promoted/inbox workbench, not the generic stage card grid.
+		The mobile shell also exposes the `Block actions` group above bottom tabs.
 	-->
 	<CaptureStageWorkbench
 		ws={data.ws}

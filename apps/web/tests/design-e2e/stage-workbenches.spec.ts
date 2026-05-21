@@ -69,4 +69,27 @@ test.describe("project-scoped stage workbench projection", () => {
 		await page.waitForURL(`**/projects/${PROJ}/capture*`, { timeout: 5_000 });
 		await expect(page.locator(STAGE_WORKBENCH_ANCHOR.capture)).toBeVisible();
 	});
+
+	test("mobile Capture route renders bottom stage tabs and block actions", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
+		const response = await page.goto(stageRoute(WS, PROJ, "capture"), { waitUntil: "load" });
+		expect(response?.status() ?? 0).toBeLessThan(400);
+
+		await expect(page.locator(STAGE_WORKBENCH_ANCHOR.capture)).toBeVisible();
+		await expect(page.getByRole("group", { name: "Block actions" })).toBeVisible();
+
+		const bottomTabs = page.locator("[data-slot='mobile-stage-tabs'][data-bottom-stage-tabs]");
+		await expect(bottomTabs).toBeVisible();
+		await expect(bottomTabs).toHaveAttribute("data-active-stage", "capture");
+		await expect(bottomTabs.locator("[data-slot='mobile-stage-tab']")).toHaveCount(STAGE_ORDER.length);
+		for (const stage of STAGE_ORDER) {
+			await expect(bottomTabs.locator(`[data-slot='mobile-stage-tab'][data-stage='${stage}']`)).toBeVisible();
+		}
+
+		const blockActions = page.locator("[data-slot='capture-block-actions']");
+		await expect(blockActions).toHaveAttribute("data-safe-area-reserve", "bottom");
+		const tabBox = await bottomTabs.boundingBox();
+		const actionsBox = await blockActions.boundingBox();
+		expect((actionsBox?.y ?? 0) + (actionsBox?.height ?? 0)).toBeLessThanOrEqual(tabBox?.y ?? 0);
+	});
 });
