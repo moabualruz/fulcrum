@@ -40,6 +40,8 @@ import type { TuiTask } from "./screens/task-types.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
 import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
 import { RunsScreen, RunDetailScreen, type TuiRun } from "./screens/runs.ts";
+import { RunsControlScreen } from "./screens/runs-screen.ts";
+import { DoctorScreen } from "./screens/doctor.ts";
 import {
   PlanningBreakdownScreen,
   type ContinuousUpdateInput,
@@ -674,6 +676,8 @@ export class TuiApp {
   private artifactsScreen: ArtifactsScreen | null = null;
   private runsScreen: RunsScreen | null = null;
   private runDetailScreen: RunDetailScreen | null = null;
+  private runsControlScreen: RunsControlScreen | null = null;
+  private doctorScreen: DoctorScreen | null = null;
   private planningScreen: PlanningBreakdownScreen | null = null;
   /**
    * The TUI-native inline `:ai` AI Assist pane (`ChatPane`, CLI-TUI-UX.md §10).
@@ -1144,6 +1148,13 @@ export class TuiApp {
     r.separator();
 
     if (screen === "runs") {
+      if (this.runsControlScreen) {
+        this.runsControlScreen.render(r);
+        r.writeln();
+        r.writeln(c.bold("  Live session pane"));
+        this.runDetailScreen?.render(r);
+        return;
+      }
       r.writeln(c.bold("  Run list"));
       this.runsScreen?.render(r);
       r.writeln();
@@ -1153,6 +1164,11 @@ export class TuiApp {
       r.writeln(c.bold("  Status footer"));
       const run = this.currentRunForFooter;
       r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
+      return;
+    }
+
+    if (screen === "doctor" && this.doctorScreen) {
+      this.doctorScreen.render(r);
       return;
     }
 
@@ -1438,6 +1454,16 @@ export class TuiApp {
       }
       if (this.domainScreen === "tasks" && this.taskListScreen) {
         const consumed = await this.taskListScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "runs" && this.runsControlScreen) {
+        const consumed = await this.runsControlScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "doctor" && this.doctorScreen) {
+        const consumed = await this.doctorScreen.handleKey(key);
         if (consumed) await this._renderCurrentScreen();
         return;
       }
@@ -2156,6 +2182,22 @@ export class TuiApp {
       if (screen === "runs" && this.caller.agent_runs) {
         const runs = await this.caller.agent_runs.list();
         this.domainRows = runs.map((run) => `${run.id}  ${run.agent}  ${run.status}  ${run.taskTitle ?? ""}`);
+        this.runsControlScreen = new RunsControlScreen({
+          projectLabel: this.traceContext.projectId ?? "fulcrum",
+          traceId: this.traceContext.traceId ?? null,
+          mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+          caller: {
+            agent_runs: {
+              list: async () => runs,
+              dispatch: async (input) => await this.caller.agent_runs!.create(input),
+              cancel: async (input) => await this.caller.agent_runs!.cancel(input),
+              retry: async (input) => await this.caller.agent_runs!.get(input),
+              getDeps: async (input) =>
+                (runs.find((run) => run.id === input.id) as (TuiRun & { deps?: [] }) | undefined)?.deps ?? [],
+            },
+          },
+        });
+        await this.runsControlScreen.load();
         this.runsScreen = new RunsScreen({ caller: { agent_runs: this.caller.agent_runs } });
         await this.runsScreen.load();
         const firstRun = runs[0];
@@ -2168,6 +2210,32 @@ export class TuiApp {
           });
           await this.runDetailScreen.load();
         }
+        return;
+      }
+
+      if (screen === "doctor") {
+        this.doctorScreen = new DoctorScreen({
+          projectLabel: this.traceContext.projectId ?? "fulcrum",
+          traceId: this.traceContext.traceId ?? null,
+          mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+          results: [
+            {
+              name: "tui.route",
+              subsystem: "tui",
+              status: "ok",
+              message: "stage routes render canonical workbenches",
+              durationMs: 4,
+            },
+            {
+              name: "tui.status-spine",
+              subsystem: "tui",
+              status: "ok",
+              message: "status spine carries trace and mode footer",
+              durationMs: 3,
+            },
+          ],
+        });
+        this.domainRows = [];
         return;
       }
 

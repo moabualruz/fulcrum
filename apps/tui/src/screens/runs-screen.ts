@@ -426,6 +426,7 @@ export class RunsControlScreen {
       `  ${c.dim("PENDING")} ${counts.pending}  ${c.cyan("RUNNING")} ${counts.running}  ${c.green("COMPLETE")} ${counts.complete}  ${c.yellow("BLOCKED")} ${counts.blocked}  ${c.red("FAILED")} ${counts.failed}`,
     );
     renderer.writeln();
+    renderer.writeln(c.bold("  Run list"));
 
     // Run list — or the shared empty-state contract.
     if (this.runs.length === 0) {

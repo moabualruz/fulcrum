@@ -315,6 +315,40 @@ describe("TUI root navigation — OD stage launcher parity", () => {
     }
   });
 
+  test("runs and doctor routes open canonical workbenches", async () => {
+    const cases = [
+      { route: ":runs", chord: "b", chrome: "fulcrum · :runs", heading: "Stage: Build", pane: "live agent sessions" },
+      { route: ":doctor", chord: "o", chrome: "fulcrum · :doctor", heading: "Stage: Operate", pane: "status spine" },
+    ] as const;
+
+    for (const expected of cases) {
+      const routeTty = new FakeTTY({ columns: 120, rows: 32 });
+      const routeApp = new TuiApp({ output: routeTty, input: routeTty, caller: createCaller() });
+      await routeApp.mount();
+      await routeApp.navigateColon(expected.route);
+
+      const routeRendered = routeTty.plainText();
+      expect(routeRendered).toContain(expected.heading);
+      expect(routeRendered).toContain(expected.chrome);
+      expect(routeRendered).toContain("step modes");
+      expect(routeRendered).toContain(expected.pane);
+      routeApp.stop();
+
+      const chordTty = new FakeTTY({ columns: 120, rows: 32 });
+      const chordApp = new TuiApp({ output: chordTty, input: chordTty, caller: createCaller() });
+      await chordApp.mount();
+      await chordApp.handleKey("g");
+      await chordApp.handleKey(expected.chord);
+
+      const chordRendered = chordTty.plainText();
+      expect(chordRendered).toContain(expected.heading);
+      expect(chordRendered).toContain(expected.chrome);
+      expect(chordRendered).toContain("step modes");
+      expect(chordRendered).toContain(expected.pane);
+      chordApp.stop();
+    }
+  });
+
   test("palette and help are visible from the root launcher", async () => {
     const tty = new FakeTTY({ columns: 120, rows: 40 });
     const app = new TuiApp({ output: tty, input: tty, caller: createCaller() });
