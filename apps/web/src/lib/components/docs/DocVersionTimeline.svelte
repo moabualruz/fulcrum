@@ -206,7 +206,7 @@
                     <span class={cn("flex-1 text-muted-foreground")}>Restore to v{version.versionNum}?</span>
                     <button
                       data-confirm-restore
-                      class={cn(buttonVariants({ variant: "default", size: "sm" }), "h-7 px-3 text-xs")}
+                      class={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-7 px-3 text-xs")}
                       disabled={restoreLoading}
                       onclick={() => handleRestore(version.id)}
                     >
