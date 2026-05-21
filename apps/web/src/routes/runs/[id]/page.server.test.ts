@@ -9,21 +9,26 @@ import { createLocalOrg, createProject } from "@test-support/product-workspace-f
 import { makeId } from "@test-support/product-workspace-fixtures.ts";
 import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
 import { closeDatabase } from "$lib/server/db";
+import { applicationScopeMock } from "$lib/test/application-scope-mock";
 
 let scratch: string;
 let activeDb: TestStore | null = null;
 let activeOrgId = "";
 let activeProjectId: string | null = null;
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string | null = null) => {
-    if (!activeDb) throw new Error("test database not initialized");
-    return {
-      em: activeDb,
-      ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
-    };
-  },
-}));
+// `applicationScopeMock` keeps a complete export set (so sibling suites that
+// import `__setApplicationScopeForTest` still resolve it) and routes foreign
+// suites through the real scope resolver.
+mock.module("$lib/server/application-scope", () =>
+  applicationScopeMock((_locals, projectId) =>
+    activeDb
+      ? {
+          em: activeDb,
+          ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
+        }
+      : null,
+  ),
+);
 
 interface RunDetailPayload {
   run: {
