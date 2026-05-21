@@ -12,6 +12,8 @@
   no feature loss.
 -->
 <script lang="ts">
+  import { CommentThread, type ThreadComment } from "@fulcrum/ui-kit";
+
   type Comment = { id: string; author: string; body: string; ts: string };
   type Thread = { id: string; blockId: string; selection: string; comments: Comment[]; resolved: boolean };
 
@@ -66,13 +68,19 @@
   function close(): void { openThreadFor = null; }
 
   function reply(): void {
-    if (!openThreadFor || !newReply.trim()) return;
+    if (!openThreadFor) return;
+    const input = document.querySelector(
+      `[data-thread-panel][data-thread-for="${openThreadFor}"] [data-thread-reply-input]`,
+    ) as HTMLTextAreaElement | null;
+    const body = (input?.value ?? newReply).trim();
+    if (!body) return;
     threads = threads.map((th) =>
       th.blockId === openThreadFor
-        ? { ...th, comments: [...th.comments, { id: `c${th.comments.length + 1}`, author: "you", body: newReply.trim(), ts: "10:02" }] }
+        ? { ...th, comments: [...th.comments, { id: `c${th.comments.length + 1}`, author: "you", body, ts: "10:02" }] }
         : th,
     );
     newReply = "";
+    if (input) input.value = "";
   }
 
   function startThread(): void {
@@ -105,6 +113,13 @@
   function previewFor(blockId: string): string {
     const first = threadFor(blockId)?.comments[0]?.body ?? "No comment yet.";
     return first.length > 50 ? `${first.slice(0, 50)}...` : first;
+  }
+
+  function uiKitComments(thread: Thread): ThreadComment[] {
+    return thread.comments.map((comment) => ({
+      ...comment,
+      kind: comment.author === "you" ? "you" : "human",
+    }));
   }
 </script>
 
@@ -179,35 +194,26 @@
 
   {#if openThreadFor}
     {@const th = threadFor(openThreadFor)}
-    <aside data-thread-panel data-thread-for={openThreadFor} class="space-y-2 rounded-md border border-border p-3">
-      <header class="flex items-center justify-between">
-        <h2 class="text-base font-medium">Thread on {openThreadFor}</h2>
-        <button type="button" data-thread-close onclick={close} aria-label="Close thread" class="rounded-md border border-border px-2 py-0.5 text-xs">Close</button>
-      </header>
+    <CommentThread
+      data-thread-panel
+      data-thread-for={openThreadFor}
+      threadId={th?.id ?? `new-${openThreadFor}`}
+      anchorLabel={`Thread on ${openThreadFor}`}
+      quote={th ? `Selection: ${th.selection}` : undefined}
+      comments={th ? uiKitComments(th) : []}
+      threadState={th ? (th.resolved ? "resolved" : "open") : "empty"}
+      showComposer={!!th && !th.resolved}
+    >
+      <button type="button" data-thread-close onclick={close} aria-label="Close thread" class="rounded-md border border-border px-2 py-0.5 text-xs">Close</button>
       {#if th}
-        <p data-thread-selection class="rounded-md bg-muted p-2 text-xs">Selection: {th.selection}</p>
-        <ul class="space-y-1" data-thread-comments>
-          {#each th.comments as c}
-            <li data-thread-comment={c.id}>
-              <strong class="text-xs">{c.author}</strong>
-              <p class="text-sm">{c.body}</p>
-            </li>
-          {/each}
-        </ul>
         {#if !th.resolved}
-          <textarea data-thread-reply-input bind:value={newReply} placeholder="Reply…" rows="2" class="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"></textarea>
-          <div class="flex gap-2">
-            <button type="button" data-thread-reply onclick={reply} class="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Reply</button>
-            <button type="button" data-thread-resolve onclick={resolve} class="rounded-md border border-border px-3 py-1 text-xs">Resolve</button>
-            <button type="button" data-delete-mark={openThreadFor} onclick={() => deleteMark(openThreadFor)} class="rounded-md border border-border px-3 py-1 text-xs">Delete mark</button>
-          </div>
-        {:else}
-          <p data-thread-resolved class="text-xs text-muted-foreground">Resolved.</p>
+          <button type="button" data-thread-reply onclick={reply} class="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Reply</button>
+          <button type="button" data-thread-resolve onclick={resolve} class="rounded-md border border-border px-3 py-1 text-xs">Resolve</button>
+          <button type="button" data-delete-mark={openThreadFor} onclick={() => deleteMark(openThreadFor)} class="rounded-md border border-border px-3 py-1 text-xs">Delete mark</button>
         {/if}
       {:else}
-        <p class="text-xs">No thread yet.</p>
         <button type="button" data-thread-start onclick={startThread} class="rounded-md border border-border px-3 py-1 text-xs">Start thread</button>
       {/if}
-    </aside>
+    </CommentThread>
   {/if}
 </main>

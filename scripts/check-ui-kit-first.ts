@@ -28,15 +28,23 @@
  *     `MetricCard`) are matched on the exact stem only, and a delegating file
  *     clears the check.
  *
+ *   RULE 3 — Absorbed primitive responsibility marker.
+ *     Some legacy demos do not use primitive filenames. If a surface declares a
+ *     known absorbed primitive responsibility through stable data hooks and does
+ *     not import `@fulcrum/ui-kit`, flag it. Keep these markers narrow so
+ *     feature composites that merely contain comments, lists, or cards do not
+ *     trip the standing gate.
+ *
  * The scan is structural and deterministic: same input → same output. It reads
  * files only; it never mutates. Exit 0 = clean, exit 1 = violations.
  *
  * Usage: bun run scripts/check-ui-kit-first.ts
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, basename } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /** Directories scanned for surface code. */
 const SURFACE_ROOTS = [
@@ -102,8 +110,32 @@ const UI_KIT_PRIMITIVE_STEMS = new Set(
     "stepper",
     "scrollarea",
     "scroll-area",
+    "comment-thread",
   ].map((s) => s.toLowerCase()),
 );
+
+interface AbsorbedPrimitiveResponsibility {
+  name: string;
+  dataHooks: readonly string[];
+  minimumHooks: number;
+}
+
+const ABSORBED_PRIMITIVE_RESPONSIBILITIES: AbsorbedPrimitiveResponsibility[] = [
+  {
+    name: "CommentThread",
+    dataHooks: [
+      "data-thread-panel",
+      "data-thread-comments",
+      "data-thread-comment",
+      "data-thread-reply-input",
+      "data-thread-reply",
+      "data-thread-resolve",
+      "data-thread-resolved",
+      "data-thread-start",
+    ],
+    minimumHooks: 4,
+  },
+];
 
 /**
  * Files explicitly allowed despite a primitive-matching stem. These are
@@ -161,6 +193,15 @@ function importsUiKit(source: string): boolean {
   return /from\s+["']@fulcrum\/ui-kit["']/.test(source);
 }
 
+function absorbedPrimitiveResponsibility(
+  source: string,
+): AbsorbedPrimitiveResponsibility | undefined {
+  return ABSORBED_PRIMITIVE_RESPONSIBILITIES.find((responsibility) => {
+    const matches = responsibility.dataHooks.filter((hook) => source.includes(hook));
+    return matches.length >= responsibility.minimumHooks;
+  });
+}
+
 for (const rootRel of SURFACE_ROOTS) {
   const rootAbs = join(ROOT, rootRel);
   walk(rootAbs, (abs) => {
@@ -195,6 +236,16 @@ for (const rootRel of SURFACE_ROOTS) {
             detail: `"${basename(abs)}" re-implements a ui-kit primitive without composing @fulcrum/ui-kit; extract to packages/ui-kit or compose the existing primitive`,
           });
         }
+      }
+
+      // ── RULE 3: absorbed primitive responsibility without ui-kit composition ──
+      const absorbed = absorbedPrimitiveResponsibility(source);
+      if (absorbed && !importsUiKit(source) && !ALLOWLIST.has(rel)) {
+        violations.push({
+          file: rel,
+          rule: "absorbed-primitive-responsibility",
+          detail: `declares ${absorbed.name} data hooks without composing @fulcrum/ui-kit; replace route-local implementation with the ui-kit primitive`,
+        });
       }
     }
   });

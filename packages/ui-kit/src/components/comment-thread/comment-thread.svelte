@@ -115,6 +115,8 @@
 
 <section
 	bind:this={ref}
+	role="region"
+	aria-label={`Comment thread for ${anchorLabel}`}
 	data-slot="comment-thread"
 	data-comment-thread={threadId}
 	data-thread-state={threadState}
@@ -152,6 +154,7 @@
 	{#if quote}
 		<div
 			data-slot="comment-thread-quote"
+			data-thread-selection="true"
 			class="mx-3 rounded-sm border border-border bg-muted/60 px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground"
 		>
 			{quote}
@@ -164,11 +167,12 @@
 			No comments on this anchor yet.
 		</p>
 	{:else}
-		<ul data-slot="comment-thread-comments" class="flex flex-col">
+		<ul data-slot="comment-thread-comments" data-thread-comments="true" class="flex flex-col">
 			{#each comments as comment (comment.id)}
 				{@const kind = comment.kind ?? "human"}
 				<li
 					data-comment-thread-comment={comment.id}
+					data-thread-comment={comment.id}
 					data-comment-author-kind={kind}
 					class="flex gap-2.5 border-b border-border px-3 py-2.5 last:border-b-0"
 				>
@@ -205,7 +209,7 @@
 	{/if}
 
 	{#if threadState === "resolved"}
-		<p data-slot="comment-thread-resolved" class="px-3 pb-2.5 text-muted-foreground">
+		<p data-slot="comment-thread-resolved" data-thread-resolved="true" class="px-3 pb-2.5 text-muted-foreground">
 			Resolved — kept as a faded reference.
 		</p>
 	{:else if threadState === "permission"}
@@ -240,6 +244,7 @@
 			<textarea
 				data-slot="comment-thread-reply-input"
 				data-comment-thread-reply-input={threadId}
+				data-thread-reply-input={threadId}
 				bind:value={draft}
 				rows="2"
 				placeholder={isEmpty ? "Start a thread on this anchor… (⌘↵ to submit)" : "Reply… (⌘↵ to submit)"}
