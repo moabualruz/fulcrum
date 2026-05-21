@@ -7,6 +7,13 @@ import {
 	traceFromHash,
 	type WorkflowStage,
 } from "$lib/components/app/route-map.ts";
+import {
+	_degradedFixtureChecks,
+	_deriveSummary,
+	_doctorTelemetryTiles,
+	type DoctorWorkbench,
+} from "../../../../../doctor/+page.server.ts";
+import { buildTimelineFixtureData } from "$lib/components/app/build-timeline-fixture.ts";
 
 const KNOWN_SUBROUTES: Readonly<Record<WorkflowStage, readonly string[]>> = {
 	capture: ["inbox", "docs", "drafts", "promoted"],
@@ -32,6 +39,7 @@ export const load: PageServerLoad = async (event) => {
 
 	const traceId =
 		event.url.searchParams.get("trace") ?? traceFromHash(event.url.searchParams.get("trace"));
+	const doctorChecks = _degradedFixtureChecks();
 
 	return {
 		ws: event.params.ws,
@@ -40,5 +48,15 @@ export const load: PageServerLoad = async (event) => {
 		sub,
 		defaultSub: STAGE_DEFAULT_SUB[typed],
 		traceId,
+		buildTimelineData: buildTimelineFixtureData(event.url.searchParams.get("state") === "empty"),
+		doctorData: {
+			streamed: {
+				workbench: Promise.resolve({
+					checks: doctorChecks,
+					summary: _deriveSummary(doctorChecks),
+					telemetry: _doctorTelemetryTiles(),
+				} satisfies DoctorWorkbench),
+			},
+		},
 	};
 };

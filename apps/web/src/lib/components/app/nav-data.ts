@@ -1,4 +1,5 @@
 import type { StageRailSubnavItem, WorkflowStage } from "@fulcrum/ui-kit";
+import { canonicalStageFor } from "./route-map.ts";
 
 export type { WorkflowStage } from "@fulcrum/ui-kit";
 
@@ -96,6 +97,8 @@ const STAGE_ROUTE_PREFIXES: ReadonlyArray<readonly [string, WorkflowStage]> = [
  * by the ScopeBar (active tab) and by `AppSidebar` (active-stage sub-nav).
  */
 export function stageForPath(pathname: string): WorkflowStage {
+	const canonicalStage = canonicalStageFor(pathname);
+	if (canonicalStage) return canonicalStage;
 	if (pathname === "/") return "capture";
 	for (const [prefix, stage] of STAGE_ROUTE_PREFIXES) {
 		if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return stage;

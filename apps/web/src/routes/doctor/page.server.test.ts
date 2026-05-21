@@ -18,26 +18,26 @@ afterEach(() => {
 });
 
 describe("/doctor +page.server.ts", () => {
-  test("load() returns streamed.checks promise", async () => {
+  test("flat /doctor redirects to the canonical Operate Doctor wrapper", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = mod.load({ url: new URL("http://localhost/doctor") });
-    expect(result.streamed.workbench).toBeInstanceOf(Promise);
-    const workbench = await result.streamed.workbench;
-    expect(Array.isArray(workbench.checks)).toBe(true);
-    expect(workbench.checks.length).toBe(17);
-    expect(workbench.summary.subsystems).toBe(17);
-    expect(workbench.telemetry.length).toBe(2);
+    try {
+      mod.load({ url: new URL("http://localhost/doctor") });
+      throw new Error("expected redirect");
+    } catch (redirect) {
+      expect((redirect as { status?: number }).status).toBe(308);
+      expect((redirect as { location?: string }).location).toBe("/mkh/projects/fulcrum/operate/doctor");
+    }
   });
 
-  test("load() with ?fixture=degraded returns the OD degraded reference scene", async () => {
+  test("flat /doctor preserves query params when redirecting", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 100}`);
-    const result = mod.load({ url: new URL("http://localhost/doctor?fixture=degraded") });
-    const workbench = await result.streamed.workbench;
-    expect(workbench.summary.failing).toBeGreaterThan(0);
-    expect(workbench.summary.failed).toBeGreaterThan(0);
-    const cron = workbench.checks.find((c: { subsystem: string }) => c.subsystem === "scheduler.cron");
-    expect(cron?.recoveryActionKind).toBe("catch-up");
-    expect(cron?.probeTrace?.traceId).toContain("tr_");
+    try {
+      mod.load({ url: new URL("http://localhost/doctor?fixture=degraded") });
+      throw new Error("expected redirect");
+    } catch (redirect) {
+      expect((redirect as { status?: number }).status).toBe(308);
+      expect((redirect as { location?: string }).location).toBe("/mkh/projects/fulcrum/operate/doctor?fixture=degraded");
+    }
   });
 
   test("all 17 subsystems present in correct order", async () => {

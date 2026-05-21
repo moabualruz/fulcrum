@@ -8,6 +8,13 @@ import {
 } from "$lib/components/app/route-map.ts";
 import { resolveCaptureView, type CaptureStep, type CaptureView } from "$lib/components/app/capture-stage.ts";
 import { createDocumentApiForEvent } from "$lib/server/document-api.ts";
+import {
+	_degradedFixtureChecks,
+	_deriveSummary,
+	_doctorTelemetryTiles,
+	type DoctorWorkbench,
+} from "../../../../doctor/+page.server.ts";
+import { buildTimelineFixtureData } from "$lib/components/app/build-timeline-fixture.ts";
 
 /**
  * `/<ws>/projects/<projId>/<stage>` — the canonical WorkflowStage workbench
@@ -114,6 +121,16 @@ export const load: PageServerLoad = async (event) => {
 		projId: event.params.projId,
 		stage: typed,
 		defaultSub: STAGE_DEFAULT_SUB[typed],
+		buildTimelineData: buildTimelineFixtureData(event.url.searchParams.get("state") === "empty"),
+		doctorData: {
+			streamed: {
+				workbench: Promise.resolve({
+					checks: _degradedFixtureChecks(),
+					summary: _deriveSummary(_degradedFixtureChecks()),
+					telemetry: _doctorTelemetryTiles(),
+				} satisfies DoctorWorkbench),
+			},
+		},
 	};
 
 	// The trace hash never reaches the server; the client hydrates it. The
