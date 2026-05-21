@@ -346,7 +346,7 @@
   <section
     data-mobile-runs-frame
     class={cn(
-      "relative grid h-[844px] w-[390px] max-w-full overflow-hidden",
+      "relative grid h-[844px] w-full max-w-[390px] overflow-hidden",
       "border border-border bg-card text-card-foreground sm:rounded-[2.75rem]",
     )}
     style="grid-template-rows: 44px auto 1fr 64px;"
@@ -506,13 +506,18 @@
     {#if sheetOpen && selectedRun}
       <div
         data-mobile-runs-sheet-backdrop
-        class="absolute inset-0 z-30 flex items-end bg-foreground/50"
+        class="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/50"
       >
+        <!--
+          The exposed backdrop above the sheet is the dismiss target — it grows
+          to fill the space the sheet does not cover, so tapping outside the
+          sheet closes it without the sheet intercepting the click.
+        -->
         <button
           type="button"
           data-mobile-runs-sheet-dismiss
           aria-label="Dismiss run detail"
-          class="absolute inset-0 h-full w-full cursor-default"
+          class="min-h-11 flex-1 cursor-default"
           onclick={closeSheet}
         ></button>
         <aside
@@ -526,7 +531,7 @@
             "relative grid w-full overflow-hidden",
             "rounded-t-3xl border-t border-border bg-card shadow-2xl",
           )}
-          style={`grid-template-rows: auto auto 1fr auto; height: ${sheetHeightVh}vh; max-height: ${SHEET_MAX_VH}vh; animation: mobile-sheet-up var(--fulcrum-dur-slow, 240ms) ease;`}
+          style={`grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr auto; height: ${sheetHeightVh}vh; max-height: ${SHEET_MAX_VH}vh; animation: mobile-sheet-up var(--fulcrum-dur-slow, 240ms) ease;`}
         >
           <!-- draggable grabber — DESIGN.md §4.7 -->
           <div
@@ -585,7 +590,7 @@
           <!-- sheet body: inline permission prompt + tool cards -->
           <div
             data-mobile-runs-sheet-body
-            class="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-5 py-3"
+            class="flex min-h-0 flex-col gap-2.5 overflow-y-auto overflow-x-hidden px-5 py-3"
           >
             {#if selectedDetail.permission}
               <!--
@@ -657,7 +662,7 @@
                 {#if tool.open && tool.log}
                   <pre
                     data-mobile-runs-tool-log
-                    class="overflow-x-auto px-3 py-2 font-mono text-[11px] text-muted-foreground"
+                    class="whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] text-muted-foreground"
                   >{tool.log}</pre>
                 {/if}
               </article>

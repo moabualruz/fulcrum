@@ -93,8 +93,14 @@ test.describe("mobile-runs — mobile Build runs OD fidelity", () => {
 			"Persist issuance row per kid",
 		);
 
-		// Selecting a different run swaps the sheet content.
+		// The backdrop is a real modal overlay — tapping it dismisses the sheet,
+		// exposing the feed underneath.
+		await page.locator("[data-mobile-runs-sheet-dismiss]").click();
+		await expect(sheet).toHaveCount(0);
+
+		// Selecting a different run draws the sheet back up over that run.
 		await page.locator("[data-mobile-run-row][data-run-id='run_56e3d12']").click();
+		await expect(page.locator("[data-mobile-runs-sheet]")).toBeVisible();
 		await expect(page.locator("#mobile-runs-sheet-title")).toContainText(
 			"Dedupe trace-id propagation",
 		);
