@@ -94,6 +94,18 @@ describe("CLI command signature regression", () => {
 });
 
 describe("CLI-TUI-UX canonical bin dispatch contract", () => {
+  function runBin(args: readonly string[], env: NodeJS.ProcessEnv = {}) {
+    return spawnSync("bun", ["apps/cli/src/main.ts", ...args], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ...env,
+        FULCRUM_TRACE_ID: env["FULCRUM_TRACE_ID"] ?? "0123456789abcdef0123456789abcdef",
+      },
+    });
+  }
+
   test("cli-signature sweep covers every CLI-TUI-UX.md command root", () => {
     const spec = readFileSync("CLI-TUI-UX.md", "utf8");
     const roots = [...new Set([
@@ -122,24 +134,53 @@ describe("CLI-TUI-UX canonical bin dispatch contract", () => {
   }, 20_000);
 
   test("trace show and operate plugin emit canonical envelopes through the actual bin", () => {
-    const trace = spawnSync("bun", ["apps/cli/src/main.ts", "trace", "show", "4f3a1c9e", "--json"], {
-      cwd: process.cwd(),
-      encoding: "utf8",
-    });
+    const trace = runBin(["trace", "show", "4f3a1c9e", "--json"]);
     expect(trace.status).toBe(0);
     const traceEnvelope = JSON.parse(trace.stdout) as Record<string, unknown>;
     expect(traceEnvelope["schema"]).toBe("fulcrum.cli.v1");
     expect(traceEnvelope["command"]).toBe("trace show");
 
-    const operate = spawnSync("bun", ["apps/cli/src/main.ts", "operate", "plugin", "list", "--json"], {
-      cwd: process.cwd(),
-      encoding: "utf8",
-    });
+    const operate = runBin(["operate", "plugin", "list", "--json"]);
     expect(operate.status).toBe(0);
     const operateEnvelope = JSON.parse(operate.stdout) as Record<string, unknown>;
     expect(operateEnvelope["schema"]).toBe("fulcrum.cli.v1");
     expect(operateEnvelope["command"]).toBe("operate plugin list");
   });
+
+  test.each([
+    ["ship list", ["ship", "list"]],
+    ["agent list", ["agent", "list"]],
+    ["doctor", ["doctor"]],
+    ["mcp list", ["mcp", "list"]],
+    ["session list --no-spawn", ["session", "list", "--no-spawn"]],
+  ] as Array<[string, string[]]>)("%s prints the default trace identity line in plain output", (_label, args) => {
+    const proc = runBin(args);
+    expect(proc.status).toBe(0);
+    expect(proc.stdout).toContain("trace: 01234567");
+  }, 20_000);
+
+  test("session list --json --no-spawn emits a canonical envelope instead of aborting", () => {
+    const proc = runBin(["session", "list", "--json", "--no-spawn"]);
+    expect(proc.status).toBe(0);
+    const parsed = JSON.parse(proc.stdout) as { schema: string; command: string; result: unknown; errors: unknown[] };
+    expect(parsed.schema).toBe("fulcrum.cli.v1");
+    expect(parsed.command).toBe("fulcrum session list");
+    expect(Array.isArray(parsed.errors)).toBe(true);
+  }, 20_000);
+
+  test("root ai --thread preserves thread semantics in the result contract", () => {
+    const proc = runBin(["ai", "--thread", "thread-9", "--json"]);
+    expect(proc.status).toBe(0);
+    const parsed = JSON.parse(proc.stdout) as {
+      schema: string;
+      args: { thread?: string; task?: string; step?: string };
+      result: { threadId?: string; taskId?: string; stepScope?: string };
+    };
+    expect(parsed.schema).toBe("fulcrum.cli.v1");
+    expect(parsed.args.thread).toBe("thread-9");
+    expect(parsed.result.threadId).toBe("thread-9");
+    expect(parsed.result.taskId).not.toBe("thread-9");
+  }, 20_000);
 });
 
 /**

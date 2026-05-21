@@ -82,6 +82,7 @@ export interface EmitResultInput<TResult> extends EnvelopeInput<TResult> {
 function traceLineOptions(
   flag: boolean | { withSpan?: boolean } | undefined,
 ): { withSpan: boolean } | undefined {
+  if (flag === undefined) return { withSpan: false };
   if (!flag) return undefined;
   return { withSpan: flag === true ? false : Boolean(flag.withSpan) };
 }

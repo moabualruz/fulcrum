@@ -39,14 +39,18 @@ describe("fulcrum mcp list", () => {
 		expect(out).toContain("https://example.com/mcp");
 	});
 
-	test("--json emits a parseable array with transport and enabled status", async () => {
+	test("--json emits a canonical envelope with transport and enabled status in result", async () => {
 		await runMcp(["register", "stdio-demo", "--stdio", "echo hello", "--vendor", "acme", "--description", "demo stdio"]);
 		captured.length = 0;
 		await runMcp(["list", "--json"]);
 		const out = captured.join("");
-		const parsed = JSON.parse(out) as Array<{ name: string; transport: string; vendor: string; agent_state: Record<string, string> }>;
-		expect(Array.isArray(parsed)).toBe(true);
-		const entry = parsed.find((e) => e.name === "stdio-demo");
+		const parsed = JSON.parse(out) as {
+			schema: string;
+			result: Array<{ name: string; transport: string; vendor: string; agent_state: Record<string, string> }>;
+		};
+		expect(parsed.schema).toBe("fulcrum.cli.v1");
+		expect(Array.isArray(parsed.result)).toBe(true);
+		const entry = parsed.result.find((e) => e.name === "stdio-demo");
 		expect(entry).toBeDefined();
 		expect(entry?.transport).toBe("stdio");
 		expect(entry?.vendor).toBe("acme");

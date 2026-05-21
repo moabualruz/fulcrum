@@ -43,12 +43,12 @@ describe("fulcrum ai", () => {
     const envelope = JSON.parse(out[0] ?? "{}") as {
       schema: string;
       command: string;
-      args: { task: string; step: string };
-      result: { taskId: string; stepScope: string };
+      args: { task: string; step: string; thread: string };
+      result: { taskId: string; stepScope: string; threadId: string };
     };
     expect(envelope.schema).toBe("fulcrum.cli.v1");
     expect(envelope.command).toBe("fulcrum ai start");
-    expect(envelope.args).toMatchObject({ task: "thread-9", step: "step-7" });
-    expect(envelope.result).toMatchObject({ taskId: "thread-9", stepScope: "step-7" });
+    expect(envelope.args).toMatchObject({ task: "step-7", step: "step-7", thread: "thread-9" });
+    expect(envelope.result).toMatchObject({ taskId: "step-7", stepScope: "step-7", threadId: "thread-9" });
   });
 });

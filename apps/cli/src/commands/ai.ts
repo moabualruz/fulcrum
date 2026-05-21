@@ -95,6 +95,7 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
   switch (verb) {
     case "start": {
       const taskId = flagValue(rest, "--task");
+      const threadId = flagValue(rest, "--thread");
       const title = flagValue(rest, "--title");
       if (!taskId || !title) {
         io.printErr("usage: fulcrum ai start --task <id> --title <title> --step <step-id>");
@@ -170,7 +171,7 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
       // The session result echoes the resolved Step scope so plain output and
       // the envelope `result` both name the Step the session acts on — the CLI
       // analog of the OD drawer header `Step 3 / 8 · …` / the `@scope` chip.
-      const scopedSession = { ...session, stepScope: stepScope.stepId };
+      const scopedSession = { ...session, stepScope: stepScope.stepId, threadId: threadId ?? null };
 
       // `--json` wraps the session in the canonical `fulcrum.cli.v1` envelope;
       // plain output pretty-prints the same session object plus the DESIGN.md
@@ -183,7 +184,7 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
           command: "fulcrum ai start",
           // `args.step` puts the Step scope in the envelope alongside the
           // trace identity — scope + trace travel together.
-          args: { task: taskId, step: stepScope.stepId },
+          args: { task: taskId, step: stepScope.stepId, thread: threadId ?? null },
           result: scopedSession,
           // The session carries the originating Step run's trace id.
           trace: { trace_id: traceId },
@@ -223,11 +224,12 @@ function normalizeAiInvocation(verb: string, rest: readonly string[]): [string, 
   const thread = flagValue(rootArgs, "--thread");
   const step = flagValue(rootArgs, "--step");
   const title = flagValue(rootArgs, "--title") ?? `AI Assist ${step ?? thread ?? "session"}`;
+  const task = step ?? "ai-session";
   return [
     "start",
     [
       "--task",
-      thread ?? step ?? "ai-session",
+      task,
       "--title",
       title,
       ...rootArgs,
