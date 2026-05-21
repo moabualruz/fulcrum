@@ -23,7 +23,10 @@ interface AgentRunRow {
   id: string;
   org_id: string;
   project_id: string | null;
-  agent: string;
+  // `agent_name` is the canonical column (migration 0012); the legacy `agent`
+  // column was made nullable and is no longer written to.
+  agent_name: string | null;
+  agent: string | null;
   model: string | null;
   prompt: string | null;
   status: string;
@@ -57,7 +60,7 @@ async function seedRun(
 ): Promise<string> {
   const id = makeId();
   await db.query(
-    `INSERT INTO agent_runs (id, org_id, project_id, agent, model, prompt, status)
+    `INSERT INTO agent_runs (id, org_id, project_id, agent_name, model, prompt, status)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       id,
@@ -104,7 +107,7 @@ describe("server actions: runs", () => {
 
       const row = await readRun(db, id);
       expect(row?.status).toBe("queued");
-      expect(row?.agent).toBe("codex");
+      expect(row?.agent_name).toBe("codex");
       expect(row?.project_id).toBe(projectId);
 
       const jobs = await db.query<{ payload: Record<string, unknown> }>(
@@ -170,7 +173,7 @@ describe("server actions: runs", () => {
 
       const newRow = await readRun(db, newId);
       expect(newRow?.status).toBe("queued");
-      expect(newRow?.agent).toBe("claude");
+      expect(newRow?.agent_name).toBe("claude");
       expect(newRow?.model).toBe("opus");
       expect(newRow?.prompt).toBe("Original prompt");
       expect(newRow?.project_id).toBe(projectId);

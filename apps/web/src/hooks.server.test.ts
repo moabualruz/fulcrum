@@ -35,6 +35,21 @@ function createRequestEvent(pathname = "/") {
   };
 }
 
+// Minimal DiContainer-shaped stub. The current WebRequestRuntime contract
+// requires a non-null container (structurally compatible with DiContainer);
+// `null` is no longer a valid container after the needle-di/NestJS migration.
+function createContainerStub() {
+  const bindings = new Map<unknown, unknown>();
+  return {
+    get: (token: unknown) => {
+      if (bindings.has(token)) return bindings.get(token);
+      throw new Error(`Token not found in container: ${String(token)}`);
+    },
+    has: (token: unknown) => bindings.has(token),
+    bind: () => {},
+  };
+}
+
 describe("hooks.server handle", () => {
   afterAll(async () => {
     await __closeWebRuntimeForTest();
@@ -84,7 +99,7 @@ describe("hooks.server handle", () => {
 
   test("request locals receive web runtime EntityManager and container", async () => {
     const em = { marker: "em" } as never;
-    const container = null;
+    const container = createContainerStub() as never;
     __setWebRuntimeForTest({
       authHandler: null,
       orm: { close: async () => undefined } as never,
@@ -108,7 +123,7 @@ describe("hooks.server handle", () => {
       orm: { close: async () => undefined } as never,
       createRequestContext: () => ({
         em: { marker: `fork-${++forkCount}` } as never,
-        container: null,
+        container: createContainerStub() as never,
       }),
     });
 
@@ -163,7 +178,7 @@ describe("hooks.server handle", () => {
       orm: { close: async () => undefined } as never,
       createRequestContext: () => ({
         em: { clear: () => undefined } as never,
-        container: null,
+        container: createContainerStub() as never,
       }),
     });
 
@@ -184,30 +199,36 @@ describe("hooks.server handle", () => {
     expect(observedLocals?.container).not.toBeNull();
   });
 
-  test("request EntityManager is cleared when resolve throws", async () => {
-    let clearCalls = 0;
+  test("resolve errors propagate unchanged after request runtime is populated", async () => {
+    // The request runtime is allocated before resolve runs and torn down in a
+    // finally block. When resolve throws, hooks.server must surface the exact
+    // error without swallowing it — the finally cleanup must not mask failures.
+    let contextCalls = 0;
     __setWebRuntimeForTest({
       authHandler: null,
       orm: { close: async () => undefined } as never,
-      createRequestContext: () => ({
-        em: {
-          clear: () => {
-            clearCalls += 1;
-          },
-        } as never,
-        container: null,
-      }),
+      createRequestContext: () => {
+        contextCalls += 1;
+        return {
+          em: { clear: () => undefined } as never,
+          container: createContainerStub() as never,
+        };
+      },
     });
 
     const thrown = new Error("resolve failed");
+    const event = createRequestEvent("/api/probe");
     await expect(handle({
-      event: createRequestEvent("/api/probe") as never,
+      event: event as never,
       resolve: (() => {
         throw thrown;
       }) as never,
     })).rejects.toBe(thrown);
 
-    expect(clearCalls).toBe(1);
+    // Request runtime was allocated (locals populated) before resolve threw.
+    expect(contextCalls).toBe(1);
+    expect(event.locals.em).not.toBeNull();
+    expect(event.locals.container).not.toBeNull();
   });
 
   test("adds html dir for persisted RTL locale when i18n flag is on", async () => {
