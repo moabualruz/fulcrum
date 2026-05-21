@@ -15,7 +15,11 @@ test.describe("ui-kit scroll-area primitive", () => {
 		for (const orientation of ["vertical", "horizontal", "both"]) {
 			const root = section.locator(`[data-slot='scroll-area'][data-orientation='${orientation}']`);
 			await expect(root).toBeVisible();
-			await expect(root.locator("[data-slot='scroll-area-viewport']")).toBeVisible();
+			const viewport = root.locator("[data-slot='scroll-area-viewport']");
+			await expect(viewport).toBeVisible();
+			await expect(viewport).toHaveAttribute("tabindex", "0");
+			await expect(viewport).toHaveAttribute("role", "region");
+			await expect(viewport).toHaveAttribute("aria-label", /.+/);
 		}
 
 		const vertical = section.locator("[data-slot='scroll-area'][data-orientation='vertical']");

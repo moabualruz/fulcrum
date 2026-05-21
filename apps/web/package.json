@@ -22,7 +22,7 @@
 		"web:e2e:full": "bun run scripts/run-real-e2e.ts tests/e2e",
 		"test:design": "bun run scripts/run-design-e2e.ts",
 		"test:e2e": "bun run scripts/run-real-e2e.ts",
-		"web:a11y": "playwright test tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts --project=real-e2e",
+		"web:a11y": "bun run scripts/run-real-e2e.ts tests/a11y/routes.test.ts tests/a11y/cross-cutting.test.ts tests/e2e/accessibility.spec.ts",
 		"i18n:extract": "bun run src/lib/i18n/extract.ts"
 	},
 	"devDependencies": {

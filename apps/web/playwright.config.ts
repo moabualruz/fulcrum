@@ -11,6 +11,7 @@ const realPort = Number(process.env.FULCRUM_REAL_E2E_PORT ?? process.env.FULCRUM
 const serverPort = Number(process.env.FULCRUM_SERVER_TEST_PORT ?? "3100");
 const quotedWebRoot = JSON.stringify(webRoot);
 const quotedRepoRoot = JSON.stringify(repoRoot);
+const syncUiKitCommand = `cd ${quotedRepoRoot} && cd packages/ui-kit && bun x svelte-kit sync`;
 const skipDesignE2eServer = process.env.FULCRUM_SKIP_DESIGN_E2E_SERVER === "1";
 const skipRealE2eServers = process.env.FULCRUM_SKIP_REAL_E2E_SERVERS === "1";
 
@@ -44,7 +45,7 @@ export default defineConfig({
 		// which would leave a partial `.svelte-kit/output` whose
 		// `manifest-full.js` imports `nodes/<n>.js` files that were never written.
 		...skipDesignE2eServer ? [] : [{
-			command: `cd ${quotedWebRoot} && bun run svelte-kit sync && bun run build && bun run preview -- --host 127.0.0.1 --port ${designPort}`,
+			command: `${syncUiKitCommand} && cd ${quotedWebRoot} && bun run svelte-kit sync && bun --bun node_modules/vite/bin/vite.js build && bun --bun node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${designPort}`,
 			port: designPort,
 			timeout: 180_000,
 			env: {
@@ -68,7 +69,7 @@ export default defineConfig({
 			reuseExistingServer: false,
 		},
 		{
-			command: `cd ${quotedWebRoot} && bun run dev -- --host 127.0.0.1 --port ${realPort}`,
+			command: `${syncUiKitCommand} && cd ${quotedWebRoot} && bun --bun node_modules/vite/bin/vite.js dev --host 127.0.0.1 --port ${realPort}`,
 			port: realPort,
 			env: {
 				FULCRUM_HOME: fulcrumHome,
@@ -90,7 +91,7 @@ export default defineConfig({
 		},
 		{
 			name: "real-e2e",
-			testMatch: "e2e/**/*.spec.ts",
+			testMatch: ["a11y/**/*.test.ts", "e2e/**/*.spec.ts"],
 			use: {
 				...devices["Desktop Chrome"],
 				baseURL: `http://127.0.0.1:${realPort}`,

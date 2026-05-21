@@ -97,7 +97,7 @@
   }
 
   p {
-    color: var(--color-muted, #6b7280);
+    color: var(--color-muted-foreground, var(--fg-muted));
     margin: 0.25rem 0 0;
   }
 
@@ -136,7 +136,7 @@
   }
 
   span {
-    color: var(--color-muted, #6b7280);
+    color: var(--color-muted-foreground, var(--fg-muted));
     font-size: 0.8125rem;
   }
 
@@ -160,13 +160,13 @@
   }
 
   th {
-    color: var(--color-muted, #6b7280);
+    color: var(--color-muted-foreground, var(--fg-muted));
     font-size: 0.8125rem;
     font-weight: 600;
   }
 
   .empty {
-    color: var(--color-muted, #6b7280);
+    color: var(--color-muted-foreground, var(--fg-muted));
     text-align: center;
   }
 

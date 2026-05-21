@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button, EmptyState } from "@fulcrum/ui-kit";
+
   type Notification = { id: string; title: string; body: string };
 
   let notifications = $state<Notification[]>([]);
@@ -16,11 +18,15 @@
   <h1 class="text-2xl font-semibold">Notifications</h1>
 
   {#if notifications.length === 0}
-    <section data-notif-empty class="space-y-2 rounded-md border border-dashed border-border p-6 text-center">
-      <p class="text-base font-medium">No notifications yet</p>
-      <p class="text-sm text-muted-foreground">When someone @mentions you, assigns a task, or comments on your doc, it shows up here.</p>
-      <button type="button" data-notif-empty-cta onclick={addOne} class="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">Add a sample notification</button>
-    </section>
+    <EmptyState
+      data-notif-empty
+      title="No notifications yet"
+      description="When someone @mentions you, assigns a task, or comments on your doc, it shows up here."
+    >
+      {#snippet actions()}
+        <Button size="sm" data-notif-empty-cta onclick={addOne}>Add a sample notification</Button>
+      {/snippet}
+    </EmptyState>
   {:else}
     <ul class="space-y-2" data-notif-list>
       {#each notifications as n}
@@ -30,6 +36,6 @@
         </li>
       {/each}
     </ul>
-    <button type="button" data-notif-clear onclick={clearAll} class="rounded-md border border-border bg-background px-3 py-1 text-xs">Clear all</button>
+    <Button variant="outline" size="sm" data-notif-clear onclick={clearAll}>Clear all</Button>
   {/if}
 </main>
