@@ -8,6 +8,11 @@ import {
 	type WorkflowStage,
 } from "$lib/components/app/route-map.ts";
 import {
+	isCaptureView,
+	type CaptureStep,
+	type CaptureView,
+} from "$lib/components/app/capture-stage.ts";
+import {
 	_degradedFixtureChecks,
 	_deriveSummary,
 	_doctorTelemetryTiles,
@@ -40,6 +45,8 @@ export const load: PageServerLoad = async (event) => {
 	const traceId =
 		event.url.searchParams.get("trace") ?? traceFromHash(event.url.searchParams.get("trace"));
 	const doctorChecks = _degradedFixtureChecks();
+	const captureView: CaptureView | null = typed === "capture" && isCaptureView(sub) ? sub : null;
+	const captureSteps: CaptureStep[] = [];
 
 	return {
 		ws: event.params.ws,
@@ -47,6 +54,8 @@ export const load: PageServerLoad = async (event) => {
 		stage: typed,
 		sub,
 		defaultSub: STAGE_DEFAULT_SUB[typed],
+		captureView,
+		captureSteps,
 		traceId,
 		buildTimelineData: buildTimelineFixtureData(event.url.searchParams.get("state") === "empty"),
 		doctorData: {

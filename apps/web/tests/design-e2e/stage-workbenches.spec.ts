@@ -6,6 +6,7 @@ import {
 	STAGE_ORDER,
 	canonicalRouteForLegacyPath,
 	stageRoute,
+	stageSubroute,
 } from "../../src/lib/components/app/route-map.ts";
 
 const WS = "acme";
@@ -66,8 +67,18 @@ test.describe("project-scoped stage workbench projection", () => {
 		await page.goto(stageRoute(WS, PROJ, "capture"), { waitUntil: "load" });
 
 		await page.locator("[data-slot='stage-rail']").getByRole("link", { name: "Inbox" }).click();
-		await page.waitForURL(`**/projects/${PROJ}/capture*`, { timeout: 5_000 });
+		await page.waitForURL(`**/projects/${PROJ}/capture/inbox`, { timeout: 5_000 });
 		await expect(page.locator(STAGE_WORKBENCH_ANCHOR.capture)).toBeVisible();
+	});
+
+	test("Capture inbox subroute renders the Capture workbench", async ({ page }) => {
+		const response = await page.goto(stageSubroute(WS, PROJ, "capture", "inbox"), {
+			waitUntil: "load",
+		});
+		expect(response?.status() ?? 0).toBeLessThan(400);
+		expect(new URL(page.url()).pathname).toBe(stageSubroute(WS, PROJ, "capture", "inbox"));
+		await expect(page.locator(STAGE_WORKBENCH_ANCHOR.capture)).toBeVisible();
+		await expect(page.getByRole("heading", { name: "Inbox is clear." })).toBeVisible();
 	});
 
 	test("mobile Capture route renders bottom stage tabs and block actions", async ({ page }) => {

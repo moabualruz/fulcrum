@@ -41,8 +41,11 @@
 		isMobileViewport,
 	} from "$lib/util/media-query";
 	import { cn } from "$lib/utils.js";
-	import { withTrace, type WorkflowStage } from "$lib/components/app/route-map.ts";
-	import { STAGE_NAV_ITEMS, stageForPath as stageForNavPath } from "$lib/components/app/nav-data.ts";
+	import { stageRoute, withTrace, type WorkflowStage } from "$lib/components/app/route-map.ts";
+	import {
+		stageForPath as stageForNavPath,
+		stageNavItemsForScope,
+	} from "$lib/components/app/nav-data.ts";
 
 	import type { InferenceStatus } from "$lib/components/app/AppTopbar.svelte";
 
@@ -76,6 +79,15 @@
 	let aiComposerTextarea = $state<HTMLTextAreaElement | null>(null);
 	const aiDrawerSide = $derived<AcpDrawerSide>(mobile ? "bottom" : "right");
 	const activeMobileStage = $derived(stageForNavPath(page.url.pathname));
+	const currentPathSegments = $derived(page.url.pathname.split("/").filter(Boolean));
+	const currentWorkspace = $derived(
+		currentPathSegments[1] === "projects" ? (currentPathSegments[0] ?? "mkh") : "mkh",
+	);
+	const currentProjectId = $derived(
+		data.activeProjectId ??
+			(currentPathSegments[1] === "projects" ? (currentPathSegments[2] ?? "fulcrum") : "fulcrum"),
+	);
+	const mobileStageItems = $derived(stageNavItemsForScope(currentWorkspace, currentProjectId));
 
 	/*
 	 * The AI Assist drawer auto-scopes to the current Step. Static OD-backed
@@ -190,14 +202,13 @@
 			o: "operate",
 		};
 		const stage = STAGE_BY_KEY[key];
-		if (stage) {
-			if (inProjectScope) {
-				// Canonical scope — swap only the `<stage>` segment.
-				return `/${segments[0]}/projects/${segments[2]}/${stage}`;
+			if (stage) {
+				if (inProjectScope) {
+					// Canonical scope — swap only the `<stage>` segment.
+					return `/${segments[0]}/projects/${segments[2]}/${stage}`;
+				}
+				return stageRoute("mkh", data.activeProjectId ?? "fulcrum", stage);
 			}
-			// Legacy scope — fall back to the stage's home route.
-			return STAGE_NAV_ITEMS.find((item) => item.stage === stage)?.href ?? null;
-		}
 		if (key === "d") return inProjectScope ? `/${segments[0]}/dashboard` : "/";
 		if (key === "i") return inProjectScope ? `/${segments[0]}/inbox` : "/inbox";
 		return null;
@@ -587,8 +598,8 @@
 					/>
 				</div>
 			</details>
-			<MobileStageTabs
-				items={STAGE_NAV_ITEMS}
+				<MobileStageTabs
+					items={mobileStageItems}
 				current={activeMobileStage}
 				aiAssistOpen={aiAssistOpen}
 				onNavigate={navigateMobileStage}
@@ -607,7 +618,7 @@
 			data-shell-region="stage-rail"
 			data-rail-collapsed={railCollapsed ? "true" : "false"}
 		>
-			<AppSidebar activeProjectId={data.activeProjectId} />
+				<AppSidebar activeProjectId={data.activeProjectId} {railCollapsed} />
 		</div>
 		<div class={cn("flex min-w-0 flex-1 flex-col")}>
 			<div class={cn("flex items-center")}>

@@ -1,5 +1,11 @@
 import type { StageRailSubnavItem, WorkflowStage } from "@fulcrum/ui-kit";
-import { canonicalStageFor } from "./route-map.ts";
+import {
+	canonicalStageFor,
+	DEFAULT_CANONICAL_PROJECT,
+	DEFAULT_CANONICAL_WORKSPACE,
+	stageRoute,
+	stageSubroute,
+} from "./route-map.ts";
 
 export type { WorkflowStage } from "@fulcrum/ui-kit";
 
@@ -27,19 +33,25 @@ export interface StageNavItem {
 }
 
 /**
- * One stage → its production route. Capture is the workspace root `/`; the rest
- * open their stage workbench. This is **data only** — the ScopeBar stage-tab
- * strip consumes it; the StageRail does not render it. Old feature-bucket routes
- * redirect to these stage homes via `prd-web-stage-route-model`.
+ * One stage → its default canonical project-scoped route. Shell consumers with
+ * live scope call `stageNavItemsForScope()` so the same IA route grammar drives
+ * ScopeBar chords and mobile tabs. Old feature-bucket routes are redirects only.
  */
 export const STAGE_NAV_ITEMS: readonly StageNavItem[] = [
-	{ stage: "capture", href: "/" },
-	{ stage: "plan", href: "/plan-session" },
-	{ stage: "build", href: "/build-board" },
-	{ stage: "review", href: "/review" },
-	{ stage: "ship", href: "/ship" },
-	{ stage: "operate", href: "/doctor" },
+	{ stage: "capture", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "capture") },
+	{ stage: "plan", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan") },
+	{ stage: "build", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "build") },
+	{ stage: "review", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "review") },
+	{ stage: "ship", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "ship") },
+	{ stage: "operate", href: stageRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate") },
 ] as const;
+
+export function stageNavItemsForScope(ws: string, projId: string): readonly StageNavItem[] {
+	return STAGE_NAV_ITEMS.map((item) => ({
+		stage: item.stage,
+		href: stageRoute(ws, projId, item.stage),
+	}));
+}
 
 /**
  * Route-prefix → WorkflowStage mapping. Every pre-existing destination resolves
@@ -114,36 +126,36 @@ export function stageForPath(pathname: string): WorkflowStage {
  */
 export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]> = {
 	capture: [
-		{ id: "capture-inbox", label: "Inbox", href: "/inbox" },
-		{ id: "capture-docs", label: "Docs", href: "/docs" },
+		{ id: "capture-inbox", label: "Inbox", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "capture", "inbox") },
+		{ id: "capture-docs", label: "Docs", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "capture", "docs") },
 	],
 	plan: [
-		{ id: "plan-sessions", label: "Sessions", href: "/plan-session" },
-		{ id: "plan-reviews", label: "Reviews", href: "/plan-review" },
-		{ id: "plan-prototypes", label: "Prototypes", href: "/plan-prototypes" },
-		{ id: "plan-templates", label: "Templates", href: "/review-templates" },
-		{ id: "plan-prompts", label: "Prompts", href: "/plan-prompts" },
+		{ id: "plan-sessions", label: "Sessions", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "sessions") },
+		{ id: "plan-reviews", label: "Reviews", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "review") },
+		{ id: "plan-prototypes", label: "Prototypes", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "prototypes") },
+		{ id: "plan-templates", label: "Templates", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "templates") },
+		{ id: "plan-prompts", label: "Prompts", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "prompts") },
 	],
 	build: [
-		{ id: "build-board", label: "Board", href: "/build-board" },
-		{ id: "build-graph", label: "Graph", href: "/build-graph" },
-		{ id: "build-runs", label: "Runs", href: "/build-runs" },
-		{ id: "build-timeline", label: "Timeline", href: "/build-timeline" },
+		{ id: "build-board", label: "Board", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "build", "board") },
+		{ id: "build-graph", label: "Graph", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "build", "graph") },
+		{ id: "build-runs", label: "Runs", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "build", "runs") },
+		{ id: "build-timeline", label: "Timeline", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "build", "timeline") },
 	],
 	review: [
-		{ id: "review-queue", label: "Queue", href: "/review" },
-		{ id: "review-search", label: "Search", href: "/review-search" },
-		{ id: "review-comments", label: "Comments", href: "/comments" },
-		{ id: "review-templates", label: "Templates", href: "/review-templates" },
+		{ id: "review-queue", label: "Queue", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "review", "queue") },
+		{ id: "review-search", label: "Search", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "review", "search") },
+		{ id: "review-comments", label: "Comments", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "review", "comments") },
+		{ id: "review-templates", label: "Templates", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "review", "templates") },
 	],
 	ship: [
-		{ id: "ship-artifacts", label: "Artifacts", href: "/ship" },
-		{ id: "ship-archive", label: "Archive", href: "/ship-archive" },
+		{ id: "ship-artifacts", label: "Artifacts", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "ship", "artifacts") },
+		{ id: "ship-archive", label: "Archive", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "ship", "archive") },
 	],
 	operate: [
-		{ id: "operate-doctor", label: "Doctor", href: "/doctor" },
-		{ id: "operate-alerts", label: "Alerts", href: "/operate-alerts" },
-		{ id: "operate-audit", label: "Audit", href: "/audit" },
+		{ id: "operate-doctor", label: "Doctor", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "doctor") },
+		{ id: "operate-alerts", label: "Alerts", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "alerts") },
+		{ id: "operate-audit", label: "Audit", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "telemetry") },
 	],
 } as const;
 
@@ -153,6 +165,20 @@ export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]>
  */
 export function subnavForStage(stage: WorkflowStage): readonly StageRailSubnavItem[] {
 	return STAGE_SUBNAV[stage];
+}
+
+export function subnavForStageScope(
+	stage: WorkflowStage,
+	ws: string,
+	projId: string,
+): readonly StageRailSubnavItem[] {
+	return STAGE_SUBNAV[stage].map((item) => {
+		const sub = item.id.replace(`${stage}-`, "");
+		return {
+			...item,
+			href: stageSubroute(ws, projId, stage, sub),
+		};
+	});
 }
 
 export const LUCIDE_ICON_NAMES = [
@@ -208,13 +234,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		label: "System",
 		items: [
-			{ id: "settings", href: "/settings", label: "Settings", iconName: "Settings" },
-			{ id: "knowledge", href: "/memory", label: "Knowledge", iconName: "BookOpen" },
-			{ id: "mcp", href: "/operate-mcp", label: "MCP", iconName: "Server" },
-			{ id: "plugins", href: "/skill-registry", label: "Plugins", iconName: "Plug" },
-		],
-	},
-] as const;
+				{ id: "settings", href: "/settings", label: "Settings", iconName: "Settings" },
+				{ id: "knowledge", href: "/memory", label: "Knowledge", iconName: "BookOpen" },
+				{ id: "mcp", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "mcp"), label: "MCP", iconName: "Server" },
+				{ id: "plugins", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "plugins"), label: "Plugins", iconName: "Plug" },
+			],
+		},
+	] as const;
 
 export const WORKSPACE_NAV_ITEMS: readonly NavItem[] =
 	NAV_GROUPS.find((group) => group.label === "Workspace")?.items ?? [];

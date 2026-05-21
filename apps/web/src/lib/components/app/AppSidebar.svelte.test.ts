@@ -22,7 +22,7 @@ mock.module("$app/state", () => ({
   },
 }));
 
-type AppSidebarProps = { activeProjectId: string | null };
+type AppSidebarProps = { activeProjectId: string | null; railCollapsed?: boolean };
 
 describe("AppSidebar component", () => {
   let render: typeof import("svelte/server").render;
@@ -52,6 +52,14 @@ describe("AppSidebar component", () => {
     expect(body).toContain('data-collapsed="false"');
   });
 
+  test("passes the shell collapsed state through to the StageRail primitive", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null, railCollapsed: true },
+    });
+    expect(body).toContain('data-slot="stage-rail"');
+    expect(body).toContain('data-collapsed="true"');
+  });
+
   test("does NOT render the six-stage workflow axis as rail items", () => {
     // Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
     // Capture→Operate axis belongs to the ScopeBar tab strip — the rail must
@@ -77,6 +85,8 @@ describe("AppSidebar component", () => {
     for (const label of ["Inbox", "Docs"]) {
       expect(body).toContain(label);
     }
+    expect(body).toContain('href="/mkh/projects/fulcrum/capture/inbox"');
+    expect(body).toContain('href="/mkh/projects/fulcrum/capture/docs"');
   });
 
   test("keeps the rail synced to the active stage via data-current", () => {
@@ -106,6 +116,8 @@ describe("AppSidebar component", () => {
     for (const label of ["Settings", "Knowledge", "MCP", "Plugins"]) {
       expect(body).toContain(label);
     }
+    expect(body).toContain('href="/mkh/projects/fulcrum/operate/mcp"');
+    expect(body).toContain('href="/mkh/projects/fulcrum/operate/plugins"');
   });
 
   test("placeholder shows '—' when activeProjectId is null", () => {

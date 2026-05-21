@@ -2,21 +2,26 @@
 	import { page } from "$app/state";
 
 	import { StageRail } from "@fulcrum/ui-kit";
-	import { STAGE_WORKBENCH_ROUTE, stageRoute, type WorkflowStage } from "$lib/components/app/route-map.ts";
+	import {
+		DEFAULT_CANONICAL_PROJECT,
+		DEFAULT_CANONICAL_WORKSPACE,
+		stageSubroute,
+	} from "$lib/components/app/route-map.ts";
 	import { cn } from "$lib/utils.js";
 
 	import {
 		SYSTEM_NAV_ITEMS,
 		WORKSPACE_NAV_ITEMS,
 		stageForPath,
-		subnavForStage,
+		subnavForStageScope,
 	} from "./nav-items.ts";
 
 	interface Props {
 		activeProjectId: string | null;
+		railCollapsed?: boolean;
 	}
 
-	let { activeProjectId }: Props = $props();
+	let { activeProjectId, railCollapsed = false }: Props = $props();
 
 	function workspaceFromPath(path: string): string {
 		const parts = path.split("/").filter(Boolean);
@@ -30,12 +35,6 @@
 		return parts[projectIndex + 1] ?? null;
 	}
 
-	function stageWorkbenchHref(stage: WorkflowStage): string {
-		const projectId = activeProjectId ?? projectFromPath(page.url.pathname);
-		if (projectId) return stageRoute(workspaceFromPath(page.url.pathname), projectId, stage);
-		return STAGE_WORKBENCH_ROUTE[stage];
-	}
-
 	// AppSidebar is a thin data-supplying consumer of the `@fulcrum/ui-kit`
 	// StageRail primitive — it owns no rail markup of its own.
 	//
@@ -46,16 +45,18 @@
 	// replica. `stageForPath` resolves the live route to a WorkflowStage so the
 	// rail picks the right sub-nav; that route↔stage mapping stays available as
 	// data (`STAGE_NAV_ITEMS`, `stageForPath`) for the ScopeBar to consume.
-	// Collapse is fixed expanded here; the 56px collapsed rail is owned by the
-	// responsive shell PRD.
 	const activeStage = $derived(stageForPath(page.url.pathname));
-	const effectiveProjectId = $derived(activeProjectId ?? projectFromPath(page.url.pathname));
+	const effectiveWorkspace = $derived(workspaceFromPath(page.url.pathname) || DEFAULT_CANONICAL_WORKSPACE);
+	const displayProjectId = $derived(activeProjectId ?? projectFromPath(page.url.pathname));
+	const effectiveProjectId = $derived(
+		displayProjectId ?? DEFAULT_CANONICAL_PROJECT,
+	);
 
 	const substages = $derived(
-		subnavForStage(activeStage).map((item, index) => ({
+		subnavForStageScope(activeStage, effectiveWorkspace, effectiveProjectId).map((item) => ({
 			id: item.id,
 			label: item.label,
-			href: index === 0 ? stageWorkbenchHref(activeStage) : item.href,
+			href: item.href,
 			count: item.count,
 		})),
 	);
@@ -66,17 +67,22 @@
 		href: item.href,
 	}));
 
-	const system = SYSTEM_NAV_ITEMS.map((item) => ({
-		id: item.id,
-		label: item.label,
-		href: item.href,
-	}));
+	const system = $derived(
+		SYSTEM_NAV_ITEMS.map((item) => ({
+			id: item.id,
+			label: item.label,
+			href:
+				item.id === "mcp" || item.id === "plugins"
+					? stageSubroute(effectiveWorkspace, effectiveProjectId, "operate", item.id)
+					: item.href,
+		})),
+	);
 </script>
 
 <aside aria-label="primary navigation" class={cn("flex h-full flex-col")}>
 	<StageRail
 		current={activeStage}
-		collapsed={false}
+		collapsed={railCollapsed}
 		{substages}
 		{workspace}
 		{system}
@@ -84,6 +90,6 @@
 		class="flex-1"
 	/>
 	<div class={cn("border-r border-t border-border bg-surface-sunken p-3")}>
-		<span class={cn("text-xs text-fg-muted")}>{effectiveProjectId ?? "—"}</span>
+		<span class={cn("text-xs text-fg-muted")}>{displayProjectId ?? "—"}</span>
 	</div>
 </aside>
