@@ -10,6 +10,33 @@ const VERSION = "0.1.0";
 const BUILD_DATE = process.env["FULCRUM_BUILD_DATE"] ?? "dev";
 const COMMIT = process.env["FULCRUM_COMMIT"] ?? "dev";
 
+const INDEX_DISPATCH_ROOTS = new Set([
+  "agent",
+  "branch",
+  "config",
+  "context",
+  "cycle",
+  "doc",
+  "e2e",
+  "mission",
+  "module",
+  "note",
+  "operate",
+  "plan",
+  "plugin",
+  "pr",
+  "profile",
+  "prototype",
+  "qa",
+  "release",
+  "repo",
+  "review",
+  "run",
+  "trace",
+  "uat",
+  "workspace",
+]);
+
 function printVersion(argv: readonly string[]): void {
   const result = {
     version: VERSION,
@@ -141,6 +168,7 @@ async function main() {
     case "auth":
     case "flags":
     case "routing":
+    case "route":
     case "db":
     case "web":
     case "tui":
@@ -148,18 +176,22 @@ async function main() {
     case "agents":
     case "projects":
     case "capture":
+    case "task":
     case "tasks":
     case "sprints":
     case "memory":
     case "search":
     case "artifacts":
+    case "artifact":
     case "repos":
+    case "repo":
     case "docs":
     case "symphony":
     case "runs":
     case "session":
     case "ai":
     case "mode":
+    case "context":
     case "notify":
     case "audit":
     case "webhooks":
@@ -195,6 +227,11 @@ async function main() {
       return;
     }
     default:
+      if (INDEX_DISPATCH_ROOTS.has(cmd)) {
+        const { run } = await import("./index.ts");
+        await run([cmd, ...rest]);
+        return;
+      }
       console.error(`fulcrum: unknown command '${cmd}'`);
       if (cmd === "projcts") {
         console.error("Did you mean 'projects'?");

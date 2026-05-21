@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 
 import { run as runArtifact } from "../artifact.ts";
 import { run as runConnectors } from "../connectors.ts";
@@ -88,6 +90,55 @@ describe("CLI command signature regression", () => {
     const io = capture();
     await run(invalid, { ...io.opts, caller } as never);
     expect(io.exits).toContain(2);
+  });
+});
+
+describe("CLI-TUI-UX canonical bin dispatch contract", () => {
+  test("cli-signature sweep covers every CLI-TUI-UX.md command root", () => {
+    const spec = readFileSync("CLI-TUI-UX.md", "utf8");
+    const roots = [...new Set([
+      ...spec
+        .split(/\n/)
+        .map((line) => line.match(/^fulcrum\s+([a-z][\w-]*)\b/)?.[1])
+        .filter((root): root is string => Boolean(root)),
+      "operate",
+    ])].sort();
+
+    expect(roots).toContain("trace");
+    expect(roots).toContain("operate");
+    expect(roots).toContain("plugin");
+    expect(roots).toContain("repo");
+    expect(roots).toContain("agent");
+
+    for (const root of roots) {
+      const args = root === "help" || root === "version" ? [root] : [root, "--help"];
+      const result = spawnSync("bun", ["apps/cli/src/main.ts", ...args], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+      });
+      const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+      expect(output).not.toContain(`fulcrum: unknown command '${root}'`);
+    }
+  }, 20_000);
+
+  test("trace show and operate plugin emit canonical envelopes through the actual bin", () => {
+    const trace = spawnSync("bun", ["apps/cli/src/main.ts", "trace", "show", "4f3a1c9e", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    expect(trace.status).toBe(0);
+    const traceEnvelope = JSON.parse(trace.stdout) as Record<string, unknown>;
+    expect(traceEnvelope["schema"]).toBe("fulcrum.cli.v1");
+    expect(traceEnvelope["command"]).toBe("trace show");
+
+    const operate = spawnSync("bun", ["apps/cli/src/main.ts", "operate", "plugin", "list", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    expect(operate.status).toBe(0);
+    const operateEnvelope = JSON.parse(operate.stdout) as Record<string, unknown>;
+    expect(operateEnvelope["schema"]).toBe("fulcrum.cli.v1");
+    expect(operateEnvelope["command"]).toBe("operate plugin list");
   });
 });
 

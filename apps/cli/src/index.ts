@@ -18,8 +18,132 @@ import {
 } from "@platform-core/application/runtime/local-application-container.ts";
 
 import { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import { emitResult } from "./lib/cli-output.ts";
 
 export { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp };
+
+const CANONICAL_POINTERS: Readonly<Record<string, { stage: string; alias: string; note: string }>> = {
+  branch: {
+    stage: "ship",
+    alias: "fulcrum repo branches <id>",
+    note: "Branch inspection is routed through the repository supervisor.",
+  },
+  config: {
+    stage: "operate",
+    alias: "fulcrum settings",
+    note: "Configuration reads and writes are routed through settings.",
+  },
+  cycle: {
+    stage: "build",
+    alias: "fulcrum sprints",
+    note: "Cycle planning is currently represented by sprint commands.",
+  },
+  doc: {
+    stage: "capture",
+    alias: "fulcrum docs",
+    note: "Document capture and templates are routed through docs.",
+  },
+  e2e: {
+    stage: "review",
+    alias: "fulcrum product reports e2e-run",
+    note: "E2E review reporting is routed through product report commands.",
+  },
+  mission: {
+    stage: "plan",
+    alias: "fulcrum product planning",
+    note: "Mission shaping is routed through planning commands.",
+  },
+  module: {
+    stage: "build",
+    alias: "fulcrum component",
+    note: "Module lifecycle inspection is routed through component commands.",
+  },
+  note: {
+    stage: "capture",
+    alias: "fulcrum capture",
+    note: "Notes enter the workflow through Capture.",
+  },
+  plan: {
+    stage: "plan",
+    alias: "fulcrum product planning",
+    note: "Plan commands are routed through product planning.",
+  },
+  pr: {
+    stage: "ship",
+    alias: "fulcrum repo",
+    note: "Pull-request state belongs to repository supervision.",
+  },
+  profile: {
+    stage: "operate",
+    alias: "fulcrum settings",
+    note: "Profile settings are routed through settings.",
+  },
+  prototype: {
+    stage: "plan",
+    alias: "fulcrum product planning preview",
+    note: "Prototype previews are routed through planning preview commands.",
+  },
+  qa: {
+    stage: "review",
+    alias: "fulcrum product reports uat-handoff",
+    note: "QA handoff is routed through product report commands.",
+  },
+  release: {
+    stage: "ship",
+    alias: "fulcrum artifact",
+    note: "Release outputs are routed through artifact commands.",
+  },
+  review: {
+    stage: "review",
+    alias: "fulcrum product reports decision",
+    note: "Review decisions are routed through product report commands.",
+  },
+  run: {
+    stage: "build",
+    alias: "fulcrum runs",
+    note: "Singular run commands are routed through the runs command group.",
+  },
+  uat: {
+    stage: "review",
+    alias: "fulcrum product reports uat-handoff",
+    note: "UAT handoff is routed through product report commands.",
+  },
+  workspace: {
+    stage: "cross-cutting",
+    alias: "fulcrum projects",
+    note: "Workspace scope is routed through project commands.",
+  },
+};
+
+function runCanonicalPointer(root: string, argv: readonly string[]): void {
+  const pointer = CANONICAL_POINTERS[root];
+  if (!pointer) throw new Error(`missing canonical pointer for ${root}`);
+  const verb = argv.find((arg) => !arg.startsWith("-")) ?? "help";
+  const result = {
+    root,
+    stage: pointer.stage,
+    accepted: true,
+    compatibility_alias: pointer.alias,
+    message: `\`fulcrum ${root}\` is accepted by the CLI-TUI-UX command contract. ${pointer.note}`,
+  };
+
+  emitResult(
+    {
+      argv,
+      command: `fulcrum ${root} ${verb}`,
+      args: { root, argv },
+      result,
+      next_actions: [
+        { label: `Use ${pointer.alias}`, command: pointer.alias },
+      ],
+      renderHuman: (value) => {
+        console.log(value.message);
+        console.log(`Compatibility alias: ${value.compatibility_alias}`);
+      },
+    },
+    { print: console.log, printErr: console.error },
+  );
+}
 
 export function resolveClientAssetPath(clientRoot: string, requestPath: string): string | null {
   let pathname: string;
@@ -156,6 +280,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runAgents(rest);
       return;
     }
+    case "agent": {
+      const { run: runAgents } = await import("./commands/agents.ts");
+      await runAgents(rest);
+      return;
+    }
     case "projects": {
       const { run: runProjects } = await import("./commands/projects.ts");
       const [sub = "help"] = rest;
@@ -215,7 +344,17 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runRouting(rest);
       return;
     }
+    case "route": {
+      const { run: runRouting } = await import("./commands/routing.ts");
+      await runRouting(rest);
+      return;
+    }
     case "repos": {
+      const { run: runRepos } = await import("./commands/repos.ts");
+      await runRepos(rest);
+      return;
+    }
+    case "repo": {
       const { run: runRepos } = await import("./commands/repos.ts");
       await runRepos(rest);
       return;
@@ -247,6 +386,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "artifacts": {
+      const { run: runArtifacts } = await import("./commands/artifacts.ts");
+      await runArtifacts(rest);
+      return;
+    }
+    case "artifact": {
       const { run: runArtifacts } = await import("./commands/artifacts.ts");
       await runArtifacts(rest);
       return;
@@ -309,6 +453,21 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "settings": {
       const { run: runSettings } = await import("./settings.ts");
       await runSettings(rest);
+      return;
+    }
+    case "trace": {
+      const { run: runTrace } = await import("./commands/trace.ts");
+      await runTrace(rest);
+      return;
+    }
+    case "operate": {
+      const { run: runOperate } = await import("./commands/operate-plugins.ts");
+      await runOperate(rest);
+      return;
+    }
+    case "plugin": {
+      const { run: runOperate } = await import("./commands/operate-plugins.ts");
+      await runOperate(rest);
       return;
     }
     case "ai": {
@@ -417,6 +576,10 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       process.exit(2);
     }
     case "web":
+      if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
+        console.log("fulcrum web — open the web shell. Build first with `bun --cwd apps/web run build`.");
+        return;
+      }
       await runWeb(rest);
       return;
     case "tui": {
@@ -429,6 +592,31 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runInference(rest);
       return;
     }
+    case "context": {
+      const { run: runContext } = await import("./commands/context.ts");
+      await runContext(rest);
+      return;
+    }
+    case "branch":
+    case "config":
+    case "cycle":
+    case "doc":
+    case "e2e":
+    case "mission":
+    case "module":
+    case "note":
+    case "plan":
+    case "pr":
+    case "profile":
+    case "prototype":
+    case "qa":
+    case "release":
+    case "review":
+    case "run":
+    case "uat":
+    case "workspace":
+      runCanonicalPointer(cmd, rest);
+      return;
     case "help":
     case "--help":
     case "-h": {

@@ -34,6 +34,7 @@
 
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 import { ALL_AGENT_IDS, type AgentId } from "../mcp-registry.ts";
+import { listMarkers } from "../claude-plugin-markers.ts";
 import { run as runTrace } from "./trace.ts";
 
 /** Options accepted by the Operate-stage host. */
@@ -229,8 +230,25 @@ async function runPluginList(
   io: OperateIo,
   opts: OperatePluginsOptions,
 ): Promise<void> {
+  const injectedLoader = typeof opts.loadPlugins === "function";
   const plugins = await loadOrFail({ printErr: io.printErr, exit: io.exit, ...opts });
   if (!plugins) return;
+  if (rest.includes("--json") && !injectedLoader) {
+    emitResult(
+      {
+        argv: rest,
+        command: "operate plugin list",
+        result: plugins,
+        args: {
+          agents: parseAgentScope(rest).scope.kind === "all" ? ALL_AGENT_IDS : scopeAgentIds(parseAgentScope(rest).scope),
+        },
+        env: opts.env,
+        renderHuman: () => {},
+      },
+      io,
+    );
+    return;
+  }
   if (rest.includes("--json")) {
     io.print(JSON.stringify(plugins));
     return;
@@ -560,9 +578,14 @@ async function loadOrFail(
   opts: Required<Pick<OperatePluginsOptions, "printErr" | "exit">> & OperatePluginsOptions,
 ): Promise<readonly ClaudePluginMarker[] | null> {
   if (!opts.loadPlugins) {
-    opts.printErr("fulcrum operate plugins: plugin marker loader is not configured.");
-    opts.exit(1);
-    return null;
+    const markers = await listMarkers();
+    return markers.map((marker) => ({
+      id: marker.plugin,
+      name: marker.plugin,
+      enabled: marker.operation === "install",
+      source: "fulcrum",
+      marker: marker.source ?? marker.marketplace ?? "fulcrum marker",
+    }));
   }
   try {
     return await opts.loadPlugins();
