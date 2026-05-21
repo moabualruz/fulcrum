@@ -7,7 +7,7 @@
  * boundary so tests can exercise every action without spinning up
  * Nest/TypeORM.
  *
- * Copy uses "AI Assist" consistently — never the raw "ACP" acronym
+ * Copy uses "AI Assist" consistently instead of the raw protocol acronym
  * (matrix rule 48).
  */
 

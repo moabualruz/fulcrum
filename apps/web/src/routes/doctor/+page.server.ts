@@ -467,7 +467,7 @@ export function _doctorTelemetryTiles(): DoctorTelemetryTile[] {
 export function _degradedFixtureChecks(): SubsystemCheckResult[] {
   const at = (s: string) => `2026-05-17T${s}.000Z`;
   return [
-    { ...ok("acp.bridge", "acp.bridge", "ACP bridge reachable"), checked_at: at("11:54:09"), latencyP99Ms: 42 },
+    { ...ok("acp.bridge", "acp.bridge", "Protocol session bridge reachable"), checked_at: at("11:54:09"), latencyP99Ms: 42 },
     { ...ok("mcp.fulcrum", "mcp.fulcrum", "MCP server reachable"), checked_at: at("11:54:09"), latencyP99Ms: 8 },
     { ...ok("mcp.context-mode", "mcp.context-mode", "MCP server reachable"), checked_at: at("11:54:09"), latencyP99Ms: 14 },
     {

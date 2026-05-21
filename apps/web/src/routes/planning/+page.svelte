@@ -6,7 +6,7 @@
 	 * live-session implementations: this service-wired forms route and the
 	 * OD-faithful `plan-session/` shell. The single rendered Plan live-session
 	 * target is now `/plan-session` (OD `plan-session.html`, DESIGN.md §8 Live
-	 * Session Pane, IA-MAP.md §2.2 "Live ACP session").
+	 * Session Pane, IA-MAP.md §2.2 "Live protocol session").
 	 *
 	 * Per the migration-strategy.md value-preservation checklist this old path
 	 * must keep resolving (no 404) and its features must stay findable. The

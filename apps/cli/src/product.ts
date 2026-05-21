@@ -539,7 +539,7 @@ async function runPlanning(caller: ProductCaller, argv: readonly string[], io: I
     }
     case "guided-acp-start": {
       const start = requirePlanning(caller).startGuidedAcpPlanningSession;
-      if (!start) throw new Error("planning guided ACP start caller is not configured");
+      if (!start) throw new Error("planning AI Assist session start caller is not configured");
       return printValue(await start(guidedAcpStartInput(rest)), rest, io.print);
     }
     case "freeform-prompt": {

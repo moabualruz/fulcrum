@@ -342,16 +342,16 @@ export interface TuiAppOptions {
   /** Approved-plan input used when opening the planning breakdown screen. */
   planningInput?: PlanningBreakdownInput;
 
-  /** Freeform-doc prompt input used when requesting ACP planning context. */
+  /** Freeform-doc prompt input used when requesting protocol-backed planning context. */
   freeformPlanningInput?: FreeformPlanningPromptInput;
 
   /** Freeform intake input used when starting workflow work from a rough document. */
   freeformStartInput?: FreeformWorkStartInput;
 
-  /** Guided ACP planning input used when starting a protocol-backed planning session. */
+  /** Guided AI Assist planning input used when starting a protocol-backed planning session. */
   guidedAcpInput?: GuidedAcpPlanningInput;
 
-  /** Continuous update input used when restarting planning from edited docs or ACP state. */
+  /** Continuous update input used when restarting planning from edited docs or protocol session state. */
   continuousUpdateInput?: ContinuousUpdateInput;
 
   /** Planning generation input used when requesting prototype and boilerplate review artifacts. */
@@ -538,7 +538,7 @@ function defaultGuidedAcpInput(): GuidedAcpPlanningInput {
   return {
     agentName: "codex",
     cwd: "/Users/mkh/workspace/fulcrum",
-    userPrompt: "Plan with selected context through ACP.",
+    userPrompt: "Plan with selected context through AI Assist.",
     promptTemplateId: "prototype-first",
     selectedDocIds: [],
     traceId: "tui-planning",

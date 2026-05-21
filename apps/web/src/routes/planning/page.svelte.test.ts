@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, mock, test } from "bun:test";
 // Pane workbench`) consolidated the legacy form-based `/planning` route into
 // the canonical `/plan-session` workbench. `/planning` is now a 200 redirect
 // stub — it must keep resolving and forward to the workbench. The legacy
-// planning *form* behaviour (preview / materialize / freeform / guided ACP /
+// planning *form* behaviour (preview / materialize / freeform / guided AI Assist /
 // continuous-update / generate / artifact-execution / workflow-cycle actions)
 // lives on in `planning/+page.server.ts` and is covered by
 // `planning/page.server.test.ts`; this file verifies the redirect contract.

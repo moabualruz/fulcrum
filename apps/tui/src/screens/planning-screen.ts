@@ -5,11 +5,11 @@
  * The Plan stage's planning-sessions surface, re-homed under the shared
  * `StageWorkbench` shell so it carries the same `fulcrum · :plan · …` header,
  * StatusFooter strip, and empty/error contract as every other stage workbench.
- * Shows current planning state, starts guided ACP or freeform planning
+ * Shows current planning state, starts guided AI Assist or freeform planning
  * sessions, and displays session status with traffic info.
  *
  * Keybindings:
- *   G       — start guided ACP session
+ *   G       — start guided AI Assist session
  *   F       — start freeform planning
  *   R       — refresh state
  *   j/k     — navigate sessions
@@ -308,4 +308,3 @@ export class PlanningScreen {
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
 }
-

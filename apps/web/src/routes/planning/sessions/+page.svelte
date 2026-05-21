@@ -1,10 +1,10 @@
 <script lang="ts">
 	/**
-	 * `/planning/sessions` — legacy ACP-sessions feature route.
+	 * `/planning/sessions` — legacy protocol-sessions feature route.
 	 *
 	 * `prd-web-plan-session-od-fidelity` folded the guided/freeform session
 	 * controls into the OD Live Session Pane at `/plan-session` (DESIGN.md §8;
-	 * IA-MAP.md §2.2 "Live ACP session"). The `AcpSession` typing and the
+	 * IA-MAP.md §2.2 "Live protocol session"). The `AcpSession` typing and the
 	 * `guidedAcpStart` / `freeformStart` action surface in
 	 * `planning/sessions/+page.server.ts` are preserved untouched; the Plan dock
 	 * tab of the new pane summarizes every guided session.
@@ -24,7 +24,7 @@
 </script>
 
 <svelte:head>
-	<title>ACP Sessions</title>
+	<title>Planning Sessions</title>
 	<meta http-equiv="refresh" content="0; url=/plan-session" />
 </svelte:head>
 
