@@ -138,13 +138,13 @@ describe("CLI-TUI-UX canonical bin dispatch contract", () => {
     expect(trace.status).toBe(0);
     const traceEnvelope = JSON.parse(trace.stdout) as Record<string, unknown>;
     expect(traceEnvelope["schema"]).toBe("fulcrum.cli.v1");
-    expect(traceEnvelope["command"]).toBe("trace show");
+    expect(traceEnvelope["command"]).toBe("fulcrum trace show");
 
     const operate = runBin(["operate", "plugin", "list", "--json"]);
     expect(operate.status).toBe(0);
     const operateEnvelope = JSON.parse(operate.stdout) as Record<string, unknown>;
     expect(operateEnvelope["schema"]).toBe("fulcrum.cli.v1");
-    expect(operateEnvelope["command"]).toBe("operate plugin list");
+    expect(operateEnvelope["command"]).toBe("fulcrum operate plugin list");
   });
 
   test.each([
@@ -205,7 +205,7 @@ describe("operate plugin envelope + root plugin alias", () => {
     const parsed = JSON.parse(proc.stdout) as Record<string, unknown>;
     expect(Array.isArray(parsed)).toBe(false);
     expect(parsed["schema"]).toBe("fulcrum.cli.v1");
-    expect(parsed["command"]).toBe("operate plugin list");
+    expect(parsed["command"]).toBe("fulcrum operate plugin list");
     expect(Array.isArray(parsed["result"])).toBe(true);
     expect(Array.isArray(parsed["errors"])).toBe(true);
   }, 20_000);
@@ -217,7 +217,7 @@ describe("operate plugin envelope + root plugin alias", () => {
     const parsed = JSON.parse(proc.stdout) as Record<string, unknown>;
     expect(Array.isArray(parsed)).toBe(false);
     expect(parsed["schema"]).toBe("fulcrum.cli.v1");
-    expect(parsed["command"]).toBe("plugin list");
+    expect(parsed["command"]).toBe("fulcrum plugin list");
   }, 20_000);
 
   test("`operate plugin enable --agent codex --json` emits a coded error envelope", () => {
@@ -229,7 +229,7 @@ describe("operate plugin envelope + root plugin alias", () => {
       errors: Array<{ code: string }>;
     };
     expect(envelope.schema).toBe("fulcrum.cli.v1");
-    expect(envelope.command).toBe("operate plugin enable");
+    expect(envelope.command).toBe("fulcrum operate plugin enable");
     expect(envelope.result).toBeNull();
     expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
   }, 20_000);
@@ -243,7 +243,7 @@ describe("operate plugin envelope + root plugin alias", () => {
       errors: Array<{ code: string }>;
     };
     expect(envelope.schema).toBe("fulcrum.cli.v1");
-    expect(envelope.command).toBe("plugin enable");
+    expect(envelope.command).toBe("fulcrum plugin enable");
     expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
   }, 20_000);
 

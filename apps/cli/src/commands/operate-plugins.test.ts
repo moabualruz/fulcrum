@@ -86,7 +86,7 @@ describe("operate plugin list: canonical envelope, not a raw array", () => {
     const io = captureIO();
     await run(["list", "--json"], { ...io, loadPlugins: async () => fakeMarkers() });
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("operate plugin list");
+    expect(envelope["command"]).toBe("fulcrum operate plugin list");
     expect(envelope["result"]).toHaveLength(2);
     expect((envelope["result"] as ClaudePluginMarker[])[0]?.id).toBe("claude-code");
   });
@@ -116,7 +116,7 @@ describe("operate plugin list: canonical envelope, not a raw array", () => {
     const io = captureIO();
     await run(["show", "claude-code", "--json"], { ...io, loadPlugins: async () => fakeMarkers() });
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("operate plugin show");
+    expect(envelope["command"]).toBe("fulcrum operate plugin show");
     expect((envelope["result"] as ClaudePluginMarker).id).toBe("claude-code");
   });
 
@@ -138,7 +138,7 @@ describe("fulcrum plugin: CLI-TUI-UX.md §1.6 root alias", () => {
       loadPlugins: async () => fakeMarkers(),
     });
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("plugin list");
+    expect(envelope["command"]).toBe("fulcrum plugin list");
     expect(envelope["result"]).toHaveLength(2);
   });
 
@@ -150,7 +150,7 @@ describe("fulcrum plugin: CLI-TUI-UX.md §1.6 root alias", () => {
       loadPlugins: async () => fakeMarkers(),
     });
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("plugin show");
+    expect(envelope["command"]).toBe("fulcrum plugin show");
   });
 
   test("`plugin help` prints the plugin usage block", async () => {
@@ -166,7 +166,7 @@ describe("operate plugin mutations: coded error envelopes (no cross-agent server
     const io = captureIO();
     await run(["plugin", "enable", "caveman", "--agent", "codex", "--json"], io);
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("operate plugin enable");
+    expect(envelope["command"]).toBe("fulcrum operate plugin enable");
     const errors = envelope["errors"] as Array<{ code: string }>;
     expect(errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
     expect((envelope["args"] as { agents: string[] }).agents).toEqual(["codex"]);
@@ -179,7 +179,7 @@ describe("operate plugin mutations: coded error envelopes (no cross-agent server
       invocationRoot: "plugin",
     });
     const envelope = expectCanonicalEnvelope(io.out[0]!);
-    expect(envelope["command"]).toBe("plugin enable");
+    expect(envelope["command"]).toBe("fulcrum plugin enable");
     const errors = envelope["errors"] as Array<{ code: string }>;
     expect(errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
   });

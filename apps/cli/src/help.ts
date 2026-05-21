@@ -271,6 +271,11 @@ const CLI_RESULT_SCHEMA = {
   },
 } as const;
 
+function renderCommandSchema(command?: string): typeof CLI_RESULT_SCHEMA {
+  void command;
+  return CLI_RESULT_SCHEMA;
+}
+
 function renderStageGroup(stage: StageHelp): string {
   const heading = stage.label.toUpperCase();
   const body = stage.commands.map((line) => `  ${line}`).join("\n");
@@ -330,5 +335,6 @@ export {
   CLI_RESULT_SCHEMA,
   ROOT_HELP,
   STAGE_HELP_TOPICS,
+  renderCommandSchema,
   renderStageHelp,
 };

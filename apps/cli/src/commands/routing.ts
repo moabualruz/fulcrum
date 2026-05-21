@@ -42,6 +42,7 @@ type RoutingEnrichedDecision = {
 type RoutingCaller = {
   routing: {
     list: (input?: JsonRecord) => Promise<RoutingRuleRow[]>;
+    show?: (input: { action: string; projectId?: string }) => Promise<RoutingRuleRow | null>;
     create: (input: JsonRecord) => Promise<RoutingRuleRow>;
     update: (input: JsonRecord) => Promise<RoutingRuleRow | null>;
     delete: (input: { id: string }) => Promise<{ ok: true }>;
@@ -76,6 +77,7 @@ Routing commands.
 
 Usage:
   fulcrum route list [--project <id>] [--json]
+  fulcrum route show <action> [--project <id>] [--json]
   fulcrum route set <action> <agent> [--project <id>] [--json]
 
   fulcrum routing rules list [--project <id>] [--json]
@@ -106,7 +108,7 @@ export async function run(
   const [scope = "help", ...rest] = argv;
   const commandRoot = opts.commandRoot ?? "routing";
 
-  if (scope === "help" || scope === "--help" || scope === "-h") {
+  if (scope === "help" || argv.includes("--help") || argv.includes("-h")) {
     print(HELP);
     return;
   }
@@ -148,6 +150,25 @@ export async function run(
         result,
         print,
         human: (value) => `Set ${action} route to ${(value as RoutingRuleRow).actionAgent}.`,
+      });
+    });
+  }
+
+  if (scope === "show") {
+    return withErrors("show", runOpts, async () => {
+      const action = requireArg(rest, 0, "show", "<action>");
+      const projectId = flagValue(rest, "--project");
+      const caller = await resolveCaller(runOpts);
+      const result = caller.routing.show
+        ? await caller.routing.show(compact({ action, projectId }) as { action: string; projectId?: string })
+        : findRouteForAction(await caller.routing.list(compact({ projectId })), action);
+      emitRoutingResult({
+        argv,
+        command: `fulcrum ${commandRoot} show`,
+        args: { action, projectId },
+        result,
+        print,
+        human: formatRoute,
       });
     });
   }
@@ -200,9 +221,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing rules: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `rules ${verb}`, `fulcrum ${commandRoot} rules: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -251,9 +271,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing drafts: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `drafts ${verb}`, `fulcrum ${commandRoot} drafts: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -291,9 +310,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing llm-gate: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `llm-gate ${verb}`, `fulcrum ${commandRoot} llm-gate: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -306,9 +324,8 @@ export async function run(
     case "dry-run":
       return runSimulate(rest, scope, runOpts);
     default:
-      printErr(`fulcrum routing: unknown command '${scope}'`);
-      printErr(HELP);
-      exit(2);
+      emitUnknownCommand(runOpts, scope, `fulcrum ${commandRoot}: unknown command '${scope}'`);
+      return;
   }
 }
 
@@ -482,6 +499,21 @@ function formatRules(value: unknown): string {
   ].join("\n");
 }
 
+function findRouteForAction(rows: readonly RoutingRuleRow[], action: string): RoutingRuleRow | null {
+  return rows.find((row) => row.conditionsJson["action"] === action || row.name === `Default ${action}`) ?? null;
+}
+
+function formatRoute(value: unknown): string {
+  const row = value as RoutingRuleRow | null;
+  if (!row) return "No route found.";
+  return [
+    `action: ${String(row.conditionsJson["action"] ?? "")}`,
+    `agent: ${row.actionAgent}`,
+    `ruleId: ${row.id}`,
+    `source: ${row.source}`,
+  ].join("\n");
+}
+
 function formatDecision(value: unknown): string {
   const decision = value as RoutingDecision | null;
   if (!decision) return "No routing decision.";
@@ -547,6 +579,32 @@ async function withErrors(
     );
     opts.exit(1);
   }
+}
+
+function emitUnknownCommand(
+  opts: Required<Pick<RoutingRunOptions, "print" | "printErr" | "exit">> & RoutingRunOptions,
+  command: string,
+  message: string,
+): void {
+  emitErrorResult(
+    {
+      argv: opts.currentArgv ?? [],
+      command: `fulcrum ${opts.commandRoot ?? "routing"} ${command}`,
+      args: {},
+      error: {
+        code: "FUL_ROUTING_UNKNOWN_COMMAND",
+        message,
+        fix: "Run `fulcrum route --help` for routing commands.",
+      },
+      renderHuman: () => {
+        opts.printErr(message);
+        opts.printErr(HELP);
+      },
+      recoveryCopy: false,
+    },
+    { print: opts.print, printErr: opts.printErr },
+  );
+  opts.exit(2);
 }
 
 async function resolveCaller(opts: RoutingRunOptions): Promise<RoutingCaller> {
