@@ -84,6 +84,10 @@ _Avoid_: Mode buttons, action row, agent buttons.
 The DESIGN.md §2 semantic web typography roles: `type-display`, `type-h1`, `type-h2`, `type-h3`, `type-body`, `type-caption`, and `type-code`. These map to the Tailwind v4 text tokens in `apps/web/src/app.css` and are the only source of truth for font size, line-height, weight, font family, and zero letter spacing in OD-referenced surfaces.
 _Avoid_: raw heading utilities (`text-lg`, `text-xl`, `text-2xl`) used as hierarchy in new Workbench or shell code.
 
+**MotionContract**:
+The DESIGN.md §5 timing and easing budget for state-change motion: drawer slide 200ms, modal scale/opacity 180ms, toast slide-in 180ms, run-feed line entry 120ms, tool-call expansion 150ms, and permission prompt slide-in 200ms. It is positive-motion proof, separate from the reduced-motion collapse in DESIGN.md §1.6; it bans decorative loops, bounce, parallax, and autoplay as communication-free motion.
+_Avoid_: animation polish, decorative motion, page-load choreography, bounce, parallax.
+
 **StagePeek**:
 The overlay used to open any entity by id (`/<ws>/browse/<id>`) without leaving the current Stage — surfaces a Step's detail without losing list/board context.
 _Avoid_: Modal, preview, sidebar peek, detail flyout.
@@ -122,6 +126,7 @@ _Avoid_: Tour, walkthrough, getting started, wizard, signup stepper.
 - Every **Workbench**, **StageRail**, **ScopeBar**, **StatusFooter**, **TraceBadge**, and **AcpDrawer** renders hierarchy through **TypeRole** tokens so dense operator screens preserve the OD type scale across desktop, mobile, and forced-colors modes.
 - A **PortfolioSurface** has no Project Scope; the **StageRail** collapses or swaps to portfolio nav when active.
 - The **OnboardingFlow** starts at `/onboarding`, keeps one trace through workspace + project setup into the Capture surface, where the first-run **coachmark** teaches the first `▶ Play` and the first TraceBadge pulse fires once; subsequent sessions never re-enter it.
+- The **MotionContract** applies to every **AcpDrawer**, modal/dialog, toast, run-feed entry, tool-call expansion, and permission prompt; **AcpDrawer** still collapses through the global reduced-motion guard, but normal motion must remain inside the positive OD duration budget.
 - Every **Workbench**, **AcpDrawer** action, and **CommandPalette** entry calls a service (tRPC client → NestJS service in `services/**`); this app holds no domain state beyond ephemeral UI state in `$lib/stores`.
 
 ## Example dialogue

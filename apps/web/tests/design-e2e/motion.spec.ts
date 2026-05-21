@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { captureScreenshot } from "../../scripts/run-design-e2e.ts";
+import type { Page } from "@playwright/test";
 
 /**
  * Rendered design-gate proof for the DESIGN.md §1.6 / §3 lines 409-411
@@ -28,6 +29,63 @@ function maxSeconds(value: string): number {
 			return Number.parseFloat(part) || 0;
 		})
 		.reduce((max, item) => Math.max(max, item), 0);
+}
+
+type MotionTiming = {
+	animationDuration: string;
+	animationIterationCount: string;
+	animationName: string;
+	transitionDuration: string;
+	transitionProperty: string;
+	transitionTimingFunction: string;
+};
+
+async function motionTiming(
+	locator: ReturnType<Page["locator"]>,
+): Promise<MotionTiming> {
+	return locator.first().evaluate((node) => {
+		const style = getComputedStyle(node);
+		return {
+			animationDuration: style.animationDuration,
+			animationIterationCount: style.animationIterationCount,
+			animationName: style.animationName,
+			transitionDuration: style.transitionDuration,
+			transitionProperty: style.transitionProperty,
+			transitionTimingFunction: style.transitionTimingFunction,
+		};
+	});
+}
+
+function expectMotionBudget(
+	label: string,
+	timing: MotionTiming,
+	maxDurationSeconds: number,
+): void {
+	const observed = Math.max(
+		maxSeconds(timing.animationDuration),
+		maxSeconds(timing.transitionDuration),
+	);
+	expect(observed, `${label} exceeds DESIGN.md §5 duration budget`).toBeLessThanOrEqual(
+		maxDurationSeconds,
+	);
+	expect(
+		timing.transitionTimingFunction,
+		`${label} must not use linear or bounce-like easing`,
+	).not.toMatch(/\blinear\b|steps\(/);
+	expect(
+		timing.animationIterationCount,
+		`${label} must not loop decorative motion`,
+	).not.toBe("infinite");
+}
+
+async function openAiAssistDrawer(page: Page) {
+	const modifier = process.platform === "darwin" ? "Meta" : "Control";
+	const drawer = page.locator("[data-slot='acp-drawer']").first();
+	await expect(async () => {
+		await page.keyboard.press(`${modifier}+Slash`);
+		await expect(drawer).toBeVisible({ timeout: 1_000 });
+	}).toPass({ timeout: 15_000 });
+	return drawer;
 }
 
 /**
@@ -70,6 +128,65 @@ async function elementsWithLiveMotion(
 }
 
 test.describe("shell reduced-motion guard", () => {
+	test("keeps the positive AcpDrawer slide within the 200ms OD drawer budget", async ({
+		page,
+	}) => {
+		await page.emulateMedia({ reducedMotion: "no-preference" });
+		await page.goto("/", { waitUntil: "load" });
+		await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+
+		const drawer = await openAiAssistDrawer(page);
+		await expect(drawer).toHaveAttribute("data-side", "right");
+		const timing = await motionTiming(drawer);
+
+		expectMotionBudget("AcpDrawer slide", timing, 0.2);
+		expect(maxSeconds(timing.transitionDuration)).toBeGreaterThan(0);
+		expect(timing.transitionProperty).toMatch(/transform|translate|opacity|overlay/);
+
+		const file = await captureScreenshot(page, "motion-acp-drawer-positive");
+		expect(file).toContain("motion-acp-drawer-positive");
+	});
+
+	test("keeps modal and toast surface motion inside DESIGN.md §5 timing budgets", async ({
+		page,
+	}) => {
+		await page.emulateMedia({ reducedMotion: "no-preference" });
+		await page.goto("/design-kit", { waitUntil: "load" });
+		await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+
+		await page.locator("[data-design-kit-skill-conflict-trigger]").click();
+		const dialog = page.locator("[data-slot='dialog-content']").first();
+		await expect(dialog).toBeVisible();
+		expectMotionBudget("Dialog scale-in", await motionTiming(dialog), 0.18);
+		await page.keyboard.press("Escape");
+		await expect(dialog).toBeHidden();
+
+		await page.locator("[data-design-kit-toast-publish='success']").click();
+		const toast = page.locator("[data-slot='toast']").first();
+		await expect(toast).toBeVisible();
+		expectMotionBudget("Toast entry", await motionTiming(toast), 0.18);
+	});
+
+	test("keeps feed and tool-call style rows non-decorative and under streaming budgets", async ({
+		page,
+	}) => {
+		await page.emulateMedia({ reducedMotion: "no-preference" });
+		await page.goto("/design-kit", { waitUntil: "load" });
+		await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
+
+		const runFeedItems = page.locator("[data-slot='run-feed-item']");
+		await expect(runFeedItems.first()).toBeVisible();
+		for (const item of await runFeedItems.all()) {
+			expectMotionBudget("Run feed item state-change", await motionTiming(item), 0.15);
+		}
+
+		const permissionRows = page.locator("[data-copy-lock-permission-button]");
+		await expect(permissionRows.first()).toBeVisible();
+		for (const row of await permissionRows.all()) {
+			expectMotionBudget("Permission prompt option", await motionTiming(row), 0.2);
+		}
+	});
+
 	test("collapses every shell animation and transition to instant under prefers-reduced-motion", async ({
 		page,
 	}) => {
@@ -146,12 +263,7 @@ test.describe("shell reduced-motion guard", () => {
 		// listener binds in the layout's `onMount`; pressing it before hydration is
 		// a no-op, so retry the chord until the shell drawer renders. This drives
 		// the real shell entry point rather than a page-local surface.
-		const modifier = process.platform === "darwin" ? "Meta" : "Control";
-		const drawer = page.locator("[data-slot='acp-drawer']").first();
-		await expect(async () => {
-			await page.keyboard.press(`${modifier}+Slash`);
-			await expect(drawer).toBeVisible({ timeout: 1_000 });
-		}).toPass({ timeout: 15_000 });
+		const drawer = await openAiAssistDrawer(page);
 		const drawerTiming = await drawer.evaluate((node) => {
 			const style = getComputedStyle(node);
 			return {
