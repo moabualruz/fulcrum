@@ -92,6 +92,10 @@ _Avoid_: Org switcher, account dropdown, team picker.
 A Stage-specific dense layout (Plan tripane, Build board/list/table/calendar/gantt/graph, Review diff workbench, Ship artifacts list, Operate doctor table). Every Workbench is a render of service data, never a holder of it.
 _Avoid_: Page, screen, dashboard, view (when referring to the Stage-specific layout).
 
+**BuildTimelineWorkbench**:
+The Build-stage 14-day Gantt Workbench — one lane per work item, a day-header row with the current day highlighted, a positioned status-colored bar per lane, a current-day `.now` line, and a status legend. The user-facing layout name is **Timeline**; the canonical route segment is `gantt` (`/<ws>/projects/<projId>/build/gantt`). The web Gantt mirrors the TUI `:timeline` screen (`apps/tui/src/screens/task-timeline.ts`) data shape so the two surfaces stay in parity.
+_Avoid_: Roadmap, schedule view, calendar (Calendar is a separate Build layout).
+
 **PortfolioSurface**:
 A workspace-scope route with no active Project — Dashboard, Projects list, Global Docs, Search, Memory, Inbox.
 _Avoid_: Home, overview, global page.
@@ -132,3 +136,4 @@ _Avoid_: Tour, walkthrough, getting started, wizard.
 - "Dashboard" vs "Home" vs "Workspace home" — resolved: **PortfolioSurface** is the umbrella; the specific landing at `/<ws>/dashboard` is the Dashboard surface. "Home" is not a term.
 - "Mode" (UI mode) vs "Mode" (vim-style NORMAL/INSERT in **StatusFooter**) — resolved: **ModeAffordance** refers to manual / Play / Discuss / AI Assist execution mode; the **StatusFooter** mode pill is the input mode (NORMAL/INSERT/FILTER/COMMAND) inherited from the TUI. Two unrelated concepts; never conflated.
 - "Step" vs "Task" vs "Item" — resolved: **Step** is the universal mode-bearing unit across every Stage. A Build Task is one Step type; a Capture Doc is another Step type. "Item" is avoided; "task" is reserved for Build-stage tasks only.
+- "Timeline" vs "Gantt" — resolved: they name the same Build layout from two angles. **Timeline** is the user-facing layout name in the Build view switcher (OD `build-timeline.html`, TUI `:timeline` screen); `gantt` is the canonical route segment (`IA-MAP.md §2.3` — `/<ws>/projects/<projId>/build/gantt`). The Workbench that renders it is the **BuildTimelineWorkbench**. The route folder `build-timeline` keeps its name (it is the pre-canonical-routing flat preview path, mapped to the `build` stage in `route-map.ts`); the canonical project-scoped URL uses `gantt`. Not to be confused with **DocVersionReview** — the document-history "version timeline" — which is a Capture/docs surface and was the content this route previously rendered before `prd-cross-mislabeled-route-content-migration` re-homed it to `/docs`.
