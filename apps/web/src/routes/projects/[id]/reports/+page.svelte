@@ -326,7 +326,7 @@
 		velocity: "Velocity",
 		"cycle-time": "Cycle Time",
 		throughput: "Throughput",
-		wip: "WIP",
+		wip: "Active work",
 		cfd: "CFD",
 		forecast: "Forecast",
 		"final-qa": "Final QA",

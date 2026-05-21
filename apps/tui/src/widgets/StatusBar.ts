@@ -192,7 +192,7 @@ export class StatusBarWidget {
       { id: "time", label: this.time },
       { id: "help", label: help },
       { id: "palette", label: ":" },
-      { id: "ai-assist", label: "✨ :ai" },
+      { id: "ai-assist", label: ":ai" },
     ];
   }
 
@@ -215,7 +215,7 @@ export class StatusBarWidget {
     // trace·time·help·palette·AI Assist.  The two clusters are pushed apart so
     // the strip fills the full terminal width and never collapses (CLI-TUI-UX
     // §8 "Never collapses. Never scrolls.").  Width math is wcwidth-aware so
-    // double-width glyphs (✨ ⎇ ● 🔔) do not truncate or mis-pad the strip.
+    // double-width glyphs (⎇ ● 🔔) do not truncate or mis-pad the strip.
     const leftIds = new Set<FooterSegmentId>(["mode", "profile", "branch", "run", "agent", "mcp"]);
     const leftSegs = segs.filter((s) => leftIds.has(s.id)).map((s) => s.label);
     const right = segs.filter((s) => !leftIds.has(s.id)).map((s) => s.label).join("  ");

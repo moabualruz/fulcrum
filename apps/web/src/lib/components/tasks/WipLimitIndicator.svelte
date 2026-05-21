@@ -23,7 +23,7 @@
   data-current={current}
   data-limit={limit}
   class={cn("text-xs tabular-nums", color)}
-  title={`WIP limit: ${current} / ${limit}`}
+  title={`Active work limit: ${current} / ${limit}`}
 >
   {current}/{limit}
 </span>
