@@ -290,6 +290,55 @@ describe("TUI root navigation — OD stage launcher parity", () => {
     app.stop();
   });
 
+  test(":run and :run/<id> open the first-class run detail route", async () => {
+    const requestedRunIds: string[] = [];
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        ...createCaller(),
+        agent_runs: {
+          list: async () => [{
+            id: "run-1",
+            agent: "codex",
+            status: "running",
+            taskTitle: "Ship TUI parity",
+            projectName: "Fulcrum",
+            logLines: ["boot"],
+          }],
+          get: async (input) => {
+            requestedRunIds.push(input.id);
+            return {
+              id: input.id,
+              agent: "codex",
+              status: "running",
+              taskTitle: "Ship TUI parity",
+              projectName: "Fulcrum",
+              logLines: ["boot"],
+            };
+          },
+          create: async (input) => ({ id: "run-2", agent: input.agent, status: "queued" }),
+          cancel: async () => ({ ok: true }),
+        },
+      },
+    });
+    await app.mount();
+
+    expect(await app.navigateColon(":run")).toBe("run");
+    expect(tty.plainText()).toContain("Run › run-1");
+
+    expect(await app.navigateColon(":run/run-42")).toBe("run");
+    const rendered = tty.plainText();
+    expect(rendered).toContain("Run › run-42");
+    for (const tab of ["Shell", "Files", "Browser", "Plan", "Cost"]) {
+      expect(rendered).toContain(tab);
+    }
+    expect(requestedRunIds).toEqual(["run-1", "run-42"]);
+
+    app.stop();
+  });
+
   test("stage chords open canonical capture, plan, and review workbenches", async () => {
     const cases = [
       { chord: "c", heading: "Capture", chrome: "fulcrum · :capture", mode: "CAPTURE" },

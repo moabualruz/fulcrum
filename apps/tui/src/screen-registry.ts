@@ -179,6 +179,7 @@ export const TUI_COLON_ROUTES: Readonly<Record<string, string>> = {
  */
 export function resolveColonRoute(route: string): string | undefined {
   const trimmed = route.trim();
+  if (/^:?run\/[^/]+$/.test(trimmed)) return "run";
   if (TUI_COLON_ROUTES[trimmed]) return TUI_COLON_ROUTES[trimmed];
   const withColon = trimmed.startsWith(":") || trimmed === "?" ? trimmed : `:${trimmed}`;
   return TUI_COLON_ROUTES[withColon];

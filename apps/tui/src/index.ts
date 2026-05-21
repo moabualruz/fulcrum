@@ -401,7 +401,7 @@ const COMMAND_PALETTE_ACTIONS = [
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "capture" | "plan" | "review" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "capture" | "plan" | "review" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist" | "run";
 type DomainScreen =
   | "projects"
   | "build-board"
@@ -475,7 +475,7 @@ const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
   tasks: "tasks",
   timeline: "tasks",
   graph: "tasks",
-  run: "runs",
+  run: "run",
   review: "review",
   ship: "artifacts",
   archive: "artifacts",
@@ -510,6 +510,11 @@ export function resolveTuiColonScreen(route: string): TuiScreen | undefined {
   const screenKey = resolveColonRoute(route);
   if (!screenKey) return undefined;
   return COLON_SCREEN_TARGETS[screenKey];
+}
+
+function runIdFromColonRoute(route: string): string | null {
+  const match = route.trim().match(/^:?run\/([^/]+)$/);
+  return match?.[1] ?? null;
 }
 
 function defaultPlanningInput(): PlanningBreakdownInput {
@@ -677,6 +682,7 @@ export class TuiApp {
   private artifactsScreen: ArtifactsScreen | null = null;
   private runsScreen: RunsScreen | null = null;
   private runDetailScreen: RunDetailScreen | null = null;
+  private pendingRunDetailId: string | null = null;
   private runsControlScreen: RunsControlScreen | null = null;
   private doctorScreen: DoctorScreen | null = null;
   private planningScreen: PlanningBreakdownScreen | null = null;
@@ -988,6 +994,9 @@ export class TuiApp {
           break;
         case "ai-assist":
           this.chatPaneScreen?.render(this.renderer);
+          break;
+        case "run":
+          this.runDetailScreen?.render(this.renderer);
           break;
       }
       if (this.domainScreen && this.currentScreen === "nav") {
@@ -1438,6 +1447,17 @@ export class TuiApp {
       return;
     }
 
+    if (this.currentScreen === "run" && this.runDetailScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.runDetailScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
     if (this.domainScreen) {
       if (key === "q" || key === "\x1b") {
         this.domainScreen = null;
@@ -1868,6 +1888,21 @@ export class TuiApp {
     }
 
     this.currentScreen = screen;
+
+    if (screen === "run" && this.caller.agent_runs) {
+      const routeRunId = this.pendingRunDetailId;
+      this.pendingRunDetailId = null;
+      const runId = routeRunId ?? (await this.caller.agent_runs.list())[0]?.id;
+      if (runId) {
+        this.runDetailScreen?.dispose();
+        this.runDetailScreen = new RunDetailScreen({
+          runId,
+          caller: { agent_runs: this.caller.agent_runs },
+          subscriptions: this.caller.runsSubscriptions,
+        });
+        await this.runDetailScreen.load();
+      }
+    }
 
     if (screen === "auth") {
       let authInfo: AuthInfo;
@@ -2360,6 +2395,7 @@ export class TuiApp {
     if (!screenKey || !this.screenRegistry.has(screenKey)) return undefined;
     const target = resolveTuiColonScreen(route);
     if (!target) return undefined;
+    this.pendingRunDetailId = target === "run" ? runIdFromColonRoute(route) : null;
     // Opening the inline `:ai` pane records the screen it was opened from so
     // `q` inside the pane pops back there, not to the launcher (§7.5, §10.1).
     if (target === "ai-assist" && this.currentScreen !== "ai-assist") {
@@ -2575,6 +2611,7 @@ function screenTitle(screen: Screen): string {
     "routing-rules": "Routing",
     planning: "Planning",
     "ai-assist": "AI Assist",
+    run: "Run detail",
   };
   return titles[screen];
 }

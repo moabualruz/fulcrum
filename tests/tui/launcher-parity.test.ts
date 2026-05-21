@@ -171,6 +171,59 @@ describe("launchTui", () => {
 });
 
 describe("TuiRouter route states", () => {
+  it(":run and :run/<id> open the first-class run detail screen with dock tabs", async () => {
+    const requestedRunIds: string[] = [];
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    const app = new TuiApp({
+      output: tty,
+      caller: {
+        ...fakeCaller(),
+        agent_runs: {
+          list: async () => [{
+            id: "run-1",
+            agent: "codex",
+            status: "running",
+            taskTitle: "Run build",
+            startedAt: "2026-05-21T00:00:00Z",
+          }],
+          get: async (input) => {
+            requestedRunIds.push(input.id);
+            return {
+              id: input.id,
+              agent: "codex",
+              status: "running",
+              taskTitle: "Run build",
+              startedAt: "2026-05-21T00:00:00Z",
+              logLines: ["boot"],
+            };
+          },
+          create: async () => ({
+            id: "run-2",
+            projectId: "fulcrum",
+            taskId: "task-1",
+            agent: "codex",
+            status: "queued",
+          }),
+          cancel: async () => ({ ok: true }),
+        },
+      },
+    });
+    await app.mount();
+
+    expect(await app.navigateColon(":run")).toBe("run");
+    expect(tty.plainText()).toContain("Run › run-1");
+
+    expect(await app.navigateColon(":run/run-42")).toBe("run");
+    const rendered = tty.plainText();
+    expect(rendered).toContain("Run › run-42");
+    for (const tab of ["Shell", "Files", "Browser", "Plan", "Cost"]) {
+      expect(rendered).toContain(tab);
+    }
+    expect(requestedRunIds).toEqual(["run-1", "run-42"]);
+
+    app.stop();
+  });
+
   it("renders unknown route state without crashing", async () => {
     const tty = new FakeTTY();
     const app = new TuiApp({
