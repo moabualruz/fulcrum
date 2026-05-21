@@ -1,6 +1,33 @@
-import { describe, expect, mock, test } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
+import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
+import { closeDatabase } from "$lib/server/db";
+import { applicationScopeMock } from "$lib/test/application-scope-mock";
 
-import { load } from "./+page.server";
+let scratch: string;
+let activeDb: TestStore | null = null;
+let activeOrgId = "";
+let activeProjectId: string | null = null;
+
+// `applicationScopeMock` keeps a complete export set (so sibling suites that
+// import `__setApplicationScopeForTest` still resolve it) and routes foreign
+// suites through the real scope resolver.
+mock.module("$lib/server/application-scope", () =>
+  applicationScopeMock((_locals, projectId) =>
+    activeDb
+      ? {
+          em: activeDb,
+          ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
+        }
+      : null,
+  ),
+);
 
 interface Payload {
   artifacts: Array<{
@@ -29,8 +56,50 @@ function makeEvent(runId: string, apiFetch: typeof fetch) {
   };
 }
 
+beforeEach(() => {
+  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-run-artifacts-"));
+  process.env["FULCRUM_HOME"] = scratch;
+});
+
+afterEach(async () => {
+  await activeDb?.close().catch(() => {});
+  activeDb = null;
+  activeOrgId = "";
+  activeProjectId = null;
+  await closeDatabase();
+  delete process.env["FULCRUM_HOME"];
+  rmSync(scratch, { recursive: true, force: true });
+});
+
+async function freshDb(): Promise<{ db: TestStore; orgId: string; projectId: string }> {
+  const dbDir = join(scratch, "pglite.data");
+  mkdirSync(dbDir, { recursive: true });
+  const db = await openIsolatedStore(dbDir);
+  await migrateIsolatedStore(db);
+  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  const project = await createProject(db, { orgId: org.id, slug: "alpha", name: "Alpha" });
+  activeDb = db;
+  activeOrgId = org.id;
+  activeProjectId = project.id;
+  return { db, orgId: org.id, projectId: project.id };
+}
+
+async function seedRun(db: TestStore, orgId: string, projectId: string): Promise<string> {
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO agent_runs
+      (id, org_id, project_id, agent, model, prompt, status)
+     VALUES ($1, $2, $3, 'codex', 'gpt-5', 'do thing', 'succeeded')`,
+    [id, orgId, projectId],
+  );
+  return id;
+}
+
 describe("/runs/[id]/artifacts +page.server.ts load()", () => {
   test("loads run-scoped artifacts through the public API", async () => {
+    const { db, orgId, projectId } = await freshDb();
+    const runId = await seedRun(db, orgId, projectId);
+
     const calls: URL[] = [];
     const apiFetch = mock(async (input: RequestInfo | URL) => {
       const url = new URL(String(input));
@@ -38,7 +107,7 @@ describe("/runs/[id]/artifacts +page.server.ts load()", () => {
       return Response.json([
         {
           id: "artifact-1",
-          runId: "run-1",
+          runId,
           kind: "file",
           title: "output.txt",
           mime: "text/plain",
@@ -48,18 +117,19 @@ describe("/runs/[id]/artifacts +page.server.ts load()", () => {
       ]);
     }) as unknown as typeof fetch;
 
-    const result = await load(makeEvent("run-1", apiFetch) as never);
-    expect(result.runId).toBe("run-1");
+    const { load } = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await load(makeEvent(runId, apiFetch) as never);
+    expect(result.runId).toBe(runId);
     const payload = await streamedData<Payload>(result);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.pathname).toBe("/api/v1/artifacts");
-    expect(calls[0]?.searchParams.get("runId")).toBe("run-1");
+    expect(calls[0]?.searchParams.get("runId")).toBe(runId);
     expect(calls[0]?.searchParams.get("archived")).toBe("false");
     expect(payload.artifacts).toEqual([
       expect.objectContaining({
         id: "artifact-1",
-        run_id: "run-1",
+        run_id: runId,
         title: "output.txt",
         size: 256,
         created_at: "2026-05-14T12:00:00.000Z",
@@ -68,11 +138,33 @@ describe("/runs/[id]/artifacts +page.server.ts load()", () => {
   });
 
   test("returns empty when the public API has no artifacts for the run", async () => {
+    const { db, orgId, projectId } = await freshDb();
+    const runId = await seedRun(db, orgId, projectId);
+
     const apiFetch = mock(async () => Response.json([])) as unknown as typeof fetch;
 
-    const result = await load(makeEvent("run-empty", apiFetch) as never);
+    const { load } = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await load(makeEvent(runId, apiFetch) as never);
     const payload = await streamedData<Payload>(result);
 
     expect(payload.artifacts).toEqual([]);
+  });
+
+  test("throws 404 when the run does not exist", async () => {
+    await freshDb();
+    const apiFetch = mock(async () => Response.json([])) as unknown as typeof fetch;
+
+    const { load } = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    let caught: unknown;
+    try {
+      await load(makeEvent("01JBOGUS000000000000000000", apiFetch) as never);
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeDefined();
+    expect(
+      typeof caught === "object" && caught !== null && "status" in caught
+        && (caught as { status: number }).status === 404,
+    ).toBe(true);
   });
 });

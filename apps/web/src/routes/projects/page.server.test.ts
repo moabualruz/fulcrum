@@ -1,16 +1,36 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
 import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
+import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
+import { closeDatabase } from "$lib/server/db";
+import { applicationScopeMock } from "$lib/test/application-scope-mock";
 
-// The route uses the configured default PGlite data directory. We seed two
-// projects there with controlled `created_at` timestamps so ordering stays
-// deterministic.
+// `+page.server.ts` resolves the application scope through
+// `requestServiceScope`. We seed an isolated PGlite store and inject it as the
+// scope's `em`, then assert the route returns the seeded projects in
+// deterministic `created_at`-ASC order.
 
 let scratch: string;
+let activeDb: TestStore | null = null;
+let activeOrgId = "";
+
+// `applicationScopeMock` keeps a complete export set (so sibling suites that
+// import `__setApplicationScopeForTest` still resolve it) and routes foreign
+// suites through the real scope resolver.
+mock.module("$lib/server/application-scope", () =>
+  applicationScopeMock((_locals, projectId) =>
+    activeDb
+      ? {
+          em: activeDb,
+          ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? null },
+        }
+      : null,
+  ),
+);
 
 interface ProjectPayload {
   projects: Array<{
@@ -33,15 +53,28 @@ beforeEach(() => {
   process.env["FULCRUM_HOME"] = scratch;
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await activeDb?.close().catch(() => {});
+  activeDb = null;
+  activeOrgId = "";
+  await closeDatabase();
   delete process.env["FULCRUM_HOME"];
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function seedTwoProjects(): Promise<{ orgId: string; first: string; second: string }> {
-  const db = await openIsolatedStore(join(scratch, "pglite.data"));
+async function freshDb(): Promise<TestStore> {
+  const dbDir = join(scratch, "pglite.data");
+  mkdirSync(dbDir, { recursive: true });
+  const db = await openIsolatedStore(dbDir);
   await migrateIsolatedStore(db);
+  activeDb = db;
+  return db;
+}
+
+async function seedTwoProjects(): Promise<{ orgId: string; first: string; second: string }> {
+  const db = await freshDb();
   const org = await createLocalOrg(db, { slug: "default", name: "Default" });
+  activeOrgId = org.id;
   const first = await createProject(db, {
     orgId: org.id,
     slug: "first",
@@ -65,16 +98,15 @@ async function seedTwoProjects(): Promise<{ orgId: string; first: string; second
     second.id,
     "2026-04-02T00:00:00.000Z",
   ]);
-  await db.close();
   return { orgId: org.id, first: first.id, second: second.id };
 }
 
 describe("/projects +page.server.ts load()", () => {
   test("returns seeded projects in deterministic created_at-ASC order", async () => {
-    const { orgId, first, second } = await seedTwoProjects();
+    const { first, second } = await seedTwoProjects();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      locals: { activeProjectId: "first", orgId },
+      locals: { activeProjectId: "first" },
     } as Parameters<typeof mod.load>[0]);
     expect(result.activeProjectId).toBe("first");
     const payload = await streamedData<ProjectPayload>(result);
@@ -87,10 +119,10 @@ describe("/projects +page.server.ts load()", () => {
   });
 
   test("returns empty array when the product DB has no projects", async () => {
-    // Initialise an empty DB at the expected path so the route does not crash.
-    const db = await openIsolatedStore(join(scratch, "pglite.data"));
-    await migrateIsolatedStore(db);
-    await db.close();
+    // Initialise an empty DB so the route resolves a scope but finds no rows.
+    await freshDb();
+    const org = await createLocalOrg(activeDb as TestStore, { slug: "default", name: "Default" });
+    activeOrgId = org.id;
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
       locals: { activeProjectId: null },

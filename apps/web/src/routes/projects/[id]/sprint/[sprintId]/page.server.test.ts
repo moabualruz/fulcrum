@@ -1,8 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+
+import { applicationScopeMock } from "$lib/test/application-scope-mock";
 
 const calls: string[] = [];
+
+// Active only while this suite runs. `mock.module` is process-wide, so the
+// seam falls through to the real scope resolver when a foreign suite is
+// exercising the module.
+let suiteActive = false;
 const pageData = {
   project: { id: "project-1", name: "Project" },
   sprint: {
@@ -22,12 +29,16 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/sprint/sprint-1", { method: "POST", body: fd });
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+// `applicationScopeMock` keeps a complete export set (so sibling suites that
+// import `__setApplicationScopeForTest` still resolve it). The `project-sprints`
+// interface is mocked too, so the `em` value is never actually queried here.
+mock.module("$lib/server/application-scope", () =>
+  applicationScopeMock((_locals, projectId) =>
+    suiteActive
+      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
+      : null,
+  ),
+);
 
 mock.module("@work-management/interface/project-sprints.ts", () => ({
   loadProjectSprintDetail: async () => pageData,
@@ -48,6 +59,14 @@ mock.module("@work-management/interface/project-sprints.ts", () => ({
     return { id: sprintId, metrics: { velocity: 0, completed_tasks: 0 } };
   },
 }));
+
+beforeAll(() => {
+  suiteActive = true;
+});
+
+afterAll(() => {
+  suiteActive = false;
+});
 
 beforeEach(() => {
   calls.splice(0, calls.length);
