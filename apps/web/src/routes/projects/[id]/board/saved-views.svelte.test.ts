@@ -39,7 +39,7 @@ describe("/projects/[id]/board saved views UI", () => {
 
   beforeAll(async () => {
     ({ render } = await import("svelte/server"));
-    const mod = (await import("$lib/components/saved-views/SavedViewFilterBuilder.svelte")) as unknown as {
+    const mod = (await import("../../../../lib/components/saved-views/SavedViewFilterBuilder.svelte")) as unknown as {
       default: typeof SavedViewFilterBuilder;
     };
     SavedViewFilterBuilder = mod.default;
