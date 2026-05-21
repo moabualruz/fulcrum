@@ -2,11 +2,41 @@
 // fulcrum — local-first CLI Agent OS. Binary entry-point.
 
 import { installCliLogRedaction } from "./log.ts";
-import { ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./index.ts";
+import { ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
 
 installCliLogRedaction();
 
 const VERSION = "0.1.0";
+const BUILD_DATE = process.env["FULCRUM_BUILD_DATE"] ?? "dev";
+const COMMIT = process.env["FULCRUM_COMMIT"] ?? "dev";
+
+function printVersion(argv: readonly string[]): void {
+  const result = {
+    version: VERSION,
+    commit: COMMIT,
+    build_date: BUILD_DATE,
+  };
+  if (argv.includes("--json")) {
+    console.log(
+      JSON.stringify({
+        schema: "fulcrum.cli.v1",
+        trace_id: process.env["FULCRUM_TRACE_ID"] ?? "trace-cli-version",
+        span_id: null,
+        run_id: null,
+        project_id: null,
+        command: "fulcrum version",
+        args: {},
+        result,
+        errors: [],
+        next_actions: [],
+        duration_ms: 0,
+        timestamp: new Date().toISOString(),
+      }),
+    );
+    return;
+  }
+  console.log(VERSION);
+}
 
 async function main() {
   const argv = Bun.argv.slice(2);
@@ -87,6 +117,26 @@ async function main() {
       await run([cmd, ...rest]);
       return;
     }
+    case "completion": {
+      const { run: runCompletion } = await import("./completion.ts");
+      await runCompletion(rest);
+      return;
+    }
+    case "version":
+    case "--version":
+    case "-V": {
+      printVersion(rest);
+      return;
+    }
+    case "--json": {
+      if (rest.includes("--version") || rest.includes("-V")) {
+        printVersion([cmd, ...rest]);
+        return;
+      }
+      const { run } = await import("./index.ts");
+      await run([cmd, ...rest]);
+      return;
+    }
     case "parity":
     case "auth":
     case "flags":
@@ -122,17 +172,11 @@ async function main() {
     case "recurrence":
     case "saved_views":
     case "taskCustomFields":
-    case "customFieldDefs":
-    case "completion": {
+    case "customFieldDefs": {
       const { run } = await import("./index.ts");
       await run([cmd, ...rest]);
       return;
     }
-    case "version":
-    case "--version":
-    case "-v":
-      console.log(VERSION);
-      return;
     case "help":
     case "--help":
     case "-h": {
