@@ -105,6 +105,41 @@ export const STAGE_WORKBENCH_ROUTE: Record<WorkflowStage, string> = {
 	operate: "/doctor",
 } as const;
 
+export const DEFAULT_CANONICAL_WORKSPACE = "mkh";
+export const DEFAULT_CANONICAL_PROJECT = "fulcrum";
+
+export type StageSubroute = {
+	stage: WorkflowStage;
+	sub?: string;
+};
+
+const LEGACY_CANONICAL_TARGETS: Readonly<Record<string, StageSubroute>> = {
+	"plan-session": { stage: "plan" },
+	"plan-review": { stage: "plan", sub: "review" },
+	"plan-prompts": { stage: "plan", sub: "prompts" },
+	"plan-prototypes": { stage: "plan", sub: "prototypes" },
+	"plan-templates": { stage: "plan", sub: "templates" },
+	"build-board": { stage: "build", sub: "board" },
+	"build-list": { stage: "build", sub: "list" },
+	"build-graph": { stage: "build", sub: "graph" },
+	"build-runs": { stage: "build", sub: "runs" },
+	"build-timeline": { stage: "build", sub: "gantt" },
+	"mobile-runs": { stage: "build", sub: "runs" },
+	review: { stage: "review" },
+	"review-queue": { stage: "review" },
+	"review-search": { stage: "review", sub: "search" },
+	"review-templates": { stage: "review", sub: "templates" },
+	ship: { stage: "ship" },
+	"ship-archive": { stage: "ship", sub: "archive" },
+	doctor: { stage: "operate", sub: "doctor" },
+	operate: { stage: "operate", sub: "doctor" },
+	"operate-alerts": { stage: "operate", sub: "alerts" },
+	"operate-mcp": { stage: "operate", sub: "mcp" },
+	"operate-plugins": { stage: "operate", sub: "plugins" },
+	"operate-telemetry": { stage: "operate", sub: "telemetry" },
+	"mobile-capture": { stage: "capture" },
+};
+
 /* ── Canonical route builders (IA-MAP §1) ──────────────────────────────── */
 
 /** `/<ws>` — workspace home. */
@@ -128,6 +163,27 @@ export function projectHomeRoute(ws: string, projId: string): string {
  */
 export function stageRoute(ws: string, projId: string, stage: WorkflowStage): string {
 	return `${projectHomeRoute(ws, projId)}/${stage}`;
+}
+
+export function stageSubroute(ws: string, projId: string, stage: WorkflowStage, sub: string): string {
+	return `${stageRoute(ws, projId, stage)}/${encodeURIComponent(sub)}`;
+}
+
+export function legacyCanonicalTarget(pathname: string): StageSubroute | null {
+	const [head, second] = pathname.replace(/^\/+|\/+$/g, "").split("/");
+	if (!head) return null;
+	if (head === "review" && second) return { stage: "review", sub: second };
+	return LEGACY_CANONICAL_TARGETS[head] ?? null;
+}
+
+export function canonicalRouteForLegacyPath(
+	pathname: string,
+	ws = DEFAULT_CANONICAL_WORKSPACE,
+	projId = DEFAULT_CANONICAL_PROJECT,
+): string | null {
+	const target = legacyCanonicalTarget(pathname);
+	if (!target) return null;
+	return target.sub ? stageSubroute(ws, projId, target.stage, target.sub) : stageRoute(ws, projId, target.stage);
 }
 
 /* ── Portfolio surfaces — workspace scope, never project-scoped ─────────── */

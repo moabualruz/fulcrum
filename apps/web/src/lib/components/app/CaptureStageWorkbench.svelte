@@ -80,6 +80,7 @@
 	data-stage="capture"
 	data-capture-view={view}
 	class="grid gap-4"
+	style:padding-bottom="calc(env(safe-area-inset-bottom) + 4rem)"
 >
 	<header
 		data-slot="capture-head"
@@ -91,6 +92,17 @@
 		</div>
 		<div class="flex items-center gap-2">
 			<Badge data-slot="capture-count">{steps.length} captures</Badge>
+			<div
+				role="group"
+				aria-label="Block actions mode group"
+				data-slot="capture-block-actions"
+				data-safe-area-reserve="bottom"
+				class="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-20 flex justify-center gap-1 rounded-sm border border-border bg-surface/95 p-1 shadow-sm sm:static sm:inset-auto sm:bg-transparent sm:p-0 sm:shadow-none"
+			>
+				<Button size="sm" variant="ghost" data-block-action="write">Write</Button>
+				<Button size="sm" variant="ghost" data-block-action="link">Link</Button>
+				<Button size="sm" variant="ghost" data-block-action="promote">Promote</Button>
+			</div>
 			<!-- Hand off to Plan — preserves the trace identity (IA-MAP §2.1). -->
 			<Button
 				href={handoffHref}
