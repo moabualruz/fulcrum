@@ -138,7 +138,7 @@
 			<div
 				data-density-switch
 				data-density-mode={densityMode}
-				class={cn("hidden h-7 overflow-hidden rounded-md border border-border lg:inline-flex")}
+				class={cn("hidden h-7 overflow-hidden rounded-md border border-border min-[1400px]:inline-flex")}
 				aria-label="density mode"
 			>
 				{#each densityModes as mode (mode.id)}

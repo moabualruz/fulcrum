@@ -187,23 +187,47 @@ test.describe("OD shell ScopeBar — populated", () => {
 		]) {
 			const icon = scopeBar.locator(`button[aria-label="${label}"]`).first();
 			await expect(icon).toBeVisible();
-			await expect(icon).toHaveAttribute("aria-expanded", "false");
 		}
 
-		await expect(scopeBar.locator("[data-density-switch]")).toHaveAttribute(
-			"data-density-mode",
-			"cozy",
-		);
-		await expect(scopeBar.locator("[data-density-option]")).toHaveText([
-			"Compact",
-			"Cozy",
-			"Comfortable",
-		]);
+		for (const label of [
+			"Notifications · 0 unread",
+			"Display, density, mode, theme",
+			"Keyboard shortcuts · ?",
+			"Account · sign out, switch workspace",
+		]) {
+			const icon = scopeBar.locator(`button[aria-label="${label}"]`).first();
+			await expect(icon).toHaveAttribute("aria-expanded", "false");
+		}
 
 		await test.info().attach("shell-scope-bar", {
 			body: await page.screenshot({ fullPage: true }),
 			contentType: "image/png",
 		});
+	});
+
+	test("keeps every system icon inside the 1280px OD shell column", async ({ page }) => {
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto("/mkh/projects/fulcrum/plan");
+
+		const icons = page.locator("[data-slot='scope-bar'] [data-scope-system-icon]");
+		await expect(icons).toHaveCount(5);
+
+		const results = await icons.evaluateAll((nodes) =>
+			nodes.map((node) => {
+				const rect = node.getBoundingClientRect();
+				return {
+					id: node.getAttribute("data-scope-system-icon"),
+					left: rect.left,
+					right: rect.right,
+					innerWidth: window.innerWidth,
+				};
+			}),
+		);
+
+		for (const result of results) {
+			expect(result.left, `${result.id} left edge`).toBeGreaterThanOrEqual(0);
+			expect(result.right, `${result.id} right edge`).toBeLessThanOrEqual(result.innerWidth);
+		}
 	});
 
 	test("maps existing routes to the active ScopeBar stage tab", async ({ page }) => {
@@ -245,6 +269,9 @@ test.describe("OD shell ScopeBar — populated", () => {
 			"data-open",
 			"true",
 		);
+		await expect(
+			scopeBar.locator("[data-scope-system-panel='display'] [data-density-option-panel]"),
+		).toHaveText(["Compact", "Cozy", "Comfortable"]);
 
 		await account.click();
 		await expect(display).toHaveAttribute("aria-expanded", "false");
