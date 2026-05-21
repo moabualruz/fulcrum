@@ -24,9 +24,10 @@ describe("MetricCard component (SSR)", () => {
       props: { label: "Total runs", value: 42 },
     });
     expect(body).toContain("data-metric-card");
-    expect(body).toContain("data-metric-value");
+    expect(body).toContain('data-slot="stat-value"');
     expect(body).toContain("42");
     expect(body).toContain("Total runs");
+    expect(body).toContain('data-slot="card"');
   });
 
   test("renders <a> tag when href is set", () => {
@@ -40,7 +41,8 @@ describe("MetricCard component (SSR)", () => {
     const { body } = render(MetricCard, {
       props: { label: "Docs", value: 5 },
     });
-    expect(body).toMatch(/<div\b[^>]*data-metric-card/);
+    expect(body).toContain('data-slot="card"');
+    expect(body).toContain('data-metric-card="true"');
     expect(body).not.toMatch(/<a\b[^>]*data-metric-card/);
   });
 
@@ -48,7 +50,7 @@ describe("MetricCard component (SSR)", () => {
     const { body } = render(MetricCard, {
       props: { label: "Active tasks", value: "7" },
     });
-    expect(body).toContain("data-metric-label-text");
+    expect(body).toContain('data-slot="stat-label"');
     expect(body).toContain("Active tasks");
   });
 });

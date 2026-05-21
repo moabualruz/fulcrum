@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
-  import { buttonVariants } from "@fulcrum/ui-kit";
+  import { Button, Sheet } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import type { TaskStatus } from "$lib/server/tasks";
   import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";
@@ -70,6 +70,8 @@
   }
 </script>
 
+<Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose?.(); }} />
+
 <aside
   data-board-sheet
   data-testid="task-detail-panel"
@@ -80,7 +82,7 @@
   {#if task}
     <header class="mb-4 flex items-center justify-between">
       <h2 data-testid="task-detail-title" class="text-lg font-semibold">{task.title}</h2>
-      <button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} class="text-muted-foreground hover:text-foreground">×</button>
+      <Button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} variant="ghost" size="icon-sm">×</Button>
     </header>
 
     <form data-board-sheet-form onsubmit={submit} class="space-y-3">
@@ -115,9 +117,9 @@
       </label>
 
       <div class="flex items-center gap-2">
-        <button type="submit" data-board-sheet-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
-        <button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} class={cn(buttonVariants({ variant: "outline" }))}>Run</button>
-        <button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
+        <Button type="submit" data-board-sheet-save>Save</Button>
+        <Button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} variant="outline">Run</Button>
+        <Button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} variant="destructive">Delete</Button>
       </div>
     </form>
 
@@ -135,7 +137,7 @@
           class={cn(fieldCls, "mt-0")}
           aria-label="Comment"
         />
-        <button type="submit" data-testid="comment-submit" class={cn(buttonVariants({ variant: "outline" }))}>Add</button>
+        <Button type="submit" data-testid="comment-submit" variant="outline">Add</Button>
       </form>
     </section>
   {/if}

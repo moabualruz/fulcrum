@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
+  import { Badge, Card } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import { makeBoardCardClick } from "./board-card-handlers.ts";
 
@@ -12,8 +13,9 @@
   const { task, onEdit, draggable = true }: Props = $props();
 </script>
 
-<button
-  type="button"
+<Card
+  role="button"
+  tabindex="0"
   data-board-card
   data-testid="task-card"
   data-task-id={task.id}
@@ -22,13 +24,19 @@
   data-draggable={draggable ? "true" : "false"}
   aria-label={`Edit task: ${task.title}`}
   onclick={makeBoardCardClick(task.id, onEdit)}
+  onkeydown={(event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      makeBoardCardClick(task.id, onEdit)();
+    }
+  }}
   class={cn(
-    "w-full rounded-md border border-border bg-background px-3 py-2 text-left shadow-sm transition hover:bg-muted",
+    "w-full rounded-md px-3 py-2 text-left transition hover:bg-muted",
   )}
 >
   <span data-board-card-title class="block text-sm font-medium">{task.title}</span>
   <span class="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-    <span data-board-card-priority class="rounded border border-border px-1.5 py-0.5">P{task.priority}</span>
+    <Badge data-board-card-priority variant="outline" size="sm">P{task.priority}</Badge>
     <span data-board-card-assignee>{task.assignee ?? "Unassigned"}</span>
   </span>
   <span class="mt-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -40,4 +48,4 @@
       <span data-board-card-project>·</span>
     {/if}
   </span>
-</button>
+</Card>

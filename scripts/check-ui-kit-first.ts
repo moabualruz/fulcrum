@@ -24,9 +24,8 @@
  *     primitive responsibility (Button, Dialog, Tooltip, …) is flagged UNLESS
  *     the file itself imports that responsibility from `@fulcrum/ui-kit` (i.e.
  *     it delegates / composes rather than re-implements). Feature-composite
- *     names that merely contain a primitive word (e.g. `RunStatusBadge`,
- *     `MetricCard`) are matched on the exact stem only, and a delegating file
- *     clears the check.
+ *     names ending in a primitive responsibility (e.g. `FacetChip`,
+ *     `MetricCard`) are also flagged unless they delegate to ui-kit.
  *
  *   RULE 3 — Absorbed primitive responsibility marker.
  *     Some legacy demos do not use primitive filenames. If a surface declares a
@@ -114,6 +113,14 @@ const UI_KIT_PRIMITIVE_STEMS = new Set(
   ].map((s) => s.toLowerCase()),
 );
 
+const UI_KIT_PRIMITIVE_SUFFIXES = [
+  "sheet",
+  "chip",
+  "card",
+  "stat",
+  "badge",
+] as const;
+
 interface AbsorbedPrimitiveResponsibility {
   name: string;
   dataHooks: readonly string[];
@@ -134,6 +141,15 @@ const ABSORBED_PRIMITIVE_RESPONSIBILITIES: AbsorbedPrimitiveResponsibility[] = [
       "data-thread-start",
     ],
     minimumHooks: 4,
+  },
+  {
+    name: "Badge",
+    dataHooks: [
+      "data-routing-project-scope",
+      "data-routing-global-scope",
+      "data-routing-enabled-toggle",
+    ],
+    minimumHooks: 1,
   },
 ];
 
@@ -235,6 +251,16 @@ for (const rootRel of SURFACE_ROOTS) {
             detail: `"${basename(abs)}" re-implements a ui-kit primitive without composing @fulcrum/ui-kit; extract to packages/ui-kit or compose the existing primitive`,
           });
         }
+      }
+      const suffix = UI_KIT_PRIMITIVE_SUFFIXES.find(
+        (primitive) => s !== primitive && s.endsWith(primitive),
+      );
+      if (suffix && !importsUiKit(source) && !ALLOWLIST.has(rel)) {
+        violations.push({
+          file: rel,
+          rule: "route-local-primitive-overlap",
+          detail: `"${basename(abs)}" owns a ${suffix} primitive overlap without composing @fulcrum/ui-kit; use the existing primitive or extend packages/ui-kit`,
+        });
       }
 
       // ── RULE 3: absorbed primitive responsibility without ui-kit composition ──
