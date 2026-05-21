@@ -233,6 +233,7 @@ export const LEGACY_ROUTE_MAP: Readonly<Record<string, WorkflowStage | null>> = 
 	agents: "operate",
 	"operate-alerts": "operate",
 	"operate-mcp": "operate",
+	"operate-plugins": "operate",
 	inference: "operate",
 	"inference-models": "operate",
 	"skill-registry": "operate",
