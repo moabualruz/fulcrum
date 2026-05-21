@@ -100,6 +100,12 @@
       window.dispatchEvent(new CustomEvent("fulcrum:open-ai-assist"));
     }
   }
+
+  function openCommandPalette(): void {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("fulcrum:open-command-palette"));
+    }
+  }
 </script>
 
 <StatusFooter
@@ -136,12 +142,9 @@
       type="button"
       data-trace-footer-palette
       aria-label="Command palette · ⌘K"
+      aria-haspopup="dialog"
       class="grid h-6 place-items-center rounded-sm px-1 font-mono text-[11px] text-fg-subtle hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      onclick={() => {
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("n-command-palette"));
-        }
-      }}
+      onclick={openCommandPalette}
     >
       <span aria-hidden="true">⌘K</span>
     </button>
