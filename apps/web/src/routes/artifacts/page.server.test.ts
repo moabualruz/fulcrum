@@ -2,30 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
-interface ArtifactRow {
-  id: string;
-  project_id: string | null;
-  run_id: string | null;
-  task_id: string | null;
-  trace_id: string | null;
-  doc_id: string | null;
-  kind: string;
-  title: string;
-  mime: string | null;
-  archived: boolean;
-  size: number | null;
-  created_at: string;
-}
-
-interface ArtifactsPayload {
-  artifacts: ArtifactRow[];
-  error?: {
-    message: string;
-    recovery: string;
-    traceId: string;
-  } | null;
-}
-
 interface PublicArtifactRow {
   id: string;
   projectId: string | null;
@@ -42,12 +18,6 @@ interface PublicArtifactRow {
   mime: string | null;
   archived: boolean;
   createdAt: string;
-}
-
-function streamedData<T>(result: unknown): Promise<T> {
-  const stream = (result as { streamed?: { data?: unknown } }).streamed?.data;
-  expect(stream).toBeInstanceOf(Promise);
-  return stream as Promise<T>;
 }
 
 function eventFor(
@@ -206,80 +176,50 @@ function defaultArtifacts(): PublicArtifactRow[] {
   ];
 }
 
-describe("/artifacts +page.server.ts load()", () => {
-  test("server route uses the artifact public API instead of direct application scope", () => {
+/**
+ * `/artifacts` is re-homed to the Ship stage workbench (`/ship`) per
+ * `IA-MAP.md §2.5` and `design-alignment/ship.md`. The list `load()` now
+ * issues a 301 (`MOVED_PERMANENTLY`) redirect; the `upload` / `bulk` server
+ * actions are preserved verbatim so bulk archive/delete and upload carry
+ * forward with no feature loss.
+ */
+describe("/artifacts +page.server.ts load() — re-home redirect", () => {
+  test("server route still uses the artifact public API for the preserved actions", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
     expect(source).toContain("createArtifactApiForEvent");
     expect(source).not.toContain("requestAppScope");
     expect(source).not.toContain("@workflow-coordination/application/artifacts");
   });
 
-  test("returns artifacts unfiltered except archived by default", async () => {
-    const calls: string[] = [];
+  test("load() issues a 301 redirect to the Ship workbench", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load(eventFor("/artifacts", fetchArtifacts(calls)));
-    const payload = await streamedData<ArtifactsPayload>(result);
-
-    expect(payload.artifacts.map((artifact) => artifact.id)).toEqual(["artifact-report", "artifact-data"]);
-    expect(payload.artifacts[0]).toMatchObject({
-      project_id: "project-1",
-      run_id: "run-1",
-      task_id: "task-1",
-      trace_id: "trace-1",
-      doc_id: null,
-      body_path: "artifacts/report.md",
-      sha256: "sha-report",
-      size: 2048,
-      created_at: "2026-05-15T10:00:00.000Z",
-    });
-    expect(calls).toEqual(["GET /api/v1/artifacts?archived=false sid=test-session"]);
+    let thrown: unknown;
+    try {
+      mod.load(eventFor("/artifacts"));
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+    const redirectResult = thrown as { status?: number; location?: string };
+    expect(redirectResult.status).toBe(301);
+    expect(redirectResult.location).toBe("/ship");
   });
 
-  test("mime filter narrows results", async () => {
+  test("load() carries the filter query string forward to /ship", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load(eventFor("/artifacts?mime=application/json"));
-    const payload = await streamedData<ArtifactsPayload>(result);
-    expect(payload.artifacts).toHaveLength(1);
-    expect(payload.artifacts[0]!.mime).toBe("application/json");
+    let thrown: unknown;
+    try {
+      mod.load(eventFor("/artifacts?mime=application/json&archived=true"));
+    } catch (error) {
+      thrown = error;
+    }
+    const redirectResult = thrown as { status?: number; location?: string };
+    expect(redirectResult.status).toBe(301);
+    expect(redirectResult.location).toBe("/ship?mime=application/json&archived=true");
   });
+});
 
-  test("kind, project, run, task, and trace filters are passed to public API", async () => {
-    const calls: string[] = [];
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load(eventFor("/artifacts?kind=file&project=project-1&run=run-1&task=task-1&trace=trace-1", fetchArtifacts(calls)));
-    const payload = await streamedData<ArtifactsPayload>(result);
-
-    expect(payload.artifacts.map((artifact) => artifact.id)).toEqual(["artifact-report"]);
-    expect(calls).toEqual(["GET /api/v1/artifacts?projectId=project-1&traceId=trace-1&kind=file&runId=run-1&taskId=task-1&archived=false sid=test-session"]);
-  });
-
-  test("archived=true includes archived results", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.load(eventFor("/artifacts?archived=true"));
-    const payload = await streamedData<ArtifactsPayload>(result);
-    expect(payload.artifacts.map((artifact) => artifact.id)).toContain("artifact-archived");
-  });
-
-  test("returns empty array when public API has no artifacts", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    const result = await mod.load(eventFor("/artifacts", fetchArtifacts([], [])));
-    const payload = await streamedData<ArtifactsPayload>(result);
-    expect(payload.artifacts).toEqual([]);
-  });
-
-  test("returns route-specific recovery payload when public API is unavailable", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
-    const result = await mod.load(eventFor("/artifacts", (async () => Response.json({ message: "not found" }, { status: 404 })) as typeof fetch));
-    const payload = await streamedData<ArtifactsPayload>(result);
-
-    expect(payload.artifacts).toEqual([]);
-    expect(payload.error).toEqual({
-      message: "Artifacts could not load.",
-      recovery: "Retry after the local API is reachable.",
-      traceId: "artifacts-list",
-    });
-  });
-
+describe("/artifacts +page.server.ts actions — preserved with no feature loss", () => {
   test("bulk action archives selected artifacts through public API", async () => {
     const calls: string[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);

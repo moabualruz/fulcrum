@@ -2,53 +2,45 @@ import { expect, test } from "../e2e/fixtures";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-test.describe("artifacts route interaction coverage", () => {
-  test("keeps route-specific controls and recovery visible when artifact API is unavailable", async ({ page }) => {
+/**
+ * `/artifacts` is re-homed to the Ship stage workbench (`/ship`) per
+ * `IA-MAP.md §2.5` and `design-alignment/ship.md`. The list route 301-redirects
+ * to `/ship`; the `/artifacts/[id]` detail route and `/artifacts/[id]/download`
+ * endpoint are preserved unchanged (no feature loss) — those tests stay below.
+ */
+test.describe("artifacts route re-home + preserved detail/download", () => {
+  test("the legacy /artifacts list 301-redirects to the Ship workbench", async ({ page }) => {
     await page.goto("/artifacts");
 
-    await expect(page.locator("[data-artifacts-header]")).toContainText("Artifacts");
-    await expect(page.locator("[data-artifacts-summary]")).toContainText("Visible artifacts");
-    await expect(page.locator("[data-artifacts-filter]")).toBeVisible();
-    await expect(page.locator("[data-selected-count]")).toContainText("0");
-    await page.locator("[data-show-archived-toggle]").check();
-    await page.locator("[data-apply-artifact-filters]").click();
-    await expect(page).toHaveURL(/archived=true/);
-
-    const error = page.locator("[data-artifacts-error]");
-    if (await error.isVisible()) {
-      await expect(error).toContainText("Artifacts could not load");
-      await expect(error).toContainText("Retry");
-      await expect(error).toContainText("artifacts-list");
-    } else {
-      await expect(page.locator("[data-empty-artifacts]").or(page.locator("[data-artifacts-list]")).first()).toBeVisible();
-    }
+    // The list view resolves to the canonical Ship route — never a 404.
+    await expect(page).toHaveURL(/\/ship$/);
+    await expect(page.locator("[data-route='ws-stage'][data-stage='ship']")).toBeVisible();
+    await expect(page.locator("[data-ship-toolbar]")).toContainText("Artifacts");
   });
 
-  test("keeps artifact route usable on mobile without horizontal overflow", async ({ page }) => {
+  test("the /artifacts redirect carries the filter query string forward to /ship", async ({
+    page,
+  }) => {
+    await page.goto("/artifacts?archived=true");
+
+    await expect(page).toHaveURL(/\/ship\?archived=true$/);
+    await expect(page.locator("[data-ship-release-table]")).toBeVisible();
+  });
+
+  test("keeps the re-homed surface usable on mobile without horizontal overflow", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/artifacts");
 
-    await expect(page.locator("[data-artifacts-header]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-filter]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-error]").or(page.locator("[data-empty-artifacts]").or(page.locator("[data-artifacts-mobile-list]"))).first()).toBeVisible();
-    const overflow = await page.locator("main").last().evaluate((element) => element.scrollWidth - element.clientWidth);
+    await expect(page).toHaveURL(/\/ship$/);
+    await expect(page.locator("[data-ship-toolbar]")).toBeVisible();
+    // The route container never overflows the viewport horizontally; the
+    // release table scrolls inside `[data-ship-table-wrap]` by design.
+    const overflow = await page
+      .locator("[data-route='ws-stage']")
+      .evaluate((element) => element.scrollWidth - element.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
-  });
-
-  test("surfaces upload, provenance filters, and recovery when artifact API is unavailable", async ({ page }) => {
-    const traceId = "trace-design-artifacts";
-    await page.goto(`/artifacts?trace=${traceId}`);
-
-    await expect(page.locator("[data-artifact-upload]")).toBeVisible();
-    await expect(page.locator("[data-artifact-upload-filename]")).toBeVisible();
-    await expect(page.locator("[data-artifact-upload-project]")).toBeVisible();
-    await expect(page.locator("[data-artifact-upload-trace]")).toBeVisible();
-    await expect(page.locator("[data-artifact-upload-submit]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-project-filter]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-run-filter]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-task-filter]")).toBeVisible();
-    await expect(page.locator("[data-artifacts-trace-filter]")).toHaveValue(traceId);
-    await expect(page.locator("[data-artifacts-error]").or(page.locator("[data-empty-artifacts]")).first()).toBeVisible();
   });
 
   test("exercises artifact detail controls at desktop and mobile widths", async ({ page, fulcrumHome }) => {

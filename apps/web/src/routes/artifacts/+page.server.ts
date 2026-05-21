@@ -1,47 +1,24 @@
-import { fail, type Actions, type PageServerLoad } from "@sveltejs/kit";
-import { createArtifactApiForEvent, type PublicArtifact, toArtifactRow } from "$lib/server/artifact-api";
+import { fail, redirect, type Actions, type PageServerLoad } from "@sveltejs/kit";
+import { createArtifactApiForEvent } from "$lib/server/artifact-api";
 
-export const load: PageServerLoad = (event) => {
-  const { url, locals } = event;
-  const mime = (url.searchParams.get("mime") ?? "").trim();
-  const kind = (url.searchParams.get("kind") ?? "").trim();
-  const run = (url.searchParams.get("run") ?? "").trim();
-  const task = (url.searchParams.get("task") ?? "").trim();
-  const trace = (url.searchParams.get("trace") ?? "").trim();
-  const archived = url.searchParams.get("archived") ?? "";
-  const projectParam = url.searchParams.get("project");
-  const projectRaw = projectParam === null ? undefined : projectParam.trim();
-
-  return {
-    activeProjectId: locals?.activeProjectId ?? null,
-    filter: { mime, kind, project: projectRaw ?? "", run, task, trace, archived },
-    streamed: {
-      data: (async () => {
-        try {
-          const artifacts = await createArtifactApiForEvent(event).artifacts.list({
-            mime: mime || null,
-            kind: kind || null,
-            projectId: projectRaw,
-            runId: run || null,
-            taskId: task || null,
-            traceId: trace || null,
-            archived: archived === "true" ? undefined : false,
-          }) as PublicArtifact[];
-          return { artifacts: artifacts.map(toArtifactRow), error: null };
-        } catch (error) {
-          console.error("artifacts:list failed", error);
-          return {
-            artifacts: [],
-            error: {
-              message: "Artifacts could not load.",
-              recovery: "Retry after the local API is reachable.",
-              traceId: "artifacts-list",
-            },
-          };
-        }
-      })(),
-    },
-  };
+/**
+ * `/artifacts` is re-homed to the Ship stage workbench (`/ship`) per
+ * `IA-MAP.md §2.5` and `design-alignment/ship.md` — the generic file-artifact
+ * list is a subset of the Ship release surface. The list `load` issues a 301
+ * (`MOVED_PERMANENTLY`) redirect to `/ship`, carrying the filter query string
+ * forward so a bookmarked `/artifacts?mime=…` lands on the same filtered Ship
+ * view.
+ *
+ * No feature loss: the `upload` and `bulk` (archive/delete) server actions and
+ * the `/artifacts/[id]/download` endpoint are preserved verbatim below and at
+ * their existing paths — the redirect only re-homes the *list view*, not the
+ * artifact mutation endpoints, so bulk archive/delete and download carry
+ * forward exactly as before.
+ */
+export const load: PageServerLoad = ({ url }) => {
+  const query = url.search ? url.search : "";
+  // 301 MOVED_PERMANENTLY — the canonical Ship route is the permanent home.
+  redirect(301, `/ship${query}`);
 };
 
 export const actions: Actions = {
