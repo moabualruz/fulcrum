@@ -117,8 +117,13 @@ export function buildAllSteps(env: NodeJS.ProcessEnv = process.env): TieredStep[
     // ── Tier 3: INTEGRATION TESTS (tests/ + DB/API contract tests) ──
     { name: "integration",   cmd: ["bun", "run", "scripts/test-tier.ts", "integration", ...changedFlag, "--timeout", "120000"], tier: "tier3" },
 
-    // ── Tier 4: DESIGN E2E (<180s) ──
+    // ── Tier 4: WEB SURFACE TESTS + DESIGN E2E (<180s) ──
     { name: "web:check",     cmd: ["bun", "run", "check"], cwd: "apps/web", env: { NODE_OPTIONS: "--max-old-space-size=12288" }, tier: "tier4" },
+    // apps/web bun tests run through the sharded runner: a single `bun test`
+    // process over the whole web suite exhausts the PGlite WASM heap and aborts
+    // mid-run, so the runner shards by directory to keep each process under the
+    // limit. Hard gate — apps/web/src test files were previously ungated.
+    { name: "web:unit",      cmd: ["bun", "run", "scripts/test-web.ts"], tier: "tier4" },
     { name: "design-e2e",    cmd: ["bun", "run", "test:design"], cwd: "apps/web", tier: "tier4" },
 
     // ── Tier 5: REAL E2E (<300s) ──
