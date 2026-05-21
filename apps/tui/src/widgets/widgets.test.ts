@@ -70,6 +70,7 @@ describe("TUI widgets", () => {
     expect(line).toContain("trace:4f3a1c9e");
     expect(line).toContain("14:02");
     expect(line).toContain(":ai");
+    expect(line).not.toContain("✨");
   });
 
   test("StatusBar never drops a segment in a width-starved terminal", () => {

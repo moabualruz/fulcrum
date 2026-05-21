@@ -258,21 +258,21 @@
 				capture · seedlings
 			</p>
 			<h1 class="text-[28px] font-semibold tracking-tight">
-				Welcome to Fulcrum — your first run
+				What's your workspace called?
 			</h1>
 			<p data-onboarding-meta class="mb-6 mt-1.5 font-mono text-[11px] text-muted-foreground">
-				2 min · onboarding · step 3 / 5
+				Use anything. You can rename later. local works fine.
 			</p>
 
-			<h2 class="mt-6 text-xl font-semibold">What just happened</h2>
+			<h2 class="mt-6 text-xl font-semibold">What are you building?</h2>
 			<p class="mt-3 text-sm leading-relaxed text-foreground">
-				You captured a thought. Fulcrum doesn't treat docs as special; every paragraph here can be
-				handed to an agent the same way a task can. The four affordances at the right of every block
-				are <strong>Manual / Play / Discuss / AI Assist</strong>. They are the same affordances
-				you'll see on every step of every stage.
+				One sentence. Become the project description.
 			</p>
 
-			<h2 class="mt-6 text-xl font-semibold">Try it on this line</h2>
+			<h2 class="mt-6 text-xl font-semibold">Type or paste anything. Press ⌘/ to ask an agent.</h2>
+			<p class="mt-3 text-sm leading-relaxed text-muted-foreground">
+				No tour. No multi-step wizard. The interface is the tutorial.
+			</p>
 
 			<!--
 				The lit `.anchor` block — OD `onboarding.html` `.anchor`. It carries
@@ -289,7 +289,7 @@
 				]}
 			>
 				<span class="min-w-0 flex-1 text-sm leading-relaxed">
-					Hand this paragraph to an agent and watch it bounce back with a one-paragraph rewrite.
+					Type or paste anything. Press ⌘/ to ask an agent.
 				</span>
 				<ModeRow
 					class="ml-auto flex-wrap"

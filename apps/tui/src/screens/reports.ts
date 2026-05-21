@@ -271,7 +271,7 @@ export class ReportsScreen {
     renderer.writeln();
     renderer.writeln(c.bold("  Reports"));
     renderer.separator();
-    renderer.writeln(c.dim("  1 Burndown  2 Velocity  3 Cycle-time  4 Throughput  5 WIP  6 CFD  7 Final QA  G Gate  8 UAT  9 Decision  A Auto  0 E2E  R Review  S Session"));
+    renderer.writeln(c.dim("  1 Burndown  2 Velocity  3 Cycle-time  4 Throughput  5 Active work  6 CFD  7 Final QA  G Gate  8 UAT  9 Decision  A Auto  0 E2E  R Review  S Session"));
     renderer.writeln();
 
     if (!this.metrics) {
@@ -332,7 +332,7 @@ function renderThroughput(renderer: Renderer, values: number[]): void {
 }
 
 function renderWip(renderer: Renderer, values: Record<string, number>): void {
-  renderer.writeln(c.bold("  WIP"));
+  renderer.writeln(c.bold("  Active work"));
   for (const [key, value] of Object.entries(values)) {
     renderer.writeln(`  ${key}: ${value}`);
   }

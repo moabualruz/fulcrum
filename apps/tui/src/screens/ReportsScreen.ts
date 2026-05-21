@@ -257,9 +257,9 @@ export class ReportsScreen {
       renderer.writeln();
     }
 
-    // WIP
+    // Active work
     if (Object.keys(data.wip).length > 0) {
-      renderer.writeln(c.dim("  WIP per status:"));
+      renderer.writeln(c.dim("  Active work per status:"));
       for (const [status, count] of Object.entries(data.wip)) {
         renderer.writeln(`  ${status.padEnd(16)} ${count}`);
       }
