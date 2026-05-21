@@ -1,8 +1,5 @@
 <script lang="ts">
-  /**
-   * Badge-style chip for active/inactive filter facets.
-   * Active: --primary fill. Inactive: --secondary fill.
-   */
+  import { Chip } from "@fulcrum/ui-kit";
 
   interface Props {
     label: string;
@@ -19,15 +16,12 @@
   data-facet-active={active}
   type="button"
   onclick={onClick}
-  class={[
-    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-    active
-      ? "bg-primary text-primary-foreground"
-      : "bg-secondary text-secondary-foreground hover:bg-primary/10",
-  ].join(" ")}
+  class="contents"
 >
-  {label}
-  {#if count !== undefined}
-    <span class={active ? "opacity-75" : "text-muted-foreground"}>{count}</span>
-  {/if}
+  <Chip tone={active ? "accent" : "neutral"} class="cursor-pointer rounded-full">
+    {label}
+    {#if count !== undefined}
+      <span class={active ? "opacity-75" : "text-muted-foreground"}>{count}</span>
+    {/if}
+  </Chip>
 </button>

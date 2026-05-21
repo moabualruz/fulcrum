@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { Badge } from "@fulcrum/ui-kit";
   import type { DraftRow, EnrichedDecisionRow, LlmGateConfig, RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
 
   interface Props {
@@ -64,9 +65,9 @@
     <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
       <h1 class="text-2xl font-semibold tracking-tight">Routing Rules</h1>
       {#if data.projectId}
-        <span data-routing-project-scope class="w-fit rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Project scope</span>
+        <Badge data-routing-project-scope variant="outline" class="w-fit">Project scope</Badge>
       {:else}
-        <span data-routing-global-scope class="w-fit rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Global scope</span>
+        <Badge data-routing-global-scope variant="outline" class="w-fit">Global scope</Badge>
       {/if}
     </div>
     <p class="text-sm text-muted-foreground">Manage deterministic task-to-agent routing rules.</p>
@@ -230,9 +231,9 @@
                 </td>
                 <td class="px-4 py-3">
                   {#if rule.enabled}
-                    <span data-routing-enabled-toggle={rule.id} class="rounded-md bg-green-100 px-2 py-0.5 text-xs text-green-800 dark:bg-green-900/30 dark:text-green-400">Enabled</span>
+                    <Badge data-routing-enabled-toggle={rule.id} variant="success">Enabled</Badge>
                   {:else}
-                    <span data-routing-enabled-toggle={rule.id} class="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">Disabled</span>
+                    <Badge data-routing-enabled-toggle={rule.id} variant="default">Disabled</Badge>
                   {/if}
                 </td>
                 <td class="px-4 py-3 text-xs text-muted-foreground">
