@@ -129,10 +129,15 @@ export async function listEventsForEntity(
   options: { limit?: number } = {},
 ): Promise<EventRow[]> {
   const limit = options.limit ?? 50;
+  // events.id is a random UUID, so it cannot tie-break events written within
+  // the same millisecond (now() granularity) — ordering by it is
+  // non-deterministic. ctid reflects physical insert order and is stable for
+  // this append-only fixture store, so it gives a deterministic newest-first
+  // order when created_at ties.
   const rows = await db.query<Record<string, unknown>>(
     `SELECT * FROM events
       WHERE subject_kind = $1 AND subject_id = $2
-      ORDER BY created_at DESC, id DESC
+      ORDER BY created_at DESC, ctid DESC
       LIMIT $3`,
     [subjectKind, subjectId, limit],
   );
