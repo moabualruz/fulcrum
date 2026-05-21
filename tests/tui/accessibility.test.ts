@@ -25,13 +25,24 @@ describe("TUI accessibility contracts", () => {
       void tabs.handleKey(key);
     });
 
-    for (let index = 0; index < 7; index += 1) {
+    const expectedTabs: Array<typeof tabs.current> = [
+      "aiAssist",
+      "backup",
+      "data",
+      "errors",
+      "flags",
+      "secrets",
+      "telemetry",
+      "theme",
+    ];
+
+    for (let index = 0; index < expectedTabs.length - 1; index += 1) {
       tty.inject("\t");
       await Bun.sleep(0);
       visited.add(tabs.current);
     }
 
-    expect([...visited].sort()).toEqual(["backup", "data", "errors", "flags", "secrets", "telemetry", "theme"]);
+    expect([...visited].sort()).toEqual(expectedTabs);
   });
 
   test("selected row includes visible text marker, not only ANSI color", () => {

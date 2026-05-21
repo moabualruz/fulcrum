@@ -27,6 +27,7 @@ import {
   TUI_CHORD_PREFIXES,
   createStageChordHandler,
   createChordLatch,
+  type TraceYankClipboard,
 } from "@fulcrum/tui/keybindings.ts";
 import {
   Palette,
@@ -53,6 +54,39 @@ function fakeCaller(): TuiCaller {
       }),
     },
     flags: { list: async () => [], set: async () => ({ ok: true }) },
+    tasks: {
+      list: async () => [],
+      update: async () => ({ id: "task-1", title: "Task 1", status: "todo" }),
+      create: async () => ({ id: "task-1", title: "Task 1", status: "todo" }),
+    },
+    agent_runs: {
+      list: async () => [
+        {
+          id: "run-1",
+          agent: "codex",
+          status: "running",
+          taskTitle: "Run build",
+          startedAt: "2026-05-21T00:00:00Z",
+          traceId: "trace-live",
+        },
+      ],
+      get: async () => ({
+        id: "run-1",
+        agent: "codex",
+        status: "running",
+        taskTitle: "Run build",
+        startedAt: "2026-05-21T00:00:00Z",
+        traceId: "trace-live",
+      }),
+      create: async () => ({
+        id: "run-2",
+        projectId: "fulcrum",
+        taskId: "task-1",
+        agent: "codex",
+        status: "queued",
+      }),
+      cancel: async () => ({ ok: true }),
+    },
   };
 }
 
@@ -300,6 +334,112 @@ describe("chord-prefix latch — g / y two-key sequencing", () => {
     const chord = latch.feed("t");
     expect(chord.kind).toBe("chord");
     if (chord.kind === "chord") expect(chord.prefix).toBe("y");
+  });
+});
+
+describe("FulcrumTui live shell StageChord wiring", () => {
+  for (const [secondKey, expectedText] of [
+    ["c", "NOTIFICATIONS"],
+    ["p", "PLANNING"],
+    ["b", "RUNS"],
+    ["B", "BUILD BOARD"],
+    ["r", "Stage: Review"],
+    ["s", "ARTIFACTS"],
+    ["o", "DOCTOR"],
+  ] as const) {
+    it(`routes g ${secondKey} through FulcrumTui.handleKey`, async () => {
+      const tty = new FakeTTY();
+      const app = await launchTui({ output: tty, input: tty, caller: fakeCaller() });
+
+      await app.handleKey("g");
+      const before = tty.plainText();
+      await app.handleKey(secondKey);
+
+      expect(before).toContain("LAUNCHER");
+      expect(tty.plainText()).toContain(expectedText);
+      app.stop();
+    });
+  }
+
+  it("bare g and y only arm chords and do not move the root selection", async () => {
+    const tty = new FakeTTY();
+    const app = await launchTui({ output: tty, input: tty, caller: fakeCaller() });
+    const before = tty.plainText();
+
+    await app.handleKey("g");
+    await app.handleKey("\x1b");
+    await app.handleKey("y");
+    await app.handleKey("\x1b");
+
+    expect(tty.plainText()).toContain("LAUNCHER");
+    expect(tty.plainText()).toContain("Stage: Capture  route::capture  chord:g c");
+    expect(before).toContain("Stage: Capture  route::capture  chord:g c");
+    app.stop();
+  });
+});
+
+describe("FulcrumTui live shell ColonPalette wiring", () => {
+  it("opens with : and routes a known command through navigateColon", async () => {
+    const tty = new FakeTTY({ columns: 100, rows: 40 });
+    const app = await launchTui({ output: tty, input: tty, caller: fakeCaller() });
+
+    await app.handleKey(":");
+    expect(tty.plainText()).toContain("palette · type to filter");
+
+    for (const key of ["d", "o", "c", "t"]) await app.handleKey(key);
+    await app.handleKey("\t");
+    await app.handleKey("\r");
+
+    expect(tty.plainText()).toContain("DOCTOR");
+    app.stop();
+  });
+
+  it("Esc cancels the : palette without routing", async () => {
+    const tty = new FakeTTY({ columns: 100, rows: 40 });
+    const app = await launchTui({ output: tty, input: tty, caller: fakeCaller() });
+
+    await app.handleKey(":");
+    tty.clear();
+    await app.handleKey("\x1b");
+
+    expect(tty.plainText()).toContain("LAUNCHER");
+    expect(tty.plainText()).not.toContain("palette · type to filter");
+    app.stop();
+  });
+});
+
+describe("FulcrumTui live shell TraceYank wiring", () => {
+  it("copies trace, run, span, and project identities through y chords", async () => {
+    const copied: string[] = [];
+    const clipboard: TraceYankClipboard = { write: (text) => copied.push(text) };
+    const tty = new FakeTTY();
+    const app = await launchTui({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+      traceContext: {
+        projectId: "/Users/mkh/workspace/fulcrum",
+        runId: "run-live",
+        spanId: "span-live",
+        traceId: "trace-live",
+      },
+      traceYankClipboard: clipboard,
+    });
+
+    for (const key of ["t", "r", "s", "p"] as const) {
+      await app.handleKey("y");
+      await app.handleKey(key);
+    }
+
+    expect(copied).toEqual([
+      "trace-live",
+      "run-live",
+      "span-live",
+      "/Users/mkh/workspace/fulcrum",
+    ]);
+    expect(tty.plainText()).toContain("Yanked trace trace-live");
+    expect(tty.plainText()).toContain("Yanked project /Users/mkh/workspace/fulcrum");
+    app.stop();
   });
 });
 

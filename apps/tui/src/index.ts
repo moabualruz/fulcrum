@@ -82,7 +82,20 @@ import {
   type StageNavEntry,
 } from "./screen-registry.ts";
 import { HelpOverlay, type KeyBinding } from "./widgets/HelpOverlay.ts";
+import { Palette } from "./widgets/Palette.ts";
 import { StatusBarWidget } from "./widgets/StatusBar.ts";
+import {
+  STAGE_CHORD_PREFIX,
+  TUI_CHORD_PREFIXES,
+  createChordLatch,
+  createStageChordHandler,
+  createTraceYankHandler,
+  osc52Clipboard,
+  type ChordLatch,
+  type StageChordHandler,
+  type TraceYankClipboard,
+  type TraceYankHandler,
+} from "./keybindings.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import {
@@ -357,6 +370,9 @@ export interface TuiAppOptions {
     spanId?: string;
     traceId?: string;
   };
+
+  /** Clipboard sink for `y t`/`y r`/`y s`/`y p`; tests inject this. */
+  traceYankClipboard?: TraceYankClipboard;
 }
 
 /** Map keybinding action → semantic TuiAction handler key. */
@@ -591,6 +607,9 @@ export class TuiApp {
   private readonly planningArtifactExecutionInput: PlanningArtifactRunInput;
   private readonly workflowCycleInput?: WorkflowAcceptanceCycleInput;
   private readonly traceContext: NonNullable<TuiAppOptions["traceContext"]>;
+  private readonly chordLatch: ChordLatch;
+  private readonly stageChordHandler: StageChordHandler;
+  private readonly traceYankHandler: TraceYankHandler;
   private keyHandler: ((key: string) => void) | null = null;
 
   private currentScreen: Screen = "nav";
@@ -605,6 +624,7 @@ export class TuiApp {
   /** Selected stage in the root StageNav (0..5 → Capture..Operate). */
   private stageCursor = 0;
   private paletteOpen = false;
+  private colonPalette: Palette | null = null;
   private helpOpen = false;
   private domainRows: string[] = [];
   private domainError: string | null = null;
@@ -694,6 +714,15 @@ export class TuiApp {
       spanId: process.env["FULCRUM_SPAN_ID"],
       traceId: process.env["FULCRUM_TRACE_ID"],
     };
+    this.chordLatch = createChordLatch(TUI_CHORD_PREFIXES);
+    this.stageChordHandler = createStageChordHandler();
+    this.traceYankHandler = createTraceYankHandler(
+      {
+        copyKeybinds: () => this._statusFooter().copyKeybinds(),
+        projectPath: this.traceContext.projectId ?? process.cwd(),
+      },
+      opts.traceYankClipboard ?? osc52Clipboard(out),
+    );
   }
 
   /** Resolved theme contract (Pillar 17), if injected. */
@@ -935,6 +964,7 @@ export class TuiApp {
         this._renderDomainScreen(this.domainScreen);
       }
       this._renderHelpOverlay();
+      this._renderColonPalette();
     } catch (error) {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
@@ -1060,6 +1090,12 @@ export class TuiApp {
     });
     this.renderer.writeln();
     for (const line of overlay.render()) this.renderer.writeln(line);
+  }
+
+  private _renderColonPalette(): void {
+    if (!this.colonPalette?.isOpen) return;
+    this.renderer.writeln();
+    for (const line of this.colonPalette.render()) this.renderer.writeln(line);
   }
 
   private _currentScreenLabel(): string {
@@ -1277,6 +1313,19 @@ export class TuiApp {
       await this._renderCurrentScreen();
       return;
     }
+
+    if (this.colonPalette) {
+      await this._handleColonPaletteKey(key);
+      return;
+    }
+
+    if (key === ":") {
+      this._openColonPalette();
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (await this._handleChordKey(key)) return;
 
     // Keybinding registry dispatch (Pillar 14). Resolves single-character
     // shortcuts to semantic TuiActions before per-screen routing.
@@ -1561,6 +1610,99 @@ export class TuiApp {
       await this._openSelected();
       return;
     }
+  }
+
+  private async _handleChordKey(key: string): Promise<boolean> {
+    const outcome = this.chordLatch.feed(key);
+    if (outcome.kind === "passthrough") return false;
+    if (outcome.kind === "armed") return true;
+    if (outcome.kind === "cancelled") return true;
+
+    if (outcome.prefix === STAGE_CHORD_PREFIX) {
+      const stage = this.stageChordHandler.resolve(outcome.key);
+      if (stage) await this.navigateColon(stage.route);
+      return true;
+    }
+
+    if (outcome.prefix === "y") {
+      const yank = this.traceYankHandler.yank(outcome.key);
+      if (yank) {
+        this.selectedNavAction = `Yanked ${yank.target} ${yank.value}`;
+        await this._renderCurrentScreen();
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  private _openColonPalette(): void {
+    this.chordLatch.reset();
+    this.colonPalette = new Palette({
+      width: Math.max(52, Math.min(90, this.renderer.width - 4)),
+      height: Math.max(18, Math.min(34, this.renderer.height - 4)),
+      items: [],
+      mode: "colon",
+    });
+    this.colonPalette.open();
+  }
+
+  private async _handleColonPaletteKey(key: string): Promise<void> {
+    const palette = this.colonPalette;
+    if (!palette) return;
+
+    if (key === "\x1b" || key === "escape") {
+      palette.close();
+      this.colonPalette = null;
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\t") {
+      palette.handleKey("tab");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x1b[A") {
+      palette.handleKey("up");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x1b[B") {
+      palette.handleKey("down");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x7f" || key === "\b") {
+      palette.setQuery(palette.currentQuery.slice(0, -1));
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\r" || key === "\n" || key === "enter") {
+      const command = palette.hasKnownColonCommand()
+        ? palette.currentQuery.trim()
+        : palette.colonCandidates()[0];
+      palette.close();
+      this.colonPalette = null;
+      if (command) {
+        await this.navigateColon(`:${command}`);
+      } else {
+        await this._renderCurrentScreen();
+      }
+      return;
+    }
+
+    if (key.length === 1 && key >= " ") {
+      palette.setQuery(palette.currentQuery + key);
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    await this._renderCurrentScreen();
   }
 
   private async _openNewDoc(): Promise<void> {
