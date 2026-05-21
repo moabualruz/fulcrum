@@ -146,7 +146,6 @@ const ABSORBED_PRIMITIVE_RESPONSIBILITIES: AbsorbedPrimitiveResponsibility[] = [
 const ALLOWLIST = new Set<string>([
   // CommandPalette composes the ui-kit CommandPalette primitive; the route
   // shell wiring is feature-specific (keyboard routing, data sources).
-  "apps/web/src/lib/components/CommandPalette.svelte",
   "apps/web/src/lib/components/command-palette/CommandPalette.svelte",
 ]);
 
