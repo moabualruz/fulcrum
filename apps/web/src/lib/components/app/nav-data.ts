@@ -33,11 +33,11 @@ export interface StageNavItem {
  */
 export const STAGE_NAV_ITEMS: readonly StageNavItem[] = [
 	{ stage: "capture", href: "/" },
-	{ stage: "plan", href: "/planning" },
-	{ stage: "build", href: "/build-runs" },
-	{ stage: "review", href: "/review-search" },
-	{ stage: "ship", href: "/ship-archive" },
-	{ stage: "operate", href: "/operate-mcp" },
+	{ stage: "plan", href: "/plan-session" },
+	{ stage: "build", href: "/build-board" },
+	{ stage: "review", href: "/review" },
+	{ stage: "ship", href: "/ship" },
+	{ stage: "operate", href: "/doctor" },
 ] as const;
 
 /**
@@ -72,10 +72,12 @@ const STAGE_ROUTE_PREFIXES: ReadonlyArray<readonly [string, WorkflowStage]> = [
 	["/runs", "build"],
 	["/orchestration", "build"],
 	// Review stage
+	["/review", "review"],
 	["/review-search", "review"],
 	["/review-templates", "review"],
 	["/comments", "review"],
 	// Ship stage
+	["/ship", "ship"],
 	["/ship-archive", "ship"],
 	["/artifacts", "ship"],
 	// Operate stage
@@ -126,11 +128,15 @@ export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]>
 		{ id: "build-timeline", label: "Timeline", href: "/build-timeline" },
 	],
 	review: [
-		{ id: "review-search", label: "Workbench", href: "/review-search" },
+		{ id: "review-queue", label: "Queue", href: "/review" },
+		{ id: "review-search", label: "Search", href: "/review-search" },
 		{ id: "review-comments", label: "Comments", href: "/comments" },
 		{ id: "review-templates", label: "Templates", href: "/review-templates" },
 	],
-	ship: [{ id: "ship-archive", label: "Archive", href: "/ship-archive" }],
+	ship: [
+		{ id: "ship-artifacts", label: "Artifacts", href: "/ship" },
+		{ id: "ship-archive", label: "Archive", href: "/ship-archive" },
+	],
 	operate: [
 		{ id: "operate-doctor", label: "Doctor", href: "/doctor" },
 		{ id: "operate-alerts", label: "Alerts", href: "/operate-alerts" },

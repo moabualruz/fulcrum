@@ -6,6 +6,7 @@
 	import UserCircle from "@lucide/svelte/icons/user-circle";
 
 	import { ScopeBar, TraceChip, type WorkflowStage } from "@fulcrum/ui-kit";
+	import { STAGE_WORKBENCH_ROUTE, stageRoute, withTrace } from "$lib/components/app/route-map.ts";
 	import { cn } from "$lib/utils.js";
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
@@ -46,6 +47,7 @@
 	function stageForPath(path: string): WorkflowStage {
 		const lower = path.toLowerCase();
 		for (const stage of stageOrder) {
+			if (lower.match(new RegExp(`^/[^/]+/projects/[^/]+/${stage}(?:/|$)`))) return stage;
 			if (lower === `/${stage}` || lower.includes(`/${stage}/`) || lower.endsWith(`/${stage}`)) {
 				return stage;
 			}
@@ -58,19 +60,33 @@
 		return "capture";
 	}
 
+	function workspaceFromPath(path: string): string {
+		const parts = path.split("/").filter(Boolean);
+		return parts[1] === "projects" ? (parts[0] ?? "mkh") : "mkh";
+	}
+
+	function projectFromPath(path: string): string | null {
+		const parts = path.split("/").filter(Boolean);
+		const projectIndex = parts.indexOf("projects");
+		if (projectIndex < 0) return null;
+		return parts[projectIndex + 1] ?? null;
+	}
+
 	function stageHref(stage: WorkflowStage): string {
-		if (activeProjectId) return `/projects/${activeProjectId}/${stage}`;
-		return `/${stage}`;
+		const projectId = activeProjectId ?? projectFromPath(pathname);
+		if (projectId) return stageRoute(workspaceFromPath(pathname), projectId, stage);
+		return STAGE_WORKBENCH_ROUTE[stage];
 	}
 
 	function selectStage(stage: WorkflowStage) {
 		if (typeof window !== "undefined") {
-			window.location.href = stageHref(stage);
+			window.location.href = withTrace(stageHref(stage), window.location);
 		}
 	}
 
 	const activeStage = $derived(stageForPath(pathname));
-	const workspacePath = $derived(`mkh / ${activeProjectId ?? "all-projects"}`);
+	const effectiveProjectId = $derived(activeProjectId ?? projectFromPath(pathname));
+	const workspacePath = $derived(`${workspaceFromPath(pathname)} / ${effectiveProjectId ?? "all-projects"}`);
 	const notificationLabel = $derived(`Notifications · ${bellCount} unread`);
 	const traceBadgeId = $derived(traceId ?? "4f3a1c9e2b7d8a6c");
 	const iconButtonClass = cn(
@@ -90,7 +106,7 @@
 			<TraceChip
 				badge
 				traceId={traceBadgeId}
-				project={activeProjectId ?? "all-projects"}
+				project={effectiveProjectId ?? "all-projects"}
 				timestamp="current request"
 			/>
 		{/snippet}

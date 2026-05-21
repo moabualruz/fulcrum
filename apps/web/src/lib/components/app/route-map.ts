@@ -92,6 +92,19 @@ export const STAGE_DEFAULT_SUB: Record<WorkflowStage, string> = {
 	operate: "doctor",
 } as const;
 
+/**
+ * Existing OD-fidelity flat workbench route each project-scoped stage projects
+ * to until those workbenches are physically nested under `/<ws>/projects/...`.
+ */
+export const STAGE_WORKBENCH_ROUTE: Record<WorkflowStage, string> = {
+	capture: "/",
+	plan: "/plan-session",
+	build: "/build-board",
+	review: "/review",
+	ship: "/ship",
+	operate: "/doctor",
+} as const;
+
 /* ── Canonical route builders (IA-MAP §1) ──────────────────────────────── */
 
 /** `/<ws>` — workspace home. */
@@ -222,6 +235,7 @@ export const LEGACY_ROUTE_MAP: Readonly<Record<string, WorkflowStage | null>> = 
 	// ── Review stage ──
 	comments: "review",
 	"comments-block-thread": "review",
+	"review-queue": "review",
 	"review-search": "review",
 	"review-templates": "review",
 	// ── Ship stage ──
@@ -234,6 +248,7 @@ export const LEGACY_ROUTE_MAP: Readonly<Record<string, WorkflowStage | null>> = 
 	"operate-alerts": "operate",
 	"operate-mcp": "operate",
 	"operate-plugins": "operate",
+	operate: "operate",
 	inference: "operate",
 	"inference-models": "operate",
 	"skill-registry": "operate",
@@ -354,6 +369,7 @@ export const CURRENT_ROUTE_COVERAGE = {
 	"onboarding": { classification: "legacy-map", stage: null, reason: "first-run route is pre-shell and outside project WorkflowStage scope" },
 	"operate-alerts": { classification: "legacy-map", stage: "operate", reason: "flat Operate alerts OD preview resolves under Operate" },
 	"operate-mcp": { classification: "legacy-map", stage: "operate", reason: "flat Operate MCP OD preview resolves under Operate" },
+	"operate": { classification: "legacy-map", stage: "operate", reason: "flat Operate default alias resolves under Operate doctor workbench" },
 	"operate-plugins": { classification: "legacy-map", stage: "operate", reason: "flat Operate plugin OD preview resolves under Operate" },
 	"operate-telemetry": { classification: "canonical-current", stage: "operate", reason: "current Operate telemetry survivor route; not an old alias" },
 	"orchestration": { classification: "legacy-map", stage: "build", reason: "legacy orchestration route resolves under Build" },
@@ -369,6 +385,7 @@ export const CURRENT_ROUTE_COVERAGE = {
 	"projects": { classification: "legacy-map", stage: null, reason: "portfolio project list has no active project stage" },
 	"repos": { classification: "legacy-map", stage: null, reason: "repository management route kept as workspace/system route" },
 	"review": { classification: "canonical-current", stage: "review", reason: "current Review queue/workbench survivor route; not an old alias" },
+	"review-queue": { classification: "legacy-map", stage: "review", reason: "flat Review queue alias resolves under Review queue workbench" },
 	"review-search": { classification: "legacy-map", stage: "review", reason: "legacy review search route resolves under Review" },
 	"review-templates": { classification: "legacy-map", stage: "review", reason: "legacy review templates route resolves under Review" },
 	"run-cancel": { classification: "legacy-map", stage: "build", reason: "legacy run cancel route resolves under Build run operations" },

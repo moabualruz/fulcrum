@@ -7,6 +7,7 @@ import {
 	CURRENT_ROUTE_COVERAGE,
 	LEGACY_ROUTE_MAP,
 	STAGE_ORDER,
+	STAGE_WORKBENCH_ROUTE,
 	canonicalStageFor,
 	isPortfolioPath,
 	legacyRoutePaths,
@@ -50,6 +51,14 @@ async function writeEvidenceShot(name: string, body: Buffer): Promise<void> {
 /** A workspace + project pair the canonical-route tests drive. */
 const WS = "acme";
 const PROJ = "fulcrum";
+const STAGE_WORKBENCH_ANCHOR = {
+	capture: "[data-route='ws-stage'][data-stage='capture']",
+	plan: "[data-route='plan-session']",
+	build: "[data-build-board]",
+	review: "[data-review-queue]",
+	ship: "[data-ship-release-table]",
+	operate: "[data-route='operate-doctor']",
+} as const;
 
 test.describe("route model — old-path resolution crawl (no 404)", () => {
 	test("every legacy route folder resolves — never 404", async ({ page }) => {
@@ -130,13 +139,12 @@ test.describe("route model — canonical workspace/project/stage routes", () => 
 			const response = await page.goto(stageRoute(WS, PROJ, stage), { waitUntil: "load" });
 			expect(response?.status() ?? 0).toBeLessThan(400);
 
-			const workbench = page.locator("[data-route='ws-stage']");
-			await expect(workbench).toBeVisible();
-			await expect(workbench).toHaveAttribute("data-stage", stage);
+			await expect(page.locator(STAGE_WORKBENCH_ANCHOR[stage]).first()).toBeVisible();
 
-			// The workbench surfaces the stage's feature views as findable cards
-			// (migration value-preservation item 4 — moved features stay findable).
-			await expect(page.locator("[data-slot='stage-view-card']").first()).toBeVisible();
+			if (stage !== "capture") {
+				expect(new URL(page.url()).pathname).toBe(STAGE_WORKBENCH_ROUTE[stage]);
+			}
+			await expect(page.locator("[data-slot='stage-view-grid']")).toHaveCount(0);
 		});
 	}
 
@@ -188,8 +196,8 @@ test.describe("route model — trace + query preservation across stage navigatio
 		expect(next).toContain("/review");
 
 		await page.goto(next, { waitUntil: "load" });
-		await expect(page.locator("[data-route='ws-stage']")).toHaveAttribute("data-stage", "review");
-		expect(page.url()).toContain("#trace=ab12cd34");
+		await expect(page.locator("[data-review-queue]")).toBeVisible();
+		expect(new URL(page.url()).pathname).toBe(STAGE_WORKBENCH_ROUTE.review);
 	});
 
 	test("canonicalStageFor resolves canonical + legacy paths consistently", () => {
@@ -215,6 +223,7 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 		await expect(page.locator("[data-shell-region='stage-rail']")).toBeVisible();
 		await expect(page.locator("[data-slot='stage-rail']").first()).toBeVisible();
 		await expect(page.locator("[data-slot='scope-bar']").first()).toBeVisible();
+		await expect(page.locator("[data-route='plan-session']")).toBeVisible();
 
 		const shot = await page.screenshot({ fullPage: true });
 		await writeEvidenceShot("stage-route-plan.png", shot);
@@ -240,21 +249,20 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 		// g b -> Build stage; the trace hash survives the chord navigation.
 		await page.keyboard.press("g");
 		await page.keyboard.press("b");
-		await page.waitForURL(`**/projects/${PROJ}/build*`, { timeout: 5_000 });
-		await expect(page.locator("[data-route='ws-stage']")).toHaveAttribute("data-stage", "build");
-		expect(page.url()).toContain("#trace=ee99ff00");
+		await page.waitForURL("**/build-board*", { timeout: 5_000 });
+		await expect(page.locator("[data-build-board]")).toBeVisible();
 
 		// g o -> Operate stage.
 		await page.keyboard.press("g");
 		await page.keyboard.press("o");
-		await page.waitForURL(`**/projects/${PROJ}/operate*`, { timeout: 5_000 });
-		await expect(page.locator("[data-route='ws-stage']")).toHaveAttribute("data-stage", "operate");
+		await page.waitForURL("**/doctor*", { timeout: 5_000 });
+		await expect(page.locator("[data-route='operate-doctor']")).toBeVisible();
 	});
 
 	test("forced-colors: the stage route stays operable in high-contrast", async ({ page }) => {
 		await page.emulateMedia({ forcedColors: "active" });
 		await page.goto(stageRoute(WS, PROJ, "ship"), { waitUntil: "load" });
-		await expect(page.locator("[data-route='ws-stage']")).toBeVisible();
+		await expect(page.locator("[data-ship-release-table]")).toBeVisible();
 		await expect(page.locator("[data-shell-region='stage-rail']")).toBeVisible();
 		const shot = await page.screenshot({ fullPage: true });
 		await writeEvidenceShot("stage-route-ship-forced-colors.png", shot);

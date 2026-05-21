@@ -1,9 +1,15 @@
-import { error } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { isWorkflowStage, STAGE_DEFAULT_SUB, type WorkflowStage } from "$lib/components/app/route-map.ts";
+import {
+	isWorkflowStage,
+	STAGE_DEFAULT_SUB,
+	STAGE_WORKBENCH_ROUTE,
+	traceFromHash,
+	type WorkflowStage,
+	withTrace,
+} from "$lib/components/app/route-map.ts";
 import { resolveCaptureView, type CaptureStep, type CaptureView } from "$lib/components/app/capture-stage.ts";
 import { createDocumentApiForEvent } from "$lib/server/document-api.ts";
-import { traceFromHash } from "$lib/components/app/route-map.ts";
 
 /**
  * `/<ws>/projects/<projId>/<stage>` — the canonical WorkflowStage workbench
@@ -113,7 +119,7 @@ export const load: PageServerLoad = async (event) => {
 	};
 
 	if (typed !== "capture") {
-		return { ...base, captureView: null, captureSteps: [] as CaptureStep[], traceId: null };
+		throw redirect(308, withTrace(STAGE_WORKBENCH_ROUTE[typed], event.url));
 	}
 
 	// Capture stage — resolve the `?view=` sub-view and load real captures.

@@ -2,6 +2,7 @@
 	import { page } from "$app/state";
 
 	import { StageRail } from "@fulcrum/ui-kit";
+	import { STAGE_WORKBENCH_ROUTE, stageRoute, type WorkflowStage } from "$lib/components/app/route-map.ts";
 	import { cn } from "$lib/utils.js";
 
 	import {
@@ -17,6 +18,24 @@
 
 	let { activeProjectId }: Props = $props();
 
+	function workspaceFromPath(path: string): string {
+		const parts = path.split("/").filter(Boolean);
+		return parts[1] === "projects" ? (parts[0] ?? "mkh") : "mkh";
+	}
+
+	function projectFromPath(path: string): string | null {
+		const parts = path.split("/").filter(Boolean);
+		const projectIndex = parts.indexOf("projects");
+		if (projectIndex < 0) return null;
+		return parts[projectIndex + 1] ?? null;
+	}
+
+	function stageWorkbenchHref(stage: WorkflowStage): string {
+		const projectId = activeProjectId ?? projectFromPath(page.url.pathname);
+		if (projectId) return stageRoute(workspaceFromPath(page.url.pathname), projectId, stage);
+		return STAGE_WORKBENCH_ROUTE[stage];
+	}
+
 	// AppSidebar is a thin data-supplying consumer of the `@fulcrum/ui-kit`
 	// StageRail primitive — it owns no rail markup of its own.
 	//
@@ -30,12 +49,13 @@
 	// Collapse is fixed expanded here; the 56px collapsed rail is owned by the
 	// responsive shell PRD.
 	const activeStage = $derived(stageForPath(page.url.pathname));
+	const effectiveProjectId = $derived(activeProjectId ?? projectFromPath(page.url.pathname));
 
 	const substages = $derived(
-		subnavForStage(activeStage).map((item) => ({
+		subnavForStage(activeStage).map((item, index) => ({
 			id: item.id,
 			label: item.label,
-			href: item.href,
+			href: index === 0 ? stageWorkbenchHref(activeStage) : item.href,
 			count: item.count,
 		})),
 	);
@@ -64,6 +84,6 @@
 		class="flex-1"
 	/>
 	<div class={cn("border-r border-t border-border bg-surface-sunken p-3")}>
-		<span class={cn("text-xs text-fg-muted")}>{activeProjectId ?? "—"}</span>
+		<span class={cn("text-xs text-fg-muted")}>{effectiveProjectId ?? "—"}</span>
 	</div>
 </aside>
