@@ -5,6 +5,7 @@ import {
 	NAV_GROUPS,
 	NAV_ITEMS,
 	STAGE_NAV_ITEMS,
+	subnavForStageScope,
 	SYSTEM_NAV_ITEMS,
 	WORKSPACE_NAV_ITEMS,
 	stageForPath,
@@ -78,6 +79,17 @@ describe("StageRail nav data", () => {
 		const ids = NAV_ITEMS.map((i) => i.id);
 		expect(new Set(ids).size).toBe(ids.length);
 		for (const id of ids) expect(id.length).toBeGreaterThan(0);
+	});
+
+	test("scoped stage subnav preserves explicit canonical hrefs instead of deriving from ids", () => {
+		expect(subnavForStageScope("plan", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Reviews",
+			"/acme/projects/alpha/plan/review",
+		]);
+		expect(subnavForStageScope("operate", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Audit",
+			"/acme/projects/alpha/operate/telemetry",
+		]);
 	});
 });
 

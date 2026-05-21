@@ -3,6 +3,7 @@ import {
 	canonicalStageFor,
 	DEFAULT_CANONICAL_PROJECT,
 	DEFAULT_CANONICAL_WORKSPACE,
+	projectHomeRoute,
 	stageRoute,
 	stageSubroute,
 } from "./route-map.ts";
@@ -172,13 +173,12 @@ export function subnavForStageScope(
 	ws: string,
 	projId: string,
 ): readonly StageRailSubnavItem[] {
-	return STAGE_SUBNAV[stage].map((item) => {
-		const sub = item.id.replace(`${stage}-`, "");
-		return {
-			...item,
-			href: stageSubroute(ws, projId, stage, sub),
-		};
-	});
+	const defaultScope = projectHomeRoute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT);
+	const scopedProject = projectHomeRoute(ws, projId);
+	return STAGE_SUBNAV[stage].map((item) => ({
+		...item,
+		href: item.href.startsWith(defaultScope) ? `${scopedProject}${item.href.slice(defaultScope.length)}` : item.href,
+	}));
 }
 
 export const LUCIDE_ICON_NAMES = [

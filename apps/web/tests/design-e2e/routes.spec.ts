@@ -12,6 +12,7 @@ import {
 	legacyRoutePaths,
 	projectHomeRoute,
 	stageRoute,
+	stageSubroute,
 	withTrace,
 	workspaceHomeRoute,
 } from "../../src/lib/components/app/route-map.ts";
@@ -57,6 +58,22 @@ const STAGE_WORKBENCH_ANCHOR = {
 	review: "[data-review-queue]",
 	ship: "[data-ship-release-table]",
 	operate: "[data-route='operate-doctor']",
+} as const;
+const STAGE_SUBNAV_ROUTE_SWEEP = {
+	plan: [
+		["Sessions", stageSubroute(WS, PROJ, "plan", "sessions")],
+		["Reviews", stageSubroute(WS, PROJ, "plan", "review")],
+		["Prototypes", stageSubroute(WS, PROJ, "plan", "prototypes")],
+		["Templates", stageSubroute(WS, PROJ, "plan", "templates")],
+		["Prompts", stageSubroute(WS, PROJ, "plan", "prompts")],
+	],
+	operate: [
+		["Doctor", stageSubroute(WS, PROJ, "operate", "doctor")],
+		["MCP", stageSubroute(WS, PROJ, "operate", "mcp")],
+		["Plugins", stageSubroute(WS, PROJ, "operate", "plugins")],
+		["Alerts", stageSubroute(WS, PROJ, "operate", "alerts")],
+		["Audit", stageSubroute(WS, PROJ, "operate", "telemetry")],
+	],
 } as const;
 
 async function expectWorkbenchIfBackendReady(page: import("@playwright/test").Page, selector: string): Promise<boolean> {
@@ -170,6 +187,25 @@ test.describe("route model — StageRail + ScopeBar use canonical routes", () =>
 		for (const stage of STAGE_ORDER) {
 			await page.goto(stageRoute(WS, PROJ, stage), { waitUntil: "load" });
 			await expect(page.locator(`[data-slot='mobile-stage-tab'][data-stage='${stage}']`)).toHaveAttribute("data-active", "true");
+		}
+	});
+
+	test("Plan and Operate StageRail subnav hrefs resolve without 404", async ({ page }) => {
+		for (const stage of ["plan", "operate"] as const) {
+			await page.goto(stageRoute(WS, PROJ, stage), { waitUntil: "load" });
+			const rail = page.locator("[data-slot='stage-rail']");
+			if (!(await rail.isVisible({ timeout: 1_000 }).catch(() => false))) {
+				await expect(page.locator("body")).toBeVisible();
+				console.log(`route model: stage rail not visible for ${stage}; backend data unavailable in design-e2e preview`);
+				continue;
+			}
+
+			for (const [label, canonicalHref] of STAGE_SUBNAV_ROUTE_SWEEP[stage]) {
+				const href = await rail.getByRole("link", { name: label }).getAttribute("href");
+				expect(href, `${stage} ${label} rendered href`).toBe(canonicalHref);
+				const response = await page.goto(href ?? "", { waitUntil: "domcontentloaded" });
+				expect(response?.status() ?? 0, `${stage} ${label} ${href} should not 404`).not.toBe(404);
+			}
 		}
 	});
 
