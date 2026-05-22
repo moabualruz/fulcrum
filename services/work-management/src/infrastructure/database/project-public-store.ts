@@ -53,6 +53,12 @@ export interface ProjectPublicStats {
   traceId: string;
 }
 
+/** Candidate parent project for the new-project parent picker: `{ id, name }`. */
+export interface ProjectPublicOption {
+  id: string;
+  name: string;
+}
+
 export class ProjectPublicStore {
   constructor(private readonly dataSource: DataSource) {}
 
@@ -211,6 +217,100 @@ export class ProjectPublicStore {
       this.dataSource.manager,
       { orgId: input.orgId, userId: null, projectId: input.id },
       input.id,
+    );
+  }
+
+  /**
+   * Candidate parent projects for the new-project parent picker. Delegates to
+   * the same `listProjectOptions` query the in-process route used so the picker
+   * stays consistent with project hierarchy rules.
+   */
+  async listProjectOptions(input: { orgId: string }): Promise<ProjectPublicOption[]> {
+    const { listProjectOptions } = await import("@work-management/application/projects/queries.ts");
+    return await listProjectOptions(this.dataSource.manager, {
+      orgId: input.orgId,
+      userId: null,
+    });
+  }
+
+  /**
+   * The richer project-creation path: template normalization, repo linking, and
+   * workflow setup via `createProjectFromSetup`. The plain `createProject` store
+   * method cannot carry `parentId`/`template`/`repoPath` semantics, so the
+   * new-project route's setup branch needs this endpoint.
+   */
+  async createProjectFromSetup(input: {
+    orgId: string;
+    userId?: string | null;
+    name: string;
+    slug?: string;
+    description?: string | null;
+    kind?: ProjectPublicKind;
+    parentId?: string | null;
+    repoPath?: string | null;
+    template?: string | null;
+  }): Promise<unknown> {
+    const { createProjectFromSetup } = await import("@work-management/application/projects/commands.ts");
+    return await createProjectFromSetup(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: input.userId ?? null },
+      {
+        name: input.name,
+        slug: input.slug,
+        description: input.description ?? null,
+        kind: input.kind,
+        parentId: input.parentId ?? null,
+        repoPath: input.repoPath ?? null,
+        template: input.template ?? null,
+      },
+    );
+  }
+
+  /**
+   * The project backlog read-model (`{ project, sprints, backlogTasks }`):
+   * unassigned, open tasks plus the project's sprints. Sprint↔task assignment
+   * here mutates `tasks.sprint_id` (the column `loadProjectBacklog` reads), so
+   * it is distinct from the `WorkManagementCycleTask` join-table assignment the
+   * sprint public API exposes.
+   */
+  async loadProjectBacklog(input: { orgId: string; id: string }): Promise<unknown> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+    const { loadProjectBacklog } = await import("@work-management/application/work-cycle-queries.ts");
+    return await loadProjectBacklog(this.dataSource.manager, {
+      orgId: input.orgId,
+      userId: null,
+      projectId: input.id,
+    });
+  }
+
+  async addBacklogTaskToSprint(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<{ moved: true }> {
+    const { addTaskToSprint } = await import("@work-management/application/work-cycle-commands.ts");
+    return await addTaskToSprint(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.id },
+      input.sprintId,
+      input.taskId,
+    );
+  }
+
+  async removeBacklogTaskFromSprint(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<{ moved: true }> {
+    const { removeTaskFromSprint } = await import("@work-management/application/work-cycle-commands.ts");
+    return await removeTaskFromSprint(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.id },
+      input.sprintId,
+      input.taskId,
     );
   }
 

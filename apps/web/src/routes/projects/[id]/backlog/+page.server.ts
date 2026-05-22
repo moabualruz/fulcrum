@@ -1,41 +1,41 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { addTaskToSprint, loadProjectBacklog, removeTaskFromSprint } from "@work-management/interface/project-backlog.ts";
-import { requestProjectScope } from "../../project-request-scope";
+import {
+  addBacklogTaskToSprintForEvent,
+  loadProjectBacklogForEvent,
+  removeBacklogTaskFromSprintForEvent,
+} from "$lib/server/project-api";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async (event) => {
   try {
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    return await loadProjectBacklog(em, ctx);
+    return await loadProjectBacklogForEvent(event, event.params.id);
   } catch {
     throw error(404, "Project not found");
   }
 };
 
 export const actions: Actions = {
-  addTask: async ({ request, params, locals }) => {
-    const fd = await request.formData();
+  addTask: async (event) => {
+    const fd = await event.request.formData();
     const sprintId = fd.get("sprintId") as string;
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
     try {
-      const { em, ctx } = await requestProjectScope(locals, params.id);
-      await addTaskToSprint(em, ctx, sprintId, taskId);
+      await addBacklogTaskToSprintForEvent(event, { projectId: event.params.id, sprintId, taskId });
       return { ok: true };
     } catch (e) {
       return fail(400, { error: (e as Error).message });
     }
   },
-  removeTask: async ({ request, params, locals }) => {
-    const fd = await request.formData();
+  removeTask: async (event) => {
+    const fd = await event.request.formData();
     const sprintId = fd.get("sprintId") as string;
     const taskId = fd.get("taskId") as string;
     if (!sprintId || !taskId) return fail(400, { error: "sprintId and taskId required" });
 
     try {
-      const { em, ctx } = await requestProjectScope(locals, params.id);
-      await removeTaskFromSprint(em, ctx, sprintId, taskId);
+      await removeBacklogTaskFromSprintForEvent(event, { projectId: event.params.id, sprintId, taskId });
       return { ok: true };
     } catch (e) {
       return fail(400, { error: (e as Error).message });
