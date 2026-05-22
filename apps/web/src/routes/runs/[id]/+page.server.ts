@@ -2,14 +2,7 @@ import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { paginateLogs } from "$lib/server/agents";
 import { actionOk } from "$lib/feedback/action-result";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
-import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
-import {
-  archiveRunArtifactForWeb,
-  linkRunArtifactToDocForWeb,
-  promoteRunArtifactToMemoryForWeb,
-} from "@workflow-coordination/application/artifacts/commands.ts";
+import { createAgentRunApiForEvent } from "$lib/server/agent-run-api";
 import type { RunStatus } from "$lib/server/runs";
 
 interface AgentRunDetail {
@@ -70,11 +63,14 @@ function isoStamp(value: string | Date | null): string | null {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+export const load: PageServerLoad = async (event) => {
+  const { params, locals } = event;
   let preloadedData;
   try {
-    preloadedData = await getProjectRunPageData(em, ctx, params.id);
+    preloadedData = await createAgentRunApiForEvent(event).runs.pageDetail({
+      id: params.id,
+      projectId: locals?.activeProjectId ?? null,
+    });
   } catch {
     throw error(404, "Run not found");
   }
@@ -125,37 +121,44 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-  cancel: async ({ params, locals }) => {
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
-    await cancelRun(em, ctx, params.id!);
+  cancel: async (event) => {
+    await createAgentRunApiForEvent(event).runs.cancel({ id: event.params.id! });
     return actionOk("Run cancelled");
   },
-  retry: async ({ params, locals }) => {
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
-    const result = await retryRun(em, ctx, params.id!);
+  retry: async (event) => {
+    const result = await createAgentRunApiForEvent(event).runs.retry({ id: event.params.id! }) as { id: string };
     const newId = result.id;
     throw redirect(303, `/runs/${newId}`);
   },
-  archiveArtifact: async ({ params, locals, request }) => {
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+  archiveArtifact: async (event) => {
+    const { params, locals, request } = event;
     const form = await request.formData();
-    await archiveRunArtifactForWeb(em, ctx, { runId: params.id!, artifactId: requiredField(form, "artifactId") });
+    await createAgentRunApiForEvent(event).runs.archiveArtifact({
+      id: params.id!,
+      artifactId: requiredField(form, "artifactId"),
+      projectId: locals?.activeProjectId ?? null,
+    });
     return actionOk("Artifact archived");
   },
-  linkArtifactToDoc: async ({ params, locals, request }) => {
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+  linkArtifactToDoc: async (event) => {
+    const { params, locals, request } = event;
     const form = await request.formData();
-    await linkRunArtifactToDocForWeb(em, ctx, {
-      runId: params.id!,
+    await createAgentRunApiForEvent(event).runs.linkArtifactToDoc({
+      id: params.id!,
       artifactId: requiredField(form, "artifactId"),
       docId: requiredField(form, "docId"),
+      projectId: locals?.activeProjectId ?? null,
     });
     return actionOk("Artifact linked to doc");
   },
-  promoteArtifactToMemory: async ({ params, locals, request }) => {
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null, null, params.id);
+  promoteArtifactToMemory: async (event) => {
+    const { params, locals, request } = event;
     const form = await request.formData();
-    await promoteRunArtifactToMemoryForWeb(em, ctx, { runId: params.id!, artifactId: requiredField(form, "artifactId") });
+    await createAgentRunApiForEvent(event).runs.promoteArtifactToMemory({
+      id: params.id!,
+      artifactId: requiredField(form, "artifactId"),
+      projectId: locals?.activeProjectId ?? null,
+    });
     return actionOk("Artifact promoted to memory");
   },
 };

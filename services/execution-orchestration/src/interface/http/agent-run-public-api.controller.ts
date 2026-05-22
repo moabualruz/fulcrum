@@ -18,10 +18,21 @@ import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger"
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsArray, IsNumber, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import { z } from "zod";
 
 import { AgentRunPublicStore } from "@execution-orchestration/infrastructure/database/agent-run-public-store.ts";
 import { FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES } from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
 import { FULCRUM_JOB_QUEUE_ENTITIES } from "@platform-core/infrastructure/database/job-queue.entities.ts";
+import {
+  dispatchRun as dispatchPromptRun,
+  recordRunApprovalDecision,
+} from "@execution-orchestration/application/runs/commands.ts";
+import {
+  getProjectRunPageData,
+  listProjectRuns,
+  loadRunsPageData,
+  type RunRowsFilter,
+} from "@execution-orchestration/application/runs/queries.ts";
 import {
   getOrchestratorStatus,
   getRun,
@@ -29,6 +40,11 @@ import {
   type LegacySymphonyStore,
 } from "@platform-core/application/legacy/symphony.ts";
 import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import {
+  archiveRunArtifactForWeb,
+  linkRunArtifactToDocForWeb,
+  promoteRunArtifactToMemoryForWeb,
+} from "@workflow-coordination/application/artifacts/commands.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { AgentRunRouteParamsDto, AgentRunListQueryDto, AgentRunIssueListQueryDto, AgentRunRefreshResponseDto, AgentRunDispatchBodyDto } from "./dto/agent-run.dto.ts";
@@ -42,10 +58,90 @@ export interface AgentRunPublicApiOptions {
   featuresEnv?: string;
 }
 
+export class AgentRunPageDataQueryDto extends AgentRunListQueryDto {
+  userId?: string | null;
+  contextProjectId?: string | null;
+  filterProjectId?: string | null;
+  hasProjectFilter?: string;
+  agent?: string;
+  range?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export class AgentRunProjectQueryDto extends AgentRunListQueryDto {
+  userId?: string | null;
+  projectId?: string | null;
+}
+
+export class AgentRunArtifactRouteParamsDto extends AgentRunRouteParamsDto {
+  artifactId!: string;
+}
+
+export class AgentRunPromptDispatchBodyDto {
+  orgId?: string;
+  userId?: string | null;
+  projectId?: string | null;
+  agentName!: string;
+  prompt!: string;
+}
+
+export class AgentRunApprovalDecisionBodyDto {
+  orgId?: string;
+  userId?: string | null;
+  projectId?: string | null;
+  approvalId!: string;
+  decision!: "approve" | "deny" | "request_info";
+  note?: string | null;
+}
+
+export class AgentRunArtifactActionBodyDto {
+  orgId?: string;
+  userId?: string | null;
+  projectId?: string | null;
+  docId?: string;
+}
+
+type PublicRunContext = { orgId: string; userId: string | null; projectId: string | null };
+
+const nullableString = z.preprocess((value) => value === "" ? null : value, z.string().min(1).nullable().optional());
+const publicRunContextSchema = z.object({
+  orgId: z.string().min(1).optional(),
+  userId: nullableString,
+  projectId: nullableString,
+});
+const runPageDataQuerySchema = publicRunContextSchema.extend({
+  contextProjectId: nullableString,
+  filterProjectId: nullableString,
+  hasProjectFilter: z.string().optional(),
+  agent: z.string().optional(),
+  status: z.string().optional(),
+  range: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+const projectRunQuerySchema = publicRunContextSchema.extend({
+  projectId: z.string().min(1),
+});
+const promptDispatchBodySchema = publicRunContextSchema.extend({
+  agentName: z.string().trim().min(1),
+  prompt: z.string().trim().min(1),
+});
+const approvalDecisionBodySchema = publicRunContextSchema.extend({
+  approvalId: z.string().trim().min(1),
+  decision: z.enum(["approve", "deny", "request_info"]),
+  note: nullableString,
+});
+const artifactActionBodySchema = publicRunContextSchema.extend({
+  docId: z.string().trim().min(1).optional(),
+});
+const RUN_RANGES = new Set(["24h", "7d", "30d", "all"]);
+
 export class AgentRunPublicApiService {
   constructor(
     private readonly options: AgentRunPublicApiOptions | null = null,
     private readonly store: AgentRunPublicStore | null = null,
+    private readonly dataSource: DataSource | null = null,
   ) {}
 
   async loadStatus(query: Pick<AgentRunListQueryDto, "orgId"> = {}): Promise<unknown> {
@@ -173,6 +269,93 @@ export class AgentRunPublicApiService {
     return run;
   }
 
+  async loadRunsPage(query: AgentRunPageDataQueryDto): Promise<unknown> {
+    const input = runPageDataQuerySchema.parse(query);
+    const ctx = this.contextFrom({
+      orgId: input.orgId,
+      userId: input.userId,
+      projectId: input.contextProjectId ?? input.projectId ?? null,
+    });
+    const filter: RunRowsFilter = {
+      range: RUN_RANGES.has(input.range ?? "") ? input.range as RunRowsFilter["range"] : "all",
+      ...(input.agent ? { agent: input.agent } : {}),
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.hasProjectFilter === "true" ? { projectId: input.filterProjectId ?? null } : {}),
+      ...(input.dateFrom ? { dateFrom: input.dateFrom } : {}),
+      ...(input.dateTo ? { dateTo: input.dateTo } : {}),
+    };
+    return await loadRunsPageData(this.requireManager(), ctx, filter);
+  }
+
+  async listProjectRunRows(query: AgentRunProjectQueryDto): Promise<unknown> {
+    const input = projectRunQuerySchema.parse(query);
+    return await listProjectRuns(this.requireManager(), this.contextFrom(input));
+  }
+
+  async loadRunPage(params: AgentRunRouteParamsDto, query: AgentRunProjectQueryDto): Promise<unknown> {
+    const input = publicRunContextSchema.parse(query);
+    return await getProjectRunPageData(this.requireManager(), this.contextFrom(input), params.identifier);
+  }
+
+  async dispatchPromptRun(body: AgentRunPromptDispatchBodyDto): Promise<unknown> {
+    const input = promptDispatchBodySchema.parse(body);
+    return await dispatchPromptRun(this.requireManager(), this.contextFrom(input), {
+      agentName: input.agentName,
+      prompt: input.prompt,
+    });
+  }
+
+  async recordApprovalDecision(
+    params: AgentRunRouteParamsDto,
+    body: AgentRunApprovalDecisionBodyDto,
+  ): Promise<unknown> {
+    const input = approvalDecisionBodySchema.parse(body);
+    return await recordRunApprovalDecision(this.requireManager(), this.contextFrom(input), {
+      runId: params.identifier,
+      approvalId: input.approvalId,
+      decision: input.decision,
+      note: input.note ?? null,
+    });
+  }
+
+  async archiveArtifact(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    const input = artifactActionBodySchema.parse(body);
+    await archiveRunArtifactForWeb(this.requireManager(), this.contextFrom(input), {
+      runId: params.identifier,
+      artifactId: params.artifactId,
+    });
+    return { ok: true };
+  }
+
+  async linkArtifactToDoc(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    const input = artifactActionBodySchema.parse(body);
+    if (!input.docId) throw new BadRequestException("docId is required.");
+    await linkRunArtifactToDocForWeb(this.requireManager(), this.contextFrom(input), {
+      runId: params.identifier,
+      artifactId: params.artifactId,
+      docId: input.docId,
+    });
+    return { ok: true };
+  }
+
+  async promoteArtifactToMemory(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    const input = artifactActionBodySchema.parse(body);
+    await promoteRunArtifactToMemoryForWeb(this.requireManager(), this.contextFrom(input), {
+      runId: params.identifier,
+      artifactId: params.artifactId,
+    });
+    return { ok: true };
+  }
+
   private requireOptions(): AgentRunPublicApiOptions {
     const env = this.options?.featuresEnv ?? process.env.FULCRUM_FEATURES;
     if (!isFeatureEnabled("public-api", env)) {
@@ -205,6 +388,23 @@ export class AgentRunPublicApiService {
       throw new InternalServerErrorException("Agent-run public API TypeORM store is not configured.");
     }
     return this.store;
+  }
+
+  private requireManager() {
+    this.requireOptions();
+    if (!this.dataSource) {
+      throw new InternalServerErrorException("Agent-run public API TypeORM store is not configured.");
+    }
+    return this.dataSource.manager;
+  }
+
+  private contextFrom(input: { orgId?: string; userId?: string | null; projectId?: string | null }): PublicRunContext {
+    const options = this.requireOptions();
+    return {
+      orgId: this.requireOrgId(options, input.orgId),
+      userId: input.userId ?? null,
+      projectId: input.projectId ?? null,
+    };
   }
 }
 
@@ -291,6 +491,57 @@ export class AgentRunPublicRunsController {
   }
 }
 
+export class AgentRunPublicRunPagesController {
+  constructor(private readonly agentRuns: AgentRunPublicApiService) {}
+
+  async loadRunsPage(query: AgentRunPageDataQueryDto): Promise<unknown> {
+    return await this.agentRuns.loadRunsPage(query);
+  }
+
+  async listProjectRunRows(query: AgentRunProjectQueryDto): Promise<unknown> {
+    return await this.agentRuns.listProjectRunRows(query);
+  }
+
+  async loadRunPage(
+    params: AgentRunRouteParamsDto,
+    query: AgentRunProjectQueryDto,
+  ): Promise<unknown> {
+    return await this.agentRuns.loadRunPage(params, query);
+  }
+
+  async dispatchPromptRun(body: AgentRunPromptDispatchBodyDto): Promise<unknown> {
+    return await this.agentRuns.dispatchPromptRun(body);
+  }
+
+  async recordApprovalDecision(
+    params: AgentRunRouteParamsDto,
+    body: AgentRunApprovalDecisionBodyDto,
+  ): Promise<unknown> {
+    return await this.agentRuns.recordApprovalDecision(params, body);
+  }
+
+  async archiveArtifact(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    return await this.agentRuns.archiveArtifact(params, body);
+  }
+
+  async linkArtifactToDoc(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    return await this.agentRuns.linkArtifactToDoc(params, body);
+  }
+
+  async promoteArtifactToMemory(
+    params: AgentRunArtifactRouteParamsDto,
+    body: AgentRunArtifactActionBodyDto,
+  ): Promise<{ ok: true }> {
+    return await this.agentRuns.promoteArtifactToMemory(params, body);
+  }
+}
+
 export class AgentRunPublicApiModule {
   static register(options: AgentRunPublicApiOptions): DynamicModule {
     return {
@@ -300,7 +551,7 @@ export class AgentRunPublicApiModule {
         ...FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES,
         ...FULCRUM_JOB_QUEUE_ENTITIES,
       ])],
-      controllers: [AgentRunPublicApiController, AgentRunPublicRunsController],
+      controllers: [AgentRunPublicApiController, AgentRunPublicRunPagesController, AgentRunPublicRunsController],
       providers: [
         { provide: AGENT_RUN_PUBLIC_API_OPTIONS, useValue: options },
         AgentRunPublicStore,
@@ -313,9 +564,11 @@ export class AgentRunPublicApiModule {
 
 Inject(AGENT_RUN_PUBLIC_API_OPTIONS)(AgentRunPublicApiService, undefined, 0);
 Inject(AgentRunPublicStore)(AgentRunPublicApiService, undefined, 1);
+Inject(DataSource)(AgentRunPublicApiService, undefined, 2);
 Inject(DataSource)(AgentRunPublicStore, undefined, 0);
 Inject(AgentRunPublicApiService)(AgentRunPublicApiController, undefined, 0);
 Inject(AgentRunPublicApiService)(AgentRunPublicRunsController, undefined, 0);
+Inject(AgentRunPublicApiService)(AgentRunPublicRunPagesController, undefined, 0);
 
 IsString()(AgentRunRouteParamsDto.prototype, "identifier");
 MinLength(1)(AgentRunRouteParamsDto.prototype, "identifier");
@@ -388,6 +641,38 @@ const retryPublicRunDescriptor = Object.getOwnPropertyDescriptor(
   AgentRunPublicRunsController.prototype,
   "retryRun",
 );
+const loadRunsPageDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunsPage",
+);
+const listProjectRunRowsDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "listProjectRunRows",
+);
+const loadRunPageDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunPage",
+);
+const dispatchPromptRunDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "dispatchPromptRun",
+);
+const recordApprovalDecisionDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "recordApprovalDecision",
+);
+const archiveArtifactDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "archiveArtifact",
+);
+const linkArtifactToDocDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "linkArtifactToDoc",
+);
+const promoteArtifactToMemoryDescriptor = Object.getOwnPropertyDescriptor(
+  AgentRunPublicRunPagesController.prototype,
+  "promoteArtifactToMemory",
+);
 
 if (
   !loadStatusDescriptor ||
@@ -399,7 +684,15 @@ if (
   !loadPublicRunDescriptor ||
   !dispatchPublicRunDescriptor ||
   !cancelPublicRunDescriptor ||
-  !retryPublicRunDescriptor
+  !retryPublicRunDescriptor ||
+  !loadRunsPageDescriptor ||
+  !listProjectRunRowsDescriptor ||
+  !loadRunPageDescriptor ||
+  !dispatchPromptRunDescriptor ||
+  !recordApprovalDecisionDescriptor ||
+  !archiveArtifactDescriptor ||
+  !linkArtifactToDocDescriptor ||
+  !promoteArtifactToMemoryDescriptor
 ) {
   throw new Error("AgentRunPublicApiController route descriptors are missing");
 }
@@ -605,13 +898,119 @@ ApiOkResponse({ description: "Retried agent run" })(
   retryPublicRunDescriptor,
 );
 
+Controller("api/v1/runs")(AgentRunPublicRunPagesController);
+ApiTags("agent-runs")(AgentRunPublicRunPagesController);
+
+Get("page-data")(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunsPage",
+  loadRunsPageDescriptor,
+);
+Query()(AgentRunPublicRunPagesController.prototype, "loadRunsPage", 0);
+ApiOperation({ summary: "Load runs page data" })(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunsPage",
+  loadRunsPageDescriptor,
+);
+ApiOkResponse({ description: "Runs page data" })(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunsPage",
+  loadRunsPageDescriptor,
+);
+
+Get("project")(
+  AgentRunPublicRunPagesController.prototype,
+  "listProjectRunRows",
+  listProjectRunRowsDescriptor,
+);
+Query()(AgentRunPublicRunPagesController.prototype, "listProjectRunRows", 0);
+ApiOperation({ summary: "List project run rows" })(
+  AgentRunPublicRunPagesController.prototype,
+  "listProjectRunRows",
+  listProjectRunRowsDescriptor,
+);
+ApiOkResponse({ description: "Project run rows" })(
+  AgentRunPublicRunPagesController.prototype,
+  "listProjectRunRows",
+  listProjectRunRowsDescriptor,
+);
+
+Get(":identifier/page-data")(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunPage",
+  loadRunPageDescriptor,
+);
+Param()(AgentRunPublicRunPagesController.prototype, "loadRunPage", 0);
+Query()(AgentRunPublicRunPagesController.prototype, "loadRunPage", 1);
+ApiParam({ name: "identifier", required: true })(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunPage",
+  loadRunPageDescriptor,
+);
+ApiOperation({ summary: "Load run detail page data" })(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunPage",
+  loadRunPageDescriptor,
+);
+ApiOkResponse({ description: "Run detail page data" })(
+  AgentRunPublicRunPagesController.prototype,
+  "loadRunPage",
+  loadRunPageDescriptor,
+);
+
+Post("prompt-dispatch")(
+  AgentRunPublicRunPagesController.prototype,
+  "dispatchPromptRun",
+  dispatchPromptRunDescriptor,
+);
+Body()(AgentRunPublicRunPagesController.prototype, "dispatchPromptRun", 0);
+ApiOperation({ summary: "Dispatch a prompt-based agent run" })(
+  AgentRunPublicRunPagesController.prototype,
+  "dispatchPromptRun",
+  dispatchPromptRunDescriptor,
+);
+ApiOkResponse({ description: "Dispatched prompt run" })(
+  AgentRunPublicRunPagesController.prototype,
+  "dispatchPromptRun",
+  dispatchPromptRunDescriptor,
+);
+
+Post(":identifier/approval-decision")(
+  AgentRunPublicRunPagesController.prototype,
+  "recordApprovalDecision",
+  recordApprovalDecisionDescriptor,
+);
+Param()(AgentRunPublicRunPagesController.prototype, "recordApprovalDecision", 0);
+Body()(AgentRunPublicRunPagesController.prototype, "recordApprovalDecision", 1);
+Post(":identifier/artifacts/:artifactId/archive")(
+  AgentRunPublicRunPagesController.prototype,
+  "archiveArtifact",
+  archiveArtifactDescriptor,
+);
+Param()(AgentRunPublicRunPagesController.prototype, "archiveArtifact", 0);
+Body()(AgentRunPublicRunPagesController.prototype, "archiveArtifact", 1);
+Post(":identifier/artifacts/:artifactId/link-doc")(
+  AgentRunPublicRunPagesController.prototype,
+  "linkArtifactToDoc",
+  linkArtifactToDocDescriptor,
+);
+Param()(AgentRunPublicRunPagesController.prototype, "linkArtifactToDoc", 0);
+Body()(AgentRunPublicRunPagesController.prototype, "linkArtifactToDoc", 1);
+Post(":identifier/artifacts/:artifactId/promote-memory")(
+  AgentRunPublicRunPagesController.prototype,
+  "promoteArtifactToMemory",
+  promoteArtifactToMemoryDescriptor,
+);
+Param()(AgentRunPublicRunPagesController.prototype, "promoteArtifactToMemory", 0);
+Body()(AgentRunPublicRunPagesController.prototype, "promoteArtifactToMemory", 1);
+
 Module({
   imports: [TypeOrmModule.forFeature([
     ...FULCRUM_WORKFLOW_SPINE_ENTITIES,
     ...FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES,
     ...FULCRUM_JOB_QUEUE_ENTITIES,
   ])],
-  controllers: [AgentRunPublicApiController, AgentRunPublicRunsController],
+  controllers: [AgentRunPublicApiController, AgentRunPublicRunPagesController, AgentRunPublicRunsController],
   providers: [
     { provide: AGENT_RUN_PUBLIC_API_OPTIONS, useValue: null },
     AgentRunPublicStore,
