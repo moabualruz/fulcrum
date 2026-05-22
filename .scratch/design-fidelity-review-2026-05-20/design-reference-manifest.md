@@ -77,18 +77,18 @@ again in §3.
 |---|---|---|---|
 | §0 | Posture | — | GAP (non-actionable posture text — low risk) |
 | §1 | Foundation — design tokens | `prd-cross-a11y-motion-forced-colors`, `prd-cross-a11y-verification-gate` | ✓ owned |
-| §2 | Typography | — | **GAP** |
-| §3 | Layout / chrome | `prd-web-shell-stage-rail`, `prd-web-shell-scope-bar`, `prd-web-shell-status-footer-ai-assist`, `prd-web-ui-kit-shell-primitives`, `prd-web-global-ai-assist-drawer`, `prd-cross-desktop-os-scope-decision`, `prd-cross-a11y-motion-forced-colors`, `prd-design-gate-rendered-screenshots`, +stage PRDs | ✓ owned (web in-app chrome). Desktop Tauri window chrome (`desktop-shell.html`) is **deferred** per `prd-cross-desktop-os-scope-decision` — see §3 Deferred |
-| §4 | Components — vocabulary | board/list/graph/runs/timeline + mode/palette/trace PRDs (§4.4–§4.13) | ✓ owned |
-| §5 | Motion | `prd-cross-a11y-motion-forced-colors` (reduced-motion only) | partial — motion design not fully owned |
+| §2 | Typography | `prd-cross-typography-fidelity` | ✓ owned |
+| §3 | Layout / chrome | `prd-web-shell-stage-rail`, `prd-web-shell-scope-bar`, `prd-web-shell-status-footer-ai-assist`, `prd-web-ui-kit-shell-primitives`, `prd-web-global-ai-assist-drawer`, `prd-cross-desktop-os-scope-decision`, `prd-cross-a11y-motion-forced-colors`, `prd-design-gate-rendered-screenshots`, `prd-design-gate-shell-assertions`, +stage PRDs | ✓ owned (web in-app chrome). Desktop Tauri window chrome (`desktop-shell.html`) is **deferred** per `prd-cross-desktop-os-scope-decision` — see §3 Deferred |
+| §4 | Components — vocabulary | `prd-cross-ui-kit-first-enforcement`, `prd-web-build-list-od-fidelity`, board/list/graph/runs/timeline + mode/palette/trace PRDs (§4.4–§4.13) | ✓ owned |
+| §5 | Motion | `prd-cross-a11y-motion-forced-colors`, `prd-cross-motion-fidelity` (reduced-motion only) | partial — motion design not fully owned |
 | §6 | Iconography | `prd-web-operate-doctor-od-fidelity` (subsystem table only) | partial |
-| §7 | Density mode | `prd-web-build-list-od-fidelity`, `prd-web-build-timeline-od-fidelity` | ✓ owned |
+| §7 | Density mode | `prd-web-build-board-od-fidelity`, `prd-web-build-list-od-fidelity`, `prd-web-build-timeline-od-fidelity` | ✓ owned |
 | §8 | Live session pane | `prd-web-build-runs-feed-od-fidelity`, `prd-web-plan-session-od-fidelity`, `prd-web-mobile-build-runs-od-fidelity` | ✓ owned |
 | §9 | Run feed + orchestrator | `prd-web-build-graph-od-fidelity`, `prd-web-build-runs-feed-od-fidelity`, `prd-web-review-workbench-od-fidelity` | ✓ owned |
 | §10 | Doctor / audit / error logs | `prd-web-operate-doctor-od-fidelity`, `prd-web-operate-alerts-console-od-fidelity`, `prd-web-operate-mcp-per-agent-scope-od-fidelity` | ✓ owned |
-| §11 | Onboarding (first-run) | `prd-web-operate-*` cite §11 for per-agent scope; **onboarding flow itself** | **GAP** — see §3 |
+| §11 | Onboarding (first-run) | `prd-onboarding-web-first-run`, `prd-web-operate-mcp-per-agent-scope-od-fidelity`, `prd-web-operate-plugins-management-od-fidelity`, `prd-web-operate-telemetry-od-fidelity`; `prd-web-operate-*` cite §11 for per-agent scope | ✓ owned |
 | §12 | What we will not build | — | GAP (scope-boundary text — low risk) |
-| §13 | Cross-surface invariants | `prd-design-gate-source-assertion-retirement`, `prd-cross-a11y-verification-gate`, `prd-cross-copy-lock`, `prd-cross-offline-connection-state` | ✓ owned |
+| §13 | Cross-surface invariants | `prd-design-gate-source-assertion-retirement`, `prd-cross-a11y-verification-gate`, `prd-cross-a11y-motion-forced-colors`, `prd-cross-copy-lock`, `prd-cross-offline-connection-state`, `prd-cross-typography-fidelity`, `prd-web-design-e2e-gate-stability` | ✓ owned |
 | §14 | Sources | — | GAP (bibliography — non-actionable) |
 
 ### IA-MAP.md
@@ -98,13 +98,13 @@ again in §3.
 | §0 | Top-level scope shape | — | GAP (low risk — implied by §1–§3) |
 | §1 | URL shape | `prd-web-stage-route-model` | ✓ owned |
 | §2.1–§2.6 | Stage IA detail | capture/plan/build/review/ship/operate PRDs | ✓ owned |
-| §3 | Sidebar IA | `prd-web-shell-stage-rail`, `prd-web-shell-scope-bar`, `prd-web-shell-status-footer-ai-assist`, `prd-web-root-default-screen` | ✓ owned |
+| §3 | Sidebar IA | `prd-cli-plan-stage-parity`, `prd-design-gate-shell-assertions`, `prd-web-plan-prompts-od-fidelity`, `prd-web-plan-prototypes-od-fidelity`, `prd-web-plan-templates-od-fidelity`, `prd-web-shell-stage-axis-ownership-fix`, `prd-web-shell-stage-rail`, `prd-web-shell-scope-bar`, `prd-web-shell-status-footer-ai-assist`, `prd-web-root-default-screen` | ✓ owned |
 | §4 | Keyboard map | `prd-cross-a11y-verification-gate` | ✓ owned |
-| §5 | Right drawer — AI Assist | `prd-web-global-ai-assist-drawer`, `prd-design-gate-rendered-screenshots` | ✓ owned |
+| §5 | Right drawer — AI Assist | `prd-design-gate-rendered-screenshots`, `prd-design-gate-shell-assertions`, `prd-web-global-ai-assist-drawer` | ✓ owned |
 | §6 | Command palette contents | `prd-web-command-palette-od-fidelity` | ✓ owned |
 | §7 | Status footer | `prd-web-shell-status-footer-ai-assist`, `prd-tui-status-footer-od-parity` (cite §3.1/§4.10, not §7 by number) | partial — owned by behavior, not by §7 citation |
 | §8 | CLI subcommand tree | `prd-cli-stage-command-tree`, `prd-cli-*-stage-parity` (cite CLI-TUI-UX §1) | partial — CLI tree owned via CLI-TUI-UX.md not IA-MAP §8 |
-| §9 | TUI screen list | `prd-tui-root-navigation-od-parity`, `prd-tui-stage-workbenches-set` | ✓ owned |
+| §9 | TUI screen list | `prd-cross-cli-tui-parity-matrix`, `prd-tui-root-navigation-od-parity`, `prd-tui-stage-workbenches-set` | ✓ owned |
 | §10 | Mobile IA | `prd-web-mobile-build-runs-od-fidelity` (§617 bottom tab bar) | partial — only build-runs mobile owned |
 | §11 | Trace-spine link grammar | `prd-cli-trace-spine-v1`, `prd-tui-trace-yank` (cite DESIGN §4.10) | partial — trace owned by behavior, §11 grammar not cited |
 | §12 | Sources | — | GAP (bibliography) |
@@ -114,14 +114,14 @@ again in §3.
 | § | Title | Owning PRD(s) | Status |
 |---|---|---|---|
 | §1 | Voice rules | `prd-cross-copy-lock`, `prd-design-gate-source-assertion-retirement` | ✓ owned |
-| §2 | Empty states | `prd-cross-empty-error-state-system`, `prd-cross-copy-lock`, plan/build/capture PRDs | ✓ owned |
-| §3 | Errors | `prd-cross-empty-error-state-system`, `prd-cross-offline-connection-state` | ✓ owned |
+| §2 | Empty states | `prd-cross-empty-error-state-system`, `prd-cross-copy-lock`, `prd-web-plan-prompts-od-fidelity`, `prd-web-plan-prototypes-od-fidelity`, `prd-web-plan-session-od-fidelity`, `prd-web-plan-templates-od-fidelity`, plan/build/capture PRDs | ✓ owned |
+| §3 | Errors | `prd-cross-empty-error-state-system`, `prd-cross-offline-connection-state`, `prd-web-error-boundary-copy-lock`, `prd-web-plan-session-od-fidelity` | ✓ owned |
 | §4 | Confirmations | `prd-cross-copy-lock`, `prd-web-ship-stage-shell-od-fidelity` | ✓ owned |
-| §5 | Mode affordance copy | — | **GAP** — `prd-web-mode-affordance-system` builds the rows but cites DESIGN §4.11/§4.13, not COPY §5 |
+| §5 | Mode affordance copy | `prd-closure5-prd-consumed-by-manifest`, `prd-web-mode-affordance-system` | ✓ owned |
 | §6 | Status labels | `prd-cross-copy-lock`, review PRDs (§362) | ✓ owned |
-| §7 | Onboarding copy | `prd-cross-copy-lock` | ✓ owned (copy); flow itself is a GAP |
+| §7 | Onboarding copy | `prd-closure2-copy-onboarding-wip-footer`, `prd-cross-copy-lock`, `prd-onboarding-web-first-run` | ✓ owned |
 | §8 | Doctor copy | `prd-web-operate-doctor-od-fidelity` | ✓ owned |
-| §9 | Audit row copy | — | **GAP** |
+| §9 | Audit row copy | `prd-closure2-unowned-spec-section-ownership`, `prd-closure3-spec-section-real-ownership`, `prd-spec-owner-audit-row-copy` | ✓ owned |
 | §10 | Permission prompt copy | `prd-cross-copy-lock` | ✓ owned |
 | §11 | Notification copy | `prd-cross-copy-lock`, `prd-web-operate-alerts-console-od-fidelity` | ✓ owned |
 | §12 | Settings labels | `prd-cross-copy-lock` | ✓ owned |
@@ -133,22 +133,22 @@ again in §3.
 | § | Title | Owning PRD(s) | Status |
 |---|---|---|---|
 | §0 | Posture | — | GAP (posture text — low risk) |
-| §1 | CLI subcommand tree | `prd-cli-stage-command-tree`, `prd-cli-*-stage-parity` (6 stages) | ✓ owned |
-| §2 | CLI flag conventions | — | **GAP** |
-| §3 | CLI JSON envelope | `prd-cli-json-envelope-v1`, `prd-cli-trace-spine-v1` | ✓ owned |
-| §4 | CLI completion install | — | **GAP** |
+| §1 | CLI subcommand tree | `prd-cli-agent-registry-envelope-and-singular-command`, `prd-cli-bin-dispatch-stage-command-contract`, `prd-cli-operate-plugin-envelope-and-root-plugin`, `prd-cli-stage-command-tree`, `prd-cli-*-stage-parity` (6 stages), `prd-web-plan-prompts-od-fidelity`, `prd-web-plan-templates-od-fidelity` | ✓ owned |
+| §2 | CLI flag conventions | `prd-cli-flag-conventions` | ✓ owned |
+| §3 | CLI JSON envelope | `prd-cli-agent-registry-envelope-and-singular-command`, `prd-cli-bin-dispatch-stage-command-contract`, `prd-cli-gate-tests-repair`, `prd-cli-json-envelope-v1`, `prd-cli-operate-plugin-envelope-and-root-plugin`, `prd-cli-trace-spine-v1` | ✓ owned |
+| §4 | CLI completion install | `prd-cli-completion-install`, `prd-cli-gate-tests-repair` | ✓ owned |
 | §5 | CLI error messages | `prd-tui-status-empty-error-contract` | partial — TUI cites §5; CLI error copy not separately owned |
-| §6 | TUI screen list | `prd-tui-stage-workbenches-set`, `prd-tui-ai-assist-pane` | ✓ owned |
-| §7 | TUI keyboard map | `prd-tui-stage-chords-and-colon-palette`, `prd-tui-ai-assist-pane`, `prd-tui-trace-yank`, `prd-tui-step-modepicker-006` | ✓ owned |
+| §6 | TUI screen list | `prd-tui-ai-assist-pane`, `prd-tui-shell-chord-yank-wiring`, `prd-tui-stage-workbenches-set` | ✓ owned |
+| §7 | TUI keyboard map | `prd-tui-stage-chords-and-colon-palette`, `prd-tui-ai-assist-pane`, `prd-tui-shell-chord-yank-wiring`, `prd-tui-trace-yank`, `prd-tui-step-modepicker-006` | ✓ owned |
 | §8 | TUI status footer | `prd-tui-status-footer-od-parity` (cites DESIGN §3.1/§4.10) | partial — owned by behavior, not §8 citation |
-| §9 | TUI command palette | `prd-tui-stage-chords-and-colon-palette` | ✓ owned |
+| §9 | TUI command palette | `prd-tui-shell-chord-yank-wiring`, `prd-tui-stage-chords-and-colon-palette` | ✓ owned |
 | §10 | AI Assist pane (TUI) | `prd-tui-ai-assist-pane` | ✓ owned |
 | §11 | TUI status badge vocabulary | `prd-tui-status-empty-error-contract` | ✓ owned |
-| §12 | TUI density modes | — | **GAP** |
-| §13 | CLI ↔ TUI parity table | — | **GAP** — no PRD verifies the parity table itself |
-| §14 | Agent-native parity | — | GAP (cross-surface invariant — partially enforced by goal.md Hard Rules) |
-| §15 | CLI startup performance budget | — | **GAP** |
-| §16 | TUI first-frame budget | — | **GAP** |
+| §12 | TUI density modes | `prd-closure2-unowned-spec-section-ownership`, `prd-closure3-spec-section-real-ownership`, `prd-spec-owner-tui-density-modes` | ✓ owned |
+| §13 | CLI ↔ TUI parity table | `prd-cross-cli-tui-parity-matrix` | ✓ owned |
+| §14 | Agent-native parity | `prd-closure2-unowned-spec-section-ownership`, `prd-closure3-spec-section-real-ownership`, `prd-cross-cli-tui-parity-matrix` | ✓ owned |
+| §15 | CLI startup performance budget | `prd-cli-startup-budget` | ✓ owned |
+| §16 | TUI first-frame budget | `prd-closure2-unowned-spec-section-ownership`, `prd-closure3-spec-section-real-ownership`, `prd-spec-owner-tui-first-frame-budget` | ✓ owned |
 | §17 | Sources | — | GAP (bibliography) |
 
 ### PRODUCT.md

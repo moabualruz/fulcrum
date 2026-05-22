@@ -117,7 +117,7 @@ function parseManifestRows() {
 
   manifest.split("\n").forEach((line, index) => {
     if (line.startsWith("## 1. OD HTML file coverage")) mode = "od";
-    if (line.startsWith("## 2. Spec section coverage")) mode = "spec";
+    if (line.startsWith("## 2. Major spec section coverage")) mode = "spec";
     if (line.startsWith("## 3.")) mode = null;
 
     if (mode === "spec") {
@@ -171,7 +171,18 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
-const rowFailures = parseManifestRows().flatMap((row) => {
+const manifestRows = parseManifestRows();
+if (
+  manifest.includes("## 2. Major spec section coverage") &&
+  !manifestRows.some((row) => row.section === "spec")
+) {
+  console.error(
+    "check-manifest-gaps FAIL: manifest has major spec section coverage but no spec rows were parsed",
+  );
+  process.exit(1);
+}
+
+const rowFailures = manifestRows.flatMap((row) => {
   const expectedOwners = ledgerOwnersFor(row);
   if (expectedOwners.length === 0) return [];
 
@@ -196,5 +207,5 @@ if (rowFailures.length > 0) {
 }
 
 console.log(
-  `check-manifest-gaps ok: ${parseManifestRows().length} manifest rows agree with vertical-prds.jsonl; all ${suggested.length} manifest-named PRD ids exist in the ledger`,
+  `check-manifest-gaps ok: ${manifestRows.length} manifest rows agree with vertical-prds.jsonl; all ${suggested.length} manifest-named PRD ids exist in the ledger`,
 );
