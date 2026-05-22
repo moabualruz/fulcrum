@@ -156,7 +156,7 @@ describe("Operate verb dispatch: canonical fulcrum.cli.v1 envelope", () => {
     const env = expectCanonicalEnvelope(h.out[0]!, "operate plugin install");
     const errors = env["errors"] as { code: string }[];
     expect(errors).toHaveLength(1);
-    expect(errors[0]!.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+    expect(errors[0]!.code).toBe("FUL_NOT_IMPLEMENTED");
     expect(env["result"]).toBeNull();
   });
 

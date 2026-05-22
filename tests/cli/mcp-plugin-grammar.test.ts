@@ -113,7 +113,7 @@ describe("CLI MCP/plugin envelope and schema grammar", () => {
       const envelope = parseEnvelope(run);
       expect(envelope.command).toBe("fulcrum plugin enable");
       expect(envelope.result).toBeNull();
-      expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+      expect(envelope.errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
       expect(envelope.errors[0]?.fix).toContain("plugins.cross_agent");
 
       const rootHelp = await runCli(["--help"], env);

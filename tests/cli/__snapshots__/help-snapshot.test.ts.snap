@@ -41,7 +41,7 @@ BUILD
   fulcrum cycle <list|activate|complete>       Manage build cycles.
   fulcrum module <list|new|view>               Manage build modules.
   fulcrum context <pack|inspect|diff>          Inspect task run context.
-  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
                                                Manage the multi-CLI agent registry.
   fulcrum route <rules|assign|simulate>        Route action kinds to agents.
   fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
@@ -151,7 +151,7 @@ Commands:
   fulcrum cycle <list|activate|complete>       Manage build cycles.
   fulcrum module <list|new|view>               Manage build modules.
   fulcrum context <pack|inspect|diff>          Inspect task run context.
-  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
                                                Manage the multi-CLI agent registry.
   fulcrum route <rules|assign|simulate>        Route action kinds to agents.
   fulcrum symphony runs list --state ready     Inspect orchestrated run queues.

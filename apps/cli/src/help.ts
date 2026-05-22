@@ -73,7 +73,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
       "fulcrum cycle <list|activate|complete>       Manage build cycles.",
       "fulcrum module <list|new|view>               Manage build modules.",
       "fulcrum context <pack|inspect|diff>          Inspect task run context.",
-      "fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>",
+      "fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>",
       "                                             Manage the multi-CLI agent registry.",
       "fulcrum route <rules|assign|simulate>        Route action kinds to agents.",
       "fulcrum symphony runs list --state ready     Inspect orchestrated run queues.",
@@ -872,7 +872,7 @@ Run \`fulcrum help <stage>\` (e.g. \`fulcrum help build\`) for stage detail.
 `;
 
 const COMMAND_HELP: ReadonlyMap<string, string> = new Map([
-  ["agent", `fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
+  ["agent", `fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
 
 Manage the no-cap multi-CLI agent registry.
 
@@ -888,6 +888,8 @@ Usage:
   fulcrum agent reload <id> [--json]
   fulcrum agent invoke <id> [--step <step-id>] [--policy <file>] [--json]
   fulcrum agent test <id> [--json]
+  fulcrum agent status <id> [--json]
+  fulcrum agent defaults [--json]
 
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope
@@ -979,6 +981,25 @@ Usage:
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope
 `],
+  ["plugin", `fulcrum plugin <list|show|install|enable|disable|update|remove> [--json]
+
+Operate plugin markers and deferred cross-agent mutation verbs.
+
+Usage:
+  fulcrum plugin list [--json] [--agent <id>]
+  fulcrum plugin show <id> [--json]
+  fulcrum plugin install <name> [--agent <id>...] [--all-agents] [--version <v>]
+  fulcrum plugin enable <name> [--agent <id>...] [--all-agents]
+  fulcrum plugin disable <name> [--agent <id>...] [--all-agents]
+  fulcrum plugin update <name|--all> [--agent <id>...] [--all-agents]
+  fulcrum plugin remove <name> [--agent <id>...] [--all-agents]
+
+Deferred:
+  install, enable, disable, update, and remove return FUL_NOT_IMPLEMENTED until plugins.cross_agent is wired.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
   ["module", `fulcrum module <list|new|view> [--json]
 
 Build modules: group, create, and inspect task modules.
@@ -997,12 +1018,31 @@ Usage:
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope
 `],
-  ["route", `fulcrum route <rules|assign|simulate> [--json]
+  ["route", `fulcrum route <list|show|set|rules|assign|simulate> [--json]
 
 Route action kinds to agents.
 
+Usage:
+  fulcrum route list [--project <id>] [--json]
+  fulcrum route show <action> [--project <id>] [--json]
+  fulcrum route set <action> <agent> [--project <id>] [--json]
+  fulcrum route rules list [--project <id>] [--json]
+  fulcrum route assign <task-id> [--json]
+  fulcrum route simulate --task-json <json|@file.json> [--json]
+
 Aliases:
   fulcrum routing ...  Compatibility alias for fulcrum route ...
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["report", `fulcrum report <list|burndown|burnup|velocity|cfd|cycle-time|lead-time|throughput|wip|workload|blocked|stale|progress> [--json]
+
+Report subcommands.
+
+Usage:
+  fulcrum report list [--json]
+  fulcrum report <type> [--project <id>] [--sprint <id>] [--format json|table|csv] [--days <n>]
 
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope

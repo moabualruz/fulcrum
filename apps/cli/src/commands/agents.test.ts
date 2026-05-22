@@ -277,5 +277,10 @@ async function runDoctorJson(): Promise<Record<string, any>> {
   });
   const out = await new Response(proc.stdout).text();
   await proc.exited;
-  return JSON.parse(out) as Record<string, any>;
+  const envelope = JSON.parse(out) as Record<string, any>;
+  expect(isCanonicalEnvelope(envelope)).toBe(true);
+  expect(envelope.schema).toBe("fulcrum.cli.v1");
+  expect(envelope.command).toBe("fulcrum doctor");
+  expect(envelope.result).toBeDefined();
+  return envelope.result as Record<string, any>;
 }
