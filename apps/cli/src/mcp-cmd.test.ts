@@ -63,3 +63,44 @@ describe("fulcrum mcp list", () => {
 		expect(out).toContain("No MCP servers registered");
 	});
 });
+
+describe("fulcrum mcp operate grammar", () => {
+	test("mcp --help lists the canonical test and reload verbs", async () => {
+		await runMcp(["--help"]);
+		const out = captured.join("\n");
+		expect(out).toContain("fulcrum mcp test");
+		expect(out).toContain("fulcrum mcp reload");
+	});
+
+	test("test --json emits a canonical envelope for a registered server", async () => {
+		await runMcp(["register", "server1", "--http", "https://example.com/mcp", "--vendor", "acme"]);
+		captured.length = 0;
+		await runMcp(["test", "server1", "--agent", "codex", "--json"]);
+		const parsed = JSON.parse(captured.join("")) as {
+			schema: string;
+			command: string;
+			result: { name: string; agent: string; status: string };
+			errors: unknown[];
+		};
+		expect(parsed.schema).toBe("fulcrum.cli.v1");
+		expect(parsed.command).toBe("fulcrum mcp test");
+		expect(parsed.result).toMatchObject({ name: "server1", agent: "codex", status: "configured" });
+		expect(parsed.errors).toEqual([]);
+	});
+
+	test("reload --json emits a canonical envelope with the resolved agent scope", async () => {
+		await runMcp(["register", "server2", "--http", "https://example.com/mcp", "--vendor", "acme"]);
+		captured.length = 0;
+		await runMcp(["reload", "server2", "--agent", "codex", "--json"]);
+		const parsed = JSON.parse(captured.join("")) as {
+			schema: string;
+			command: string;
+			result: { name: string; reloaded: boolean; agents: string[] };
+			errors: unknown[];
+		};
+		expect(parsed.schema).toBe("fulcrum.cli.v1");
+		expect(parsed.command).toBe("fulcrum mcp reload");
+		expect(parsed.result).toMatchObject({ name: "server2", reloaded: true, agents: ["codex"] });
+		expect(parsed.errors).toEqual([]);
+	});
+});

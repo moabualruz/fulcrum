@@ -73,7 +73,8 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
       "fulcrum cycle <list|activate|complete>       Manage build cycles.",
       "fulcrum module <list|new|view>               Manage build modules.",
       "fulcrum context <pack|inspect|diff>          Inspect task run context.",
-      "fulcrum agent <list|profile|test>            Inspect the agent registry.",
+      "fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>",
+      "                                             Manage the multi-CLI agent registry.",
       "fulcrum route <rules|assign|simulate>        Route action kinds to agents.",
       "fulcrum symphony runs list --state ready     Inspect orchestrated run queues.",
     ],
@@ -134,8 +135,10 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
       "fulcrum install [--profile minimal|rules-only|full] [--dry-run]",
       "                                             Splice rules, vendor hooks, sync skills.",
       "fulcrum uninstall [--dry-run] [--purge]      Remove Fulcrum-managed install artifacts.",
-      "fulcrum mcp <list|register|unregister|enable|disable>",
+      "fulcrum mcp <list|register|unregister|enable|disable|test|reload>",
       "                                             Manage the MCP server registry.",
+      "fulcrum plugin <list|install|enable|disable|update|remove>",
+      "                                             Manage agent plugin scope.",
       "fulcrum hooks <list|enable|disable|test>     Manage agent hook recipes.",
       "fulcrum skills <sync|upstream|lint|list>     Mirror and validate authored skills.",
       "fulcrum component|components <list|info|plan|status>",
@@ -455,6 +458,70 @@ const COMMAND_RESULT_SCHEMAS: ReadonlyMap<string, ResultSchemaFactory> = new Map
         },
       }),
     })],
+  ["runs feed", (title) =>
+    objectResultSchema(title, ["runs", "filters", "watch", "stream", "sentinel"], {
+      runs: arrayOf({
+        type: "object",
+        additionalProperties: true,
+        properties: {
+          id: STRING_VALUE,
+          taskId: STRING_VALUE,
+          status: STRING_VALUE,
+          agent: STRING_VALUE,
+          traceId: STRING_VALUE,
+        },
+      }),
+      filters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          projectId: STRING_VALUE,
+          runId: STRING_VALUE,
+          taskId: STRING_VALUE,
+          traceId: STRING_VALUE,
+        },
+      },
+      watch: BOOLEAN_VALUE,
+      stream: {
+        type: "object",
+        additionalProperties: false,
+        required: ["jsonl", "poll_ms"],
+        properties: {
+          jsonl: BOOLEAN_VALUE,
+          poll_ms: NUMBER_VALUE,
+        },
+      },
+      sentinel: {
+        type: "object",
+        additionalProperties: false,
+        required: ["schema", "result", "end", "trace_id"],
+        properties: {
+          schema: { const: "fulcrum.cli.v1" },
+          result: { type: "null" },
+          end: { const: true },
+          trace_id: STRING_VALUE,
+        },
+      },
+    })],
+  ["runs tail", (title) =>
+    objectResultSchema(title, ["kind", "runId", "lines", "tail"], {
+      kind: { const: "runs-tail" },
+      runId: STRING_VALUE,
+      lines: NUMBER_VALUE,
+      tail: arrayOf(STRING_VALUE),
+    })],
+  ["runs retry", (title) =>
+    objectResultSchema(title, ["runId", "status"], {
+      runId: STRING_VALUE,
+      status: STRING_VALUE,
+      fromStep: NUMBER_VALUE,
+    })],
+  ["run retry", (title) =>
+    objectResultSchema(title, ["runId", "status"], {
+      runId: STRING_VALUE,
+      status: STRING_VALUE,
+      fromStep: NUMBER_VALUE,
+    })],
   ["ai", (title) =>
     objectResultSchema(title, ["sessionId", "taskId", "agent", "route", "stepScope"], {
       sessionId: STRING_VALUE,
@@ -628,14 +695,27 @@ Run \`fulcrum help <stage>\` (e.g. \`fulcrum help build\`) for stage detail.
 `;
 
 const COMMAND_HELP: ReadonlyMap<string, string> = new Map([
-  ["agent", `fulcrum agent <list|profile|test>
+  ["agent", `fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
 
-Inspect agent registry entries and profile/test metadata.
+Manage the no-cap multi-CLI agent registry.
+
+Usage:
+  fulcrum agent list [--json] [--client <kind>] [--ring <ring>]
+  fulcrum agent view <id> [--json]
+  fulcrum agent add <id> --client <kind> [--binary <path>] [--model <m>] [--json]
+  fulcrum agent edit <id> [--ring <r>] [--policy <file>] [--model <m>] [--json]
+  fulcrum agent remove <id> [--force] [--json]
+  fulcrum agent enable <id> [--json]
+  fulcrum agent disable <id> [--json]
+  fulcrum agent set-default <id> [--action <kind>] [--json]
+  fulcrum agent reload <id> [--json]
+  fulcrum agent invoke <id> [--step <step-id>] [--policy <file>] [--json]
+  fulcrum agent test <id> [--json]
 
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope
 `],
-  ["agents", `fulcrum agents <list|profile|test>
+  ["agents", `fulcrum agents <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
 
 Compatibility alias for fulcrum agent.
 
@@ -706,9 +786,18 @@ Options:
 
 Bootstrap a project with Fulcrum agent rules and local ignore defaults.
 `],
-  ["mcp", `fulcrum mcp <list|register|unregister|enable|disable> [--json]
+  ["mcp", `fulcrum mcp <list|register|unregister|enable|disable|test|reload> [--json]
 
 Manage the MCP server registry.
+
+Usage:
+  fulcrum mcp list [--json] [--agent <id>]
+  fulcrum mcp register <name> [--http <url>|--stdio <cmd>] [--vendor <v>] [--agent <id>...] [--all-agents]
+  fulcrum mcp unregister <name> [--agent <id>...] [--all-agents]
+  fulcrum mcp enable <name> [--agent <id>...] [--all-agents]
+  fulcrum mcp disable <name> [--agent <id>...] [--all-agents]
+  fulcrum mcp test <name> [--agent <id>]
+  fulcrum mcp reload <name> [--agent <id>...] [--all-agents]
 
 Options:
   --json            Canonical fulcrum.cli.v1 JSON envelope

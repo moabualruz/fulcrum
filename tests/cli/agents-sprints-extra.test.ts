@@ -29,7 +29,7 @@ function io() {
 describe("agent command source", () => {
   // The CLI surface was renamed `agents`->`agent` and `profile`->`view`; the
   // command root and subcommand verbs below track the current contract.
-  it("covers list/view/test/help/error paths", async () => {
+  it("covers list/view/manage/test/help/error paths", async () => {
     const a = io();
     await runAgents(["help"], a.opts);
     await runAgents(["list"], a.opts);
@@ -38,13 +38,17 @@ describe("agent command source", () => {
     await runAgents(["view", "codex", "--json"], a.opts);
     await runAgents(["view"], a.opts);
     await runAgents(["view", "missing", "--json"], a.opts);
+    await runAgents(["enable", "codex", "--json"], a.opts);
+    await runAgents(["disable", "codex", "--json"], a.opts);
+    await runAgents(["reload", "codex", "--json"], a.opts);
+    await runAgents(["invoke", "codex", "--step", "step-1", "--json"], a.opts);
     await runAgents(["test", "codex"], a.opts);
     await runAgents(["test"], a.opts);
     await runAgents(["test", "missing"], a.opts);
     await runAgents(["wat"], a.opts);
 
     const out = a.stdout.join("\n");
-    expect(out).toContain("fulcrum agent <list|view|test>");
+    expect(out).toContain("fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>");
     expect(out).toContain("codex");
     expect(out).toContain("\"name\":\"codex\"");
     const err = a.stderr.join("\n");

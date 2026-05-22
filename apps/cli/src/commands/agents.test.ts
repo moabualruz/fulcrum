@@ -59,6 +59,10 @@ describe("fulcrum agent canonical grammar", () => {
     ["status", ["status", "codex", "--json"]],
     ["defaults", ["defaults", "--json"]],
     ["set-default", ["set-default", "codex", "--action", "build.run.step", "--json"]],
+    ["enable", ["enable", "codex", "--json"]],
+    ["disable", ["disable", "codex", "--json"]],
+    ["reload", ["reload", "codex", "--json"]],
+    ["invoke", ["invoke", "codex", "--step", "step-1", "--json"]],
   ] as const)("%s emits canonical envelope", async (_name, argv) => {
     const { captured, exitCode } = await runAgents([...argv]);
     expect(exitCode).toBe(0);
@@ -143,7 +147,11 @@ describe("fulcrum agents help", () => {
   test("shows usage", async () => {
     const { captured, exitCode } = await runAgents(["--help"]);
     expect(exitCode).toBe(0);
-    expect(captured.join("\n")).toContain("fulcrum agent");
+    const help = captured.join("\n");
+    expect(help).toContain("fulcrum agent");
+    for (const verb of ["enable", "disable", "reload", "invoke"]) {
+      expect(help).toContain(verb);
+    }
   });
 
   test("unknown subcommand exits 2", async () => {

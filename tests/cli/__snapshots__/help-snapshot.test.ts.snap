@@ -41,7 +41,8 @@ BUILD
   fulcrum cycle <list|activate|complete>       Manage build cycles.
   fulcrum module <list|new|view>               Manage build modules.
   fulcrum context <pack|inspect|diff>          Inspect task run context.
-  fulcrum agent <list|profile|test>            Inspect the agent registry.
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
+                                               Manage the multi-CLI agent registry.
   fulcrum route <rules|assign|simulate>        Route action kinds to agents.
   fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
 
@@ -73,8 +74,10 @@ OPERATE
   fulcrum install [--profile minimal|rules-only|full] [--dry-run]
                                                Splice rules, vendor hooks, sync skills.
   fulcrum uninstall [--dry-run] [--purge]      Remove Fulcrum-managed install artifacts.
-  fulcrum mcp <list|register|unregister|enable|disable>
+  fulcrum mcp <list|register|unregister|enable|disable|test|reload>
                                                Manage the MCP server registry.
+  fulcrum plugin <list|install|enable|disable|update|remove>
+                                               Manage agent plugin scope.
   fulcrum hooks <list|enable|disable|test>     Manage agent hook recipes.
   fulcrum skills <sync|upstream|lint|list>     Mirror and validate authored skills.
   fulcrum component|components <list|info|plan|status>
@@ -148,7 +151,8 @@ Commands:
   fulcrum cycle <list|activate|complete>       Manage build cycles.
   fulcrum module <list|new|view>               Manage build modules.
   fulcrum context <pack|inspect|diff>          Inspect task run context.
-  fulcrum agent <list|profile|test>            Inspect the agent registry.
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test>
+                                               Manage the multi-CLI agent registry.
   fulcrum route <rules|assign|simulate>        Route action kinds to agents.
   fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
 
