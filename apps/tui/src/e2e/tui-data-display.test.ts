@@ -54,29 +54,46 @@ describe("TUI E2E data display", () => {
     expect(text).toContain("codex");
   });
 
+  // The fourth tuple element is the keybind/footer affordance row the screen
+  // renders beneath its rows. Generic domain screens emit the shared
+  // `Status footer` heading; the `tasks` screen is the dedicated TaskListScreen
+  // workbench (closure-6 Build/Operate rework) and renders its own keybind
+  // strip instead — domain screens no longer double-render under the launcher.
   test.each([
-    ["tasks", { tasks: { list: async () => [{ id: "task-1", title: "Ship coverage", status: "open" }] } }, "Ship coverage  [open]  task-1"],
-    ["sprints", { sprints: { list: async () => [{ id: "sprint-1", name: "Sprint 9.6", status: "active" }] } }, "Sprint 9.6  [active]  sprint-1"],
-    ["repos", { repos: { list: async () => [{ id: "repo-1", slug: "fulcrum", status: "idle" }] } }, "fulcrum  [idle]  repo-1"],
-    ["memory", { memories: { list: async () => [{ id: "mem-1", title: "Architecture note" }], promote: async () => ({ ok: true }) } }, "Architecture note  mem-1"],
-    ["search", { search: { query: async () => [{ id: "search-1", title: "Search result" }] } }, "Search result  search-1"],
-  ] as const)("renders %s domain rows from the in-process caller", async (screen, overrides, expected) => {
+    ["tasks", { tasks: { list: async () => [{ id: "task-1", title: "Ship coverage", status: "open" }] } }, "Ship coverage  [open]  task-1", "j/k navigate  Space select  c create"],
+    ["sprints", { sprints: { list: async () => [{ id: "sprint-1", name: "Sprint 9.6", status: "active" }] } }, "Sprint 9.6  [active]  sprint-1", "Status footer"],
+    ["repos", { repos: { list: async () => [{ id: "repo-1", slug: "fulcrum", status: "idle" }] } }, "fulcrum  [idle]  repo-1", "Status footer"],
+    ["memory", { memories: { list: async () => [{ id: "mem-1", title: "Architecture note" }], promote: async () => ({ ok: true }) } }, "Architecture note  mem-1", "Status footer"],
+    ["search", { search: { query: async () => [{ id: "search-1", title: "Search result" }] } }, "Search result  search-1", "Status footer"],
+  ] as const)("renders %s domain rows from the in-process caller", async (screen, overrides, expected, footer) => {
     const text = await renderDomain(screen, makeCaller(overrides as Partial<TuiCaller>));
 
     expect(text).toContain(expected);
-    expect(text).toContain("Status footer");
+    expect(text).toContain(footer);
   });
 
   test.each([
     ["docs"],
     ["skills"],
     ["components"],
-    ["doctor"],
   ] as const)("renders empty %s domain state without a caller shortcut", async (screen) => {
     const text = await renderDomain(screen, makeCaller());
 
     expect(text).toContain("No ");
     expect(text).toContain("records.");
+  });
+
+  // The `doctor` domain screen is no longer a generic empty-list workbench:
+  // closure-6 `fix(tui): route runs and doctor workbenches` promoted it to the
+  // dedicated Operate-stage DoctorScreen, which renders its own subsystem
+  // health spine (the route + status-spine checks) instead of a "No … records."
+  // empty state. Assert the workbench render, not the retired generic contract.
+  test("renders the doctor workbench without a caller shortcut", async () => {
+    const text = await renderDomain("doctor", makeCaller());
+
+    expect(text).toContain("Doctor");
+    expect(text).toContain("stage routes render canonical workbenches");
+    expect(text).toContain("status spine carries trace and mode footer");
   });
 
   test("renders caller errors in the domain detail pane", async () => {

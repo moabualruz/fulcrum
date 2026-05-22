@@ -416,8 +416,12 @@ describe("TUI planning workflow", () => {
       permissionMode: "review_each_tool",
     }]);
     expect(tty.plainText()).toContain("AI Assist session");
-    expect(tty.plainText()).toContain("acp-guided-tui");
-    expect(tty.plainText()).toContain("codex");
+    // The raw `acp-…` session id is delegated to the caller (asserted above on
+    // `guidedAcpCalls`) but is no longer rendered verbatim: closure-6
+    // `fix(copy): enforce AI Assist copy gates` purges visible `ACP`/protocol
+    // identifiers from the surface, so the session row shows `<agent> active`.
+    expect(tty.plainText()).toContain("Session:");
+    expect(tty.plainText()).toContain("codex active");
     expect(tty.plainText()).toContain("session/new");
     expect(tty.plainText()).toContain("TUI guided AI Assist prompt with submit_plan");
 
@@ -433,7 +437,10 @@ describe("TUI planning workflow", () => {
       optionId: "allow_once",
     }]);
     expect(tty.plainText()).toContain("Planning session action");
-    expect(tty.plainText()).toContain("permission_resolved");
+    // Raw status tokens are humanized for display: closure-6
+    // `fix(copy): enforce AI Assist copy gates` routes session status through
+    // `displayStatus`, so `permission_resolved` renders as `Permission Resolved`.
+    expect(tty.plainText()).toContain("Permission Resolved");
     expect(tty.plainText()).toContain("session/request_permission");
 
     await screen.handleKey("u");

@@ -1179,6 +1179,7 @@ export class TuiApp {
         r.writeln();
         r.writeln(c.bold("  Live session pane"));
         this.runDetailScreen?.render(r);
+        this._renderRunsStatusFooter(r);
         return;
       }
       r.writeln(c.bold("  Run list"));
@@ -1186,10 +1187,7 @@ export class TuiApp {
       r.writeln();
       r.writeln(c.bold("  Transcript / log"));
       this.runDetailScreen?.render(r);
-      r.writeln();
-      r.writeln(c.bold("  Status footer"));
-      const run = this.currentRunForFooter;
-      r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
+      this._renderRunsStatusFooter(r);
       return;
     }
 
@@ -1210,6 +1208,19 @@ export class TuiApp {
     r.writeln();
     r.writeln(c.bold("  Status footer"));
     r.writeln(c.dim("  Esc back  / commands  q root quit"));
+  }
+
+  /**
+   * Render the canonical `runs` workbench status footer. Carries the focused
+   * run's live `state:` identity regardless of whether the new RunsControl
+   * workbench or the legacy run-list path is active — the run-subscription
+   * lifecycle reads run state off this line, so it must render on both paths.
+   */
+  private _renderRunsStatusFooter(r: Renderer): void {
+    r.writeln();
+    r.writeln(c.bold("  Status footer"));
+    const run = this.currentRunForFooter;
+    r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
   }
 
   private get currentRunForFooter(): TuiRun | null {
