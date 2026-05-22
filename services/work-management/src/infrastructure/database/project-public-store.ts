@@ -212,11 +212,14 @@ export class ProjectPublicStore {
   async projectOverview(input: { orgId: string; id: string }): Promise<unknown> {
     const project = await this.findScopedProject(input);
     if (!project) return null;
+    // `findScopedProject` accepts a slug OR uuid; downstream
+    // `loadProjectOverview` queries the projects table by uuid only — pass the
+    // resolved uuid so a slug-keyed URL still returns the overview.
     const { loadProjectOverview } = await import("@work-management/application/projects/queries.ts");
     return await loadProjectOverview(
       this.dataSource.manager,
-      { orgId: input.orgId, userId: null, projectId: input.id },
-      input.id,
+      { orgId: input.orgId, userId: null, projectId: project.id },
+      project.id,
     );
   }
 
@@ -315,7 +318,14 @@ export class ProjectPublicStore {
   }
 
   private async findScopedProject(input: { orgId: string; id: string }): Promise<FulcrumProject | null> {
-    return await this.projectRepository().findOneBy({ id: input.id, workspaceId: input.orgId });
+    // `id` may arrive as a uuid OR a project slug (web routes pass the slug
+    // straight through from the URL). Try the uuid first, fall back to slug,
+    // both scoped to the workspace.
+    const repo = this.projectRepository();
+    return (
+      (await repo.findOneBy({ id: input.id, workspaceId: input.orgId })) ??
+      (await repo.findOneBy({ slug: input.id, workspaceId: input.orgId }))
+    );
   }
 
   private workspaceRepository() {
