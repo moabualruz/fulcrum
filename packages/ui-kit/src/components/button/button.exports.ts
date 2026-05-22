@@ -34,16 +34,30 @@ const buttonClassVariants = tv({
 	},
 });
 
+// Legacy variant/size aliases map onto the DESIGN.md §4.1 vocabulary. A stray
+// legacy value from an un-migrated consumer maps gracefully instead of throwing
+// — a 500 in one Button must not take down a whole SSR route.
+const LEGACY_VARIANT_ALIASES: Record<string, ButtonVariant> = {
+	default: "primary",
+	destructive: "danger",
+	outline: "secondary",
+};
+const LEGACY_SIZE_ALIASES: Record<string, ButtonSize> = {
+	default: "md",
+	icon: "sm",
+	"icon-sm": "xs",
+};
+
 function normalizeButtonVariant(variant: ButtonVariant | null | undefined): ButtonVariant {
 	if (variant === null || variant === undefined) return "primary";
 	if (buttonVariantValues.includes(variant)) return variant;
-	throw new TypeError(`Unsupported Button variant: ${String(variant)}`);
+	return LEGACY_VARIANT_ALIASES[variant as string] ?? "primary";
 }
 
 function normalizeButtonSize(size: ButtonSize | null | undefined): ButtonSize {
 	if (size === null || size === undefined) return "md";
 	if (buttonSizeValues.includes(size)) return size;
-	throw new TypeError(`Unsupported Button size: ${String(size)}`);
+	return LEGACY_SIZE_ALIASES[size as string] ?? "md";
 }
 
 export function buttonVariants(options?: {
