@@ -8,9 +8,11 @@ const board = {
   velocity: [],
 };
 
-// The route reads sprints through the sprint public API and guards the project
-// through the project public API; both seams are mocked here so the test never
-// opens a database.
+// The route's project-existence guard reads `projects.overview` through the
+// project public API; that seam is driven by a fake `event.fetch` — no
+// `mock.module("$lib/server/project-api")`, so sibling settings suites that
+// import the real module are never hijacked. The sprint public API is a
+// route-specific seam and stays mocked.
 mock.module("$lib/server/sprint-api", () => ({
   createSprintApiForEvent: () => ({
     sprints: {
@@ -34,16 +36,21 @@ mock.module("$lib/server/sprint-api", () => ({
   }),
 }));
 
-mock.module("$lib/server/project-api", () => ({
-  createProjectApiForEvent: () => ({
-    projects: {
-      overview: async (input: { id: string }) => {
-        calls.push(`overview:${input.id}`);
-        return { id: input.id, name: "Project" };
-      },
-    },
-  }),
-}));
+// Fake project public API: `GET /api/v1/projects/:id/overview` answers the
+// `projects.overview` call inside the route's `ensureProject` guard. Records
+// the call for assertions.
+function fetchProject(): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const parts = url.pathname.split("/").filter(Boolean); // api v1 projects :id overview
+    if (parts.length === 5 && parts[2] === "projects" && parts[4] === "overview" && method === "GET") {
+      calls.push(`overview:${decodeURIComponent(parts[3]!)}`);
+      return Response.json({ id: decodeURIComponent(parts[3]!), name: "Project" });
+    }
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
+  }) as typeof fetch;
+}
 
 beforeEach(() => {
   calls.splice(0, calls.length);
@@ -58,7 +65,7 @@ function event(method: "GET" | "POST", projectId: string, data: Record<string, s
     url,
     params: { id: projectId },
     locals: { orgId: "org-1", userId: "user-1" },
-    fetch: globalThis.fetch,
+    fetch: fetchProject(),
     request: new Request(url, method === "POST" ? { method, body: fd } : { method }),
   } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
