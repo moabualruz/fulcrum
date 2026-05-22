@@ -15,12 +15,12 @@
 - Service-internal domain entities and repository types stay inside their owning `services/**` domain.
 - UI rendering primitives stay in `@fulcrum/ui-kit`; this package owns the shared values those primitives can consume.
 
-## Example Dialogue
+## Example dialogue
 
 - "Need a web and TUI prop type for a workflow stage." "Import `WorkflowStage` from `@fulcrum/shared-dto`."
 - "Need a service-only aggregate state." "Keep it in the owning service domain; do not promote it here."
 - "Need a CLI trace id normalizer also used by another surface." "Put the value helper here and import it."
 
-## Flagged Ambiguities
+## Flagged ambiguities
 
 - `StatusBadge` is UI status vocabulary and may differ from `RunStatus`. Use `RunStatus` for agent-run lifecycle contracts.
