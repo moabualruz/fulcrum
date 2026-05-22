@@ -1,50 +1,48 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-const scope = {
-  em: { marker: "em" },
-  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
-};
-const mocks = {
-  scope,
-  requestServiceScope: vi.fn(async () => scope),
-  createSettingsDataExport: vi.fn(async (_em, _ctx, input: { kinds?: readonly string[] }) => {
-    const output: Record<string, unknown[]> = {};
-    for (const kind of input.kinds?.length ? input.kinds : ["projects", "tasks"]) output[kind] = [];
-    return output;
+// The route delegates every operation to the data-portability public API
+// (`createSettingsDataApiForEvent`). Mocking that seam keeps this a unit test:
+// no TypeORM EntityManager, no database seeding.
+const calls: Array<{ method: string; input?: unknown }> = [];
+
+mock.module("$lib/server/settings-data-api", () => ({
+  createSettingsDataApiForEvent: () => ({
+    settingsData: {
+      export: async (input: { kinds?: readonly string[] }) => {
+        calls.push({ method: "settingsData.export", input });
+        const output: Record<string, unknown[]> = {};
+        for (const kind of input.kinds?.length ? input.kinds : ["projects", "tasks"]) output[kind] = [];
+        return output;
+      },
+      preflightImport: async (input: { data?: unknown }) => {
+        calls.push({ method: "settingsData.preflightImport", input });
+        const data = input.data;
+        return {
+          preflightSummary: Object.fromEntries(
+            Object.entries(data && typeof data === "object" ? (data as Record<string, unknown>) : {})
+              .filter(([, value]) => Array.isArray(value))
+              .map(([key, value]) => [key, (value as unknown[]).length]),
+          ),
+        };
+      },
+      import: async (input: { data?: unknown }) => {
+        calls.push({ method: "settingsData.import", input });
+        const data = input.data;
+        return {
+          imported: true,
+          totalRows: Object.values(data && typeof data === "object" ? (data as Record<string, unknown>) : {})
+            .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0),
+        };
+      },
+    },
   }),
-  preflightSettingsDataImport: vi.fn((input: unknown) => ({
-    preflightSummary: Object.fromEntries(
-      Object.entries(input && typeof input === "object" ? input as Record<string, unknown> : {})
-        .filter(([, value]) => Array.isArray(value))
-        .map(([key, value]) => [key, (value as unknown[]).length]),
-    ),
-  })),
-  importSettingsData: vi.fn(async (_em, _ctx, input: unknown) => ({
-    imported: true,
-    totalRows: Object.values(input && typeof input === "object" ? input as Record<string, unknown> : {})
-      .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0),
-  })),
-  SETTINGS_ENTITY_KINDS: ["projects", "tasks", "credentials", "feature_flags", "tenant_settings"] as const,
-};
-
-vi.mock("$lib/server/request-service-scope", () => ({
-  requestServiceScope: mocks.requestServiceScope,
 }));
-
-vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
-  createSettingsDataExport: mocks.createSettingsDataExport,
-  preflightSettingsDataImport: mocks.preflightSettingsDataImport,
-  importSettingsData: mocks.importSettingsData,
-  SETTINGS_ENTITY_KINDS: mocks.SETTINGS_ENTITY_KINDS,
-}));
-
-import { actions } from "./+page.server.js";
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  calls.splice(0, calls.length);
 });
 
-function makeRequest(body: Record<string, string | File | string[]>) {
+function makeEvent(body: Record<string, string | File | string[]>) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(body)) {
     if (Array.isArray(v)) {
@@ -53,52 +51,74 @@ function makeRequest(body: Record<string, string | File | string[]>) {
       fd.set(k, v);
     }
   }
-  return { request: { formData: () => Promise.resolve(fd) } } as Parameters<typeof actions.preflight>[0];
+  const url = new URL("http://localhost/settings/data");
+  return {
+    url,
+    locals: {},
+    request: new Request(url, { method: "POST", body: fd }),
+    fetch,
+  };
 }
 
 describe("/settings/data actions", () => {
-  it("export: returns JSON data", async () => {
-    const result = await actions.export(makeRequest({}));
+  test("export: returns JSON data and delegates to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const result = await mod.actions.export(makeEvent({}) as Parameters<typeof mod.actions.export>[0]);
     expect(result).toMatchObject({ exported: true });
     expect(typeof result.data).toBe("string");
     const parsed = JSON.parse(result.data as string);
     expect(typeof parsed).toBe("object");
+    expect(calls).toEqual([{ method: "settingsData.export", input: { kinds: [] } }]);
   });
 
-  it("export: only selected kinds", async () => {
-    const result = await actions.export(makeRequest({ kinds: ["projects"] }));
+  test("export: forwards only selected kinds to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await mod.actions.export(makeEvent({ kinds: ["projects"] }) as Parameters<typeof mod.actions.export>[0]);
     expect(result).toMatchObject({ exported: true });
     const parsed = JSON.parse(result.data as string);
     expect(Object.keys(parsed)).toContain("projects");
     expect(Object.keys(parsed)).not.toContain("tasks");
+    expect(calls).toEqual([{ method: "settingsData.export", input: { kinds: ["projects"] } }]);
   });
 
-  it("preflight: fails with no file", async () => {
-    const result = await actions.preflight(makeRequest({}));
+  test("preflight: fails with no file before reaching the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.actions.preflight(makeEvent({}) as Parameters<typeof mod.actions.preflight>[0]);
     expect(result).toMatchObject({ status: 400 });
+    expect(calls).toEqual([]);
   });
 
-  it("preflight: fails with invalid JSON", async () => {
+  test("preflight: fails with invalid JSON before reaching the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const file = new File(["bad"], "data.json", { type: "application/json" });
-    const result = await actions.preflight(makeRequest({ file }));
+    const result = await mod.actions.preflight(makeEvent({ file }) as Parameters<typeof mod.actions.preflight>[0]);
     expect(result).toMatchObject({ status: 400 });
+    expect(calls).toEqual([]);
   });
 
-  it("preflight: returns entity counts", async () => {
+  test("preflight: returns entity counts from the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
     const payload = JSON.stringify({ projects: [1, 2], tasks: [1] });
     const file = new File([payload], "data.json", { type: "application/json" });
-    const result = await actions.preflight(makeRequest({ file }));
+    const result = await mod.actions.preflight(makeEvent({ file }) as Parameters<typeof mod.actions.preflight>[0]);
     expect(result).toMatchObject({ preflightSummary: { projects: 2, tasks: 1 } });
+    expect(calls).toEqual([
+      { method: "settingsData.preflightImport", input: { data: { projects: [1, 2], tasks: [1] } } },
+    ]);
   });
 
-  it("import: returns total rows", async () => {
+  test("import: returns total rows from the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
     const payload = JSON.stringify({ projects: [{ id: "1" }, { id: "2" }] });
     const file = new File([payload], "data.json", { type: "application/json" });
-    const result = await actions.import(makeRequest({ file }));
+    const result = await mod.actions.import(makeEvent({ file }) as Parameters<typeof mod.actions.import>[0]);
     expect(result).toMatchObject({ imported: true, totalRows: 2 });
+    expect(calls).toEqual([
+      { method: "settingsData.import", input: { data: { projects: [{ id: "1" }, { id: "2" }] } } },
+    ]);
   });
 
-  it("page copy exposes dry-run state", async () => {
+  test("page copy exposes dry-run state", async () => {
     const source = await Bun.file(new URL("./+page.svelte", import.meta.url)).text();
     expect(source).toContain("Dry run");
     expect(source).toContain("data-import-dry-run");

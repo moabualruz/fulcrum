@@ -1,89 +1,124 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-const scope = {
-  em: { marker: "em" },
-  ctx: { orgId: "org-1", userId: "user-1", projectId: "project-1" },
-};
-const mocks = {
-  scope,
-  requestServiceScope: vi.fn(async () => scope),
-  addSettingsSecret: vi.fn(async () => ({ success: true })),
-  rotateSettingsSecret: vi.fn(async () => ({ success: true })),
-  toggleSettingsSecretArchive: vi.fn(async () => ({ success: true })),
-  deleteSettingsSecret: vi.fn(async () => ({ success: true })),
-  listSettingsSecrets: vi.fn(async () => ({ credentials: [] })),
-};
+// The route delegates every operation to the credential public API
+// (`createSettingsApiForEvent`). Mocking that seam keeps this a unit test:
+// no TypeORM EntityManager, no database seeding.
+const calls: Array<{ method: string; input?: unknown }> = [];
 
-vi.mock("$lib/server/request-service-scope", () => ({
-  requestServiceScope: mocks.requestServiceScope,
+mock.module("$lib/server/settings-api", () => ({
+  createSettingsApiForEvent: () => ({
+    settingsSecrets: {
+      list: async () => {
+        calls.push({ method: "settingsSecrets.list" });
+        return { credentials: [] };
+      },
+      add: async (input: unknown) => {
+        calls.push({ method: "settingsSecrets.add", input });
+        return { success: true };
+      },
+      rotate: async (input: unknown) => {
+        calls.push({ method: "settingsSecrets.rotate", input });
+        return { success: true };
+      },
+      archive: async (input: unknown) => {
+        calls.push({ method: "settingsSecrets.archive", input });
+        return { success: true };
+      },
+      delete: async (input: unknown) => {
+        calls.push({ method: "settingsSecrets.delete", input });
+        return { success: true };
+      },
+    },
+  }),
 }));
-
-vi.mock("@platform-core/interface/settings-workbench.ts", () => ({
-  addSettingsSecret: mocks.addSettingsSecret,
-  rotateSettingsSecret: mocks.rotateSettingsSecret,
-  toggleSettingsSecretArchive: mocks.toggleSettingsSecretArchive,
-  deleteSettingsSecret: mocks.deleteSettingsSecret,
-  listSettingsSecrets: mocks.listSettingsSecrets,
-}));
-
-import { actions } from "./+page.server.js";
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  calls.splice(0, calls.length);
 });
 
-function makeRequest(body: Record<string, string>) {
+function makeEvent(body: Record<string, string>) {
   const fd = new FormData();
   for (const [k, v] of Object.entries(body)) fd.set(k, v);
-  return { request: { formData: () => Promise.resolve(fd) } } as Parameters<typeof actions.add>[0];
+  const url = new URL("http://localhost/settings/secrets");
+  return {
+    url,
+    locals: {},
+    request: new Request(url, { method: "POST", body: fd }),
+    fetch,
+  };
 }
 
 describe("/settings/secrets actions", () => {
-  it("add: requires name and value", async () => {
-    const result = await actions.add(makeRequest({ name: "", value: "" }));
+  test("load streams the credential list from the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const url = new URL("http://localhost/settings/secrets");
+    const result = await mod.load({
+      url,
+      locals: {},
+      request: new Request(url),
+      fetch,
+    } as Parameters<typeof mod.load>[0]);
+    const stream = result.streamed.data;
+    expect(stream).toBeInstanceOf(Promise);
+    expect(await stream).toEqual({ credentials: [] });
+    expect(calls).toEqual([{ method: "settingsSecrets.list" }]);
+  });
+
+  test("add: requires name and value before reaching the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await mod.actions.add(makeEvent({ name: "", value: "" }) as Parameters<typeof mod.actions.add>[0]);
     expect(result).toMatchObject({ status: 400 });
+    expect(calls).toEqual([]);
   });
 
-  it("add: inserts credential", async () => {
-    const result = await actions.add(makeRequest({ name: "MY_KEY", value: "secret123", provider: "aws" }));
+  test("add: delegates credential insert to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const result = await mod.actions.add(
+      makeEvent({ name: "MY_KEY", value: "secret123", provider: "aws" }) as Parameters<typeof mod.actions.add>[0],
+    );
     expect(result).toMatchObject({ success: true });
-    expect(mocks.addSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
-      name: "MY_KEY",
-      value: "secret123",
-      provider: "aws",
-    });
+    expect(calls).toEqual([
+      { method: "settingsSecrets.add", input: { name: "MY_KEY", value: "secret123", provider: "aws" } },
+    ]);
   });
 
-  it("rotate: requires id and value", async () => {
-    const result = await actions.rotate(makeRequest({ id: "", value: "" }));
+  test("rotate: requires id and value before reaching the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.actions.rotate(makeEvent({ id: "", value: "" }) as Parameters<typeof mod.actions.rotate>[0]);
     expect(result).toMatchObject({ status: 400 });
+    expect(calls).toEqual([]);
   });
 
-  it("rotate: updates value_hash and last_used_at", async () => {
-    const result = await actions.rotate(makeRequest({ id: "abc", value: "newvalue" }));
+  test("rotate: delegates value rotation to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
+    const result = await mod.actions.rotate(
+      makeEvent({ id: "abc", value: "newvalue" }) as Parameters<typeof mod.actions.rotate>[0],
+    );
     expect(result).toMatchObject({ success: true });
-    expect(mocks.rotateSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, {
-      id: "abc",
-      value: "newvalue",
-    });
+    expect(calls).toEqual([{ method: "settingsSecrets.rotate", input: { id: "abc", value: "newvalue" } }]);
   });
 
-  it("archive: toggles archived", async () => {
-    const result = await actions.archive(makeRequest({ id: "abc" }));
+  test("archive: delegates archive toggle to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    const result = await mod.actions.archive(makeEvent({ id: "abc" }) as Parameters<typeof mod.actions.archive>[0]);
     expect(result).toMatchObject({ success: true });
-    expect(mocks.toggleSettingsSecretArchive).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, { id: "abc" });
+    expect(calls).toEqual([{ method: "settingsSecrets.archive", input: { id: "abc" } }]);
   });
 
-  it("delete: removes row", async () => {
-    const result = await actions.delete(makeRequest({ id: "abc" }));
+  test("delete: delegates row removal to the public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);
+    const result = await mod.actions.delete(makeEvent({ id: "abc" }) as Parameters<typeof mod.actions.delete>[0]);
     expect(result).toMatchObject({ success: true });
-    expect(mocks.deleteSettingsSecret).toHaveBeenCalledWith(mocks.scope.em, mocks.scope.ctx, { id: "abc" });
+    expect(calls).toEqual([{ method: "settingsSecrets.delete", input: { id: "abc" } }]);
   });
 
-  it("add: route delegates plaintext handling to settings service only", async () => {
-    await actions.add(makeRequest({ name: "TEST", value: "plaintext-secret", provider: "" }));
-    expect(mocks.addSettingsSecret).toHaveBeenCalledTimes(1);
-    expect(mocks.rotateSettingsSecret).not.toHaveBeenCalled();
-    expect(mocks.deleteSettingsSecret).not.toHaveBeenCalled();
+  test("add: route delegates plaintext handling to the credential API only", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 7}`);
+    await mod.actions.add(
+      makeEvent({ name: "TEST", value: "plaintext-secret", provider: "" }) as Parameters<typeof mod.actions.add>[0],
+    );
+    expect(calls).toEqual([
+      { method: "settingsSecrets.add", input: { name: "TEST", value: "plaintext-secret", provider: "" } },
+    ]);
   });
 });

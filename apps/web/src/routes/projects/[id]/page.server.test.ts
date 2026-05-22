@@ -1,27 +1,43 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
-import { projectLifecycleMock, useProjectLifecycle } from "$lib/test/project-lifecycle-mock";
+import { ProjectApiError } from "@work-management/interface/http/project-api-client";
 
+// The route delegates to the project public API (`createProjectApiForEvent`).
+// Mocking that seam keeps this a unit test: no TypeORM EntityManager, no
+// request service scope, no database seeding.
+const calls: Array<{ method: string; input: unknown }> = [];
 const updates: Array<{ id: string; name?: string; description?: string | null }> = [];
 const deleted: string[] = [];
 let overview: {
-  project: {
-    id: string;
-    slug: string;
-    name: string;
-    description: string | null;
-    updated_at: string;
-  };
-  summary: {
-    openTasks: number;
-    inProgress: number;
-    done: number;
-    sprintDaysRemaining: number;
-  };
+  project: { id: string; slug: string; name: string; description: string | null; updated_at: string };
+  summary: { openTasks: number; inProgress: number; done: number; sprintDaysRemaining: number };
 } | null = null;
+
+mock.module("$lib/server/project-api", () => ({
+  createProjectApiForEvent: () => ({
+    projects: {
+      overview: async (input: { id: string }) => {
+        calls.push({ method: "projects.overview", input });
+        // The real client throws `ProjectApiError(404)` for an unknown id;
+        // mirror that so the route's `instanceof` 404 mapping is exercised.
+        if (overview === null) throw new ProjectApiError("Project not found", 404);
+        return overview;
+      },
+      update: async (input: { id: string; name?: string; description?: string | null }) => {
+        calls.push({ method: "projects.update", input });
+        updates.push(input);
+        return { ok: true };
+      },
+      delete: async (input: { id: string }) => {
+        calls.push({ method: "projects.delete", input });
+        deleted.push(input.id);
+        return { ok: true };
+      },
+    },
+  }),
+}));
 
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
@@ -33,38 +49,13 @@ function redirectOf(value: unknown): { status?: number; location?: string } {
   return value as { status?: number; location?: string };
 }
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its seam while active (beforeAll/afterAll) so sibling suites that
-// mock the same path are never hijacked.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
-
-mock.module("@work-management/interface/project-lifecycle.ts", () => projectLifecycleMock());
-
-const projectLifecycleOverrides = {
-  loadProjectOverview: async () => overview,
-  updateProject: async (_em: unknown, _ctx: unknown, input: { id: string; name?: string; description?: string | null }) => {
-    updates.push(input);
-    return { ok: true };
-  },
-  deleteProject: async (_em: unknown, _ctx: unknown, id: string) => {
-    deleted.push(id);
-    return { ok: true };
-  },
-  listProjectOptions: async () => [],
-  createProject: async () => ({ id: "project-created", slug: "created", name: "Created", parentId: null, kind: "project", path: "created", depth: 0 }),
-  createProjectFromSetup: async () => ({
-    links: {
-      project: { id: "project-created", slug: "created", path: "created" },
-      repo: { id: "", localPath: null, syncStatus: "missing" },
-      workflow: { id: "workflow-1" },
-    },
-    template: { id: "template-1", name: "Template", workflow: { id: "workflow-1" } },
-    trace: { audit: "event-1" },
-  }),
-};
+function loadEvent(id: string, parent?: () => Promise<{ activeProjectId: string | null }>) {
+  const url = new URL(`http://localhost/projects/${id}`);
+  return { params: { id }, parent, url, locals: {}, request: new Request(url), fetch };
+}
 
 beforeEach(() => {
+  calls.splice(0, calls.length);
   updates.splice(0, updates.length);
   deleted.splice(0, deleted.length);
   overview = {
@@ -75,44 +66,24 @@ beforeEach(() => {
       description: "first project",
       updated_at: "2026-05-01T00:00:00.000Z",
     },
-    summary: {
-      openTasks: 2,
-      inProgress: 1,
-      done: 1,
-      sprintDaysRemaining: 0,
-    },
+    summary: { openTasks: 2, inProgress: 1, done: 1, sprintDaysRemaining: 0 },
   };
 });
 
 describe("/projects/[id] +page.server.ts", () => {
-  let disposeScope: (() => void) | undefined;
-  let disposeLifecycle: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) => ({
-      em: { kind: "mock-em" },
-      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
-    }));
-    disposeLifecycle = useProjectLifecycle(projectLifecycleOverrides);
-  });
-  afterAll(() => {
-    disposeScope?.();
-    disposeLifecycle?.();
-  });
-
-  test("server route uses the project lifecycle interface instead of direct application imports", () => {
+  test("server route uses the project public API instead of request service scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@work-management/interface/project-lifecycle");
-    expect(source).not.toContain("@work-management/application/projects");
+    expect(source).toContain("createProjectApiForEvent");
+    expect(source).not.toContain("requestServiceScope");
     expect(source).not.toContain("$lib/server/application-scope");
+    expect(source).not.toContain("@work-management/application/projects");
   });
 
   test("load returns project summary and a rename form", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      params: { id: "project-1" },
-      parent: async () => ({ activeProjectId: "project-1" }),
-      locals: {},
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(
+      loadEvent("project-1", async () => ({ activeProjectId: "project-1" })) as Parameters<typeof mod.load>[0],
+    );
 
     expect(result.project.id).toBe("project-1");
     expect(result.project.slug).toBe("alpha");
@@ -120,18 +91,19 @@ describe("/projects/[id] +page.server.ts", () => {
     expect(result.form?.data?.name).toBe("Alpha");
     expect(result.form?.data?.description).toBe("first project");
     expect(result.activeProjectId).toBe("project-1");
+    expect(calls).toEqual([{ method: "projects.overview", input: { id: "project-1" } }]);
   });
 
-  test("load throws 404 when the project id does not exist", async () => {
+  test("load throws 404 when the project public API reports the id is missing", async () => {
     overview = null;
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    await expect(mod.load({
-      params: { id: "missing-project" },
-      locals: {},
-    } as Parameters<typeof mod.load>[0])).rejects.toMatchObject({ status: 404 });
+    await expect(
+      mod.load(loadEvent("missing-project") as Parameters<typeof mod.load>[0]),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(calls).toEqual([{ method: "projects.overview", input: { id: "missing-project" } }]);
   });
 
-  test("rename action validates and updates through the service boundary", async () => {
+  test("rename action validates and updates through the public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const result = await mod.actions.rename({
       params: { id: "project-1" },
@@ -141,15 +113,18 @@ describe("/projects/[id] +page.server.ts", () => {
 
     expect((result as { form?: unknown }).form).toBeDefined();
     expect(updates).toEqual([{ id: "project-1", name: "NewName", description: "after" }]);
+    expect(calls).toEqual([
+      { method: "projects.update", input: { id: "project-1", name: "NewName", description: "after" } },
+    ]);
   });
 
-  test("rename action returns fail(400, { form }) when name is empty", async () => {
+  test("rename action returns fail(400, { form }) when name is empty and skips the public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.actions.rename({
+    const result = (await mod.actions.rename({
       params: { id: "project-1" },
       request: form({ name: "", description: "anything" }),
       locals: {},
-    } as Parameters<typeof mod.actions.rename>[0]) as {
+    } as Parameters<typeof mod.actions.rename>[0])) as {
       status?: number;
       data?: { form?: { valid?: boolean; errors?: Record<string, unknown> } };
     };
@@ -157,9 +132,10 @@ describe("/projects/[id] +page.server.ts", () => {
     expect(result.status).toBe(400);
     expect(result.data?.form?.valid).toBe(false);
     expect(updates).toEqual([]);
+    expect(calls).toEqual([]);
   });
 
-  test("delete action deletes through the service boundary and redirects", async () => {
+  test("delete action deletes through the public API and redirects", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
     let thrown: unknown;
     try {
@@ -172,6 +148,7 @@ describe("/projects/[id] +page.server.ts", () => {
     }
 
     expect(deleted).toEqual(["project-1"]);
+    expect(calls).toEqual([{ method: "projects.delete", input: { id: "project-1" } }]);
     expect(redirectOf(thrown).status).toBe(303);
     expect(redirectOf(thrown).location).toBe("/projects");
   });
