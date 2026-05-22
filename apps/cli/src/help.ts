@@ -138,7 +138,7 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
       "fulcrum mcp <list|register|unregister|enable|disable|test|reload>",
       "                                             Manage the MCP server registry.",
       "fulcrum plugin <list|install|enable|disable|update|remove>",
-      "                                             Manage agent plugin scope.",
+      "                                             List plugin markers; mutation verbs are deferred until plugins.cross_agent.",
       "fulcrum hooks <list|enable|disable|test>     Manage agent hook recipes.",
       "fulcrum skills <sync|upstream|lint|list>     Mirror and validate authored skills.",
       "fulcrum component|components <list|info|plan|status>",
@@ -379,6 +379,7 @@ const NULLABLE_STRING_VALUE = { type: ["string", "null"] } as const;
 const BOOLEAN_VALUE = { type: "boolean" } as const;
 const NUMBER_VALUE = { type: "number" } as const;
 const OBJECT_VALUE = { type: "object", additionalProperties: true } as const;
+const NULL_VALUE = { type: "null" } as const;
 
 function arrayOf(item: JsonObjectSchema = OBJECT_VALUE): JsonObjectSchema {
   return { type: "array", items: item };
@@ -397,6 +398,70 @@ function objectResultSchema(
     properties,
   };
 }
+
+function nullResultSchema(title: string): JsonObjectSchema {
+  return { title, ...NULL_VALUE };
+}
+
+const AGENT_PROFILE_SCHEMA = {
+  type: "object",
+  additionalProperties: true,
+  required: ["name", "cliPath", "defaultFlags"],
+  properties: {
+    name: STRING_VALUE,
+    cliPath: STRING_VALUE,
+    defaultFlags: arrayOf(STRING_VALUE),
+    skillFolder: STRING_VALUE,
+    authEnvVars: arrayOf(STRING_VALUE),
+    sandcastleProvider: STRING_VALUE,
+    supportsSessionResume: BOOLEAN_VALUE,
+    maxIterations: NUMBER_VALUE,
+    defaultTimeout: NUMBER_VALUE,
+  },
+} as const;
+
+const MCP_SERVER_ROW_SCHEMA = {
+  type: "object",
+  additionalProperties: true,
+  required: ["name", "transport", "vendor", "default_enabled", "agent_state", "disabled_config"],
+  properties: {
+    name: STRING_VALUE,
+    transport: STRING_VALUE,
+    vendor: STRING_VALUE,
+    default_enabled: BOOLEAN_VALUE,
+    agent_state: OBJECT_VALUE,
+    disabled_config: OBJECT_VALUE,
+    description: STRING_VALUE,
+    url: STRING_VALUE,
+    command_line: STRING_VALUE,
+    agent_visibility: OBJECT_VALUE,
+  },
+} as const;
+
+const MCP_CHECK_SCHEMA = {
+  type: "object",
+  additionalProperties: true,
+  required: ["agent", "visible", "enabled", "disabled_config"],
+  properties: {
+    agent: STRING_VALUE,
+    visible: BOOLEAN_VALUE,
+    enabled: BOOLEAN_VALUE,
+    disabled_config: STRING_VALUE,
+  },
+} as const;
+
+const PLUGIN_MARKER_SCHEMA = {
+  type: "object",
+  additionalProperties: true,
+  required: ["id", "name", "enabled", "source", "marker"],
+  properties: {
+    id: STRING_VALUE,
+    name: STRING_VALUE,
+    enabled: BOOLEAN_VALUE,
+    source: STRING_VALUE,
+    marker: STRING_VALUE,
+  },
+} as const;
 
 const AI_THREAD_FIELDS = {
   threadId: STRING_VALUE,
@@ -445,19 +510,131 @@ const COMMAND_RESULT_SCHEMAS: ReadonlyMap<string, ResultSchemaFactory> = new Map
     })],
   ["agent", (title) =>
     objectResultSchema(title, ["profiles"], {
-      profiles: arrayOf({
-        type: "object",
-        additionalProperties: true,
-        required: ["name", "cliPath", "defaultFlags"],
-        properties: {
-          name: STRING_VALUE,
-          cliPath: STRING_VALUE,
-          defaultFlags: arrayOf(STRING_VALUE),
-          skillFolder: STRING_VALUE,
-          supportsSessionResume: BOOLEAN_VALUE,
-        },
-      }),
+      profiles: arrayOf(AGENT_PROFILE_SCHEMA),
     })],
+  ["agent list", (title) => COMMAND_RESULT_SCHEMAS.get("agent")!(title, "fulcrum agent list")],
+  ["agent view", (title) =>
+    objectResultSchema(title, ["profile"], {
+      profile: AGENT_PROFILE_SCHEMA,
+    })],
+  ["agent add", (title) =>
+    objectResultSchema(title, ["profile", "registered", "operation", "client"], {
+      profile: AGENT_PROFILE_SCHEMA,
+      registered: BOOLEAN_VALUE,
+      operation: STRING_VALUE,
+      client: STRING_VALUE,
+    })],
+  ["agent edit", (title) => COMMAND_RESULT_SCHEMAS.get("agent add")!(title, "fulcrum agent edit")],
+  ["agent status", (title) => COMMAND_RESULT_SCHEMAS.get("agent add")!(title, "fulcrum agent status")],
+  ["agent remove", (title) =>
+    objectResultSchema(title, ["name", "removed", "registered"], {
+      name: STRING_VALUE,
+      removed: BOOLEAN_VALUE,
+      registered: BOOLEAN_VALUE,
+    })],
+  ["agent enable", (title) =>
+    objectResultSchema(title, ["profile", "operation", "enabled", "reloaded", "status"], {
+      profile: AGENT_PROFILE_SCHEMA,
+      operation: STRING_VALUE,
+      enabled: BOOLEAN_VALUE,
+      reloaded: BOOLEAN_VALUE,
+      status: STRING_VALUE,
+    })],
+  ["agent disable", (title) => COMMAND_RESULT_SCHEMAS.get("agent enable")!(title, "fulcrum agent disable")],
+  ["agent reload", (title) => COMMAND_RESULT_SCHEMAS.get("agent enable")!(title, "fulcrum agent reload")],
+  ["agent defaults", (title) =>
+    objectResultSchema(title, ["defaultAgent", "routes", "availableAgents"], {
+      defaultAgent: STRING_VALUE,
+      routes: OBJECT_VALUE,
+      availableAgents: arrayOf(STRING_VALUE),
+    })],
+  ["agent set-default", (title) =>
+    objectResultSchema(title, ["action", "defaultAgent", "profile"], {
+      action: STRING_VALUE,
+      defaultAgent: STRING_VALUE,
+      profile: AGENT_PROFILE_SCHEMA,
+    })],
+  ["agent invoke", (title) =>
+    objectResultSchema(title, ["action", "agent", "profile", "stepId", "policy", "status"], {
+      action: { const: "invoke" },
+      agent: STRING_VALUE,
+      profile: AGENT_PROFILE_SCHEMA,
+      stepId: STRING_VALUE,
+      policy: NULLABLE_STRING_VALUE,
+      status: STRING_VALUE,
+    })],
+  ["agent test", (title) =>
+    objectResultSchema(title, ["name", "passed", "testedAt"], {
+      name: STRING_VALUE,
+      passed: BOOLEAN_VALUE,
+      reason: STRING_VALUE,
+      testedAt: STRING_VALUE,
+    })],
+  ["mcp", (title) =>
+    objectResultSchema(title, ["servers"], {
+      servers: arrayOf(MCP_SERVER_ROW_SCHEMA),
+    })],
+  ["mcp list", (title) => ({
+    ...arrayOf(MCP_SERVER_ROW_SCHEMA),
+    title,
+  })],
+  ["mcp register", (title) =>
+    objectResultSchema(title, ["name", "registered", "transport", "vendor", "agents"], {
+      name: STRING_VALUE,
+      registered: BOOLEAN_VALUE,
+      transport: STRING_VALUE,
+      vendor: STRING_VALUE,
+      agents: arrayOf(STRING_VALUE),
+    })],
+  ["mcp unregister", (title) =>
+    objectResultSchema(title, ["name", "unregistered"], {
+      name: STRING_VALUE,
+      unregistered: BOOLEAN_VALUE,
+    })],
+  ["mcp enable", (title) =>
+    objectResultSchema(title, ["name", "enabled", "agents"], {
+      name: STRING_VALUE,
+      enabled: BOOLEAN_VALUE,
+      agents: arrayOf(STRING_VALUE),
+    })],
+  ["mcp disable", (title) =>
+    objectResultSchema(title, ["name", "enabled", "agents"], {
+      name: STRING_VALUE,
+      enabled: BOOLEAN_VALUE,
+      agents: arrayOf(STRING_VALUE),
+    })],
+  ["mcp test", (title) =>
+    objectResultSchema(title, ["name", "transport", "vendor", "status", "agent", "agents", "checks", "testedAt"], {
+      name: STRING_VALUE,
+      transport: STRING_VALUE,
+      vendor: STRING_VALUE,
+      status: STRING_VALUE,
+      agent: NULLABLE_STRING_VALUE,
+      agents: arrayOf(STRING_VALUE),
+      checks: arrayOf(MCP_CHECK_SCHEMA),
+      testedAt: STRING_VALUE,
+    })],
+  ["mcp reload", (title) =>
+    objectResultSchema(title, ["name", "reloaded", "agents", "messages"], {
+      name: STRING_VALUE,
+      reloaded: BOOLEAN_VALUE,
+      agents: arrayOf(STRING_VALUE),
+      messages: arrayOf(STRING_VALUE),
+    })],
+  ["plugin", (title) => ({
+    ...arrayOf(PLUGIN_MARKER_SCHEMA),
+    title,
+  })],
+  ["plugin list", (title) => COMMAND_RESULT_SCHEMAS.get("plugin")!(title, "fulcrum plugin list")],
+  ["plugin show", (title) => ({
+    ...PLUGIN_MARKER_SCHEMA,
+    title,
+  })],
+  ["plugin install", (title) => nullResultSchema(title)],
+  ["plugin enable", (title) => nullResultSchema(title)],
+  ["plugin disable", (title) => nullResultSchema(title)],
+  ["plugin update", (title) => nullResultSchema(title)],
+  ["plugin remove", (title) => nullResultSchema(title)],
   ["runs feed", (title) =>
     objectResultSchema(title, ["runs", "filters", "watch", "stream", "sentinel"], {
       runs: arrayOf({

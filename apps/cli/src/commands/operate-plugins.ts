@@ -131,7 +131,7 @@ Commands:
   fulcrum operate mcp <list|register|unregister|enable|disable|test|reload>
                                         Manage the MCP server registry.
   fulcrum operate plugin <list|show|install|enable|disable|update|remove>
-                                        Manage agent plugins (per-agent scope).
+                                        List plugin markers; mutation verbs are deferred until plugins.cross_agent.
   fulcrum operate hooks <list|enable|disable|test>
                                         Manage agent hook recipes.
   fulcrum operate skills <sync|install|lint|list|upstream>
@@ -154,7 +154,7 @@ Examples:
   fulcrum operate doctor --json
   fulcrum operate plugins list --json
   fulcrum operate plugin enable caveman --agent claude-code --agent codex
-  fulcrum operate plugin enable caveman --all-agents
+    emits a deferred error envelope until plugins.cross_agent is configured.
   fulcrum operate trace show 4f3a1c9e --json
   fulcrum operate audit list --trace 4f3a1c9e --json`;
 
@@ -171,7 +171,9 @@ Usage:
   fulcrum operate plugin remove <name> [--agent <id> ...] [--all-agents]
 
 \`--json\` emits the canonical fulcrum.cli.v1 envelope (CLI-TUI-UX.md §3).
-\`--agent\` / \`--all-agents\` scope a mutation per CLI-TUI-UX.md §1.8.`;
+\`--agent\` / \`--all-agents\` scope a mutation per CLI-TUI-UX.md §1.8.
+Mutation verbs are deferred until plugins.cross_agent is configured; they emit
+a non-zero FUL_OPERATE_PLUGIN_UNAVAILABLE envelope instead of mutating state.`;
 
 /** Output sink for the envelope helpers. */
 interface OperateIo {
@@ -430,6 +432,7 @@ function runPluginMutation(
       },
       io,
     );
+    io.exit(1);
     return;
   }
 
@@ -452,6 +455,7 @@ function runPluginMutation(
       },
       io,
     );
+    io.exit(1);
     return;
   }
 
@@ -482,6 +486,7 @@ function runPluginMutation(
     },
     io,
   );
+  io.exit(1);
 }
 
 /** Dispatch the `plugin` / `plugins` verb group. */

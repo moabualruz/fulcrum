@@ -225,22 +225,60 @@ function parseAgentFlags(args: string[]): AgentId[] | "all" {
   return agents;
 }
 
-async function visibleAgentList(name: string, target: AgentId[] | "all"): Promise<AgentId[]> {
+interface VisibleAgentListOptions {
+  json: boolean;
+  argv: readonly string[];
+  command: string;
+  args: Record<string, unknown>;
+}
+
+function emitMcpLookupError(
+  options: VisibleAgentListOptions | undefined,
+  error: { code: string; message: string; fix: string },
+): never {
+  if (options?.json) {
+    emitErrorResult(
+      {
+        argv: options.argv,
+        command: options.command,
+        args: options.args,
+        error,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
+    process.exit(2);
+  }
+  console.error(error.message);
+  process.exit(2);
+}
+
+async function visibleAgentList(
+  name: string,
+  target: AgentId[] | "all",
+  options?: VisibleAgentListOptions,
+): Promise<AgentId[]> {
   const reg = await loadRegistry();
   const server = reg.servers[name] as McpServer | undefined;
   if (!server) {
-    console.error(`fulcrum mcp: server '${name}' not registered`);
-    process.exit(2);
+    emitMcpLookupError(options, {
+      code: "FUL_MCP_SERVER_NOT_FOUND",
+      message: `fulcrum mcp: server '${name}' not registered`,
+      fix: "Run `fulcrum mcp list --json` to inspect registered MCP servers, then retry with a listed name.",
+    });
   }
   const requested = target === "all" ? [...ALL_AGENT_IDS] : target;
   const visible = requested.filter((id) => server.agent_visibility[id]);
   const hidden = requested.filter((id) => !server.agent_visibility[id]);
-  if (hidden.length > 0) {
+  if (hidden.length > 0 && !options?.json) {
     console.log(`· ${name}: skip plugin/extension-owned or unsupported agent(s): ${hidden.join(", ")}`);
   }
   if (visible.length === 0) {
-    console.error(`fulcrum mcp: '${name}' has no registry-owned target agents in this request`);
-    process.exit(2);
+    emitMcpLookupError(options, {
+      code: "FUL_MCP_NO_VISIBLE_AGENTS",
+      message: `fulcrum mcp: '${name}' has no registry-owned target agents in this request`,
+      fix: "Retry with `--all-agents` or an agent listed as visible by `fulcrum mcp list --json`.",
+    });
   }
   return visible;
 }
@@ -278,7 +316,12 @@ async function cmdTest(args: string[]): Promise<void> {
     process.exit(2);
   }
   const target = parseAgentFlags(args.slice(1));
-  const agentList = await visibleAgentList(name, target);
+  const agentList = await visibleAgentList(name, target, {
+    json: args.includes("--json"),
+    argv: args,
+    command: "fulcrum mcp test",
+    args: { subcommand: "test", name },
+  });
   const reg = await loadRegistry();
   const server = reg.servers[name]!;
   const checks = agentList.map((agent) => ({
@@ -322,7 +365,12 @@ async function cmdReload(args: string[]): Promise<void> {
   }
   const asJson = args.includes("--json");
   const target = parseAgentFlags(args.slice(1));
-  const agentList = await visibleAgentList(name, target);
+  const agentList = await visibleAgentList(name, target, {
+    json: asJson,
+    argv: args,
+    command: "fulcrum mcp reload",
+    args: { subcommand: "reload", name },
+  });
   if (asJson) {
     const messages = await captureConsoleLog(async () => {
       await applyToAgents(name, { agents: agentList });
