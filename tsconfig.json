@@ -27,6 +27,8 @@
       "@fulcrum/shared-dto/*": ["packages/shared-dto/src/*"],
       "@fulcrum/tui/*": ["apps/tui/src/*"],
       "@fulcrum/server/*": ["apps/server/src/*"],
+      "@fulcrum/test-fixtures": ["packages/test-fixtures/src/index.ts"],
+      "@fulcrum/test-fixtures/*": ["packages/test-fixtures/src/*"],
       "@fulcrum/web/*": ["apps/web/src/*"],
       "$lib/*": ["apps/web/src/lib/*"],
       "@identity-access/*": ["services/identity-access/src/*"],
