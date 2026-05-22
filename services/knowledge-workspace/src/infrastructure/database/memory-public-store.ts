@@ -133,6 +133,9 @@ export class MemoryPublicStore {
     id: string;
     orgId?: string;
     body?: string;
+    kind?: string;
+    scope?: "project" | "global" | "task" | "user";
+    key?: string;
     tags?: string[];
     importance?: string;
   }): Promise<MemoryPublicRow | null> {
@@ -141,6 +144,12 @@ export class MemoryPublicStore {
     if (!(await this.isMemoryVisibleToOrg(memory, input.orgId))) return null;
 
     if (input.body !== undefined) memory.body = input.body;
+    if (input.kind !== undefined) memory.kind = input.kind;
+    if (input.scope === "global") memory.scope = "global";
+    if (input.scope && input.scope !== "global") memory.scope = "project";
+    if (input.key !== undefined) {
+      memory.sourceRef = { ...memory.sourceRef, key: input.key, scope: input.scope ?? memory.sourceRef["scope"] };
+    }
     if (input.tags !== undefined) memory.tags = input.tags;
     if (input.importance !== undefined) memory.importance = input.importance;
     return toPublicRow(await this.repository().save(memory));
