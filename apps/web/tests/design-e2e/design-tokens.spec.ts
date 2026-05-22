@@ -42,9 +42,9 @@ async function readTokenValues(page: import("@playwright/test").Page, tokens: re
 	}, tokens);
 }
 
-test.describe("wave 0a color tokens", () => {
+test.describe("design token colors", () => {
 	test("exposes OKLCH semantic tokens for light, dark, and high contrast modes", async ({ page }) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 		await expect(page.locator("[data-token-scope]")).toHaveAttribute("data-hydrated", "true");
 
 		for (const mode of ["light", "dark", "high-contrast"]) {
@@ -60,7 +60,7 @@ test.describe("wave 0a color tokens", () => {
 	});
 
 	test("renders contrast pairs without hardcoded hex or rgb colors", async ({ page }) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 
 		await expect(page.locator("[data-color-token-grid]")).toBeVisible();
 		await expect(page.locator("[data-token='--primary']")).toContainText("Primary");
@@ -71,9 +71,9 @@ test.describe("wave 0a color tokens", () => {
 	});
 });
 
-test.describe("wave 0a shadow scale", () => {
+test.describe("design token shadow scale", () => {
 	test("defines elevation tokens and adjusts shadow opacity by mode", async ({ page }) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 		await expect(page.locator("[data-token-scope]")).toHaveAttribute("data-hydrated", "true");
 
 		const tokenValues = await readTokenValues(page, requiredShadowTokens.map(([token]) => token));
@@ -92,7 +92,7 @@ test.describe("wave 0a shadow scale", () => {
 	});
 
 	test("maps floating components to correct shadows and keeps inputs and text flat", async ({ page }) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 
 		await expect(page.locator("[data-shadow-token-grid]")).toBeVisible();
 		await expect(page.locator("[data-shadow-popover]")).toHaveCSS("box-shadow", /0px 2px 4px/);
@@ -107,9 +107,9 @@ test.describe("wave 0a shadow scale", () => {
 	});
 });
 
-test.describe("wave 0a radius scale", () => {
+test.describe("design token radius scale", () => {
 	test("exposes configurable Tailwind radius tokens", async ({ page }) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 
 		const tokenValues = await readTokenValues(page, requiredRadiusTokens.map(([token]) => token));
 
@@ -121,7 +121,7 @@ test.describe("wave 0a radius scale", () => {
 	test("uses radius-md for buttons, radius-lg for cards, radius-xl for modals, and class overrides", async ({
 		page,
 	}) => {
-		await page.goto("/wave-0a-foundation");
+		await page.goto("/design-tokens");
 
 		await expect(page.locator("[data-radius-token-grid]")).toBeVisible();
 		await expect(page.locator("[data-radius-button]")).toHaveCSS("border-radius", "8px");

@@ -91,6 +91,8 @@ const EXACTNESS_SIGNAL = /\b(exact(?:ly)?|verbatim|literal(?:ly)?)\b/i;
 const BANNED_TOKEN_PATTERNS = [
   /\bACP\b/i,
   /\bchat\b/i,
+  /\bphase\s*\/\s*wave\b/i,
+  /\bwave\s*\/\s*phase\b/i,
   /\bWIP\b/,
   /\bem dash(?: character)?\b/i,
   /\bdecorative sparkle glyph\b/i,

@@ -44,7 +44,7 @@
 </script>
 
 <svelte:head>
-	<title>Design System Token Specimen</title>
+	<title>Design tokens</title>
 </svelte:head>
 
 <main
@@ -56,10 +56,10 @@
 	<section class="mx-auto flex max-w-6xl flex-col gap-6">
 		<header class="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
 			<div class="max-w-3xl">
-				<p class="text-xs font-medium uppercase text-fg-muted">Design system foundation</p>
+				<p class="text-xs font-medium uppercase text-fg-muted">Interface tokens</p>
 				<h1 class="mt-2 text-2xl font-semibold text-fg">Color token specimen</h1>
 				<p class="mt-2 text-sm text-fg-subtle">
-					OKLCH semantic roles from DESIGN.md, mirrored through Tailwind theme variables and runtime mode switching.
+					Mode-aware semantic roles for product surfaces, controls, overlays, and status states.
 				</p>
 			</div>
 			<div class="flex gap-2" aria-label="Token mode">
@@ -130,7 +130,7 @@
 
 			<article data-radius-card class="rounded-lg border border-border bg-surface-elevated p-4 shadow-sm">
 				<h2 class="text-sm font-semibold text-fg">Card</h2>
-				<p class="mt-1 text-xs text-fg-muted">Foundation surface</p>
+				<p class="mt-1 text-xs text-fg-muted">Content surface</p>
 			</article>
 
 			<div
