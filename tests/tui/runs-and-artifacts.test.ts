@@ -512,20 +512,30 @@ describe("Build stage workbench (:runs): OD parity", () => {
     }
   });
 
-  test("p/d/m select ModePicker modes instead of opening legacy run actions", async () => {
+  test("p/d/m honor the Play/Discuss/mode-picker contract", async () => {
     const screen = buildScreen();
     await screen.load();
 
     await screen.handleKey("p");
     expect(screen.currentStepMode).toBe("play");
-    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dependencies for");
+    let rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Play current step");
+    expect(rendered).toContain("agent");
+    expect(rendered).toContain("model");
+    expect(rendered).toContain("policy");
+    expect(rendered).toContain("Enter Play");
+    expect(rendered).not.toContain("Dependencies for");
 
     await screen.handleKey("d");
     expect(screen.currentStepMode).toBe("discuss");
-    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dispatch run");
+    rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Discuss current step");
+    expect(rendered).not.toContain("Dispatch run");
 
     await screen.handleKey("m");
-    expect(screen.currentStepMode).toBe("manual");
+    expect(screen.currentStepMode).toBe("discuss");
+    rendered = renderPlain((renderer) => screen.render(renderer));
+    expect(rendered).toContain("Mode picker");
   });
 
   test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {

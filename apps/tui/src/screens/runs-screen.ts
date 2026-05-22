@@ -464,6 +464,9 @@ export class RunsControlScreen {
           Math.max(20, renderer.width),
         ),
       );
+      for (const line of this.modePicker.renderPopover()) {
+        renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
+      }
     }
 
     // Dispatch overlay
@@ -500,7 +503,7 @@ export class RunsControlScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  m=mode  j/k=navigate  Enter=detail  q=back"));
+    renderer.writeln(c.dim("  p play  d discuss  m picker  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
