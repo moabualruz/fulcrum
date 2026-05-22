@@ -1,11 +1,41 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { pmStructureMock, usePmStructureOverrides } from "$lib/test/pm-structure-mock";
-import { projectRequestScopeMock, useProjectRequestScope } from "$lib/test/project-request-scope-mock";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { PlanningStructureApiError } from "@work-management/interface/http/planning-structure-api-client";
 
 const calls: string[] = [];
 const intake = [{ id: "intake-1", title: "Import request", status: "open", traceId: "trace-intake-1" }];
+let listError: unknown;
+
+mock.module("$lib/server/planning-structure-api", () => ({
+  PlanningStructureApiError,
+  createPlanningStructureApiForEvent: () => ({
+    intake: {
+      list: async (input: { projectId: string }) => {
+        calls.push(`list:${input.projectId}`);
+        if (listError) throw listError;
+        return intake;
+      },
+      create: async (input: { projectId: string; title: string; source?: string }) => {
+        calls.push(`create:${input.projectId}:${input.title}:${input.source ?? ""}`);
+        return { id: "intake-new" };
+      },
+      update: async (input: { id: string; projectId: string; title?: string; status?: string }) => {
+        calls.push(`update:${input.projectId}:${input.id}:${input.title ?? ""}:${input.status ?? ""}`);
+        return { ok: true };
+      },
+      delete: async (input: { id: string; projectId: string }) => {
+        calls.push(`delete:${input.projectId}:${input.id}`);
+        return { ok: true };
+      },
+    },
+  }),
+}));
+
+beforeEach(() => {
+  calls.splice(0, calls.length);
+  listError = undefined;
+});
 
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
@@ -13,62 +43,15 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/intake", { method: "POST", body: fd });
 }
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. The complete-export factories read a shared `globalThis` slot; this
-// suite publishes its stubs while active (beforeAll/afterAll) so sibling
-// suites that mock the same paths are never hijacked.
-mock.module("../../project-request-scope", () => projectRequestScopeMock());
-mock.module("@work-management/interface/pm-structure.ts", () => pmStructureMock());
-
-let disposeScope: (() => void) | undefined;
-let disposePm: (() => void) | undefined;
-
-beforeAll(() => {
-  disposeScope = useProjectRequestScope((_locals, projectId) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
-  }));
-  disposePm = usePmStructureOverrides({
-    listIntakeRequests: async (_em: unknown, ctx: { projectId: string }) => {
-      calls.push(`list:${ctx.projectId}`);
-      return intake;
-    },
-    createIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { title: string; source: string }) => {
-      calls.push(`create:${ctx.projectId}:${input.title}:${input.source}`);
-      return { id: "intake-new" };
-    },
-    updateIntakeRequest: async (_em: unknown, ctx: { projectId: string }, input: { intakeId: string; title?: string; status?: string }) => {
-      calls.push(`update:${ctx.projectId}:${input.intakeId}:${input.title ?? ""}:${input.status ?? ""}`);
-      return { ok: true };
-    },
-    deleteIntakeRequest: async (_em: unknown, ctx: { projectId: string }, intakeId: string) => {
-      calls.push(`delete:${ctx.projectId}:${intakeId}`);
-      return { ok: true };
-    },
-    listProjectModules: async () => [],
-    createProjectModule: async () => ({ id: "module-new" }),
-    updateProjectModule: async () => ({ ok: true }),
-    deleteProjectModule: async () => ({ ok: true }),
-  });
-});
-
-afterAll(() => {
-  disposeScope?.();
-  disposePm?.();
-});
-
-beforeEach(() => {
-  calls.splice(0, calls.length);
-});
-
 describe("/projects/[id]/intake +page.server.ts", () => {
-  test("server route uses work-management PM structure interface", () => {
+  test("server route uses the planning structure public API web client", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@work-management/interface/pm-structure");
-    expect(source).toContain("../project-request-scope");
+    expect(source).toContain("$lib/server/planning-structure-api");
+    expect(source).not.toContain("project-request-scope");
+    expect(source).not.toContain("requestProjectScope");
+    expect(source).not.toContain("@work-management/interface/pm-structure");
     expect(source).not.toContain("@work-management/application/");
     expect(source).not.toContain("from \"typeorm\"");
-    expect(source).not.toContain("@mikro-orm");
   });
 
   test("load streams project intake requests", async () => {
@@ -81,7 +64,16 @@ describe("/projects/[id]/intake +page.server.ts", () => {
     expect(calls).toEqual(["list:project-1"]);
   });
 
-  test("create update and delete actions delegate to PM structure interface", async () => {
+  test("load throws 404 when the project is missing", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 10}`);
+    listError = new PlanningStructureApiError("Project not found", 404);
+    await expect(mod.load({
+      params: { id: "missing" },
+      locals: {},
+    } as Parameters<typeof mod.load>[0])).rejects.toMatchObject({ status: 404 });
+  });
+
+  test("create update and delete actions delegate to the planning structure API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const eventBase = { params: { id: "project-1" }, locals: {} };
 

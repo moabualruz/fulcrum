@@ -2,29 +2,25 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
 import {
-  createProjectModule,
-  deleteProjectModule,
-  listProjectModules,
-  updateProjectModule,
-  type ProjectModuleStatus,
-} from "@work-management/interface/pm-structure.ts";
-import { requestProjectScope } from "../../project-request-scope";
+  createPlanningStructureApiForEvent,
+  PlanningStructureApiError,
+} from "$lib/server/planning-structure-api";
 
 const MODULE_STATUSES = ["planned", "active", "completed", "archived"] as const;
+type ProjectModuleStatus = (typeof MODULE_STATUSES)[number];
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async (event) => {
+  const projectId = event.params.id;
   try {
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    const modules = await listProjectModules(em, ctx);
+    const modules = await createPlanningStructureApiForEvent(event).modules.list({ projectId });
     return {
-      projectId: params.id,
+      projectId,
       streamed: {
         data: Promise.resolve({ modules }),
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (/not found|invalid input syntax for type uuid|request failed with 404|project id required/i.test(message)) {
+    if (err instanceof PlanningStructureApiError && err.status === 404) {
       throw error(404, "Project not found");
     }
     throw err;
@@ -32,34 +28,40 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-  create: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  create: async (event) => {
+    const fd = await event.request.formData();
     const name = stringField(fd, "name");
     if (!name) return fail(400, { error: "Name is required" });
     const status = moduleStatus(stringField(fd, "status")) ?? "planned";
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await createProjectModule(em, ctx, { name, status, leadUserId: nullableStringField(fd, "leadUserId") });
+    await createPlanningStructureApiForEvent(event).modules.create({
+      projectId: event.params.id,
+      name,
+      status,
+      leadUserId: nullableStringField(fd, "leadUserId"),
+    });
     return { success: true };
   },
-  update: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  update: async (event) => {
+    const fd = await event.request.formData();
     const moduleId = stringField(fd, "moduleId");
     if (!moduleId) return fail(400, { error: "moduleId is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await updateProjectModule(em, ctx, {
-      moduleId,
+    await createPlanningStructureApiForEvent(event).modules.update({
+      id: moduleId,
+      projectId: event.params.id,
       name: nullableStringField(fd, "name") ?? undefined,
       status: moduleStatus(stringField(fd, "status")) ?? undefined,
       leadUserId: nullableStringField(fd, "leadUserId"),
     });
     return { success: true };
   },
-  delete: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  delete: async (event) => {
+    const fd = await event.request.formData();
     const moduleId = stringField(fd, "moduleId");
     if (!moduleId) return fail(400, { error: "moduleId is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await deleteProjectModule(em, ctx, moduleId);
+    await createPlanningStructureApiForEvent(event).modules.delete({
+      id: moduleId,
+      projectId: event.params.id,
+    });
     return { success: true };
   },
 };
