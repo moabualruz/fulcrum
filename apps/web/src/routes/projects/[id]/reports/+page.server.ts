@@ -1,35 +1,28 @@
-import { error, fail } from "@sveltejs/kit";
+import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import {
-  appendReviewWorkbenchAnnotation,
-  applyConfiguredUatCodeReviewDecision,
-  buildFinalQaFeedbackGate,
-  buildFinalQaReport,
-  buildReviewWorkbenchModel,
-  buildUatCodeReviewHandoff,
-  loadReviewWorkbenchSession,
-  recordUatCodeReviewDecision,
-  runGeneratedE2eRegressionTests,
-  saveReviewWorkbenchSession,
-  type AppendReviewWorkbenchAnnotationInput,
-  type GeneratedE2eRegressionRunner,
-  type ReviewWorkbenchSessionType,
-  type UatCodeReviewDecision,
-  type UatCodeReviewSessionType,
-} from "@planning-review/interface/project-review-reports.ts";
-import { loadProjectReportsPage } from "@work-management/interface/project-reports.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createReportApiForEvent } from "$lib/server/report-api";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
-export const load: PageServerLoad = async ({ params, url, locals }) => {
-  const sprintId = url.searchParams.get("sprint") ?? undefined;
-  const { em, ctx } = await requestServiceScope(locals, params.id);
-  try {
-    return await loadProjectReportsPage(em, ctx, { projectId: params.id, sprintId });
-  } catch (err) {
-    if (err instanceof AppNotFoundError) throw error(404, err.message);
-    throw err;
-  }
+type GeneratedE2eRegressionRunner = "bun" | "playwright";
+type ReviewWorkbenchSessionType = "plan" | "uat" | "code_review";
+type UatCodeReviewDecision =
+  | "start_uat"
+  | "start_code_review"
+  | "request_changes"
+  | "approve_without_manual_review";
+type UatCodeReviewSessionType = "uat" | "code_review";
+type ReviewAnnotationType = "comment" | "suggestion" | "concern" | undefined;
+type ReviewAnnotationScope = "line" | "file" | undefined;
+type ReviewAnnotationSide = "old" | "new" | undefined;
+type ReviewAnnotationSeverity = "important" | "nit" | "pre_existing" | undefined;
+type ReviewAnnotationDecorations = ("blocking" | "non-blocking" | "if-minor")[] | undefined;
+
+export const load: PageServerLoad = async (event) => {
+  const sprintId = event.url.searchParams.get("sprint") ?? undefined;
+  return await createReportApiForEvent(event).reports.projectPage({
+    projectId: event.params.id,
+    sprintId,
+  });
 };
 
 function fdToRecord(fd: FormData): Record<string, string | null> {
@@ -75,35 +68,35 @@ function reviewSessionType(value: string | null | undefined): ReviewWorkbenchSes
   throw new Error(`Unsupported review session type: ${normalized}`);
 }
 
-function reviewAnnotationType(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["type"] {
+function reviewAnnotationType(value: string | null | undefined): ReviewAnnotationType {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   if (normalized === "comment" || normalized === "suggestion" || normalized === "concern") return normalized;
   throw new Error(`Unsupported review annotation type: ${normalized}`);
 }
 
-function reviewAnnotationScope(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["scope"] {
+function reviewAnnotationScope(value: string | null | undefined): ReviewAnnotationScope {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   if (normalized === "line" || normalized === "file") return normalized;
   throw new Error(`Unsupported review annotation scope: ${normalized}`);
 }
 
-function reviewAnnotationSide(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["side"] {
+function reviewAnnotationSide(value: string | null | undefined): ReviewAnnotationSide {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   if (normalized === "old" || normalized === "new") return normalized;
   throw new Error(`Unsupported review annotation side: ${normalized}`);
 }
 
-function reviewAnnotationSeverity(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["severity"] {
+function reviewAnnotationSeverity(value: string | null | undefined): ReviewAnnotationSeverity {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   if (normalized === "important" || normalized === "nit" || normalized === "pre_existing") return normalized;
   throw new Error(`Unsupported review annotation severity: ${normalized}`);
 }
 
-function reviewAnnotationDecorations(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["decorations"] {
+function reviewAnnotationDecorations(value: string | null | undefined): ReviewAnnotationDecorations {
   const decorations = csvIds(value);
   if (decorations.length === 0) return undefined;
   for (const decoration of decorations) {
@@ -111,7 +104,7 @@ function reviewAnnotationDecorations(value: string | null | undefined): AppendRe
       throw new Error(`Unsupported review annotation decoration: ${decoration}`);
     }
   }
-  return decorations as AppendReviewWorkbenchAnnotationInput["decorations"];
+  return decorations as ReviewAnnotationDecorations;
 }
 
 function requiredInt(value: string | null | undefined, label: string): number {
@@ -128,13 +121,13 @@ function parseJsonArray(value: string | null | undefined, label: string): unknow
 }
 
 export const actions: Actions = {
-  finalQa: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  finalQa: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const report = await buildFinalQaReport(em, ctx, {
-        projectId: params.id,
+      const report = await workflowApi(event).reports.finalQa({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         taskIds: csvIds(raw["taskIds"] ?? raw["taskId"]),
       });
@@ -143,16 +136,16 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "finalQa", message: (err as Error).message });
     }
   },
-  finalQaGate: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  finalQaGate: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
       const maxIterations = raw["maxIterations"]?.trim()
         ? requiredInt(raw["maxIterations"], "maxIterations")
         : undefined;
-      const gate = await buildFinalQaFeedbackGate(em, ctx, {
-        projectId: params.id,
+      const gate = await workflowApi(event).reports.finalQaFeedbackGate({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         taskIds: csvIds(raw["taskIds"] ?? raw["taskId"]),
         workerId: raw["workerId"]?.trim() || undefined,
@@ -168,13 +161,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "finalQaGate", message: (err as Error).message });
     }
   },
-  uatHandoff: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  uatHandoff: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const handoff = await buildUatCodeReviewHandoff(em, ctx, {
-        projectId: params.id,
+      const handoff = await workflowApi(event).reports.uatCodeReviewHandoff({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         taskIds: csvIds(raw["taskIds"] ?? raw["taskId"]),
       });
@@ -183,13 +176,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "uatHandoff", message: (err as Error).message });
     }
   },
-  uatDecision: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  uatDecision: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const decision = await recordUatCodeReviewDecision(em, ctx, {
-        projectId: params.id,
+      const decision = await workflowApi(event).reports.recordUatCodeReviewDecision({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         decision: uatDecision(raw["decision"]),
         reviewType: uatReviewType(raw["reviewType"]),
@@ -202,13 +195,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "uatDecision", message: (err as Error).message });
     }
   },
-  autoDecision: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  autoDecision: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const autoDecision = await applyConfiguredUatCodeReviewDecision(em, ctx, {
-        projectId: params.id,
+      const autoDecision = await workflowApi(event).reports.applyConfiguredUatCodeReviewDecision({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         taskIds: csvIds(raw["taskIds"] ?? raw["taskId"]),
       });
@@ -217,13 +210,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "autoDecision", message: (err as Error).message });
     }
   },
-  e2eRun: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  e2eRun: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const e2eRun = await runGeneratedE2eRegressionTests(em, ctx, {
-        projectId: params.id,
+      const e2eRun = await workflowApi(event).reports.runGeneratedE2eRegressionTests({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         runner: e2eRunner(raw["runner"]),
         planOnly: raw["planOnly"] === "1" || raw["planOnly"] === "on",
@@ -233,16 +226,16 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "e2eRun", message: (err as Error).message });
     }
   },
-  reviewWorkbench: async ({ params, request }) => {
-    const fd = await request.formData();
+  reviewWorkbench: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const reviewWorkbench = await buildReviewWorkbenchModel({
-        projectId: params.id,
+      const reviewWorkbench = await workflowApi(event).reports.reviewWorkbench({
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         reviewId: raw["reviewId"]?.trim() || undefined,
-        files: parseJsonArray(raw["filesJson"], "filesJson") as never,
-        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson") as never,
+        files: parseJsonArray(raw["filesJson"], "filesJson"),
+        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson"),
         searchQuery: raw["searchQuery"]?.trim() || undefined,
         selectedFilePath: raw["selectedFilePath"]?.trim() || undefined,
         viewedFilePaths: csvIds(raw["viewedFilePaths"]),
@@ -260,19 +253,19 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "reviewWorkbench", message: (err as Error).message });
     }
   },
-  reviewSessionSave: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  reviewSessionSave: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await saveReviewWorkbenchSession(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.saveReviewWorkbenchSession({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         reviewId: raw["reviewId"]?.trim() || undefined,
         reviewType: reviewSessionType(raw["reviewType"]),
         title: raw["title"]?.trim() || undefined,
-        files: parseJsonArray(raw["filesJson"], "filesJson") as never,
-        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson") as never,
+        files: parseJsonArray(raw["filesJson"], "filesJson"),
+        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson"),
         searchQuery: raw["searchQuery"]?.trim() || undefined,
         selectedFilePath: raw["selectedFilePath"]?.trim() || undefined,
         viewedFilePaths: csvIds(raw["viewedFilePaths"]),
@@ -290,13 +283,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "reviewSession", message: (err as Error).message });
     }
   },
-  reviewSessionLoad: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  reviewSessionLoad: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await loadReviewWorkbenchSession(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.loadReviewWorkbenchSession({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,
         traceId: raw["traceId"]?.trim() || undefined,
         searchQuery: raw["searchQuery"]?.trim() || undefined,
@@ -310,13 +303,13 @@ export const actions: Actions = {
       return fail(400, { ok: false, mode: "reviewSession", message: (err as Error).message });
     }
   },
-  reviewSessionAnnotate: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  reviewSessionAnnotate: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await appendReviewWorkbenchAnnotation(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.appendReviewWorkbenchAnnotation({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,
         traceId: raw["traceId"]?.trim() || undefined,
         annotationId: raw["annotationId"]?.trim() || undefined,
@@ -346,3 +339,9 @@ export const actions: Actions = {
     }
   },
 };
+
+function workflowApi(event: Parameters<typeof createWebWorkflowApiCaller>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}

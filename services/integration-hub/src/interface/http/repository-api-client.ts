@@ -43,6 +43,21 @@ export function createRepositoryApiCaller(options: RepositoryApiClientOptions) {
           method: "DELETE",
           query: repositoryContextQuery(options),
         }),
+      projectCards: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/repos`, {
+          method: "GET",
+          query: repositoryContextQuery(options),
+        }),
+      addToProject: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/repos`, {
+          method: "POST",
+          body: repositoryBody(options, input),
+        }),
+      linkToProject: async (input: JsonRecord & { projectId: string; repoId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/repos/${encodeURIComponent(input.repoId)}/link`, {
+          method: "POST",
+          body: repositoryBody(options, input),
+        }),
     },
     repoBranches: {
       list: async (input: JsonRecord = {}) =>

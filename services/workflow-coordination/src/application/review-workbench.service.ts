@@ -69,6 +69,10 @@ import {
   DependencyRunService,
   type AutomatedFeedbackLoopOutput,
 } from "@workflow-coordination/application/dependency-execution.service.ts";
+import {
+  listGeneratedE2eRunHistory,
+  type GeneratedE2eRunHistoryEntry,
+} from "@planning-review/application/reports/generated-e2e-run-actions.ts";
 
 export type ReviewWorkbenchPreview = ReviewWorkbenchModel;
 export type ReviewWorkbenchSession = ReviewWorkbenchSessionOutput;
@@ -88,6 +92,7 @@ export type UatCodeReviewHandoff = UatCodeReviewHandoffOutput;
 export type UatCodeReviewDecision = UatCodeReviewDecisionOutput;
 export type ConfiguredUatCodeReviewDecision = ConfiguredUatCodeReviewDecisionOutput;
 export type GeneratedE2eRegressionRun = GeneratedE2eRegressionRunOutput;
+export type GeneratedE2eRunHistory = GeneratedE2eRunHistoryEntry[];
 
 const UAT_CODE_REVIEW_AUTO_DECISION_SETTING_KEY = "reports.uatCodeReviewAutoDecision";
 
@@ -125,6 +130,10 @@ export interface ConfiguredUatCodeReviewDecisionInput
 export interface GeneratedE2eRegressionRunInput
   extends UatCodeReviewHandoffInput,
     RunGeneratedE2eRegressionTestsInput {}
+
+export interface GeneratedE2eRunHistoryInput extends UatCodeReviewHandoffInput {
+  limit?: number;
+}
 
 export interface ReviewWorkbenchSessionSaveInput
   extends SaveReviewWorkbenchSessionInput {
@@ -849,6 +858,21 @@ export class ReviewWorkbenchService {
         eventId,
       };
     });
+  }
+
+  async listGeneratedE2eRuns(input: GeneratedE2eRunHistoryInput): Promise<GeneratedE2eRunHistory> {
+    if (!this.dataSource) {
+      throw new Error("ReviewWorkbenchService requires a TypeORM DataSource to list generated E2E runs.");
+    }
+    if (!input.projectId.trim()) throw new Error("Generated E2E projectId is required.");
+
+    const traceId = input.traceId ?? reviewWorkflowId("trace", input.projectId, "generated-e2e-history");
+    await ensureReviewWorkspaceProject(this.dataSource.manager, input, traceId);
+    return await listGeneratedE2eRunHistory(
+      this.dataSource.manager,
+      { orgId: input.workspaceId, userId: null, projectId: input.projectId },
+      { projectId: input.projectId, limit: input.limit },
+    );
   }
 }
 

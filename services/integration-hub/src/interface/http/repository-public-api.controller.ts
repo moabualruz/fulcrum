@@ -28,11 +28,18 @@ import {
 } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import { z } from "zod";
 
 import { INTEGRATION_HUB_REPOSITORY_ENTITIES } from "@integration-hub/infrastructure/database/repository.entities.ts";
 import { RepositoryPublicStore } from "@integration-hub/infrastructure/database/repository-public-store.ts";
 import { getFileContent, getFileTree } from "@integration-hub/application/repos/git.ts";
 import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import {
+  addProjectRepo,
+  linkProjectRepoToProject,
+  listProjectRepoCards,
+  type ProjectRepoCard,
+} from "@integration-hub/interface/project-repositories.ts";
 
 import { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryTreeQueryDto, RepositoryFileQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto } from "./dto/repository.dto.ts";
 export { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryTreeQueryDto, RepositoryFileQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto };
@@ -338,6 +345,80 @@ export class RepositoryCommitPublicApiController {
   }
 }
 
+const ProjectRepositoryParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+const ProjectRepositoryLinkParamsSchema = ProjectRepositoryParamsSchema.extend({
+  repoId: z.string().min(1),
+});
+
+const ProjectRepositoryQuerySchema = z.object({
+  orgId: z.string().min(1),
+});
+
+const ProjectRepositoryCreateBodySchema = ProjectRepositoryQuerySchema.extend({
+  kind: z.enum(["local", "remote"]).optional(),
+  path: z.string().optional().nullable(),
+  url: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+});
+
+export class ProjectRepositoryPublicApiService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectRepoCard[]> {
+    const parsedParams = ProjectRepositoryParamsSchema.parse(params);
+    const parsedQuery = ProjectRepositoryQuerySchema.parse(query);
+    return await listProjectRepoCards(this.dataSource.manager, {
+      orgId: parsedQuery.orgId,
+      userId: null,
+      projectId: parsedParams.id,
+    });
+  }
+
+  async add(params: unknown, body: unknown): Promise<{ id: string }> {
+    const parsedParams = ProjectRepositoryParamsSchema.parse(params);
+    const parsedBody = ProjectRepositoryCreateBodySchema.parse(body);
+    return await addProjectRepo(
+      this.dataSource.manager,
+      { orgId: parsedBody.orgId, userId: null, projectId: parsedParams.id },
+      {
+        kind: parsedBody.kind === "remote" ? "remote" : "local",
+        path: parsedBody.path,
+        url: parsedBody.url,
+        name: parsedBody.name,
+      },
+    );
+  }
+
+  async link(params: unknown, body: unknown): Promise<{ ok: true }> {
+    const parsedParams = ProjectRepositoryLinkParamsSchema.parse(params);
+    const parsedBody = ProjectRepositoryQuerySchema.parse(body);
+    return await linkProjectRepoToProject(
+      this.dataSource.manager,
+      { orgId: parsedBody.orgId, userId: null, projectId: parsedParams.id },
+      parsedParams.repoId,
+    );
+  }
+}
+
+export class ProjectRepositoryPublicApiController {
+  constructor(private readonly projectRepositories: ProjectRepositoryPublicApiService) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectRepoCard[]> {
+    return await this.projectRepositories.list(params, query);
+  }
+
+  async add(params: unknown, body: unknown): Promise<{ id: string }> {
+    return await this.projectRepositories.add(params, body);
+  }
+
+  async link(params: unknown, body: unknown): Promise<{ ok: true }> {
+    return await this.projectRepositories.link(params, body);
+  }
+}
+
 export class RepositoryPublicApiModule {
   static register(options: RepositoryPublicApiOptions): NestDynamicModule {
     return {
@@ -347,11 +428,13 @@ export class RepositoryPublicApiModule {
         RepositoryPublicApiController,
         RepositoryBranchPublicApiController,
         RepositoryCommitPublicApiController,
+        ProjectRepositoryPublicApiController,
       ],
       providers: [
         { provide: REPOSITORY_PUBLIC_API_OPTIONS, useValue: options },
         RepositoryPublicStore,
         RepositoryPublicApiService,
+        ProjectRepositoryPublicApiService,
       ],
       exports: [RepositoryPublicApiService],
     };
@@ -397,9 +480,11 @@ function toJsonDates(value: unknown): unknown {
 Inject(REPOSITORY_PUBLIC_API_OPTIONS)(RepositoryPublicApiService, undefined, 0);
 Inject(RepositoryPublicStore)(RepositoryPublicApiService, undefined, 1);
 Inject(DataSource)(RepositoryPublicStore, undefined, 0);
+Inject(DataSource)(ProjectRepositoryPublicApiService, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryPublicApiController, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryBranchPublicApiController, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryCommitPublicApiController, undefined, 0);
+Inject(ProjectRepositoryPublicApiService)(ProjectRepositoryPublicApiController, undefined, 0);
 
 for (const dto of [
   RepositoryListQueryDto,
@@ -502,6 +587,18 @@ const getCommitDescriptor = Object.getOwnPropertyDescriptor(
   RepositoryCommitPublicApiController.prototype,
   "getCommit",
 );
+const listProjectRepositoriesDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+);
+const addProjectRepositoryDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+);
+const linkProjectRepositoryDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+);
 
 if (
   !listRepositoriesDescriptor ||
@@ -516,7 +613,10 @@ if (
   !listBranchesDescriptor ||
   !getBranchDescriptor ||
   !listCommitsDescriptor ||
-  !getCommitDescriptor
+  !getCommitDescriptor ||
+  !listProjectRepositoriesDescriptor ||
+  !addProjectRepositoryDescriptor ||
+  !linkProjectRepositoryDescriptor
 ) {
   throw new Error("RepositoryPublicApiController route descriptors are missing");
 }
@@ -750,17 +850,84 @@ ApiOkResponse({ description: "Repository commit" })(
   getCommitDescriptor,
 );
 
+Controller("api/v1/projects/:id/repos")(ProjectRepositoryPublicApiController);
+ApiTags("project-repositories")(ProjectRepositoryPublicApiController);
+
+Get()(ProjectRepositoryPublicApiController.prototype, "list", listProjectRepositoriesDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "list", 0);
+Query()(ProjectRepositoryPublicApiController.prototype, "list", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+ApiOperation({ summary: "List project repository cards" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+ApiOkResponse({ description: "Project repository cards" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+
+Post()(ProjectRepositoryPublicApiController.prototype, "add", addProjectRepositoryDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "add", 0);
+Body()(ProjectRepositoryPublicApiController.prototype, "add", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+ApiOperation({ summary: "Add a repository to a project" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+ApiCreatedResponse({ description: "Project repository created" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+
+Post(":repoId/link")(ProjectRepositoryPublicApiController.prototype, "link", linkProjectRepositoryDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "link", 0);
+Body()(ProjectRepositoryPublicApiController.prototype, "link", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiParam({ name: "repoId", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiOperation({ summary: "Link an existing repository to a project" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiOkResponse({ description: "Project repository linked" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+
 Module({
   imports: [TypeOrmModule.forFeature(INTEGRATION_HUB_REPOSITORY_ENTITIES)],
   controllers: [
     RepositoryPublicApiController,
     RepositoryBranchPublicApiController,
     RepositoryCommitPublicApiController,
+    ProjectRepositoryPublicApiController,
   ],
   providers: [
     { provide: REPOSITORY_PUBLIC_API_OPTIONS, useValue: null },
     RepositoryPublicStore,
     RepositoryPublicApiService,
+    ProjectRepositoryPublicApiService,
   ],
   exports: [RepositoryPublicApiService],
 })(RepositoryPublicApiModule);

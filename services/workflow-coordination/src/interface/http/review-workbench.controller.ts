@@ -15,6 +15,8 @@ import {
   type FinalQaReportInput,
   type GeneratedE2eRegressionRun,
   type GeneratedE2eRegressionRunInput,
+  type GeneratedE2eRunHistory,
+  type GeneratedE2eRunHistoryInput,
   type ReviewWorkbenchSession,
   type ReviewWorkbenchSessionAnnotationInput,
   type ReviewWorkbenchSessionLoadInput,
@@ -27,8 +29,32 @@ import {
   type ReviewWorkbenchPreview,
 } from "@workflow-coordination/application/review-workbench.service.ts";
 
-import { ReviewWorkbenchRequestDto, ReviewWorkbenchSessionSaveRequestDto, ReviewWorkbenchSessionLoadRequestDto, ReviewWorkbenchSessionAnnotateRequestDto, FinalQaReportRequestDto, FinalQaFeedbackGateRequestDto, UatCodeReviewHandoffRequestDto, UatCodeReviewDecisionRequestDto, ConfiguredUatCodeReviewDecisionRequestDto, GeneratedE2eRegressionRunRequestDto } from "./dto/review-workbench.dto.ts";
-export { ReviewWorkbenchRequestDto, ReviewWorkbenchSessionSaveRequestDto, ReviewWorkbenchSessionLoadRequestDto, ReviewWorkbenchSessionAnnotateRequestDto, FinalQaReportRequestDto, FinalQaFeedbackGateRequestDto, UatCodeReviewHandoffRequestDto, UatCodeReviewDecisionRequestDto, ConfiguredUatCodeReviewDecisionRequestDto, GeneratedE2eRegressionRunRequestDto };
+import {
+  ConfiguredUatCodeReviewDecisionRequestDto,
+  FinalQaFeedbackGateRequestDto,
+  FinalQaReportRequestDto,
+  GeneratedE2eRegressionRunRequestDto,
+  GeneratedE2eRunHistoryRequestDto,
+  ReviewWorkbenchRequestDto,
+  ReviewWorkbenchSessionAnnotateRequestDto,
+  ReviewWorkbenchSessionLoadRequestDto,
+  ReviewWorkbenchSessionSaveRequestDto,
+  UatCodeReviewDecisionRequestDto,
+  UatCodeReviewHandoffRequestDto,
+} from "./dto/review-workbench.dto.ts";
+export {
+  ConfiguredUatCodeReviewDecisionRequestDto,
+  FinalQaFeedbackGateRequestDto,
+  FinalQaReportRequestDto,
+  GeneratedE2eRegressionRunRequestDto,
+  GeneratedE2eRunHistoryRequestDto,
+  ReviewWorkbenchRequestDto,
+  ReviewWorkbenchSessionAnnotateRequestDto,
+  ReviewWorkbenchSessionLoadRequestDto,
+  ReviewWorkbenchSessionSaveRequestDto,
+  UatCodeReviewDecisionRequestDto,
+  UatCodeReviewHandoffRequestDto,
+};
 
 type ReviewWorkbenchPort = Pick<
   ReviewWorkbenchService,
@@ -42,7 +68,9 @@ type ReviewWorkbenchPort = Pick<
   | "recordUatCodeReviewDecision"
   | "applyConfiguredUatCodeReviewDecision"
   | "runGeneratedE2eRegressionTests"
->;
+> & {
+  listGeneratedE2eRuns?: ReviewWorkbenchService["listGeneratedE2eRuns"];
+};
 
 export class ReviewWorkbenchController {
   constructor(private readonly review: ReviewWorkbenchPort) {}
@@ -105,6 +133,15 @@ export class ReviewWorkbenchController {
     body: GeneratedE2eRegressionRunRequestDto,
   ): Promise<GeneratedE2eRegressionRun> {
     return await this.review.runGeneratedE2eRegressionTests(body);
+  }
+
+  async listGeneratedE2eRuns(
+    body: GeneratedE2eRunHistoryInput,
+  ): Promise<GeneratedE2eRunHistory> {
+    if (!this.review.listGeneratedE2eRuns) {
+      throw new Error("Review workbench service does not expose generated E2E run history.");
+    }
+    return await this.review.listGeneratedE2eRuns(body);
   }
 }
 
@@ -286,6 +323,10 @@ const runGeneratedE2eRegressionTestsDescriptor = Object.getOwnPropertyDescriptor
   ReviewWorkbenchController.prototype,
   "runGeneratedE2eRegressionTests",
 );
+const listGeneratedE2eRunsDescriptor = Object.getOwnPropertyDescriptor(
+  ReviewWorkbenchController.prototype,
+  "listGeneratedE2eRuns",
+);
 
 if (
   !previewWorkbenchDescriptor ||
@@ -297,7 +338,8 @@ if (
   !buildUatCodeReviewHandoffDescriptor ||
   !recordUatCodeReviewDecisionDescriptor ||
   !applyConfiguredUatCodeReviewDecisionDescriptor ||
-  !runGeneratedE2eRegressionTestsDescriptor
+  !runGeneratedE2eRegressionTestsDescriptor ||
+  !listGeneratedE2eRunsDescriptor
 ) {
   throw new Error("ReviewWorkbenchController route descriptor is missing");
 }
@@ -516,4 +558,26 @@ ApiOkResponse({ description: "Generated E2E run command, files, and audit event"
   ReviewWorkbenchController.prototype,
   "runGeneratedE2eRegressionTests",
   runGeneratedE2eRegressionTestsDescriptor,
+);
+
+Post("generated-e2e/history")(
+  ReviewWorkbenchController.prototype,
+  "listGeneratedE2eRuns",
+  listGeneratedE2eRunsDescriptor,
+);
+Body()(ReviewWorkbenchController.prototype, "listGeneratedE2eRuns", 0);
+ApiOperation({ summary: "List generated real-data E2E regression runs" })(
+  ReviewWorkbenchController.prototype,
+  "listGeneratedE2eRuns",
+  listGeneratedE2eRunsDescriptor,
+);
+ApiBody({ type: GeneratedE2eRunHistoryRequestDto })(
+  ReviewWorkbenchController.prototype,
+  "listGeneratedE2eRuns",
+  listGeneratedE2eRunsDescriptor,
+);
+ApiOkResponse({ description: "Generated E2E run history" })(
+  ReviewWorkbenchController.prototype,
+  "listGeneratedE2eRuns",
+  listGeneratedE2eRunsDescriptor,
 );

@@ -1,43 +1,18 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import {
-  createWorkflowApiCaller,
-  WorkflowApiError,
-} from "@workflow-coordination/interface/http/workflow-api-client";
-import { listGeneratedE2eRunHistory } from "@planning-review/interface/project-review-reports.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { WorkflowApiError } from "@workflow-coordination/interface/http/workflow-api-client";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
-interface E2eEvent {
-  params: { id: string };
-  fetch: typeof fetch;
-  locals: App.Locals;
-  request: Request;
-  url: URL;
-}
+type GeneratedE2eRegressionRunner = "bun" | "playwright";
 
-function workflowApiBaseUrl(url: URL): string {
-  return (
-    process.env["FULCRUM_SERVER_URL"] ??
-    process.env["FULCRUM_PUBLIC_API_URL"] ??
-    `${url.protocol}//${url.host}`
-  ).replace(/\/+$/, "");
-}
-
-function createE2eWorkflowApi(event: E2eEvent) {
-  return createWorkflowApiCaller({
-    baseUrl: workflowApiBaseUrl(event.url),
-    fetch: event.fetch,
-    headers: {
-      cookie: event.request.headers.get("cookie") ?? "",
-    },
-  });
-}
-
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const projectId = params.id;
+export const load: PageServerLoad = async (event) => {
+  const projectId = event.params.id;
   try {
-    const { em, ctx } = await requestServiceScope(locals, projectId);
-    const history = await listGeneratedE2eRunHistory(em, ctx, { projectId, limit: 20 });
+    const history = await workflowApi(event).reports.listGeneratedE2eRuns({
+      ...workflowApiProjectMetadata(event, projectId),
+      projectId,
+      limit: 20,
+    });
     return { projectId, history };
   } catch {
     return { projectId, history: [] };
@@ -74,10 +49,10 @@ export const actions: Actions = {
     }
 
     try {
-      const api = createE2eWorkflowApi(event as unknown as E2eEvent);
-      const result = await api.reports.runGeneratedE2eRegressionTests({
+      const result = await workflowApi(event).reports.runGeneratedE2eRegressionTests({
+        ...workflowApiProjectMetadata(event, projectId),
         projectId,
-        runner,
+        runner: runner as GeneratedE2eRegressionRunner,
         traceId,
         testFiles: testFiles.length > 0 ? testFiles : undefined,
       });
@@ -99,3 +74,9 @@ export const actions: Actions = {
     }
   },
 };
+
+function workflowApi(event: Parameters<PageServerLoad>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}

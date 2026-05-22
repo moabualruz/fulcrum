@@ -1,6 +1,6 @@
 import { createWorkflowApiCaller } from "@workflow-coordination/interface/http/workflow-api-client";
 
-import { cookieHeaders } from "$lib/server/public-api";
+import { cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 interface WorkflowApiRouteEvent {
   fetch: typeof fetch;
@@ -11,6 +11,7 @@ interface WorkflowApiRouteEvent {
     workspaceName?: string | null;
   };
   request: Request;
+  url?: URL;
 }
 
 interface WorkflowApiProjectMetadata {
@@ -26,7 +27,7 @@ export function createWebWorkflowApiCaller(
   event: WorkflowApiRouteEvent,
   env: Record<string, string | undefined> = process.env,
 ) {
-  const raw = workflowApiBaseUrl(env);
+  const raw = workflowApiBaseUrl(env) ?? (event.url ? publicApiBaseUrl(event.url) : null);
   if (!raw) return null;
   return createWorkflowApiCaller({
     baseUrl: raw,
@@ -90,6 +91,6 @@ function titleOf(value: string): string {
 }
 
 function workflowApiBaseUrl(env: Record<string, string | undefined>): string | null {
-  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"];
+  const raw = env["FULCRUM_SERVER_URL"] ?? env["FULCRUM_PUBLIC_API_URL"] ?? env["FULCRUM_API_URL"];
   return raw ? raw.replace(/\/+$/, "") : null;
 }

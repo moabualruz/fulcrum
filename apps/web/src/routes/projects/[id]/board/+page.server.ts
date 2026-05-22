@@ -2,31 +2,28 @@ import { fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
 import {
-  buildProjectTaskWorkbench,
-  createProjectBoardWorkItem,
-  deleteProjectBoardWorkItem,
-  listProjectBoardWorkItems,
-  TASK_STATE_GROUP_ORDER,
-  type ManualTaskWorkbenchViewMode,
-  type TaskStateGroup,
-  updateProjectBoardWorkItem,
-} from "@work-management/interface/project-board.ts";
-import {
-  dispatchDependencyRunForTasks,
-  previewDependencyRunForTasks,
-} from "@execution-orchestration/interface/dependency-run-actions.ts";
-import { recordTaskQaReview } from "@execution-orchestration/interface/task-run-reviews.ts";
-import {
   BoardCreateSchema,
   BoardDeleteSchema,
   BoardMoveSchema,
   BoardUpdateSchema,
 } from "../../../../lib/server/boards.schema";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createTaskApiForEvent } from "$lib/server/task-api";
 import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
-export const load: PageServerLoad = async ({ params, url, locals }) => {
+type ManualTaskWorkbenchViewMode = "board" | "list" | "table";
+type TaskStateGroup = "backlog" | "unstarted" | "started" | "completed" | "cancelled";
+
+const TASK_STATE_GROUP_ORDER: readonly TaskStateGroup[] = [
+  "backlog",
+  "unstarted",
+  "started",
+  "completed",
+  "cancelled",
+];
+
+export const load: PageServerLoad = async (event) => {
+  const { params, url } = event;
   const projectId = params.id;
   const sprintFilter = url.searchParams.get("sprint")?.trim() ?? "";
   return {
@@ -34,10 +31,10 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
     sprintFilter,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, projectId);
-        return {
-          tasks: await listProjectBoardWorkItems(em, ctx),
-          manualWorkbench: await buildProjectTaskWorkbench(em, ctx, {
+        const taskApi = createTaskApiForEvent(event);
+        const [tasks, manualWorkbench] = await Promise.all([
+          taskApi.tasks.list({ projectId }),
+          taskApi.tasks.manualWorkbench({
             projectId,
             traceId: url.searchParams.get("trace")?.trim() || undefined,
             viewMode: viewModeParam(url.searchParams.get("view")),
@@ -54,7 +51,8 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
             },
             projectCapabilities: { estimateEnabled: false },
           }),
-        };
+        ]);
+        return { tasks, manualWorkbench };
       })(),
     },
   };
@@ -94,15 +92,15 @@ function stateGroupParam(value: string | null | undefined): TaskStateGroup[] | u
 }
 
 export const actions: Actions = {
-  create: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  create: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
-    const candidate: Record<string, unknown> = { ...raw, projectId: params.id };
+    const candidate: Record<string, unknown> = { ...raw, projectId: event.params.id };
     const parsed = v.safeParse(BoardCreateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      await createProjectBoardWorkItem(em, ctx, {
+      await createTaskApiForEvent(event).tasks.create({
+        projectId: event.params.id,
         title: parsed.output.title,
         status: parsed.output.status,
       });
@@ -112,8 +110,8 @@ export const actions: Actions = {
     }
   },
 
-  update: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  update: async (event) => {
+    const fd = await event.request.formData();
     const candidate: Record<string, unknown> = { ...fdToRecord(fd) };
     if ("priority" in candidate && candidate["priority"] !== null) {
       candidate["priority"] = Number(candidate["priority"]);
@@ -122,31 +120,39 @@ export const actions: Actions = {
     const parsed = v.safeParse(BoardUpdateSchema, candidate);
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
       const { id, ...patch } = parsed.output;
-      await updateProjectBoardWorkItem(em, ctx, id, patch);
+      await createTaskApiForEvent(event).tasks.update({
+        id,
+        projectId: event.params.id,
+        ...patch,
+      });
       return actionOk("Task updated");
     } catch (err) {
       return fail(400, actionFail((err as Error).message));
     }
   },
 
-  delete: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  delete: async (event) => {
+    const fd = await event.request.formData();
     const parsed = v.safeParse(BoardDeleteSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
-    const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
-    await deleteProjectBoardWorkItem(em, ctx, parsed.output.id);
+    await createTaskApiForEvent(event).tasks.delete({
+      id: parsed.output.id,
+      projectId: event.params.id,
+    });
     return actionOk("Task deleted");
   },
 
-  move: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  move: async (event) => {
+    const fd = await event.request.formData();
     const parsed = v.safeParse(BoardMoveSchema, fdToRecord(fd));
     if (!parsed.success) return fail(400, actionFail("invalid input"));
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id, parsed.output.id);
-      await updateProjectBoardWorkItem(em, ctx, parsed.output.id, { status: parsed.output.to });
+      await createTaskApiForEvent(event).tasks.update({
+        id: parsed.output.id,
+        projectId: event.params.id,
+        status: parsed.output.to,
+      });
       return actionOk("Task moved");
     } catch (err) {
       const msg = (err as Error).message;
@@ -156,24 +162,14 @@ export const actions: Actions = {
   },
 
   runPreview: async (event) => {
-    const { params, request, locals } = event;
-    const fd = await request.formData();
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     const taskIds = csvIds(raw["taskIds"] ?? raw["taskId"] ?? raw["id"]);
     if (taskIds.length === 0) return fail(400, { ok: false, mode: "runPreview", message: "taskIds is required" });
     try {
-      const workflowApi = createWebWorkflowApiCaller(event);
-      if (workflowApi) {
-        const preview = await workflowApi.tasks.previewDependencyRun({
-          projectId: params.id,
-          mode: taskIds.length > 1 ? "board" : "task",
-          targetTaskIds: taskIds,
-          traceId: raw["traceId"] ?? undefined,
-        });
-        return { ok: true, mode: "runPreview", preview };
-      }
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const preview = await previewDependencyRunForTasks(em, ctx, {
+      const preview = await workflowApi(event).tasks.previewDependencyRun({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         mode: taskIds.length > 1 ? "board" : "task",
         targetTaskIds: taskIds,
         traceId: raw["traceId"] ?? undefined,
@@ -185,28 +181,14 @@ export const actions: Actions = {
   },
 
   run: async (event) => {
-    const { params, request, locals } = event;
-    const fd = await request.formData();
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     const taskIds = csvIds(raw["taskIds"] ?? raw["taskId"] ?? raw["id"]);
     if (taskIds.length === 0) return fail(400, { ok: false, mode: "run", message: "taskIds is required" });
     const agent = raw["agent"]?.trim() || "codex";
     try {
-      const workflowApi = createWebWorkflowApiCaller(event);
-      if (workflowApi) {
-        const dispatch = await workflowApi.tasks.dispatchDependencyRun({
-          ...workflowApiProjectMetadata(event, params.id),
-          mode: taskIds.length > 1 ? "board" : "task",
-          targetTaskIds: taskIds,
-          traceId: raw["traceId"] ?? undefined,
-          agent,
-          model: raw["model"] ?? undefined,
-          prompt: raw["prompt"] ?? undefined,
-        });
-        return { ok: true, mode: "run", dispatch };
-      }
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const dispatch = await dispatchDependencyRunForTasks(em, ctx, {
+      const dispatch = await workflowApi(event).tasks.dispatchDependencyRun({
+        ...workflowApiProjectMetadata(event, event.params.id),
         mode: taskIds.length > 1 ? "board" : "task",
         targetTaskIds: taskIds,
         traceId: raw["traceId"] ?? undefined,
@@ -221,31 +203,15 @@ export const actions: Actions = {
   },
 
   qaReview: async (event) => {
-    const { params, request, locals } = event;
-    const fd = await request.formData();
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     const taskId = raw["taskId"] ?? raw["id"];
     if (!taskId) return fail(400, { ok: false, mode: "qaReview", message: "taskId is required" });
     const reviewText = raw["reviewText"];
     if (!reviewText) return fail(400, { ok: false, mode: "qaReview", message: "reviewText is required" });
     try {
-      const workflowApi = createWebWorkflowApiCaller(event);
-      if (workflowApi) {
-        const review = await workflowApi.tasks.recordQaReview({
-          ...workflowApiProjectMetadata(event, params.id),
-          taskId,
-          runId: raw["runId"] ?? raw["run"] ?? undefined,
-          traceId: raw["traceId"] ?? undefined,
-          reviewType: raw["reviewType"] === "plan" || raw["reviewType"] === "spec" ? raw["reviewType"] : "code",
-          reviewerAgent: raw["reviewerAgent"] ?? undefined,
-          feedbackAgent: raw["feedbackAgent"] ?? undefined,
-          feedbackModel: raw["feedbackModel"] ?? undefined,
-          reviewText,
-        });
-        return { ok: true, mode: "qaReview", review };
-      }
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const review = await recordTaskQaReview(em, ctx, {
+      const review = await workflowApi(event).tasks.recordQaReview({
+        ...workflowApiProjectMetadata(event, event.params.id),
         taskId,
         runId: raw["runId"] ?? raw["run"] ?? undefined,
         traceId: raw["traceId"] ?? undefined,
@@ -261,3 +227,9 @@ export const actions: Actions = {
     }
   },
 };
+
+function workflowApi(event: Parameters<typeof createWebWorkflowApiCaller>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}
