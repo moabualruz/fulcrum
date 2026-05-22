@@ -1,41 +1,81 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { WorkflowApiError } from "@workflow-coordination/interface/http/workflow-api-client";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-const calls: Array<{ method: string; input: unknown }> = [];
-let historyShouldFail = false;
-let runShouldFail: unknown;
+// The route delegates generated-E2E history and runs to the workflow public
+// API (`POST /workflows/review/generated-e2e/...`). The seam is exercised
+// through a fake `event.fetch` plus `FULCRUM_SERVER_URL` — no `mock.module`,
+// so sibling route suites sharing the shard never inherit a hijacked client.
+const ORG_ID = "org-1";
+const SERVER_URL = "http://127.0.0.1:3210";
+const originalServerUrl = process.env["FULCRUM_SERVER_URL"];
+const originalPublicApiUrl = process.env["FULCRUM_PUBLIC_API_URL"];
 
-mock.module("$lib/server/workflow-api", () => ({
-  webWorkflowApiUrl: () => null,
-  workflowApiProjectMetadata: (_event: unknown, projectId: string) => ({ orgId: "org-1", userId: "user-1", projectId }),
-  createWebWorkflowApiCaller: () => ({
-    reports: {
-      listGeneratedE2eRuns: async (input: unknown) => {
-        calls.push({ method: "reports.listGeneratedE2eRuns", input });
-        if (historyShouldFail) throw new Error("history unavailable");
-        return [{ id: "e2e-1", runner: "bun", status: "passed" }];
-      },
-      runGeneratedE2eRegressionTests: async (input: unknown) => {
-        calls.push({ method: "reports.runGeneratedE2eRegressionTests", input });
-        if (runShouldFail) throw runShouldFail;
-        return { id: "e2e-2", status: "queued" };
-      },
-    },
-  }),
-}));
+interface RecordedCall {
+  method: string;
+  pathname: string;
+  body: Record<string, unknown>;
+}
+
+interface FakeFetchOptions {
+  /** Non-200 history status makes the route fall back to an empty list. */
+  historyStatus?: number;
+  /** Non-200 run status surfaces a `WorkflowApiError` with that status. */
+  runStatus?: number;
+  runBody?: unknown;
+}
+
+function fakeFetch(calls: RecordedCall[], options: FakeFetchOptions = {}): typeof fetch {
+  const historyStatus = options.historyStatus ?? 200;
+  const runStatus = options.runStatus ?? 200;
+
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+
+    if (url.pathname === "/workflows/review/generated-e2e/history" && method === "POST") {
+      calls.push({ method: "reports.listGeneratedE2eRuns", pathname: url.pathname, body });
+      if (historyStatus !== 200) return Response.json({ message: "history unavailable" }, { status: historyStatus });
+      return Response.json([{ id: "e2e-1", runner: "bun", status: "passed" }]);
+    }
+
+    if (url.pathname === "/workflows/review/generated-e2e/run" && method === "POST") {
+      calls.push({ method: "reports.runGeneratedE2eRegressionTests", pathname: url.pathname, body });
+      if (runStatus !== 200) return Response.json(options.runBody ?? { message: "No tests generated" }, { status: runStatus });
+      return Response.json({ id: "e2e-2", status: "queued" });
+    }
+
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
+  }) as typeof fetch;
+}
 
 beforeEach(() => {
-  calls.splice(0, calls.length);
-  historyShouldFail = false;
-  runShouldFail = undefined;
+  process.env["FULCRUM_SERVER_URL"] = SERVER_URL;
+  delete process.env["FULCRUM_PUBLIC_API_URL"];
+});
+
+afterEach(() => {
+  if (originalServerUrl === undefined) delete process.env["FULCRUM_SERVER_URL"];
+  else process.env["FULCRUM_SERVER_URL"] = originalServerUrl;
+  if (originalPublicApiUrl === undefined) delete process.env["FULCRUM_PUBLIC_API_URL"];
+  else process.env["FULCRUM_PUBLIC_API_URL"] = originalPublicApiUrl;
 });
 
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
   for (const [key, value] of Object.entries(data)) fd.set(key, value);
   return new Request("http://localhost/projects/project-1/e2e", { method: "POST", body: fd });
+}
+
+function loadEvent(id: string, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/e2e`);
+  return { params: { id }, url, locals: { orgId: ORG_ID }, request: new Request(url), fetch: fetchImpl };
+}
+
+function actionEvent(id: string, request: Request, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/e2e`);
+  return { params: { id }, url, locals: { orgId: ORG_ID }, request, fetch: fetchImpl };
 }
 
 describe("/projects/[id]/e2e +page.server.ts", () => {
@@ -47,63 +87,51 @@ describe("/projects/[id]/e2e +page.server.ts", () => {
   });
 
   test("load returns generated e2e history from workflow public API", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      params: { id: "project-1" },
-      locals: {},
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(loadEvent("project-1", fakeFetch(calls)) as Parameters<typeof mod.load>[0]);
 
     expect(result).toEqual({ projectId: "project-1", history: [{ id: "e2e-1", runner: "bun", status: "passed" }] });
-    expect(calls).toEqual([
-      { method: "reports.listGeneratedE2eRuns", input: { orgId: "org-1", userId: "user-1", projectId: "project-1", limit: 20 } },
-    ]);
+    expect(calls.map((call) => call.method)).toEqual(["reports.listGeneratedE2eRuns"]);
+    expect(calls[0]!.body).toMatchObject({ projectId: "project-1", limit: 20 });
   });
 
   test("load returns empty history when workflow history fails", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    historyShouldFail = true;
-    const result = await mod.load({
-      params: { id: "project-1" },
-      locals: {},
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(
+      loadEvent("project-1", fakeFetch(calls, { historyStatus: 500 })) as Parameters<typeof mod.load>[0],
+    );
 
     expect(result).toEqual({ projectId: "project-1", history: [] });
-    expect(calls).toEqual([
-      { method: "reports.listGeneratedE2eRuns", input: { orgId: "org-1", userId: "user-1", projectId: "project-1", limit: 20 } },
-    ]);
+    expect(calls.map((call) => call.method)).toEqual(["reports.listGeneratedE2eRuns"]);
   });
 
   test("runE2e delegates runner, trace, and file filters to workflow public API", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.actions.runE2e({
-      params: { id: "project-1" },
-      locals: {},
-      request: form({ runner: "playwright", traceId: "trace-1", testFiles: "a.spec.ts, b.spec.ts" }),
-    } as Parameters<typeof mod.actions.runE2e>[0]);
+    const result = await mod.actions.runE2e(
+      actionEvent("project-1", form({ runner: "playwright", traceId: "trace-1", testFiles: "a.spec.ts, b.spec.ts" }), fakeFetch(calls)) as Parameters<
+        typeof mod.actions.runE2e
+      >[0],
+    );
 
     expect(result).toEqual({ ok: true, mode: "runE2e", result: { id: "e2e-2", status: "queued" } });
-    expect(calls).toEqual([
-      {
-        method: "reports.runGeneratedE2eRegressionTests",
-        input: {
-          orgId: "org-1",
-          userId: "user-1",
-          projectId: "project-1",
-          runner: "playwright",
-          traceId: "trace-1",
-          testFiles: ["a.spec.ts", "b.spec.ts"],
-        },
-      },
-    ]);
+    expect(calls.map((call) => call.method)).toEqual(["reports.runGeneratedE2eRegressionTests"]);
+    expect(calls[0]!.body).toMatchObject({
+      projectId: "project-1",
+      runner: "playwright",
+      traceId: "trace-1",
+      testFiles: ["a.spec.ts", "b.spec.ts"],
+    });
   });
 
   test("runE2e validates runner before delegating", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.actions.runE2e({
-      params: { id: "project-1" },
-      locals: {},
-      request: form({ runner: "vitest" }),
-    } as Parameters<typeof mod.actions.runE2e>[0]) as { status: number; data: unknown };
+    const result = await mod.actions.runE2e(
+      actionEvent("project-1", form({ runner: "vitest" }), fakeFetch(calls)) as Parameters<typeof mod.actions.runE2e>[0],
+    ) as { status: number; data: unknown };
 
     expect(result.status).toBe(400);
     expect(result.data).toEqual({ ok: false, error: "runner must be bun or playwright" });
@@ -111,13 +139,15 @@ describe("/projects/[id]/e2e +page.server.ts", () => {
   });
 
   test("runE2e preserves public API error status", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
-    runShouldFail = new WorkflowApiError("No tests generated", 422);
-    const result = await mod.actions.runE2e({
-      params: { id: "project-1" },
-      locals: {},
-      request: form({ runner: "bun" }),
-    } as Parameters<typeof mod.actions.runE2e>[0]) as { status: number; data: unknown };
+    const result = await mod.actions.runE2e(
+      actionEvent(
+        "project-1",
+        form({ runner: "bun" }),
+        fakeFetch(calls, { runStatus: 422, runBody: { message: "No tests generated" } }),
+      ) as Parameters<typeof mod.actions.runE2e>[0],
+    ) as { status: number; data: unknown };
 
     expect(result.status).toBe(422);
     expect(result.data).toEqual({ ok: false, error: "No tests generated" });

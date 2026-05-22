@@ -1,9 +1,91 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-const calls: Array<{ method: string; input: unknown }> = [];
-let projectPageShouldFail = false;
+// The route delegates project report reads to the report public API
+// (`GET /api/v1/reports/projects/:id`) and the QA/review-workbench actions to
+// the workflow public API (`POST /workflows/review/...`). Both seams are
+// exercised through a fake `event.fetch` plus `FULCRUM_SERVER_URL` — no
+// `mock.module`, so sibling route suites sharing the shard never inherit a
+// hijacked client.
+const ORG_ID = "org-1";
+const SERVER_URL = "http://127.0.0.1:3210";
+const originalServerUrl = process.env["FULCRUM_SERVER_URL"];
+const originalPublicApiUrl = process.env["FULCRUM_PUBLIC_API_URL"];
+
+interface RecordedCall {
+  method: string;
+  pathname: string;
+  search: Record<string, string>;
+  body: Record<string, unknown> | undefined;
+}
+
+// Maps a workflow public-API pathname to the route-facing method name + the
+// canned result shape the route consumes.
+const WORKFLOW_ROUTES: Record<string, { method: string; result: Record<string, unknown> }> = {
+  "/workflows/review/final-qa/report": { method: "reports.finalQa", result: { status: "passed" } },
+  "/workflows/review/final-qa/feedback-gate": { method: "reports.finalQaFeedbackGate", result: { readyForUserAcceptance: true } },
+  "/workflows/review/uat-code-review/handoff": { method: "reports.uatCodeReviewHandoff", result: { status: "ready" } },
+  "/workflows/review/uat-code-review/decision/record": { method: "reports.recordUatCodeReviewDecision", result: { status: "approved" } },
+  "/workflows/review/uat-code-review/decision/apply-configured": { method: "reports.applyConfiguredUatCodeReviewDecision", result: { status: "applied" } },
+  "/workflows/review/generated-e2e/run": { method: "reports.runGeneratedE2eRegressionTests", result: { status: "passed" } },
+  "/workflows/review/workbench/preview": { method: "reports.reviewWorkbench", result: { files: [] } },
+  "/workflows/review/workbench/session/save": { method: "reports.saveReviewWorkbenchSession", result: { reviewId: "review-1", status: "saved" } },
+  "/workflows/review/workbench/session/load": { method: "reports.loadReviewWorkbenchSession", result: { reviewId: "review-1", status: "loaded" } },
+  "/workflows/review/workbench/session/annotate": { method: "reports.appendReviewWorkbenchAnnotation", result: { reviewId: "review-1", status: "annotated" } },
+};
+
+interface FakeFetchOptions {
+  /** Non-200 makes `reports.projectPage` reject with the supplied message. */
+  projectPageStatus?: number;
+}
+
+function fakeFetch(calls: RecordedCall[], options: FakeFetchOptions = {}): typeof fetch {
+  const projectPageStatus = options.projectPageStatus ?? 200;
+
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined;
+    const search = Object.fromEntries(url.searchParams.entries());
+
+    // Report public API: project reports page.
+    if (/^\/api\/v1\/reports\/projects\/[^/]+$/.test(url.pathname) && method === "GET") {
+      calls.push({ method: "reports.projectPage", pathname: url.pathname, search, body });
+      if (projectPageStatus !== 200) {
+        return Response.json({ message: "Project not found" }, { status: projectPageStatus });
+      }
+      const projectId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+      return Response.json({
+        project: { id: projectId, name: "Project" },
+        reports: { sprints: [], burndown: [], velocity: [], cycleTime: { bins: [], p50: 0, p90: 0 }, throughput: [], wip: [], cfd: [] },
+        selectedSprintId: search["sprintId"] ?? null,
+        orgId: ORG_ID,
+      });
+    }
+
+    // Workflow public API.
+    const workflowRoute = WORKFLOW_ROUTES[url.pathname];
+    if (workflowRoute && method === "POST") {
+      calls.push({ method: workflowRoute.method, pathname: url.pathname, search, body });
+      return Response.json({ projectId: (body as { projectId?: string }).projectId, ...workflowRoute.result });
+    }
+
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
+  }) as typeof fetch;
+}
+
+beforeEach(() => {
+  process.env["FULCRUM_SERVER_URL"] = SERVER_URL;
+  delete process.env["FULCRUM_PUBLIC_API_URL"];
+});
+
+afterEach(() => {
+  if (originalServerUrl === undefined) delete process.env["FULCRUM_SERVER_URL"];
+  else process.env["FULCRUM_SERVER_URL"] = originalServerUrl;
+  if (originalPublicApiUrl === undefined) delete process.env["FULCRUM_PUBLIC_API_URL"];
+  else process.env["FULCRUM_PUBLIC_API_URL"] = originalPublicApiUrl;
+});
 
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
@@ -11,52 +93,15 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/reports", { method: "POST", body: fd });
 }
 
-mock.module("$lib/server/report-api", () => ({
-  createReportApiForEvent: () => ({
-    reports: {
-      projectPage: async (input: unknown) => {
-        calls.push({ method: "reports.projectPage", input });
-        if (projectPageShouldFail) throw new Error("Project not found");
-        const projectId = (input as { projectId: string }).projectId;
-        return {
-          project: { id: projectId, name: "Project" },
-          reports: { sprints: [], burndown: [], velocity: [], cycleTime: { bins: [], p50: 0, p90: 0 }, throughput: [], wip: [], cfd: [] },
-          selectedSprintId: (input as { sprintId?: string }).sprintId ?? null,
-          orgId: "org-1",
-        };
-      },
-    },
-  }),
-}));
-
-mock.module("$lib/server/workflow-api", () => ({
-  webWorkflowApiUrl: () => null,
-  workflowApiProjectMetadata: (_event: unknown, projectId: string) => ({ orgId: "org-1", userId: "user-1", projectId }),
-  createWebWorkflowApiCaller: () => ({
-    reports: {
-      finalQa: async (input: unknown) => record("reports.finalQa", input, { status: "passed" }),
-      finalQaFeedbackGate: async (input: unknown) => record("reports.finalQaFeedbackGate", input, { readyForUserAcceptance: true }),
-      uatCodeReviewHandoff: async (input: unknown) => record("reports.uatCodeReviewHandoff", input, { status: "ready" }),
-      recordUatCodeReviewDecision: async (input: unknown) => record("reports.recordUatCodeReviewDecision", input, { status: "approved" }),
-      applyConfiguredUatCodeReviewDecision: async (input: unknown) => record("reports.applyConfiguredUatCodeReviewDecision", input, { status: "applied" }),
-      runGeneratedE2eRegressionTests: async (input: unknown) => record("reports.runGeneratedE2eRegressionTests", input, { status: "passed" }),
-      reviewWorkbench: async (input: unknown) => record("reports.reviewWorkbench", input, { files: [] }),
-      saveReviewWorkbenchSession: async (input: unknown) => record("reports.saveReviewWorkbenchSession", input, { reviewId: "review-1", status: "saved" }),
-      loadReviewWorkbenchSession: async (input: unknown) => record("reports.loadReviewWorkbenchSession", input, { reviewId: "review-1", status: "loaded" }),
-      appendReviewWorkbenchAnnotation: async (input: unknown) => record("reports.appendReviewWorkbenchAnnotation", input, { reviewId: "review-1", status: "annotated" }),
-    },
-  }),
-}));
-
-function record(method: string, input: unknown, result: Record<string, unknown>) {
-  calls.push({ method, input });
-  return { projectId: (input as { projectId?: string }).projectId, ...result };
+function loadEvent(id: string, query: string, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/reports${query}`);
+  return { params: { id }, url, locals: { orgId: ORG_ID }, request: new Request(url), fetch: fetchImpl };
 }
 
-beforeEach(() => {
-  calls.splice(0, calls.length);
-  projectPageShouldFail = false;
-});
+function actionEvent(id: string, request: Request, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/reports`);
+  return { params: { id }, url, locals: { orgId: ORG_ID }, request, fetch: fetchImpl };
+}
 
 describe("/projects/[id]/reports +page.server.ts", () => {
   test("server route uses report and workflow public APIs instead of application scope", () => {
@@ -69,39 +114,38 @@ describe("/projects/[id]/reports +page.server.ts", () => {
   });
 
   test("load maps project reports and preserves sprint filter delegation", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      params: { id: "project-1" },
-      url: new URL("http://localhost/projects/project-1/reports?sprint=sprint-1"),
-      locals: {},
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(loadEvent("project-1", "?sprint=sprint-1", fakeFetch(calls)) as Parameters<typeof mod.load>[0]);
 
     expect(result.project.id).toBe("project-1");
     expect(result.selectedSprintId).toBe("sprint-1");
-    expect(calls).toEqual([{ method: "reports.projectPage", input: { projectId: "project-1", sprintId: "sprint-1" } }]);
+    expect(calls.map((call) => call.method)).toEqual(["reports.projectPage"]);
+    expect(calls[0]!.pathname).toBe("/api/v1/reports/projects/project-1");
+    expect(calls[0]!.search).toMatchObject({ sprintId: "sprint-1" });
   });
 
   test("load propagates public API failure", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    projectPageShouldFail = true;
-    await expect(mod.load({
-      params: { id: "missing" },
-      url: new URL("http://localhost/projects/missing/reports"),
-      locals: {},
-    } as Parameters<typeof mod.load>[0])).rejects.toThrow("Project not found");
-    expect(calls).toEqual([{ method: "reports.projectPage", input: { projectId: "missing", sprintId: undefined } }]);
+    await expect(
+      mod.load(loadEvent("missing", "", fakeFetch(calls, { projectPageStatus: 404 })) as Parameters<typeof mod.load>[0]),
+    ).rejects.toThrow("Project not found");
+    expect(calls.map((call) => call.method)).toEqual(["reports.projectPage"]);
+    expect(calls[0]!.pathname).toBe("/api/v1/reports/projects/missing");
   });
 
   test("report workflow actions delegate through workflow public API", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const base = { params: { id: "project-1" }, locals: {} };
+    const fetchImpl = fakeFetch(calls);
 
-    await mod.actions.finalQa({ ...base, request: form({ traceId: "trace-1", taskIds: "task-1,task-2" }) } as Parameters<typeof mod.actions.finalQa>[0]);
-    await mod.actions.finalQaGate({ ...base, request: form({ maxIterations: "3", copyToWorktree: "a,b" }) } as Parameters<typeof mod.actions.finalQaGate>[0]);
-    await mod.actions.uatHandoff({ ...base, request: form({ traceId: "trace-2" }) } as Parameters<typeof mod.actions.uatHandoff>[0]);
-    await mod.actions.uatDecision({ ...base, request: form({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" }) } as Parameters<typeof mod.actions.uatDecision>[0]);
-    await mod.actions.autoDecision({ ...base, request: form({ traceId: "trace-3" }) } as Parameters<typeof mod.actions.autoDecision>[0]);
-    await mod.actions.e2eRun({ ...base, request: form({ runner: "bun", planOnly: "1" }) } as Parameters<typeof mod.actions.e2eRun>[0]);
+    await mod.actions.finalQa(actionEvent("project-1", form({ traceId: "trace-1", taskIds: "task-1,task-2" }), fetchImpl) as Parameters<typeof mod.actions.finalQa>[0]);
+    await mod.actions.finalQaGate(actionEvent("project-1", form({ maxIterations: "3", copyToWorktree: "a,b" }), fetchImpl) as Parameters<typeof mod.actions.finalQaGate>[0]);
+    await mod.actions.uatHandoff(actionEvent("project-1", form({ traceId: "trace-2" }), fetchImpl) as Parameters<typeof mod.actions.uatHandoff>[0]);
+    await mod.actions.uatDecision(actionEvent("project-1", form({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" }), fetchImpl) as Parameters<typeof mod.actions.uatDecision>[0]);
+    await mod.actions.autoDecision(actionEvent("project-1", form({ traceId: "trace-3" }), fetchImpl) as Parameters<typeof mod.actions.autoDecision>[0]);
+    await mod.actions.e2eRun(actionEvent("project-1", form({ runner: "bun", planOnly: "1" }), fetchImpl) as Parameters<typeof mod.actions.e2eRun>[0]);
 
     expect(calls.map((call) => call.method)).toEqual([
       "reports.finalQa",
@@ -111,23 +155,23 @@ describe("/projects/[id]/reports +page.server.ts", () => {
       "reports.applyConfiguredUatCodeReviewDecision",
       "reports.runGeneratedE2eRegressionTests",
     ]);
-    expect(calls[0].input).toMatchObject({ projectId: "project-1", traceId: "trace-1", taskIds: ["task-1", "task-2"] });
-    expect(calls[1].input).toMatchObject({ maxIterations: 3, copyToWorktree: ["a", "b"] });
-    expect(calls[3].input).toMatchObject({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" });
-    expect(calls[5].input).toMatchObject({ runner: "bun", planOnly: true });
+    expect(calls[0]!.body).toMatchObject({ projectId: "project-1", traceId: "trace-1", taskIds: ["task-1", "task-2"] });
+    expect(calls[1]!.body).toMatchObject({ maxIterations: 3, copyToWorktree: ["a", "b"] });
+    expect(calls[3]!.body).toMatchObject({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" });
+    expect(calls[5]!.body).toMatchObject({ runner: "bun", planOnly: true });
   });
 
   test("review workbench actions delegate through workflow public API", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const base = { params: { id: "project-1" }, locals: {} };
+    const fetchImpl = fakeFetch(calls);
 
-    await mod.actions.reviewWorkbench({ ...base, request: form({ reviewId: "review-1", filesJson: "[]", annotationsJson: "[]" }) } as Parameters<typeof mod.actions.reviewWorkbench>[0]);
-    await mod.actions.reviewSessionSave({ ...base, request: form({ reviewId: "review-1", filesJson: "[]", annotationsJson: "[]" }) } as Parameters<typeof mod.actions.reviewSessionSave>[0]);
-    await mod.actions.reviewSessionLoad({ ...base, request: form({ reviewId: "review-1" }) } as Parameters<typeof mod.actions.reviewSessionLoad>[0]);
-    await mod.actions.reviewSessionAnnotate({
-      ...base,
-      request: form({ reviewId: "review-1", filePath: "src/app.ts", lineStart: "1", lineEnd: "1", annotationText: "fix" }),
-    } as Parameters<typeof mod.actions.reviewSessionAnnotate>[0]);
+    await mod.actions.reviewWorkbench(actionEvent("project-1", form({ reviewId: "review-1", filesJson: "[]", annotationsJson: "[]" }), fetchImpl) as Parameters<typeof mod.actions.reviewWorkbench>[0]);
+    await mod.actions.reviewSessionSave(actionEvent("project-1", form({ reviewId: "review-1", filesJson: "[]", annotationsJson: "[]" }), fetchImpl) as Parameters<typeof mod.actions.reviewSessionSave>[0]);
+    await mod.actions.reviewSessionLoad(actionEvent("project-1", form({ reviewId: "review-1" }), fetchImpl) as Parameters<typeof mod.actions.reviewSessionLoad>[0]);
+    await mod.actions.reviewSessionAnnotate(
+      actionEvent("project-1", form({ reviewId: "review-1", filePath: "src/app.ts", lineStart: "1", lineEnd: "1", annotationText: "fix" }), fetchImpl) as Parameters<typeof mod.actions.reviewSessionAnnotate>[0],
+    );
 
     expect(calls.map((call) => call.method)).toEqual([
       "reports.reviewWorkbench",
@@ -135,7 +179,7 @@ describe("/projects/[id]/reports +page.server.ts", () => {
       "reports.loadReviewWorkbenchSession",
       "reports.appendReviewWorkbenchAnnotation",
     ]);
-    expect(calls[0].input).toMatchObject({ projectId: "project-1", reviewId: "review-1", files: [], annotations: [] });
-    expect(calls[3].input).toMatchObject({ projectId: "project-1", reviewId: "review-1", filePath: "src/app.ts", lineStart: 1, lineEnd: 1, text: "fix" });
+    expect(calls[0]!.body).toMatchObject({ projectId: "project-1", reviewId: "review-1", files: [], annotations: [] });
+    expect(calls[3]!.body).toMatchObject({ projectId: "project-1", reviewId: "review-1", filePath: "src/app.ts", lineStart: 1, lineEnd: 1, text: "fix" });
   });
 });
