@@ -1,45 +1,52 @@
-import { afterAll, beforeAll, describe, expect, test, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { OrchestrationDashboardData } from "$lib/server/orchestration";
-import { orchestrationMock } from "$lib/test/orchestration-mock";
-import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
 
-// `mock.module` is process-global; these seams answer only while this suite
-// runs and otherwise delegate to the real implementations for foreign suites.
-let suiteActive = false;
-let suiteDispatches: unknown[] = [];
-let suiteProjects: unknown[] = [];
+const calls: Array<{ method: string; input?: Record<string, unknown> }> = [];
+let dispatches: unknown[] = [];
+let projects: unknown[] = [];
+let dashboardStatus = {
+  lastTickAt: null,
+  workerConnected: false,
+  concurrencyUsed: 0,
+  concurrencyMax: 4,
+  lastSyncDate: null,
+};
 
-mock.module("$lib/server/request-service-scope", () =>
-  requestServiceScopeMock((_locals, projectId) =>
-    suiteActive
-      ? { em: { kind: "mock-em" }, ctx: { orgId: "org1", userId: "user1", projectId: projectId ?? null } }
-      : null,
-  ),
-);
-
-// `$lib/server/orchestration` is a barrel; `orchestrationMock` keeps a complete
-// export set (real `loadOrchestrationConfig` / `upsertOrchestrationConfig` / …)
-// and only overrides the two functions this suite drives, while it is active.
-mock.module("$lib/server/orchestration", () =>
-  orchestrationMock(() =>
-    suiteActive
-      ? {
-          loadOrchestrationDashboard: async (...args: unknown[]) => {
-            const projectId = args[2] as string | undefined;
-            return {
-              ...EMPTY_DASHBOARD,
-              dispatches: projectId
-                ? (suiteDispatches as Array<{ project_id: string | null }>).filter(
-                    (d) => d.project_id === projectId,
-                  )
-                : suiteDispatches,
-            };
-          },
-          listOrchestrationProjectOptions: async () => suiteProjects,
-        }
-      : null,
-  ),
-);
+mock.module("$lib/server/orchestration-config-api", () => ({
+  createOrchestrationConfigApiForEvent: () => ({
+    orchestration: {
+      dashboard: async (input: Record<string, unknown>) => {
+        calls.push({ method: "dashboard", input });
+        const projectId = input.projectId as string | undefined;
+        return {
+          status: dashboardStatus,
+          dispatches: projectId
+            ? (dispatches as Array<{ project_id: string | null }>).filter((dispatch) => dispatch.project_id === projectId)
+            : dispatches,
+          retryQueue: [],
+        };
+      },
+      projects: async () => {
+        calls.push({ method: "projects" });
+        return projects;
+      },
+    },
+    runs: {
+      dispatch: async (input: Record<string, unknown>) => {
+        calls.push({ method: "runs.dispatch", input });
+        return { id: "run-dispatched", status: "queued" };
+      },
+      cancel: async (input: Record<string, unknown>) => {
+        calls.push({ method: "runs.cancel", input });
+        return { ok: true };
+      },
+      retry: async (input: Record<string, unknown>) => {
+        calls.push({ method: "runs.retry", input });
+        return { id: input.id };
+      },
+    },
+  }),
+}));
 
 function mockUrl(params: Record<string, string> = {}): URL {
   const u = new URL("http://localhost:5173/orchestration");
@@ -53,65 +60,45 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-const EMPTY_DASHBOARD: OrchestrationDashboardData = {
-  status: {
-    lastTickAt: null,
-    workerConnected: false,
-    concurrencyUsed: 0,
-    concurrencyMax: 4,
-    lastSyncDate: null,
-  },
-  dispatches: [],
-  retryQueue: [],
-};
-
-function mockDb(dispatches: unknown[] = [], projects: unknown[] = []) {
-  // The route resolves its data through `requestServiceScope` and
-  // `$lib/server/orchestration`: both stubbed at the top of this file via the
-  // shared complete-export factories. Here we only seed the suite-scoped data
-  // the orchestration dashboard mock reads.
-  suiteDispatches = dispatches;
-  suiteProjects = projects;
-  mock.module("$lib/server/runs", () => ({
-    dispatchRunAction: async () => ({ id: "run-dispatched" }),
-    cancelRunAction: async () => {},
-    retryRunAction: async () => {},
-  }));
-  // `$lib/feedback/action-result` is a pure module; the route's `actionOk`
-  // result is never asserted by this load()-only suite. Mocking it here froze
-  // a process-global, wrong-shaped (`success` vs `ok`) export set that broke
-  // every sibling suite importing the real module: left unmocked on purpose.
-  return { projects };
+function event(data: Record<string, string> = {}, url: URL = mockUrl()) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return {
+    url,
+    locals: { activeProjectId: "project-1" },
+    request: new Request(url, { method: "POST", body: fd }),
+    fetch,
+  };
 }
 
-describe("/orchestration +page.server.ts load()", () => {
-  beforeAll(() => {
-    suiteActive = true;
-  });
-  afterAll(() => {
-    suiteActive = false;
-  });
+describe("/orchestration +page.server.ts", () => {
   beforeEach(() => {
-    mockDb();
+    calls.splice(0, calls.length);
+    dispatches = [];
+    projects = [];
+    dashboardStatus = {
+      lastTickAt: null,
+      workerConnected: false,
+      concurrencyUsed: 0,
+      concurrencyMax: 4,
+      lastSyncDate: null,
+    };
   });
 
   test("returns dashboard data for empty DB", async () => {
-    mockDb([], []);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      url: mockUrl(),
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event({}, mockUrl()) as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<OrchestrationDashboardData & { projects: unknown[] }>(result);
     expect(payload.status.concurrencyUsed).toBe(0);
     expect(payload.status.concurrencyMax).toBe(4);
     expect(payload.dispatches).toEqual([]);
     expect(payload.retryQueue).toEqual([]);
     expect(payload.projects).toEqual([]);
+    expect(calls).toEqual([{ method: "dashboard", input: { projectId: undefined } }, { method: "projects" }]);
   });
 
   test("returns dispatches with seeded runs", async () => {
-    const dispatches = [
+    dispatches = [
       {
         id: "r1",
         agent: "claude",
@@ -124,21 +111,9 @@ describe("/orchestration +page.server.ts load()", () => {
         project_id: null,
       },
     ];
-    mockDb(dispatches, []);
-    mock.module("$lib/server/orchestration", () => ({
-      loadOrchestrationDashboard: async () => ({
-        ...EMPTY_DASHBOARD,
-        status: { ...EMPTY_DASHBOARD.status, concurrencyUsed: 1, workerConnected: true },
-        dispatches,
-      }),
-      listOrchestrationProjectOptions: async () => [],
-      SYMPHONY_COLORS: {},
-    }));
+    dashboardStatus = { ...dashboardStatus, concurrencyUsed: 1, workerConnected: true };
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load({
-      url: mockUrl(),
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event({}, mockUrl()) as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<OrchestrationDashboardData & { projects: unknown[] }>(result);
     expect(payload.dispatches).toHaveLength(1);
     expect(payload.dispatches[0]?.agent).toBe("claude");
@@ -147,7 +122,7 @@ describe("/orchestration +page.server.ts load()", () => {
   });
 
   test("dispatches include orchestration_state", async () => {
-    const dispatches = [
+    dispatches = [
       {
         id: "r2",
         agent: "codex",
@@ -160,19 +135,8 @@ describe("/orchestration +page.server.ts load()", () => {
         project_id: null,
       },
     ];
-    mock.module("$lib/server/orchestration", () => ({
-      loadOrchestrationDashboard: async () => ({
-        ...EMPTY_DASHBOARD,
-        dispatches,
-      }),
-      listOrchestrationProjectOptions: async () => [],
-      SYMPHONY_COLORS: {},
-    }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const result = await mod.load({
-      url: mockUrl(),
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event({}, mockUrl()) as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<OrchestrationDashboardData & { projects: unknown[] }>(result);
     expect(payload.dispatches[0]?.orchestration_state).toBe("claimed");
     expect(payload.dispatches[0]?.claimed_by).toBeNull();
@@ -180,35 +144,32 @@ describe("/orchestration +page.server.ts load()", () => {
 
   test("filter by project narrows dispatches", async () => {
     const proj1 = "proj-aaa";
-    const allDispatches = [
-      { id: "r3", agent: "claude", status: "queued", symphony_state: null,
-        orchestration_state: null, claimed_by: null,
-        started_at: "2026-05-01T00:00:00Z", ended_at: null, project_id: proj1 },
-      { id: "r4", agent: "codex", status: "queued", symphony_state: null,
-        orchestration_state: null, claimed_by: null,
-        started_at: "2026-05-01T00:00:00Z", ended_at: null, project_id: null },
+    dispatches = [
+      { id: "r3", agent: "claude", status: "queued", symphony_state: null, orchestration_state: null, claimed_by: null, started_at: "2026-05-01T00:00:00Z", ended_at: null, project_id: proj1 },
+      { id: "r4", agent: "codex", status: "queued", symphony_state: null, orchestration_state: null, claimed_by: null, started_at: "2026-05-01T00:00:00Z", ended_at: null, project_id: null },
     ];
-    mock.module("$lib/server/orchestration", () => ({
-      loadOrchestrationDashboard: async (
-        _em: unknown,
-        _ctx: unknown,
-        projectId?: string,
-      ) => ({
-        ...EMPTY_DASHBOARD,
-        dispatches: projectId
-          ? allDispatches.filter((d) => d.project_id === projectId)
-          : allDispatches,
-      }),
-      listOrchestrationProjectOptions: async () => [],
-      SYMPHONY_COLORS: {},
-    }));
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    const result = await mod.load({
-      url: mockUrl({ project: proj1 }),
-      locals: { activeProjectId: null },
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event({}, mockUrl({ project: proj1 })) as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<OrchestrationDashboardData & { projects: unknown[] }>(result);
     expect(payload.dispatches).toHaveLength(1);
     expect(payload.dispatches[0]?.agent).toBe("claude");
+    expect(calls[0]).toEqual({ method: "dashboard", input: { projectId: proj1 } });
+  });
+
+  test("dispatch, cancel, and retry actions delegate to public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
+    const dispatch = await mod.actions.dispatch(
+      event({ task_id: "task-1", agent: "codex" }) as Parameters<typeof mod.actions.dispatch>[0],
+    );
+    const cancel = await mod.actions.cancel(event({ run_id: "run-1" }) as Parameters<typeof mod.actions.cancel>[0]);
+    const retry = await mod.actions.retry(event({ run_id: "run-1" }) as Parameters<typeof mod.actions.retry>[0]);
+    expect(dispatch).toEqual({ ok: true, message: "Dispatched run run-dispatched (queued)" });
+    expect(cancel).toEqual({ ok: true, message: "Run cancelled" });
+    expect(retry).toEqual({ ok: true, message: "Run queued for retry" });
+    expect(calls).toEqual([
+      { method: "runs.dispatch", input: { taskId: "task-1", agent: "codex", projectId: "project-1" } },
+      { method: "runs.cancel", input: { id: "run-1" } },
+      { method: "runs.retry", input: { id: "run-1" } },
+    ]);
   });
 });
