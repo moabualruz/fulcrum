@@ -44,7 +44,7 @@
 </script>
 
 <svelte:head>
-	<title>Wave 0a Foundation Tokens</title>
+	<title>Design System Token Specimen</title>
 </svelte:head>
 
 <main
@@ -56,7 +56,7 @@
 	<section class="mx-auto flex max-w-6xl flex-col gap-6">
 		<header class="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
 			<div class="max-w-3xl">
-				<p class="text-xs font-medium uppercase text-fg-muted">Wave 0a foundation</p>
+				<p class="text-xs font-medium uppercase text-fg-muted">Design system foundation</p>
 				<h1 class="mt-2 text-2xl font-semibold text-fg">Color token specimen</h1>
 				<p class="mt-2 text-sm text-fg-subtle">
 					OKLCH semantic roles from DESIGN.md, mirrored through Tailwind theme variables and runtime mode switching.

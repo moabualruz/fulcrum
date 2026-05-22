@@ -21,6 +21,7 @@ const BAN_RULES: BanRule[] = [
   { name: "status-synonym", pattern: /\b(?:In Flight|WIP|Doing|Stuck|Done!)\b/, reason: "COPY.md §6 locks status vocabulary." },
   { name: "generic-error", pattern: /\bSomething went wrong\b|\bOops!\b|\bPlease try again\b|\bContact support\b/i, reason: "COPY.md §3 requires action-specific recovery copy." },
   { name: "first-person-plural", pattern: /\bWe (?:couldn't|can't|cannot|could not)\b/i, reason: "COPY.md §1 bans first-person plural recovery copy." },
+  { name: "phase-provenance", pattern: /\b(?:wave(?:[-\s]?\d+[a-z]?)?|phase)\b/i, reason: "COPY.md §1 and AGENTS.md require responsibility/value/behavior names instead of phase or plan-provenance copy." },
 ];
 
 const SOURCE_ROOTS = [
@@ -265,6 +266,12 @@ function allowed(candidate: Candidate, rule: BanRule): boolean {
     return true;
   }
 
+  if (rule.name === "phase-provenance") {
+    if (source !== "source" || !/^apps\/web\/src\/routes\/.*\.svelte$/.test(file)) return true;
+    if (origin !== "svelte-text" && isMachineToken(text)) return true;
+    if (/=>|=|\{|\}/.test(text)) return true;
+  }
+
   // The ui-kit status badge exports BANNED_STATUS_SYNONYMS so tests and
   // fixtures can assert those labels never render.
   if (isStatusBanlistFixture(candidate, rule)) return true;
@@ -315,6 +322,19 @@ function runSelfTest(): void {
     }
     if (!findings.some((finding) => finding.rule.name === "protocol-chrome")) {
       throw new Error("self-test failed: injected visible acp protocol label was not detected");
+    }
+
+    const provenanceFindings = scan([
+      {
+        file: "apps/web/src/routes/copy-banlist-self-test/+page.svelte",
+        line: 1,
+        text: "Wave 0a foundation",
+        source: "source",
+        origin: "svelte-text",
+      },
+    ]);
+    if (!provenanceFindings.some((finding) => finding.rule.name === "phase-provenance")) {
+      throw new Error("self-test failed: injected visible phase provenance copy was not detected");
     }
 
     const statusFixture = resolve(
