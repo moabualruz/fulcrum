@@ -498,7 +498,7 @@ export const CURRENT_ROUTE_COVERAGE = {
 	"views-custom-fields": { classification: "legacy-map", stage: "build", reason: "legacy custom-fields route resolves under Build" },
 	"watch-list": { classification: "legacy-map", stage: "build", reason: "legacy watch list route resolves under Build" },
 	"design-tokens": { classification: "internal", stage: null, reason: "internal design-system token reference route, not product navigation" },
-	"mkh": { classification: "canonical-current", stage: null, reason: "canonical workspace route segment — hosts /<ws>/projects/<projId>/<stage> project-scoped routing" },
+	"mkh": { classification: "canonical-current", stage: null, reason: "canonical workspace route segment that hosts /<ws>/projects/<projId>/<stage> project-scoped routing" },
 	"workspace": { classification: "deferred/kept-with-reason", stage: null, reason: "workspace-scoped survivor kept outside project WorkflowStage scope until portfolio routing PRD owns it" },
 } as const satisfies Readonly<Record<string, CurrentRouteCoverageEntry>>;
 

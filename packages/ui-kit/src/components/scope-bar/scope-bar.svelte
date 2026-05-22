@@ -58,6 +58,7 @@
 
 <header
 	bind:this={ref}
+	role="banner"
 	aria-label="Scope bar"
 	data-slot="scope-bar"
 	data-scope-bar=""

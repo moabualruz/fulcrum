@@ -53,6 +53,7 @@
 
 <footer
 	bind:this={ref}
+	role="contentinfo"
 	aria-label="Status footer"
 	data-slot="status-footer"
 	data-footer-mode={mode}
