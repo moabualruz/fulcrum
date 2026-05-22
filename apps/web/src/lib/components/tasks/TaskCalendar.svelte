@@ -1,7 +1,7 @@
 <script lang="ts">
   import { dndzone } from "svelte-dnd-action";
   import type { BoardTask } from "$lib/product-queries";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     addMonths,
     applyCalendarReschedule,

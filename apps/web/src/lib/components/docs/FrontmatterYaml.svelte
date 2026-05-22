@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import {
 		dumpFrontmatterYaml,
 		parseFrontmatterYaml,

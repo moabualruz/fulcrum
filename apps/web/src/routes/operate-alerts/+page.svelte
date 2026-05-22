@@ -40,7 +40,7 @@
     StatusBadge,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   /** OD `sev-dot` severity classes: `crit` / `warn` / `info`. */
   type AlertSeverity = "crit" | "warn" | "info";

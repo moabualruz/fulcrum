@@ -1,17 +1,11 @@
+import { WorkflowStageValues, type WorkflowStage } from "@fulcrum/shared-dto";
 import type { HTMLAttributes } from "svelte/elements";
 import { cn, type WithElementRef } from "../../utils.js";
 
-/** The six left-to-right WorkflowStages (DESIGN.md §3.1, IA-MAP.md §3). */
-export type WorkflowStage = "capture" | "plan" | "build" | "review" | "ship" | "operate";
+export type { WorkflowStage } from "@fulcrum/shared-dto";
 
-export const WORKFLOW_STAGES: WorkflowStage[] = [
-	"capture",
-	"plan",
-	"build",
-	"review",
-	"ship",
-	"operate",
-];
+/** The six left-to-right WorkflowStages (DESIGN.md §3.1, IA-MAP.md §3). */
+export const WORKFLOW_STAGES = [...WorkflowStageValues] satisfies WorkflowStage[];
 
 const STAGE_LABEL: Record<WorkflowStage, string> = {
 	capture: "Capture",

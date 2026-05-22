@@ -3,7 +3,7 @@
    * AutomationRuleList: CRUD UI for project automation rules.
    */
   import { onMount } from "svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     createAutomationRule,
     deleteAutomationRule,

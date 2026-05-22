@@ -11,7 +11,7 @@
    * endpoint are preserved on the server: only the *list view* moved.
    */
   import { Button } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 </script>
 
 <svelte:head><title>Artifacts moved to Ship | Fulcrum</title></svelte:head>

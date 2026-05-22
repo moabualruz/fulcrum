@@ -8,7 +8,7 @@
 	import FrontmatterForm from "$lib/components/docs/FrontmatterForm.svelte";
 	import FrontmatterYaml from "$lib/components/docs/FrontmatterYaml.svelte";
 	import { buttonVariants } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
 	import FeatureGate from "$lib/components/FeatureGate.svelte";

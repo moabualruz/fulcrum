@@ -4,7 +4,7 @@
   import { TASK_STATUSES, describeStatus } from "$lib/components/board/board-helpers";
   import { matchTaskShortcut } from "$lib/components/task-detail/task-detail-helpers";
   import { buttonVariants } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props {

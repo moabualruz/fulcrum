@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   type Role = "owner" | "admin" | "guest";
   type MemberStatus = "active" | "invited";

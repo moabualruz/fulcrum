@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { dndzone, type DndEvent } from "svelte-dnd-action";
   import TaskCard, { type TaskCardTask } from "./TaskCard.svelte";
   import WipLimitIndicator from "./WipLimitIndicator.svelte";

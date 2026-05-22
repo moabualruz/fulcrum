@@ -17,7 +17,7 @@
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
   import { page } from "$app/state";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: {

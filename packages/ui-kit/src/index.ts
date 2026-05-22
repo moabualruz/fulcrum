@@ -1,3 +1,6 @@
+export { cn } from "./utils.js";
+export type { WithElementRef, WithoutChild, WithoutChildren, WithoutChildrenOrChild } from "./utils.js";
+
 export {
 	Button,
 	buttonVariants,
@@ -371,7 +374,7 @@ export {
 	modeGlyph,
 	modeLabel,
 } from "./components/mode-row/index.js";
-export type { ModeRowProps, ModeRowDensity, WorkflowMode } from "./components/mode-row/index.js";
+export type { ModeRowProps, ModeRowDensity, ModeRowMode, WorkflowMode } from "./components/mode-row/index.js";
 export {
 	TraceChip,
 	TraceBadge,

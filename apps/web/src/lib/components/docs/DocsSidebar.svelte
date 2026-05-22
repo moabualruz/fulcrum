@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { dndzone, type DndEvent } from "svelte-dnd-action";
   import { buttonVariants } from "@fulcrum/ui-kit";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";

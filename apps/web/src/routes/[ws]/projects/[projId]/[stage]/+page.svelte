@@ -4,7 +4,7 @@
 	import type { PageData } from "./$types";
 
 	import { EmptyState, LoadingState, TreeView, type TreeNode } from "@fulcrum/ui-kit";
-	import { WORKFLOW_STAGES, type WorkflowStage, traceFromHash } from "$lib/components/app/route-map.ts";
+	import { WORKFLOW_STAGE_ENTRIES, type WorkflowStage, traceFromHash } from "$lib/components/app/route-map.ts";
 	import CaptureStageWorkbench from "$lib/components/app/CaptureStageWorkbench.svelte";
 	import PlanSessionPage from "../../../../plan-session/+page.svelte";
 	import PlanReviewPage from "../../../../plan-review/+page.svelte";
@@ -47,7 +47,7 @@
 	const traceId = $derived(data.traceId ?? clientTraceId);
 
 	const stageLabel = $derived(
-		WORKFLOW_STAGES.find((entry) => entry.stage === data.stage)?.label ?? data.stage,
+		WORKFLOW_STAGE_ENTRIES.find((entry) => entry.stage === data.stage)?.label ?? data.stage,
 	);
 	const loadingState = $derived(page.url.searchParams.get("state") === "loading");
 	const selectedSub = $derived(data.defaultSub);

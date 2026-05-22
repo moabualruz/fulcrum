@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   type HeaderState = "expanded" | "collapsed";
   const COLLAPSE_THRESHOLD_PX = 50;

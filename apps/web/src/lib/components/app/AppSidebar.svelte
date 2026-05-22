@@ -7,7 +7,7 @@
 		DEFAULT_CANONICAL_WORKSPACE,
 		stageSubroute,
 	} from "$lib/components/app/route-map.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	import {
 		SYSTEM_NAV_ITEMS,

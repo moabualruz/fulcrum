@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Badge, Card, Stat } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { fetchSprintReport, type SprintReportData } from "./sprint-report-api.js";
 
   interface VelocityEntry {

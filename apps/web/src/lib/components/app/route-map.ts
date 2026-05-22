@@ -15,7 +15,7 @@
  *
  * This module is the single source of truth for:
  *
- *  1. `STAGE_ORDER` / `WORKFLOW_STAGES`: the six canonical WorkflowStages.
+ *  1. `STAGE_ORDER` / `WORKFLOW_STAGE_ENTRIES`: the six canonical WorkflowStages.
  *  2. `stageRoute()` / `projectHomeRoute()` / `workspaceHomeRoute()`: builders
  *     that compose canonical IA-MAP §1 paths, so no surface hand-writes a
  *     stage URL.
@@ -56,7 +56,7 @@ export interface WorkflowStageEntry {
 }
 
 /** Ordered stage entries; the StageRail and ScopeBar render this exact list. */
-export const WORKFLOW_STAGES: readonly WorkflowStageEntry[] = [
+export const WORKFLOW_STAGE_ENTRIES: readonly WorkflowStageEntry[] = [
 	{ stage: "capture", label: "Capture" },
 	{ stage: "plan", label: "Plan" },
 	{ stage: "build", label: "Build" },

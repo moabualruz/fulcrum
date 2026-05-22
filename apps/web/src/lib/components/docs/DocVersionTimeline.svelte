@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { Sheet, SheetContent, SheetHeader, SheetTitle, ScrollArea } from "@fulcrum/ui-kit";
   import { buttonVariants } from "@fulcrum/ui-kit";
   import HistoryIcon from "@lucide/svelte/icons/history";

@@ -3,7 +3,7 @@
    * RecurrenceConfig: popover for configuring task recurrence rules.
    */
   import { onMount } from "svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     deleteTaskRecurrenceRule,
     listTaskRecurrenceRules,

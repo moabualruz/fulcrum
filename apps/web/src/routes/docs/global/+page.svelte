@@ -2,7 +2,7 @@
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
 	import { buttonVariants } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import type { DocTreeNode } from "$lib/server/doc-tree";
 
 	interface Props {

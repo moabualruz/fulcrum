@@ -4,7 +4,7 @@
 	import type { ActionData, PageData } from "./$types";
 	import DangerZone from "$lib/components/projects/DangerZone.svelte";
 	import SetActiveButton from "$lib/components/projects/SetActiveButton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;

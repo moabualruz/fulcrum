@@ -51,7 +51,7 @@
     EmptyState,
     ModeRow,
   } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   /** Semver class of a release: drives the OD `.tag-pill` variant. */
   type SemverClass = "maj" | "min" | "patch";

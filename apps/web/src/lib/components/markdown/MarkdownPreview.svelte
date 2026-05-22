@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils";
+  import { cn } from "@fulcrum/ui-kit";
   import { renderMarkdownToHtml } from "./markdown-preview-helpers";
 
   interface Props {

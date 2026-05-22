@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import ReviewWorkbench from "$lib/components/review/ReviewWorkbench.svelte";
 
   interface QaCheck {

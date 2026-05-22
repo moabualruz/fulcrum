@@ -11,6 +11,7 @@
  * (matrix rule 48).
  */
 
+import { AbortReasonValues, type AbortReason } from "@fulcrum/shared-dto";
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 
@@ -22,13 +23,9 @@ export type SessionMenuAction =
 	| "restore"
 	| null;
 
-export const ABORT_REASONS = [
-	"user-cancel",
-	"dangerous-output",
-	"wrong-context",
-	"cost-cap",
-] as const;
-export type AbortReason = (typeof ABORT_REASONS)[number];
+const ABORT_REASONS = AbortReasonValues;
+export { ABORT_REASONS };
+export type { AbortReason } from "@fulcrum/shared-dto";
 
 export interface SessionScreenSession {
 	id: string;

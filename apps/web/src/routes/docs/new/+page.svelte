@@ -12,7 +12,7 @@
 		type TemplatePickerState,
 	} from "$lib/docs/template-picker";
 	import { DOC_TYPE_DESCRIPTIONS, DOC_TYPE_LABELS } from "$lib/docs/doc-templates";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;

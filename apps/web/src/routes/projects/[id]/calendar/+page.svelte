@@ -3,7 +3,7 @@
   import type { PageData } from "./$types";
   import CalendarView from "$lib/components/tasks/CalendarView.svelte";
   import ProjectViewSwitcher from "$lib/components/board/ProjectViewSwitcher.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

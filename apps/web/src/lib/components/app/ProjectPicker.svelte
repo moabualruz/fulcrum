@@ -4,7 +4,7 @@
 	import { goto } from "$app/navigation";
 
 	import { buttonVariants } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	import { selectProject } from "./project-picker-helpers.ts";
 

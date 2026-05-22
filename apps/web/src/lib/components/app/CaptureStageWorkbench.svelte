@@ -33,7 +33,7 @@
 	} from "./capture-stage.ts";
 	import { createStepModeRow, modeAffordanceHooks } from "./mode-affordance-host.ts";
 	import { stageRoute } from "./route-map.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		/** Workspace slug: for the sub-view tab `href`s. */

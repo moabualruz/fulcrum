@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { formatDate } from "@platform-core/interface/localization.ts";
   import type { TaskColumn, TaskSortDirection, TaskViewRow } from "./task-view-types";
   import {

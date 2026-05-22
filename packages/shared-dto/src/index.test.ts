@@ -4,6 +4,8 @@ import {
 	RunIdSchema,
 	RunHandleSchema,
 	RunStatusSchema,
+	AbortReasonSchema,
+	SortDirectionSchema,
 	StatusBadgeSchema,
 	ToolCallEventSchema,
 	TraceIdentitySchema,
@@ -34,6 +36,11 @@ describe("@fulcrum/shared-dto", () => {
 	test("locks workflow stage and mode values", () => {
 		expect(WorkflowStageSchema.options).toEqual(["capture", "plan", "build", "review", "ship", "operate"]);
 		expect(WorkflowModeSchema.options).toEqual(["manual", "play", "discuss", "assist"]);
+	});
+
+	test("locks session and sorting vocabularies", () => {
+		expect(AbortReasonSchema.options).toEqual(["user-cancel", "dangerous-output", "wrong-context", "cost-cap"]);
+		expect(SortDirectionSchema.options).toEqual(["asc", "desc"]);
 	});
 
 	test("validates trace ids, run handles, and tool call events at runtime", () => {

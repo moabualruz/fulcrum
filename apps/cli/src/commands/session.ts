@@ -13,6 +13,7 @@
 
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { AbortReasonValues, type AbortReason } from "@fulcrum/shared-dto";
 import { DataSource } from "typeorm";
 import { AcpSessionCheckpoint } from "@agent-client-protocol/infrastructure/database/entities/AcpSessionCheckpoint.ts";
 import { AcpSession } from "@agent-client-protocol/infrastructure/database/entities/AcpSession.ts";
@@ -54,13 +55,9 @@ export const SESSION_VERBS: ReadonlySet<SessionVerb> = new Set([
 	"watch",
 ]);
 
-export const ABORT_REASONS = [
-	"user-cancel",
-	"dangerous-output",
-	"wrong-context",
-	"cost-cap",
-] as const;
-export type AbortReason = (typeof ABORT_REASONS)[number];
+const ABORT_REASONS = AbortReasonValues;
+export { ABORT_REASONS };
+export type { AbortReason } from "@fulcrum/shared-dto";
 
 export interface SessionSummary {
 	id: string;

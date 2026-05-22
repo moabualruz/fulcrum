@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Badge, Card } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   export interface TaskCardTask {
     id: string;

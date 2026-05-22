@@ -2,7 +2,7 @@
   import { enhance } from "$app/forms";
   import type { PageData, ActionData } from "./$types";
   import DocVersionTimeline from "$lib/components/docs/DocVersionTimeline.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

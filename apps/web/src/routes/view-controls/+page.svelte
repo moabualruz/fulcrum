@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import type { SortDirection } from "@fulcrum/shared-dto";
+  import { cn } from "@fulcrum/ui-kit";
 
-  type SortDirection = "asc" | "desc";
   type SortField = "key" | "title" | "state" | "priority" | "estimate" | "updated";
 
   interface ViewTask {

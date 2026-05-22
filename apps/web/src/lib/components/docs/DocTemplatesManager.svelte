@@ -2,7 +2,7 @@
 	import { DOC_TYPE_LABELS, groupTemplatesByDocType, type WebDocTemplate } from "$lib/docs/doc-templates";
 	import { SEEDED_DOC_TYPES } from "$lib/docs/template-picker";
 	import { buttonVariants } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		templates: WebDocTemplate[];

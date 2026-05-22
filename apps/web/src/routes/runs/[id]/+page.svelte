@@ -6,7 +6,7 @@
   import RunStatusBadge from "$lib/components/runs/RunStatusBadge.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { formatDuration } from "$lib/util/duration";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
