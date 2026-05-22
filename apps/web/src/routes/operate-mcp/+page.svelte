@@ -299,7 +299,7 @@
    * prove the OD failure copy + secret redaction without a live MCP daemon.
    * The `error` data state is declared in the PRD `states` array.
    */
-  const errorState = $derived($page.url.searchParams.get("state") === "error");
+  const errorState = $derived(page.url.searchParams.get("state") === "error");
 
   let scopeAgentId = $state<string>(CLI_AGENTS[0]!.id);
   /** Working copy of every agent's registry: scope-switching swaps the slice. */

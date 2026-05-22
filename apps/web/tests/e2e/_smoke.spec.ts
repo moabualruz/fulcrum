@@ -19,6 +19,15 @@ if (isPlaywrightCli) {
 		}
 	});
 
+	test("/operate-mcp redirects to the canonical workbench route", async ({ page, fulcrumHome: _fulcrumHome }) => {
+		const response = await page.goto("/operate-mcp");
+
+		expect(response?.ok(), `/operate-mcp returned ${response?.status() ?? "no response"}`).toBe(true);
+		await expect(page).toHaveURL(/\/mkh\/projects\/fulcrum\/operate\/mcp$/);
+		await expect(page.getByRole("heading", { name: "MCP servers" })).toBeVisible();
+		await expect(page.locator("body")).not.toContainText("Fulcrum could not render this page");
+	});
+
 	test("Cmd+K opens command palette, focuses input, and Escape closes it", async ({
 		page,
 		fulcrumHome: _fulcrumHome,
