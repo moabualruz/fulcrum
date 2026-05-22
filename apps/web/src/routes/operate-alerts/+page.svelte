@@ -170,7 +170,7 @@
    * the alert-evaluator failure banner. Both data states are declared in the
    * PRD `states` array so design-e2e proves them without a live rule engine.
    */
-  const stateParam = $derived($page.url.searchParams.get("state"));
+  const stateParam = $derived(page.url.searchParams.get("state"));
   const emptyState = $derived(stateParam === "empty");
   const errorState = $derived(stateParam === "error");
 

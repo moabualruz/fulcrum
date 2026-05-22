@@ -283,7 +283,7 @@
    * OD failure copy without a live plugin server. The `error` data state is
    * declared in the PRD `states` array.
    */
-  const errorState = $derived($page.url.searchParams.get("state") === "error");
+  const errorState = $derived(page.url.searchParams.get("state") === "error");
 
   let scopeAgentId = $state<string>(CLI_AGENTS[0]!.id);
   let activeFilter = $state<PluginFilter>("all");

@@ -39,7 +39,7 @@
 
   function onProjectChange(e: Event) {
     const select = e.target as HTMLSelectElement;
-    const url = new URL($page.url);
+    const url = new URL(page.url);
     if (select.value) {
       url.searchParams.set("project", select.value);
     } else {

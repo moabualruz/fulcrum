@@ -253,8 +253,8 @@
   const abortReasons = ["user-cancel", "dangerous-output", "wrong-context", "cost-cap"] as const;
 
   // --- live UI state -------------------------------------------------------
-  const emptyState = $derived($page.url.searchParams.get("state") === "empty");
-  const loadingState = $derived($page.url.searchParams.get("state") === "loading");
+  const emptyState = $derived(page.url.searchParams.get("state") === "empty");
+  const loadingState = $derived(page.url.searchParams.get("state") === "loading");
 
   function runIdFromPath(pathname: string): string | null {
     const segments = pathname.replace(/^\/+|\/+$/g, "").split("/");
@@ -263,7 +263,7 @@
     return encoded ? decodeURIComponent(encoded) : null;
   }
 
-  const routeRunId = $derived(runIdFromPath($page.url.pathname));
+  const routeRunId = $derived(runIdFromPath(page.url.pathname));
   let live = $state(true);
   let selectedRunId = $state(feedRuns[0]?.runId ?? "");
   let activeDock = $state<(typeof dockTabs)[number]>("Shell");

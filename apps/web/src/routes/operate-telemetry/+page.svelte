@@ -40,6 +40,7 @@
   import { browser } from "$app/environment";
   import { page } from "$app/state";
   import { BarChart, LineChart } from "layerchart";
+  import { scalePoint } from "d3-scale";
   import { Badge, ErrorBanner, RadioGroup, RadioGroupItem, Stat } from "@fulcrum/ui-kit";
   import {
     ModeRow,
@@ -61,16 +62,16 @@
    * else (including no param) shows the OD observability dashboard.
    */
   const activeView = $derived<TelemetryView>(
-    $page.url.searchParams.get("view") === "settings" ? "settings" : "observability",
+    page.url.searchParams.get("view") === "settings" ? "settings" : "observability",
   );
 
   /** Build the in-place tab href preserving the rest of the query string. */
   function viewHref(view: TelemetryView): string {
-    const params = new URLSearchParams($page.url.search);
+    const params = new URLSearchParams(page.url.search);
     if (view === "observability") params.delete("view");
     else params.set("view", view);
     const qs = params.toString();
-    return qs ? `?${qs}` : $page.url.pathname;
+    return qs ? `?${qs}` : page.url.pathname;
   }
 
   /* ----------------------------------------------------------------------- *
@@ -89,7 +90,7 @@
    * prove the OD failure copy without a live telemetry event store. The
    * `error` data state is declared in the PRD `states` array.
    */
-  const errorState = $derived($page.url.searchParams.get("state") === "error");
+  const errorState = $derived(page.url.searchParams.get("state") === "error");
 
   /** A latency sample point: one rolling bucket on the p50/p99 line chart. */
   interface LatencyPoint {
@@ -375,7 +376,7 @@
    * (COPY.md §13 "DO_NOT_TRACK=1 is respected"): the radios are then disabled
    * and the surface explains why. `?dnt=1` forces the scenario for design-e2e.
    */
-  const doNotTrack = $derived($page.url.searchParams.get("dnt") === "1");
+  const doNotTrack = $derived(page.url.searchParams.get("dnt") === "1");
 
   /** The effective mode: `DO_NOT_TRACK` clamps it to `off` regardless. */
   const effectiveMode = $derived<TelemetryMode>(doNotTrack ? "off" : telemetryMode);
@@ -570,6 +571,7 @@
             <LineChart
               data={bundle.latency}
               x={(d: LatencyPoint) => d.t}
+              xScale={scalePoint()}
               y={(d: LatencyPoint) => d.p99}
               series={latencySeriesDef}
               legend

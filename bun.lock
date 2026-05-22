@@ -123,6 +123,7 @@
         "@tiptap/starter-kit": "3.22.5",
         "@trpc/client": "11.7.2",
         "codemirror": "^6.0.2",
+        "d3-scale": "^4.0.2",
         "dompurify": "^3.4.2",
         "isomorphic-dompurify": "^3.11.0",
         "layerchart": "^1.0.13",
@@ -208,6 +209,7 @@
       "name": "@fulcrum/ui-kit",
       "version": "0.0.1",
       "dependencies": {
+        "@fulcrum/shared-dto": "workspace:*",
         "@lucide/svelte": "^1.14.0",
         "bits-ui": "^2.16.3",
         "clsx": "^2.1.1",

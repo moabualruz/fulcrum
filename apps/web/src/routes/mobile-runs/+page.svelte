@@ -240,7 +240,7 @@
    * the empty-state matrix through this query, mirroring the desktop runs
    * feed's state switch (DESIGN.md §4.8 / COPY.md Build runs feed).
    */
-  const isEmptyState = $derived($page.url.searchParams.get("state") === "empty");
+  const isEmptyState = $derived(page.url.searchParams.get("state") === "empty");
   const visibleRuns = $derived(isEmptyState ? [] : feedRuns);
   const runCount = $derived(visibleRuns.length);
 

@@ -19,6 +19,18 @@ export function parseFeatures(raw?: string): EnvFeatureFlag[] {
     });
 }
 
+/**
+ * Features that are default-ON outside production. The public REST API surface
+ * (`public-api`) must serve `/api/v1/*` on a local dev or test stack without
+ * the operator setting `FULCRUM_FEATURES=public-api` by hand — the 38 public-api
+ * controllers gate on this check. Production still requires the explicit flag.
+ */
+const DEV_DEFAULT_ON_FEATURES = new Set(["public-api"]);
+
+function isDevDefaultOn(name: string): boolean {
+  return DEV_DEFAULT_ON_FEATURES.has(name) && process.env.NODE_ENV !== "production";
+}
+
 export function isFeatureEnabled(flags: readonly EnvFeatureFlag[], name: string): boolean;
 export function isFeatureEnabled(name: string, raw?: string): boolean;
 export function isFeatureEnabled(name: string, flags: readonly EnvFeatureFlag[]): boolean;
@@ -26,10 +38,16 @@ export function isFeatureEnabled(
   flagsOrName: readonly EnvFeatureFlag[] | string,
   nameOrRaw?: string | readonly EnvFeatureFlag[],
 ): boolean {
-  if (Array.isArray(flagsOrName)) return flagsOrName.some((flag) => flag.name === nameOrRaw);
+  if (Array.isArray(flagsOrName)) {
+    return (
+      flagsOrName.some((flag) => flag.name === nameOrRaw) ||
+      (typeof nameOrRaw === "string" && isDevDefaultOn(nameOrRaw))
+    );
+  }
 
+  const name = flagsOrName as string;
   const flags = typeof nameOrRaw === "string" || nameOrRaw === undefined
     ? parseFeatures(nameOrRaw ?? process.env.FULCRUM_FEATURES)
     : nameOrRaw;
-  return flags.some((flag) => flag.name === flagsOrName);
+  return flags.some((flag) => flag.name === name) || isDevDefaultOn(name);
 }
