@@ -1,22 +1,22 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { loadProjectCalendar, rescheduleProjectTask } from "@work-management/interface/project-timeline.ts";
 import { actionFail, actionOk } from "../../../../lib/feedback/action-result";
-import { requestProjectScope } from "../../project-request-scope";
+import { createProjectTimelineApiForEvent } from "$lib/server/project-timeline-api";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const projectId = params.id;
+export const load: PageServerLoad = async (event) => {
+  const projectId = event.params.id;
   try {
-    const { em, ctx } = await requestProjectScope(locals, projectId);
-    return await loadProjectCalendar(em, ctx);
+    return await createProjectTimelineApiForEvent(event).timeline.calendar({ projectId });
   } catch {
+    // The page contract treats any timeline failure (missing project, server
+    // error) as a 404 — preserved verbatim from the retired in-process route.
     throw error(404, "Project not found");
   }
 };
 
 export const actions: Actions = {
-  reschedule: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  reschedule: async (event) => {
+    const fd = await event.request.formData();
     const id = fd.get("id");
     const start_date = fd.get("start_date");
     const due_date = fd.get("due_date");
@@ -24,8 +24,8 @@ export const actions: Actions = {
     if (typeof id !== "string" || !id) return fail(400, actionFail("missing id"));
 
     try {
-      const { em, ctx } = await requestProjectScope(locals, params.id);
-      await rescheduleProjectTask(em, ctx, {
+      await createProjectTimelineApiForEvent(event).timeline.reschedule({
+        projectId: event.params.id,
         taskId: id,
         ...(typeof start_date === "string" && start_date ? { startDate: start_date } : {}),
         ...(typeof due_date === "string" && due_date ? { dueDate: due_date } : {}),
