@@ -120,6 +120,7 @@
 	<SheetContent
 		{side}
 		showCloseButton={true}
+		aria-label={title}
 		data-slot="acp-drawer"
 		data-open={open ? "true" : "false"}
 		data-side={side}
