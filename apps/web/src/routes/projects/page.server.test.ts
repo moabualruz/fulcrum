@@ -1,39 +1,26 @@
-import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
-import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
-import { closeDatabase } from "$lib/server/db";
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
 
-// `+page.server.ts` resolves the application scope through
-// `requestServiceScope`. We seed an isolated PGlite store and inject it as the
-// scope's `em`, then assert the route returns the seeded projects in
-// deterministic `created_at`-ASC order.
+// `/projects/+page.server.ts` is a pure invocation layer: its `load` streams
+// `listProjectRowsForEvent` (from $lib/server/project-api), which calls the
+// NestJS project public API. This suite mocks that client seam — no in-process
+// database, no application-scope.
+let rows: Array<{
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  updated_at: string;
+}> = [];
+let suiteActive = false;
 
-let scratch: string;
-let activeDb: TestStore | null = null;
-let activeOrgId = "";
-
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its `activeDb`-backed seam while active (beforeAll/afterAll) so
-// sibling suites that mock the same path are never hijacked. The seam reads
-// `activeDb` live, so it answers `null` between tests and lets foreign suites
-// fall through to the real resolver.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
+mock.module("$lib/server/project-api", () => ({
+  // `mock.module` is process-global; answer only while this suite is active so
+  // foreign suites get the real client.
+  listProjectRowsForEvent: async () => (suiteActive ? rows : []),
+}));
 
 interface ProjectPayload {
-  projects: Array<{
-    id: string;
-    slug: string;
-    name: string;
-    description: string | null;
-    updated_at: string;
-  }>;
+  projects: typeof rows;
 }
 
 function streamedData<T>(result: unknown): Promise<T> {
@@ -43,73 +30,25 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-projects-list-"));
-  process.env["FULCRUM_HOME"] = scratch;
+  rows = [];
 });
-
-afterEach(async () => {
-  await activeDb?.close().catch(() => {});
-  activeDb = null;
-  activeOrgId = "";
-  await closeDatabase();
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function freshDb(): Promise<TestStore> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  activeDb = db;
-  return db;
-}
-
-async function seedTwoProjects(): Promise<{ orgId: string; first: string; second: string }> {
-  const db = await freshDb();
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  activeOrgId = org.id;
-  const first = await createProject(db, {
-    orgId: org.id,
-    slug: "first",
-    name: "First",
-    description: "earlier project",
-  });
-  // Pin both rows' `created_at` so the ASC ordering assertion is invariant
-  // across PGlite's clock granularity (otherwise sub-millisecond inserts can
-  // collide and the secondary `id ASC` tie-break dominates).
-  await db.query(`UPDATE projects SET created_at = $2 WHERE id = $1`, [
-    first.id,
-    "2026-04-01T00:00:00.000Z",
-  ]);
-  const second = await createProject(db, {
-    orgId: org.id,
-    slug: "second",
-    name: "Second",
-    description: null,
-  });
-  await db.query(`UPDATE projects SET created_at = $2 WHERE id = $1`, [
-    second.id,
-    "2026-04-02T00:00:00.000Z",
-  ]);
-  return { orgId: org.id, first: first.id, second: second.id };
-}
 
 describe("/projects +page.server.ts load()", () => {
-  let disposeScope: (() => void) | undefined;
   beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) =>
-      activeDb
-        ? { em: activeDb, ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? null } }
-        : null,
-    );
+    suiteActive = true;
   });
   afterAll(() => {
-    disposeScope?.();
+    suiteActive = false;
+  });
+  afterEach(() => {
+    rows = [];
   });
 
-  test("returns seeded projects in deterministic created_at-ASC order", async () => {
-    const { first, second } = await seedTwoProjects();
+  test("streams the project rows the public API returns", async () => {
+    rows = [
+      { id: "id-first", slug: "first", name: "First", description: "earlier project", updated_at: "2026-04-01T00:00:00.000Z" },
+      { id: "id-second", slug: "second", name: "Second", description: null, updated_at: "2026-04-02T00:00:00.000Z" },
+    ];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       locals: { activeProjectId: "first" },
@@ -118,17 +57,14 @@ describe("/projects +page.server.ts load()", () => {
     const payload = await streamedData<ProjectPayload>(result);
     expect(Array.isArray(payload.projects)).toBe(true);
     expect(payload.projects).toHaveLength(2);
-    expect(payload.projects[0]?.id).toBe(first);
-    expect(payload.projects[1]?.id).toBe(second);
+    expect(payload.projects[0]?.id).toBe("id-first");
+    expect(payload.projects[1]?.id).toBe("id-second");
     expect(payload.projects[0]?.slug).toBe("first");
     expect(payload.projects[1]?.slug).toBe("second");
   });
 
-  test("returns empty array when the product DB has no projects", async () => {
-    // Initialise an empty DB so the route resolves a scope but finds no rows.
-    await freshDb();
-    const org = await createLocalOrg(activeDb as TestStore, { slug: "default", name: "Default" });
-    activeOrgId = org.id;
+  test("returns empty array when the public API has no projects", async () => {
+    rows = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
       locals: { activeProjectId: null },
