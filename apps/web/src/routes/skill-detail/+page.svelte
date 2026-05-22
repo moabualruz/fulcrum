@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
+
   type VersionRecord = { version: string; notes: string; released: string };
 
   const SKILL = {
@@ -32,10 +34,17 @@
   <p class="text-sm" data-skill-description>{SKILL.description}</p>
 
   <label class="flex items-center gap-2 text-xs">
-    Version
-    <select data-skill-version-select bind:value={selectedVersion} class="rounded-md border border-border bg-background px-2 py-1">
-      {#each SKILL.versions as v}<option value={v.version}>{v.version}</option>{/each}
-    </select>
+    <span>Version</span>
+    <Select bind:value={selectedVersion} type="single">
+      <SelectTrigger aria-label="Version" data-skill-version-select size="sm">
+        <SelectValue placeholder={SKILL.versions[0]!.version} />
+      </SelectTrigger>
+      <SelectContent>
+        {#each SKILL.versions as v}
+          <SelectItem value={v.version} label={v.version} />
+        {/each}
+      </SelectContent>
+    </Select>
   </label>
 
   <section class="rounded-md border border-border p-3" data-skill-version-detail>
