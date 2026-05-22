@@ -1,14 +1,14 @@
 import { fail } from "@sveltejs/kit";
-import { AuthStore } from "@identity-access/infrastructure/database/auth-store.ts";
 import type { Actions, PageServerLoad } from "./$types";
+import { createAuthApiForEvent } from "$lib/server/auth-api";
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async (event) => {
+  const { url } = event;
   const token = url.searchParams.get("token") ?? "";
   if (!token) return { status: "missing" };
-  if (!locals.em) return { status: "unavailable" };
 
   try {
-    const result = await new AuthStore(locals.em.connection).verifyEmail({ token });
+    const result = await createAuthApiForEvent(event).auth.verifyEmail({ token }) as { email?: string };
     return { status: "verified", email: result.email };
   } catch (cause) {
     return { status: "invalid", message: messageFrom(cause) };
@@ -16,16 +16,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-  resend: async ({ locals, request, url }) => {
-    if (!locals.em) return fail(503, { resendError: "Email verification is unavailable." });
-
+  resend: async (event) => {
+    const { request, url } = event;
     const form = await request.formData();
     const orgId = String(form.get("orgId") ?? "");
     const userId = String(form.get("userId") ?? "");
     const email = String(form.get("email") ?? "");
 
     try {
-      const result = await new AuthStore(locals.em.connection).requestEmailVerification({
+      const result = await createAuthApiForEvent(event).auth.requestEmailVerification({
         orgId,
         userId,
         email,

@@ -1,4 +1,5 @@
-export async function requestProjectScope(locals: App.Locals, projectId?: string | null) {
-  const scope = await import("$lib/server/request-service-scope");
-  return scope.requestServiceScope(locals, projectId ?? null);
+import { error } from "@sveltejs/kit";
+
+export async function requestProjectScope(_locals: App.Locals, _projectId?: string | null): Promise<never> {
+  throw error(410, "Project pages must use public API web clients; in-process project scope is retired.");
 }

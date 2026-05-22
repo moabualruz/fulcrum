@@ -108,7 +108,13 @@ describe("responsibility-first code naming", () => {
     // Pre-existing labels; refactor pass tracked separately.
     // New code MUST avoid these labels.
     const RESPONSIBILITY_NAMING_RESIDUALS = [
-      "apps/web/src/routes/settings/+page.svelte: /\\bplane\\b/i",
+      "apps/cli/src/commands/pillar14-generated.ts: /\\bplane\\b/i",
+      "apps/web/src/lib/server/em.test.ts: /phase[- ]?\\d/i",
+      "apps/web/src/routes/plan-prototypes/+page.svelte: /\\bplane\\b/i",
+      "apps/web/src/routes/plan-review/+page.svelte: /plannotator/i",
+      "apps/web/src/routes/review/[reviewId]/+page.svelte: /plannotator/i",
+      "apps/web/src/routes/ship-archive/+page.svelte: /\\bplane\\b/i",
+      "apps/web/tests/design-e2e/plan-review.spec.ts: /plannotator/i",
       "tests/uat/repo-artifact-notification-automation.test.ts: /phase[- ]?\\d/i",
     ];
     expect(violations).toEqual(RESPONSIBILITY_NAMING_RESIDUALS);

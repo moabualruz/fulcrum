@@ -75,8 +75,8 @@ describe("interface additional architecture requirement gates", () => {
     )).toEqual([]);
   });
 
-  test.skip("R-16 rate-limit middleware exists under apps/server/src/runtime or apps/server/src/api", async () => {
-    expect(await filesMatching(["apps/server/src/runtime", "apps/server/src/api"], /rateLimit|rateLimiter/)).not.toEqual([]);
+  test("R-16 rate-limit middleware exists in server runtime/router/api code", async () => {
+    expect(await filesMatching(["apps/server/src/runtime", "apps/server/src/router", "apps/server/src/api"], /rateLimit|rateLimiter/)).not.toEqual([]);
   });
 
   test("R-17 encrypt/decrypt functions exist in application crypto boundary", async () => {

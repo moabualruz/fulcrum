@@ -130,10 +130,7 @@ describe("interface raw EntityManager and SQL boundary", () => {
     );
     // Pre-existing app-surface ORM references; refactor pass tracked
     // separately. New routes MUST NOT be added here.
-    const RESIDUAL_INVOCATION_LAYER_ORM_FILES = [
-      "apps/web/src/routes/auth/signup/+page.server.ts",
-      "apps/web/src/routes/settings/users/+page.server.ts",
-    ];
+    const RESIDUAL_INVOCATION_LAYER_ORM_FILES: string[] = [];
     expect(found).toEqual(RESIDUAL_INVOCATION_LAYER_ORM_FILES);
   });
 });

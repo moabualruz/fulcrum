@@ -61,6 +61,19 @@ export function toArtifactRow(artifact: PublicArtifact) {
   };
 }
 
+export function toArtifactDetail(artifact: PublicArtifact) {
+  const row = toArtifactRow(artifact);
+  const createdAt = row.created_at ? new Date(row.created_at).getTime() : Number.NaN;
+  const ageDays = Number.isFinite(createdAt) ? Math.floor((Date.now() - createdAt) / 86_400_000) : 0;
+  return {
+    ...row,
+    filename: artifact.filename ?? row.title,
+    downloadHref: `/artifacts/${artifact.id}/download`,
+    retentionDaysRemaining: Math.max(0, 90 - ageDays),
+    content: typeof artifact.metadataJson?.["content"] === "string" ? artifact.metadataJson["content"] : null,
+  };
+}
+
 export function artifactStatsFromRows(artifacts: PublicArtifact[]) {
   return artifacts.reduce(
     (stats, artifact) => ({

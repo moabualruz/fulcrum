@@ -6,15 +6,18 @@
  */
 
 import { fail } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { getProduct\u0044b as productRuntime, getDefaultOrgId } from "$lib/server/db";
-import {
-  getTenantSetting,
-  upsertTenantSetting,
-  createCredential,
-  listConnectorRuns,
-} from "@platform-core/interface/external-connection-settings.ts";
+
 import { actionOk } from "$lib/feedback/action-result";
+import { createConnectorApiForEvent } from "$lib/server/connector-api";
+
+type ConnectorRun = {
+  status?: string;
+  startedAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  summary?: Record<string, unknown> | null;
+};
 
 function isConnectorLinearEnabled(): boolean {
   const features = (process.env["FULCRUM_FEATURES"] ?? "")
@@ -23,59 +26,73 @@ function isConnectorLinearEnabled(): boolean {
   return features.includes("connector-linear");
 }
 
-export const load: PageServerLoad = ({ locals }) => {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asConnectorConfig(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function asConnectorRuns(value: unknown): ConnectorRun[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function syncRunRow(run: ConnectorRun) {
+  const summary = asConnectorConfig(run.summary);
   return {
-    activeProjectId: locals?.activeProjectId ?? null,
+    status: run.status ?? "unknown",
+    started_at: run.startedAt ?? run.createdAt ?? null,
+    records_synced: Number(summary["recordsSynced"] ?? summary["records_synced"] ?? 0),
+    error: typeof summary["error"] === "string" ? summary["error"] : null,
+  };
+}
+
+async function loadLinearSettings(event: RequestEvent) {
+  if (!isConnectorLinearEnabled()) {
+    return { teamId: null, hasApiKey: false, recentRuns: [] };
+  }
+
+  const api = createConnectorApiForEvent(event);
+  const [connector, runs] = await Promise.all([
+    api.connectors.get({ id: "linear" }),
+    api.connectors.runs.list({ connectorId: "linear" }),
+  ]);
+  const config = asConnectorConfig((connector as { config?: unknown }).config);
+
+  return {
+    teamId: typeof config["teamId"] === "string" ? config["teamId"] : null,
+    hasApiKey: Boolean(config["apiKey"]) || Boolean(process.env["LINEAR_API_KEY"]),
+    recentRuns: asConnectorRuns(runs).slice(0, 5).map(syncRunRow),
+  };
+}
+
+export const load: PageServerLoad = (event) => {
+  return {
+    activeProjectId: event.locals?.activeProjectId ?? null,
     featureEnabled: isConnectorLinearEnabled(),
     streamed: {
-      data: (async () => {
-        if (!isConnectorLinearEnabled()) {
-          return { teamId: null, hasApiKey: false, recentRuns: [] };
-        }
-
-        const db = productRuntime();
-        const orgId = await getDefaultOrgId(db);
-        const teamSetting = await getTenantSetting(db, orgId, "linear.team_id");
-        const recentRuns = await listConnectorRuns(db, orgId, "linear", 5);
-
-        return {
-          teamId: teamSetting?.value?.teamId ?? null,
-          hasApiKey: !!process.env["LINEAR_API_KEY"],
-          recentRuns,
-        };
-      })(),
+      data: loadLinearSettings(event),
     },
   };
 };
 
 export const actions: Actions = {
-  save: async ({ request }) => {
+  save: async (event) => {
     if (!isConnectorLinearEnabled()) {
       return fail(403, { error: "connector-linear feature flag is not enabled" });
     }
 
-    const form = await request.formData();
+    const form = await event.request.formData();
     const teamId = (form.get("team_id") as string)?.trim() || null;
     const apiKey = (form.get("api_key") as string)?.trim() || null;
 
     if (!teamId) return fail(400, { error: "Team ID is required" });
 
-    const db = productRuntime();
-    const orgId = await getDefaultOrgId(db);
-
-    await upsertTenantSetting(db, {
-      orgId,
-      key: "linear.team_id",
-      value: { teamId },
+    await createConnectorApiForEvent(event).connectors.enable({
+      id: "linear",
+      config: { teamId, ...(apiKey ? { apiKey } : {}) },
     });
-
-    if (apiKey) {
-      await createCredential(db, {
-        orgId,
-        key: "linear_api_key",
-        encryptedValue: apiKey, // In production: encrypt before storing
-      });
-    }
 
     return actionOk("Linear integration settings saved");
   },

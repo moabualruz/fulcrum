@@ -4,7 +4,6 @@
 
 import type { RequestHandler } from "@sveltejs/kit";
 import { isDataExchangeFeatureEnabled } from "@integration-hub/interface/data-exchange-features.ts";
-import { importTasksFromCsvUpload } from "@work-management/interface/task-csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -13,7 +12,7 @@ function jsonError(msg: string, status = 400): Response {
   });
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request }) => {
   if (!isDataExchangeFeatureEnabled("import-csv")) {
     return jsonError("Feature import-csv not enabled", 403);
   }
@@ -42,23 +41,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     return jsonError("columnMap is not valid JSON");
   }
 
-  try {
-    const { em, ctx } = await requestScopedApp(locals);
-    const result = await importTasksFromCsvUpload(em, ctx, {
-      bytes: await file.arrayBuffer(),
-      columnMap,
-    });
-
-    return new Response(
-      JSON.stringify(result),
-      { headers: { "content-type": "application/json" } },
-    );
-  } catch (err) {
-    return jsonError((err as Error).message);
-  }
+  void file;
+  void columnMap;
+  return jsonError("CSV import moved to the public data-portability API", 410);
 };
-
-async function requestScopedApp(locals: App.Locals) {
-  const { requestServiceScope } = await import("$lib/server/request-service-scope");
-  return requestServiceScope(locals);
-}

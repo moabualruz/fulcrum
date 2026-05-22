@@ -32,6 +32,15 @@ export interface ProjectPublicRow {
   traceId: string;
   createdAt: string | null;
   updatedAt: string | null;
+  updated_at: string | null;
+  taskCount: number;
+  task_count: number;
+  openTaskCount: number;
+  open_task_count: number;
+  docCount: number;
+  doc_count: number;
+  latestActivityAt: string | null;
+  latest_activity_at: string | null;
 }
 
 export interface ProjectPublicStats {
@@ -52,7 +61,11 @@ export class ProjectPublicStore {
       where: { workspaceId: input.orgId },
       order: { createdAt: "ASC", id: "ASC" },
     });
-    return { data: projects.map((project) => toPublicRow(input.orgId, project)) };
+    return {
+      data: await Promise.all(
+        projects.map(async (project) => toPublicRow(input.orgId, project, {}, await this.projectListStats(project))),
+      ),
+    };
   }
 
   async createProject(input: {
@@ -91,6 +104,15 @@ export class ProjectPublicStore {
         traceId: `trace-workspace-${workspace.id}`,
         createdAt: workspace.createdAt?.toISOString() ?? null,
         updatedAt: workspace.updatedAt?.toISOString() ?? null,
+        updated_at: workspace.updatedAt?.toISOString() ?? null,
+        taskCount: 0,
+        task_count: 0,
+        openTaskCount: 0,
+        open_task_count: 0,
+        docCount: 0,
+        doc_count: 0,
+        latestActivityAt: workspace.updatedAt?.toISOString() ?? null,
+        latest_activity_at: workspace.updatedAt?.toISOString() ?? null,
       };
     }
 
@@ -190,6 +212,30 @@ export class ProjectPublicStore {
     return this.dataSource.getRepository(FulcrumTaskEntity);
   }
 
+  private documentRepository() {
+    return this.dataSource.getRepository(FulcrumDocumentEntity);
+  }
+
+  private async projectListStats(project: FulcrumProject): Promise<ProjectPublicListStats> {
+    const [tasks, docs] = await Promise.all([
+      this.taskRepository().findBy({ projectId: project.id, deletedAt: IsNull() }),
+      this.documentRepository().findBy({ projectId: project.id }),
+    ]);
+    const closed = new Set(["completed", "done", "canceled", "cancelled"]);
+    const dates = [
+      project.updatedAt,
+      ...tasks.map((task) => task.updatedAt),
+      ...docs.map((doc) => doc.updatedAt),
+    ].filter((value): value is Date => value instanceof Date);
+    const latest = dates.length > 0 ? new Date(Math.max(...dates.map((value) => value.getTime()))).toISOString() : null;
+    return {
+      taskCount: tasks.length,
+      openTaskCount: tasks.filter((task) => !closed.has(task.status ?? "")).length,
+      docCount: docs.length,
+      latestActivityAt: latest,
+    };
+  }
+
   private async countProjectArtifacts(projectId: string): Promise<number> {
     const queryRunner = this.dataSource.createQueryRunner();
     const exists = await queryRunner.hasTable("fulcrum_artifacts");
@@ -207,9 +253,12 @@ function toPublicRow(
   orgId: string,
   project: FulcrumProject,
   overrides: Partial<Pick<ProjectPublicRow, "kind" | "repoPath" | "template">> = {},
+  stats: ProjectPublicListStats = EMPTY_PROJECT_LIST_STATS,
 ): ProjectPublicRow {
   const memoryConfig = project.workflowConfig?.["memory_config"];
   const publicMemoryConfig = isRecord(memoryConfig) ? memoryConfig : null;
+  const updatedAt = project.updatedAt?.toISOString() ?? null;
+  const latestActivityAt = stats.latestActivityAt ?? updatedAt;
   return {
     id: project.id,
     orgId,
@@ -226,9 +275,32 @@ function toPublicRow(
     memory_config: publicMemoryConfig,
     traceId: project.traceId,
     createdAt: project.createdAt?.toISOString() ?? null,
-    updatedAt: project.updatedAt?.toISOString() ?? null,
+    updatedAt,
+    updated_at: updatedAt,
+    taskCount: stats.taskCount,
+    task_count: stats.taskCount,
+    openTaskCount: stats.openTaskCount,
+    open_task_count: stats.openTaskCount,
+    docCount: stats.docCount,
+    doc_count: stats.docCount,
+    latestActivityAt,
+    latest_activity_at: latestActivityAt,
   };
 }
+
+interface ProjectPublicListStats {
+  taskCount: number;
+  openTaskCount: number;
+  docCount: number;
+  latestActivityAt: string | null;
+}
+
+const EMPTY_PROJECT_LIST_STATS: ProjectPublicListStats = {
+  taskCount: 0,
+  openTaskCount: 0,
+  docCount: 0,
+  latestActivityAt: null,
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);

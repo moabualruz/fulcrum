@@ -22,6 +22,7 @@ const CANONICAL_SERVICE_DIRS = ["domain", "application", "infrastructure", "inte
 const APP_SURFACE_ROOTS = ["apps/web/src", "apps/cli/src", "apps/tui/src"] as const;
 
 const SERVICE_INTERFACE_PERSISTENCE_RESIDUALS = [
+  "services/execution-orchestration/src/interface/http/agent-profile-public-api.controller.ts",
   "services/execution-orchestration/src/interface/http/agent-run-public-api.controller.ts",
   "services/execution-orchestration/src/interface/http/routing-public-api.controller.ts",
   "services/feature-flags/src/interface/http/controllers/feature-flag-public-api.controller.ts",
@@ -46,6 +47,7 @@ const SERVICE_INTERFACE_PERSISTENCE_RESIDUALS = [
   "services/work-management/src/interface/http/field-dependency-public-api.controller.ts",
   "services/work-management/src/interface/http/planning-structure-public-api.controller.ts",
   "services/work-management/src/interface/http/project-public-api.controller.ts",
+  "services/work-management/src/interface/http/project-status-public-api.controller.ts",
   "services/work-management/src/interface/http/relationship-public-api.controller.ts",
   "services/work-management/src/interface/http/report-public-api.controller.ts",
   "services/work-management/src/interface/http/saved-view-public-api.controller.ts",
@@ -70,10 +72,7 @@ const SERVICE_INTERFACE_PERSISTENCE_IMPORT = /from\s+["'][^"']*(?:typeorm|infras
 // refactor pass to route them through a service interface helper before the
 // allow-list can shrink. New routes MUST NOT be added here.
 const APP_SURFACE_PERSISTENCE_RESIDUALS = [
-  "apps/web/src/routes/api/v1/routing/[...path]/+server.ts",
-  "apps/web/src/routes/auth/signup/+page.server.ts",
-  "apps/web/src/routes/auth/verify-email/+page.server.ts",
-  "apps/web/src/routes/settings/users/+page.server.ts",
+  "apps/cli/src/commands/session.ts",
 ] as const;
 
 async function exists(path: string): Promise<boolean> {

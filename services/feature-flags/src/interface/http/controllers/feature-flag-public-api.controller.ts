@@ -17,7 +17,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -296,6 +296,9 @@ if (Object.values(routeDescriptors).some((descriptor) => !descriptor)) {
 
 Controller("api/v1/feature-flags")(FeatureFlagPublicApiController);
 ApiTags("feature-flags")(FeatureFlagPublicApiController);
+ApiForbiddenResponse({ description: "Feature flag operation is forbidden for the current context" })(
+  FeatureFlagPublicApiController,
+);
 
 applyGetRoute("listSettingsFlags", "settings", FeatureFlagSettingsScopeDto, "List settings feature flags");
 applyPatchIdRoute("toggleSettingsFlag", "settings/:id/toggle", FeatureFlagSettingsScopeDto, "Toggle settings feature flag");
