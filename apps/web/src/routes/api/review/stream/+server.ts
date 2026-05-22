@@ -38,7 +38,7 @@ export const GET: RequestHandler = async (event) => {
     });
   }
   const reviewSession = reviewId || traceId
-    ? await api.workflows.loadReviewWorkbenchSession({
+    ? await api.reports.loadReviewWorkbenchSession({
       projectId,
       traceId,
       reviewId,
@@ -52,7 +52,7 @@ export const GET: RequestHandler = async (event) => {
       headers: { "content-type": "text/event-stream" },
     });
   }
-  const model = reviewSession?.model ?? await api.workflows.reviewWorkbench({
+  const model = reviewSession?.model ?? await api.reports.reviewWorkbench({
     projectId,
     files: [],
     annotations: [],
