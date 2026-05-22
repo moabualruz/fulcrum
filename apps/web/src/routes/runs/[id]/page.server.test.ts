@@ -1,56 +1,98 @@
-import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
-import { makeId } from "@test-support/product-workspace-fixtures.ts";
-import type { TestStore } from "@test-support/product-workspace-fixtures.ts";
-import { closeDatabase } from "$lib/server/db";
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-let scratch: string;
-let activeDb: TestStore | null = null;
-let activeOrgId = "";
-let activeProjectId: string | null = null;
+const calls: Array<{ method: string; input: Record<string, unknown> }> = [];
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its `activeDb`-backed seam while active (beforeAll/afterAll) so
-// sibling suites that mock the same path are never hijacked. The seam reads
-// `activeDb` live, so it answers `null` between tests and lets foreign suites
-// fall through to the real resolver.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
+const mockRun = {
+  id: "run-1",
+  org_id: "org-1",
+  project_id: "project-1",
+  agent: "codex",
+  model: "gpt-5",
+  prompt: "do thing",
+  status: "succeeded",
+  parent_run_id: null,
+  started_at: "2026-05-14T12:00:00.000Z",
+  ended_at: null,
+  transcript_path: null,
+  retry_count: 0,
+  last_error_kind: null,
+};
+
+const mockArtifact = {
+  id: "artifact-1",
+  title: "summary.txt",
+  kind: "text",
+  body_path: "/tmp/summary.txt",
+  mime: "text/plain",
+  created_at: "2026-05-14T12:05:00.000Z",
+  retention_until: "2026-06-01T00:00:00.000Z",
+  lifecycle_state: "linked",
+  preview_kind: "markdown",
+  linked_doc_id: "doc-1",
+  promoted_to_memory: true,
+};
+
+const mockPageDetail = {
+  run: mockRun,
+  transcript: null as string | null,
+  diff: "diff --git a/src/app.ts b/src/app.ts\n",
+  artifacts: [mockArtifact],
+  events: [
+    {
+      id: "event-1",
+      org_id: "org-1",
+      project_id: "project-1",
+      subject_kind: "agent_run",
+      subject_id: "run-1",
+      verb: "run.started",
+      payload: {},
+      actor: "system",
+      created_at: "2026-05-14T12:00:00.000Z",
+    },
+  ],
+};
+
+mock.module("$lib/server/agent-run-api", () => ({
+  createAgentRunApiForEvent: () => ({
+    runs: {
+      pageDetail: async (input: Record<string, unknown>) => {
+        calls.push({ method: "pageDetail", input });
+        if (input.id === "missing-run") throw new Error("not found");
+        return mockPageDetail;
+      },
+      cancel: async (input: Record<string, unknown>) => {
+        calls.push({ method: "cancel", input });
+        return { ok: true };
+      },
+      retry: async (input: Record<string, unknown>) => {
+        calls.push({ method: "retry", input });
+        return { id: "run-retry" };
+      },
+      archiveArtifact: async (input: Record<string, unknown>) => {
+        calls.push({ method: "archiveArtifact", input });
+        return { ok: true };
+      },
+      linkArtifactToDoc: async (input: Record<string, unknown>) => {
+        calls.push({ method: "linkArtifactToDoc", input });
+        return { ok: true };
+      },
+      promoteArtifactToMemory: async (input: Record<string, unknown>) => {
+        calls.push({ method: "promoteArtifactToMemory", input });
+        return { ok: true };
+      },
+    },
+  }),
+}));
 
 interface RunDetailPayload {
-  run: {
-    id: string;
-    org_id: string;
-    project_id: string | null;
-    agent: string;
-    model: string | null;
-    prompt: string | null;
-    status: string;
-    parent_run_id: string | null;
-    started_at: string;
-    ended_at: string | null;
-    transcript_path: string | null;
-  };
+  run: typeof mockRun;
   transcript: string | null;
-  artifacts: Array<{
-    id: string;
-    title: string;
-    kind: string;
-    downloadHref: string;
-    retention_until: string | null;
-    lifecycle_state: string;
-    preview_kind: string;
-    linked_doc_id: string | null;
-    promoted_to_memory: boolean;
-  }>;
+  artifacts: Array<typeof mockArtifact>;
   events: Array<{ id: string; created_at: string }>;
+  observability: {
+    artifacts: Array<{ id: string; lifecycleState: string }>;
+    recovery: { retryable: boolean; retryCount: number; lastErrorKind: string | null };
+  };
 }
 
 function streamedData<T>(result: unknown): Promise<T> {
@@ -59,223 +101,107 @@ function streamedData<T>(result: unknown): Promise<T> {
   return stream as Promise<T>;
 }
 
-beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-runs-detail-"));
-  process.env["FULCRUM_HOME"] = scratch;
-});
-
-afterEach(async () => {
-  await activeDb?.close().catch(() => {});
-  activeDb = null;
-  activeOrgId = "";
-  activeProjectId = null;
-  await closeDatabase();
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function freshDb(): Promise<{ db: TestStore; orgId: string; projectId: string }> {
-  const dbDir = join(scratch, "pglite.data");
-  mkdirSync(dbDir, { recursive: true });
-  const db = await openIsolatedStore(dbDir);
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const project = await createProject(db, {
-    orgId: org.id,
-    slug: "alpha",
-    name: "Alpha",
-  });
-  activeDb = db;
-  activeOrgId = org.id;
-  activeProjectId = project.id;
-  return { db, orgId: org.id, projectId: project.id };
-}
-
-async function seedRun(
-  db: TestStore,
-  orgId: string,
-  projectId: string,
-  status: "queued" | "running" | "succeeded" | "failed" | "cancelled",
-  transcriptPath: string | null = null,
-): Promise<string> {
-  const id = randomUUID();
-  await db.query(
-    `INSERT INTO agent_runs
-      (id, org_id, project_id, agent, model, prompt, status, transcript_path)
-     VALUES ($1, $2, $3, 'codex', 'gpt-5', 'do thing', $4, $5)`,
-    [id, orgId, projectId, status, transcriptPath],
-  );
-  return id;
-}
-
-interface RedirectError {
-  status: number;
-  location: string;
-}
-
-function isRedirect(e: unknown): e is RedirectError {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "status" in e &&
-    "location" in e &&
-    typeof (e as RedirectError).status === "number"
-  );
-}
-
-function formEvent(id: string, fields: Record<string, string>) {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+function event(id: string, data: Record<string, string> = {}) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  const url = new URL(`http://localhost/runs/${id}`);
   return {
     params: { id },
-    request: { formData: async () => form },
+    locals: { activeProjectId: "project-1" },
+    url,
+    request: new Request(url, { method: "POST", body: fd }),
+    fetch,
   };
 }
 
 describe("/runs/[id] +page.server.ts", () => {
-  let disposeScope: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) =>
-      activeDb
-        ? {
-            em: activeDb,
-            ctx: { orgId: activeOrgId, userId: null, projectId: projectId ?? activeProjectId },
-          }
-        : null,
-    );
-  });
-  afterAll(() => {
-    disposeScope?.();
+  beforeEach(() => {
+    calls.splice(0, calls.length);
+    mockPageDetail.transcript = null;
+    mockPageDetail.run = { ...mockRun };
   });
 
-  test("load returns run + null transcript when transcript_path missing", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const id = await seedRun(db, orgId, projectId, "succeeded", null);
+  test("load returns run + null transcript when transcript missing", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
-    expect(result.activeProjectId).toBeNull();
+    const result = await mod.load(event("run-1") as Parameters<typeof mod.load>[0]);
+    expect(result.activeProjectId).toBe("project-1");
     const payload = await streamedData<RunDetailPayload>(result);
-    expect(payload.run.id).toBe(id);
+    expect(payload.run.id).toBe("run-1");
     expect(payload.run.status).toBe("succeeded");
     expect(payload.transcript).toBeNull();
     expect(Array.isArray(payload.events)).toBe(true);
+    expect(calls).toEqual([{ method: "pageDetail", input: { id: "run-1", projectId: "project-1" } }]);
   });
 
-  test("load reads transcript file content when transcript_path is set", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const tPath = join(scratch, "transcript.txt");
-    writeFileSync(tPath, "hello transcript", "utf8");
-    const id = await seedRun(db, orgId, projectId, "succeeded", tPath);
+  test("load returns transcript content when API provides it", async () => {
+    mockPageDetail.transcript = "hello transcript";
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event("run-1") as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
     expect(payload.transcript).toBe("hello transcript");
+    expect(payload.observability.recovery).toMatchObject({ retryable: false, retryCount: 0, lastErrorKind: null });
   });
 
-  test("load returns artifacts produced by the run through edges", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const id = await seedRun(db, orgId, projectId, "succeeded");
-    const artifactId = randomUUID();
-    await db.query(
-      `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime, metadata_json, retention_until)
-       VALUES ($1, $2, $3, $4, 'text', 'summary.txt', '/tmp/summary.txt', 'text/plain',
-               '{"previewKind":"markdown","lifecycleState":"linked","linkedDocId":"doc-1","promotedToMemory":true}'::jsonb,
-               '2026-06-01T00:00:00.000Z')`,
-      [artifactId, orgId, projectId, id],
-    );
-    await db.query(
-      `INSERT INTO edges (id, org_id, project_id, from_kind, from_id, to_kind, to_id, rel)
-       VALUES ($1, $2, $3, 'agent_run', $4, 'artifact', $5, 'produced')`,
-      [makeId(), orgId, projectId, id, artifactId],
-    );
+  test("load returns artifacts produced by the run", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 11}`);
-    const result = await mod.load({ params: { id } } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event("run-1") as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<RunDetailPayload>(result);
     expect(payload.artifacts).toHaveLength(1);
     expect(payload.artifacts[0]).toMatchObject({
-      id: artifactId,
+      id: "artifact-1",
       title: "summary.txt",
-      kind: "text",
-      downloadHref: `/artifacts/${artifactId}/download`,
       retention_until: "2026-06-01T00:00:00.000Z",
       lifecycle_state: "linked",
       preview_kind: "markdown",
       linked_doc_id: "doc-1",
       promoted_to_memory: true,
     });
+    expect(payload.observability.artifacts[0]).toMatchObject({ id: "artifact-1", lifecycleState: "linked" });
   });
 
   test("artifact actions archive, link docs, and promote memory metadata", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const id = await seedRun(db, orgId, projectId, "succeeded");
-    const artifactId = randomUUID();
-    await db.query(
-      `INSERT INTO artifacts (id, org_id, project_id, run_id, kind, title, body_path, mime, metadata_json)
-       VALUES ($1, $2, $3, $4, 'report', 'handoff.md', 'runs/handoff.md', 'text/markdown', '{}'::jsonb)`,
-      [artifactId, orgId, projectId, id],
-    );
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 12}`);
-    await mod.actions.archiveArtifact(formEvent(id, { artifactId }) as Parameters<typeof mod.actions.archiveArtifact>[0]);
-    await mod.actions.linkArtifactToDoc(formEvent(id, { artifactId, docId: "doc-linked" }) as Parameters<typeof mod.actions.linkArtifactToDoc>[0]);
-    await mod.actions.promoteArtifactToMemory(formEvent(id, { artifactId }) as Parameters<typeof mod.actions.promoteArtifactToMemory>[0]);
-
-    const rows = await db.query<{ archived: boolean; metadata_json: Record<string, unknown> }>(
-      `SELECT archived, metadata_json FROM artifacts WHERE id = $1`,
-      [artifactId],
+    await mod.actions.archiveArtifact(event("run-1", { artifactId: "artifact-1" }) as Parameters<typeof mod.actions.archiveArtifact>[0]);
+    await mod.actions.linkArtifactToDoc(
+      event("run-1", { artifactId: "artifact-1", docId: "doc-linked" }) as Parameters<typeof mod.actions.linkArtifactToDoc>[0],
     );
-    expect(rows[0]?.archived).toBe(true);
-    expect(rows[0]?.metadata_json).toMatchObject({
-      lifecycleState: "promoted",
-      linkedDocId: "doc-linked",
-      promotedToMemory: true,
-    });
+    await mod.actions.promoteArtifactToMemory(
+      event("run-1", { artifactId: "artifact-1" }) as Parameters<typeof mod.actions.promoteArtifactToMemory>[0],
+    );
+    expect(calls).toEqual([
+      { method: "archiveArtifact", input: { id: "run-1", artifactId: "artifact-1", projectId: "project-1" } },
+      { method: "linkArtifactToDoc", input: { id: "run-1", artifactId: "artifact-1", docId: "doc-linked", projectId: "project-1" } },
+      { method: "promoteArtifactToMemory", input: { id: "run-1", artifactId: "artifact-1", projectId: "project-1" } },
+    ]);
   });
 
   test("load throws 404 when run does not exist", async () => {
-    await freshDb();
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     let caught: unknown;
     try {
-      const result = await mod.load({ params: { id: "01JBOGUS000000000000000000" } } as Parameters<typeof mod.load>[0]);
-      await streamedData<RunDetailPayload>(result);
-    } catch (e) {
-      caught = e;
+      await mod.load(event("missing-run") as Parameters<typeof mod.load>[0]);
+    } catch (err) {
+      caught = err;
     }
-    expect(caught).toBeDefined();
-    expect(
-      typeof caught === "object" && caught !== null && "status" in caught
-        && (caught as { status: number }).status === 404,
-    ).toBe(true);
+    expect(caught).toMatchObject({ status: 404 });
   });
 
-  test("cancel action transitions run row to cancelled", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const id = await seedRun(db, orgId, projectId, "running");
+  test("cancel action delegates to the run API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    await mod.actions.cancel({ params: { id } } as Parameters<typeof mod.actions.cancel>[0]);
-    const rows = await db.query<{ status: string }>(
-      `SELECT status FROM agent_runs WHERE id = $1`,
-      [id],
-    );
-    expect(rows[0]?.status).toBe("cancelled");
+    const result = await mod.actions.cancel(event("run-1") as Parameters<typeof mod.actions.cancel>[0]);
+    expect(result).toEqual({ ok: true, message: "Run cancelled" });
+    expect(calls).toEqual([{ method: "cancel", input: { id: "run-1" } }]);
   });
 
   test("retry action redirects 303 to new run id", async () => {
-    const { db, orgId, projectId } = await freshDb();
-    const id = await seedRun(db, orgId, projectId, "failed");
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
     let caught: unknown;
     try {
-      await mod.actions.retry({ params: { id } } as Parameters<typeof mod.actions.retry>[0]);
-    } catch (e) {
-      caught = e;
+      await mod.actions.retry(event("run-1") as Parameters<typeof mod.actions.retry>[0]);
+    } catch (err) {
+      caught = err;
     }
-    expect(caught).toBeDefined();
-    expect(isRedirect(caught)).toBe(true);
-    if (isRedirect(caught)) {
-      expect(caught.status).toBe(303);
-      expect(caught.location).toMatch(/^\/runs\/[A-Z0-9]+$/);
-      expect(caught.location).not.toBe(`/runs/${id}`);
-    }
+    expect(caught).toMatchObject({ status: 303, location: "/runs/run-retry" });
+    expect(calls).toEqual([{ method: "retry", input: { id: "run-1" } }]);
   });
 });

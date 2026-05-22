@@ -1,10 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
-
-const calls: string[] = [];
+const calls: Array<{ method: string; input: Record<string, unknown> }> = [];
 const boardTasks = [
   {
     id: "task-1",
@@ -16,150 +12,121 @@ const boardTasks = [
   },
 ];
 
+mock.module("$lib/server/workspace-board-api", () => ({
+  createWorkspaceBoardApiForEvent: () => ({
+    tasks: {
+      board: {
+        list: async (input: Record<string, unknown>) => {
+          calls.push({ method: "list", input });
+          return boardTasks;
+        },
+        create: async (input: Record<string, unknown>) => {
+          calls.push({ method: "create", input });
+          return { id: "task-new" };
+        },
+        update: async (input: Record<string, unknown>) => {
+          calls.push({ method: "update", input });
+          if (input.expectedStatus === "blocked") throw new Error("status conflict: expected blocked, got pending");
+          return { id: input.id };
+        },
+        delete: async (input: Record<string, unknown>) => {
+          calls.push({ method: "delete", input });
+          return { id: input.id };
+        },
+        bulkStatus: async (input: Record<string, unknown>) => {
+          calls.push({ method: "bulkStatus", input });
+          return { updated: (input.ids as string[]).length };
+        },
+        bulkDelete: async (input: Record<string, unknown>) => {
+          calls.push({ method: "bulkDelete", input });
+          return { deleted: (input.ids as string[]).length };
+        },
+        move: async (input: Record<string, unknown>) => {
+          calls.push({ method: "move", input });
+          if (input.expectedStatus === "blocked") throw new Error("status conflict: expected blocked, got pending");
+          return { id: input.id };
+        },
+      },
+    },
+  }),
+}));
+
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
   for (const [key, value] of Object.entries(data)) fd.set(key, value);
   return new Request("http://localhost/boards", { method: "POST", body: fd });
 }
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its seam while active (beforeAll/afterAll) so sibling suites that
-// mock the same path are never hijacked.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
-
-mock.module("@work-management/interface/work-item-detail.ts", () => ({
-  listBoardWorkItems: async (_em: unknown, ctx: { projectId?: string | null }) => {
-    calls.push(`list:${ctx.projectId ?? ""}`);
-    return boardTasks;
-  },
-}));
-
-mock.module("@work-management/interface/work-item-actions.ts", () => ({
-  TASK_STATUSES: ["pending", "in_progress", "blocked", "completed", "cancelled"],
-  createTaskAction: async () => ({ id: "task-new" }),
-  updateTaskAction: async () => ({ ok: true }),
-  deleteTaskAction: async () => ({ ok: true }),
-  moveTaskStatusAction: async () => ({ ok: true }),
-  createWorkItem: async (_em: unknown, _ctx: unknown, input: { title: string; status?: string | null }) => {
-    calls.push(`create:${input.title}:${input.status ?? ""}`);
-    return { id: "task-new" };
-  },
-  updateWorkItem: async (
-    _em: unknown,
-    _ctx: unknown,
-    id: string,
-    input: { status?: string | null; expectedStatus?: string | null },
-  ) => {
-    calls.push(`update:${id}:${input.expectedStatus ?? ""}:${input.status ?? ""}`);
-    if (input.expectedStatus === "blocked") throw new Error("status conflict: expected blocked, got pending");
-    return { id };
-  },
-  deleteWorkItem: async (_em: unknown, _ctx: unknown, id: string) => {
-    calls.push(`delete:${id}`);
-    return { id };
-  },
-  bulkUpdateWorkItems: async (_em: unknown, _ctx: unknown, ids: string[], patch: { status?: string | null }) => {
-    calls.push(`bulk-update:${ids.join("|")}:${patch.status ?? ""}`);
-    return { updated: ids.length };
-  },
-  bulkDeleteWorkItems: async (_em: unknown, _ctx: unknown, ids: string[]) => {
-    calls.push(`bulk-delete:${ids.join("|")}`);
-    return { deleted: ids.length };
-  },
-}));
+function event(request: Request = form({}), locals: Record<string, unknown> = { activeProjectId: "project-1" }) {
+  return {
+    url: new URL("http://localhost/boards?project=project-1"),
+    request,
+    locals,
+    fetch,
+    parent: async () => ({ activeProjectId: null }),
+  };
+}
 
 beforeEach(() => {
   calls.splice(0, calls.length);
 });
 
 describe("/boards +page.server.ts", () => {
-  let disposeScope: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) => ({
-      em: { kind: "mock-em" },
-      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
-    }));
-  });
-  afterAll(() => {
-    disposeScope?.();
-  });
-
-  test("server route uses work-management interfaces instead of direct application imports", () => {
-    const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@work-management/interface/work-item-actions");
-    expect(source).toContain("@work-management/interface/work-item-detail");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@work-management/application/tasks");
-    expect(source).not.toContain("$lib/server/application-scope");
-  });
-
-  test("load returns board rows through the service boundary", async () => {
+  test("load returns board rows through the public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      url: new URL("http://localhost/boards?project=project-1"),
-      locals: {},
-      parent: async () => ({ activeProjectId: null }),
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(event() as Parameters<typeof mod.load>[0]);
 
     expect(result.project).toBe("project-1");
     const payload = await result.streamed.data;
     expect(payload.tasks).toEqual(boardTasks);
-    expect(calls).toEqual(["list:project-1"]);
+    expect(calls).toEqual([{ method: "list", input: { projectId: "project-1" } }]);
   });
 
-  test("create, update, delete, and bulk actions call the service boundary", async () => {
+  test("create, update, delete, and bulk actions call the public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const locals = { activeProjectId: "project-1" };
 
     await mod.actions.create({
-      request: form({ title: "New task", status: "pending" }),
-      locals,
+      ...event(form({ title: "New task", status: "pending" }), locals),
     } as Parameters<typeof mod.actions.create>[0]);
     await mod.actions.update({
-      request: form({ id: "task-1", title: "Renamed", status: "in_progress", priority: "2" }),
-      locals,
+      ...event(form({ id: "task-1", title: "Renamed", status: "in_progress", priority: "2" }), locals),
     } as Parameters<typeof mod.actions.update>[0]);
     await mod.actions.delete({
-      request: form({ id: "task-1" }),
-      locals,
+      ...event(form({ id: "task-1" }), locals),
     } as Parameters<typeof mod.actions.delete>[0]);
     const bulkStatus = await mod.actions.bulkStatus({
-      request: form({ ids: "task-1,task-2", status: "blocked" }),
-      locals,
+      ...event(form({ ids: "task-1,task-2", status: "blocked" }), locals),
     } as Parameters<typeof mod.actions.bulkStatus>[0]);
     const bulkDelete = await mod.actions.bulkDelete({
-      request: form({ ids: "task-1,task-2" }),
-      locals,
+      ...event(form({ ids: "task-1,task-2" }), locals),
     } as Parameters<typeof mod.actions.bulkDelete>[0]);
 
     expect(bulkStatus).toEqual({ ok: true, message: "2 task(s) updated" });
     expect(bulkDelete).toEqual({ ok: true, message: "2 task(s) deleted" });
     expect(calls).toEqual([
-      "create:New task:pending",
-      "update:task-1::in_progress",
-      "delete:task-1",
-      "bulk-update:task-1|task-2:blocked",
-      "bulk-delete:task-1|task-2",
+      { method: "create", input: { title: "New task", status: "pending", projectId: null } },
+      { method: "update", input: { id: "task-1", title: "Renamed", status: "in_progress", priority: 2, projectId: "project-1" } },
+      { method: "delete", input: { id: "task-1", projectId: "project-1" } },
+      { method: "bulkStatus", input: { ids: ["task-1", "task-2"], status: "blocked", projectId: "project-1" } },
+      { method: "bulkDelete", input: { ids: ["task-1", "task-2"], projectId: "project-1" } },
     ]);
   });
 
   test("move preserves optimistic status conflict handling", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const ok = await mod.actions.move({
-      request: form({ id: "task-1", from: "pending", to: "in_progress" }),
-      locals: { activeProjectId: "project-1" },
+      ...event(form({ id: "task-1", from: "pending", to: "in_progress" })),
     } as Parameters<typeof mod.actions.move>[0]);
     const conflict = await mod.actions.move({
-      request: form({ id: "task-1", from: "blocked", to: "completed" }),
-      locals: { activeProjectId: "project-1" },
+      ...event(form({ id: "task-1", from: "blocked", to: "completed" })),
     } as Parameters<typeof mod.actions.move>[0]);
 
     expect(ok).toEqual({ ok: true, message: "Task moved" });
     expect((conflict as { status?: number }).status).toBe(409);
     expect(calls).toEqual([
-      "update:task-1:pending:in_progress",
-      "update:task-1:blocked:completed",
+      { method: "move", input: { id: "task-1", expectedStatus: "pending", status: "in_progress", projectId: "project-1" } },
+      { method: "move", input: { id: "task-1", expectedStatus: "blocked", status: "completed", projectId: "project-1" } },
     ]);
   });
 });
