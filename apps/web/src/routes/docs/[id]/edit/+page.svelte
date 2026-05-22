@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { enhance } from "$app/forms";
-	import type { ActionData, onMount, PageData } from "./$types";
+	import type { ActionData, PageData } from "./$types";
 	import type { JSONContent } from "@tiptap/core";
 	import CommentsPanel from "$lib/components/editor/CommentsPanel.svelte";
 	import DocEditor from "$lib/components/editor/DocEditor.svelte";
 	import FrontmatterForm from "$lib/components/docs/FrontmatterForm.svelte";
 	import FrontmatterYaml from "$lib/components/docs/FrontmatterYaml.svelte";
-	import { buttonVariants, Select, untrack } from "@fulcrum/ui-kit";
-	import { cn } from "@fulcrum/ui-kit";
+	import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
 	import FeatureGate from "$lib/components/FeatureGate.svelte";

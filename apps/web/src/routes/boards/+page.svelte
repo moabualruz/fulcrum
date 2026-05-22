@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
   import type { TaskStatus } from "$lib/server/tasks";
-  import { } from "$lib/components/board/board-helpers";
+  import { buildBoardSnapshot, describeStatus, keyboardMove, TASK_STATUSES } from "$lib/components/board/board-helpers";
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
@@ -12,7 +12,7 @@
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
   import { page } from "$app/state";
-  import { cn, buildBoardSnapshot, describeStatus, keyboardMove, Select, TASK_STATUSES } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: {
