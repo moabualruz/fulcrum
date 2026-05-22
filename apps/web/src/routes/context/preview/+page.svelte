@@ -69,7 +69,7 @@
 		<div class={cn("self-end")}>
 			<button
 				type="submit"
-				class={cn(buttonVariants({ variant: "default" }))}
+				class={cn(buttonVariants({ variant: "primary" }))}
 			>Preview</button>
 		</div>
 	</form>

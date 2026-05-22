@@ -6,10 +6,8 @@
 	export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link";
 	export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
-	type LegacyButtonVariant = "default" | "destructive" | "outline";
-	type LegacyButtonSize = "default" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
-	type ButtonVariantInput = ButtonVariant | LegacyButtonVariant;
-	type ButtonSizeInput = ButtonSize | LegacyButtonSize;
+	const buttonVariantValues = ["primary", "secondary", "ghost", "danger", "link"] as const;
+	const buttonSizeValues = ["xs", "sm", "md", "lg"] as const;
 
 	const buttonClassVariants = tv({
 		base: "focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 rounded-md border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-3 active:not-aria-[haspopup]:translate-y-px aria-invalid:ring-3 [&_svg:not([class*='size-'])]:size-4 group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 data-[loading=true]:cursor-wait data-[loading=true]:opacity-80 data-[selected=true]:ring-2 data-[selected=true]:ring-ring data-[selected=true]:ring-offset-2 [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -19,16 +17,16 @@
 				danger:
 					"bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 data-[selected=true]:bg-destructive/95 dark:focus-visible:ring-destructive/40",
 				secondary:
-					"border-border bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground data-[selected=true]:bg-secondary/90",
+					"border-border bg-surface-elevated text-fg shadow-xs hover:bg-surface-sunken aria-expanded:bg-surface-sunken aria-expanded:text-fg data-[selected=true]:bg-surface-sunken",
 				ghost:
 					"hover:bg-muted hover:text-foreground data-[selected=true]:bg-muted data-[selected=true]:text-foreground dark:hover:bg-muted/50 aria-expanded:bg-muted aria-expanded:text-foreground",
 				link: "text-primary underline-offset-4 hover:underline data-[selected=true]:underline",
 			},
 			size: {
 				md: "h-7 gap-1.5 px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				xs: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-				sm: "h-8 gap-1 rounded-[min(var(--radius-md),10px)] px-2.5 in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-				lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+				xs: "h-5 gap-1 rounded-[min(var(--radius-md),8px)] px-1.5 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 [&_svg:not([class*='size-'])]:size-3",
+				sm: "h-6 gap-1 rounded-[min(var(--radius-md),8px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+				lg: "h-8 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
 			},
 		},
 		defaultVariants: {
@@ -37,33 +35,21 @@
 		},
 	});
 
-	function normalizeButtonVariant(variant: ButtonVariantInput | null | undefined): ButtonVariant {
-		if (variant === "default") return "primary";
-		if (variant === "destructive") return "danger";
-		if (variant === "outline") return "secondary";
-		return variant ?? "primary";
+	function normalizeButtonVariant(variant: ButtonVariant | null | undefined): ButtonVariant {
+		if (variant === null || variant === undefined) return "primary";
+		if (buttonVariantValues.includes(variant)) return variant;
+		throw new TypeError(`Unsupported Button variant: ${String(variant)}`);
 	}
 
-	function normalizeButtonSize(size: ButtonSizeInput | null | undefined): ButtonSize {
-		if (size === "default") return "md";
-		if (size === "icon-xs") return "xs";
-		if (size === "icon-sm" || size === "icon") return "sm";
-		if (size === "icon-lg") return "lg";
-		return size ?? "md";
-	}
-
-	function legacyIconSizeClass(size: ButtonSizeInput | null | undefined): string | undefined {
-		if (size === "icon-xs") {
-			return "size-6 rounded-[min(var(--radius-md),8px)] px-0 [&_svg:not([class*='size-'])]:size-3";
-		}
-		if (size === "icon-sm" || size === "icon") return "size-8 px-0";
-		if (size === "icon-lg") return "size-10 px-0";
-		return undefined;
+	function normalizeButtonSize(size: ButtonSize | null | undefined): ButtonSize {
+		if (size === null || size === undefined) return "md";
+		if (buttonSizeValues.includes(size)) return size;
+		throw new TypeError(`Unsupported Button size: ${String(size)}`);
 	}
 
 	export function buttonVariants(options?: {
-		variant?: ButtonVariantInput | null;
-		size?: ButtonSizeInput | null;
+		variant?: ButtonVariant | null;
+		size?: ButtonSize | null;
 		class?: string;
 		className?: string;
 	}) {
@@ -75,7 +61,6 @@
 				variant: normalizedVariant,
 				size: normalizedSize,
 			}),
-			legacyIconSizeClass(options?.size),
 			options?.class,
 			options?.className,
 		);

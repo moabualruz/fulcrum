@@ -79,7 +79,7 @@
 				{#if payload.page > 1}
 					<a
 						href="?page={payload.page - 1}"
-						class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+						class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					>← Prev</a>
 				{:else}
 					<span></span>
@@ -92,7 +92,7 @@
 				{#if payload.page < payload.totalPages}
 					<a
 						href="?page={payload.page + 1}"
-						class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+						class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					>Next →</a>
 				{:else}
 					<span></span>

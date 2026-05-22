@@ -67,7 +67,7 @@
       </div>
       <form method="POST" action="?/purge" use:enhance>
         <button type="submit" data-purge-btn
-          class={cn(buttonVariants({ variant: "destructive" }))}>Purge</button>
+          class={cn(buttonVariants({ variant: "danger" }))}>Purge</button>
       </form>
     </div>
   </div>

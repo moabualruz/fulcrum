@@ -109,8 +109,8 @@
     </label>
 
     <div class={cn("flex flex-wrap gap-2")}>
-      <button type="button" class={cn(buttonVariants({ variant: "default" }))} onclick={() => void save()}>Save</button>
-      <button type="button" class={cn(buttonVariants({ variant: "outline" }))} onclick={resetDefaults}>Reset defaults</button>
+      <button type="button" class={cn(buttonVariants({ variant: "primary" }))} onclick={() => void save()}>Save</button>
+      <button type="button" class={cn(buttonVariants({ variant: "secondary" }))} onclick={resetDefaults}>Reset defaults</button>
     </div>
 
     {#if saved}

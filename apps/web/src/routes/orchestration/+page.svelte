@@ -136,7 +136,7 @@
                         <button
                           type="submit"
                           data-cancel-button={d.id}
-                          class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                          class={cn(buttonVariants({ variant: "danger", size: "sm" }))}
                         >Cancel</button>
                       </form>
                     {/if}
@@ -146,7 +146,7 @@
                         <button
                           type="submit"
                           data-retry-button={d.id}
-                          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                         >Retry</button>
                       </form>
                     {/if}

@@ -50,7 +50,7 @@
 			href="/docs/new"
 			data-new-doc
 			data-slot="button"
-			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+			class={cn(buttonVariants({ variant: "primary" }), "gap-2")}
 		>New document</a>
 	</header>
 
@@ -107,7 +107,7 @@
 		/>
 		<button
 			type="submit"
-			class={cn(buttonVariants({ variant: "outline" }))}
+			class={cn(buttonVariants({ variant: "secondary" }))}
 		>Apply</button>
 	</form>
 
@@ -123,7 +123,7 @@
 			<a
 				href="/docs"
 				data-docs-error-retry
-				class={cn(buttonVariants({ variant: "outline" }), "mt-3 gap-2")}
+				class={cn(buttonVariants({ variant: "secondary" }), "mt-3 gap-2")}
 			>Retry</a>
 		</div>
 	{:else if payload.documents.length === 0 && data.kind === "" && data.q === ""}

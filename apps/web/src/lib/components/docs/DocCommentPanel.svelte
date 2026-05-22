@@ -130,7 +130,7 @@
       </h2>
       <button
         data-close-comments
-        class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-6")}
+        class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "size-6 px-0")}
         onclick={() => { open = false; }}
         aria-label="Close comments"
       >
@@ -214,7 +214,7 @@
                     >Reply</button>
                     <button
                       data-resolve-comment={comment.id}
-                      class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-5 text-muted-foreground hover:text-green-600")}
+                      class={cn(buttonVariants({ variant: "ghost", size: "xs" }), "size-5 px-0 text-muted-foreground hover:text-green-600")}
                       onclick={() => handleResolve(comment.id)}
                       disabled={resolving[comment.id]}
                       title="Resolve comment"
@@ -246,7 +246,7 @@
                     {#if !reply.resolved}
                       <button
                         data-resolve-comment={reply.id}
-                        class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-5 mt-1 text-muted-foreground hover:text-green-600")}
+                        class={cn(buttonVariants({ variant: "ghost", size: "xs" }), "size-5 mt-1 px-0 text-muted-foreground hover:text-green-600")}
                         onclick={() => handleResolve(reply.id)}
                         disabled={resolving[reply.id]}
                         title="Resolve reply"
@@ -286,7 +286,7 @@
                     }}
                   ></textarea>
                   <button
-                    class={cn(buttonVariants({ variant: "primary", size: "icon" }), "size-8 shrink-0 self-end")}
+                    class={cn(buttonVariants({ variant: "primary", size: "lg" }), "size-8 shrink-0 self-end px-0")}
                     onclick={() => void handleReply(comment.id)}
                     disabled={submitting || !replyText.trim()}
                     aria-label="Send reply"
@@ -316,7 +316,7 @@
         ></textarea>
         <button
           data-submit-comment
-          class={cn(buttonVariants({ variant: "primary", size: "icon" }), "size-8 shrink-0")}
+          class={cn(buttonVariants({ variant: "primary", size: "lg" }), "size-8 shrink-0 px-0")}
           onclick={() => void handleNewComment()}
           disabled={submitting || !newCommentText.trim()}
           aria-label="Submit comment"

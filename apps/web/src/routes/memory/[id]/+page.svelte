@@ -47,7 +47,7 @@
 			<button
 				data-delete-memory
 				type="submit"
-				class={cn(buttonVariants({ variant: "destructive" }))}
+				class={cn(buttonVariants({ variant: "danger" }))}
 			>Delete</button>
 		</form>
 	</header>
@@ -110,7 +110,7 @@
 				<button
 					type="submit"
 					data-save-memory
-					class={cn(buttonVariants({ variant: "default" }), "w-full")}
+					class={cn(buttonVariants({ variant: "primary" }), "w-full")}
 				>Save changes</button>
 			</form>
 

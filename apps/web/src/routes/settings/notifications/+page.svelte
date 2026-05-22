@@ -162,7 +162,7 @@
           type="button"
           data-mute-page
           onclick={muteCurrentPage}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >Mute page</button>
       </div>
       {#if mutedPages.length > 0}
@@ -203,7 +203,7 @@
       <button
         type="submit"
         data-save-preferences
-        class={cn(buttonVariants({ variant: "default" }))}
+        class={cn(buttonVariants({ variant: "primary" }))}
       >Save preferences</button>
       {#if prefsSaved && !validationError}
         <span data-preferences-saved class={cn("text-sm text-green-600")}>Preferences saved.</span>
@@ -237,7 +237,7 @@
     <button
       data-save-retention
       type="submit"
-      class={cn(buttonVariants({ variant: "default" }))}
+      class={cn(buttonVariants({ variant: "primary" }))}
     >Save</button>
   </form>
 

@@ -299,7 +299,7 @@
                   data-pull-button
                   type="button"
                   onclick={() => handlePull(model.id)}
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >Download</button>
               {/if}
               {#if model.downloaded}
@@ -307,7 +307,7 @@
                   data-remove-button
                   type="button"
                   onclick={() => { confirmRemoveModelId = model.id; }}
-                  class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "danger", size: "sm" }))}
                 >Remove</button>
               {/if}
             </div>
@@ -329,13 +329,13 @@
             data-confirm-cancel
             type="button"
             onclick={() => { confirmRemoveModelId = null; }}
-            class={cn(buttonVariants({ variant: "outline" }))}
+            class={cn(buttonVariants({ variant: "secondary" }))}
           >Cancel</button>
           <button
             data-confirm-remove
             type="button"
             onclick={() => confirmRemoveModelId && handleRemove(confirmRemoveModelId)}
-            class={cn(buttonVariants({ variant: "destructive" }))}
+            class={cn(buttonVariants({ variant: "danger" }))}
           >Remove</button>
         </div>
       </div>
@@ -364,7 +364,7 @@
         data-clear-cache
         type="button"
         onclick={handleClearCache}
-        class={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}
+        class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-3")}
       >Clear cache</button>
     {:else}
       <p class={cn("text-sm text-muted-foreground")}>Cache stats unavailable</p>
@@ -383,7 +383,7 @@
           type="button"
           disabled={testLoading["embed"]}
           onclick={handleTestEmbed}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["embed"] ? "Running..." : "Run"}</button>
         {#if embedResult}
           <p data-test-embed-result class={cn("mt-2 text-sm text-muted-foreground")}>{embedResult}</p>
@@ -398,7 +398,7 @@
           type="button"
           disabled={testLoading["generate"]}
           onclick={handleTestGenerate}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["generate"] ? "Running..." : "Run"}</button>
         {#if generateResult}
           <p data-test-generate-result class={cn("mt-2 text-sm text-muted-foreground")}>{generateResult}</p>
@@ -413,7 +413,7 @@
           type="button"
           disabled={testLoading["classify"]}
           onclick={handleTestClassify}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["classify"] ? "Running..." : "Run"}</button>
         {#if classifyResult}
           <p data-test-classify-result class={cn("mt-2 text-sm text-muted-foreground")}>{classifyResult}</p>
@@ -428,7 +428,7 @@
           type="button"
           disabled={testLoading["tokenize"]}
           onclick={handleTestTokenize}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["tokenize"] ? "Running..." : "Run"}</button>
         {#if tokenizeResult}
           <p data-test-tokenize-result class={cn("mt-2 text-sm text-muted-foreground")}>{tokenizeResult}</p>

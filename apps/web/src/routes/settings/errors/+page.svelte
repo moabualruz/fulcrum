@@ -32,7 +32,7 @@
         class={cn("ml-1 border-input bg-background h-8 rounded-md border px-2 text-xs")} />
     </label>
     <button type="submit" data-clear-before-btn disabled={!clearBefore}
-      class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Clear</button>
+      class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Clear</button>
   </form>
 </header>
 

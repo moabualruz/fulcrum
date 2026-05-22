@@ -57,12 +57,12 @@
 			<a
 				data-doc-plan
 				href="/planning?docId={doc.id}"
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Plan from this doc</a>
 			<a
 				data-doc-edit
 				href="/docs/{doc.id}/edit"
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Edit</a>
 		</div>
 	</header>
@@ -224,7 +224,7 @@
 		<a
 			href="/docs"
 			data-doc-detail-error-back
-			class={cn(buttonVariants({ variant: "outline" }), "mt-3 gap-2")}
+			class={cn(buttonVariants({ variant: "secondary" }), "mt-3 gap-2")}
 		>Back to documents</a>
 	</section>
 {/await}

@@ -68,7 +68,7 @@
   />
   <button
     type="submit"
-    class={cn(buttonVariants({ variant: "outline" }))}
+    class={cn(buttonVariants({ variant: "secondary" }))}
   >Apply</button>
 </form>
 

@@ -132,7 +132,7 @@
                 <button
                   type="submit"
                   data-test-button={profile.name}
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >Test</button>
               </form>
 
@@ -140,7 +140,7 @@
                 type="button"
                 data-dispatch-button={profile.name}
                 onclick={() => openDispatch(profile.name)}
-                class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                class={cn(buttonVariants({ variant: "primary", size: "sm" }))}
               >Dispatch</button>
             </div>
           </div>
@@ -197,13 +197,13 @@
               type="button"
               data-dispatch-cancel
               onclick={closeDispatch}
-              class={cn(buttonVariants({ variant: "outline" }))}
+              class={cn(buttonVariants({ variant: "secondary" }))}
             >Cancel</button>
             <button
               type="submit"
               data-dispatch-submit
               disabled={!dispatchTaskId}
-              class={cn(buttonVariants({ variant: "default" }))}
+              class={cn(buttonVariants({ variant: "primary" }))}
             >Dispatch</button>
           </div>
         </form>

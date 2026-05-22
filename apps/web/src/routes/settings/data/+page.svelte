@@ -61,7 +61,7 @@
         </label>
       {/each}
     </div>
-    <button type="submit" data-export-btn class={cn(buttonVariants({ variant: "default" }))}>
+    <button type="submit" data-export-btn class={cn(buttonVariants({ variant: "primary" }))}>
       Export JSON
     </button>
     <p class={cn("text-xs text-muted-foreground mt-1")}>Leave all unchecked to export everything.</p>
@@ -78,7 +78,7 @@
         class={cn("text-sm")}
         onchange={(e) => { importFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-import-preflight disabled={!importFile}
-        class={cn(buttonVariants({ variant: "default" }))}>Preflight check</button>
+        class={cn(buttonVariants({ variant: "primary" }))}>Preflight check</button>
     </div>
   </form>
 </section>
@@ -111,7 +111,7 @@
           {#if importFile}
             <!-- We store the file reference; in production use a temp key approach -->
           {/if}
-          <button type="submit" data-confirm-import class={cn(buttonVariants({ variant: "default" }))}>Confirm import</button>
+          <button type="submit" data-confirm-import class={cn(buttonVariants({ variant: "primary" }))}>Confirm import</button>
         </form>
       </div>
     </div>

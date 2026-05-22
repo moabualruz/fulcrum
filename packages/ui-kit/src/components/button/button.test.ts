@@ -29,6 +29,19 @@ describe("Button — DESIGN.md §4.1 vocabulary", () => {
 		expect(body).toContain("h-7");
 	});
 
+	test("maps DESIGN sizes to exact height utilities", () => {
+		const expectedHeights = {
+			xs: "h-5",
+			sm: "h-6",
+			md: "h-7",
+			lg: "h-8",
+		} as const satisfies Record<ButtonSize, string>;
+
+		for (const size of designButtonSizes) {
+			expect(buttonVariants({ size })).toContain(expectedHeights[size]);
+		}
+	});
+
 	test("renders the danger variant with danger token aliases", () => {
 		const { body } = render(ButtonRoot, {
 			props: { variant: "danger" },
@@ -39,16 +52,18 @@ describe("Button — DESIGN.md §4.1 vocabulary", () => {
 		expect(body).toContain("text-destructive-foreground");
 	});
 
-	test("keeps legacy names as explicit compatibility aliases", () => {
-		expect(buttonVariants({ variant: "default", size: "default" })).toBe(
-			buttonVariants({ variant: "primary", size: "md" }),
+	test("rejects legacy variant and icon-size aliases", () => {
+		expect(() => buttonVariants({ variant: "default" as ButtonVariant })).toThrow(
+			"Unsupported Button variant",
 		);
-		expect(buttonVariants({ variant: "destructive" })).toBe(
-			buttonVariants({ variant: "danger" }),
+		expect(() => buttonVariants({ variant: "destructive" as ButtonVariant })).toThrow(
+			"Unsupported Button variant",
 		);
-		expect(buttonVariants({ variant: "outline" })).toBe(
-			buttonVariants({ variant: "secondary" }),
+		expect(() => buttonVariants({ variant: "outline" as ButtonVariant })).toThrow(
+			"Unsupported Button variant",
 		);
+		expect(() => buttonVariants({ size: "default" as ButtonSize })).toThrow("Unsupported Button size");
+		expect(() => buttonVariants({ size: "icon" as ButtonSize })).toThrow("Unsupported Button size");
 	});
 
 	test("uses OKLCH-tokened utilities only — no raw hex/rgb/hsl in markup", () => {

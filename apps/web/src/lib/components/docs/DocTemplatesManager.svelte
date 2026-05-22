@@ -74,8 +74,8 @@
 								<textarea name="bodyTemplate" rows="4" class={cn("border-input bg-background rounded-md border px-3 py-2 text-sm")}>{template.bodyTemplate}</textarea>
 							</div>
 							<div class={cn("flex flex-row gap-2 md:flex-col")}>
-								<button type="submit" name="intent" value="update" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Save</button>
-								<button type="submit" name="intent" value="setDefault" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Set default</button>
+								<button type="submit" name="intent" value="update" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Save</button>
+								<button type="submit" name="intent" value="setDefault" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Set default</button>
 								<button type="submit" name="intent" value="delete" disabled={!template.projectId} class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Delete</button>
 							</div>
 						</form>

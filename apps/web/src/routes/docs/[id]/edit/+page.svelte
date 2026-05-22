@@ -171,7 +171,7 @@
 			<button
 				type="button"
 				data-collab-retry-save
-				class={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}
+				class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-2")}
 				onclick={retryCollaborationSave}
 			>Retry save</button>
 		{/if}
@@ -206,7 +206,7 @@
 				<button
 					type="button"
 					data-frontmatter-toggle-yaml
-					class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+					class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					onclick={() => (frontmatterMode = frontmatterMode === "form" ? "yaml" : "form")}
 					>{frontmatterMode === "form" ? "YAML" : "Form"}</button
 				>
@@ -300,11 +300,11 @@
 		</div>
 
 		<div class={cn("flex items-center gap-2 pt-2")}>
-			<button type="submit" data-doc-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+			<button type="submit" data-doc-save class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
 			<a
 				href="/docs/{data.doc.id}"
 				data-doc-cancel
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Cancel</a>
 		</div>
 	</form>

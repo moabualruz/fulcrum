@@ -31,7 +31,7 @@
 		<button
 			type="button"
 			data-add-repo-trigger
-			class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+			class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 		>Add repo</button>
 	</header>
 
@@ -90,7 +90,7 @@
 										type="submit"
 										data-sync-btn
 										data-repo-id={repo.id}
-										class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+										class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 									>Sync</button>
 								</form>
 							</td>

@@ -23,7 +23,7 @@
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Secrets</h1>
   <button
     data-add-secret
-    class={cn(buttonVariants({ variant: "default" }))}
+    class={cn(buttonVariants({ variant: "primary" }))}
     onclick={() => { sheetOpen = true; }}
   >Add secret</button>
 </header>
@@ -69,7 +69,7 @@
           data-secret-value-input
         />
       </label>
-      <button type="submit" class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+      <button type="submit" class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
     </form>
   </SheetContent>
 </Sheet>
@@ -118,7 +118,7 @@
                       data-rotate-value-input
                       class="h-7 w-32 mr-1"
                     />
-                    <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }))}>Save</button>
+                    <button type="submit" class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>Save</button>
                     <button type="button" onclick={() => { rotateId = null; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Cancel</button>
                   </form>
                 {:else}
@@ -136,7 +136,7 @@
                 </form>
                 <form method="POST" action="?/delete" use:enhance>
                   <input type="hidden" name="id" value={cred.id} />
-                  <button type="submit" data-delete-btn class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Delete</button>
+                  <button type="submit" data-delete-btn class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Delete</button>
                 </form>
               </td>
             </tr>

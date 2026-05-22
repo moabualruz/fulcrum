@@ -119,7 +119,7 @@
 				</div>
 				<button
 					type="button"
-					class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+					class={cn(buttonVariants({ variant: "primary", size: "sm" }))}
 					onclick={useSelectedTemplate}
 				>Use template</button>
 			</div>
@@ -201,7 +201,7 @@
 			type="submit"
 			data-doc-save
 			data-doc-submit
-			class={cn(buttonVariants({ variant: "default" }))}
+			class={cn(buttonVariants({ variant: "primary" }))}
 		>Create document</button>
 	</div>
 </form>

@@ -82,7 +82,7 @@
 						href="/settings/data"
 						data-import-projects
 						data-slot="button"
-						class={cn(buttonVariants({ variant: "outline" }), "w-full justify-center gap-2 sm:w-auto")}
+						class={cn(buttonVariants({ variant: "secondary" }), "w-full justify-center gap-2 sm:w-auto")}
 				>
 					<FolderOpenIcon class="size-4" aria-hidden="true" />
 					Import
@@ -91,7 +91,7 @@
 						href="/projects/new"
 						data-new-project
 						data-slot="button"
-						class={cn(buttonVariants({ variant: "default" }), "w-full justify-center gap-2 sm:w-auto")}
+						class={cn(buttonVariants({ variant: "primary" }), "w-full justify-center gap-2 sm:w-auto")}
 				>
 					<PlusIcon class="size-4" aria-hidden="true" />
 					New project
@@ -136,7 +136,7 @@
 			data-projects-reset
 			disabled={filter.trim() === "" && statusFilter === "all"}
 			onclick={resetFilters}
-			class={cn(buttonVariants({ variant: "outline" }), "gap-2 disabled:pointer-events-none disabled:opacity-40")}
+			class={cn(buttonVariants({ variant: "secondary" }), "gap-2 disabled:pointer-events-none disabled:opacity-40")}
 		>
 			<XIcon class="size-4" aria-hidden="true" />
 			Reset
@@ -171,7 +171,7 @@
 					<a
 						href="/projects/new"
 						data-empty-create-project
-						class={cn(buttonVariants({ variant: "default" }), "w-full justify-center gap-2 sm:w-auto")}
+						class={cn(buttonVariants({ variant: "primary" }), "w-full justify-center gap-2 sm:w-auto")}
 					>
 						<PlusIcon class="size-4" aria-hidden="true" />
 						New project
@@ -179,7 +179,7 @@
 					<a
 						href="/settings/data"
 						data-empty-import-projects
-						class={cn(buttonVariants({ variant: "outline" }), "w-full justify-center gap-2 sm:w-auto")}
+						class={cn(buttonVariants({ variant: "secondary" }), "w-full justify-center gap-2 sm:w-auto")}
 					>
 						<FolderOpenIcon class="size-4" aria-hidden="true" />
 						Import data
@@ -187,7 +187,7 @@
 					<a
 						href="/search"
 						data-empty-open-existing
-						class={cn(buttonVariants({ variant: "outline" }), "w-full justify-center gap-2 sm:w-auto")}
+						class={cn(buttonVariants({ variant: "secondary" }), "w-full justify-center gap-2 sm:w-auto")}
 					>
 						<SearchIcon class="size-4" aria-hidden="true" />
 						Search all projects
@@ -201,7 +201,7 @@
 		>
 			<h2 class={cn("text-base font-semibold text-foreground")}>No matching projects</h2>
 			<p class={cn("mt-1 text-sm text-muted-foreground")}>No project matches the current search or status filter.</p>
-			<button type="button" data-empty-filter-reset onclick={resetFilters} class={cn(buttonVariants({ variant: "outline" }), "mt-4 gap-2")}>
+			<button type="button" data-empty-filter-reset onclick={resetFilters} class={cn(buttonVariants({ variant: "secondary" }), "mt-4 gap-2")}>
 				<XIcon class="size-4" aria-hidden="true" />
 				Clear filters
 			</button>
@@ -260,7 +260,7 @@
 						<a
 							href="/projects/{project.id}"
 							data-project-primary-action
-							class={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-2")}
+							class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "gap-2")}
 						>
 							Open
 							<ArrowRightIcon class="size-4" aria-hidden="true" />
