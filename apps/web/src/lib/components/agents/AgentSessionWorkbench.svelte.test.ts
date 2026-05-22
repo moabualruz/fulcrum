@@ -198,7 +198,7 @@ describe("AgentSessionWorkbench component", () => {
       expect(body).toContain('value="cost-cap"');
       expect(body).toContain('name="note"');
       expect(body).toContain("data-abort-note");
-      expect(body).toContain('required data-abort-reason');
+      expect(body).toContain("data-abort-reason");
       expect(body).toContain('required data-abort-note');
     });
   });

@@ -4,6 +4,7 @@
   import { createEventDispatcher, onDestroy, onMount, tick } from "svelte";
   import type { Unsubscriber } from "svelte/store";
   import { createEditor, EditorContent } from "svelte-tiptap";
+  import { CommandPaletteItem } from "@fulcrum/ui-kit";
   import type { CollabProvider } from "$lib/collab/types.js";
   import { handleAttachmentFiles } from "./embeds";
   import {
@@ -310,18 +311,17 @@
     <div class="doc-editor__surface">
       <EditorContent editor={editor as never} class="doc-editor__content" />
       {#if slashOpen}
-        <div data-slash-menu role="listbox" class="doc-editor__slash">
+        <div data-slash-menu data-ui-kit-command-list class="doc-editor__slash">
           {#each filteredItems as item, index (item.id)}
-            <button
-              type="button"
-              role="option"
+            <CommandPaletteItem
+              value={item.id}
               aria-selected={index === selectedIndex}
               data-slash-item={item.id}
-              class:active={index === selectedIndex}
+              class={index === selectedIndex ? "active" : ""}
               onclick={() => chooseItem(item)}
             >
               {item.label}
-            </button>
+            </CommandPaletteItem>
           {/each}
         </div>
       {/if}

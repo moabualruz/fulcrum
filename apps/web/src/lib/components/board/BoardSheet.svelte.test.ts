@@ -65,16 +65,11 @@ describe("BoardSheet (SSR)", () => {
     expect(body).toMatch(/data-board-sheet-title[^>]*value="Wire UI"|value="Wire UI"[^>]*data-board-sheet-title/);
   });
 
-  test("status select marks the task's current status as selected", () => {
+  test("status select renders the ui-kit trigger with the task's current status", () => {
     const { body } = render(BoardSheet, { props: { open: true, task: sampleTask } });
-    const selectMatch = body.match(
-      /<select\b[^>]*data-board-sheet-status[\s\S]*?<\/select>/,
-    );
-    expect(selectMatch).not.toBeNull();
-    const selectHtml = selectMatch?.[0] ?? "";
-    expect(selectHtml).toMatch(
-      /<option[^>]*value="in_progress"[^>]*selected[^>]*>In progress<\/option>|<option[^>]*selected[^>]*value="in_progress"[^>]*>In progress<\/option>/,
-    );
+    expect(body).toMatch(/data-board-sheet-status/);
+    expect(body).toMatch(/data-slot="select-trigger"/);
+    expect(body).toContain("in_progress");
   });
 
   test("close button has aria-label and data-board-sheet-close", () => {

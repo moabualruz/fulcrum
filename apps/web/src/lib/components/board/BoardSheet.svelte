@@ -1,6 +1,19 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
-  import { Button, Input, Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
+  import {
+    Button,
+    Input,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+  } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
   import type { TaskStatus } from "$lib/server/tasks";
   import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";
@@ -94,9 +107,16 @@
 
       <label class="block text-sm">
         Status
-        <select data-board-sheet-status data-testid="task-detail-status" bind:value={status} class="mt-1 w-full rounded border border-border bg-background p-2">
-          {#each TASK_STATUSES as s (s)}<option value={s}>{describeStatus(s)}</option>{/each}
-        </select>
+        <Select bind:value={status} type="single">
+          <SelectTrigger data-board-sheet-status data-testid="task-detail-status" aria-label="Task status" class="mt-1">
+            <SelectValue placeholder={describeStatus(status)} />
+          </SelectTrigger>
+          <SelectContent>
+            {#each TASK_STATUSES as s (s)}
+              <SelectItem value={s} label={describeStatus(s)} />
+            {/each}
+          </SelectContent>
+        </Select>
       </label>
 
       <label class="block text-sm">

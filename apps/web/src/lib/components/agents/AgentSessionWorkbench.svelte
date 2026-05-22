@@ -1,6 +1,6 @@
 <script lang="ts">
   import { cn } from "../../utils.js";
-  import { buttonVariants } from "@fulcrum/ui-kit";
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, buttonVariants } from "@fulcrum/ui-kit";
   import type { SessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
 
   interface AgentPickerOption {
@@ -44,6 +44,8 @@
   let cwdPickerError = $state<string | null>(null);
   let selectedStartMode = $state("planning");
   let selectedRuntime = $state("");
+  let abortReason = $state("user-cancel");
+  let trafficFilter = $state(model.traffic.filter);
   const messageCount = $derived(model.messages.length);
   const hasMutatingToolCalls = $derived(model.toolCalls.items.some((toolCall) => toolCall.status === "pending" || toolCall.status === "in_progress"));
   const newestCheckpointId = $derived(model.checkpoints[0]?.id ?? null);
@@ -515,12 +517,18 @@
         <form method="POST" action="?/abortWithReason" class={cn("mt-4 grid gap-3")}>
           <label class={cn("grid gap-1 text-xs font-medium text-muted-foreground")}>
             Abort reason
-            <select name="reason" required data-abort-reason class={cn("rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground")}>
-              <option value="user-cancel">User cancel</option>
-              <option value="dangerous-output">Dangerous output</option>
-              <option value="wrong-context">Wrong context</option>
-              <option value="cost-cap">Cost cap</option>
-            </select>
+            <input type="hidden" name="reason" value={abortReason} />
+            <Select bind:value={abortReason} type="single">
+              <SelectTrigger data-abort-reason aria-label="Abort reason" size="sm">
+                <SelectValue placeholder="User cancel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user-cancel" label="User cancel" />
+                <SelectItem value="dangerous-output" label="Dangerous output" />
+                <SelectItem value="wrong-context" label="Wrong context" />
+                <SelectItem value="cost-cap" label="Cost cap" />
+              </SelectContent>
+            </Select>
           </label>
           <label class={cn("grid gap-1 text-xs font-medium text-muted-foreground")}>
             Note
@@ -584,17 +592,19 @@
       <div class={cn("flex flex-wrap items-center gap-2")}>
         <form method="POST" action="?/trafficControl" class={cn("flex flex-wrap items-center gap-2")}>
           <input type="hidden" name="trafficAction" value="filter" />
-          <select
-            data-traffic-filter
-            name="value"
-            class={cn("rounded-md border border-border bg-background px-2 py-1 text-xs")}
-          >
-            <option value="all" selected={model.traffic.filter === "all"}>All</option>
-            <option value="request" selected={model.traffic.filter === "request"}>Request</option>
-            <option value="response" selected={model.traffic.filter === "response"}>Response</option>
-            <option value="notification" selected={model.traffic.filter === "notification"}>Notification</option>
-            <option value="error" selected={model.traffic.filter === "error"}>Error</option>
-          </select>
+          <input type="hidden" name="value" value={trafficFilter} />
+          <Select bind:value={trafficFilter} type="single">
+            <SelectTrigger data-traffic-filter aria-label="Traffic filter" size="sm" class="w-36">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" label="All" />
+              <SelectItem value="request" label="Request" />
+              <SelectItem value="response" label="Response" />
+              <SelectItem value="notification" label="Notification" />
+              <SelectItem value="error" label="Error" />
+            </SelectContent>
+          </Select>
         </form>
         <form method="POST" action="?/trafficControl" class={cn("flex items-center gap-2")}>
           <input type="hidden" name="trafficAction" value="search" />
