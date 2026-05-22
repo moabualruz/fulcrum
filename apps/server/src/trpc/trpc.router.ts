@@ -26,11 +26,17 @@ export class TrpcRouter implements OnModuleInit {
     return buildFulcrumAppRouter(this.trpcService.router);
   }
 
+  /** Build the router on demand so applyMiddleware never captures an undefined router. */
+  private resolveAppRouter() {
+    if (!this._appRouter) this._appRouter = this.buildRouter();
+    return this._appRouter;
+  }
+
   async applyMiddleware(app: INestApplication) {
     app.use(
       TRPC_EXPRESS_MOUNT_PATH,
       trpcExpress.createExpressMiddleware({
-        router: this._appRouter,
+        router: this.resolveAppRouter(),
         createContext: ({ req, res }) => {
           const locals = (req as Record<string, unknown>)["locals"] as
             | Record<string, unknown>
