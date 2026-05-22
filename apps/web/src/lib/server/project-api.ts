@@ -60,6 +60,96 @@ export async function listProjectRowsForEvent(event: ProjectApiEvent) {
   return projects.map(toProjectRow);
 }
 
+export interface ProjectOption {
+  id: string;
+  name: string;
+}
+
+/** Candidate parent projects for the new-project parent picker. */
+export async function listProjectOptionsForEvent(event: ProjectApiEvent): Promise<ProjectOption[]> {
+  const response = await createProjectApiForEvent(event).projects.options();
+  return (Array.isArray(response) ? response : []) as ProjectOption[];
+}
+
+interface ProjectSetupFields {
+  slug: string;
+  name: string;
+  description: string | null;
+  kind: string;
+  repoPath: string | null;
+  template: string | null;
+  parentId: string | null;
+}
+
+interface ProjectSetupResult {
+  links: { project: { id: string; slug: string } };
+}
+
+interface ProjectCreateResult {
+  id: string;
+  slug: string;
+}
+
+/** Plain project create — no template, repo, or parent hierarchy. */
+export async function createProjectForEvent(
+  event: ProjectApiEvent,
+  fields: { slug: string; name: string; description: string | null; kind: string },
+): Promise<ProjectCreateResult> {
+  return await createProjectApiForEvent(event).projects.create(fields) as ProjectCreateResult;
+}
+
+/** Project create with template/repo/parent setup; returns the setup links. */
+export async function createProjectFromSetupForEvent(
+  event: ProjectApiEvent,
+  fields: ProjectSetupFields,
+): Promise<ProjectSetupResult> {
+  return await createProjectApiForEvent(event).projects.createFromSetup(fields) as ProjectSetupResult;
+}
+
+interface BacklogSprint {
+  id: string;
+  name: string;
+  status: string;
+  capacity_points: number | null;
+}
+
+interface BacklogTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  estimate_points: number | null;
+  sprint_id: string | null;
+}
+
+export interface ProjectBacklog {
+  project: { id: string; name: string };
+  sprints: BacklogSprint[];
+  backlogTasks: BacklogTask[];
+}
+
+/** The project backlog read-model: sprints plus unassigned open tasks. */
+export async function loadProjectBacklogForEvent(
+  event: ProjectApiEvent,
+  projectId: string,
+): Promise<ProjectBacklog> {
+  return await createProjectApiForEvent(event).backlog.load({ projectId }) as ProjectBacklog;
+}
+
+export async function addBacklogTaskToSprintForEvent(
+  event: ProjectApiEvent,
+  input: { projectId: string; sprintId: string; taskId: string },
+): Promise<void> {
+  await createProjectApiForEvent(event).backlog.addTask(input);
+}
+
+export async function removeBacklogTaskFromSprintForEvent(
+  event: ProjectApiEvent,
+  input: { projectId: string; sprintId: string; taskId: string },
+): Promise<void> {
+  await createProjectApiForEvent(event).backlog.removeTask(input);
+}
+
 function toProjectRow(project: PublicProject) {
   const updatedAt = project.updated_at ?? project.updatedAt ?? "";
   return {

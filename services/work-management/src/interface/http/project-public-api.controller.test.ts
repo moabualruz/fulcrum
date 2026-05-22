@@ -51,6 +51,29 @@ describe("project public Nest API", () => {
     expect(Reflect.getMetadata(METHOD_METADATA, ProjectPublicApiController.prototype.projectStats)).toBe(
       RequestMethod.GET,
     );
+    expect(Reflect.getMetadata(PATH_METADATA, ProjectPublicApiController.prototype.listProjectOptions)).toBe("options");
+    expect(Reflect.getMetadata(METHOD_METADATA, ProjectPublicApiController.prototype.listProjectOptions)).toBe(
+      RequestMethod.GET,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, ProjectPublicApiController.prototype.createProjectFromSetup)).toBe("setup");
+    expect(Reflect.getMetadata(METHOD_METADATA, ProjectPublicApiController.prototype.createProjectFromSetup)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, ProjectPublicApiController.prototype.loadProjectBacklog)).toBe(
+      ":id/backlog",
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, ProjectPublicApiController.prototype.addBacklogTaskToSprint)).toBe(
+      ":id/backlog/sprint-tasks",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, ProjectPublicApiController.prototype.addBacklogTaskToSprint)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, ProjectPublicApiController.prototype.removeBacklogTaskFromSprint)).toBe(
+      ":id/backlog/sprints/:sprintId/tasks/:taskId",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, ProjectPublicApiController.prototype.removeBacklogTaskFromSprint)).toBe(
+      RequestMethod.DELETE,
+    );
   });
 
   test("hides the default unconfigured route when the public API feature is off", async () => {
@@ -154,6 +177,75 @@ describe("project public Nest API", () => {
     });
     expect(projectStats).toHaveBeenCalledWith({ orgId: "org-1", id: "project-1" });
     expect(deleteProject).toHaveBeenCalledWith({ orgId: "org-1", id: "project-1" });
+  });
+
+  test("delegates options, setup, and backlog operations to the application facade", async () => {
+    const listProjectOptions = mock(async () => [{ id: "project-1", name: "Project 1" }]);
+    const createProjectFromSetup = mock(async () => ({ links: { project: { id: "project-2", slug: "project-2" } } }));
+    const loadProjectBacklog = mock(async () => ({ project: { id: "project-1", name: "Project 1" }, sprints: [], backlogTasks: [] }));
+    const addBacklogTaskToSprint = mock(async () => ({ moved: true }));
+    const removeBacklogTaskFromSprint = mock(async () => ({ moved: true }));
+    const controller = new ProjectPublicApiController(
+      new ProjectPublicApiService({
+        featuresEnv: "public-api",
+        application: {
+          listProjects: async () => ({ data: [] }),
+          listProjectOptions,
+          createProjectFromSetup,
+          loadProjectBacklog,
+          addBacklogTaskToSprint,
+          removeBacklogTaskFromSprint,
+        },
+      }),
+    );
+
+    await expect(controller.listProjectOptions({ orgId: "org-1" })).resolves.toEqual([
+      expect.objectContaining({ id: "project-1" }),
+    ]);
+    await expect(controller.createProjectFromSetup({
+      orgId: "org-1",
+      name: "Project 2",
+      slug: "project-2",
+      template: "agent-os-software-project",
+      repoPath: "/tmp/project-2",
+      parentId: "project-1",
+    })).resolves.toEqual(expect.objectContaining({ links: expect.anything() }));
+    await expect(controller.loadProjectBacklog({ id: "project-1" }, { orgId: "org-1" })).resolves.toEqual(
+      expect.objectContaining({ backlogTasks: [] }),
+    );
+    await expect(controller.addBacklogTaskToSprint(
+      { id: "project-1" },
+      { orgId: "org-1", sprintId: "sprint-1", taskId: "task-1" },
+    )).resolves.toEqual({ moved: true });
+    await expect(controller.removeBacklogTaskFromSprint(
+      { id: "project-1", sprintId: "sprint-1", taskId: "task-1" },
+      { orgId: "org-1" },
+    )).resolves.toEqual({ moved: true });
+
+    expect(listProjectOptions).toHaveBeenCalledWith({ orgId: "org-1" });
+    expect(createProjectFromSetup).toHaveBeenCalledWith({
+      orgId: "org-1",
+      name: "Project 2",
+      slug: "project-2",
+      description: undefined,
+      kind: undefined,
+      parentId: "project-1",
+      repoPath: "/tmp/project-2",
+      template: "agent-os-software-project",
+    });
+    expect(loadProjectBacklog).toHaveBeenCalledWith({ orgId: "org-1", id: "project-1" });
+    expect(addBacklogTaskToSprint).toHaveBeenCalledWith({
+      orgId: "org-1",
+      id: "project-1",
+      sprintId: "sprint-1",
+      taskId: "task-1",
+    });
+    expect(removeBacklogTaskFromSprint).toHaveBeenCalledWith({
+      orgId: "org-1",
+      id: "project-1",
+      sprintId: "sprint-1",
+      taskId: "task-1",
+    });
   });
 
   test("returns a Nest invariant error when a CRUD method has no application implementation", async () => {
