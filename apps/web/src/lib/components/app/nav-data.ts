@@ -132,6 +132,7 @@ export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]>
 	],
 	plan: [
 		{ id: "plan-sessions", label: "Sessions", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "sessions") },
+		{ id: "plan-missions", label: "Missions", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "missions") },
 		{ id: "plan-reviews", label: "Reviews", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "review") },
 		{ id: "plan-prototypes", label: "Prototypes", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "prototypes") },
 		{ id: "plan-templates", label: "Templates", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "plan", "templates") },
@@ -156,7 +157,8 @@ export const STAGE_SUBNAV: Record<WorkflowStage, readonly StageRailSubnavItem[]>
 	operate: [
 		{ id: "operate-doctor", label: "Doctor", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "doctor") },
 		{ id: "operate-alerts", label: "Alerts", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "alerts") },
-		{ id: "operate-audit", label: "Audit", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "telemetry") },
+		{ id: "operate-audit", label: "Audit", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "audit") },
+		{ id: "operate-telemetry", label: "Telemetry", href: stageSubroute(DEFAULT_CANONICAL_WORKSPACE, DEFAULT_CANONICAL_PROJECT, "operate", "telemetry") },
 	],
 } as const;
 

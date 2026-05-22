@@ -92,6 +92,28 @@ export const STAGE_DEFAULT_SUB: Record<WorkflowStage, string> = {
 	operate: "doctor",
 } as const;
 
+/** Canonical one-segment IA subroutes owned by the dynamic stage route. */
+export const STAGE_SUBROUTES: Readonly<Record<WorkflowStage, readonly string[]>> = {
+	capture: ["inbox", "docs", "drafts", "promoted"],
+	plan: ["missions", "sessions", "review", "prompts", "prototypes", "templates"],
+	build: ["board", "list", "table", "calendar", "gantt", "timeline", "graph", "runs", "cycles", "modules"],
+	review: ["queue", "search", "comments", "templates", "qa", "uat", "e2e"],
+	ship: ["artifacts", "archive", "reports", "memory"],
+	operate: ["doctor", "runs", "inbox", "audit", "error-logs", "telemetry", "settings", "alerts", "mcp", "plugins"],
+} as const;
+
+export function isKnownStageSubroute(stage: WorkflowStage, sub: string): boolean {
+	return STAGE_SUBROUTES[stage].includes(sub);
+}
+
+export function isReviewDetailSubroute(sub: string): boolean {
+	return !isKnownStageSubroute("review", sub);
+}
+
+export function isShipArtifactSubroute(sub: string): boolean {
+	return !isKnownStageSubroute("ship", sub);
+}
+
 /**
  * Existing OD-fidelity flat workbench route each project-scoped stage projects
  * to until those workbenches are physically nested under `/<ws>/projects/...`.

@@ -62,6 +62,7 @@ const STAGE_WORKBENCH_ANCHOR = {
 const STAGE_SUBNAV_ROUTE_SWEEP = {
 	plan: [
 		["Sessions", stageSubroute(WS, PROJ, "plan", "sessions")],
+		["Missions", stageSubroute(WS, PROJ, "plan", "missions")],
 		["Reviews", stageSubroute(WS, PROJ, "plan", "review")],
 		["Prototypes", stageSubroute(WS, PROJ, "plan", "prototypes")],
 		["Templates", stageSubroute(WS, PROJ, "plan", "templates")],
@@ -72,9 +73,25 @@ const STAGE_SUBNAV_ROUTE_SWEEP = {
 		["MCP", stageSubroute(WS, PROJ, "operate", "mcp")],
 		["Plugins", stageSubroute(WS, PROJ, "operate", "plugins")],
 		["Alerts", stageSubroute(WS, PROJ, "operate", "alerts")],
-		["Audit", stageSubroute(WS, PROJ, "operate", "telemetry")],
+		["Audit", stageSubroute(WS, PROJ, "operate", "audit")],
+		["Telemetry", stageSubroute(WS, PROJ, "operate", "telemetry")],
 	],
 } as const;
+
+const CANONICAL_STAGE_SUBROUTES = [
+	{ stage: "plan", sub: "missions", selector: "[data-route='plan-missions']", heading: "Mission tree" },
+	{ stage: "build", sub: "table", selector: "[data-route='stage-deferred-workbench'][data-stage='build'][data-sub='table']", heading: "Build table" },
+	{ stage: "build", sub: "calendar", selector: "[data-route='stage-deferred-workbench'][data-stage='build'][data-sub='calendar']", heading: "Build calendar" },
+	{ stage: "build", sub: "cycles", selector: "[data-route='stage-deferred-workbench'][data-stage='build'][data-sub='cycles']", heading: "Build cycles" },
+	{ stage: "build", sub: "modules", selector: "[data-route='stage-deferred-workbench'][data-stage='build'][data-sub='modules']", heading: "Build modules" },
+	{ stage: "ship", sub: "reports", selector: "[data-route='stage-deferred-workbench'][data-stage='ship'][data-sub='reports']", heading: "Ship reports" },
+	{ stage: "ship", sub: "memory", selector: "[data-route='stage-deferred-workbench'][data-stage='ship'][data-sub='memory']", heading: "Ship memory" },
+	{ stage: "operate", sub: "runs", selector: "[data-route='stage-deferred-workbench'][data-stage='operate'][data-sub='runs']", heading: "Operate runs" },
+	{ stage: "operate", sub: "inbox", selector: "[data-route='stage-deferred-workbench'][data-stage='operate'][data-sub='inbox']", heading: "Operate inbox" },
+	{ stage: "operate", sub: "audit", selector: "[data-route='stage-deferred-workbench'][data-stage='operate'][data-sub='audit']", heading: "Operate audit" },
+	{ stage: "operate", sub: "error-logs", selector: "[data-route='stage-deferred-workbench'][data-stage='operate'][data-sub='error-logs']", heading: "Operate error logs" },
+	{ stage: "operate", sub: "settings", selector: "[data-route='stage-deferred-workbench'][data-stage='operate'][data-sub='settings']", heading: "Operate settings" },
+] as const;
 
 async function expectWorkbenchIfBackendReady(page: import("@playwright/test").Page, selector: string): Promise<boolean> {
 	const workbench = page.locator(selector).first();
@@ -105,6 +122,34 @@ test.describe("route model — canonical workspace/project/stage routes", () => 
 		const response = await page.goto(`/${WS}/projects/${PROJ}/nonsense`, { waitUntil: "load" });
 		expect(response?.status()).toBe(404);
 	});
+
+	test("canonical review detail subroutes render the review workbench, not the queue", async ({ page }) => {
+		const detailRoute = stageSubroute(WS, PROJ, "review", "auth-rewrite");
+		const response = await page.goto(detailRoute, { waitUntil: "load" });
+		expect(response?.status() ?? 0).toBeLessThan(400);
+		expect(new URL(page.url()).pathname).toBe(detailRoute);
+		await expect(page.locator("[data-review-body]")).toBeVisible();
+		await expect(page.locator("[data-review-queue]")).toHaveCount(0);
+	});
+
+	test("Plan missions renders the mission tree workbench", async ({ page }) => {
+		const missionsRoute = stageSubroute(WS, PROJ, "plan", "missions");
+		const response = await page.goto(missionsRoute, { waitUntil: "load" });
+		expect(response?.status() ?? 0).toBeLessThan(400);
+		await expect(page.locator("[data-route='plan-missions']")).toBeVisible();
+		await expect(page.getByRole("heading", { name: "Mission tree" })).toBeVisible();
+		await expect(page.locator("[data-route='plan-session']")).toHaveCount(0);
+	});
+
+	for (const route of CANONICAL_STAGE_SUBROUTES) {
+		test(`${route.stage}/${route.sub} canonical IA subroute resolves to a scoped workbench`, async ({ page }) => {
+			const href = stageSubroute(WS, PROJ, route.stage, route.sub);
+			const response = await page.goto(href, { waitUntil: "load" });
+			expect(response?.status() ?? 0, `${href} should not 404`).not.toBe(404);
+			await expect(page.locator(route.selector)).toBeVisible();
+			await expect(page.getByRole("heading", { name: route.heading })).toBeVisible();
+		});
+	}
 
 	test("project home redirects to the Capture stage (IA-MAP §1 default)", async ({ page }) => {
 		await page.goto(projectHomeRoute(WS, PROJ), { waitUntil: "load" });

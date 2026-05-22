@@ -88,6 +88,10 @@ describe("StageRail nav data", () => {
 		]);
 		expect(subnavForStageScope("operate", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
 			"Audit",
+			"/acme/projects/alpha/operate/audit",
+		]);
+		expect(subnavForStageScope("operate", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Telemetry",
 			"/acme/projects/alpha/operate/telemetry",
 		]);
 	});
