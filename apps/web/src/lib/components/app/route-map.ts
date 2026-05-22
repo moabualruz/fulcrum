@@ -126,6 +126,7 @@ export const DEFAULT_CANONICAL_PROJECT = "fulcrum";
 export type StageSubroute = {
 	stage: WorkflowStage;
 	sub?: string;
+	detail?: string;
 };
 
 const LEGACY_CANONICAL_TARGETS: Readonly<Record<string, StageSubroute>> = {
@@ -140,6 +141,13 @@ const LEGACY_CANONICAL_TARGETS: Readonly<Record<string, StageSubroute>> = {
 	"build-runs": { stage: "build", sub: "runs" },
 	"build-timeline": { stage: "build", sub: "gantt" },
 	"mobile-runs": { stage: "build", sub: "runs" },
+	"run-cancel": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-cost-tracking": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-detail": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-fork": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-rate-limits": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-retry-policy": { stage: "build", sub: "runs", detail: "run_56e3d12" },
+	"run-retry-prompt": { stage: "build", sub: "runs", detail: "run_56e3d12" },
 	review: { stage: "review" },
 	"review-queue": { stage: "review" },
 	"review-search": { stage: "review", sub: "search" },
@@ -184,6 +192,10 @@ export function stageSubroute(ws: string, projId: string, stage: WorkflowStage, 
 	return `${stageRoute(ws, projId, stage)}/${encodeURIComponent(sub)}`;
 }
 
+export function buildRunDetailRoute(ws: string, projId: string, runId: string): string {
+	return `${stageSubroute(ws, projId, "build", "runs")}/${encodeURIComponent(runId)}`;
+}
+
 export function legacyCanonicalTarget(pathname: string): StageSubroute | null {
 	const [head, second] = pathname.replace(/^\/+|\/+$/g, "").split("/");
 	if (!head) return null;
@@ -198,6 +210,9 @@ export function canonicalRouteForLegacyPath(
 ): string | null {
 	const target = legacyCanonicalTarget(pathname);
 	if (!target) return null;
+	if (target.stage === "build" && target.sub === "runs" && target.detail) {
+		return buildRunDetailRoute(ws, projId, target.detail);
+	}
 	return target.sub ? stageSubroute(ws, projId, target.stage, target.sub) : stageRoute(ws, projId, target.stage);
 }
 
