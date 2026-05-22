@@ -196,6 +196,24 @@ export class ProjectPublicStore {
     };
   }
 
+  /**
+   * The full project-detail read-model (`{ project, summary }`): the same
+   * `loadProjectOverview` query the in-process detail route used, exposed over
+   * the public API so the web detail route stays a pure invocation layer.
+   * `projectStats` is a counts-only projection and cannot carry `inProgress` /
+   * `sprintDaysRemaining`, so the detail route needs this richer endpoint.
+   */
+  async projectOverview(input: { orgId: string; id: string }): Promise<unknown> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+    const { loadProjectOverview } = await import("@work-management/application/projects/queries.ts");
+    return await loadProjectOverview(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.id },
+      input.id,
+    );
+  }
+
   private async findScopedProject(input: { orgId: string; id: string }): Promise<FulcrumProject | null> {
     return await this.projectRepository().findOneBy({ id: input.id, workspaceId: input.orgId });
   }

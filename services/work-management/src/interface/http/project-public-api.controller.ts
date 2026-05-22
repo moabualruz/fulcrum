@@ -90,6 +90,7 @@ export interface ProjectPublicApplication {
   }): Promise<unknown>;
   deleteProject?(input: { orgId: string; id: string }): Promise<void>;
   projectStats?(input: { orgId: string; id: string }): Promise<unknown>;
+  projectOverview?(input: { orgId: string; id: string }): Promise<unknown>;
 }
 
 export interface ProjectPublicApiOptions {
@@ -168,6 +169,15 @@ export class ProjectPublicApiService {
     return result;
   }
 
+  async projectOverview(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
+    const application = this.requireMethod("projectOverview");
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
+    if (!result) throw new NotFoundException({ error: "Project not found." });
+    return result;
+  }
+
   async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
     this.requireApplication();
     const dataSource = this.requireDataSource();
@@ -189,6 +199,7 @@ export class ProjectPublicApiService {
         patchProject: (input) => this.store!.patchProject(input),
         deleteProject: (input) => this.store!.deleteProject(input),
         projectStats: (input) => this.store!.projectStats(input),
+        projectOverview: (input) => this.store!.projectOverview(input),
       };
     }
     throw new InternalServerErrorException("Project public API application facade is not configured.");
@@ -244,6 +255,10 @@ export class ProjectPublicApiController {
     return await this.projects.projectStats(params, query);
   }
 
+  async projectOverview(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    return await this.projects.projectOverview(params, query);
+  }
+
   async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
     return await this.projects.dashboard(query);
   }
@@ -292,6 +307,7 @@ const getProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiCon
 const patchProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "patchProject");
 const deleteProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "deleteProject");
 const projectStatsDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "projectStats");
+const projectOverviewDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "projectOverview");
 const dashboardDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "dashboard");
 
 if (
@@ -301,6 +317,7 @@ if (
   !patchProjectDescriptor ||
   !deleteProjectDescriptor ||
   !projectStatsDescriptor ||
+  !projectOverviewDescriptor ||
   !dashboardDescriptor
 ) {
   throw new Error("ProjectPublicApiController route descriptors are missing");
@@ -423,6 +440,25 @@ ApiOkResponse({ description: "Project stats" })(
   ProjectPublicApiController.prototype,
   "projectStats",
   projectStatsDescriptor,
+);
+
+Get(":id/overview")(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+Param()(ProjectPublicApiController.prototype, "projectOverview", 0);
+Query()(ProjectPublicApiController.prototype, "projectOverview", 1);
+ApiOperation({ summary: "Get the project detail read-model" })(
+  ProjectPublicApiController.prototype,
+  "projectOverview",
+  projectOverviewDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  ProjectPublicApiController.prototype,
+  "projectOverview",
+  projectOverviewDescriptor,
+);
+ApiOkResponse({ description: "Project overview" })(
+  ProjectPublicApiController.prototype,
+  "projectOverview",
+  projectOverviewDescriptor,
 );
 
 Module({

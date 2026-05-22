@@ -52,6 +52,11 @@ export function createProjectApiCaller(options: ProjectApiClientOptions) {
           method: "GET",
           query: projectContextQuery(options),
         }),
+      overview: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.id)}/overview`, {
+          method: "GET",
+          query: projectContextQuery(options),
+        }),
       dashboard: async (input: JsonRecord = {}) =>
         await request("/api/v1/projects/dashboard", {
           method: "GET",
