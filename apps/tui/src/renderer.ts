@@ -137,6 +137,10 @@ export class Renderer {
     this.out.write(hideCursor());
   }
 
+  moveTo(row: number, col: number): void {
+    this.out.write(moveTo(row, col));
+  }
+
   showCursor(): void {
     this.out.write(showCursor());
   }
