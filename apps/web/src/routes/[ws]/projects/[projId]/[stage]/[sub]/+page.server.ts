@@ -2,10 +2,13 @@ import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 
 import {
+	isKnownStageSubroute,
+	isReviewDetailSubroute,
+	isShipArtifactSubroute,
 	isWorkflowStage,
 	STAGE_DEFAULT_SUB,
-	traceFromHash,
 	type WorkflowStage,
+	traceFromHash,
 } from "$lib/components/app/route-map.ts";
 import {
 	isCaptureView,
@@ -20,15 +23,6 @@ import {
 } from "../../../../../doctor/+page.server.ts";
 import { buildTimelineFixtureData } from "$lib/components/app/build-timeline-fixture.ts";
 
-const KNOWN_SUBROUTES: Readonly<Record<WorkflowStage, readonly string[]>> = {
-	capture: ["inbox", "docs", "drafts", "promoted"],
-	plan: ["missions", "sessions", "review", "prompts", "prototypes", "templates"],
-	build: ["board", "list", "gantt", "timeline", "graph", "runs"],
-	review: ["queue", "search", "templates"],
-	ship: ["archive", "artifacts"],
-	operate: ["doctor", "alerts", "mcp", "plugins", "telemetry"],
-};
-
 export const load: PageServerLoad = async (event) => {
 	const stage = event.params.stage;
 	if (!isWorkflowStage(stage)) {
@@ -37,8 +31,11 @@ export const load: PageServerLoad = async (event) => {
 
 	const typed: WorkflowStage = stage;
 	const sub = event.params.sub;
-	const known = KNOWN_SUBROUTES[typed].includes(sub);
-	if (!known && typed !== "review") {
+	const known =
+		isKnownStageSubroute(typed, sub) ||
+		(typed === "review" && isReviewDetailSubroute(sub)) ||
+		(typed === "ship" && isShipArtifactSubroute(sub));
+	if (!known) {
 		throw error(404, `Unknown ${typed} stage route "${sub}"`);
 	}
 
