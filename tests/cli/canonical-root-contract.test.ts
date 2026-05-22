@@ -73,34 +73,79 @@ describe("canonical CLI root live contract", () => {
     }
   });
 
-  test("AI Assist advertised verbs and unknown --json failures stay inside the canonical envelope", async () => {
-    const cases: ReadonlyArray<{ args: readonly string[]; command: string; code: string }> = [
+  test("AI Assist advertised lifecycle verbs run real success envelopes", async () => {
+    const cases: ReadonlyArray<{ args: readonly string[]; command: string; result: Record<string, unknown> }> = [
       {
         args: ["ai", "send", "--thread", "thread-1", "--message", "hi", "--json"],
         command: "fulcrum ai send",
-        code: "FUL_NOT_IMPLEMENTED",
+        result: { action: "send", threadId: "thread-1", message: "hi", status: "queued" },
       },
-      { args: ["ai", "attach", "thread-1", "--json"], command: "fulcrum ai attach", code: "FUL_NOT_IMPLEMENTED" },
-      { args: ["ai", "pause", "thread-1", "--json"], command: "fulcrum ai pause", code: "FUL_NOT_IMPLEMENTED" },
-      { args: ["ai", "resume", "thread-1", "--json"], command: "fulcrum ai resume", code: "FUL_NOT_IMPLEMENTED" },
-      { args: ["ai", "checkpoint", "thread-1", "--json"], command: "fulcrum ai checkpoint", code: "FUL_NOT_IMPLEMENTED" },
+      {
+        args: ["ai", "attach", "thread-1", "--json"],
+        command: "fulcrum ai attach",
+        result: { action: "attach", threadId: "thread-1", status: "attached" },
+      },
+      {
+        args: ["ai", "pause", "thread-1", "--json"],
+        command: "fulcrum ai pause",
+        result: { action: "pause", threadId: "thread-1", status: "paused" },
+      },
+      {
+        args: ["ai", "resume", "thread-1", "--json"],
+        command: "fulcrum ai resume",
+        result: { action: "resume", threadId: "thread-1", status: "active" },
+      },
+      {
+        args: ["ai", "checkpoint", "thread-1", "--json"],
+        command: "fulcrum ai checkpoint",
+        result: { action: "checkpoint", threadId: "thread-1", checkpointId: "checkpoint-thread-1" },
+      },
       {
         args: ["ai", "restore", "thread-1", "--checkpoint", "cp1", "--json"],
         command: "fulcrum ai restore",
-        code: "FUL_NOT_IMPLEMENTED",
+        result: { action: "restore", threadId: "thread-1", checkpointId: "cp1", status: "restored" },
       },
-      { args: ["ai", "preview", "--task", "t1", "--json"], command: "fulcrum ai preview", code: "FUL_NOT_IMPLEMENTED" },
-      { args: ["ai", "unknown-verb", "--json"], command: "fulcrum ai unknown-verb", code: "FUL_CLI_UNKNOWN_COMMAND" },
+      {
+        args: ["ai", "prompt", "edit", "thread-1", "--message", "revise prompt", "--json"],
+        command: "fulcrum ai prompt edit",
+        result: { action: "prompt.edit", threadId: "thread-1", prompt: "revise prompt" },
+      },
+      {
+        args: ["ai", "rerun", "thread-1", "--json"],
+        command: "fulcrum ai rerun",
+        result: { action: "rerun", threadId: "thread-1", status: "queued" },
+      },
+      {
+        args: ["ai", "preview", "--task", "t1", "--json"],
+        command: "fulcrum ai preview",
+        result: { action: "preview", taskId: "t1", status: "ready" },
+      },
+      {
+        args: ["ai", "route", "thread-1", "--agent", "codex", "--json"],
+        command: "fulcrum ai route",
+        result: { action: "route", threadId: "thread-1", agent: "codex" },
+      },
     ];
 
     for (const entry of cases) {
       const run = await runCli(entry.args);
-      expect(run.exitCode).not.toBe(0);
+      expect(run.exitCode, run.stderr).toBe(0);
       expect(run.stderr.trim()).toBe("");
       const envelope = parseEnvelope(run);
       expect(envelope["command"]).toBe(entry.command);
-      expect((envelope["errors"] as Array<{ code: string }>)[0]?.code).toBe(entry.code);
+      expect(envelope["errors"]).toEqual([]);
+      expect(envelope["result"]).toMatchObject(entry.result);
+      expect(JSON.stringify(envelope)).not.toContain("FUL_NOT_IMPLEMENTED");
     }
+  });
+
+  test("AI Assist unknown --json failures stay inside the canonical envelope", async () => {
+    const run = await runCli(["ai", "unknown-verb", "--json"]);
+    expect(run.exitCode).not.toBe(0);
+    expect(run.stderr.trim()).toBe("");
+    const envelope = parseEnvelope(run);
+    expect(envelope["command"]).toBe("fulcrum ai unknown-verb");
+    expect((envelope["errors"] as Array<{ code: string }>)[0]?.code).toBe("FUL_CLI_UNKNOWN_COMMAND");
   });
 
   test("every advertised root has bin-level help and command-specific json schema", async () => {
@@ -127,4 +172,28 @@ describe("canonical CLI root live contract", () => {
       expect(JSON.stringify(schema.properties?.result)).toContain(root);
     }
   }, 120_000);
+
+  test("help json schemas expose command-specific result payload properties", async () => {
+    const cases: ReadonlyArray<{ command: string; properties: readonly string[] }> = [
+      { command: "capture", properties: ["items", "summary"] },
+      { command: "doctor", properties: ["bun", "platform", "agents", "warnings", "errors", "verdict"] },
+      { command: "ship", properties: ["stage", "surface", "channels", "message"] },
+      { command: "agent", properties: ["profiles"] },
+      { command: "ai send", properties: ["action", "threadId", "message", "status"] },
+    ];
+
+    for (const entry of cases) {
+      const schemaRun = await runCli(["help", ...entry.command.split(" "), "--json-schema"]);
+      expect(schemaRun.exitCode, `${entry.command}\n${schemaRun.stderr}`).toBe(0);
+      const schema = JSON.parse(schemaRun.stdout) as {
+        properties?: { result?: { oneOf?: unknown; properties?: Record<string, unknown>; required?: string[] } };
+      };
+      const result = schema.properties?.result;
+      expect(result?.oneOf, entry.command).toBeUndefined();
+      for (const property of entry.properties) {
+        expect(result?.properties, entry.command).toHaveProperty(property);
+      }
+      expect(result?.required, entry.command).toEqual(expect.arrayContaining(entry.properties));
+    }
+  });
 });
