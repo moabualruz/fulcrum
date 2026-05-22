@@ -234,6 +234,18 @@ function isMachineToken(text: string): boolean {
   return /^[-_:./@A-Za-z0-9]+$/.test(value);
 }
 
+function isStatusBanlistFixture(candidate: Candidate, rule: BanRule): boolean {
+  return (
+    rule.name === "status-synonym" &&
+    candidate.source === "source" &&
+    candidate.origin === "quoted" &&
+    /^packages\/ui-kit\/src\/components\/status-badge\/status-badge\.(?:svelte|exports\.ts)$/.test(
+      candidate.file,
+    ) &&
+    /^(?:In Flight|WIP|Doing|Stuck|Done!)$/.test(candidate.text)
+  );
+}
+
 function allowed(candidate: Candidate, rule: BanRule): boolean {
   const { file, text, source, origin } = candidate;
 
@@ -253,15 +265,9 @@ function allowed(candidate: Candidate, rule: BanRule): boolean {
     return true;
   }
 
-  // The ui-kit status badge exports a banned vocabulary list so tests and
+  // The ui-kit status badge exports BANNED_STATUS_SYNONYMS so tests and
   // fixtures can assert those labels never render.
-  if (
-    rule.name === "status-synonym" &&
-    file === "packages/ui-kit/src/components/status-badge/status-badge.svelte" &&
-    /^(?:In Flight|WIP|Doing|Stuck|Done!)$/.test(text)
-  ) {
-    return true;
-  }
+  if (isStatusBanlistFixture(candidate, rule)) return true;
 
   // The copy gate itself names banned examples so regressions are explicit.
   if (file === "scripts/check-copy-banlist.ts") return true;
@@ -309,6 +315,35 @@ function runSelfTest(): void {
     }
     if (!findings.some((finding) => finding.rule.name === "protocol-chrome")) {
       throw new Error("self-test failed: injected visible acp protocol label was not detected");
+    }
+
+    const statusFixture = resolve(
+      repoRoot,
+      "packages/ui-kit/src/components/status-badge/status-badge.exports.ts",
+    );
+    const fixtureFindings = scan(candidatesForFile(statusFixture, "source"));
+    if (fixtureFindings.some((finding) => finding.rule.name === "status-synonym")) {
+      throw new Error("self-test failed: BANNED_STATUS_SYNONYMS export was treated as visible copy");
+    }
+
+    const renderedStatusFindings = scan([
+      {
+        file: "apps/web/tests/__snapshots__/copy-banlist-self-test.snap",
+        line: 1,
+        text: "In Flight",
+        source: "rendered",
+        origin: "rendered",
+      },
+      {
+        file: "apps/web/tests/__snapshots__/copy-banlist-self-test.snap",
+        line: 2,
+        text: "WIP",
+        source: "rendered",
+        origin: "rendered",
+      },
+    ]);
+    if (renderedStatusFindings.filter((finding) => finding.rule.name === "status-synonym").length !== 2) {
+      throw new Error("self-test failed: injected rendered status synonyms were not detected");
     }
     console.log("check-copy-banlist self-test ok: injected banned visible string detected.");
   } finally {
