@@ -60,6 +60,52 @@ export function createSprintApiCaller(options: SprintApiClientOptions) {
           `/api/v1/sprints/${encodeURIComponent(input.id)}/tasks/${encodeURIComponent(input.taskId)}`,
           { method: "DELETE", query: sprintContextQuery(options) },
         ),
+      // Project-scoped sprint board: backs the web `/projects/[id]/sprints` and
+      // `/sprint/[sprintId]` routes (the `sprints` table, not the cycle model).
+      loadProjectSprints: async (input: JsonRecord & { projectId: string }) =>
+        await request("/api/v1/sprints/project-board", {
+          method: "GET",
+          query: projectBoardQuery(options, input),
+        }),
+      createProjectSprint: async (input: JsonRecord & { projectId: string }) =>
+        await request("/api/v1/sprints/project-board", {
+          method: "POST",
+          body: sprintBody(options, input),
+        }),
+      loadProjectSprintDetail: async (input: JsonRecord & { id: string; projectId: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/detail`, {
+          method: "GET",
+          query: projectBoardQuery(options, input),
+        }),
+      startProjectSprint: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/start-board`, {
+          method: "POST",
+          body: sprintContextQuery(options),
+        }),
+      completeProjectSprint: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/complete-board`, {
+          method: "POST",
+          body: sprintContextQuery(options),
+        }),
+      updateProjectSprintGoal: async (input: JsonRecord & { id: string; goal: string }) =>
+        await request(`/api/v1/sprints/${encodeURIComponent(input.id)}/goal`, {
+          method: "PATCH",
+          body: sprintBody(options, { goal: input.goal }),
+        }),
+      createProjectSprintTask: async (input: JsonRecord & { id: string; projectId: string }) => {
+        const { id, ...body } = input;
+        return await request(`/api/v1/sprints/${encodeURIComponent(id)}/board-tasks`, {
+          method: "POST",
+          body: sprintBody(options, body),
+        });
+      },
+      updateProjectSprintTask: async (input: JsonRecord & { taskId: string; projectId: string }) => {
+        const { taskId, ...body } = input;
+        return await request(`/api/v1/sprints/project-tasks/${encodeURIComponent(taskId)}`, {
+          method: "PATCH",
+          body: sprintBody(options, body),
+        });
+      },
     },
   };
 }
@@ -111,6 +157,11 @@ function sprintQuery(options: SprintApiClientOptions, input: JsonRecord): JsonRe
 
 function sprintContextQuery(options: SprintApiClientOptions): JsonRecord {
   return { orgId: options.orgId };
+}
+
+/** Query carrying org + project scope for the project-scoped sprint board routes. */
+function projectBoardQuery(options: SprintApiClientOptions, input: JsonRecord): JsonRecord {
+  return compact({ orgId: options.orgId, projectId: input.projectId });
 }
 
 function sprintBody(options: SprintApiClientOptions, input: JsonRecord): JsonRecord {
