@@ -1,11 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { projectApiMock } from "$lib/test/project-api-mock";
-import { requestServiceScopeMock } from "$lib/test/request-service-scope-mock";
-
-const calls: string[] = [];
+const calls: Array<{ method: string; input: unknown }> = [];
 
 const mockRun = {
   id: "run-1",
@@ -50,62 +47,29 @@ const mockPageData = {
   approvalQueue: [],
 };
 
-// `mock.module` is process-global; both seams answer only while this suite
-// runs and otherwise delegate to the real implementations for foreign suites.
-let suiteActive = false;
-
-mock.module("$lib/server/request-service-scope", () =>
-  requestServiceScopeMock((_locals, projectId) =>
-    suiteActive
-      ? { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null } }
-      : null,
-  ),
-);
-
-// Complete `run-pages.ts` surface: `mock.module` freezes export names on
-// first registration, so `loadRunsPageData` is stubbed even though unused.
-mock.module("@execution-orchestration/interface/run-pages.ts", () => ({
-  loadRunsPageData: async () => ({ runs: [], projects: [], agents: [] }),
-  getProjectRunPageData: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`getRunPage:${runId}`);
-    if (runId === "not-found") throw new Error("Run not found");
-    return mockPageData;
-  },
-  listProjectRuns: async () => [],
+mock.module("$lib/server/agent-run-api", () => ({
+  createAgentRunApiForEvent: () => ({
+    runs: {
+      pageDetail: async (input: { id: string; projectId: string }) => {
+        calls.push({ method: "pageDetail", input });
+        if (input.id === "not-found") throw new Error("Run not found");
+        return mockPageData;
+      },
+      cancel: async (input: { id: string }) => {
+        calls.push({ method: "cancel", input });
+        return { ok: true };
+      },
+      retry: async (input: { id: string }) => {
+        calls.push({ method: "retry", input });
+        return { id: "run-2" };
+      },
+      recordApprovalDecision: async (input: unknown) => {
+        calls.push({ method: "recordApprovalDecision", input });
+        return { ok: true };
+      },
+    },
+  }),
 }));
-
-// `mock.module` is process-global and the export-name set is frozen on first
-// registration: this stub must declare every `run-actions.ts` export, or any
-// later test importing the real module loses the omitted names. dispatchRun /
-// dispatchTaskRun are unused here but kept so the surface stays complete.
-mock.module("@execution-orchestration/interface/run-actions.ts", () => ({
-  dispatchTaskRun: async () => ({ id: "run-dispatched" }),
-  dispatchRun: async () => ({ id: "run-dispatched" }),
-  cancelRun: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`cancel:${runId}`);
-    return { ok: true };
-  },
-  retryRun: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`retry:${runId}`);
-    return { id: "run-2" };
-  },
-  recordRunApprovalDecision: async (_em: unknown, _ctx: unknown, input: { runId: string; approvalId: string; decision: string }) => {
-    calls.push(`approval:${input.runId}:${input.approvalId}:${input.decision}`);
-    return { ok: true };
-  },
-}));
-
-// `projectApiMock` keeps a complete export set (real `createProjectApiForEvent`
-// / `activeOrgId` / `currentUserId`) and only routes `ensureProjectExists` to
-// this suite's no-op stub while the suite is active.
-mock.module("$lib/server/project-api", () =>
-  projectApiMock(() => (suiteActive ? ((async () => {}) as never) : null)),
-);
-
-// `$lib/feedback/action-result` is a pure module; the real `actionOk` already
-// returns `{ ok: true, message }`: exactly what this suite asserts. Mocking it
-// only froze a process-global export set that broke sibling suites, so the real
-// module is used directly.
 
 beforeEach(() => {
   calls.splice(0, calls.length);
@@ -118,19 +82,12 @@ function form(data: Record<string, string>): Request {
 }
 
 describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
-  beforeAll(() => {
-    suiteActive = true;
-  });
-  afterAll(() => {
-    suiteActive = false;
-  });
-
-  test("server route imports from service interface boundaries, not application layer", () => {
+  test("server route uses the agent run public API instead of request service scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@execution-orchestration/interface/run-pages");
-    expect(source).toContain("@execution-orchestration/interface/run-actions");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@execution-orchestration/application/");
+    expect(source).toContain("createAgentRunApiForEvent");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("@execution-orchestration/interface/run-pages");
+    expect(source).not.toContain("@execution-orchestration/interface/run-actions");
   });
 
   test("load returns run detail data with events and transcript", async () => {
@@ -151,10 +108,10 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     expect(payload.run.cost_usd).toBe("0.0123");
     expect(payload.events).toHaveLength(1);
     expect(payload.events[0].verb).toBe("run.started");
-    expect(calls).toEqual(["getRunPage:run-1"]);
+    expect(calls).toEqual([{ method: "pageDetail", input: { id: "run-1", projectId: "project-1" } }]);
   });
 
-  test("cancel action delegates through run-actions boundary", async () => {
+  test("cancel action delegates through the agent run public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.actions.cancel({
       params: { id: "project-1", runId: "run-1" },
@@ -163,7 +120,7 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     } as Parameters<typeof mod.actions.cancel>[0]);
 
     expect(result).toEqual({ ok: true, message: "Run cancelled" });
-    expect(calls).toEqual(["cancel:run-1"]);
+    expect(calls).toEqual([{ method: "cancel", input: { id: "run-1" } }]);
   });
 
   test("retry action dispatches new run and redirects", async () => {
@@ -180,6 +137,29 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
       expect(redirectErr.status).toBe(303);
       expect(redirectErr.location).toBe("/projects/project-1/runs/run-2");
     }
-    expect(calls).toEqual(["retry:run-1"]);
+    expect(calls).toEqual([{ method: "retry", input: { id: "run-1" } }]);
+  });
+
+  test("approval action records the decision through the agent run public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.actions.approvalDecision({
+      params: { id: "project-1", runId: "run-1" },
+      locals: {},
+      request: form({ approvalId: "approval-1", decision: "approve" }),
+    } as Parameters<typeof mod.actions.approvalDecision>[0]);
+
+    expect(result).toEqual({ ok: true, message: "Approval decision recorded" });
+    expect(calls).toEqual([
+      {
+        method: "recordApprovalDecision",
+        input: {
+          id: "run-1",
+          projectId: "project-1",
+          approvalId: "approval-1",
+          decision: "approve",
+          note: null,
+        },
+      },
+    ]);
   });
 });
