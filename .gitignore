@@ -32,3 +32,4 @@ tests/.tmp-*/
 # Manual smoke session runtime homes (PGlite data, logs, etc.) — track only
 # the curated critique/screenshot/logs evidence, not the live PGlite snapshot.
 /.scratch/manual-smoke-*/home/
+.playwright-cli/
