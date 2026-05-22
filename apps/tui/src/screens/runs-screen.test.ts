@@ -30,7 +30,9 @@ describe("RunsControlScreen reassignment", () => {
     });
 
     await screen.load();
-    await screen.handleKey("a");
+    // Reassign is `A` (uppercase) — bare lowercase `a` is reserved for the
+    // ModePicker `m a` assist chord, so screen actions use the shifted key.
+    await screen.handleKey("A");
     const renderer = new TestRenderer();
     screen.render(renderer as never);
     const output = renderer.output();
