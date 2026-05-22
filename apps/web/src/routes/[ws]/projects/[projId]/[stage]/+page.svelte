@@ -68,7 +68,7 @@
 			children: [
 				{
 					id: "wave-16",
-					label: "Wave 16: canonical IA closure",
+					label: "Canonical IA closure",
 					hint: "in progress",
 					children: [
 						{
@@ -91,7 +91,7 @@
 			children: [
 				{
 					id: "wave-foundation",
-					label: "Wave: workflow foundation",
+					label: "Workflow foundation",
 					children: [
 						{ id: "task-context-engine", label: "Context engine surfaces" },
 						{ id: "task-artifact-ledger", label: "Artifact ledger" },
@@ -298,7 +298,7 @@
 						Mission tree
 					</h1>
 					<p class="mt-2 max-w-3xl text-sm text-muted-foreground">
-						Mission - Wave - Increment - Task hierarchy for active recovery and foundation work.
+						Mission, increment, and task hierarchy for active recovery and foundation work.
 					</p>
 				</header>
 				<div
