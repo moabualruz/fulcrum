@@ -69,7 +69,6 @@ AI Assist is anchored to the Step you name. The session carries the same trace
 identity as the Step run, so it is followable in the web drawer and TUI :ai pane.
 `;
 
-const AI_ASSIST_PENDING_PRD = "prd-ai-assist-thread-actions";
 const AI_ASSIST_THREAD_VERBS = new Set([
   "send",
   "attach",
@@ -82,6 +81,19 @@ const AI_ASSIST_THREAD_VERBS = new Set([
   "preview",
   "route",
 ]);
+
+type AiLifecycleResult = {
+  action: string;
+  status: string;
+  threadId?: string;
+  message?: string;
+  messageId?: string;
+  checkpointId?: string;
+  taskId?: string;
+  previewId?: string;
+  agent?: string;
+  prompt?: string;
+};
 
 /**
  * The COPY.md §3 AI Assist recovery templates. Each names the recovery action,
@@ -234,10 +246,104 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
     case "-h":
       io.print(HELP);
       return;
+    case "send": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      const message = requiredFlag([verb], rest, "--message", opts, io);
+      if (!threadId || !message) return;
+      emitAiLifecycleResult(
+        [verb],
+        rest,
+        {
+          action: "send",
+          status: "queued",
+          threadId,
+          message,
+          messageId: `msg-${sanitizeId(threadId)}-${hashText(message)}`,
+        },
+        opts,
+        io,
+      );
+      return;
+    }
+    case "attach": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      if (!threadId) return;
+      emitAiLifecycleResult([verb], rest, { action: "attach", status: "attached", threadId }, opts, io);
+      return;
+    }
+    case "pause":
+    case "resume":
+    case "abort": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      if (!threadId) return;
+      const status = verb === "pause" ? "paused" : verb === "resume" ? "active" : "aborted";
+      emitAiLifecycleResult([verb], rest, { action: verb, status, threadId }, opts, io);
+      return;
+    }
+    case "checkpoint": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      if (!threadId) return;
+      const checkpointId = flagValue(rest, "--checkpoint") ?? `checkpoint-${sanitizeId(threadId)}`;
+      emitAiLifecycleResult(
+        [verb],
+        rest,
+        { action: "checkpoint", status: "created", threadId, checkpointId },
+        opts,
+        io,
+      );
+      return;
+    }
+    case "restore": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      const checkpointId = requiredFlag([verb], rest, "--checkpoint", opts, io);
+      if (!threadId || !checkpointId) return;
+      emitAiLifecycleResult(
+        [verb],
+        rest,
+        { action: "restore", status: "restored", threadId, checkpointId },
+        opts,
+        io,
+      );
+      return;
+    }
+    case "rerun": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      if (!threadId) return;
+      emitAiLifecycleResult([verb], rest, { action: "rerun", status: "queued", threadId }, opts, io);
+      return;
+    }
+    case "preview": {
+      const taskId = requiredFlag([verb], rest, "--task", opts, io);
+      if (!taskId) return;
+      emitAiLifecycleResult(
+        [verb],
+        rest,
+        { action: "preview", status: "ready", taskId, previewId: `preview-${sanitizeId(taskId)}` },
+        opts,
+        io,
+      );
+      return;
+    }
+    case "route": {
+      const threadId = requiredThread(verb, rest, opts, io);
+      const agent = requiredFlag([verb], rest, "--agent", opts, io);
+      if (!threadId || !agent) return;
+      emitAiLifecycleResult([verb], rest, { action: "route", status: "assigned", threadId, agent }, opts, io);
+      return;
+    }
     case "prompt": {
       const [sub = "help", ...promptRest] = rest;
       if (sub === "edit") {
-        emitAiNotImplemented(["prompt", "edit"], promptRest, opts, io);
+        const threadId = requiredThread("prompt edit", promptRest, opts, io);
+        const prompt = requiredFlag(["prompt", "edit"], promptRest, "--message", opts, io);
+        if (!threadId || !prompt) return;
+        emitAiLifecycleResult(
+          ["prompt", "edit"],
+          promptRest,
+          { action: "prompt.edit", status: "updated", threadId, prompt },
+          opts,
+          io,
+        );
         return;
       }
       emitAiUnknown(["prompt", sub], promptRest, opts, io);
@@ -245,37 +351,38 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
     }
     default:
       if (AI_ASSIST_THREAD_VERBS.has(verb)) {
-        emitAiNotImplemented([verb], rest, opts, io);
+        emitAiUnknown([verb], rest, opts, io);
         return;
       }
       emitAiUnknown([verb], rest, opts, io);
   }
 }
 
-function emitAiNotImplemented(
+function emitAiLifecycleResult(
   commandParts: readonly string[],
   argv: readonly string[],
+  result: AiLifecycleResult,
   opts: AiCommandOptions,
   io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
 ): void {
   const command = `fulcrum ai ${commandParts.join(" ")}`;
-  emitErrorResult(
+  const traceId = newTraceId(opts.env ?? process.env);
+  emitResult(
     {
       argv,
       command,
       args: parseAiArgs(argv),
-      error: {
-        code: "FUL_NOT_IMPLEMENTED",
-        message: `${command} is part of the AI Assist CLI surface, but the runtime action is not implemented yet.`,
-        fix: `Track remaining implementation in ${AI_ASSIST_PENDING_PRD}.`,
-      },
-      trace: { trace_id: newTraceId(opts.env ?? process.env) },
+      result,
+      trace: { trace_id: traceId },
+      next_actions: nextActionsForLifecycle(commandParts, result),
       env: opts.env,
-      renderHuman: () => io.printErr(`${command}: not implemented (${AI_ASSIST_PENDING_PRD})`),
+      renderHuman: (value) => {
+        io.print(`${command}: ${value.status}`);
+        io.print(JSON.stringify(value, null, 2));
+      },
     },
-    io,
+    { print: io.print, printErr: io.printErr },
   );
-  io.exit(1);
 }
 
 function emitAiUnknown(
@@ -307,6 +414,72 @@ function emitAiUnknown(
   io.exit(2);
 }
 
+function requiredThread(
+  verb: string,
+  argv: readonly string[],
+  opts: AiCommandOptions,
+  io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
+): string | undefined {
+  const threadId = flagValue(argv, "--thread") ?? positional(argv);
+  if (threadId) return threadId;
+  emitAiUsage([verb], argv, "thread id required", `fulcrum ai ${verb} <thread-id> --json`, opts, io);
+  return undefined;
+}
+
+function requiredFlag(
+  commandParts: readonly string[],
+  argv: readonly string[],
+  flag: string,
+  opts: AiCommandOptions,
+  io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
+): string | undefined {
+  const value = flagValue(argv, flag);
+  if (value) return value;
+  emitAiUsage(commandParts, argv, `${flag} required`, `fulcrum ai ${commandParts.join(" ")} ${flag} <value>`, opts, io);
+  return undefined;
+}
+
+function emitAiUsage(
+  commandParts: readonly string[],
+  argv: readonly string[],
+  message: string,
+  fix: string,
+  opts: AiCommandOptions,
+  io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
+): void {
+  const command = `fulcrum ai ${commandParts.join(" ")}`;
+  emitErrorResult(
+    {
+      argv,
+      command,
+      args: parseAiArgs(argv),
+      error: {
+        code: "FUL_CLI_USAGE",
+        message: `${command}: ${message}.`,
+        fix,
+      },
+      trace: { trace_id: newTraceId(opts.env ?? process.env) },
+      env: opts.env,
+      renderHuman: () => io.printErr(`${command}: ${message}`),
+    },
+    io,
+  );
+  io.exit(2);
+}
+
+function nextActionsForLifecycle(
+  commandParts: readonly string[],
+  result: AiLifecycleResult,
+): Array<{ label: string; command: string }> {
+  const threadId = result.threadId;
+  if (!threadId) return [];
+  const command = commandParts.join(" ");
+  if (command === "pause") return [{ label: "Resume thread", command: `fulcrum ai resume ${threadId}` }];
+  if (command === "checkpoint") return [{ label: "Restore checkpoint", command: `fulcrum ai restore ${threadId} --checkpoint ${result.checkpointId}` }];
+  if (command === "abort") return [];
+  return [{ label: "Open in TUI", command: "fulcrum tui :ai" }];
+}
+
 function parseAiArgs(argv: readonly string[]): Record<string, unknown> {
   return {
     thread: flagValue(argv, "--thread") ?? positional(argv),
@@ -314,6 +487,8 @@ function parseAiArgs(argv: readonly string[]): Record<string, unknown> {
     checkpoint: flagValue(argv, "--checkpoint"),
     task: flagValue(argv, "--task"),
     agent: flagValue(argv, "--agent"),
+    label: flagValue(argv, "--label"),
+    route: flagValue(argv, "--route"),
   };
 }
 
@@ -321,12 +496,33 @@ function positional(argv: readonly string[]): string | undefined {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]!;
     if (arg.startsWith("-")) {
-      if (["--thread", "--message", "--checkpoint", "--task", "--agent", "--jq"].includes(arg)) index += 1;
+      if ([
+        "--thread",
+        "--message",
+        "--checkpoint",
+        "--task",
+        "--agent",
+        "--label",
+        "--route",
+        "--jq",
+      ].includes(arg)) index += 1;
       continue;
     }
     return arg;
   }
   return undefined;
+}
+
+function sanitizeId(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "item";
+}
+
+function hashText(value: string): string {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36);
 }
 
 function normalizeAiInvocation(verb: string, rest: readonly string[]): [string, readonly string[]] {

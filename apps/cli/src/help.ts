@@ -369,38 +369,205 @@ function commandPathLabel(command?: string | readonly string[]): string {
   return path.length > 0 ? `fulcrum ${path.join(" ")}` : "fulcrum";
 }
 
-function resultSchemaFor(command?: string | readonly string[]): JsonObjectSchema {
-  const commandLabel = commandPathLabel(command);
-  const [root = "root", verb] = normalizeCommandPath(command);
-  const title = `${commandLabel} result`;
-  if (root === "ai") {
-    return {
-      title,
-      oneOf: [
-        { type: "object", description: `${commandLabel} AI Assist result payload.` },
-        { type: "null", description: `${commandLabel} failure result.` },
-      ],
-    };
-  }
-  if (["list", "search", "query", undefined].includes(verb)) {
-    return {
-      title,
-      oneOf: [
-        { type: "array", description: `${commandLabel} rows.` },
-        { type: "object", description: `${commandLabel} result object.` },
-        { type: "null", description: `${commandLabel} failure result.` },
-      ],
-    };
-  }
+type ResultSchemaFactory = (title: string, commandLabel: string) => JsonObjectSchema;
+
+const STRING_VALUE = { type: "string" } as const;
+const NULLABLE_STRING_VALUE = { type: ["string", "null"] } as const;
+const BOOLEAN_VALUE = { type: "boolean" } as const;
+const NUMBER_VALUE = { type: "number" } as const;
+const OBJECT_VALUE = { type: "object", additionalProperties: true } as const;
+
+function arrayOf(item: JsonObjectSchema = OBJECT_VALUE): JsonObjectSchema {
+  return { type: "array", items: item };
+}
+
+function objectResultSchema(
+  title: string,
+  required: readonly string[],
+  properties: Record<string, unknown>,
+): JsonObjectSchema {
   return {
     title,
-    oneOf: [
-      { type: "object", description: `${commandLabel} result object.` },
-      { type: "array", description: `${commandLabel} result rows.` },
-      { type: "string", description: `${commandLabel} scalar result.` },
-      { type: "null", description: `${commandLabel} failure result.` },
-    ],
+    type: "object",
+    additionalProperties: true,
+    required,
+    properties,
   };
+}
+
+const AI_THREAD_FIELDS = {
+  threadId: STRING_VALUE,
+  status: STRING_VALUE,
+} as const;
+
+const COMMAND_RESULT_SCHEMAS: ReadonlyMap<string, ResultSchemaFactory> = new Map([
+  ["capture", (title, commandLabel) =>
+    objectResultSchema(title, ["items", "summary"], {
+      command: { const: commandLabel },
+      items: arrayOf({
+        type: "object",
+        additionalProperties: true,
+        properties: {
+          id: STRING_VALUE,
+          kind: STRING_VALUE,
+          status: STRING_VALUE,
+          title: STRING_VALUE,
+        },
+      }),
+      summary: OBJECT_VALUE,
+    })],
+  ["doctor", (title) =>
+    objectResultSchema(title, ["bun", "platform", "agents", "warnings", "errors", "verdict"], {
+      bun: STRING_VALUE,
+      platform: STRING_VALUE,
+      agents: arrayOf({
+        type: "object",
+        additionalProperties: true,
+        properties: {
+          label: STRING_VALUE,
+          detected: BOOLEAN_VALUE,
+          rulesSpliced: BOOLEAN_VALUE,
+        },
+      }),
+      warnings: NUMBER_VALUE,
+      errors: NUMBER_VALUE,
+      verdict: STRING_VALUE,
+    })],
+  ["ship", (title) =>
+    objectResultSchema(title, ["stage", "surface", "channels", "message"], {
+      stage: { const: "ship" },
+      surface: STRING_VALUE,
+      channels: arrayOf(STRING_VALUE),
+      message: STRING_VALUE,
+    })],
+  ["agent", (title) =>
+    objectResultSchema(title, ["profiles"], {
+      profiles: arrayOf({
+        type: "object",
+        additionalProperties: true,
+        required: ["name", "cliPath", "defaultFlags"],
+        properties: {
+          name: STRING_VALUE,
+          cliPath: STRING_VALUE,
+          defaultFlags: arrayOf(STRING_VALUE),
+          skillFolder: STRING_VALUE,
+          supportsSessionResume: BOOLEAN_VALUE,
+        },
+      }),
+    })],
+  ["ai", (title) =>
+    objectResultSchema(title, ["sessionId", "taskId", "agent", "route", "stepScope"], {
+      sessionId: STRING_VALUE,
+      taskId: STRING_VALUE,
+      taskTitle: STRING_VALUE,
+      taskDescription: STRING_VALUE,
+      agent: STRING_VALUE,
+      route: STRING_VALUE,
+      workspacePath: STRING_VALUE,
+      contextBundle: OBJECT_VALUE,
+      stepScope: STRING_VALUE,
+      threadId: NULLABLE_STRING_VALUE,
+    })],
+  ["ai start", (title) => COMMAND_RESULT_SCHEMAS.get("ai")!(title, "fulcrum ai start")],
+  ["ai send", (title) =>
+    objectResultSchema(title, ["action", "threadId", "message", "status"], {
+      action: { const: "send" },
+      ...AI_THREAD_FIELDS,
+      message: STRING_VALUE,
+      messageId: STRING_VALUE,
+    })],
+  ["ai attach", (title) =>
+    objectResultSchema(title, ["action", "threadId", "status"], {
+      action: { const: "attach" },
+      ...AI_THREAD_FIELDS,
+    })],
+  ["ai pause", (title) =>
+    objectResultSchema(title, ["action", "threadId", "status"], {
+      action: { const: "pause" },
+      ...AI_THREAD_FIELDS,
+    })],
+  ["ai resume", (title) =>
+    objectResultSchema(title, ["action", "threadId", "status"], {
+      action: { const: "resume" },
+      ...AI_THREAD_FIELDS,
+    })],
+  ["ai abort", (title) =>
+    objectResultSchema(title, ["action", "threadId", "status"], {
+      action: { const: "abort" },
+      ...AI_THREAD_FIELDS,
+    })],
+  ["ai checkpoint", (title) =>
+    objectResultSchema(title, ["action", "threadId", "checkpointId", "status"], {
+      action: { const: "checkpoint" },
+      ...AI_THREAD_FIELDS,
+      checkpointId: STRING_VALUE,
+    })],
+  ["ai restore", (title) =>
+    objectResultSchema(title, ["action", "threadId", "checkpointId", "status"], {
+      action: { const: "restore" },
+      ...AI_THREAD_FIELDS,
+      checkpointId: STRING_VALUE,
+    })],
+  ["ai prompt edit", (title) =>
+    objectResultSchema(title, ["action", "threadId", "prompt", "status"], {
+      action: { const: "prompt.edit" },
+      ...AI_THREAD_FIELDS,
+      prompt: STRING_VALUE,
+    })],
+  ["ai rerun", (title) =>
+    objectResultSchema(title, ["action", "threadId", "status"], {
+      action: { const: "rerun" },
+      ...AI_THREAD_FIELDS,
+    })],
+  ["ai preview", (title) =>
+    objectResultSchema(title, ["action", "taskId", "previewId", "status"], {
+      action: { const: "preview" },
+      taskId: STRING_VALUE,
+      previewId: STRING_VALUE,
+      status: STRING_VALUE,
+    })],
+  ["ai route", (title) =>
+    objectResultSchema(title, ["action", "threadId", "agent", "status"], {
+      action: { const: "route" },
+      ...AI_THREAD_FIELDS,
+      agent: STRING_VALUE,
+    })],
+]);
+
+function resultSchemaFor(command?: string | readonly string[]): JsonObjectSchema {
+  const commandLabel = commandPathLabel(command);
+  const rawPath = normalizeCommandPath(command);
+  const [rawRoot = "root", verb, subverb] = rawPath;
+  const root = canonicalHelpRoot(rawRoot);
+  const title = `${commandLabel} result`;
+
+  const schemaKey = [root, verb, subverb].filter(Boolean).join(" ");
+  const rootVerbKey = [root, verb].filter(Boolean).join(" ");
+  const schemaFactory =
+    COMMAND_RESULT_SCHEMAS.get(schemaKey) ??
+    COMMAND_RESULT_SCHEMAS.get(rootVerbKey) ??
+    COMMAND_RESULT_SCHEMAS.get(root);
+
+  if (schemaFactory) return schemaFactory(title, commandLabel);
+
+  return objectResultSchema(title, ["command", "summary"], {
+    command: { const: commandLabel },
+    root: { const: root },
+    verb: verb ? { const: verb } : NULLABLE_STRING_VALUE,
+    summary: {
+      type: "object",
+      additionalProperties: true,
+      description: `${commandLabel} command-specific summary payload.`,
+    },
+    items: {
+      type: "array",
+      description: `${commandLabel} command-specific row payloads when the command returns a collection.`,
+      items: OBJECT_VALUE,
+    },
+    value: {
+      description: `${commandLabel} command-specific scalar payload when applicable.`,
+    },
+  });
 }
 
 function renderCommandSchema(command?: string | readonly string[]): JsonObjectSchema {
