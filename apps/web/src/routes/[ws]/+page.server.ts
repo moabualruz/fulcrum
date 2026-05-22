@@ -9,5 +9,11 @@ import { projectListRoute, withTrace } from "$lib/components/app/route-map.ts";
  * redirect (IA-MAP §1 URL invariants).
  */
 export const load: PageServerLoad = ({ params, url }) => {
+	if (params.ws === "wave-0a-foundation") {
+		const target = new URL("/design-tokens", url);
+		target.search = url.search;
+		throw redirect(308, `${target.pathname}${target.search}`);
+	}
+
 	throw redirect(308, withTrace(projectListRoute(params.ws), url));
 };
