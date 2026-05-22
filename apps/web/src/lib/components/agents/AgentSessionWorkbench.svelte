@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { cn } from "../../utils.js";
-  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, buttonVariants } from "@fulcrum/ui-kit";
+  import { cn, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, buttonVariants } from "@fulcrum/ui-kit";
   import type { SessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
 
   interface AgentPickerOption {

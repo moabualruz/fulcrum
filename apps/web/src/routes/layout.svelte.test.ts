@@ -58,7 +58,6 @@ mock.module("$lib/util/media-query", () =>
       : null,
   ),
 );
-mock.module("$lib/utils.js", () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(" ") }));
 mock.module("$lib/components/app/BellBadge.svelte", () => ({ default: () => "" }));
 mock.module("@lucide/svelte/icons/bell", () => ({ default: () => "" }));
 mock.module("@lucide/svelte/icons/sun", () => ({ default: () => "" }));

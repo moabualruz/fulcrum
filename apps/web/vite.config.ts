@@ -40,6 +40,7 @@ export default defineConfig({
     alias: {
       "@fulcrum/cli": new URL("../cli/src", import.meta.url).pathname,
       "@fulcrum/server": new URL("../server/src", import.meta.url).pathname,
+      "@fulcrum/shared-dto": new URL("../../packages/shared-dto/src", import.meta.url).pathname,
       "@fulcrum/tui": new URL("../tui/src", import.meta.url).pathname,
       "@fulcrum/web": new URL("./src", import.meta.url).pathname,
       "@agent-client-protocol": new URL("../../services/agent-client-protocol/src", import.meta.url)
