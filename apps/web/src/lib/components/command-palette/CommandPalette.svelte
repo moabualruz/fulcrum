@@ -32,7 +32,7 @@
     CommandPaletteEmpty,
     CommandPaletteGroup,
   } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { oramaIndex } from "$lib/search/OramaIndex";
   import type { CommandItem } from "./command-palette-filter";
   import {

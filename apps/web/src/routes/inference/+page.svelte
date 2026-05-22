@@ -5,7 +5,7 @@
   import type { PageData } from "./$types";
   import type { BackendStatusRow } from "./+page.server";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { Breadcrumb, type BreadcrumbItem } from "@fulcrum/ui-kit";
   import type { SavedSearch, SearchHit } from "./+page.server.ts";
 

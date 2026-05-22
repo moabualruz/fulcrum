@@ -8,7 +8,7 @@
 	import { WorkflowStageValues, type WorkflowStage } from "@fulcrum/shared-dto";
 	import { ScopeBar, TraceChip } from "@fulcrum/ui-kit";
 	import { STAGE_WORKBENCH_ROUTE, stageRoute, withTrace } from "$lib/components/app/route-map.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	export type InferenceStatus = "healthy" | "degraded" | "unreachable" | "unknown";
 	export type DensityMode = "compact" | "cozy" | "comfortable";

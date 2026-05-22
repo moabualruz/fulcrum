@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
   import type { TaskStatus } from "$lib/server/tasks";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import BoardCard from "./BoardCard.svelte";
   import {
     diffMoveFromBoard,

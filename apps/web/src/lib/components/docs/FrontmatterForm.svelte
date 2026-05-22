@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import {
 		getFrontmatterFields,
 		validateFrontmatter,

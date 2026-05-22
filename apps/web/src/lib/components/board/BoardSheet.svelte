@@ -14,7 +14,7 @@
     SheetHeader,
     SheetTitle,
   } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { TaskStatus } from "$lib/server/tasks";
   import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";
   import type { JSONContent } from "@tiptap/core";

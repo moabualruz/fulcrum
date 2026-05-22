@@ -3,7 +3,7 @@
   import { TASK_STATUSES, describeStatus } from "./board-helpers";
   import { applyBoardMove, buildSwimlanes, filterTasksBySprint, revertBoardMove, type BoardMove, type SwimlaneMode } from "./kanban-board";
   import BoardColumn from "./BoardColumn.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { DndMovePayload } from "./board-column-handlers";
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 

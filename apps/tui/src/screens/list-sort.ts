@@ -1,4 +1,6 @@
-export type SortDirection = "asc" | "desc";
+import type { SortDirection } from "@fulcrum/shared-dto";
+
+export type { SortDirection } from "@fulcrum/shared-dto";
 
 export interface SortField {
   id: string;

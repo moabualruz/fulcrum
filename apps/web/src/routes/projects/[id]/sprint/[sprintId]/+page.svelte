@@ -2,7 +2,7 @@
   import type { BoardTask } from "$lib/product-queries";
   import { TASK_STATUSES, buildBoardSnapshot, describeStatus } from "$lib/components/board/board-helpers";
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
 
   interface Sprint {

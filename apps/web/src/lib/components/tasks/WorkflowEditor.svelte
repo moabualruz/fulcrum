@@ -3,7 +3,7 @@
    * WorkflowEditor: visual transition graph editor.
    */
   import { onMount } from "svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     fetchDefaultWorkflowTransitions,
     fetchWorkflowTransitions,

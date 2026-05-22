@@ -5,7 +5,7 @@
     listFieldDependencyRules,
     type FieldDependencyRule,
   } from "./field-dependency-api.js";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     projectId: string;

@@ -34,7 +34,7 @@
   import { page } from "$app/state";
   import { Badge, Button, Chip, EmptyState, Input, ModeRow } from "@fulcrum/ui-kit";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   /**
    * A workflow stage a prompt is tagged for. `mine` is the synthetic "My

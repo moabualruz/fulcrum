@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from "svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import {
     applyTimelineMove,

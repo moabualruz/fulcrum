@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
   import { Badge, Card } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { makeBoardCardClick } from "./board-card-handlers.ts";
 
   interface Props {

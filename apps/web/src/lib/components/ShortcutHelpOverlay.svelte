@@ -5,7 +5,7 @@
    * Opened with the `?` key. Shows all keyboard shortcuts in a
    * two-column grouped layout. Closes on Esc or backdrop click.
    */
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     open: boolean;

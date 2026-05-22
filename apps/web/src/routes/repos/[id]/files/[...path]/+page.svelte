@@ -4,7 +4,7 @@
   import BlameView from "$lib/components/repos/BlameView.svelte";
   import BranchSelector from "$lib/components/repos/BranchSelector.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

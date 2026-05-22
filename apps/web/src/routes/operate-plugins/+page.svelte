@@ -36,7 +36,7 @@
     ModeRow,
     Switch,
   } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   /** OD plugin source: `npm` / `git` / `local` (the `.v` line). */
   type PluginSource = "npm" | "git" | "local";

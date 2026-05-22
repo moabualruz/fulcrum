@@ -22,7 +22,7 @@
    * shared `mode-affordance-host` ModeRow. `ui_kit_adds: []`.
    */
   import { Button, EmptyState } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     ModeRow,
     createStepModeRow,

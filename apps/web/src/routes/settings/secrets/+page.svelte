@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { buttonVariants, CredentialInput } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";

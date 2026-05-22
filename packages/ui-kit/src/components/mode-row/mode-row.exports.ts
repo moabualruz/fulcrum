@@ -1,3 +1,4 @@
+import { WorkflowModeValues, type WorkflowMode } from "@fulcrum/shared-dto";
 import type { HTMLAttributes } from "svelte/elements";
 import { cn, type WithElementRef } from "../../utils.js";
 
@@ -15,18 +16,19 @@ import { cn, type WithElementRef } from "../../utils.js";
  * is not part of the canonical four and is never rendered unless requested.
  */
 
+export type { WorkflowMode } from "@fulcrum/shared-dto";
+
 /**
- * A workflow mode. The canonical four are `manual | play | discuss | assist`
- * (DESIGN.md §4.13). `ai-assist` is a deprecated alias of `assist` kept so
- * existing consumers compile; `trace` is the optional legacy fifth mode.
+ * ModeRow accepts the canonical shared workflow modes plus two UI-only legacy
+ * aliases used by older reference surfaces.
  */
-export type WorkflowMode = "manual" | "play" | "discuss" | "assist" | "ai-assist" | "trace";
+export type ModeRowMode = WorkflowMode | "ai-assist" | "trace";
 
 /** Density form the row renders in (DESIGN.md §4.13). */
 export type ModeRowDensity = "long" | "compact" | "tight";
 
 /** The canonical labelled label for each mode (DESIGN.md §4.13 long form). */
-const MODE_LABEL: Record<WorkflowMode, string> = {
+const MODE_LABEL: Record<ModeRowMode, string> = {
 	manual: "Manual",
 	play: "Play",
 	discuss: "Discuss",
@@ -36,7 +38,7 @@ const MODE_LABEL: Record<WorkflowMode, string> = {
 };
 
 /** The label used in the `tight` form, where Manual/Assist are noise. */
-const MODE_TIGHT_LABEL: Record<WorkflowMode, string> = {
+const MODE_TIGHT_LABEL: Record<ModeRowMode, string> = {
 	manual: "Manual",
 	play: "Suggest",
 	discuss: "Discuss",
@@ -46,7 +48,7 @@ const MODE_TIGHT_LABEL: Record<WorkflowMode, string> = {
 };
 
 /** The OD glyph for each mode (DESIGN.md §4.13: `✋ ▶ 💬 ⊞`). */
-const MODE_GLYPH: Record<WorkflowMode, string> = {
+const MODE_GLYPH: Record<ModeRowMode, string> = {
 	manual: "✋",
 	play: "▶",
 	discuss: "💬",
@@ -56,7 +58,7 @@ const MODE_GLYPH: Record<WorkflowMode, string> = {
 };
 
 /** Per-action `title`/tooltip text: DESIGN.md §4.13 requires every mode carries one. */
-const MODE_TITLE: Record<WorkflowMode, string> = {
+const MODE_TITLE: Record<ModeRowMode, string> = {
 	manual: "Manual: work this step yourself",
 	play: "▶ Play: hand off to an AI agent",
 	discuss: "💬 Discuss: open the comment thread",
@@ -67,11 +69,11 @@ const MODE_TITLE: Record<WorkflowMode, string> = {
 
 export type ModeRowProps = WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 	/** The currently-selected mode. Bindable. */
-	value?: WorkflowMode;
+	value?: ModeRowMode;
 	/** Fires whenever a mode button is activated. */
-	onSelect?: (mode: WorkflowMode) => void;
+	onSelect?: (mode: ModeRowMode) => void;
 	/** The modes rendered, in order. Defaults to the canonical four. */
-	modes?: WorkflowMode[];
+	modes?: ModeRowMode[];
 	/** Density form: `long` labelled, `compact` icon-only, `tight` Suggest/Discuss. */
 	density?: ModeRowDensity;
 	/** Toolbar `aria-label`. DESIGN.md §4.13 canonical value is `Step modes`. */
@@ -79,17 +81,17 @@ export type ModeRowProps = WithElementRef<HTMLAttributes<HTMLDivElement>> & {
 };
 
 /** The canonical four workflow modes (DESIGN.md §4.13). */
-export const WORKFLOW_MODES: WorkflowMode[] = ["manual", "play", "discuss", "assist"];
+export const WORKFLOW_MODES = [...WorkflowModeValues] satisfies WorkflowMode[];
 
 /** The `tight`-form mode subset: Suggest + Discuss only (DESIGN.md §4.13). */
 export const TIGHT_MODES: WorkflowMode[] = ["play", "discuss"];
 
 /** Stable resolution of a mode to its canonical glyph: exported for sibling surfaces. */
-export function modeGlyph(mode: WorkflowMode): string {
+export function modeGlyph(mode: ModeRowMode): string {
 	return MODE_GLYPH[mode];
 }
 
 /** Stable resolution of a mode to its long-form label: exported for sibling surfaces. */
-export function modeLabel(mode: WorkflowMode): string {
+export function modeLabel(mode: ModeRowMode): string {
 	return MODE_LABEL[mode];
 }

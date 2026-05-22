@@ -7,7 +7,7 @@
    * Enter submits, Esc closes. Stays open after submit for multi-create.
    *
    */
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { page } from "$app/state";
   import {
     createQuickTask,

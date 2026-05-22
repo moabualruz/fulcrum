@@ -1,7 +1,7 @@
 <script lang="ts">
   import Bell from "@lucide/svelte/icons/bell";
   import { Badge } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     count: number;

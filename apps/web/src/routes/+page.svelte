@@ -5,7 +5,7 @@
 	import RecentDocs from "$lib/components/dashboard/RecentDocs.svelte";
 	import TopTasks from "$lib/components/dashboard/TopTasks.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import type { PageData } from "./$types";
 
 	const { data }: { data: PageData } = $props();

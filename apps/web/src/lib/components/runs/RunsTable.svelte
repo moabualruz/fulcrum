@@ -21,7 +21,7 @@
     type SortColumn,
     type SortDirection,
   } from "./runs-table-sort.ts";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     rows: RunRow[];

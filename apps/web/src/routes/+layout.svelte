@@ -40,7 +40,7 @@
 		browserDriver,
 		isMobileViewport,
 	} from "$lib/util/media-query";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import { stageRoute, withTrace, type WorkflowStage } from "$lib/components/app/route-map.ts";
 	import {
 		stageForPath as stageForNavPath,

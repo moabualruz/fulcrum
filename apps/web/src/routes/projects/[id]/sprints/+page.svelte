@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SprintListing } from "$lib/product-queries";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { enhance } from "$app/forms";
 
   interface VelocityPoint { sprintName: string; points: number }

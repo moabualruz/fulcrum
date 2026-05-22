@@ -7,6 +7,8 @@ export {
 	type RunStatus,
 	type ToolCallEvent,
 } from "./run.ts";
+export { AbortReasonSchema, AbortReasonValues, type AbortReason } from "./session.ts";
+export { SortDirectionSchema, SortDirectionValues, type SortDirection } from "./sort.ts";
 export { StatusBadgeSchema, StatusBadgeValues, type StatusBadge } from "./status.ts";
 export {
 	ProjectIdSchema,

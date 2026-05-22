@@ -7,7 +7,7 @@
   import type { SortColumn, SortDirection } from "$lib/components/runs/runs-table-sort";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { buttonVariants } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

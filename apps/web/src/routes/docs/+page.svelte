@@ -5,7 +5,7 @@
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import DocTree from "$lib/components/docs/DocTree.svelte";
 	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;

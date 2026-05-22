@@ -2,7 +2,7 @@
   import { Avatar, AvatarFallback, Chip, EmptyState, ModeRow, Progress, StatusBadge } from "@fulcrum/ui-kit";
   import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { page } from "$app/state";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   /**
    * Build · List: the `☰ List` layout of the Build workbench.

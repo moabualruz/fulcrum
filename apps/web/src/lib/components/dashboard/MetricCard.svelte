@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Card, Stat } from "@fulcrum/ui-kit";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     label: string;

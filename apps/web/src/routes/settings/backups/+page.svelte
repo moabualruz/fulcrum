@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageData, ActionData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { toast } from "svelte-sonner";

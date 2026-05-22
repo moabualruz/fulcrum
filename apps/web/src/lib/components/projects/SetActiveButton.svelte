@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { buttonVariants } from "@fulcrum/ui-kit";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import { runSetActive } from "./set-active-handler.ts";
 
 	interface Props {

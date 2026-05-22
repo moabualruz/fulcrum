@@ -53,7 +53,7 @@
 		modeAffordanceHooks,
 		type ModeStepScope,
 	} from "$lib/components/app/mode-affordance-host.ts";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	/**
 	 * The four review lifecycle tabs (OD `review-queue.html` lines 58–63;

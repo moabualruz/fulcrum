@@ -2,7 +2,7 @@
   import type { BoardTask } from "$lib/product-queries";
   import type { TaskStatus } from "$lib/server/tasks";
   import { TASK_STATUSES, describeStatus } from "./board-helpers";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 
   interface Props {
