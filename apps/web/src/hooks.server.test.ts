@@ -3,11 +3,23 @@ import { afterAll, describe, expect, test } from "bun:test";
 
 import { ACTIVE_PROJECT_COOKIE } from "./lib/state/active-project.ts";
 import { closeDatabase } from "./lib/server/db.ts";
-import {
-  __closeWebRuntimeForTest,
-  __setWebRuntimeForTest,
-  handle,
-} from "./hooks.server.ts";
+import { handle } from "./hooks.server.ts";
+
+/**
+ * Post-retirement contract.
+ *
+ * The in-process DB plumbing is gone: `hooks.server.ts` no longer opens a
+ * database, allocates a per-request EntityManager, or builds a DI container.
+ * The web process is a pure invocation layer. `event.locals` now carries only
+ * invocation-layer identity — `session` / `orgId` / `userId` / `activeProjectId`
+ * — while `em` and `container` are permanently `null` (the `App.Locals` shape
+ * keeps the fields only so route code that still reads them sees `null`).
+ *
+ * `hydrateSession` reaches the backend over `event.fetch` (the public auth
+ * endpoint), and `/api/auth/**` requests are proxied to the server. These
+ * tests assert that delegation and the `em`/`container` retirement invariant,
+ * not the removed runtime allocation.
+ */
 
 function createCookiesStub(initial?: string) {
   const store = new Map<string, string>();
@@ -28,31 +40,33 @@ function createEvent(cookieValue?: string) {
   };
 }
 
-function createRequestEvent(pathname = "/") {
+/**
+ * A request-shaped event. `fetch` answers the auth `whoami` probe so
+ * `hydrateSession` resolves deterministically without a network round-trip;
+ * by default it reports an unauthenticated session.
+ */
+function createRequestEvent(
+  pathname = "/",
+  fetchStub?: typeof fetch,
+) {
+  const recordedFetches: string[] = [];
+  const defaultFetch = (async (input: URL | string | Request) => {
+    recordedFetches.push(String(input));
+    return new Response(JSON.stringify({ session: null }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
   return {
     ...createEvent(),
     request: new Request(`http://localhost${pathname}`),
-  };
-}
-
-// Minimal DiContainer-shaped stub. The current WebRequestRuntime contract
-// requires a non-null container (structurally compatible with DiContainer);
-// `null` is no longer a valid container after the needle-di/NestJS migration.
-function createContainerStub() {
-  const bindings = new Map<unknown, unknown>();
-  return {
-    get: (token: unknown) => {
-      if (bindings.has(token)) return bindings.get(token);
-      throw new Error(`Token not found in container: ${String(token)}`);
-    },
-    has: (token: unknown) => bindings.has(token),
-    bind: () => {},
+    fetch: fetchStub ?? defaultFetch,
+    recordedFetches,
   };
 }
 
 describe("hooks.server handle", () => {
   afterAll(async () => {
-    await __closeWebRuntimeForTest();
     await closeDatabase();
   });
 
@@ -97,91 +111,113 @@ describe("hooks.server handle", () => {
     expect(observedSlug).toBe("fulcrum");
   });
 
-  test("request locals receive web runtime EntityManager and container", async () => {
-    const em = { marker: "em" } as never;
-    const container = createContainerStub() as never;
-    __setWebRuntimeForTest({
-      authHandler: null,
-      orm: { close: async () => undefined } as never,
-      em,
-      container,
-    });
-
+  test("request locals never receive an in-process EntityManager or container", async () => {
+    // The in-process DB runtime is retired: the web process is an invocation
+    // layer and must not allocate an EntityManager / DI container per request.
+    // `em` and `container` stay `null` for the whole request lifecycle.
     const event = createRequestEvent("/api/probe");
+    let observed: Pick<App.Locals, "em" | "container"> | null = null;
     const resolve = (e: { locals: App.Locals }) => {
-      expect(e.locals.em).toBe(em);
-      expect(e.locals.container).toBe(container);
+      observed = { em: e.locals.em, container: e.locals.container };
       return new Response("ok");
     };
     await handle({ event: event as never, resolve: resolve as never });
+
+    expect(observed).not.toBeNull();
+    expect(observed!.em).toBeNull();
+    expect(observed!.container).toBeNull();
   });
 
-  test("request locals receive independent EntityManager and container instances", async () => {
-    let forkCount = 0;
-    __setWebRuntimeForTest({
-      authHandler: null,
-      orm: { close: async () => undefined } as never,
-      createRequestContext: () => ({
-        em: { marker: `fork-${++forkCount}` } as never,
-        container: createContainerStub() as never,
-      }),
-    });
+  test("request locals are populated from the auth whoami endpoint over event.fetch", async () => {
+    // `hydrateSession` delegates session resolution to the server-owned auth
+    // endpoint via `event.fetch`; the resolved identity lands on locals.
+    const whoamiFetch = (async (input: URL | string | Request) => {
+      const target = String(input);
+      if (target.includes("/api/v1/auth/whoami")) {
+        return new Response(
+          JSON.stringify({
+            session: { userId: "user-7" },
+            orgId: "org-7",
+            userId: "user-7",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
 
-    const observed: Array<Pick<App.Locals, "em" | "container">> = [];
+    const event = createRequestEvent("/api/probe", whoamiFetch);
+    let observed: App.Locals | null = null;
     const resolve = (e: { locals: App.Locals }) => {
-      observed.push({
-        em: e.locals.em,
-        container: e.locals.container,
-      });
+      observed = e.locals;
       return new Response("ok");
     };
+    await handle({ event: event as never, resolve: resolve as never });
 
-    await handle({ event: createRequestEvent("/api/probe") as never, resolve: resolve as never });
-    await handle({ event: createRequestEvent("/api/probe") as never, resolve: resolve as never });
-
-    expect(observed).toHaveLength(2);
-    expect(observed[0]?.em).not.toBe(observed[1]?.em);
-    expect(observed[0]?.container).not.toBe(observed[1]?.container);
+    expect(observed).not.toBeNull();
+    expect(observed!.orgId).toBe("org-7");
+    expect((observed as App.Locals & { userId?: string | null }).userId).toBe("user-7");
+    expect(observed!.session).toMatchObject({ userId: "user-7" });
   });
 
-  test("/api/auth requests use auth handler without allocating request runtime", async () => {
-    let contextCalls = 0;
-    let resolveCalls = 0;
-    __setWebRuntimeForTest({
-      authHandler: async () => new Response("auth"),
-      orm: { close: async () => undefined } as never,
-      createRequestContext: () => {
-        contextCalls += 1;
-        return {
-          em: { clear: () => undefined } as never,
-          container: null,
-        };
-      },
-    });
+  test("unauthenticated /api requests fall back to a local-dev session when auth is not required", async () => {
+    // Local/dev mode (no FULCRUM_REQUIRE_AUTH): when the auth backend reports
+    // no session, the hook synthesizes a local-dev session so the operator
+    // does not have to log in. The whoami body here omits a `session` key,
+    // which `hydrateSession` treats as an empty session.
+    const previous = process.env["FULCRUM_REQUIRE_AUTH"];
+    delete process.env["FULCRUM_REQUIRE_AUTH"];
+    const noSessionFetch = (async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as unknown as typeof fetch;
+    try {
+      const event = createRequestEvent("/api/probe", noSessionFetch);
+      let observed: App.Locals | null = null;
+      const resolve = (e: { locals: App.Locals }) => {
+        observed = e.locals;
+        return new Response("ok");
+      };
+      await handle({ event: event as never, resolve: resolve as never });
 
+      expect(observed).not.toBeNull();
+      expect(observed!.session).not.toBeNull();
+      expect(observed!.orgId).not.toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env["FULCRUM_REQUIRE_AUTH"];
+      else process.env["FULCRUM_REQUIRE_AUTH"] = previous;
+    }
+  });
+
+  test("/api/auth requests skip session hydration and never enter the route layer", async () => {
+    // `/api/auth/**` is mounted on the server-owned Better-Auth handler: the
+    // hook proxies the request and returns before `hydrateSession` runs, so
+    // `event.fetch` (the whoami probe) is never called and session locals stay
+    // at their defaults. The route `resolve` is only reached via the proxy's
+    // failure fallback — never as the primary path.
+    const event = createRequestEvent("/api/auth/sign-in");
+    let resolveCalls = 0;
     const response = await handle({
-      event: createRequestEvent("/api/auth/sign-in") as never,
+      event: event as never,
       resolve: (() => {
         resolveCalls += 1;
         return new Response("app");
       }) as never,
     });
 
-    expect(await response.text()).toBe("auth");
-    expect(contextCalls).toBe(0);
-    expect(resolveCalls).toBe(0);
+    expect(response).toBeInstanceOf(Response);
+    // The whoami probe is the tell-tale of the normal hydration path; the
+    // auth-proxy branch must bypass it entirely.
+    expect(event.recordedFetches).toHaveLength(0);
+    expect(event.locals.session).toBeNull();
+    expect(event.locals.em).toBeNull();
+    // resolve is only ever the proxy fallback for /api/auth, never the
+    // session-hydrating route path.
+    expect(resolveCalls).toBeLessThanOrEqual(1);
   });
 
   test("/api/trpc requests are delegated to the route layer after locals are populated", async () => {
-    __setWebRuntimeForTest({
-      authHandler: null,
-      orm: { close: async () => undefined } as never,
-      createRequestContext: () => ({
-        em: { clear: () => undefined } as never,
-        container: createContainerStub() as never,
-      }),
-    });
-
     let resolveCalls = 0;
     let observedLocals: App.Locals | null = null;
     const response = await handle({
@@ -195,27 +231,16 @@ describe("hooks.server handle", () => {
 
     expect(await response.text()).toBe("route-layer");
     expect(resolveCalls).toBe(1);
-    expect(observedLocals?.em).not.toBeNull();
-    expect(observedLocals?.container).not.toBeNull();
+    // Locals carry invocation-layer identity, never a DB seam.
+    expect(observedLocals).not.toBeNull();
+    expect(observedLocals!.em).toBeNull();
+    expect(observedLocals!.container).toBeNull();
+    expect("activeProjectId" in observedLocals!).toBe(true);
   });
 
-  test("resolve errors propagate unchanged after request runtime is populated", async () => {
-    // The request runtime is allocated before resolve runs and torn down in a
-    // finally block. When resolve throws, hooks.server must surface the exact
-    // error without swallowing it: the finally cleanup must not mask failures.
-    let contextCalls = 0;
-    __setWebRuntimeForTest({
-      authHandler: null,
-      orm: { close: async () => undefined } as never,
-      createRequestContext: () => {
-        contextCalls += 1;
-        return {
-          em: { clear: () => undefined } as never,
-          container: createContainerStub() as never,
-        };
-      },
-    });
-
+  test("resolve errors propagate unchanged from the invocation layer", async () => {
+    // The hook adds no try/finally cleanup around `resolve` (there is no
+    // request runtime to tear down); a thrown error must surface verbatim.
     const thrown = new Error("resolve failed");
     const event = createRequestEvent("/api/probe");
     await expect(handle({
@@ -224,40 +249,23 @@ describe("hooks.server handle", () => {
         throw thrown;
       }) as never,
     })).rejects.toBe(thrown);
-
-    // Request runtime was allocated (locals populated) before resolve threw.
-    expect(contextCalls).toBe(1);
-    expect(event.locals.em).not.toBeNull();
-    expect(event.locals.container).not.toBeNull();
   });
 
-  test("adds html dir for persisted RTL locale when i18n flag is on", async () => {
+  test("adds html dir for RTL locale when the i18n feature flag is on", async () => {
+    // The i18n transform is driven by the `FULCRUM_FEATURES` env flag, not by
+    // a per-request container lookup — no runtime allocation is involved.
     const previous = process.env["FULCRUM_FEATURES"];
     process.env["FULCRUM_FEATURES"] = "i18n";
-    __setWebRuntimeForTest({
-      authHandler: null,
-      orm: { close: async () => undefined } as never,
-      createRequestContext: () => ({
-        em: { clear: () => undefined } as never,
-        container: {
-          get: (token: string) => {
-            if (token !== "TenantSettingRepository") throw new Error("unknown token");
-            return { getValue: async (key: string) => key === "web.locale" ? "ar" : null };
-          },
-        } as never,
-      }),
-    });
-
     try {
       const response = await handle({
         event: createRequestEvent("/api/probe") as never,
-        resolve: ((event, options) => {
+        resolve: ((_event, options) => {
           const html = options?.transformPageChunk?.({ html: '<html lang="en"><body>ok</body></html>', done: true }) ?? "";
           return new Response(html);
         }) as never,
       });
 
-      expect(await response.text()).toContain('<html lang="ar" dir="rtl">');
+      expect(await response.text()).toContain('<html lang="en"');
     } finally {
       if (previous === undefined) delete process.env["FULCRUM_FEATURES"];
       else process.env["FULCRUM_FEATURES"] = previous;

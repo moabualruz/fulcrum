@@ -34,24 +34,27 @@ const SURFACES: Surface[] = [
     keys: ["_isSaasAuthEnabled"],
   },
   {
+    // Web is a pure invocation layer: the dashboard loader reaches the backend
+    // through the `project-api` public-API client, not a service-interface
+    // module — the retired in-process `$lib/server/dashboard` seam is gone.
     name: "dashboard",
     file: "+page.server.ts",
     applicationModule: null,
-    helperModule: "$lib/server/dashboard",
+    helperModule: "$lib/server/project-api",
     keys: ["activeProjectId", "streamed", "dashboard"],
   },
   {
     name: "projects",
     file: "projects/+page.server.ts",
     applicationModule: null,
-    helperModule: "@work-management/interface/project-lifecycle",
+    helperModule: "$lib/server/project-api",
     keys: ["activeProjectId", "streamed", "data", "projects"],
   },
   {
     name: "runs",
     file: "runs/+page.server.ts",
     applicationModule: null,
-    helperModule: "@execution-orchestration/interface/run-pages",
+    helperModule: "$lib/server/agent-run-api",
     keys: ["activeProjectId", "filter", "streamed", "data", "runs", "projects", "tasks"],
   },
   {
@@ -103,7 +106,7 @@ const SURFACES: Surface[] = [
     name: "memory",
     file: "memory/+page.server.ts",
     applicationModule: null,
-    helperModule: "@knowledge-workspace/interface/memory-records",
+    helperModule: "$lib/server/memory-api",
     keys: ["activeProjectId", "scope", "kind", "streamed", "data", "memories"],
   },
   {
@@ -187,14 +190,14 @@ const SURFACES: Surface[] = [
     name: "tasks",
     file: "tasks/[id]/+page.server.ts",
     applicationModule: null,
-    helperModule: "@work-management/interface/work-item-detail",
+    helperModule: "$lib/server/task-detail-api",
     keys: ["task", "children"],
   },
   {
     name: "boards",
     file: "boards/+page.server.ts",
     applicationModule: null,
-    helperModule: "@work-management/interface/work-item-detail",
+    helperModule: "$lib/server/workspace-board-api",
     keys: ["project", "activeProjectId", "streamed", "data", "tasks"],
   },
 ];
