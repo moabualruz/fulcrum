@@ -307,6 +307,18 @@ export class SprintPublicApiController {
     return await this.sprints.createSprint(body);
   }
 
+  // Literal-segment routes (`project-board`) MUST be declared before the
+  // `:id` parametric route — NestJS mounts in method-definition order +
+  // Express matches in registration order, so a parametric `:id` declared
+  // first would capture `/project-board` as `{id:"project-board"}` and 404.
+  async loadProjectSprints(query: ProjectSprintBoardQueryDto): Promise<unknown> {
+    return await this.sprints.loadProjectSprints(query);
+  }
+
+  async createProjectSprint(body: ProjectSprintCreateBodyDto): Promise<unknown> {
+    return await this.sprints.createProjectSprint(body);
+  }
+
   async getSprint(params: SprintIdParamsDto, query: SprintRequestContextDto): Promise<unknown> {
     return await this.sprints.getSprint(params, query);
   }
@@ -333,14 +345,6 @@ export class SprintPublicApiController {
 
   async removeTask(params: SprintTaskParamsDto, query: SprintRequestContextDto): Promise<unknown> {
     return await this.sprints.removeTask(params, query);
-  }
-
-  async loadProjectSprints(query: ProjectSprintBoardQueryDto): Promise<unknown> {
-    return await this.sprints.loadProjectSprints(query);
-  }
-
-  async createProjectSprint(body: ProjectSprintCreateBodyDto): Promise<unknown> {
-    return await this.sprints.createProjectSprint(body);
   }
 
   async loadProjectSprintDetail(

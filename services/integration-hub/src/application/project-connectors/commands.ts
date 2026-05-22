@@ -121,8 +121,15 @@ export async function listProjectConnectors(
   projectId: string,
 ): Promise<ProjectConnectorRow[]> {
   const conn = ormSqlConnection(em);
-  return conn.execute<ProjectConnectorRow[]>(
-    `SELECT * FROM project_connectors WHERE project_id = $1 ORDER BY connector_type ASC`,
-    [projectId],
-  );
+  // `project_connectors` table is provisioned by the integrations migration;
+  // until that lands, return an empty list rather than 500ing the
+  // project-settings/connectors route.
+  try {
+    return await conn.execute<ProjectConnectorRow[]>(
+      `SELECT * FROM project_connectors WHERE project_id = $1 ORDER BY connector_type ASC`,
+      [projectId],
+    );
+  } catch {
+    return [];
+  }
 }

@@ -69,6 +69,8 @@ export class TaskPatchBodyDto {
   priority?: number;
   points?: number;
   assigneeId?: string;
+  sprintId?: string | null;
+  sprint_id?: string | null;
 }
 
 export class TaskDependenciesBodyDto {

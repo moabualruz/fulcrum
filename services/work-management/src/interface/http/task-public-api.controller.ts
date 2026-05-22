@@ -674,6 +674,11 @@ function taskPatch(body: TaskPatchBodyDto): Partial<TaskPatchBodyDto> {
       patch[key] = body[key] as never;
     }
   }
+  // `sprintId` was historically assigned through `/backlog/sprint-tasks`;
+  // accept it here too (camel or snake) so the standard tasks PATCH can move
+  // a task into / out of a sprint without a separate endpoint.
+  const sprintId = body.sprintId ?? body.sprint_id;
+  if (sprintId !== undefined) patch.sprintId = sprintId;
   return patch;
 }
 

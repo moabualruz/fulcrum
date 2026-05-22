@@ -35,15 +35,33 @@
 		},
 	});
 
+	// shadcn-svelte-era variant + size names still flow in from many callers;
+	// map them to the canonical set so a legacy `variant="default"` does not
+	// 500 the page. Each canonical token stays the source of truth.
+	const LEGACY_VARIANT_ALIASES: Record<string, ButtonVariant> = {
+		default: "primary",
+		destructive: "danger",
+		outline: "secondary",
+	};
+	const LEGACY_SIZE_ALIASES: Record<string, ButtonSize> = {
+		default: "md",
+		icon: "sm",
+		"icon-sm": "xs",
+	};
+
 	function normalizeButtonVariant(variant: ButtonVariant | null | undefined): ButtonVariant {
 		if (variant === null || variant === undefined) return "primary";
 		if (buttonVariantValues.includes(variant)) return variant;
+		const alias = LEGACY_VARIANT_ALIASES[variant as string];
+		if (alias) return alias;
 		throw new Error(`Unsupported Button variant: ${variant}`);
 	}
 
 	function normalizeButtonSize(size: ButtonSize | null | undefined): ButtonSize {
 		if (size === null || size === undefined) return "md";
 		if (buttonSizeValues.includes(size)) return size;
+		const alias = LEGACY_SIZE_ALIASES[size as string];
+		if (alias) return alias;
 		throw new Error(`Unsupported Button size: ${size}`);
 	}
 

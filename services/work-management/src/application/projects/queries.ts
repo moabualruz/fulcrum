@@ -225,10 +225,12 @@ export async function getProjectOrNull(
   ctx: AppContext,
   projectId: string,
 ): Promise<ProjectRow | null> {
-  const columns = await projectColumns(em);
-  const slugExpr = columns.has("slug") ? "COALESCE(slug, id::text)" : "id::text";
+  // Resolve via canonical entity table `fulcrum_projects` (workspace_id, no
+  // org_id) and accept either a uuid or a slug — web routes pass the slug
+  // straight through from the URL.
   const rows = await ormSqlConnection(em).execute<ProjectRow[]>(
-    `SELECT id, ${slugExpr} AS slug, name FROM projects WHERE id::text = $1 AND org_id = $2`,
+    `SELECT id, slug, name FROM fulcrum_projects
+       WHERE (id::text = $1 OR slug = $1) AND workspace_id = $2`,
     [projectId, ctx.orgId],
   );
   return rows[0] ?? null;
@@ -241,9 +243,12 @@ export async function loadProjectOverview(
   options: { includeDescendants?: boolean } = {},
 ): Promise<ProjectOverviewData | null> {
   const conn = ormSqlConnection(em);
+  // Schema is `fulcrum_projects` (workspace_id, no org_id) and `fulcrum_tasks`
+  // (project_id, no org_id) — the legacy `projects` / `tasks` table names with
+  // `org_id` columns no longer exist. Query the canonical entity tables.
   const rows = await conn.execute<Array<ProjectRow & { description: string | null; updated_at: Date | string }>>(
-    `SELECT id, slug, name, description, updated_at FROM projects
-       WHERE id::text = $1 AND org_id = $2`,
+    `SELECT id, slug, name, description, updated_at FROM fulcrum_projects
+       WHERE id::text = $1 AND workspace_id = $2`,
     [projectId, ctx.orgId],
   );
   const row = rows[0];
@@ -252,12 +257,12 @@ export async function loadProjectOverview(
   const projectPlaceholders = targetProjectIds.map((_, index) => `$${index + 1}`).join(", ");
   const summaryRows = await conn.execute<Array<{ open_tasks: number | string; in_progress: number | string; done: number | string }>>(
     `SELECT
-       COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled')) AS open_tasks,
+       COUNT(*) FILTER (WHERE status NOT IN ('completed', 'cancelled', 'done')) AS open_tasks,
        COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
-       COUNT(*) FILTER (WHERE status = 'completed') AS done
-     FROM tasks
-     WHERE project_id IN (${projectPlaceholders}) AND org_id = $${targetProjectIds.length + 1}`,
-    [...targetProjectIds, ctx.orgId],
+       COUNT(*) FILTER (WHERE status IN ('completed', 'done')) AS done
+     FROM fulcrum_tasks
+     WHERE project_id IN (${projectPlaceholders}) AND deleted_at IS NULL`,
+    [...targetProjectIds],
   );
   const summary = summaryRows[0] ?? { open_tasks: 0, in_progress: 0, done: 0 };
   return {

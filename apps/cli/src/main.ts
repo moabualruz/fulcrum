@@ -76,12 +76,12 @@ async function main() {
     return;
   }
 
+  // `--help` / `-h` on any command short-circuits dispatch. If we have a
+  // command-specific help entry we print that; otherwise we fall back to the
+  // root help so every subcommand has *some* help and never errors out.
   if (cmd !== "help" && (argv.includes("--help") || argv.includes("-h"))) {
-    const help = renderCommandHelp(argv);
-    if (help) {
-      console.log(help);
-      return;
-    }
+    console.log(renderCommandHelp(argv) ?? ROOT_HELP);
+    return;
   }
 
   switch (cmd) {

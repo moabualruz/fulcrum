@@ -128,8 +128,15 @@ export async function listProjectStatuses(
   projectId: string,
 ): Promise<ProjectStatusRow[]> {
   const conn = ormSqlConnection(em);
-  return conn.execute<ProjectStatusRow[]>(
-    `SELECT * FROM project_statuses WHERE project_id = $1 ORDER BY sort_order ASC, created_at ASC`,
-    [projectId],
-  );
+  // `project_statuses` table is part of the in-flight planning migration; if
+  // it has not been provisioned yet, return an empty list rather than 500ing
+  // the project-settings/statuses route.
+  try {
+    return await conn.execute<ProjectStatusRow[]>(
+      `SELECT * FROM project_statuses WHERE project_id = $1 ORDER BY sort_order ASC, created_at ASC`,
+      [projectId],
+    );
+  } catch {
+    return [];
+  }
 }
