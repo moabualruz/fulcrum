@@ -659,19 +659,21 @@
           data-ship-peek-backdrop
           class="absolute inset-0 z-30 flex justify-end bg-black/40"
           role="presentation"
-          onclick={closePeek}
+          onclick={(event) => {
+            if (event.target === event.currentTarget) closePeek();
+          }}
         >
-          <aside
+          <div
             data-ship-peek
             role="dialog"
             aria-modal="true"
             aria-label={`Release ${peekRelease.artifact}`}
+            tabindex="-1"
             class={cn(
               "flex h-full w-full flex-col overflow-y-auto border-l border-border-strong bg-card",
               "shadow-[-8px_0_32px_oklch(0_0_0/0.4)]",
               "lg:w-1/2 lg:min-w-[520px] lg:max-w-[880px]",
             )}
-            onclick={(event) => event.stopPropagation()}
           >
             <!-- peek head: crumbs, title, status, trace pill, close -->
             <header
@@ -925,7 +927,7 @@
                 </Button>
               {/if}
             </footer>
-          </aside>
+          </div>
         </div>
       {/if}
     </div>

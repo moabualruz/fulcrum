@@ -266,8 +266,9 @@
       <h3 class={cn("text-sm font-semibold")}>New Automation Rule</h3>
 
       <div class={cn("flex flex-col gap-1")}>
-        <label class={cn("text-xs font-medium")}>Rule Name</label>
+        <label for="automation-rule-name" class={cn("text-xs font-medium")}>Rule Name</label>
         <input
+          id="automation-rule-name"
           bind:value={newName}
           placeholder="e.g. Auto-assign on task created"
           class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}
@@ -276,16 +277,16 @@
 
       <div class={cn("grid grid-cols-2 gap-3")}>
         <div class={cn("flex flex-col gap-1")}>
-          <label class={cn("text-xs font-medium")}>Trigger</label>
-          <select bind:value={newTrigger} class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}>
+          <label for="automation-rule-trigger" class={cn("text-xs font-medium")}>Trigger</label>
+          <select id="automation-rule-trigger" bind:value={newTrigger} class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}>
             {#each Object.entries(TRIGGER_LABELS) as [val, label]}
               <option value={val}>{label}</option>
             {/each}
           </select>
         </div>
         <div class={cn("flex flex-col gap-1")}>
-          <label class={cn("text-xs font-medium")}>Action</label>
-          <select bind:value={newAction} class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}>
+          <label for="automation-rule-action" class={cn("text-xs font-medium")}>Action</label>
+          <select id="automation-rule-action" bind:value={newAction} class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}>
             {#each Object.entries(ACTION_LABELS) as [val, label]}
               <option value={val}>{label}</option>
             {/each}
@@ -294,8 +295,9 @@
       </div>
 
       <div class={cn("flex flex-col gap-1")}>
-        <label class={cn("text-xs font-medium")}>Action Value</label>
+        <label for="automation-rule-action-value" class={cn("text-xs font-medium")}>Action Value</label>
         <input
+          id="automation-rule-action-value"
           bind:value={newActionValue}
           placeholder="e.g. status name, assignee ID, label name"
           class={cn("h-8 rounded-md border border-input px-2 text-sm bg-background")}
@@ -400,7 +402,7 @@
                 "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition",
                 rule.enabled ? "translate-x-4" : "translate-x-0"
               )}
-            />
+            ></span>
           </button>
 
           <!-- Rule details -->

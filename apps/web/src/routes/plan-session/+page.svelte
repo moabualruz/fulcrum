@@ -568,7 +568,6 @@
 					<h3 class="mt-3 text-sm font-semibold text-foreground">{selectedEvent.summary}</h3>
 					<pre
 						data-transcript-payload
-						tabindex="0"
 						aria-label={`Payload for ${selectedEvent.summary}`}
 						class="mt-3 max-h-72 overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">{selectedEvent.payload}</pre>
 				{/if}

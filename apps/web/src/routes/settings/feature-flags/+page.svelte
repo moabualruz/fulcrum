@@ -57,6 +57,7 @@
                       flag.enabled ? "bg-primary" : "bg-muted",
                     )}
                     aria-pressed={flag.enabled}
+                    aria-label={`${flag.enabled ? "Disable" : "Enable"} ${flag.name}`}
                   >
                     <span class={cn(
                       "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",

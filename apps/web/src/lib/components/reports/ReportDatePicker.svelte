@@ -69,16 +69,18 @@
     {#if showCustom}
       <div class="custom-range-form" style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; min-width: 240px;">
         <div>
-          <label style="font-size: 0.75rem; font-weight: 500; display: block; margin-bottom: 0.25rem;">Start</label>
+          <label for="report-date-start" style="font-size: 0.75rem; font-weight: 500; display: block; margin-bottom: 0.25rem;">Start</label>
           <input
+            id="report-date-start"
             type="date"
             bind:value={customStart}
             style="width: 100%; padding: 0.375rem 0.5rem; border: 1px solid hsl(var(--border)); border-radius: 0.375rem; background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 0.875rem;"
           />
         </div>
         <div>
-          <label style="font-size: 0.75rem; font-weight: 500; display: block; margin-bottom: 0.25rem;">End</label>
+          <label for="report-date-end" style="font-size: 0.75rem; font-weight: 500; display: block; margin-bottom: 0.25rem;">End</label>
           <input
+            id="report-date-end"
             type="date"
             bind:value={customEnd}
             style="width: 100%; padding: 0.375rem 0.5rem; border: 1px solid hsl(var(--border)); border-radius: 0.375rem; background: hsl(var(--background)); color: hsl(var(--foreground)); font-size: 0.875rem;"

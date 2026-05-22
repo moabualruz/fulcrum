@@ -118,7 +118,7 @@
       step === s ? "bg-primary text-primary-foreground" :
       step > s ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
     )}>{step > s ? "✓" : s}</div>
-    {#if s < 5}<div class={cn("h-px flex-1 bg-border")} />{/if}
+    {#if s < 5}<div class={cn("h-px flex-1 bg-border")}></div>{/if}
   {/each}
 </div>
 
@@ -331,7 +331,7 @@
             <div
               class={cn("h-full bg-primary rounded-full transition-all duration-200")}
               style="width: {importProgress}%"
-            />
+            ></div>
           </div>
           <p class={cn("text-xs text-muted-foreground text-right")}>{importProgress}%</p>
         {/if}

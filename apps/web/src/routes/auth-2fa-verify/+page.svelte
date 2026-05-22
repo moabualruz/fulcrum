@@ -64,7 +64,7 @@
       {:else}
         <label class="flex flex-col gap-1 text-xs">
           6-digit code from your authenticator
-          <input data-auth-code-input bind:value={code} maxlength="6" inputmode="numeric" autofocus class="rounded-md border border-border bg-background px-2 py-1 text-sm" />
+          <input data-auth-code-input bind:value={code} maxlength="6" inputmode="numeric" class="rounded-md border border-border bg-background px-2 py-1 text-sm" />
         </label>
       {/if}
       {#if error}<p data-auth-error class="text-xs text-destructive">{error}</p>{/if}

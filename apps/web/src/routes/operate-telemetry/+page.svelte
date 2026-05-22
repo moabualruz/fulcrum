@@ -433,7 +433,7 @@
   class="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-[18px] pb-20"
 >
   <!-- Two-tab disambiguation: resolves the "Telemetry" name overload. -->
-  <nav
+  <div
     data-telemetry-view-tabs
     role="tablist"
     aria-label="Telemetry surfaces"
@@ -467,7 +467,7 @@
           : "border-transparent text-muted-foreground hover:text-foreground",
       )}
     >Telemetry settings</a>
-  </nav>
+  </div>
 
   {#if activeView === "observability"}
     <!-- ================= OBSERVABILITY DASHBOARD: OD operate-telemetry.html ================ -->
@@ -478,7 +478,7 @@
       <span data-telemetry-count class="font-mono text-xs text-muted-foreground">
         {countLine}
       </span>
-      <nav
+      <div
         data-telemetry-range
         role="radiogroup"
         aria-label="Telemetry time range"
@@ -502,7 +502,7 @@
             onclick={() => selectRange(r)}
           >{r}</button>
         {/each}
-      </nav>
+      </div>
       <ModeRow
         data-telemetry-mode-row
         {...modeAffordanceHooks(dashboardModeScope)}

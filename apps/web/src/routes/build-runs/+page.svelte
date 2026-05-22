@@ -851,15 +851,17 @@
   <div
     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
     role="presentation"
-    onclick={() => (abortOpen = false)}
+    onclick={(event) => {
+      if (event.target === event.currentTarget) abortOpen = false;
+    }}
   >
     <div
       data-abort-modal
       role="dialog"
       aria-modal="true"
       aria-label="Abort run"
+      tabindex="-1"
       class="w-[400px] max-w-full rounded-md border border-border bg-card p-4 shadow-lg"
-      onclick={(e) => e.stopPropagation()}
     >
       <h2 class="text-sm font-semibold">Stop this run?</h2>
       <p class="mt-1 text-xs text-muted-foreground">
