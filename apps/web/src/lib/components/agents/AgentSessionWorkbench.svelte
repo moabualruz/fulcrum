@@ -741,7 +741,9 @@
                                 {line.newLine ?? ""}
                               </span>
                               <span class={cn("select-none px-2 text-muted-foreground")} role="cell">{diffPrefix(line.kind)}</span>
-                              <code class={cn("whitespace-pre px-2")} role="cell">{line.content}</code>
+                              <span class={cn("px-2")} role="cell">
+                                <code class={cn("whitespace-pre")}>{line.content}</code>
+                              </span>
                             </div>
                           {/each}
                         </div>

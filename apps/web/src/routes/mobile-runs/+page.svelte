@@ -520,13 +520,14 @@
           class="min-h-11 flex-1 cursor-default"
           onclick={closeSheet}
         ></button>
-        <aside
+        <div
           data-mobile-runs-sheet
           data-draggable="true"
           data-sheet-height-vh={sheetHeightVh}
           role="dialog"
           aria-modal="true"
           aria-labelledby="mobile-runs-sheet-title"
+          tabindex="-1"
           class={cn(
             "relative grid w-full overflow-hidden",
             "rounded-t-3xl border-t border-border bg-card shadow-2xl",
@@ -714,7 +715,7 @@
               </Button>
             </div>
           {/if}
-        </aside>
+        </div>
       </div>
     {/if}
 

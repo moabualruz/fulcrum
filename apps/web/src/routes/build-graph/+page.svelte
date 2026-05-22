@@ -164,7 +164,7 @@
     data-build-graph-toolbar
     class={cn("flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2")}
   >
-    <nav
+    <div
       data-build-graph-layouts
       role="tablist"
       aria-label="Build layouts"
@@ -188,7 +188,7 @@
           <span>{layout.label}</span>
         </a>
       {/each}
-    </nav>
+    </div>
 
     <span class={cn("flex-1")}></span>
 

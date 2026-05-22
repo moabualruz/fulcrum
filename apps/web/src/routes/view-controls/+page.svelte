@@ -146,13 +146,15 @@
                 <th class={cn(
                   "px-3 py-2 font-medium text-muted-foreground",
                   field.align === "center" ? "text-center" : field.align === "right" ? "text-right" : "text-left",
-                )}>
+                )}
+                  scope="col"
+                  aria-sort={sortField === field.id ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                >
                   <button
                     type="button"
                     class={cn("inline-flex min-h-9 items-center gap-2 rounded-md px-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
                     data-sort-header={field.id}
                     data-sort-state={indicator(field.id)}
-                    aria-sort={sortField === field.id ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
                     aria-label={`Sort by ${field.label}`}
                     onclick={() => toggleHeaderSort(field.id)}
                   >

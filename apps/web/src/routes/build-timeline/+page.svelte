@@ -173,7 +173,7 @@
     <span data-build-timeline-count class={cn("font-mono text-xs text-muted-foreground")}>
       {timeline.cycle} · {timeline.daysVisible} days · {timeline.lanes.length} work items
     </span>
-    <nav
+    <div
       data-build-timeline-layouts
       role="tablist"
       aria-label="Build views"
@@ -196,7 +196,7 @@
           {layout.label}
         </a>
       {/each}
-    </nav>
+    </div>
   </header>
 
   {#if timeline.isEmpty}

@@ -252,13 +252,16 @@
             class="text-2xl font-bold w-full border-b border-border bg-transparent outline-none"
           />
         {:else}
-          <h1
-            data-task-title
-            class="text-2xl font-bold cursor-pointer hover:text-muted-foreground"
-            onclick={() => (editingTitle = true)}
-            role="button"
-            tabindex="0"
-          >{payload.task.title}</h1>
+          <h1 class="text-2xl font-bold">
+            <button
+              type="button"
+              data-task-title
+              class="cursor-pointer text-left hover:text-muted-foreground"
+              onclick={() => (editingTitle = true)}
+            >
+              {payload.task.title}
+            </button>
+          </h1>
         {/if}
         <div class="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
           <span data-task-status>{describeStatus(payload.task.status)}</span>

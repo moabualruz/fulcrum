@@ -325,7 +325,7 @@
           <span class={cn("text-red-500 ml-1")}>-{model.selectedFile.deletions}</span>
         </span>
       </header>
-      <div class={cn("flex-1 overflow-auto font-mono text-xs leading-5")} role="listbox" aria-label="Diff lines" onmouseup={handleMouseUp}>
+      <div class={cn("flex-1 overflow-auto font-mono text-xs leading-5")} role="listbox" aria-label="Diff lines" tabindex="0" onmouseup={handleMouseUp}>
         {#each model.selectedFile.patch.split("\n") as line, i (i)}
           <div
             data-diff-line={i}

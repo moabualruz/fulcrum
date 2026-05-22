@@ -431,7 +431,7 @@
 		title + diff `desc`, a four-dot check-row, stacked reviewer avatars, a
 		canonical status badge, relative age, and a compact per-Step mode row.
 	-->
-	<section
+	<div
 		id="review-queue-rows"
 		role="tabpanel"
 		aria-labelledby={`review-tab-${activeTab}`}
@@ -552,5 +552,5 @@
 				{/each}
 			</ul>
 		{/if}
-	</section>
+	</div>
 </main>

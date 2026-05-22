@@ -392,7 +392,7 @@
 >
   <header data-build-board-header class={cn("flex flex-col gap-2 border-b border-border bg-card px-4 py-2")}>
     <div class={cn("flex flex-wrap items-center gap-2")}>
-      <nav
+      <div
         data-build-board-layouts
         role="tablist"
         aria-label="Build layouts"
@@ -430,7 +430,7 @@
             </span>
           {/if}
         {/each}
-      </nav>
+      </div>
       <span class={cn("flex-1")}></span>
       <Button size="sm" variant="ghost" data-build-board-group>Group: Status</Button>
       <Button size="sm" variant="ghost" data-build-board-sort>Sort: Manual</Button>
