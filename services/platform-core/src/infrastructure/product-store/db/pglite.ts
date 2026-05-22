@@ -12,7 +12,13 @@ export function isCompiledBunBinary(): boolean {
 }
 
 export async function openPglite(dataDir: string): Promise<ProductDb> {
-  await mkdir(dataDir, { recursive: true });
+  // PGlite accepts a filesystem path OR an in-memory URI (`memory://[label]`).
+  // Only a real path needs its directory created — calling mkdir on a
+  // `memory://…` URI would create a literal `./memory:/…` junk directory on
+  // disk (":" is a valid filename character), which is never cleaned up.
+  if (!dataDir.startsWith("memory://")) {
+    await mkdir(dataDir, { recursive: true });
+  }
   const { PGlite } = await import("@electric-sql/pglite");
   const { vector } = await import("@electric-sql/pglite/vector");
   const db = new PGlite(dataDir, { extensions: { vector } });
