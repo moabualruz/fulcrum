@@ -36,6 +36,17 @@ Call service APIs via HTTP, tRPC, or in-process `AppCaller`. Do not own business
 | [tui](./apps/tui/CONTEXT.md) | `apps/tui/` | OpenTUI surface — screens mirror web stages; `:` palette + `Space` menu + stage chord | TuiScreen, ColonPalette, SpaceMenu, StatusFooter, StageChord, ChatPane, ModePicker, TraceYank |
 | [cli](./apps/cli/CONTEXT.md) | `apps/cli/` | Bun-compiled `fulcrum` binary — subcommands organized by workflow stage; JSON envelope `fulcrum.cli.v1` | Command, Subcommand, Envelope, ExitCode, JsonOutput, TraceId, ConfigPrecedence |
 | [desktop](./apps/desktop/CONTEXT.md) | `apps/desktop/` | Tauri v2 shell — single window hosts web surface; feature-gated by `FULCRUM_FEATURES=desktop-app` | DesktopShell, MainProcess, RendererProcess, IpcCommand, DesktopWindow, TauriPlugin, FeatureGate, FulcrumHome |
+| [daemon](./apps/daemon/CONTEXT.md) | `apps/daemon/` | Background process host — long-running supervisor/scheduler for agent runs and jobs outside an interactive surface | DaemonProcess, Supervisor, Scheduler, JobRunner, Heartbeat |
+
+### Package Contexts (cross-cutting shared libraries)
+
+Packages hold cross-cutting shared code with **no domain ownership and no runnable entrypoint** — consumed by ≥2 apps/services. A package with zero importers is dead scaffolding and must be wired+adopted or deleted (see the AGENTS.md `packages/` rule).
+
+| Package | Path | Responsibility | Consumers |
+|---|---|---|---|
+| [@fulcrum/ui-kit](./packages/ui-kit/CONTEXT.md) | `packages/ui-kit/` | The only UI primitive source — OKLCH-tokened Svelte primitives (Button, Input, Select, Dialog, Sheet, Badge, Card, StageRail, ScopeBar, StatusFooter, AcpDrawer, …) | `apps/web`, `apps/desktop` |
+| [@fulcrum/shared-dto](./packages/shared-dto/CONTEXT.md) | `packages/shared-dto/` | Cross-surface DTO/value types not owned by a single bounded service — workflow-stage / run / trace / status vocabulary | `apps/web`, `apps/cli`, `apps/tui` |
+| [@fulcrum/test-fixtures](./packages/test-fixtures/CONTEXT.md) | `packages/test-fixtures/` | Cross-service test factories + fixtures (fishery-style) | `tests/**`, service `*.test.ts` |
 
 ### Sub-context Docs
 
