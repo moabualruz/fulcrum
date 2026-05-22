@@ -48,6 +48,44 @@ export function createDataPortabilityApiCaller(options: DataPortabilityApiClient
           body: scopedBody(options, input),
         }),
     },
+    settingsData: {
+      export: async (input: JsonRecord = {}) =>
+        await request("/api/v1/data-portability/settings/export", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      preflightImport: async (input: JsonRecord) =>
+        await request("/api/v1/data-portability/settings/import/preflight", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      import: async (input: JsonRecord) =>
+        await request("/api/v1/data-portability/settings/import/run", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+    },
+    settingsBackups: {
+      list: async () =>
+        await request("/api/v1/data-portability/settings/backups", {
+          query: scopedQuery(options, {}),
+        }),
+      create: async () =>
+        await request("/api/v1/data-portability/settings/backups", {
+          method: "POST",
+          body: scopedBody(options, {}),
+        }),
+      preflight: async (input: JsonRecord) =>
+        await request("/api/v1/data-portability/settings/backups/preflight", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      restore: async (input: JsonRecord) =>
+        await request("/api/v1/data-portability/settings/backups/restore", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+    },
   };
 }
 

@@ -52,6 +52,11 @@ export function createProjectApiCaller(options: ProjectApiClientOptions) {
           method: "GET",
           query: projectContextQuery(options),
         }),
+      dashboard: async (input: JsonRecord = {}) =>
+        await request("/api/v1/projects/dashboard", {
+          method: "GET",
+          query: { ...projectContextQuery(options), projectId: input.projectId, project_id: input.project_id },
+        }),
     },
   };
 }

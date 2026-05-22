@@ -1,7 +1,6 @@
 import { redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { loadDashboard } from "$lib/server/dashboard";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createProjectApiForEvent } from "$lib/server/project-api";
 import { stageRoute, withTrace } from "$lib/components/app/route-map.ts";
 
 /**
@@ -51,13 +50,13 @@ function workspaceSlugFor(orgId: string | null | undefined): string {
 	);
 }
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-	const projectId = locals?.activeProjectId ?? null;
+export const load: PageServerLoad = async (event) => {
+	const projectId = event.locals?.activeProjectId ?? null;
 
 	// An active project is in Scope: land inside its Capture workbench.
 	if (projectId !== null) {
-		const ws = workspaceSlugFor(locals?.orgId);
-		throw redirect(308, withTrace(stageRoute(ws, projectId, "capture"), url));
+		const ws = workspaceSlugFor(event.locals?.orgId);
+		throw redirect(308, withTrace(stageRoute(ws, projectId, "capture"), event.url));
 	}
 
 	// No active project: render the portfolio Dashboard PortfolioSurface.
@@ -68,8 +67,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		activeProjectId: null,
 		streamed: {
 			dashboard: (async () => {
-				const { em, ctx } = await requestServiceScope(locals, null);
-				return await loadDashboard(em, ctx.orgId, null);
+				const projectApi = createProjectApiForEvent(event);
+				return await projectApi.projects.dashboard({ projectId: null });
 			})(),
 		},
 	};

@@ -42,6 +42,33 @@ export function createFeatureExperimentApiCaller(options: FeatureExperimentApiCl
           method: "PATCH",
           body: scopedBody(options, input),
         }),
+      settings: {
+        list: async () =>
+          await request("/api/v1/feature-flags/settings", {
+            query: scopedQuery(options, {}),
+          }),
+        toggle: async (input: JsonRecord & { id: string }) => {
+          const { id, ...body } = input;
+          return await request(`/api/v1/feature-flags/settings/${encodeURIComponent(id)}/toggle`, {
+            method: "PATCH",
+            body: scopedBody(options, body),
+          });
+        },
+        setRollout: async (input: JsonRecord & { id: string }) => {
+          const { id, ...body } = input;
+          return await request(`/api/v1/feature-flags/settings/${encodeURIComponent(id)}/rollout`, {
+            method: "PATCH",
+            body: scopedBody(options, body),
+          });
+        },
+        setCohortRules: async (input: JsonRecord & { id: string }) => {
+          const { id, ...body } = input;
+          return await request(`/api/v1/feature-flags/settings/${encodeURIComponent(id)}/cohort-rules`, {
+            method: "PATCH",
+            body: scopedBody(options, body),
+          });
+        },
+      },
       experiments: {
         list: async () => await request("/api/v1/feature-flags/experiments"),
         create: async (input: JsonRecord) =>
