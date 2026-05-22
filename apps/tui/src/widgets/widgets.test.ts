@@ -253,40 +253,35 @@ describe("ModePicker: TUI per-Step mode affordance row", () => {
     expect(line).toContain("▶ Play");
     expect(line).toContain("💬 Discuss");
     expect(line).toContain("⊞ AI Assist");
-    // Key hints: every mode shows its full `m`-chord keybinding.
-    expect(line).toContain("[m a]");
-    expect(line).toContain("[m p]");
-    expect(line).toContain("[m d]");
-    expect(line).toContain("[m i]");
+    // Key hints: CLI-TUI-UX §7.4 bare keys.
+    expect(line).toContain("[m]");
+    expect(line).toContain("[p]");
+    expect(line).toContain("[d]");
+    expect(line).toContain("[:ai]");
   });
 
-  test("snapshot: the selected mode is reverse-video and an armed chord shows the cue", () => {
+  test("snapshot: the selected mode is reverse-video and opening the picker shows the cue", () => {
     const picker = new ModePicker({ stepId: "run" });
     // Default-pressed mode is Manual (OD default).
     expect(picker.value).toBe("manual");
 
-    // Arming the `m` chord adds the `m>` selector cue to the rendered row.
-    expect(stripAnsi(picker.render())).not.toContain("m>");
+    // Bare `m` opens the picker without committing a mode.
+    expect(stripAnsi(picker.render())).not.toContain("picker>");
     picker.handleChordKey(MODE_CHORD_PREFIX);
-    expect(stripAnsi(picker.render())).toContain("m>");
+    expect(stripAnsi(picker.render())).toContain("picker>");
+    expect(picker.value).toBe("manual");
 
-    // Completing the chord selects the mode and clears the cue.
+    // Bare `p` selects Play and clears the cue.
     picker.handleChordKey("p");
     expect(picker.value).toBe("play");
-    expect(stripAnsi(picker.render())).not.toContain("m>");
+    expect(stripAnsi(picker.render())).not.toContain("picker>");
   });
 
   test("mode keybindings do not collide with palette / help / navigation chords", () => {
-    // Acceptance: the `m` chord prefix is disjoint from `:` `?` `/` `j` `k`
-    // `q` `H` `L` `g`. modeKeyCollidesWith proves the contract.
+    // Acceptance: spec keys remain disjoint from root nav / palette keys.
     expect(modeKeyCollidesWith(MODE_CHORD_PREFIX)).toBe(false);
     expect(PALETTE_HELP_NAV_KEYS).not.toContain(MODE_CHORD_PREFIX);
-    // The documented keybindings use the collision-free `m` prefix.
-    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m", "m p", "m d", "m a", "m i"]);
-    // Each keybinding starts with the collision-free `m` prefix.
-    for (const binding of MODE_CHORD_KEYBINDINGS) {
-      expect(binding === MODE_CHORD_PREFIX || binding.startsWith(`${MODE_CHORD_PREFIX} `)).toBe(true);
-    }
+    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m", "p", "d", ":ai"]);
   });
 
   test("web ModeRow and TUI ModePicker expose the same four-mode action set", () => {
@@ -316,8 +311,9 @@ describe("ModePicker: TUI per-Step mode affordance row", () => {
       bindings: new ModePicker({ stepId: "run" }).keybindings(),
     });
     const rendered = help.render().join("\n");
-    expect(rendered).toContain("m a");
-    expect(rendered).toContain("✋ Manual");
+    expect(rendered).toContain("Open mode picker");
+    expect(rendered).toContain("p");
+    expect(rendered).toContain("d");
     expect(rendered).toContain("⊞ AI Assist");
   });
 });

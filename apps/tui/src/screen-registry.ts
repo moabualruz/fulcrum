@@ -124,52 +124,87 @@ export const TUI_TAB_STRIP: readonly TabStripEntry[] = [
 // Colon-route resolution (ColonPalette / `:` command grammar)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface CanonicalTuiRoute {
+  route: string;
+  screenKey: string;
+  target: string;
+  title: string;
+}
+
 /**
- * Colon route → canonical screen key. Covers every stage route, the system
- * screens, and the CLI-TUI-UX.md §6 aliases (`:inbox`→`:capture`,
- * `:plans`→`:plan`, `:tasks`/`:list`→`:board`/`:tasks`, `:artifacts`→`:ship`).
- *
- * The `prd-tui-stage-chords-and-colon-palette` PRD owns the `g`-chord state
- * machine and the `:` command grammar parsing; this map is the screen-resolution
- * layer both that PRD and the root launcher consume.
+ * Canonical static TUI screen list from CLI-TUI-UX.md §6. `screenKey` is the
+ * registry identity; `target` is the concrete `TuiApp` screen implementation.
+ * `TUI_COLON_ROUTES` and `resolveTuiColonScreen` both derive from this list.
  */
-export const TUI_COLON_ROUTES: Readonly<Record<string, string>> = {
-  ":capture": "capture",
-  ":inbox": "capture",
-  ":docs": "docs",
-  ":doc": "doc",
-  ":plan": "plan",
-  ":plans": "plan",
-  ":missions": "missions",
-  ":prototype": "prototype",
-  ":templates": "templates",
-  ":prompts": "prompts",
-  ":runs": "runs",
-  ":run": "run",
-  ":board": "build-board",
-  ":tasks": "tasks",
-  ":list": "tasks",
-  ":timeline": "timeline",
-  ":graph": "graph",
-  ":review": "review",
-  ":ship": "ship",
-  ":archive": "archive",
-  ":artifacts": "ship",
-  ":doctor": "doctor",
-  ":telemetry": "telemetry",
-  ":alerts": "alerts",
-  ":audit": "audit",
-  ":logs": "logs",
-  ":trace": "trace",
-  ":ai": "ai",
-  ":agents": "agents",
-  ":mcp": "mcp",
-  ":plugins": "plugins",
-  ":routes": "routes",
-  ":settings": "settings",
-  ":K": "palette",
-  "?": "help",
-};
+export const CANONICAL_TUI_ROUTES: readonly CanonicalTuiRoute[] = [
+  { route: ":capture", screenKey: "capture", target: "capture", title: "Capture" },
+  { route: ":inbox", screenKey: "capture", target: "capture", title: "Capture" },
+  { route: ":docs", screenKey: "docs", target: "docs", title: "Capture · Docs" },
+  { route: ":doc", screenKey: "doc", target: "docs", title: "Capture · Document" },
+  { route: ":notes", screenKey: "notes", target: "notes", title: "Capture · Notes" },
+  { route: ":plan", screenKey: "plan", target: "plan", title: "Plan" },
+  { route: ":plans", screenKey: "plan", target: "plan", title: "Plan" },
+  { route: ":missions", screenKey: "missions", target: "planning", title: "Plan · Missions" },
+  { route: ":prototype", screenKey: "prototype", target: "planning", title: "Plan · Prototype" },
+  { route: ":templates", screenKey: "templates", target: "planning", title: "Plan · Templates" },
+  { route: ":prompts", screenKey: "prompts", target: "planning", title: "Plan · Prompts" },
+  { route: ":runs", screenKey: "runs", target: "runs", title: "Build · Runs" },
+  { route: ":run", screenKey: "run", target: "run", title: "Run detail" },
+  { route: ":board", screenKey: "build-board", target: "build-board", title: "Build · Board" },
+  { route: ":tasks", screenKey: "tasks", target: "tasks", title: "Build · Tasks" },
+  { route: ":list", screenKey: "tasks", target: "tasks", title: "Build · Tasks" },
+  { route: ":timeline", screenKey: "timeline", target: "timeline", title: "Build · Timeline" },
+  { route: ":table", screenKey: "table", target: "table", title: "Build · Table" },
+  { route: ":graph", screenKey: "graph", target: "graph", title: "Build · Graph" },
+  { route: ":cycles", screenKey: "cycles", target: "cycles", title: "Build · Cycles" },
+  { route: ":modules", screenKey: "modules", target: "modules", title: "Build · Modules" },
+  { route: ":review", screenKey: "review", target: "review", title: "Review" },
+  { route: ":ship", screenKey: "ship", target: "artifacts", title: "Ship" },
+  { route: ":artifacts", screenKey: "ship", target: "artifacts", title: "Ship" },
+  { route: ":archive", screenKey: "archive", target: "artifacts", title: "Ship · Archive" },
+  { route: ":repos", screenKey: "repos", target: "repos", title: "Ship · Repos" },
+  { route: ":memory", screenKey: "memory", target: "memory", title: "Ship · Memory" },
+  { route: ":doctor", screenKey: "doctor", target: "doctor", title: "Operate · Doctor" },
+  { route: ":telemetry", screenKey: "telemetry", target: "telemetry", title: "Operate · Telemetry" },
+  { route: ":alerts", screenKey: "alerts", target: "alerts", title: "Operate · Alerts" },
+  { route: ":audit", screenKey: "audit", target: "audit", title: "Operate · Audit" },
+  { route: ":logs", screenKey: "logs", target: "logs", title: "Operate · Logs" },
+  { route: ":errors", screenKey: "errors", target: "errors", title: "Operate · Errors" },
+  { route: ":mcp", screenKey: "mcp", target: "mcp", title: "Operate · MCP" },
+  { route: ":plugins", screenKey: "plugins", target: "plugins", title: "Operate · Plugins" },
+  { route: ":hooks", screenKey: "hooks", target: "hooks", title: "Operate · Hooks" },
+  { route: ":skills", screenKey: "skills", target: "skills", title: "Operate · Skills" },
+  { route: ":trace", screenKey: "trace", target: "trace", title: "Operate · Trace" },
+  { route: ":ai", screenKey: "ai", target: "ai-assist", title: "AI Assist" },
+  { route: ":agents", screenKey: "agents", target: "agents", title: "Agents" },
+  { route: ":routes", screenKey: "routes", target: "routing-rules", title: "Routes" },
+  { route: ":settings", screenKey: "settings", target: "settings", title: "Settings" },
+  { route: ":K", screenKey: "palette", target: "nav", title: "Command palette" },
+  { route: "?", screenKey: "help", target: "nav", title: "Keyboard help" },
+] as const;
+
+export const TUI_COLON_ROUTES: Readonly<Record<string, string>> = Object.fromEntries(
+  CANONICAL_TUI_ROUTES.map((entry) => [entry.route, entry.screenKey]),
+);
+
+export const TUI_COLON_SCREEN_TARGETS: Readonly<Record<string, string>> = Object.fromEntries(
+  CANONICAL_TUI_ROUTES.map((entry) => [entry.screenKey, entry.target]),
+);
+
+const DYNAMIC_TUI_ROUTES: ReadonlyArray<{ pattern: RegExp; screenKey: string }> = [
+  { pattern: /^:?doc\/[^/]+$/, screenKey: "doc" },
+  { pattern: /^:?plan\/[^/]+(?:\/review)?$/, screenKey: "plan" },
+  { pattern: /^:?mission\/[^/]+$/, screenKey: "missions" },
+  { pattern: /^:?run\/[^/]+$/, screenKey: "run" },
+  { pattern: /^:?cycle\/[^/]+$/, screenKey: "cycles" },
+  { pattern: /^:?module\/[^/]+$/, screenKey: "modules" },
+  { pattern: /^:?review\/[^/]+$/, screenKey: "review" },
+  { pattern: /^:?qa\/[^/]+$/, screenKey: "review" },
+  { pattern: /^:?ship\/[^/]+$/, screenKey: "ship" },
+  { pattern: /^:?artifact\/[^/]+$/, screenKey: "ship" },
+  { pattern: /^:?repo\/[^/]+$/, screenKey: "repos" },
+  { pattern: /^:?trace\/[^/]+$/, screenKey: "trace" },
+];
 
 /**
  * Resolve a colon route (`:capture`, `:plan`, …) to its screen key. Accepts the
@@ -179,10 +214,18 @@ export const TUI_COLON_ROUTES: Readonly<Record<string, string>> = {
  */
 export function resolveColonRoute(route: string): string | undefined {
   const trimmed = route.trim();
-  if (/^:?run\/[^/]+$/.test(trimmed)) return "run";
+  for (const dynamic of DYNAMIC_TUI_ROUTES) {
+    if (dynamic.pattern.test(trimmed)) return dynamic.screenKey;
+  }
   if (TUI_COLON_ROUTES[trimmed]) return TUI_COLON_ROUTES[trimmed];
   const withColon = trimmed.startsWith(":") || trimmed === "?" ? trimmed : `:${trimmed}`;
   return TUI_COLON_ROUTES[withColon];
+}
+
+export function resolveCanonicalTuiRoute(route: string): CanonicalTuiRoute | undefined {
+  const screenKey = resolveColonRoute(route);
+  if (!screenKey) return undefined;
+  return CANONICAL_TUI_ROUTES.find((entry) => entry.screenKey === screenKey);
 }
 
 /**
@@ -192,39 +235,9 @@ export function resolveColonRoute(route: string): string | undefined {
  */
 export function buildTuiScreenRegistry(): ScreenRegistry {
   const registry = new ScreenRegistry();
-  const titles: Record<string, string> = {
-    capture: "Capture",
-    docs: "Capture · Docs",
-    doc: "Capture · Document",
-    plan: "Plan",
-    missions: "Plan · Missions",
-    prototype: "Plan · Prototype",
-    templates: "Plan · Templates",
-    prompts: "Plan · Prompts",
-    runs: "Build · Runs",
-    "build-board": "Build · Board",
-    tasks: "Build · Tasks",
-    timeline: "Build · Timeline",
-    graph: "Build · Graph",
-    run: "Run detail",
-    review: "Review",
-    ship: "Ship",
-    archive: "Ship · Archive",
-    doctor: "Operate · Doctor",
-    telemetry: "Operate · Telemetry",
-    alerts: "Operate · Alerts",
-    audit: "Operate · Audit",
-    logs: "Operate · Logs",
-    trace: "Operate · Trace",
-    ai: "AI Assist",
-    agents: "Agents",
-    mcp: "MCP",
-    plugins: "Plugins",
-    routes: "Routes",
-    settings: "Settings",
-    palette: "Command palette",
-    help: "Keyboard help",
-  };
+  const titles: Record<string, string> = Object.fromEntries(
+    CANONICAL_TUI_ROUTES.map((entry) => [entry.screenKey, entry.title]),
+  );
   const seen = new Set<string>();
   const order: string[] = [
     ...TUI_STAGE_NAV.map((s) => s.screenKey),

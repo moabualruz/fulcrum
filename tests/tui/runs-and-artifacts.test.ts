@@ -512,25 +512,23 @@ describe("Build stage workbench (:runs): OD parity", () => {
     }
   });
 
-  test("m-chord selectors select ModePicker modes without opening run actions", async () => {
+  test("bare p/d/m execute the CLI-TUI-UX ModePicker contract", async () => {
     const screen = buildScreen();
     await screen.load();
 
-    await screen.handleKey("m");
     await screen.handleKey("p");
     expect(screen.currentStepMode).toBe("play");
-    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dependencies for");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Play current step");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("policy:");
 
-    await screen.handleKey("m");
     await screen.handleKey("d");
     expect(screen.currentStepMode).toBe("discuss");
-    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dispatch run");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Discuss thread");
 
+    const selectedBeforePicker = screen.currentStepMode;
     await screen.handleKey("m");
-    expect(screen.currentStepMode).toBe("manual");
-
-    await screen.handleKey("i");
-    expect(screen.currentStepMode).toBe("assist");
+    expect(screen.currentStepMode).toBe(selectedBeforePicker);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Mode picker");
   });
 
   test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {

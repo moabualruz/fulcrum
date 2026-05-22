@@ -11,6 +11,7 @@ import {
   TuiApp,
   listTuiNavigationEntries,
   launchTui,
+  resolveTuiColonScreen,
   type TuiCaller,
 } from "@fulcrum/tui/index.ts";
 import {
@@ -88,6 +89,10 @@ function fakeCaller(): TuiCaller {
       cancel: async () => ({ ok: true }),
     },
   };
+}
+
+function lastNonEmptyLine(text: string): string {
+  return text.split(/\r?\n/).filter((line) => line.trim().length > 0).at(-1) ?? "";
 }
 
 describe("ScreenRegistry", () => {
@@ -168,6 +173,22 @@ describe("launchTui", () => {
 
     app.stop();
   });
+
+  for (const [columns, rows] of [[80, 24], [120, 32]] as const) {
+    it(`pins StatusFooter to the terminal bottom row at ${columns}x${rows}`, async () => {
+      const tty = new FakeTTY({ columns, rows });
+      const app = await launchTui({
+        output: tty,
+        input: tty,
+        caller: fakeCaller(),
+      });
+
+      expect(tty.raw()).toContain(`\x1b[${rows};1H`);
+      expect(lastNonEmptyLine(tty.plainText())).toContain("LAUNCHER");
+
+      app.stop();
+    });
+  }
 });
 
 describe("TuiRouter route states", () => {
@@ -244,6 +265,43 @@ describe("TuiRouter route states", () => {
     expect(tty.plainText()).toContain("Unknown route: /missing");
     // OD StatusFooter `mode` pill renders the screen label uppercased.
     expect(tty.plainText()).toContain("NOT FOUND");
+
+    app.stop();
+  });
+
+  it("resolves canonical specialized colon routes to real screens without nav/tasks fallbacks", async () => {
+    const matrix = [
+      [":timeline", "timeline", "Timeline "],
+      [":table", "table", "Build Table"],
+      [":graph", "graph", "Build Graph"],
+      [":cycles", "cycles", "Build Cycles"],
+      [":modules", "modules", "Build Modules"],
+      [":telemetry", "telemetry", "Operate Telemetry"],
+      [":alerts", "alerts", "Operate Alerts"],
+      [":logs", "logs", "Operate Logs"],
+      [":errors", "errors", "Operate Errors"],
+      [":mcp", "mcp", "Operate MCP"],
+      [":plugins", "plugins", "Operate Plugins"],
+      [":hooks", "hooks", "Operate Hooks"],
+      [":skills", "skills", "Operate Skills"],
+      [":trace/abc", "trace", "Operate Trace"],
+    ] as const;
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    const app = new TuiApp({ output: tty, caller: fakeCaller() });
+    await app.mount();
+
+    for (const [route, target, title] of matrix) {
+      tty.clear();
+      expect(resolveTuiColonScreen(route)).toBe(target);
+      const resolved = await app.navigateColon(route);
+      expect(resolved).toBe(target);
+      expect(resolved).not.toBe("nav");
+      expect(resolved).not.toBe("tasks");
+      const rendered = tty.plainText();
+      expect(rendered).toContain(title);
+      expect(rendered).not.toContain("No tasks records.");
+      expect(rendered).not.toContain("No domain selected.");
+    }
 
     app.stop();
   });

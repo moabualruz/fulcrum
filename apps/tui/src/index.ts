@@ -36,6 +36,7 @@ import { NewDocScreen } from "./screens/new-doc.ts";
 import { CaptureWorkbenchScreen } from "./screens/capture.ts";
 import { TaskBoardScreen, type TaskCreateInput } from "./screens/task-board.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
+import { TaskTimelineScreen } from "./screens/task-timeline.ts";
 import type { TuiTask } from "./screens/task-types.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
 import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
@@ -81,6 +82,7 @@ import { TuiRouter, type TuiRoute } from "./router.ts";
 import {
   TUI_STAGE_NAV,
   TUI_TAB_STRIP,
+  TUI_COLON_SCREEN_TARGETS,
   buildTuiScreenRegistry,
   resolveColonRoute,
   type ScreenRegistry,
@@ -194,7 +196,7 @@ export interface TuiCaller {
   agent_runs?: {
     list: () => Promise<TuiRun[]>;
     get: (input: { id: string }) => Promise<TuiRun>;
-    create: (input: { projectId: string; taskId: string; agent: string }) => Promise<TuiRun>;
+    create: (input: { projectId: string; taskId: string; agent: string; model?: string; policy?: string }) => Promise<TuiRun>;
     cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
   };
   runsSubscriptions?: SubscriptionBridge;
@@ -406,13 +408,29 @@ type DomainScreen =
   | "projects"
   | "build-board"
   | "tasks"
+  | "timeline"
+  | "table"
+  | "graph"
+  | "cycles"
+  | "modules"
   | "sprints"
   | "docs"
+  | "notes"
   | "memory"
   | "runs"
   | "repos"
   | "search"
   | "skills"
+  | "telemetry"
+  | "alerts"
+  | "logs"
+  | "errors"
+  | "mcp"
+  | "plugins"
+  | "hooks"
+  | "trace"
+  | "agents"
+  | "settings"
   | "components"
   | "doctor";
 
@@ -456,6 +474,25 @@ export const TUI_NAV_ENTRIES: readonly NavEntry[] = [
 
 const NAV_ENTRIES = TUI_NAV_ENTRIES;
 
+const ROUTE_SCREEN_DETAILS: Partial<Record<DomainScreen, { title: string; route: string; purpose: string }>> = {
+  table: { title: "Build Table", route: ":table", purpose: "Spreadsheet task layout" },
+  graph: { title: "Build Graph", route: ":graph", purpose: "Dependency graph" },
+  cycles: { title: "Build Cycles", route: ":cycles", purpose: "Cycle list" },
+  modules: { title: "Build Modules", route: ":modules", purpose: "Module list" },
+  notes: { title: "Capture Notes", route: ":notes", purpose: "Short-form notes" },
+  telemetry: { title: "Operate Telemetry", route: ":telemetry", purpose: "p50/p99 charts and run resources" },
+  alerts: { title: "Operate Alerts", route: ":alerts", purpose: "Firing alerts by severity" },
+  logs: { title: "Operate Logs", route: ":logs", purpose: "Live log tail" },
+  errors: { title: "Operate Errors", route: ":errors", purpose: "Grouped error logs" },
+  mcp: { title: "Operate MCP", route: ":mcp", purpose: "MCP server list with agent scope" },
+  plugins: { title: "Operate Plugins", route: ":plugins", purpose: "Plugin list with agent scope" },
+  hooks: { title: "Operate Hooks", route: ":hooks", purpose: "Hook list" },
+  skills: { title: "Operate Skills", route: ":skills", purpose: "Skill list" },
+  trace: { title: "Operate Trace", route: ":trace/<id>", purpose: "Trace explorer" },
+  agents: { title: "System Agents", route: ":agents", purpose: "CLI agent registry" },
+  settings: { title: "System Settings", route: ":settings", purpose: "TUI settings sections" },
+};
+
 export function listTuiNavigationEntries(): readonly NavEntry[] {
   return TUI_NAV_ENTRIES;
 }
@@ -467,40 +504,6 @@ export function listTuiNavigationEntries(): readonly NavEntry[] {
  * so every colon route resolves to a real screen: never an unknown-screen
  * crash. Existing screens keep their home (value-preservation: no lost route).
  */
-const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
-  capture: "capture",
-  plan: "plan",
-  runs: "runs",
-  "build-board": "build-board",
-  tasks: "tasks",
-  timeline: "tasks",
-  graph: "tasks",
-  run: "run",
-  review: "review",
-  ship: "artifacts",
-  archive: "artifacts",
-  doctor: "doctor",
-  telemetry: "doctor",
-  alerts: "doctor",
-  audit: "audit",
-  logs: "doctor",
-  trace: "audit",
-  ai: "ai-assist",
-  agents: "nav",
-  mcp: "nav",
-  plugins: "nav",
-  routes: "routing-rules",
-  settings: "doctor",
-  docs: "docs",
-  doc: "docs",
-  missions: "planning",
-  prototype: "planning",
-  templates: "planning",
-  prompts: "planning",
-  palette: "nav",
-  help: "nav",
-};
-
 /**
  * Resolve a colon route (`:capture`, `:plan`, `:runs`, `:board`, `:review`,
  * `:ship`, `:doctor`, `:ai`, …) to a `TuiScreen`. Returns `undefined` for an
@@ -509,7 +512,7 @@ const COLON_SCREEN_TARGETS: Readonly<Record<string, TuiScreen>> = {
 export function resolveTuiColonScreen(route: string): TuiScreen | undefined {
   const screenKey = resolveColonRoute(route);
   if (!screenKey) return undefined;
-  return COLON_SCREEN_TARGETS[screenKey];
+  return TUI_COLON_SCREEN_TARGETS[screenKey] as TuiScreen | undefined;
 }
 
 function runIdFromColonRoute(route: string): string | null {
@@ -643,6 +646,7 @@ export class TuiApp {
   private selectedNavAction: string | null = null;
   private taskBoardScreen: TaskBoardScreen | null = null;
   private taskListScreen: TaskListScreen | null = null;
+  private taskTimelineScreen: TaskTimelineScreen | null = null;
   private statusInfo: { email: string; orgId: string } | null = null;
   private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
     status: "down",
@@ -839,7 +843,8 @@ export class TuiApp {
    * trace identity, and copy keybinds; this method only supplies shell data.
    */
   private _renderStatusBar(): void {
-    this.renderer.writeln(this._statusFooter().render());
+    this.renderer.moveTo(this.renderer.height, 1);
+    this.renderer.write(this._statusFooter().render());
   }
 
   /**
@@ -943,12 +948,12 @@ export class TuiApp {
     try {
       this.renderer.clearScreen();
       this.renderer.hideCursor();
-      this._renderStatusBar();
 
       if (this.currentPath && this.pathRouter) {
         const body = this.pathRouter.render();
         if (body) this.renderer.writeln(body);
         this._renderHelpOverlay();
+        this._renderStatusBar();
         return;
       }
 
@@ -1010,6 +1015,7 @@ export class TuiApp {
       }
       this._renderHelpOverlay();
       this._renderColonPalette();
+      this._renderStatusBar();
     } catch (error) {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
@@ -1169,6 +1175,15 @@ export class TuiApp {
       this.taskListScreen.render(r);
       return;
     }
+    if (screen === "timeline" && this.taskTimelineScreen) {
+      this._renderRouteScreenHeader(screen);
+      this.taskTimelineScreen.render(r);
+      return;
+    }
+    if (ROUTE_SCREEN_DETAILS[screen]) {
+      this._renderRouteScreen(screen);
+      return;
+    }
     r.writeln();
     r.writeln(c.bold(`  ${domainTitle(screen)}`));
     r.separator();
@@ -1208,6 +1223,34 @@ export class TuiApp {
     r.writeln();
     r.writeln(c.bold("  Status footer"));
     r.writeln(c.dim("  Esc back  / commands  q root quit"));
+  }
+
+  private _renderRouteScreenHeader(screen: DomainScreen): void {
+    const detail = ROUTE_SCREEN_DETAILS[screen];
+    if (!detail) return;
+    this.renderer.writeln();
+    this.renderer.writeln(c.bold(`  ${detail.title}`));
+    this.renderer.writeln(c.dim(`  ${detail.route} · ${detail.purpose}`));
+    this.renderer.separator();
+  }
+
+  private _renderRouteScreen(screen: DomainScreen): void {
+    const r = this.renderer;
+    const detail = ROUTE_SCREEN_DETAILS[screen];
+    if (!detail) return;
+    this._renderRouteScreenHeader(screen);
+    r.writeln();
+    if (this.domainError) {
+      r.writeln(c.red(`  ${this.domainError}`));
+      r.writeln(c.dim(`  Recovery: reopen ${detail.route} after restoring the backing API.`));
+    } else if (this.domainRows.length === 0) {
+      r.writeln(c.dim(`  No ${detail.title.toLowerCase()} records.`));
+      r.writeln(c.dim(`  ${detail.purpose}.`));
+    } else {
+      for (const row of this.domainRows) r.writeln(`  ${row}`);
+    }
+    r.writeln();
+    r.writeln(c.dim("  j/k navigate  Enter detail  q back  : routes  ? help"));
   }
 
   /**
@@ -2200,6 +2243,7 @@ export class TuiApp {
     this.taskBoardScreen = null;
     this.taskListScreen?.dispose();
     this.taskListScreen = null;
+    this.taskTimelineScreen = null;
     try {
       if (screen === "build-board") {
         const tasks = this.caller.tasks;
@@ -2243,6 +2287,18 @@ export class TuiApp {
         return;
       }
 
+      if (screen === "timeline") {
+        this.taskTimelineScreen = new TaskTimelineScreen({
+          caller: {
+            tasks: {
+              list: async () => (await this.caller.tasks?.list() ?? []).map(toTuiTask),
+            },
+          },
+        });
+        await this.taskTimelineScreen.load();
+        return;
+      }
+
       if (screen === "runs" && this.caller.agent_runs) {
         const runs = await this.caller.agent_runs.list();
         this.domainRows = runs.map((run) => `${run.id}  ${run.agent}  ${run.status}  ${run.taskTitle ?? ""}`);
@@ -2250,6 +2306,9 @@ export class TuiApp {
           projectLabel: this.traceContext.projectId ?? "fulcrum",
           traceId: this.traceContext.traceId ?? null,
           mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+          agent: runs[0]?.agent ?? this.inferenceModels[0]?.id ?? "codex",
+          model: this.inferenceModels[0]?.id ?? "default",
+          policy: this.inferenceRoutingConfig["build.run.step"] ?? "review_each_tool",
           caller: {
             agent_runs: {
               list: async () => runs,
@@ -2313,12 +2372,27 @@ export class TuiApp {
   private async _listDomainRows(screen: DomainScreen): Promise<unknown[]> {
     if (screen === "projects") return await this.caller.projects?.list() ?? [];
     if (screen === "tasks") return await this.caller.tasks?.list() ?? [];
+    if (screen === "table") return await this.caller.tasks?.list() ?? [];
+    if (screen === "graph") return await this.caller.tasks?.list() ?? [];
+    if (screen === "cycles") return [];
+    if (screen === "modules") return [];
     if (screen === "sprints") return await this.caller.sprints?.list() ?? [];
     if (screen === "repos") return await this.caller.repos?.list() ?? [];
     if (screen === "memory") return await this.caller.memories?.list({}) ?? [];
     if (screen === "search") return await this.caller.search?.query({ q: "", limit: 10 }) ?? [];
     if (screen === "docs") return [];
     if (screen === "skills") return [];
+    if (screen === "notes") return [];
+    if (screen === "telemetry") return [];
+    if (screen === "alerts") return [];
+    if (screen === "logs") return [];
+    if (screen === "errors") return [];
+    if (screen === "mcp") return [];
+    if (screen === "plugins") return [];
+    if (screen === "hooks") return [];
+    if (screen === "trace") return [];
+    if (screen === "agents") return [];
+    if (screen === "settings") return [];
     if (screen === "components") return [];
     if (screen === "doctor") return [];
     return [];
@@ -2581,13 +2655,29 @@ function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
     "projects",
     "build-board",
     "tasks",
+    "timeline",
+    "table",
+    "graph",
+    "cycles",
+    "modules",
     "sprints",
     "docs",
+    "notes",
     "memory",
     "runs",
     "repos",
     "search",
     "skills",
+    "telemetry",
+    "alerts",
+    "logs",
+    "errors",
+    "mcp",
+    "plugins",
+    "hooks",
+    "trace",
+    "agents",
+    "settings",
     "components",
     "doctor",
   ].includes(screen);
@@ -2598,13 +2688,29 @@ function domainTitle(screen: DomainScreen): string {
     projects: "Projects",
     "build-board": "Build Board",
     tasks: "Tasks",
+    timeline: "Build Timeline",
+    table: "Build Table",
+    graph: "Build Graph",
+    cycles: "Build Cycles",
+    modules: "Build Modules",
     sprints: "Sprints",
     docs: "Docs",
+    notes: "Capture Notes",
     memory: "Memory",
     runs: "Runs",
     repos: "Repos",
     search: "Search",
-    skills: "Skills",
+    skills: "Operate Skills",
+    telemetry: "Operate Telemetry",
+    alerts: "Operate Alerts",
+    logs: "Operate Logs",
+    errors: "Operate Errors",
+    mcp: "Operate MCP",
+    plugins: "Operate Plugins",
+    hooks: "Operate Hooks",
+    trace: "Operate Trace",
+    agents: "System Agents",
+    settings: "System Settings",
     components: "Components",
     doctor: "Doctor",
   };
@@ -2688,6 +2794,9 @@ function toTuiTask(row: {
   assigneeId?: string | null;
   assignee?: string | null;
   labels?: string[] | null;
+  dueDate?: string | Date | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
 }): TuiTask {
   return {
     id: row.id,
@@ -2695,6 +2804,9 @@ function toTuiTask(row: {
     status: row.status ?? "pending",
     assignee: row.assignee ?? row.assigneeId ?? null,
     labels: row.labels ?? [],
+    dueDate: row.dueDate ?? null,
+    startDate: row.startDate ?? null,
+    endDate: row.endDate ?? null,
   };
 }
 

@@ -24,7 +24,7 @@
  *   R      : retry failed run
  *   P      : preview dependency tree
  *   A      : reassign agent
- *   m/p/d/a: Step mode picker: ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist
+ *   p/d/m  : Step mode actions: Play / Discuss / open picker
  *   j/k    : navigate
  *   Enter  : open run detail
  *   q      : go back
@@ -345,10 +345,16 @@ export interface RunsControlScreenOptions {
   traceId?: string | null;
   /** Healthy/total MCP servers rendered in the workbench footer. */
   mcp?: string | null;
+  /** Configured invocation agent for Play/Discuss actions. */
+  agent?: string | null;
+  /** Configured model for Play/Discuss actions. */
+  model?: string | null;
+  /** Configured policy for Play/Discuss actions. */
+  policy?: string | null;
   caller: {
     agent_runs: {
       list: (input?: { projectId?: string }) => Promise<TuiManagedRun[]>;
-      dispatch: (input: { projectId: string; taskId: string; agent: string }) => Promise<TuiManagedRun>;
+      dispatch: (input: { projectId: string; taskId: string; agent: string; model?: string; policy?: string }) => Promise<TuiManagedRun>;
       cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
       retry: (input: { id: string }) => Promise<TuiManagedRun>;
       getDeps: (input: { id: string }) => Promise<TuiRunDep[]>;
@@ -358,7 +364,7 @@ export interface RunsControlScreenOptions {
   viewportRows?: number;
 }
 
-type RunsOverlay = "none" | "dispatch" | "deps" | "reassign";
+type RunsOverlay = "none" | "dispatch" | "deps" | "reassign" | "play" | "discuss" | "mode-picker";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RunsControlScreen: the Build stage workbench
@@ -474,6 +480,32 @@ export class RunsControlScreen {
       renderer.writeln(c.dim("  Use submitDispatch(projectId, taskId, agent) to dispatch."));
     }
 
+    if (this.overlay === "play") {
+      const input = this.modeActionInput;
+      renderer.writeln();
+      renderer.writeln(c.bold("  Play current step"));
+      renderer.writeln(`  agent: ${input.agent}`);
+      renderer.writeln(`  model: ${input.model ?? "default"}`);
+      renderer.writeln(`  policy: ${input.policy ?? "review_each_tool"}`);
+      renderer.writeln(c.dim("  Enter dispatches through KernelCaller agent_runs.create."));
+    }
+
+    if (this.overlay === "discuss") {
+      const input = this.modeActionInput;
+      renderer.writeln();
+      renderer.writeln(c.bold("  Discuss thread"));
+      renderer.writeln(`  agent: ${input.agent}`);
+      renderer.writeln(`  model: ${input.model ?? "default"}`);
+      renderer.writeln(`  policy: ${input.policy ?? "review_each_tool"}`);
+      renderer.writeln(c.dim("  Thread scope follows the focused run and trace."));
+    }
+
+    if (this.overlay === "mode-picker") {
+      renderer.writeln();
+      renderer.writeln(c.bold("  Mode picker"));
+      renderer.writeln(c.dim("  p Play current step  d Discuss thread  :ai AI Assist"));
+    }
+
     // Dependency tree overlay
     if (this.overlay === "deps") {
       renderer.writeln();
@@ -501,7 +533,7 @@ export class RunsControlScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  m/m p/m d/m a step modes  D=dispatch  A=reassign agent  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
+    renderer.writeln(c.dim("  p=Play  d=Discuss  m=mode picker  :ai=AI Assist  D=dispatch  A=reassign  C=cancel  R=retry  P=preview deps  j/k=navigate  Enter=detail  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
@@ -526,9 +558,18 @@ export class RunsControlScreen {
       return true;
     }
 
-    // Lowercase p/d/m/a are owned by the focused Step ModePicker. Uppercase
-    // action keys keep the workbench commands addressable.
-    if (this.modePicker.handleKey(key)) return true;
+    // Lowercase p/d/m are owned by the focused Step ModePicker. Uppercase action
+    // keys keep the workbench commands addressable.
+    const modeAction = this.modePicker.handleKey(key);
+    if (modeAction) {
+      if (modeAction === "picker") {
+        this.overlay = "mode-picker";
+      } else if (modeAction === "play" || modeAction === "discuss") {
+        this.stepMode = modeAction;
+        this.overlay = modeAction;
+      }
+      return true;
+    }
 
     if (key === "D") {
       this.overlay = "dispatch";
@@ -586,6 +627,11 @@ export class RunsControlScreen {
       return true;
     }
 
+    if ((key === "\r" || key === "\n") && this.overlay === "play") {
+      await this.submitDispatch(this.modeActionInput);
+      return true;
+    }
+
     if (key === "\r" || key === "\n") {
       const run = this.runs[this.cursor];
       if (!run) return false;
@@ -597,7 +643,7 @@ export class RunsControlScreen {
   }
 
   /** Dispatch a new run and prepend to the list. */
-  async submitDispatch(input: { projectId: string; taskId: string; agent: string }): Promise<void> {
+  async submitDispatch(input: { projectId: string; taskId: string; agent: string; model?: string; policy?: string }): Promise<void> {
     try {
       const run = await this.opts.caller.agent_runs.dispatch(input);
       this.runs = [run, ...this.runs];
@@ -613,6 +659,17 @@ export class RunsControlScreen {
   get visibleRuns(): readonly TuiManagedRun[] {
     const rows = this.opts.viewportRows ?? 20;
     return this.runs.slice(this.scrollTop, this.scrollTop + rows);
+  }
+
+  private get modeActionInput(): { projectId: string; taskId: string; agent: string; model?: string; policy?: string } {
+    const run = this.runs[this.cursor];
+    return {
+      projectId: this.opts.projectId ?? this.opts.projectLabel ?? run?.projectName ?? "fulcrum",
+      taskId: run?.id ?? "current-step",
+      agent: this.opts.agent ?? run?.agent ?? "codex",
+      model: this.opts.model ?? "default",
+      policy: this.opts.policy ?? "review_each_tool",
+    };
   }
 
   private clampCursor(): void {
