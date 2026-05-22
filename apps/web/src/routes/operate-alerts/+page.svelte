@@ -32,12 +32,12 @@
    * hidden `empty-state` copy is intentionally NOT used: COPY.md is canonical).
    */
   import { page } from "$app/stores";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     EmptyState,
     ErrorBanner,
     ModeRow,
     StatusBadge,
-    type WorkflowMode,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

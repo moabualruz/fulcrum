@@ -28,13 +28,13 @@
    * §operate-plugins.html "Migration notes").
    */
   import { page } from "$app/stores";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Chip,
     EmptyState,
     ErrorBanner,
     ModeRow,
     Switch,
-    type WorkflowMode,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 

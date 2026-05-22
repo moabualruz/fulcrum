@@ -1,5 +1,6 @@
+export type { RunStatus } from "@fulcrum/shared-dto";
+
 export {
-  type RunStatus,
   type DispatchRunInput,
   dispatchRunAction,
   cancelRunAction,

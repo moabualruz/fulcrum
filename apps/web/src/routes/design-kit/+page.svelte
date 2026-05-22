@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as UiKit from "@fulcrum/ui-kit";
+	import type { WorkflowMode, WorkflowStage } from "@fulcrum/shared-dto";
 	import {
 		Label,
 		Button,
@@ -83,8 +84,6 @@
 	import type {
 		SortState,
 		TreeNode,
-		WorkflowMode,
-		WorkflowStage,
 		StatusFooterMode,
 	} from "@fulcrum/ui-kit";
 

@@ -31,7 +31,8 @@
 	 * (AGENTS.md ui-kit rule). The OD shell chrome (StageRail / ScopeBar /
 	 * StatusFooter / AcpDrawer) is provided by the root `+layout.svelte`; this
 	 * route renders the template-library page only.
-	 */
+ */
+	import type { WorkflowMode } from "@fulcrum/shared-dto";
 	import {
 		Badge,
 		Button,
@@ -39,7 +40,6 @@
 		Chip,
 		EmptyState,
 		ModeRow,
-		type WorkflowMode,
 	} from "@fulcrum/ui-kit";
 
 	/** A Category facet: the OD sidebar's first facet group. */

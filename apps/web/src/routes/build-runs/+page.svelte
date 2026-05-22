@@ -15,6 +15,7 @@
    * states of this one pane, not separate routes.
    */
   import { page } from "$app/stores";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Badge,
     Button,
@@ -24,7 +25,6 @@
     RunFeedItem,
     StatusBadge,
     TraceChip,
-    type WorkflowMode,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

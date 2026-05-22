@@ -38,7 +38,7 @@
 	 * AcpDrawer) is provided by the root `+layout.svelte`.
 	 */
 	import { Badge, Button, Card, EmptyState, ModeRow } from "@fulcrum/ui-kit";
-	import type { WorkflowMode } from "@fulcrum/ui-kit";
+	import type { WorkflowMode } from "@fulcrum/shared-dto";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 

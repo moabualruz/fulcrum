@@ -26,13 +26,13 @@
    * forward from the pre-migration route: no feature loss.
    */
   import { page } from "$app/stores";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     CredentialInput,
     EmptyState,
     ErrorBanner,
     ModeRow,
     StatusBadge,
-    type WorkflowMode,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

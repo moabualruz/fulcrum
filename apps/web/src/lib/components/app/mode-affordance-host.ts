@@ -31,6 +31,7 @@
  * coverage gate honest at the same time.
  */
 
+import type { WorkflowMode } from "@fulcrum/shared-dto";
 import {
 	ModeRow,
 	TIGHT_MODES,
@@ -38,11 +39,11 @@ import {
 	modeGlyph,
 	modeLabel,
 	type ModeRowDensity,
-	type WorkflowMode,
 } from "@fulcrum/ui-kit";
 
 export { ModeRow, WORKFLOW_MODES, TIGHT_MODES, modeGlyph, modeLabel };
-export type { ModeRowDensity, WorkflowMode };
+export type { WorkflowMode } from "@fulcrum/shared-dto";
+export type { ModeRowDensity };
 
 /**
  * The kind of Step a ModeAffordance is attached to. Drawn from DESIGN.md §4.11

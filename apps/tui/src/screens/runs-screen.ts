@@ -34,6 +34,7 @@ import type { Renderer } from "../renderer.ts";
 import { c, hRule } from "../renderer.ts";
 import { truncateWide } from "../utils/truncate.ts";
 import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
+import type { RunId, SpanId, TraceId } from "@fulcrum/shared-dto";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // StageWorkbench shell: shared per-stage workbench chrome
@@ -65,11 +66,11 @@ export interface StageWorkbenchScope {
   /** Healthy/total MCP servers (OD footer `mcp 7/7`). */
   mcp?: string | null;
   /** Current trace id (OD footer `trace tr_8f29a4c…`). */
-  traceId?: string | null;
+  traceId?: TraceId | null;
   /** Focused run id for footer identity (`y r`). */
-  runId?: string | null;
+  runId?: RunId | null;
   /** Focused span id for footer identity (`y s`). */
-  spanId?: string | null;
+  spanId?: SpanId | null;
   /** Active workspace profile (OD footer `profile: dev`). */
   profile?: string | null;
 }

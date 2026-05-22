@@ -40,19 +40,12 @@
  * key in `LEGACY_ROUTE_MAP` and asserts each resolves `200|301|308`, never 404.
  */
 
-import type { WorkflowStage } from "@fulcrum/ui-kit";
+import { WorkflowStageValues, type WorkflowStage } from "@fulcrum/shared-dto";
 
-export type { WorkflowStage } from "@fulcrum/ui-kit";
+export type { WorkflowStage } from "@fulcrum/shared-dto";
 
 /** The six WorkflowStages, left-to-right, per `apps/web/CONTEXT.md` + IA-MAP §1. */
-export const STAGE_ORDER = [
-	"capture",
-	"plan",
-	"build",
-	"review",
-	"ship",
-	"operate",
-] as const satisfies readonly WorkflowStage[];
+export const STAGE_ORDER = WorkflowStageValues satisfies readonly WorkflowStage[];
 
 /** A WorkflowStage with its human label: the canonical stage vocabulary. */
 export interface WorkflowStageEntry {

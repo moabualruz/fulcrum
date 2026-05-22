@@ -43,13 +43,13 @@
    * is a read-only projection of release history.
    */
   import { page } from "$app/state";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Badge,
     type BadgeVariant,
     Button,
     EmptyState,
     ModeRow,
-    type WorkflowMode,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 

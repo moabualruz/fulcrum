@@ -23,6 +23,8 @@
       "@feature-flags/*": ["services/feature-flags/src/*"],
       "@fulcrum/services/feature-flags/*": ["services/feature-flags/src/*"],
       "@fulcrum/cli/*": ["apps/cli/src/*"],
+      "@fulcrum/shared-dto": ["packages/shared-dto/src/index.ts"],
+      "@fulcrum/shared-dto/*": ["packages/shared-dto/src/*"],
       "@fulcrum/tui/*": ["apps/tui/src/*"],
       "@fulcrum/server/*": ["apps/server/src/*"],
       "@fulcrum/web/*": ["apps/web/src/*"],

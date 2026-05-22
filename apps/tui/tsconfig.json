@@ -1,6 +1,29 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@agent-client-protocol/*": ["services/agent-client-protocol/src/*"],
+      "@execution-orchestration/*": ["services/execution-orchestration/src/*"],
+      "@feature-flags/*": ["services/feature-flags/src/*"],
+      "@fulcrum/services/feature-flags/*": ["services/feature-flags/src/*"],
+      "@fulcrum/cli/*": ["apps/cli/src/*"],
+      "@fulcrum/shared-dto": ["packages/shared-dto/src/index.ts"],
+      "@fulcrum/shared-dto/*": ["packages/shared-dto/src/*"],
+      "@fulcrum/tui/*": ["apps/tui/src/*"],
+      "@fulcrum/server/*": ["apps/server/src/*"],
+      "@fulcrum/web/*": ["apps/web/src/*"],
+      "$lib/*": ["apps/web/src/lib/*"],
+      "@identity-access/*": ["services/identity-access/src/*"],
+      "@integration-hub/*": ["services/integration-hub/src/*"],
+      "@knowledge-workspace/*": ["services/knowledge-workspace/src/*"],
+      "@notification-center/*": ["services/notification-center/src/*"],
+      "@planning-review/*": ["services/planning-review/src/*"],
+      "@platform-core/*": ["services/platform-core/src/*"],
+      "@test-support/*": ["tests/support/*"],
+      "@workflow-coordination/*": ["services/workflow-coordination/src/*"],
+      "@work-management/*": ["services/work-management/src/*"]
+    },
     "experimentalDecorators": true,
     "useDefineForClassFields": false
   }

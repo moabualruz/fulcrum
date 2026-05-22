@@ -1,3 +1,5 @@
+import { normalizeTraceId } from "@fulcrum/shared-dto";
+
 import { apiErrorCode, formatApiError } from "../api-errors.ts";
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
@@ -414,11 +416,6 @@ function printIntake(
     },
     { print, printErr: print },
   );
-}
-
-/** A 32-char lowercase-hex trace id passes through; anything else stays unset. */
-function normalizeTraceId(value: string | undefined): string | undefined {
-  return value && /^[0-9a-f]{32}$/i.test(value) ? value.toLowerCase() : undefined;
 }
 
 /**
