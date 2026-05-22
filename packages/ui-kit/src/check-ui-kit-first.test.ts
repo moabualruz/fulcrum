@@ -74,7 +74,7 @@ describe("check-ui-kit-first", () => {
         <option value="email">Email</option>
       </select>
     `,
-      "settings/routing/RoutingPage.svelte",
+      "settings/routing/NewRoutingPage.svelte",
     );
 
     const result = Bun.spawnSync(["bun", script], {
@@ -85,7 +85,36 @@ describe("check-ui-kit-first", () => {
 
     const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
     expect(result.exitCode).toBe(1);
-    expect(output).toContain("apps/web/src/routes/settings/routing/RoutingPage.svelte");
+    expect(output).toContain("apps/web/src/routes/settings/routing/NewRoutingPage.svelte");
+    expect(output).toContain("native-select-reimplementation");
+  });
+
+  test("flags import-only native select false-passes", () => {
+    const root = makeFixtureRoot(`
+      <script lang="ts">
+        import { Select } from "@fulcrum/ui-kit";
+
+        let value = "open";
+      </script>
+
+      <label>
+        Status
+        <select bind:value={value}>
+          <option value="open">Open</option>
+          <option value="done">Done</option>
+        </select>
+      </label>
+    `);
+
+    const result = Bun.spawnSync(["bun", script], {
+      env: { ...process.env, UI_KIT_FIRST_ROOT: root },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const output = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+    expect(result.exitCode).toBe(1);
+    expect(output).toContain("apps/web/src/routes/settings/Filters.svelte");
     expect(output).toContain("native-select-reimplementation");
   });
 });
