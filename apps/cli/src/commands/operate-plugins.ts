@@ -173,7 +173,7 @@ Usage:
 \`--json\` emits the canonical fulcrum.cli.v1 envelope (CLI-TUI-UX.md §3).
 \`--agent\` / \`--all-agents\` scope a mutation per CLI-TUI-UX.md §1.8.
 Mutation verbs are deferred until plugins.cross_agent is configured; they emit
-a non-zero FUL_OPERATE_PLUGIN_UNAVAILABLE envelope instead of mutating state.`;
+a non-zero FUL_NOT_IMPLEMENTED envelope instead of mutating state.`;
 
 /** Output sink for the envelope helpers. */
 interface OperateIo {
@@ -399,12 +399,10 @@ async function runPluginShow(
  * `fulcrum operate plugin <install|enable|disable|update|remove>`: the plugin
  * mutation verbs with per-agent scoping (CLI-TUI-UX.md §1.6 + §1.8).
  *
- * No cross-agent plugin server is wired through this host (AGENTS.md "Where we
- * are going": `fulcrum plugins …` is a placeholder layer). Rather than
- * fabricate a mutation result, each verb emits the canonical envelope: a coded
- * error in the always-array `errors` field, with the *resolved* `--agent` /
- * `--all-agents` scope echoed in `args` so the §1.8 scoping contract is
- * observable and testable. The verb grammar and scoping are complete.
+ * No cross-agent plugin server is wired through this host yet. Rather than
+ * fabricate a mutation result, each verb emits `FUL_NOT_IMPLEMENTED` in the
+ * canonical envelope and echoes the resolved `--agent` / `--all-agents` scope
+ * in `args` so the §1.8 scoping contract is observable and testable.
  */
 function runPluginMutation(
   verb: PluginVerb,
@@ -472,12 +470,12 @@ function runPluginMutation(
         scope: describeScope(scope),
       },
       error: {
-        code: "FUL_OPERATE_PLUGIN_UNAVAILABLE",
+        code: "FUL_NOT_IMPLEMENTED",
         message:
-          `\`fulcrum ${commandPrefix} ${verb}\` (scope: ${describeScope(scope)}) is not ` +
-          "available: no cross-agent plugin server is configured.",
+          `\`fulcrum ${commandPrefix} ${verb}\` (scope: ${describeScope(scope)}) is deferred: ` +
+          "no cross-agent plugin server is configured.",
         fix:
-          "Cross-agent plugin install is staged behind the plugins.cross_agent feature " +
+          "Cross-agent plugin mutation is staged behind the plugins.cross_agent feature " +
           "flag. Until it lands, manage plugin markers with `fulcrum operate plugin list`.",
         doc: "CLI-TUI-UX.md §1.6",
       },

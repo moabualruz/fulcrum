@@ -231,7 +231,7 @@ describe("operate plugin envelope + root plugin alias", () => {
     expect(envelope.schema).toBe("fulcrum.cli.v1");
     expect(envelope.command).toBe("fulcrum operate plugin enable");
     expect(envelope.result).toBeNull();
-    expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+    expect(envelope.errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
   }, 20_000);
 
   test("root `plugin enable --agent codex --json` emits the same coded error envelope", () => {
@@ -244,7 +244,7 @@ describe("operate plugin envelope + root plugin alias", () => {
     };
     expect(envelope.schema).toBe("fulcrum.cli.v1");
     expect(envelope.command).toBe("fulcrum plugin enable");
-    expect(envelope.errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+    expect(envelope.errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
   }, 20_000);
 
   test.each([
@@ -256,9 +256,57 @@ describe("operate plugin envelope + root plugin alias", () => {
     expect(proc.status).toBe(0);
     const schema = JSON.parse(proc.stdout) as Record<string, unknown>;
     expect(schema["$schema"]).toBe("https://json-schema.org/draft/2020-12/schema");
-    expect(schema["title"]).toBe("fulcrum.cli.v1");
+    expect(schema["title"]).toBe(`fulcrum ${command.replace("help ", "").replace(" --json-schema", "")} fulcrum.cli.v1`);
     expect(JSON.stringify(schema)).toContain("trace_id");
     expect(JSON.stringify(schema)).toContain("result");
+  });
+
+  test.each([
+    "agent list",
+    "agent view",
+    "agent add",
+    "agent edit",
+    "agent remove",
+    "agent enable",
+    "agent disable",
+    "agent set-default",
+    "agent reload",
+    "agent invoke",
+    "agent test",
+    "agent status",
+    "agent defaults",
+    "mcp list",
+    "mcp register",
+    "mcp unregister",
+    "mcp enable",
+    "mcp disable",
+    "mcp test",
+    "mcp reload",
+    "plugin list",
+    "plugin show",
+    "plugin install",
+    "plugin enable",
+    "plugin disable",
+    "plugin update",
+    "plugin remove",
+  ])("`fulcrum help %s --json-schema` exposes a command-specific result schema", (command) => {
+    const proc = runBin(["help", ...command.split(" "), "--json-schema"]);
+    expect(proc.status).toBe(0);
+    const schema = JSON.parse(proc.stdout) as {
+      title?: string;
+      properties?: { result?: { title?: string; description?: string; type?: string } };
+    };
+    const resultSchema = schema.properties?.result;
+    expect(schema.title).toBe(`fulcrum ${command} fulcrum.cli.v1`);
+    expect(resultSchema?.title).toBe(`fulcrum ${command} result`);
+    expect(JSON.stringify(resultSchema)).not.toContain("command-specific summary payload");
+  });
+
+  test("root plugin help marks mutation verbs deferred", () => {
+    const proc = runBin(["plugin", "--help"]);
+    expect(proc.status).toBe(0);
+    expect(proc.stdout).toContain("install");
+    expect(proc.stdout).toContain("deferred until plugins.cross_agent");
   });
 
   test.each([

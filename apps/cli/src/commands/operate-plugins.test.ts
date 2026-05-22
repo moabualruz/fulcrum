@@ -162,13 +162,13 @@ describe("fulcrum plugin: CLI-TUI-UX.md §1.6 root alias", () => {
 });
 
 describe("operate plugin mutations: coded error envelopes (no cross-agent server)", () => {
-  test("`enable <name> --agent codex --json` emits FUL_OPERATE_PLUGIN_UNAVAILABLE", async () => {
+  test("`enable <name> --agent codex --json` emits FUL_NOT_IMPLEMENTED", async () => {
     const io = captureIO();
     await run(["plugin", "enable", "caveman", "--agent", "codex", "--json"], io);
     const envelope = expectCanonicalEnvelope(io.out[0]!);
     expect(envelope["command"]).toBe("fulcrum operate plugin enable");
     const errors = envelope["errors"] as Array<{ code: string }>;
-    expect(errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+    expect(errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
     expect((envelope["args"] as { agents: string[] }).agents).toEqual(["codex"]);
   });
 
@@ -181,7 +181,7 @@ describe("operate plugin mutations: coded error envelopes (no cross-agent server
     const envelope = expectCanonicalEnvelope(io.out[0]!);
     expect(envelope["command"]).toBe("fulcrum plugin enable");
     const errors = envelope["errors"] as Array<{ code: string }>;
-    expect(errors[0]?.code).toBe("FUL_OPERATE_PLUGIN_UNAVAILABLE");
+    expect(errors[0]?.code).toBe("FUL_NOT_IMPLEMENTED");
   });
 
   test("`enable --agent bogus --json` emits FUL_OPERATE_PLUGIN_UNKNOWN_AGENT", async () => {

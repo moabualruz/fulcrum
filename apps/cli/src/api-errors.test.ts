@@ -54,6 +54,15 @@ describe("CLI API error handling", () => {
     expect(apiErrorCode("bad input")).toBeUndefined();
   });
 
+  test("maps missing public API configuration to a stable CLI error code", () => {
+    const error = new Error(
+      "Public API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL for runs, run, cycle, module, context, notifications, audit, webhooks, or connectors commands.",
+    );
+
+    expect(apiErrorCode(error)).toBe("FUL_PUBLIC_API_NOT_CONFIGURED");
+    expect(hasApiErrorCode(error, "FUL_PUBLIC_API_NOT_CONFIGURED")).toBe(true);
+  });
+
   test("CLI source files do not import @trpc/server", async () => {
     const files = await listTypeScriptFiles("apps/cli/src");
     const offenders: string[] = [];

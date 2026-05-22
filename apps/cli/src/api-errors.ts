@@ -22,6 +22,9 @@ const APP_KIND_TO_CODE: Record<string, string> = {
   external_dependency: "INTERNAL_SERVER_ERROR",
 };
 
+const PUBLIC_API_NOT_CONFIGURED_MESSAGE = "Public API caller is not configured";
+const PUBLIC_API_NOT_CONFIGURED_CODE = "FUL_PUBLIC_API_NOT_CONFIGURED";
+
 export function formatApiError(error: unknown): string {
   if (isCodedError(error)) return appendDiagnostics(`${error.code}: ${error.message}`, error);
   if (isAppKindError(error)) return appendDiagnostics(`${appKindCode(error.kind)}: ${error.message}`, error);
@@ -41,6 +44,7 @@ export function formatUnknownError(error: unknown): string {
 export function apiErrorCode(error: unknown): string | undefined {
   if (isCodedError(error)) return error.code;
   if (isAppKindError(error)) return appKindCode(error.kind);
+  if (isMissingPublicApiConfiguration(error)) return PUBLIC_API_NOT_CONFIGURED_CODE;
   return undefined;
 }
 
@@ -58,6 +62,10 @@ function isAppKindError(error: unknown): error is AppKindError {
   if (!error || typeof error !== "object") return false;
   const record = error as Record<string, unknown>;
   return typeof record["kind"] === "string" && typeof record["message"] === "string";
+}
+
+function isMissingPublicApiConfiguration(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(PUBLIC_API_NOT_CONFIGURED_MESSAGE);
 }
 
 function appKindCode(kind: string): string {
