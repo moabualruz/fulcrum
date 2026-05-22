@@ -10,7 +10,7 @@ declare global {
 			userId?: string | null;
 			locale?: import("$lib/i18n").SupportedLocale;
 			i18nEnabled?: boolean;
-			em: import("@platform-core/application/runtime/application-scope.ts").ApplicationPersistence | null;
+			em: unknown | null;
 			container: unknown | null;
 		}
 		interface PageData {

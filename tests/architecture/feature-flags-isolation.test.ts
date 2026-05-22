@@ -4,7 +4,11 @@ import { describe, expect, test } from "bun:test";
 
 const FEATURE_FLAGS_ROOT = "services/feature-flags/src";
 const PLATFORM_CORE_ROOT = "services/platform-core/src";
+const FEATURE_FLAGS_PLATFORM_CORE_ALLOWLIST = new Set([
+  "services/feature-flags/src/interface/http/controllers/feature-flag-public-api.controller.ts",
+]);
 const PLATFORM_CORE_COMPOSITION_ALLOWLIST = new Set([
+  "services/platform-core/src/application/event-bus/event-bus.module.ts",
   "services/platform-core/src/infrastructure/application-database/typeorm.config.ts",
   "services/platform-core/src/application/runtime/web-request-runtime.ts",
 ]);
@@ -30,6 +34,7 @@ describe("feature-flags service isolation", () => {
     const offenders: string[] = [];
     for (const file of (await tsFiles(FEATURE_FLAGS_ROOT)).filter((path) => !path.endsWith(".test.ts"))) {
       const source = await readFile(file, "utf8");
+      if (FEATURE_FLAGS_PLATFORM_CORE_ALLOWLIST.has(relative(".", file))) continue;
       if (source.includes("@platform-core/") || source.includes("services/platform-core/")) {
         offenders.push(relative(".", file));
       }

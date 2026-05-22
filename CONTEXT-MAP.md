@@ -27,12 +27,12 @@ Owned domain logic + persistence. Each composes into `apps/server` as a NestJS m
 
 ### Surface Contexts (invocation/visualization layers)
 
-Call service APIs via HTTP, tRPC, or in-process `AppCaller`. Do not own business logic or persistence. Each defines its own surface-level vocabulary (screens, panes, palettes, chrome).
+Call service APIs via HTTP, tRPC, or in-process `AppCaller`. Do not own business logic or persistence. Each defines its own surface-level vocabulary (screens, panes, palettes, chrome). `apps/web` is pure HTTP/tRPC invocation and must never open a local DB runtime.
 
 | Surface | Path | Responsibility | Key Surface Terms |
 |---|---|---|---|
 | [server](./apps/server/CONTEXT.md) | `apps/server/` | NestJS runtime — `AppModule` composes service modules; mounts HTTP controllers + tRPC `AppRouter`; exposes `AppCaller` for in-process callers | NestApplication, AppModule, AppRouter, AppCaller, TrpcContext, ZodValidationPipe, OpenApiDocument |
-| [web](./apps/web/CONTEXT.md) | `apps/web/` | SvelteKit web surface — workflow-stage IA (Capture/Plan/Build/Review/Ship/Operate), four-mode-per-step contract | WorkflowStage, Step, Scope, StageRail, ScopeBar, StatusFooter, AcpDrawer, CommandPalette, TraceBadge, ModeAffordance |
+| [web](./apps/web/CONTEXT.md) | `apps/web/` | SvelteKit web surface — pure HTTP/tRPC invocation layer for workflow-stage IA (Capture/Plan/Build/Review/Ship/Operate), no local DB runtime | WorkflowStage, Step, Scope, StageRail, ScopeBar, StatusFooter, AcpDrawer, CommandPalette, TraceBadge, ModeAffordance |
 | [tui](./apps/tui/CONTEXT.md) | `apps/tui/` | OpenTUI surface — screens mirror web stages; `:` palette + `Space` menu + stage chord | TuiScreen, ColonPalette, SpaceMenu, StatusFooter, StageChord, ChatPane, ModePicker, TraceYank |
 | [cli](./apps/cli/CONTEXT.md) | `apps/cli/` | Bun-compiled `fulcrum` binary — subcommands organized by workflow stage; JSON envelope `fulcrum.cli.v1` | Command, Subcommand, Envelope, ExitCode, JsonOutput, TraceId, ConfigPrecedence |
 | [desktop](./apps/desktop/CONTEXT.md) | `apps/desktop/` | Tauri v2 shell — single window hosts web surface; feature-gated by `FULCRUM_FEATURES=desktop-app` | DesktopShell, MainProcess, RendererProcess, IpcCommand, DesktopWindow, TauriPlugin, FeatureGate, FulcrumHome |

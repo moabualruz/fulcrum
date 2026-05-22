@@ -1,13 +1,9 @@
 import type { RequestHandler } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import {
-  buildReviewWorkbenchModel,
-  loadReviewWorkbenchSession,
-} from "@planning-review/interface/project-review-reports.ts";
 import {
   createSubscriptionEvent,
   formatSubscriptionServerSentEvent,
 } from "@platform-core/application/subscriptions/event-bus.ts";
+import { createWebWorkflowApiCaller } from "$lib/server/workflow-api";
 
 function sse(type: string, traceId: string | undefined, payload: unknown): string {
   return formatSubscriptionServerSentEvent(createSubscriptionEvent({
@@ -18,7 +14,8 @@ function sse(type: string, traceId: string | undefined, payload: unknown): strin
   }));
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async (event) => {
+  const { url } = event;
   const projectId = url.searchParams.get("projectId");
   if (!projectId) {
     return new Response(sse("error", undefined, { error: "projectId required" }), {
@@ -33,9 +30,15 @@ export const GET: RequestHandler = async ({ url, locals }) => {
   const lineStart = Number(url.searchParams.get("lineStart") ?? 0) || undefined;
   const lineEnd = Number(url.searchParams.get("lineEnd") ?? 0) || undefined;
 
-  const { em, ctx } = await requestServiceScope(locals, projectId);
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) {
+    return new Response(sse("error", traceId, { error: "workflow API is not configured" }), {
+      status: 503,
+      headers: { "content-type": "text/event-stream" },
+    });
+  }
   const reviewSession = reviewId || traceId
-    ? await loadReviewWorkbenchSession(em, ctx, {
+    ? await api.workflows.loadReviewWorkbenchSession({
       projectId,
       traceId,
       reviewId,
@@ -49,7 +52,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
       headers: { "content-type": "text/event-stream" },
     });
   }
-  const model = reviewSession?.model ?? await buildReviewWorkbenchModel({
+  const model = reviewSession?.model ?? await api.workflows.reviewWorkbench({
     projectId,
     files: [],
     annotations: [],

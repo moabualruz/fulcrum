@@ -1,15 +1,14 @@
 import type { PageServerLoad } from "./$types";
-import { listProjectRows } from "@work-management/interface/project-lifecycle.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { listProjectRowsForEvent } from "$lib/server/project-api";
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { locals } = event;
   const activeProjectId = locals?.activeProjectId ?? null;
   return {
     activeProjectId,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, activeProjectId);
-        const projects = await listProjectRows(em, ctx);
+        const projects = await listProjectRowsForEvent(event);
         return { projects };
       })(),
     },

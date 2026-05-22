@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import { DataSource, type FindOptionsWhere } from "typeorm";
 
@@ -7,6 +8,10 @@ import {
   type FulcrumArtifact,
 } from "@planning-review/infrastructure/database/review-workflow.entities.ts";
 import { WorkflowAuditEventEntity } from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
+import {
+  assertArtifactPathInRoot,
+  resolveArtifactStoreRoot,
+} from "@workflow-coordination/infrastructure/artifacts/storage.ts";
 
 export interface ArtifactPublicListInput {
   projectId?: string;
@@ -66,6 +71,10 @@ export interface ArtifactPublicDownload {
   artifact: ArtifactPublicRow;
   bodyPath: string | null;
   checksumSha256: string | null;
+  contentBase64: string | null;
+  filename: string;
+  mime: string;
+  sizeBytes: string;
 }
 
 export interface ArtifactPublicDeleteResult {
@@ -179,10 +188,16 @@ export class ArtifactPublicStore {
   async downloadArtifact(id: string): Promise<ArtifactPublicDownload | null> {
     const artifact = await this.getArtifact(id);
     if (!artifact) return null;
+    const bodyPath = safeArtifactBodyPath(artifact.bodyPath);
+    const contentBase64 = bodyPath ? await readArtifactContentBase64(bodyPath) : null;
     return {
       artifact,
-      bodyPath: safeArtifactBodyPath(artifact.bodyPath),
+      bodyPath,
       checksumSha256: artifact.checksumSha256,
+      contentBase64,
+      filename: artifact.filename ?? artifact.title ?? artifact.id,
+      mime: artifact.mime ?? "application/octet-stream",
+      sizeBytes: artifact.sizeBytes,
     };
   }
 
@@ -314,4 +329,13 @@ function safeArtifactBodyPath(bodyPath: string | null): string | null {
   const segments = normalized.split("/");
   if (segments.some((segment) => !segment || segment === "." || segment === "..")) return null;
   return normalized;
+}
+
+async function readArtifactContentBase64(bodyPath: string): Promise<string | null> {
+  try {
+    const safePath = assertArtifactPathInRoot(resolveArtifactStoreRoot(), bodyPath);
+    return (await readFile(safePath)).toString("base64");
+  } catch {
+    return null;
+  }
 }

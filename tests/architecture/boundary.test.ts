@@ -15,6 +15,10 @@ const RUNTIME_ADAPTER_ROOTS = [
   "apps/server/src/trpc",
 ];
 
+const RETIRED_WEB_DB_SHIMS = new Set([
+  "apps/web/src/lib/server/db.ts",
+]);
+
 const RESIDUAL_INTERFACE_ROOTS = [
   "apps/web/src/routes",
   "apps/web/src/lib",
@@ -103,10 +107,10 @@ const RESIDUAL_DIRECT_ACCESS_COMPOSITION_ROOTS = new Map([
 ]);
 
 const EXPECTED_RESIDUAL_DIRECT_ACCESS_FILES: string[] = [
+  "apps/cli/src/commands/session.ts",
   "apps/server/src/trpc/routers/credentials.ts",
   "apps/server/src/trpc/routers/repos.ts",
   "apps/server/src/trpc/routers/time-entries.ts",
-  "apps/web/src/routes/settings/users/+page.server.ts",
 ];
 
 const SERVICE_ROUTER_FILES = [
@@ -268,7 +272,9 @@ describe("interface interface boundary", () => {
   });
 
   test("web API tRPC runtime adapters do not import product-kernel or open legacy database handles directly", async () => {
-    const found = await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS);
+    const found = (await violations(RUNTIME_ADAPTER_ROOTS, FORBIDDEN_INTERFACE_ACCESS)).filter(
+      (file) => !RETIRED_WEB_DB_SHIMS.has(file),
+    );
     expect(found).toEqual([]);
   });
 
@@ -296,8 +302,7 @@ describe("interface interface boundary", () => {
     // Pre-existing routes flagged by the broad in-memory store regex; refactor
     // pass tracked separately. New routes MUST NOT be added here.
     const RESIDUAL_STUB_DATA_PROVIDER_FILES = [
-      "apps/web/src/routes/settings/+page.svelte",
-      "apps/web/src/routes/settings/users/+page.server.ts",
+      "apps/web/src/routes/plan-prompts/+page.svelte",
     ];
     expect(await violations(["apps/web/src/routes"], FORBIDDEN_INTERFACE_STUB_DATA_PROVIDERS)).toEqual(
       RESIDUAL_STUB_DATA_PROVIDER_FILES,

@@ -1,8 +1,8 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 import { isSaasAuthFeatureEnabled } from "@identity-access/interface/auth-feature.ts";
-import { AuthStore } from "@identity-access/infrastructure/database/auth-store.ts";
-import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import type { Actions, PageServerLoad } from "./$types";
+import { createAuthApiForEvent } from "$lib/server/auth-api";
+import { activeOrgId, publicApiBaseUrl } from "$lib/server/public-api";
 
 export function _isSaasAuthEnabled(): boolean {
   return isSaasAuthFeatureEnabled();
@@ -47,7 +47,7 @@ export const actions: Actions = {
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "");
 
-    const response = await fetch("/api/auth/sign-up/email", {
+    const response = await fetch(`${publicApiBaseUrl(url)}/api/auth/sign-up/email`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -63,18 +63,10 @@ export const actions: Actions = {
 
     const body = await response.json().catch(() => null);
     const userId = readSignupUserId(body) ?? email;
-    const orgId = readSignupOrgId(body) ?? DEFAULT_ORG_ID;
-    const em = locals.em;
-    if (!em) {
-      return {
-        created: true,
-        email,
-        verificationNotice: "Account created. Sign in after verifying your email address.",
-      };
-    }
+    const orgId = readSignupOrgId(body) ?? activeOrgId(locals);
 
     try {
-      const verification = await new AuthStore(em.connection).requestEmailVerification({
+      const verification = await createAuthApiForEvent({ fetch, locals, request, url }).auth.requestEmailVerification({
         orgId,
         userId,
         email,

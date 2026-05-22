@@ -1,8 +1,8 @@
 import { error, fail } from "@sveltejs/kit";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { startTaskAiAssistSession } from "@agent-client-protocol/application/task-ai-assist-session.ts";
 import { actionOk, actionFail } from "$lib/feedback/action-result";
+import { startTaskAiAssistSession } from "$lib/server/task-ai-assist-session";
 import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 import { createTaskDetailApiForEvent } from "$lib/server/task-detail-api";
 

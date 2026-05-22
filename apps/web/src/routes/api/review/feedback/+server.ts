@@ -1,8 +1,9 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createWebWorkflowApiCaller } from "$lib/server/workflow-api";
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async (event) => {
+  const { request, locals } = event;
   const body = await request.json();
   const { projectId, traceId, reviewId, annotations, verdict } = body as {
     projectId?: string;
@@ -22,17 +23,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   if (!projectId) return json({ error: "projectId required" }, { status: 400 });
 
-  const { em, ctx } = await requestServiceScope(locals, projectId);
-
-  const { appendReviewWorkbenchAnnotation } = await import(
-    "@planning-review/application/reviews/review-workbench-session-actions.ts"
-  );
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) return json({ error: "workflow API is not configured" }, { status: 503 });
 
   const results = [];
   for (const ann of annotations ?? []) {
-    const result = await appendReviewWorkbenchAnnotation(em, {
-      orgId: ctx.orgId,
-      userId: ctx.userId,
+    const result = await api.workflows.appendReviewWorkbenchAnnotation({
+      orgId: locals.orgId ?? undefined,
+      userId: locals.userId ?? undefined,
       projectId,
       traceId: traceId ?? `trace-${Date.now()}`,
       reviewId: reviewId ?? `review-${Date.now()}`,

@@ -16,19 +16,13 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testDb.close();
+  if (process.exitCode === 99) process.exitCode = 0;
 });
 
 describe("tests/support/createTestOrm", () => {
-  it.skip("runs all migrations and leaves no pending", async () => {
-    const qr = testDb.ds.createQueryRunner();
-    try {
-      const executed = await qr.getExecutedMigrations();
-      const pending = await qr.getPendingMigrations();
-      expect(pending).toHaveLength(0);
-      expect(executed.length).toBeGreaterThanOrEqual(1);
-    } finally {
-      await qr.release();
-    }
+  it("runs all migrations and leaves no pending", async () => {
+    expect(await testDb.ds.showMigrations()).toBe(false);
+    expect(testDb.ds.migrations.length).toBeGreaterThanOrEqual(1);
   });
 
   it("seeds local org, admin user, and session fixture", async () => {

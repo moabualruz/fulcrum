@@ -5,7 +5,8 @@
  *
  * Commands default to public API clients. Only local runtime entry points such
  * as init, web, db migration, and interactive TUI startup open
- * the local application container.
+ * the local application container. The `fulcrum settings` command is registered
+ * in the switch below and advertised through generated command help.
  */
 
 import { join, resolve, sep } from "node:path";

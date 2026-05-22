@@ -1,13 +1,5 @@
 import type { RequestHandler } from "@sveltejs/kit";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import {
-  installSkill,
-  upgradeSkill,
-  upgradeAllSkills,
-  uninstallSkill,
-  updateEnabledAgents,
-  resolveConflict,
-} from "$lib/server/skills";
+import { createSkillSupplyApiForEvent } from "$lib/server/skill-supply-api";
 
 function jsonError(message: string, status = 400): Response {
   return new Response(JSON.stringify({ error: message }), {
@@ -23,7 +15,8 @@ function jsonOk(data: unknown, status = 200): Response {
   });
 }
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async (event) => {
+  const { request } = event;
   let payload: Record<string, unknown>;
   try {
     payload = (await request.json()) as Record<string, unknown>;
@@ -34,7 +27,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const action = payload.action as string | undefined;
   if (!action) return jsonError("action is required");
 
-  const scope = await requestServiceScope(locals);
+  const skills = createSkillSupplyApiForEvent(event).fulcrumSkills;
 
   switch (action) {
     case "install": {
@@ -42,7 +35,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug || slug.trim() === "") return jsonError("slug is required");
       const upstreamRepo = (payload.upstream_repo as string) || undefined;
       try {
-        const skill = await installSkill(scope, { slug, upstreamRepo });
+        const skill = await skills.install({ slug, upstreamRepo });
         return jsonOk(skill, 201);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "install failed";
@@ -55,10 +48,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug) return jsonError("slug is required");
       try {
         if (slug === "all") {
-          const skills = await upgradeAllSkills(scope);
-          return jsonOk(skills);
+          return jsonOk(await skills.upgrade({ slug: "all" }));
         }
-        const skill = await upgradeSkill(scope, slug);
+        const skill = await skills.upgrade({ slug });
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "upgrade failed";
@@ -70,7 +62,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const slug = payload.slug as string | undefined;
       if (!slug) return jsonError("slug is required");
       try {
-        await uninstallSkill(scope, slug);
+        await skills.uninstall({ slug });
         return new Response(null, { status: 204 });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "uninstall failed";
@@ -84,7 +76,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!slug) return jsonError("slug is required");
       if (!Array.isArray(agents)) return jsonError("enabled_agents must be an array");
       try {
-        const skill = await updateEnabledAgents(scope, slug, agents);
+        const skill = await skills.sync({ slug, enabled_agents: agents });
         return jsonOk(skill);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "update failed";
@@ -107,7 +99,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return jsonError("resolution must be keep_local, use_upstream, force, alt_version, skip, or upgrade_installed");
       }
       try {
-        const skill = await resolveConflict(scope, {
+        const skill = await skills.resolveConflict({
           slug,
           resolution,
           altVersion: payload.alt_version as string | undefined,

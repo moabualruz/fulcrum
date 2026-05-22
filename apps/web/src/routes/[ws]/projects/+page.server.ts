@@ -1,6 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { listProjectRows } from "@work-management/interface/project-lifecycle.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { listProjectRowsForEvent } from "$lib/server/project-api";
 
 /**
  * `/<ws>/projects`: the canonical workspace-scoped project list (IA-MAP §1
@@ -12,15 +11,15 @@ import { requestServiceScope } from "$lib/server/request-service-scope";
  * preserved verbatim here: migration-strategy.md value-preservation item 1
  * ("every data load / tRPC call from the old route still runs").
  */
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = (event) => {
+	const { params, locals } = event;
 	const activeProjectId = locals?.activeProjectId ?? null;
 	return {
 		ws: params.ws,
 		activeProjectId,
 		streamed: {
 			data: (async () => {
-				const { em, ctx } = await requestServiceScope(locals, activeProjectId);
-				const projects = await listProjectRows(em, ctx);
+				const projects = await listProjectRowsForEvent(event);
 				return { projects };
 			})(),
 		},
