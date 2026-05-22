@@ -1,6 +1,6 @@
 export type WorkflowContractClient = "api" | "cli" | "tui" | "web";
 
-type WorkflowContractRefKind =
+export type WorkflowContractRefKind =
   | "artifact"
   | "audit_event"
   | "automation"
@@ -20,7 +20,7 @@ export type WorkflowContractRef = {
   id: string;
 };
 
-type WorkflowContractJourney = {
+export type WorkflowContractJourney = {
   id: string;
   title: string;
   requiredClients: WorkflowContractClient[];

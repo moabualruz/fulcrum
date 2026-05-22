@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { runPillar14Command } from "../../apps/cli/src/commands/pillar14-generated.ts";
 import { run as runWorkCommand, type WorkRunOptions } from "../../apps/cli/src/commands/work.ts";
-import { WORKFLOW_UAT_FIXTURE, workflowFixtureIds } from "./workflow-fixture.ts";
+import { WORKFLOW_UAT_FIXTURE, workflowFixtureIds } from "@fulcrum/test-fixtures";
 
 function cliHarness<TCaller>(caller: TCaller) {
   const out: string[] = [];
