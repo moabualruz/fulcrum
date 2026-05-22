@@ -369,19 +369,9 @@
             data-run-id={run.runId}
             data-status={run.status}
             aria-current={run.runId === selectedRunId ? "true" : undefined}
-            role="button"
-            tabindex="0"
-            onclick={() => selectRun(run.runId)}
-            onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                selectRun(run.runId);
-              }
-            }}
             class={cn(
-              "flex cursor-pointer flex-col gap-1.5 border-b border-border px-1",
+              "flex flex-col gap-1.5 border-b border-border px-1",
               "transition-colors hover:bg-card/60",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               run.runId === selectedRunId &&
                 "bg-card shadow-[inset_2px_0_0_var(--accent)]",
             )}
@@ -398,6 +388,21 @@
               <div
                 class="flex flex-wrap items-center gap-1.5 font-mono text-[10px] text-muted-foreground"
               >
+                <button
+                  type="button"
+                  data-run-row-select
+                  data-selected={run.runId === selectedRunId ? "true" : "false"}
+                  aria-pressed={run.runId === selectedRunId}
+                  aria-label={`Select run ${run.runId}`}
+                  onclick={() => selectRun(run.runId)}
+                  class={cn(
+                    "rounded-sm border border-border bg-background px-1.5 py-0.5 font-sans text-[10px] font-medium text-foreground",
+                    "hover:bg-card focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                    run.runId === selectedRunId && "border-accent text-accent-foreground",
+                  )}
+                >
+                  {run.runId === selectedRunId ? "Selected" : "Select"}
+                </button>
                 <span data-run-row-age>{run.age}</span>
                 <span aria-hidden="true">·</span>
                 <span data-run-row-id>{run.runId}</span>
@@ -409,6 +414,7 @@
               {#if run.spark}
                 <div
                   data-run-sparkline
+                  role="img"
                   class="flex h-4 items-end gap-0.5"
                   aria-label="Recent step outcomes"
                 >
