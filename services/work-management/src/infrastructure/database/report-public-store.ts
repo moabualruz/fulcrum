@@ -12,6 +12,7 @@ import {
   FulcrumProjectEntity,
   FulcrumTaskEntity,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+import type { ProjectReportsPage } from "@work-management/interface/project-reports.ts";
 
 interface ReportPublicInput {
   orgId: string;
@@ -28,6 +29,15 @@ export interface ReportPublicResponse {
 
 export class ReportPublicStore {
   constructor(private readonly dataSource: DataSource) {}
+
+  async projectPage(input: BurndownInput): Promise<ProjectReportsPage> {
+    const reports = await import("@work-management/interface/project-reports.ts");
+    return await reports.loadProjectReportsPage(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.projectId },
+      { projectId: input.projectId, sprintId: input.sprintId },
+    );
+  }
 
   async burndown(input: BurndownInput): Promise<ReportPublicResponse> {
     const project = await this.projectForOrg(input);

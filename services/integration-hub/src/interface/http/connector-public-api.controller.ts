@@ -27,11 +27,18 @@ import {
 } from "@nestjs/swagger";
 import { IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import { z } from "zod";
 
 import {
   listConnectors,
   type ConnectorDescriptor,
 } from "@integration-hub/application/connectors/web-actions.ts";
+import {
+  listProjectConnectors,
+  syncProjectConnector,
+  upsertProjectConnector,
+  type ProjectConnectorRow,
+} from "@integration-hub/interface/project-connectors.ts";
 import { INTEGRATION_HUB_CONNECTOR_ENTITIES } from "@integration-hub/infrastructure/database/connector.entities.ts";
 import {
   ConnectorNotEnabledError,
@@ -170,16 +177,88 @@ export class ConnectorRunPublicApiController {
   }
 }
 
+const ProjectConnectorParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+const ProjectConnectorIdParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+const ProjectConnectorQuerySchema = z.object({
+  orgId: z.string().min(1),
+});
+
+const ProjectConnectorUpsertBodySchema = ProjectConnectorQuerySchema.extend({
+  connectorType: z.string().min(1),
+  enabled: z.boolean().optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
+});
+
+export class ProjectConnectorPublicApiService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectConnectorRow[]> {
+    const parsedParams = ProjectConnectorParamsSchema.parse(params);
+    ProjectConnectorQuerySchema.parse(query);
+    return await listProjectConnectors(this.dataSource.manager, parsedParams.id);
+  }
+
+  async upsert(params: unknown, body: unknown): Promise<{ id: string }> {
+    const parsedParams = ProjectConnectorParamsSchema.parse(params);
+    const parsedBody = ProjectConnectorUpsertBodySchema.parse(body);
+    return await upsertProjectConnector(this.dataSource.manager, {
+      orgId: parsedBody.orgId,
+      projectId: parsedParams.id,
+      connectorType: parsedBody.connectorType,
+      enabled: parsedBody.enabled,
+      config: parsedBody.config,
+    });
+  }
+
+  async sync(params: unknown, body: unknown): Promise<{ ok: true }> {
+    const parsedParams = ProjectConnectorIdParamsSchema.parse(params);
+    ProjectConnectorQuerySchema.parse(body);
+    return await syncProjectConnector(this.dataSource.manager, parsedParams.id);
+  }
+}
+
+export class ProjectConnectorPublicApiController {
+  constructor(private readonly projectConnectors: ProjectConnectorPublicApiService) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectConnectorRow[]> {
+    return await this.projectConnectors.list(params, query);
+  }
+
+  async upsert(params: unknown, body: unknown): Promise<{ id: string }> {
+    return await this.projectConnectors.upsert(params, body);
+  }
+}
+
+export class ProjectConnectorSyncPublicApiController {
+  constructor(private readonly projectConnectors: ProjectConnectorPublicApiService) {}
+
+  async sync(params: unknown, body: unknown): Promise<{ ok: true }> {
+    return await this.projectConnectors.sync(params, body);
+  }
+}
+
 export class ConnectorPublicApiModule {
   static register(options: ConnectorPublicApiOptions): NestDynamicModule {
     return {
       module: ConnectorPublicApiModule,
       imports: [TypeOrmModule.forFeature(INTEGRATION_HUB_CONNECTOR_ENTITIES)],
-      controllers: [ConnectorPublicApiController, ConnectorRunPublicApiController],
+      controllers: [
+        ConnectorPublicApiController,
+        ConnectorRunPublicApiController,
+        ProjectConnectorPublicApiController,
+        ProjectConnectorSyncPublicApiController,
+      ],
       providers: [
         { provide: CONNECTOR_PUBLIC_API_OPTIONS, useValue: options },
         ConnectorStore,
         ConnectorPublicApiService,
+        ProjectConnectorPublicApiService,
       ],
       exports: [ConnectorPublicApiService],
     };
@@ -189,8 +268,11 @@ export class ConnectorPublicApiModule {
 Inject(CONNECTOR_PUBLIC_API_OPTIONS)(ConnectorPublicApiService, undefined, 0);
 Inject(ConnectorStore)(ConnectorPublicApiService, undefined, 1);
 Inject(DataSource)(ConnectorStore, undefined, 0);
+Inject(DataSource)(ProjectConnectorPublicApiService, undefined, 0);
 Inject(ConnectorPublicApiService)(ConnectorPublicApiController, undefined, 0);
 Inject(ConnectorPublicApiService)(ConnectorRunPublicApiController, undefined, 0);
+Inject(ProjectConnectorPublicApiService)(ProjectConnectorPublicApiController, undefined, 0);
+Inject(ProjectConnectorPublicApiService)(ProjectConnectorSyncPublicApiController, undefined, 0);
 
 IsOptional()(ConnectorListQueryDto.prototype, "orgId");
 IsString()(ConnectorListQueryDto.prototype, "orgId");
@@ -231,9 +313,16 @@ const runRouteDescriptors = {
   getRun: Object.getOwnPropertyDescriptor(ConnectorRunPublicApiController.prototype, "getRun"),
 } as const;
 
+const projectConnectorRouteDescriptors = {
+  list: Object.getOwnPropertyDescriptor(ProjectConnectorPublicApiController.prototype, "list"),
+  upsert: Object.getOwnPropertyDescriptor(ProjectConnectorPublicApiController.prototype, "upsert"),
+  sync: Object.getOwnPropertyDescriptor(ProjectConnectorSyncPublicApiController.prototype, "sync"),
+} as const;
+
 if (
   Object.values(routeDescriptors).some((descriptor) => !descriptor) ||
-  Object.values(runRouteDescriptors).some((descriptor) => !descriptor)
+  Object.values(runRouteDescriptors).some((descriptor) => !descriptor) ||
+  Object.values(projectConnectorRouteDescriptors).some((descriptor) => !descriptor)
 ) {
   throw new Error("ConnectorPublicApiController route descriptors are missing");
 }
@@ -287,13 +376,83 @@ ApiOkResponse({ description: "Connector sync run" })(
   runRouteDescriptors.getRun!,
 );
 
+Controller("api/v1/projects/:id/connectors")(ProjectConnectorPublicApiController);
+ApiTags("project-connectors")(ProjectConnectorPublicApiController);
+
+Get()(ProjectConnectorPublicApiController.prototype, "list", projectConnectorRouteDescriptors.list!);
+Param()(ProjectConnectorPublicApiController.prototype, "list", 0);
+Query()(ProjectConnectorPublicApiController.prototype, "list", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectConnectorPublicApiController.prototype,
+  "list",
+  projectConnectorRouteDescriptors.list!,
+);
+ApiOperation({ summary: "List project connector settings" })(
+  ProjectConnectorPublicApiController.prototype,
+  "list",
+  projectConnectorRouteDescriptors.list!,
+);
+ApiOkResponse({ description: "Project connector rows" })(
+  ProjectConnectorPublicApiController.prototype,
+  "list",
+  projectConnectorRouteDescriptors.list!,
+);
+
+Post()(ProjectConnectorPublicApiController.prototype, "upsert", projectConnectorRouteDescriptors.upsert!);
+Param()(ProjectConnectorPublicApiController.prototype, "upsert", 0);
+Body()(ProjectConnectorPublicApiController.prototype, "upsert", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectConnectorPublicApiController.prototype,
+  "upsert",
+  projectConnectorRouteDescriptors.upsert!,
+);
+ApiOperation({ summary: "Create or update project connector settings" })(
+  ProjectConnectorPublicApiController.prototype,
+  "upsert",
+  projectConnectorRouteDescriptors.upsert!,
+);
+ApiOkResponse({ description: "Project connector row id" })(
+  ProjectConnectorPublicApiController.prototype,
+  "upsert",
+  projectConnectorRouteDescriptors.upsert!,
+);
+
+Controller("api/v1/project-connectors")(ProjectConnectorSyncPublicApiController);
+ApiTags("project-connectors")(ProjectConnectorSyncPublicApiController);
+
+Post(":id/sync")(ProjectConnectorSyncPublicApiController.prototype, "sync", projectConnectorRouteDescriptors.sync!);
+HttpCode(202)(ProjectConnectorSyncPublicApiController.prototype, "sync", projectConnectorRouteDescriptors.sync!);
+Param()(ProjectConnectorSyncPublicApiController.prototype, "sync", 0);
+Body()(ProjectConnectorSyncPublicApiController.prototype, "sync", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectConnectorSyncPublicApiController.prototype,
+  "sync",
+  projectConnectorRouteDescriptors.sync!,
+);
+ApiOperation({ summary: "Sync a project connector" })(
+  ProjectConnectorSyncPublicApiController.prototype,
+  "sync",
+  projectConnectorRouteDescriptors.sync!,
+);
+ApiAcceptedResponse({ description: "Project connector sync accepted" })(
+  ProjectConnectorSyncPublicApiController.prototype,
+  "sync",
+  projectConnectorRouteDescriptors.sync!,
+);
+
 Module({
   imports: [TypeOrmModule.forFeature(INTEGRATION_HUB_CONNECTOR_ENTITIES)],
-  controllers: [ConnectorPublicApiController, ConnectorRunPublicApiController],
+  controllers: [
+    ConnectorPublicApiController,
+    ConnectorRunPublicApiController,
+    ProjectConnectorPublicApiController,
+    ProjectConnectorSyncPublicApiController,
+  ],
   providers: [
     { provide: CONNECTOR_PUBLIC_API_OPTIONS, useValue: null },
     ConnectorStore,
     ConnectorPublicApiService,
+    ProjectConnectorPublicApiService,
   ],
   exports: [ConnectorPublicApiService],
 })(ConnectorPublicApiModule);

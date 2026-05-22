@@ -1,26 +1,26 @@
-import { error, fail, redirect } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import {
-  buildUatCodeReviewHandoff,
-  recordUatCodeReviewDecision,
-  type UatCodeReviewDecision,
-} from "@planning-review/interface/project-review-reports.ts";
+import { WorkflowApiError } from "@workflow-coordination/interface/http/workflow-api-client";
 import { ensureProjectExists } from "$lib/server/project-api";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
+
+type UatCodeReviewDecision =
+  | "start_uat"
+  | "start_code_review"
+  | "request_changes"
+  | "approve_without_manual_review";
 
 export const load: PageServerLoad = async (event) => {
-  const { params, locals } = event;
-  const projectId = params.id;
+  const projectId = event.params.id;
   await ensureProjectExists(event, projectId);
-  const { em, ctx } = await requestServiceScope(locals, projectId);
   try {
-    const handoff = await buildUatCodeReviewHandoff(em, ctx, {
+    const handoff = await workflowApi(event).reports.uatCodeReviewHandoff({
+      ...workflowApiProjectMetadata(event, projectId),
       projectId,
     });
     return { projectId, handoff };
   } catch (err) {
-    if (err instanceof AppNotFoundError) throw error(404, err.message);
+    if (err instanceof WorkflowApiError && err.status === 404) throw error(404, err.message);
     return {
       projectId,
       handoff: null,
@@ -46,27 +46,27 @@ function csvIds(value: string | null | undefined): string[] {
 }
 
 export const actions: Actions = {
-  decide: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  decide: async (event) => {
+    const fd = await event.request.formData();
     const raw: Record<string, string | null> = {};
     for (const [key, value] of fd.entries()) raw[key] = typeof value === "string" ? value : null;
 
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const decision = await recordUatCodeReviewDecision(em, ctx, {
-        projectId: params.id,
+      const decision = await workflowApi(event).reports.recordUatCodeReviewDecision({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         decision: uatDecision(raw["decision"]),
         reviewType: "uat",
         feedbackText: raw["feedbackText"]?.trim() || undefined,
         taskIds: csvIds(raw["taskIds"]),
-      });
+      }) as { status: string };
 
       if (decision.status === "approved") {
-        return { ok: true, mode: "decide" as const, decision, redirectTo: `/projects/${params.id}/reports` };
+        return { ok: true, mode: "decide" as const, decision, redirectTo: `/projects/${event.params.id}/reports` };
       }
       if (decision.status === "changes_requested") {
-        return { ok: true, mode: "decide" as const, decision, redirectTo: `/projects/${params.id}/review` };
+        return { ok: true, mode: "decide" as const, decision, redirectTo: `/projects/${event.params.id}/review` };
       }
 
       return { ok: true, mode: "decide" as const, decision, redirectTo: null };
@@ -75,3 +75,9 @@ export const actions: Actions = {
     }
   },
 };
+
+function workflowApi(event: Parameters<PageServerLoad>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}
