@@ -40,6 +40,7 @@ import { FieldDependencyPublicApiModule } from "@work-management/interface/http/
 import { PlanningStructurePublicApiModule } from "@work-management/interface/http/planning-structure-public-api.controller.ts";
 import { ProjectPublicApiModule } from "@work-management/interface/http/project-public-api.controller.ts";
 import { ProjectStatusPublicApiModule } from "@work-management/interface/http/project-status-public-api.controller.ts";
+import { ProjectTimelinePublicApiModule } from "@work-management/interface/http/project-timeline-public-api.controller.ts";
 import { SprintPublicApiModule } from "@work-management/interface/http/sprint-public-api.controller.ts";
 import { TaskCommentPublicApiModule } from "@work-management/interface/http/task-comment-public-api.controller.ts";
 import { TaskRecurrencePublicApiModule } from "@work-management/interface/http/task-recurrence-public-api.controller.ts";
@@ -92,6 +93,7 @@ Module({
     PlanningStructurePublicApiModule,
     ProjectPublicApiModule,
     ProjectStatusPublicApiModule,
+    ProjectTimelinePublicApiModule,
     SprintPublicApiModule,
     TaskCommentPublicApiModule,
     TaskRecurrencePublicApiModule,
