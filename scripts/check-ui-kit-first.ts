@@ -37,7 +37,8 @@
  *   RULE 4 — Native Select responsibility.
  *     A route / feature `.svelte` file that renders a visible native `<select>`
  *     or owns a listbox surface is re-implementing the ui-kit Select
- *     responsibility unless it imports `Select` from `@fulcrum/ui-kit`.
+ *     responsibility. Importing `Select` is not enough; the surface must render
+ *     the ui-kit Select primitive parts instead of native controls.
  *
  * The scan is structural and deterministic: same input → same output. It reads
  * files only; it never mutates. Exit 0 = clean, exit 1 = violations.
@@ -234,6 +235,82 @@ function hasNativeSelectResponsibility(source: string): boolean {
   return /<select\b/i.test(source) || /\brole\s*=\s*["']listbox["']/i.test(source);
 }
 
+function rendersUiKitSelectParts(source: string): boolean {
+  return /(^|[^a-zA-Z0-9_])<Select\b/.test(source) || /(^|[^a-zA-Z0-9_])<SelectTrigger\b/.test(source);
+}
+
+// Existing import-only native selects are documented debt from the closure-9
+// review. Keeping the baseline explicit lets the standing gate fail any new
+// native Select reimplementation instead of false-passing by import alone.
+const DOCUMENTED_NATIVE_SELECT_SURFACES = new Set([
+  "apps/web/src/routes/agents/+page.svelte",
+  "apps/web/src/routes/boards/+page.svelte",
+  "apps/web/src/routes/build-runs/+page.svelte",
+  "apps/web/src/routes/comments/+page.svelte",
+  "apps/web/src/routes/context/preview/+page.svelte",
+  "apps/web/src/routes/cross-cutting-perf/+page.svelte",
+  "apps/web/src/routes/doc-labels/+page.svelte",
+  "apps/web/src/routes/docs/+page.svelte",
+  "apps/web/src/routes/docs/[id]/edit/+page.svelte",
+  "apps/web/src/routes/docs/new/+page.svelte",
+  "apps/web/src/routes/inference/+page.svelte",
+  "apps/web/src/routes/member-remove/+page.svelte",
+  "apps/web/src/routes/members/+page.svelte",
+  "apps/web/src/routes/memory/+page.svelte",
+  "apps/web/src/routes/memory/[id]/+page.svelte",
+  "apps/web/src/routes/operate-mcp/+page.svelte",
+  "apps/web/src/routes/orchestration/+page.svelte",
+  "apps/web/src/routes/project-settings/+page.svelte",
+  "apps/web/src/routes/projects/+page.svelte",
+  "apps/web/src/routes/projects/[id]/activity/+page.svelte",
+  "apps/web/src/routes/projects/[id]/backlog/+page.svelte",
+  "apps/web/src/routes/projects/[id]/board/+page.svelte",
+  "apps/web/src/routes/projects/[id]/e2e/+page.svelte",
+  "apps/web/src/routes/projects/[id]/gantt/+page.svelte",
+  "apps/web/src/routes/projects/[id]/intake/[intakeId]/+page.svelte",
+  "apps/web/src/routes/projects/[id]/modules/+page.svelte",
+  "apps/web/src/routes/projects/[id]/modules/[moduleId]/+page.svelte",
+  "apps/web/src/routes/projects/[id]/reports/+page.svelte",
+  "apps/web/src/routes/projects/[id]/review/+page.svelte",
+  "apps/web/src/routes/projects/[id]/runs/[runId]/+page.svelte",
+  "apps/web/src/routes/projects/[id]/settings/fields/+page.svelte",
+  "apps/web/src/routes/projects/[id]/settings/import/+page.svelte",
+  "apps/web/src/routes/projects/[id]/settings/views/+page.svelte",
+  "apps/web/src/routes/projects/[id]/settings/views/[viewId]/+page.svelte",
+  "apps/web/src/routes/projects/[id]/updates/+page.svelte",
+  "apps/web/src/routes/review/+page.svelte",
+  "apps/web/src/routes/review/[reviewId]/+page.svelte",
+  "apps/web/src/routes/review-search/+page.svelte",
+  "apps/web/src/routes/review-templates/+page.svelte",
+  "apps/web/src/routes/runs/+page.svelte",
+  "apps/web/src/routes/settings/ai-assist/+page.svelte",
+  "apps/web/src/routes/settings/i18n/+page.svelte",
+  "apps/web/src/routes/settings/notifications/+page.svelte",
+  "apps/web/src/routes/settings/routing/RoutingPage.svelte",
+  "apps/web/src/routes/settings/theme/+page.svelte",
+  "apps/web/src/routes/settings/users/+page.svelte",
+  "apps/web/src/routes/skill-registry/+page.svelte",
+  "apps/web/src/routes/space-permissions/+page.svelte",
+  "apps/web/src/routes/task-filters/+page.svelte",
+  "apps/web/src/routes/tasks/[id]/+page.svelte",
+  "apps/web/src/routes/theme-picker/+page.svelte",
+  "apps/web/src/routes/view-controls/+page.svelte",
+  "apps/web/src/routes/views-custom-fields/+page.svelte",
+  "apps/web/src/lib/components/projects/ProjectForm.svelte",
+  "apps/web/src/lib/components/repos/BranchSelector.svelte",
+  "apps/web/src/lib/components/review/ReviewWorkbench.svelte",
+  "apps/web/src/lib/components/saved-views/SavedViewFilterBuilder.svelte",
+  "apps/web/src/lib/components/tasks/AutomationRuleList.svelte",
+  "apps/web/src/lib/components/tasks/FieldDependencyConfig.svelte",
+  "apps/web/src/lib/components/tasks/GanttView.svelte",
+  "apps/web/src/lib/components/tasks/MentionSuggestion.svelte",
+  "apps/web/src/lib/components/tasks/QuickCreateForm.svelte",
+  "apps/web/src/lib/components/tasks/RecurrenceConfig.svelte",
+  "apps/web/src/lib/components/tasks/TaskBoard.svelte",
+  "apps/web/src/lib/components/tasks/TaskListView.svelte",
+  "apps/web/src/lib/components/tasks/TaskTable.svelte",
+]);
+
 const REQUIRED_PRIMITIVE_COMPOSITION: Record<string, readonly string[]> = {
   "apps/web/src/lib/components/board/BoardSheet.svelte": [
     "Sheet",
@@ -318,12 +395,13 @@ for (const rootRel of SURFACE_ROOTS) {
       }
       if (
         hasNativeSelectResponsibility(source) &&
-        missingUiKitImports(source, ["Select"]).length > 0
+        !rendersUiKitSelectParts(source) &&
+        !DOCUMENTED_NATIVE_SELECT_SURFACES.has(rel)
       ) {
         violations.push({
           file: rel,
           rule: "native-select-reimplementation",
-          detail: "renders a native select/listbox without composing @fulcrum/ui-kit Select",
+          detail: "renders a native select/listbox; use @fulcrum/ui-kit Select parts instead",
         });
       }
       const s = stem(abs);
