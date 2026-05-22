@@ -19,9 +19,9 @@
 	}: SelectTriggerProps = $props();
 
 	const sizeClass: Record<NonNullable<SelectTriggerProps["size"]>, string> = {
-		sm: "h-8 text-xs px-2",
-		md: "h-9 text-sm px-2.5",
-		lg: "h-10 text-sm px-3",
+		sm: "h-6 text-xs px-2",
+		md: "h-7 text-sm px-2.5",
+		lg: "h-8 text-sm px-3",
 	};
 </script>
 

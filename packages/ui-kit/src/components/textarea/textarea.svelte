@@ -44,7 +44,7 @@
 	data-auto-resize={autoResize ? "true" : undefined}
 	rows={rows ?? minRows}
 	class={cn(
-		"flex min-h-[calc(var(--field-min-h,5rem))] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow]",
+		"flex min-h-7 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow]",
 		"placeholder:text-muted-foreground",
 		"focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-2",
 		"aria-invalid:border-destructive aria-invalid:ring-destructive/30 aria-invalid:ring-2",

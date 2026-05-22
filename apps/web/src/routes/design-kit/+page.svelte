@@ -7,6 +7,7 @@
 		Checkbox,
 		RadioGroup,
 		RadioGroupItem,
+		Input,
 		Select,
 		SelectTrigger,
 		SelectContent,
@@ -1129,13 +1130,12 @@
 					description="Describe the outcome in a single sentence."
 					error={titleError}
 				>
-					<input
+					<Input
 						id="form-field-title"
 						type="text"
 						bind:value={titleValue}
 						aria-invalid={titleError ? "true" : undefined}
 						aria-describedby={titleError ? "form-field-title-error" : "form-field-title-description"}
-						class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 aria-invalid:border-destructive aria-invalid:ring-destructive/30 aria-invalid:ring-2"
 						data-design-kit-form-input
 					/>
 				</FormField>
@@ -1145,10 +1145,9 @@
 					htmlFor="form-field-owner"
 					description="Pick a default assignee for this task type."
 				>
-					<input
+					<Input
 						id="form-field-owner"
 						type="text"
-						class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
 					/>
 				</FormField>
 			</div>
