@@ -32,6 +32,7 @@ type DocsCaller = {
 
 export interface DocsRunOptions {
   caller?: DocsCaller;
+  commandRoot?: "doc" | "docs";
   env?: DocumentApiEnvironment;
   fetch?: typeof fetch;
   print?: (line: string) => void;
@@ -93,7 +94,7 @@ export async function run(
       return withErrors("list", resolved, async () => {
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.list(parseListInput(rest));
-        emitDocs(result, "fulcrum doc list", rest, resolved.print, formatRows);
+        emitDocs(result, commandName(resolved, "list"), rest, resolved.print, formatRows);
       });
     // `view` is the CLI-TUI-UX §1.1 verb; `get` stays as a documented alias.
     case "view":
@@ -102,7 +103,7 @@ export async function run(
         const key = requireArg(rest, 0, sub, "<slug|id>");
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.get(docLookup(key));
-        emitDocs(result, "fulcrum doc view", rest, resolved.print, formatRow);
+        emitDocs(result, commandName(resolved, "view"), rest, resolved.print, formatRow);
       });
     // `new` is the CLI-TUI-UX §1.1 verb; `create` stays as a documented alias.
     case "new":
@@ -110,7 +111,7 @@ export async function run(
       return withErrors(sub, resolved, async () => {
         const caller = await resolveCaller(resolved);
         const result = await caller.docs.create(parseCreateInput(rest));
-        emitDocs(result, "fulcrum doc new", rest, resolved.print, formatRow);
+        emitDocs(result, commandName(resolved, "new"), rest, resolved.print, formatRow);
       });
     case "edit":
       return withErrors("edit", resolved, async () => {
@@ -169,7 +170,7 @@ async function runTemplate(argv: readonly string[], opts: ResolvedOptions): Prom
         const caller = await resolveCaller(opts);
         if (!caller.docs.templates?.list) throw new Error("docs template list operation is not available");
         const result = await caller.docs.templates.list({});
-        emitDocs(result, "fulcrum doc template list", rest, opts.print, formatRows);
+        emitDocs(result, commandName(opts, "template list"), rest, opts.print, formatRows);
       });
     case "help":
     case "--help":
@@ -209,7 +210,7 @@ async function runHistory(argv: readonly string[], opts: ResolvedOptions): Promi
   const caller = await resolveCaller(opts);
   if (!caller.docs.versionsList) throw new Error("docs version history operation is not available");
   const result = await caller.docs.versionsList({ docId });
-  emitDocs(result, "fulcrum doc history", argv, opts.print, formatRows);
+  emitDocs(result, commandName(opts, "history"), argv, opts.print, formatRows);
 }
 
 /** `fulcrum docs restore <doc-id> --version <n>`: restore a prior version (`CLI-TUI-UX.md` §1.1). */
@@ -220,7 +221,7 @@ async function runRestore(argv: readonly string[], opts: ResolvedOptions): Promi
   const caller = await resolveCaller(opts);
   if (!caller.docs.restoreVersion) throw new Error("docs restore operation is not available");
   const result = await caller.docs.restoreVersion({ docId, version });
-  emitDocs(result, "fulcrum doc restore", argv, opts.print, formatRow);
+  emitDocs(result, commandName(opts, "restore"), argv, opts.print, formatRow);
 }
 
 /** `fulcrum docs attach <slug|id> <file>`: record an attachment on a doc (`CLI-TUI-UX.md` §1.1). */
@@ -237,7 +238,7 @@ async function runAttach(argv: readonly string[], opts: ResolvedOptions): Promis
     fileName: file.split("/").pop() ?? file,
     storagePath: file,
   });
-  emitDocs(result, "fulcrum doc attach", argv, opts.print, () => `Attached ${file} to doc ${id}.`);
+  emitDocs(result, commandName(opts, "attach"), argv, opts.print, () => `Attached ${file} to doc ${id}.`);
 }
 
 /** `fulcrum docs comment <slug|id> --body <text>`: add a thread comment (`CLI-TUI-UX.md` §1.1). */
@@ -257,7 +258,7 @@ async function runComment(argv: readonly string[], opts: ResolvedOptions): Promi
       resolveCommentId: flagValue(argv, "--resolve"),
     }),
   );
-  emitDocs(result, "fulcrum doc comment", argv, opts.print, () => `Comment added to doc ${id}.`);
+  emitDocs(result, commandName(opts, "comment"), argv, opts.print, () => `Comment added to doc ${id}.`);
 }
 
 /** `fulcrum docs link <slug|id> --task <task-id>`: link a doc to a task (`CLI-TUI-UX.md` §1.1). */
@@ -276,7 +277,7 @@ async function runLink(argv: readonly string[], opts: ResolvedOptions): Promise<
     targetId: task,
     linkType: "source",
   });
-  emitDocs(result, "fulcrum doc link", argv, opts.print, () => `Linked doc ${id} to task ${task}.`);
+  emitDocs(result, commandName(opts, "link"), argv, opts.print, () => `Linked doc ${id} to task ${task}.`);
 }
 
 async function runEdit(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
@@ -304,7 +305,7 @@ async function runEdit(argv: readonly string[], opts: ResolvedOptions): Promise<
 
     const bodyMd = await readFile(file, "utf8");
     const result = await caller.docs.update({ id, bodyMd });
-    emitDocs(result, "fulcrum doc edit", argv, opts.print, formatRow);
+    emitDocs(result, commandName(opts, "edit"), argv, opts.print, formatRow);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
@@ -319,7 +320,7 @@ async function runDelete(argv: readonly string[], opts: ResolvedOptions): Promis
 
   const caller = await resolveCaller(opts);
   const result = await caller.docs.delete(compact({ id, hard: hard ? true : undefined }));
-  emitDocs(result, "fulcrum doc delete", argv, opts.print, () => hard ? `Deleted doc ${id}.` : `Archived doc ${id}.`);
+  emitDocs(result, commandName(opts, "delete"), argv, opts.print, () => hard ? `Deleted doc ${id}.` : `Archived doc ${id}.`);
 }
 
 async function runSearch(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
@@ -334,7 +335,7 @@ async function runSearch(argv: readonly string[], opts: ResolvedOptions): Promis
   const result = caller.docs.search
     ? await caller.docs.search(input)
     : await caller.docs.list({ ...input, query: undefined });
-  emitDocs(result, "fulcrum doc search", argv, opts.print, formatRows);
+  emitDocs(result, commandName(opts, "search"), argv, opts.print, formatRows);
 }
 
 function parseListInput(argv: readonly string[]): Record<string, unknown> {
@@ -412,6 +413,10 @@ function compact(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
+function commandName(opts: DocsRunOptions, command: string): string {
+  return `fulcrum ${opts.commandRoot ?? "doc"} ${command}`.trim();
+}
+
 function requireArg(argv: readonly string[], index: number, command: string, name: string): string {
   const value = argv[index];
   if (!value || value.startsWith("-")) {
@@ -468,14 +473,14 @@ async function withErrors(
     emitErrorResult(
       {
         argv: opts.currentArgv ?? [],
-        command: `fulcrum docs ${command}`,
+        command: commandName(opts, command),
         args: {},
         error: {
           code: "FUL_DOCS_ERROR",
-          message: `fulcrum doc ${command}: ${message}`,
+          message: `${commandName(opts, command)}: ${message}`,
           fix: "Configure the Fulcrum public API environment, then retry.",
         },
-        renderHuman: () => opts.printErr(`fulcrum doc ${command}: ${message}`),
+        renderHuman: () => opts.printErr(`${commandName(opts, command)}: ${message}`),
       },
       { print: opts.print, printErr: opts.printErr },
     );

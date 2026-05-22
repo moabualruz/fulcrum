@@ -2,7 +2,14 @@
 // fulcrum: local-first CLI Agent OS. Binary entry-point.
 
 import { installCliLogRedaction } from "./log.ts";
-import { CLI_RESULT_SCHEMA, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import {
+  ROOT_HELP,
+  STAGE_HELP_TOPICS,
+  commandPathFromArgv,
+  renderCommandHelp,
+  renderCommandSchema,
+  renderStageHelp,
+} from "./help.ts";
 import { serializeEnvelope, wrapEnvelope } from "./lib/envelope.ts";
 
 installCliLogRedaction();
@@ -63,6 +70,19 @@ function printVersion(argv: readonly string[]): void {
 async function main() {
   const argv = Bun.argv.slice(2);
   const [cmd = "help", ...rest] = argv;
+
+  if (argv.includes("--json-schema")) {
+    console.log(JSON.stringify(renderCommandSchema(commandPathFromArgv(argv))));
+    return;
+  }
+
+  if (cmd !== "help" && (argv.includes("--help") || argv.includes("-h"))) {
+    const help = renderCommandHelp(argv);
+    if (help) {
+      console.log(help);
+      return;
+    }
+  }
 
   switch (cmd) {
     case "hook": {
@@ -209,15 +229,13 @@ async function main() {
     case "help":
     case "--help":
     case "-h": {
-      const [topic] = rest;
-      if (rest.includes("--json-schema")) {
-        console.log(JSON.stringify(CLI_RESULT_SCHEMA));
-        return;
-      }
+      const path = commandPathFromArgv(argv);
+      const topic = path[0];
       if (topic) {
-        const stageHelp = renderStageHelp(topic);
-        if (stageHelp) {
-          console.log(stageHelp);
+        const stageHelp = path.length === 1 ? renderStageHelp(topic) : null;
+        const commandHelp = renderCommandHelp(path);
+        if (stageHelp || commandHelp) {
+          console.log(stageHelp ?? commandHelp);
           return;
         }
         console.error(`fulcrum help: unknown stage '${topic}'`);

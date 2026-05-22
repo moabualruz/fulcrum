@@ -49,6 +49,15 @@ Usage:
   fulcrum ai start --task <id> --title <title> --step <step-id>
     [--description <text>] [--agent <id>] [--route plan|build|review]
     [--workspace <path>] [--json]
+  fulcrum ai send --thread <thread-id> --message <text> [--json]
+  fulcrum ai attach <thread-id> [--json]
+  fulcrum ai pause|resume|abort <thread-id> [--json]
+  fulcrum ai checkpoint <thread-id> [--json]
+  fulcrum ai restore <thread-id> --checkpoint <checkpoint-id> [--json]
+  fulcrum ai prompt edit <thread-id> --message <text> [--json]
+  fulcrum ai rerun <thread-id> [--json]
+  fulcrum ai preview --task <task-id> [--json]
+  fulcrum ai route <thread-id> --agent <id> [--json]
 
 Options:
   --step <step-id>  Scope the AI Assist session to a Step (bare step id, no stage prefix)
@@ -59,6 +68,20 @@ Options:
 AI Assist is anchored to the Step you name. The session carries the same trace
 identity as the Step run, so it is followable in the web drawer and TUI :ai pane.
 `;
+
+const AI_ASSIST_PENDING_PRD = "prd-ai-assist-thread-actions";
+const AI_ASSIST_THREAD_VERBS = new Set([
+  "send",
+  "attach",
+  "pause",
+  "resume",
+  "abort",
+  "checkpoint",
+  "restore",
+  "rerun",
+  "preview",
+  "route",
+]);
 
 /**
  * The COPY.md §3 AI Assist recovery templates. Each names the recovery action,
@@ -211,11 +234,99 @@ export async function run(argv: readonly string[], opts: AiCommandOptions = {}):
     case "-h":
       io.print(HELP);
       return;
+    case "prompt": {
+      const [sub = "help", ...promptRest] = rest;
+      if (sub === "edit") {
+        emitAiNotImplemented(["prompt", "edit"], promptRest, opts, io);
+        return;
+      }
+      emitAiUnknown(["prompt", sub], promptRest, opts, io);
+      return;
+    }
     default:
-      io.printErr(`fulcrum ai: unknown command '${verb}'`);
-      io.printErr(HELP);
-      io.exit(2);
+      if (AI_ASSIST_THREAD_VERBS.has(verb)) {
+        emitAiNotImplemented([verb], rest, opts, io);
+        return;
+      }
+      emitAiUnknown([verb], rest, opts, io);
   }
+}
+
+function emitAiNotImplemented(
+  commandParts: readonly string[],
+  argv: readonly string[],
+  opts: AiCommandOptions,
+  io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
+): void {
+  const command = `fulcrum ai ${commandParts.join(" ")}`;
+  emitErrorResult(
+    {
+      argv,
+      command,
+      args: parseAiArgs(argv),
+      error: {
+        code: "FUL_NOT_IMPLEMENTED",
+        message: `${command} is part of the AI Assist CLI surface, but the runtime action is not implemented yet.`,
+        fix: `Track remaining implementation in ${AI_ASSIST_PENDING_PRD}.`,
+      },
+      trace: { trace_id: newTraceId(opts.env ?? process.env) },
+      env: opts.env,
+      renderHuman: () => io.printErr(`${command}: not implemented (${AI_ASSIST_PENDING_PRD})`),
+    },
+    io,
+  );
+  io.exit(1);
+}
+
+function emitAiUnknown(
+  commandParts: readonly string[],
+  argv: readonly string[],
+  opts: AiCommandOptions,
+  io: { print: (line: string) => void; printErr: (line: string) => void; exit: (code: number) => void },
+): void {
+  const command = `fulcrum ai ${commandParts.join(" ")}`;
+  emitErrorResult(
+    {
+      argv,
+      command,
+      args: parseAiArgs(argv),
+      error: {
+        code: "FUL_CLI_UNKNOWN_COMMAND",
+        message: `${command}: unknown AI Assist command.`,
+        fix: "fulcrum ai --help",
+      },
+      trace: { trace_id: newTraceId(opts.env ?? process.env) },
+      env: opts.env,
+      renderHuman: () => {
+        io.printErr(`${command}: unknown AI Assist command.`);
+        io.printErr(HELP);
+      },
+    },
+    io,
+  );
+  io.exit(2);
+}
+
+function parseAiArgs(argv: readonly string[]): Record<string, unknown> {
+  return {
+    thread: flagValue(argv, "--thread") ?? positional(argv),
+    message: flagValue(argv, "--message"),
+    checkpoint: flagValue(argv, "--checkpoint"),
+    task: flagValue(argv, "--task"),
+    agent: flagValue(argv, "--agent"),
+  };
+}
+
+function positional(argv: readonly string[]): string | undefined {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]!;
+    if (arg.startsWith("-")) {
+      if (["--thread", "--message", "--checkpoint", "--task", "--agent", "--jq"].includes(arg)) index += 1;
+      continue;
+    }
+    return arg;
+  }
+  return undefined;
 }
 
 function normalizeAiInvocation(verb: string, rest: readonly string[]): [string, readonly string[]] {

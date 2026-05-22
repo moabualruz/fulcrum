@@ -17,7 +17,15 @@ import {
   type LocalApplicationContainer,
 } from "@platform-core/application/runtime/local-application-container.ts";
 
-import { CLI_RESULT_SCHEMA, HELP, ROOT_HELP, renderCommandSchema, STAGE_HELP_TOPICS, renderStageHelp } from "./help.ts";
+import {
+  HELP,
+  ROOT_HELP,
+  commandPathFromArgv,
+  renderCommandHelp,
+  renderCommandSchema,
+  STAGE_HELP_TOPICS,
+  renderStageHelp,
+} from "./help.ts";
 import { emitResult } from "./lib/cli-output.ts";
 
 export { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp };
@@ -147,15 +155,25 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
   const [cmd = "help", ...rest] = argv;
 
   if (argv.includes("--json-schema")) {
-    const topic = cmd === "help" ? rest.find((arg) => !arg.startsWith("-")) : cmd;
-    console.log(JSON.stringify(renderCommandSchema(topic)));
+    console.log(JSON.stringify(renderCommandSchema(commandPathFromArgv(argv))));
+    return;
+  }
+
+  if (cmd !== "help" && (argv.includes("--help") || argv.includes("-h"))) {
+    const help = renderCommandHelp(argv);
+    if (help) {
+      console.log(help);
+      return;
+    }
     return;
   }
 
   if (cmd === "help" || cmd === "--help" || cmd === "-h") {
-    const topic = cmd === "help" ? rest.find((arg) => !arg.startsWith("-")) : cmd;
-    const stageHelp = topic ? renderStageHelp(topic) : null;
-    console.log(stageHelp ?? ROOT_HELP);
+    const path = commandPathFromArgv(argv);
+    const topic = path[0];
+    const stageHelp = topic && path.length === 1 ? renderStageHelp(topic) : null;
+    const commandHelp = path.length > 0 ? renderCommandHelp(path) : null;
+    console.log(stageHelp ?? commandHelp ?? ROOT_HELP);
     return;
   }
 
@@ -274,12 +292,12 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "docs": {
       const { run: runDocsCommand } = await import("./commands/docs.ts");
-      await runDocsCommand(rest);
+      await runDocsCommand(rest, { commandRoot: "docs" });
       return;
     }
     case "doc": {
       const { run: runDocsCommand } = await import("./commands/docs.ts");
-      await runDocsCommand(rest);
+      await runDocsCommand(rest, { commandRoot: "doc" });
       return;
     }
     case "report": {
@@ -436,8 +454,8 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "module": {
-      const { run: runComponent } = await import("./component.ts");
-      await runComponent(rest);
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      await runPillar14Command("module", rest);
       return;
     }
     case "relationships":
@@ -573,18 +591,18 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       return;
     }
     case "cycle": {
-      const { run: runSprints } = await import("./commands/sprints.ts");
-      await runSprints(rest);
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      await runPillar14Command("cycle", rest);
       return;
     }
     case "note": {
       const { run: runCapture } = await import("./commands/capture.ts");
-      await runCapture(rest);
+      await runCapture(["note", ...rest], { commandRoot: "note" });
       return;
     }
     case "run": {
       const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
-      await runPillar14Command("runs", rest);
+      await runPillar14Command("run", rest);
       return;
     }
     case "workspace": {

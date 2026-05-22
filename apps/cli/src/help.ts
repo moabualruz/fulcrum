@@ -26,12 +26,16 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
     label: "Capture",
     summary: "Intake: docs, notes, captures, and search before planning.",
     commands: [
-      "fulcrum capture <review|status|action>      Review mobile captures, set status, run quick actions.",
-      "fulcrum docs <template list>                 Browse and template capture documents.",
+      "fulcrum capture <text|url|file|inbox|review|status|action>",
+      "                                             Capture intake items and triage mobile/inbox captures.",
+      "fulcrum note <new|list>                      Create and browse short-form capture notes.",
+      "fulcrum doc <list|new|view|edit|attach|history|restore|comment|link|search|delete|template>",
+      "                                             Browse and edit capture documents.",
       "fulcrum search query <query>                 Full-text search across captured content.",
     ],
     examples: [
-      "fulcrum capture review <id> --note \"triaged\"",
+      "fulcrum note list --json",
+      "fulcrum doc new --title \"Release plan\" --json",
       "fulcrum capture status <id> --status review --json",
       "fulcrum search query \"release plan\" --json",
     ],
@@ -63,16 +67,22 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
       "                                             Create and manage build tasks.",
       "fulcrum work <create|inspect|move|link|report>",
       "                                             Manage durable units of work.",
+      "fulcrum run <new|view|cancel|retry|attach>   Manage one agent run.",
       "fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs>",
-      "                                             Inspect and control agent runs.",
-      "fulcrum agents <list|profile|test>           Inspect the agent registry.",
-      "fulcrum routing <rules|assign|simulate>      Route action kinds to agents.",
+      "                                             Inspect and control the runs feed.",
+      "fulcrum cycle <list|activate|complete>       Manage build cycles.",
+      "fulcrum module <list|new|view>               Manage build modules.",
+      "fulcrum context <pack|inspect|diff>          Inspect task run context.",
+      "fulcrum agent <list|profile|test>            Inspect the agent registry.",
+      "fulcrum route <rules|assign|simulate>        Route action kinds to agents.",
       "fulcrum symphony runs list --state ready     Inspect orchestrated run queues.",
     ],
     examples: [
       "fulcrum task list --status open --json",
+      "fulcrum run view run-1 --json",
+      "fulcrum cycle list --json",
       "fulcrum runs feed --watch --json",
-      "fulcrum routing simulate --action build.run.step --json",
+      "fulcrum route simulate --action build.run.step --json",
     ],
   },
   {
@@ -162,13 +172,15 @@ const WORKFLOW_STAGES: readonly StageHelp[] = [
     summary: "Step-scoped agent sessions: the CLI side of the AI Assist drawer.",
     commands: [
       "fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.",
-      "fulcrum ai start --task <id> --title <title> Start a step-scoped AI Assist session.",
+      "fulcrum ai <start|send|attach|pause|resume|abort|checkpoint|restore|preview|rerun>",
+      "                                             Operate step-scoped AI Assist threads.",
       "fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>",
       "                                             Control persisted AI Assist sessions.",
     ],
     examples: [
       "fulcrum mode play AUTH-42 --agent codex --json",
       "fulcrum ai start --task t-9 --title \"draft tests\" --json",
+      "fulcrum ai send --thread thread-1 --message \"try focused tests\" --json",
       "fulcrum session list --json",
       "fulcrum session watch <id>",
     ],
@@ -271,9 +283,153 @@ const CLI_RESULT_SCHEMA = {
   },
 } as const;
 
-function renderCommandSchema(command?: string): typeof CLI_RESULT_SCHEMA {
-  void command;
-  return CLI_RESULT_SCHEMA;
+type JsonObjectSchema = Record<string, unknown>;
+
+const BOOLEAN_SCHEMA_FLAGS = new Set([
+  "--archived",
+  "--check",
+  "--checks",
+  "--dry-run",
+  "--hard",
+  "--help",
+  "-h",
+  "--json",
+  "--json-raw",
+  "--json-schema",
+  "--probe",
+  "--purge",
+  "--unread",
+  "--watch",
+  "--yes",
+]);
+
+const VALUE_SCHEMA_FLAGS = new Set([
+  "--action",
+  "--agent",
+  "--against",
+  "--assignee",
+  "--body",
+  "--budget",
+  "--checkpoint",
+  "--cycle",
+  "--description",
+  "--editor",
+  "--from-checkpoint",
+  "--from-step",
+  "--id",
+  "--label",
+  "--limit",
+  "--message",
+  "--model",
+  "--mode",
+  "--note",
+  "--offset",
+  "--parent",
+  "--policy",
+  "--profile",
+  "--project",
+  "--reason",
+  "--route",
+  "--scope",
+  "--shell",
+  "--state",
+  "--status",
+  "--step",
+  "--subsystem",
+  "--tag",
+  "--task",
+  "--thread",
+  "--title",
+  "--trace",
+  "--type",
+  "--version",
+  "--workspace",
+]);
+
+const ROOT_ALIASES = new Map([
+  ["agents", "agent"],
+  ["docs", "doc"],
+  ["routing", "route"],
+]);
+
+function normalizeCommandPath(command?: string | readonly string[]): string[] {
+  if (command === undefined) return [];
+  const parts = typeof command === "string" ? command.trim().split(/\s+/) : [...command];
+  if (parts[0] === "fulcrum") parts.shift();
+  if (parts[0] === "help" && parts.length > 1) parts.shift();
+  return parts.filter((part: string) => part && !part.startsWith("-")).slice(0, 3);
+}
+
+function canonicalHelpRoot(root: string): string {
+  return ROOT_ALIASES.get(root) ?? root;
+}
+
+function commandPathLabel(command?: string | readonly string[]): string {
+  const path = normalizeCommandPath(command);
+  return path.length > 0 ? `fulcrum ${path.join(" ")}` : "fulcrum";
+}
+
+function resultSchemaFor(command?: string | readonly string[]): JsonObjectSchema {
+  const commandLabel = commandPathLabel(command);
+  const [root = "root", verb] = normalizeCommandPath(command);
+  const title = `${commandLabel} result`;
+  if (root === "ai") {
+    return {
+      title,
+      oneOf: [
+        { type: "object", description: `${commandLabel} AI Assist result payload.` },
+        { type: "null", description: `${commandLabel} failure result.` },
+      ],
+    };
+  }
+  if (["list", "search", "query", undefined].includes(verb)) {
+    return {
+      title,
+      oneOf: [
+        { type: "array", description: `${commandLabel} rows.` },
+        { type: "object", description: `${commandLabel} result object.` },
+        { type: "null", description: `${commandLabel} failure result.` },
+      ],
+    };
+  }
+  return {
+    title,
+    oneOf: [
+      { type: "object", description: `${commandLabel} result object.` },
+      { type: "array", description: `${commandLabel} result rows.` },
+      { type: "string", description: `${commandLabel} scalar result.` },
+      { type: "null", description: `${commandLabel} failure result.` },
+    ],
+  };
+}
+
+function renderCommandSchema(command?: string | readonly string[]): JsonObjectSchema {
+  return {
+    ...CLI_RESULT_SCHEMA,
+    title: `${commandPathLabel(command)} fulcrum.cli.v1`,
+    properties: {
+      ...CLI_RESULT_SCHEMA.properties,
+      result: resultSchemaFor(command),
+    },
+  };
+}
+
+function commandPathFromArgv(argv: readonly string[]): string[] {
+  const raw = argv[0] === "help" ? argv.slice(1) : [...argv];
+  const path: string[] = [];
+  for (let index = 0; index < raw.length; index += 1) {
+    const arg = raw[index]!;
+    if (arg === "--") break;
+    if (BOOLEAN_SCHEMA_FLAGS.has(arg)) continue;
+    if (VALUE_SCHEMA_FLAGS.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith("-")) continue;
+    path.push(arg);
+    if (path.length >= 3) break;
+  }
+  return path;
 }
 
 function renderStageGroup(stage: StageHelp): string {
@@ -304,6 +460,155 @@ Environment:
 Run \`fulcrum help <stage>\` (e.g. \`fulcrum help build\`) for stage detail.
 `;
 
+const COMMAND_HELP: ReadonlyMap<string, string> = new Map([
+  ["agent", `fulcrum agent <list|profile|test>
+
+Inspect agent registry entries and profile/test metadata.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["agents", `fulcrum agents <list|profile|test>
+
+Compatibility alias for fulcrum agent.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["ai", `fulcrum ai: AI Assist thread surface
+
+Usage:
+  fulcrum ai --step <step-id> --thread <thread-id> [--title <title>] [--json]
+  fulcrum ai start --task <id> --title <title> --step <step-id> [--json]
+  fulcrum ai send --thread <thread-id> --message <text> [--json]
+  fulcrum ai attach <thread-id> [--json]
+  fulcrum ai pause|resume|abort <thread-id> [--json]
+  fulcrum ai checkpoint <thread-id> [--json]
+  fulcrum ai restore <thread-id> --checkpoint <checkpoint-id> [--json]
+  fulcrum ai prompt edit <thread-id> --message <text> [--json]
+  fulcrum ai rerun <thread-id> [--json]
+  fulcrum ai preview --task <task-id> [--json]
+  fulcrum ai route <thread-id> --agent <id> [--json]
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+  --jq <expr>       Filter the envelope's .result through jq
+  --json-raw        Pre-envelope JSON payload (compatibility, removed next release)
+`],
+  ["cycle", `fulcrum cycle <list|activate|complete> [--json]
+
+Build cycles: list, activate, or complete project cycles.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["doc", `fulcrum doc <list|new|view|edit|attach|history|restore|comment|link|search|delete|template> [--json]
+
+Capture-stage documents: browse, edit, attach, link, comment, and template docs.
+
+Aliases:
+  fulcrum docs ...  Compatibility alias for fulcrum doc ...
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["docs", `fulcrum docs <list|new|view|edit|attach|history|restore|comment|link|search|delete|template> [--json]
+
+Compatibility alias for fulcrum doc.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["flags", `fulcrum flags <list|set> [--json]
+
+Subcommands:
+  list              List feature flags.
+  set               Set a feature flag.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["inference", `fulcrum inference <start|status|embed|generate|stop> [--json]
+
+Manage the local inference runtime.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["init", `fulcrum init [DIR]
+
+Bootstrap a project with Fulcrum agent rules and local ignore defaults.
+`],
+  ["mcp", `fulcrum mcp <list|register|unregister|enable|disable> [--json]
+
+Manage the MCP server registry.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["module", `fulcrum module <list|new|view> [--json]
+
+Build modules: group, create, and inspect task modules.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["note", `fulcrum note <new|list> [--json]
+
+Short-form capture notes.
+
+Usage:
+  fulcrum note new <text> [--project <id>] [--trace <id>] [--json]
+  fulcrum note list [--tag <tag>] [--project <id>] [--json]
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["route", `fulcrum route <rules|assign|simulate> [--json]
+
+Route action kinds to agents.
+
+Aliases:
+  fulcrum routing ...  Compatibility alias for fulcrum route ...
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["routing", `fulcrum routing <rules|assign|simulate> [--json]
+
+Compatibility alias for fulcrum route.
+
+Subcommands:
+  rules list        List routing rules.
+  assign            Assign an action to an agent.
+  simulate          Simulate routing for an action.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+  ["run", `fulcrum run <new|view|cancel|retry|attach> [--json]
+
+Manage one agent run.
+
+Options:
+  --json            Canonical fulcrum.cli.v1 JSON envelope
+`],
+]);
+
+const COMMAND_PATH_HELP: ReadonlyMap<string, string> = new Map([
+  ["data export", `fulcrum export [--json]
+
+Export workspace data.
+
+Canonical path:
+  fulcrum data export [--json]
+`],
+  ["data import", `fulcrum data import [--json]
+
+Import workspace data.
+`],
+]);
+
 /** Back-compat alias: callers that imported `HELP` keep working. */
 const HELP = ROOT_HELP;
 
@@ -330,11 +635,42 @@ ${GLOBAL_FLAGS_NOTE}
 `;
 }
 
+function renderGenericCommandHelp(path: readonly string[]): string {
+  const command = commandPathLabel(path);
+  return `${command}
+
+Usage:
+  ${command} [subcommand] [options]
+
+${GLOBAL_FLAGS_NOTE}
+`;
+}
+
+function renderCommandHelp(argv: readonly string[]): string | null {
+  const path = commandPathFromArgv(argv);
+  if (path.length === 0) return ROOT_HELP;
+  const root = path[0]!;
+  const pathHelp = COMMAND_PATH_HELP.get(path.join(" "));
+  if (pathHelp) return pathHelp;
+  const exactHelp = COMMAND_HELP.get(root);
+  if (path.length === 1 && exactHelp) return exactHelp;
+  const canonicalRoot = canonicalHelpRoot(root);
+  if (path.length === 1) {
+    const commandHelp = COMMAND_HELP.get(canonicalRoot);
+    if (commandHelp) return root === canonicalRoot ? commandHelp : `${commandHelp}\nAlias invoked: fulcrum ${root}\n`;
+    return renderStageHelp(canonicalRoot) ?? renderGenericCommandHelp(path);
+  }
+  const displayPath = root === canonicalRoot ? path : [root, ...path.slice(1)];
+  return renderGenericCommandHelp(displayPath);
+}
+
 export {
   HELP,
   CLI_RESULT_SCHEMA,
   ROOT_HELP,
   STAGE_HELP_TOPICS,
+  commandPathFromArgv,
   renderCommandSchema,
+  renderCommandHelp,
   renderStageHelp,
 };
