@@ -11,6 +11,16 @@ import {
 
 const WS = "acme";
 const PROJ = "fulcrum";
+const BUILD_RUN_ID = "run_56e3d12";
+const LEGACY_RUN_DETAIL_ROUTES = [
+	"/run-detail",
+	"/run-cancel",
+	"/run-cost-tracking",
+	"/run-fork",
+	"/run-rate-limits",
+	"/run-retry-policy",
+	"/run-retry-prompt",
+] as const;
 
 const STAGE_WORKBENCH_ANCHOR = {
 	capture: "[data-route='ws-stage'][data-stage='capture']",
@@ -26,6 +36,10 @@ async function writeEvidenceShot(name: string, body: Buffer): Promise<void> {
 	if (!dir) return;
 	await mkdir(dir, { recursive: true });
 	await writeFile(path.join(dir, name), body);
+}
+
+function buildRunDetailRoute(ws: string, proj: string, runId: string): string {
+	return `${stageSubroute(ws, proj, "build", "runs")}/${runId}`;
 }
 
 test.describe("project-scoped stage workbench projection", () => {
@@ -52,6 +66,32 @@ test.describe("project-scoped stage workbench projection", () => {
 			expect(location).toBe(canonicalRouteForLegacyPath(legacyRoute, "mkh", "fulcrum"));
 		});
 	}
+
+	for (const legacyRoute of LEGACY_RUN_DETAIL_ROUTES) {
+		test(`${legacyRoute} remains a 308 redirect to the canonical Build run detail`, async ({
+			page,
+		}) => {
+			const response = await page.request.get(legacyRoute, { maxRedirects: 0 });
+			expect(response.status()).toBe(308);
+			expect(response.headers().location).toBe(buildRunDetailRoute("mkh", "fulcrum", BUILD_RUN_ID));
+		});
+	}
+
+	test("Build live run detail canonical route renders the run-detail workbench", async ({ page }) => {
+		const route = buildRunDetailRoute(WS, PROJ, BUILD_RUN_ID);
+		const response = await page.goto(route, { waitUntil: "load" });
+		expect(response?.status() ?? 0).toBeLessThan(400);
+		expect(new URL(page.url()).pathname).toBe(route);
+
+		await expect(page.locator("[data-build-runs-shell]")).toBeVisible();
+		await expect(page.locator("[data-live-session-pane]")).toBeVisible();
+		await expect(page.locator(`[data-run-row][data-run-id='${BUILD_RUN_ID}']`)).toHaveAttribute(
+			"aria-current",
+			"true",
+		);
+		await expect(page.getByRole("heading", { name: "OBS-12 · Dedupe trace-id propagation" })).toBeVisible();
+		await expect(page.locator("[data-slot='stage-view-grid']")).toHaveCount(0);
+	});
 
 	test("ScopeBar stage tab starts from project scope and lands on Build board", async ({ page }) => {
 		await page.goto(stageRoute(WS, PROJ, "capture"), { waitUntil: "load" });

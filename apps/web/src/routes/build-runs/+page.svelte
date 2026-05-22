@@ -264,6 +264,14 @@
   const emptyState = $derived($page.url.searchParams.get("state") === "empty");
   const loadingState = $derived($page.url.searchParams.get("state") === "loading");
 
+  function runIdFromPath(pathname: string): string | null {
+    const segments = pathname.replace(/^\/+|\/+$/g, "").split("/");
+    const runsIndex = segments.lastIndexOf("runs");
+    const encoded = runsIndex >= 0 ? segments[runsIndex + 1] : null;
+    return encoded ? decodeURIComponent(encoded) : null;
+  }
+
+  const routeRunId = $derived(runIdFromPath($page.url.pathname));
   let live = $state(true);
   let selectedRunId = $state(feedRuns[0]?.runId ?? "");
   let activeDock = $state<(typeof dockTabs)[number]>("Shell");
@@ -283,6 +291,12 @@
   function selectRun(runId: string): void {
     selectedRunId = runId;
   }
+
+  $effect(() => {
+    if (routeRunId && feedRuns.some((run) => run.runId === routeRunId) && selectedRunId !== routeRunId) {
+      selectedRunId = routeRunId;
+    }
+  });
 
   function toggleCard(id: string): void {
     openCards = { ...openCards, [id]: !openCards[id] };
