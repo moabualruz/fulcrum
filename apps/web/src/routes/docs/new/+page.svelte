@@ -134,6 +134,11 @@
 	use:enhance
 	class={cn("flex min-w-0 max-w-3xl flex-col gap-4")}
 >
+	<!-- Owning project: seeded from `?project=` so a Capture-stage doc binds
+	     to that project. resolveProjectId (action) accepts a slug or uuid. -->
+	{#if data.form.data.projectId}
+		<input type="hidden" name="projectId" value={data.form.data.projectId} />
+	{/if}
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
 		<input

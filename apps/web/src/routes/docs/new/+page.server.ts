@@ -11,8 +11,13 @@ import { createProjectApiForEvent } from "$lib/server/project-api";
 
 // ─── Load ────────────────────────────────────────────────────────────────────
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
   const form = await superValidate(valibot(DocumentFormSchema));
+  // `?project=<slug|uuid>` preselects the owning project so a doc created
+  // from a Capture stage lands in that project (resolveProjectId in the
+  // action accepts a slug or uuid).
+  const project = url.searchParams.get("project");
+  if (project) form.data.projectId = project;
   const templates: Record<string, string> = { ...TEMPLATE_BODY_MAP };
   return { form, templates };
 };

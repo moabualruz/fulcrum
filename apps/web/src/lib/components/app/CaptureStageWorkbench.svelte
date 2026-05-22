@@ -20,6 +20,8 @@
 	 * EmptyState): it never re-implements a primitive, per the AGENTS.md
 	 * ui-kit rule.
 	 */
+	import { goto } from "$app/navigation";
+
 	import { Badge, Button, EmptyState, ModeRow } from "@fulcrum/ui-kit";
 
 	import {
@@ -68,6 +70,28 @@
 	function modeRowFor(step: CaptureStep) {
 		return createStepModeRow({ stepId: step.id, kind: "doc-block", traceId: traceId ?? undefined, title: step.title });
 	}
+
+	/**
+	 * The Capture primary action: open the document-creation wizard scoped to
+	 * this project (`/docs/new` resolves `?project=` to the owning project).
+	 * Shared by the empty-state primary action and the `Write` block action.
+	 */
+	function captureNewDocument(): void {
+		void goto(`/docs/new?project=${encodeURIComponent(projId)}`);
+	}
+
+	/**
+	 * The empty-state secondary action target. `Open inbox` / `Open Drafts`
+	 * are `?view=` projections of this stage; `Learn more` has no in-app
+	 * destination yet and stays a no-op button.
+	 */
+	const secondaryHref = $derived(
+		emptyCopy.secondaryAction === "Open inbox"
+			? viewHref("inbox")
+			: emptyCopy.secondaryAction === "Open Drafts"
+				? viewHref("drafts")
+				: undefined,
+	);
 </script>
 
 <!--
@@ -99,7 +123,7 @@
 					data-safe-area-reserve="bottom"
 					class="fixed right-3 left-3 bottom-[calc(4rem+var(--fulcrum-gesture-zone-bottom)+0.75rem)] z-20 flex max-w-[calc(100vw-1.5rem)] justify-center gap-1 rounded-sm border border-border bg-surface/95 p-1 shadow-sm sm:static sm:inset-auto sm:max-w-none sm:bg-transparent sm:p-0 sm:shadow-none"
 				>
-				<Button size="sm" variant="ghost" data-block-action="write">Write</Button>
+				<Button size="sm" variant="ghost" data-block-action="write" onclick={captureNewDocument}>Write</Button>
 				<Button size="sm" variant="ghost" data-block-action="link">Link</Button>
 				<Button size="sm" variant="ghost" data-block-action="promote">Promote</Button>
 			</div>
@@ -156,8 +180,14 @@
 			keyHint={emptyCopy.keyHint}
 		>
 			{#snippet actions()}
-				<Button data-slot="capture-empty-primary">{emptyCopy.primaryAction}</Button>
-				<Button variant="ghost" data-slot="capture-empty-secondary">
+				<Button data-slot="capture-empty-primary" onclick={captureNewDocument}>
+					{emptyCopy.primaryAction}
+				</Button>
+				<Button
+					variant="ghost"
+					data-slot="capture-empty-secondary"
+					href={secondaryHref}
+				>
 					{emptyCopy.secondaryAction}
 				</Button>
 			{/snippet}

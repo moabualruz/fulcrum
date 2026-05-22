@@ -157,13 +157,18 @@ export class DocumentPublicStore {
     sortPosition?: number;
   }): Promise<DocumentPublicRow | null> {
     if (!input.projectId) return null;
-    const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({ id: input.projectId });
+    // `projectId` may arrive as a uuid or a project slug (the Capture-stage
+    // create flow passes `?project=<slug>`): resolve either to the canonical id.
+    const projectRepo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const project =
+      (await projectRepo.findOneBy({ id: input.projectId })) ??
+      (await projectRepo.findOneBy({ slug: input.projectId }));
     if (!project) return null;
 
     const id = randomUUID();
     const document = await this.documentRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       title: input.title,
       bodyMd: input.bodyMd ?? "",
       sourceType: input.docType ?? "note",
