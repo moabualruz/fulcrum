@@ -1,17 +1,17 @@
 <script lang="ts">
-  type EventKind = "chat" | "tool" | "lock" | "error";
+  type EventKind = "assist" | "tool" | "lock" | "error";
   type Event = { id: string; kind: EventKind; ts: string; summary: string };
 
   const EVENTS: Event[] = [
-    { id: "e1", kind: "chat", ts: "10:00:01", summary: "User requested refactor" },
+    { id: "e1", kind: "assist", ts: "10:00:01", summary: "User requested refactor" },
     { id: "e2", kind: "tool", ts: "10:00:05", summary: "read src/cycle.ts" },
     { id: "e3", kind: "lock", ts: "10:00:09", summary: "Approval requested for write" },
     { id: "e4", kind: "tool", ts: "10:00:11", summary: "write src/cycle.ts" },
     { id: "e5", kind: "error", ts: "10:00:18", summary: "Type error on line 12" },
-    { id: "e6", kind: "chat", ts: "10:00:24", summary: "Assistant: fixed the typing issue" },
+    { id: "e6", kind: "assist", ts: "10:00:24", summary: "Assistant: fixed the typing issue" },
   ];
 
-  const ICONS: Record<EventKind, string> = { chat: "💬", tool: "🛠", lock: "🔒", error: "⚠" };
+  const ICONS: Record<EventKind, string> = { assist: "💬", tool: "🛠", lock: "🔒", error: "⚠" };
 
   let expandedId = $state<string | null>(null);
   let scrolledTo = $state<string | null>(null);
@@ -43,7 +43,7 @@
           <div data-timeline-detail class="mt-2 space-y-1 text-xs text-muted-foreground">
             <p>Event id: {e.id}</p>
             <p>Kind: {e.kind}</p>
-            <button type="button" data-timeline-jump={e.id} onclick={() => jumpTo(e.id)} class="rounded-md border border-border bg-background px-2 py-0.5">Jump to chat message</button>
+            <button type="button" data-timeline-jump={e.id} onclick={() => jumpTo(e.id)} class="rounded-md border border-border bg-background px-2 py-0.5">Jump to AI Assist message</button>
           </div>
         {/if}
       </li>
@@ -51,6 +51,6 @@
   </ol>
 
   {#if scrolledTo}
-    <p data-timeline-scrolled class="text-xs text-primary">Chat scrolled to {scrolledTo}</p>
+    <p data-timeline-scrolled class="text-xs text-primary">AI Assist scrolled to {scrolledTo}</p>
   {/if}
 </main>

@@ -192,8 +192,8 @@
       ],
     },
     {
-      id: "fulcrum-acp-bridge@0.4.2",
-      artifact: "fulcrum-acp-bridge 0.4.2",
+      id: "fulcrum-ai-assist-bridge@0.4.2",
+      artifact: "fulcrum-ai-assist-bridge 0.4.2",
       channel: "stable",
       status: "completed",
       desc: "deployed",
@@ -204,7 +204,7 @@
       promoted: "10:51",
       trace: "tr_55014df1",
       size: "4.7 MB",
-      crumbs: "ship · stable · fulcrum-acp-bridge",
+      crumbs: "ship · stable · fulcrum-ai-assist-bridge",
       sub: "promoted by agent gpt-5.4 · deployed to 100%",
       release: [
         { k: "version", v: "0.4.2" },
@@ -214,8 +214,8 @@
         { k: "artifact sha", v: "sha256:55014…df1a" },
         { k: "build trace", v: "tr_55014df1aa90" },
       ],
-      checks: [{ name: "unit (acp bridge)", ok: true, age: "passed · 0m 38s" }],
-      includes: [{ summary: "fix(acp): reconnect on stream drop", ref: "#4198" }],
+      checks: [{ name: "unit (AI Assist bridge)", ok: true, age: "passed · 0m 38s" }],
+      includes: [{ summary: "fix(ai-assist): reconnect on stream drop", ref: "#4198" }],
       timeline: [{ t: "10:51:00", text: "promoted from canary by agent gpt-5.4" }],
     },
     {

@@ -105,10 +105,11 @@ Usage:
   fulcrum product reports review-session save --project <id> --diff-file <path> [--annotations-file <path>] [--trace <id>] [--review <id>] [--type <plan|uat|code_review>] [--title <text>] [--search <query>] [--json]
   fulcrum product reports review-session load --project <id> [--review <id>|--trace <id>] [--search <query>] [--selected-file <path>] [--viewed-files <path,path,...>] [--hide-viewed] [--json]
   fulcrum product reports review-session annotate --project <id> --file <path> --line-start <N> --line-end <N> [--review <id>|--trace <id>] [--annotation <id>] [--type <comment|suggestion|concern>] [--scope <line|file>] [--side <old|new>] [--text <text>] [--suggested-code <code>] [--original-code <code>] [--severity <important|nit|pre_existing>] [--decorations <blocking,non-blocking,if-minor>] [--search <query>] [--json]
-  fulcrum product planning freeform-start --title <text> --body <markdown> --prompt <text> [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--json]
-  fulcrum product planning guided-acp-start --agent <A> --cwd <path> --prompt <text> [--template <id>] [--source-docs <ids>] [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--permission <review_each_tool|allow_workspace|read_only>] [--json]
-  fulcrum product planning continuous-update --trigger <manual_doc_edit|acp_session_update> --prompt <text> [--doc <id>] [--title <text>] [--body <markdown>] [--source-docs <ids>] [--tasks <ids>] [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--json]
-  fulcrum product planning generate --source <freeform_docs|guided_acp|continuous_update> --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--plan <id>] [--review <id>] [--prototype-paths <paths>] [--boilerplate-paths <paths>] [--criteria <text,...>] [--json]
+  AI Assist planning:
+  fulcrum product planning freeform-start --title <text> --body <markdown> --prompt <text> [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--json]
+  fulcrum product planning guided-ai-assist-start --agent <A> --cwd <path> --prompt <text> [--template <id>] [--source-docs <ids>] [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--permission <review_each_tool|allow_workspace|read_only>] [--json]
+  fulcrum product planning continuous-update --trigger <manual_doc_edit|ai_assist_session_update> --prompt <text> [--doc <id>] [--title <text>] [--body <markdown>] [--source-docs <ids>] [--tasks <ids>] [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--json]
+  fulcrum product planning generate --source <freeform_docs|guided_ai_assist|continuous_update> --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--plan <id>] [--review <id>] [--prototype-paths <paths>] [--boilerplate-paths <paths>] [--criteria <text,...>] [--json]
   fulcrum product planning freeform-prompt --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--json]
   fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
   fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
@@ -124,8 +125,9 @@ const VALUE_FLAGS = new Set<string>([
   "--assignee",
   "--agent",
   "--annotation",
-  "--annotations-file",
-  "--acp-session",
+	"--annotations-file",
+	"--acp-session",
+	"--ai-assist-session",
   "--author",
   "--baseline",
   "--body",
@@ -537,7 +539,8 @@ async function runPlanning(caller: ProductCaller, argv: readonly string[], io: I
       if (!start) throw new Error("planning freeform start caller is not configured");
       return printValue(await start(freeformStartInput(rest)), rest, io.print);
     }
-    case "guided-acp-start": {
+		case "guided-ai-assist-start":
+		case "guided-acp-start": {
       const start = requirePlanning(caller).startGuidedAcpPlanningSession;
       if (!start) throw new Error("planning AI Assist session start caller is not configured");
       return printValue(await start(guidedAcpStartInput(rest)), rest, io.print);
@@ -720,7 +723,7 @@ function freeformStartInput(argv: readonly string[]): Record<string, unknown> {
     projectId: flagValue(argv, "--project"),
     parentId: flagValue(argv, "--parent-doc"),
     traceId: flagValue(argv, "--trace"),
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     modeId: flagValue(argv, "--mode"),
     modelId: flagValue(argv, "--model"),
     maxDocChars: numberFlag(argv, "--max-doc-chars"),
@@ -738,7 +741,7 @@ function guidedAcpStartInput(argv: readonly string[]): Record<string, unknown> {
     throw new Error("--permission must be review_each_tool, allow_workspace, or read_only");
   }
   return compact({
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     agentName: requiredFlag(argv, "--agent"),
     cwd: requiredFlag(argv, "--cwd"),
     userPrompt: requiredFlag(argv, "--prompt"),
@@ -764,9 +767,9 @@ function freeformPlanningInput(argv: readonly string[]): Record<string, unknown>
 }
 
 function continuousUpdateInput(argv: readonly string[]): Record<string, unknown> {
-  const trigger = requiredFlag(argv, "--trigger");
-  if (trigger !== "manual_doc_edit" && trigger !== "acp_session_update") {
-    throw new Error("--trigger must be manual_doc_edit or acp_session_update");
+  const trigger = planningUpdateTrigger(argv);
+  if (!trigger) {
+    throw new Error("--trigger must be manual_doc_edit or ai_assist_session_update");
   }
   const changedDoc = compact({
     id: flagValue(argv, "--doc"),
@@ -782,7 +785,7 @@ function continuousUpdateInput(argv: readonly string[]): Record<string, unknown>
     changedDocs,
     projectId: flagValue(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     modeId: flagValue(argv, "--mode"),
     modelId: flagValue(argv, "--model"),
     maxDocChars: numberFlag(argv, "--max-doc-chars"),
@@ -790,9 +793,9 @@ function continuousUpdateInput(argv: readonly string[]): Record<string, unknown>
 }
 
 function technicalPlanningInput(argv: readonly string[]): Record<string, unknown> {
-  const source = requiredFlag(argv, "--source");
-  if (source !== "freeform_docs" && source !== "guided_acp" && source !== "continuous_update") {
-    throw new Error("--source must be freeform_docs, guided_acp, or continuous_update");
+  const source = technicalPlanningSource(argv);
+  if (!source) {
+    throw new Error("--source must be freeform_docs, guided_ai_assist, or continuous_update");
   }
   return compact({
     source,
@@ -1106,6 +1109,24 @@ function firstArg(argv: readonly string[]): string | undefined {
 function flagValue(argv: readonly string[], flag: string): string | undefined {
   const value = parseProductArgs(argv).flags[flag];
   return typeof value === "string" ? value : undefined;
+}
+
+function aiAssistSessionFlag(argv: readonly string[]): string | undefined {
+  return flagValue(argv, "--ai-assist-session") ?? flagValue(argv, "--acp-session");
+}
+
+function planningUpdateTrigger(argv: readonly string[]): "manual_doc_edit" | "acp_session_update" | null {
+  const trigger = requiredFlag(argv, "--trigger");
+  if (trigger === "manual_doc_edit") return trigger;
+  if (trigger === "ai_assist_session_update" || trigger === "acp_session_update") return "acp_session_update";
+  return null;
+}
+
+function technicalPlanningSource(argv: readonly string[]): "freeform_docs" | "guided_acp" | "continuous_update" | null {
+  const source = requiredFlag(argv, "--source");
+  if (source === "freeform_docs" || source === "continuous_update") return source;
+  if (source === "guided_ai_assist" || source === "guided_acp") return "guided_acp";
+  return null;
 }
 
 function flagEnabled(argv: readonly string[], flag: string): boolean {

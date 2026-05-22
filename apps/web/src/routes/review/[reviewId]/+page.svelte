@@ -74,13 +74,13 @@
 		count?: number;
 	}
 
-	const WORKBENCH_TABS: readonly TabDef[] = [
-		{ id: "files", label: "Files", count: 7 },
-		{ id: "comments", label: "Comments", count: 6 },
-		{ id: "chat", label: "Free chat", count: 2 },
-		{ id: "plan", label: "Plan & tasks" },
-		{ id: "commits", label: "Commits", count: 17 },
-	] as const;
+		const WORKBENCH_TABS: readonly TabDef[] = [
+			{ id: "files", label: "Files", count: 7 },
+			{ id: "comments", label: "Comments", count: 6 },
+			{ id: "chat", label: "AI Assist", count: 2 },
+			{ id: "plan", label: "Plan & tasks" },
+			{ id: "commits", label: "Commits", count: 17 },
+		] as const;
 
 	/* ── File tree (OD `.tree` lines 312–329) ───────────────────────────────── */
 
@@ -912,12 +912,12 @@
 				data-review-panel="chat"
 				class="flex flex-col gap-3 text-sm"
 			>
-				<p class="text-xs text-muted-foreground">
-					Free-form chat with PR reviewers and AI: @ to mention.
-				</p>
-				<CommentThread
-					threadId="free-chat"
-					anchorLabel="Free chat · auth/rewrite"
+					<p class="text-xs text-muted-foreground">
+						AI Assist thread with PR reviewers: @ to mention.
+					</p>
+					<CommentThread
+						threadId="ai-assist-thread"
+						anchorLabel="AI Assist · auth/rewrite"
 					comments={[
 						{ id: "fc1", author: "Jamie Black", ts: "14m", body: "Pulling this in. Do we have rollback steps documented?" },
 						{ id: "fc2", author: "You", kind: "you", ts: "12m", body: "Feature flag auth.rotate_kid in operate/doctor. Default off." },

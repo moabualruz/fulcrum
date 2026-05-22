@@ -618,7 +618,7 @@
             <p class="type-caption mb-3.5 text-muted-foreground">
               Connect any number of CLI agents: Claude Code, Codex, Gemini, OpenCode, pi-cli, or anything that
               speaks the agent protocol. Each agent runs locally with its own MCP server set and plugin selection.
-              Use the picker in any chat to pick one for that thread; use
+              Use the picker in any AI Assist thread; use
               <a href="#routes" class="text-primary hover:underline" onclick={(e) => { e.preventDefault(); selectSection("routes"); }}>Default routes</a>
               below to auto-assign action kinds to a preferred agent (you can always override per-action).
             </p>
