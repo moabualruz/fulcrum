@@ -6,6 +6,8 @@
 //   fulcrum mcp unregister <name>
 //   fulcrum mcp enable <name> [--agent <id> ...] [--all-agents]
 //   fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
+//   fulcrum mcp test <name> [--agent <id>]
+//   fulcrum mcp reload <name> [--agent <id> ...] [--all-agents]
 
 import {
   ALL_AGENT_IDS,
@@ -25,12 +27,38 @@ import {
 } from "./mcp-registry.ts";
 import { emitErrorResult, emitResult } from "./lib/cli-output.ts";
 
+const HELP = `fulcrum mcp <list|register|unregister|enable|disable|test|reload> [options]
+
+  fulcrum mcp list             List MCP servers [--json] [--agent <id>]
+  fulcrum mcp register <name>  Register an MCP server
+                               [--http <url>|--stdio <cmd>] [--vendor <v>]
+                               [--agent <id> ...] [--all-agents]
+  fulcrum mcp unregister <name>
+                               Remove an MCP server
+                               [--agent <id> ...] [--all-agents]
+  fulcrum mcp enable <name>    Enable a server for agents
+                               [--agent <id> ...] [--all-agents]
+  fulcrum mcp disable <name>   Disable a server for agents
+                               [--agent <id> ...] [--all-agents]
+  fulcrum mcp test <name>      Inspect server config for one agent [--agent <id>]
+  fulcrum mcp reload <name>    Reapply registry config to agent surfaces
+                               [--agent <id> ...] [--all-agents]
+
+Options:
+  --json                       Canonical fulcrum.cli.v1 JSON envelope
+`;
+
 function pad(s: string, n: number): string {
   return s.length >= n ? s : s + " ".repeat(n - s.length);
 }
 
 async function cmdList(args: string[]): Promise<void> {
-  const asJson = args.includes("--json");
+  const agentFilter = optionValue(args, "--agent");
+  if (agentFilter && !ALL_AGENT_IDS.includes(agentFilter as AgentId)) {
+    console.error(`fulcrum mcp list: unknown agent id '${agentFilter}'. Valid: ${ALL_AGENT_IDS.join(", ")}`);
+    process.exit(2);
+  }
+  const agentIds = agentFilter ? [agentFilter as AgentId] : ALL_AGENT_IDS;
   const reg = await loadRegistry();
   const servers = Object.values(reg.servers);
 
@@ -40,13 +68,13 @@ async function cmdList(args: string[]): Promise<void> {
     vendor: s.vendor,
     default_enabled: s.default_enabled,
     agent_state: Object.fromEntries(
-      ALL_AGENT_IDS.map((id) => [
+      agentIds.map((id) => [
         id,
         !s.agent_visibility[id] ? "hidden" : isEnabled(s, id) ? "enabled" : "disabled",
       ])
     ),
     disabled_config: Object.fromEntries(
-      ALL_AGENT_IDS.map((id) => [id, disabledConfigSupport(s, id)]),
+      agentIds.map((id) => [id, disabledConfigSupport(s, id)]),
     ),
     description: s.description,
     url: s.url,
@@ -57,8 +85,8 @@ async function cmdList(args: string[]): Promise<void> {
     {
       argv: args,
       command: "fulcrum mcp list",
-      args: { subcommand: "list" },
       result: out,
+      args: { subcommand: "list", agent: agentFilter ?? null },
       renderHuman: (value) => {
         if (value.length === 0) {
           console.log("No MCP servers registered. Run: fulcrum mcp register <name> ...");
@@ -70,7 +98,7 @@ async function cmdList(args: string[]): Promise<void> {
           const transport = s.transport === "http" ? `http  ${s.url ?? ""}` : `stdio ${s.command_line ?? ""}`;
           console.log(`  ${pad(s.name, 16)}  ${s.vendor}  [${transport}]`);
           console.log(`    ${s.description}`);
-          for (const id of ALL_AGENT_IDS) {
+          for (const id of agentIds) {
             const state = s.agent_state[id];
             const visible = s.agent_visibility[id];
             const disabledConfig = state === "disabled" && visible ? `  ${s.disabled_config[id]}` : "";
@@ -97,9 +125,7 @@ async function cmdRegister(args: string[]): Promise<void> {
   let vendor = "unknown";
   let description = "";
   const authEnvVars: string[] = [];
-  const visibility: McpServerVisibility = {
-    "claude-code": true, codex: true, gemini: true, opencode: true, pi: true,
-  };
+  let targetAgents: AgentId[] | "all" = "all";
 
   let i = 1;
   while (i < args.length) {
@@ -116,12 +142,30 @@ async function cmdRegister(args: string[]): Promise<void> {
       description = args[++i] ?? description;
     } else if (a === "--auth-env") {
       authEnvVars.push(args[++i] ?? "");
+    } else if (a === "--all-agents") {
+      targetAgents = "all";
+    } else if (a === "--agent") {
+      const id = args[++i] as AgentId;
+      if (!ALL_AGENT_IDS.includes(id)) {
+        console.error(`fulcrum mcp register: unknown agent id '${id}'. Valid: ${ALL_AGENT_IDS.join(", ")}`);
+        process.exit(2);
+      }
+      if (targetAgents === "all") targetAgents = [];
+      targetAgents.push(id);
     } else {
       console.error(`fulcrum mcp register: unknown arg '${a}'`);
       process.exit(2);
     }
     i++;
   }
+
+  const visibility: McpServerVisibility = {
+    "claude-code": targetAgents === "all" || targetAgents.includes("claude-code"),
+    codex: targetAgents === "all" || targetAgents.includes("codex"),
+    gemini: targetAgents === "all" || targetAgents.includes("gemini"),
+    opencode: targetAgents === "all" || targetAgents.includes("opencode"),
+    pi: targetAgents === "all" || targetAgents.includes("pi"),
+  };
 
   if (transport === "http" && !url) {
     console.error("fulcrum mcp register: --http requires a URL");
@@ -227,14 +271,93 @@ async function cmdDisable(args: string[]): Promise<void> {
   console.log(`✓ Disabled MCP server '${name}' for: ${agentList.join(", ")}`);
 }
 
+async function cmdTest(args: string[]): Promise<void> {
+  const name = args[0];
+  if (!name) {
+    console.error("usage: fulcrum mcp test <name> [--agent <id>]");
+    process.exit(2);
+  }
+  const target = parseAgentFlags(args.slice(1));
+  const agentList = await visibleAgentList(name, target);
+  const reg = await loadRegistry();
+  const server = reg.servers[name]!;
+  const checks = agentList.map((agent) => ({
+    agent,
+    visible: server.agent_visibility[agent],
+    enabled: isEnabled(server, agent),
+    disabled_config: disabledConfigSupport(server, agent),
+  }));
+  const result = {
+    name,
+    transport: server.transport,
+    vendor: server.vendor,
+    status: "configured",
+    agent: agentList.length === 1 ? agentList[0] : null,
+    agents: agentList,
+    checks,
+    testedAt: new Date().toISOString(),
+  };
+  emitResult(
+    {
+      argv: args,
+      command: "fulcrum mcp test",
+      args: { subcommand: "test", name, agents: agentList },
+      result,
+      renderHuman: (value) => {
+        console.log(`${value.name}: ${value.status}`);
+        for (const check of value.checks) {
+          console.log(`  ${check.agent}: ${check.enabled ? "enabled" : "disabled"} (${check.disabled_config})`);
+        }
+      },
+    },
+    { print: console.log, printErr: console.error },
+  );
+}
+
+async function cmdReload(args: string[]): Promise<void> {
+  const name = args[0];
+  if (!name) {
+    console.error("usage: fulcrum mcp reload <name> [--agent <id> ...] [--all-agents]");
+    process.exit(2);
+  }
+  const asJson = args.includes("--json");
+  const target = parseAgentFlags(args.slice(1));
+  const agentList = await visibleAgentList(name, target);
+  if (asJson) {
+    const messages = await captureConsoleLog(async () => {
+      await applyToAgents(name, { agents: agentList });
+    });
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum mcp reload",
+        args: { subcommand: "reload", name, agents: agentList },
+        result: { name, reloaded: true, agents: agentList, messages },
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
+    return;
+  }
+  await applyToAgents(name, { agents: agentList });
+  console.log(`✓ Reloaded MCP server '${name}' for: ${agentList.join(", ")}`);
+}
+
 export async function run(args: string[]): Promise<void> {
   const sub = args[0] ?? "list";
   switch (sub) {
+    case "help":
+    case "--help":
+    case "-h":
+      console.log(HELP);
+      return;
     case "list":        return cmdList(args.slice(1));
     case "register":    return cmdRegister(args.slice(1));
     case "unregister":  return cmdUnregister(args.slice(1));
     case "enable":      return cmdEnable(args.slice(1));
     case "disable":     return cmdDisable(args.slice(1));
+    case "test":        return cmdTest(args.slice(1));
+    case "reload":      return cmdReload(args.slice(1));
     default:
       if (args.includes("--json")) {
         emitErrorResult(
@@ -254,7 +377,28 @@ export async function run(args: string[]): Promise<void> {
         process.exit(2);
       }
       console.error(`fulcrum mcp: unknown subcommand '${sub}'`);
-      console.error("Available: list, register, unregister, enable, disable");
+      console.error("Available: list, register, unregister, enable, disable, test, reload");
       process.exit(2);
   }
+}
+
+function optionValue(argv: readonly string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  return value && !value.startsWith("--") ? value : undefined;
+}
+
+async function captureConsoleLog(action: () => Promise<void>): Promise<string[]> {
+  const originalLog = console.log;
+  const messages: string[] = [];
+  console.log = (...parts: unknown[]) => {
+    messages.push(parts.map(String).join(" "));
+  };
+  try {
+    await action();
+  } finally {
+    console.log = originalLog;
+  }
+  return messages;
 }

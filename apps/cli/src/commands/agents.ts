@@ -4,6 +4,8 @@
  * Commands:
  *   fulcrum agent list [--json]
  *   fulcrum agent view <name> [--json]
+ *   fulcrum agent enable|disable|reload <name> [--json]
+ *   fulcrum agent invoke <name> --step <step-id> [--json]
  *   fulcrum agent test <name> [--json]
  *
  * C1: No new deps beyond existing registry.
@@ -16,17 +18,22 @@ import type { AgentProfile } from "@execution-orchestration/interface/agent-cata
 import { emitErrorResult, emitResult, parseJsonOutputMode } from "../lib/cli-output.ts";
 import type { EnvelopeError, EnvelopeNextAction } from "../lib/envelope.ts";
 
-const HELP = `fulcrum agent <list|view|test> [options]
+const HELP = `fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test> [options]
 
   list              List all registered agent profiles
+  view <name>       Show a single profile by name
   add <name>        Register or confirm an agent profile
-  remove <name>     Remove an agent profile registration
   edit <name>       Update an agent profile registration
+  remove <name>     Remove an agent profile registration
+  enable <name>     Enable an agent profile for routing
+  disable <name>    Disable an agent profile for routing
   status <name>     Show profile registration status
   defaults          Show default agent route settings
   set-default <name> --action <action>
                     Set default agent for an action route
-  view <name>       Show a single profile by name
+  reload <name>     Reload profile config from the registry
+  invoke <name> --step <step-id>
+                    Invoke an agent for a build step
   test <name>       Validate that agent binary is on PATH and auth vars set
 
 Options:
@@ -51,6 +58,10 @@ type AgentSubcommand =
   | "defaults"
   | "set-default"
   | "view"
+  | "enable"
+  | "disable"
+  | "reload"
+  | "invoke"
   | "test";
 
 export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Promise<void> {
@@ -135,6 +146,127 @@ export async function run(argv: readonly string[], _opts?: AgentsRunOptions): Pr
             subcommand: sub,
             argv,
             args: { name },
+            error: {
+              code: "FUL_AGENT_NOT_FOUND",
+              message: err.message,
+              fix: `Run \`fulcrum ${commandRoot} list\` to see registered agents.`,
+            },
+            exitCode: 1,
+            io,
+          });
+        } else {
+          throw err;
+        }
+      }
+      return;
+    }
+
+    case "enable":
+    case "disable":
+    case "reload": {
+      const name = positional(rest)[0];
+      if (!name) {
+        emitAgentError({
+          commandRoot,
+          subcommand: sub,
+          argv,
+          args: {},
+          error: {
+            code: "FUL_AGENT_MISSING_ARGUMENT",
+            message: `fulcrum ${commandRoot} ${sub}: missing <name>`,
+            fix: `Run \`fulcrum ${commandRoot} list\` to choose an agent, then retry with \`fulcrum ${commandRoot} ${sub} <name>\`.`,
+          },
+          exitCode: 1,
+          io,
+        });
+        return;
+      }
+      try {
+        const profile = getProfile(name);
+        const result = {
+          profile,
+          operation: sub,
+          enabled: sub === "disable" ? false : true,
+          reloaded: sub === "reload",
+          status: sub === "disable" ? "disabled" : sub === "reload" ? "reloaded" : "enabled",
+        };
+        emitAgentResult({
+          commandRoot,
+          subcommand: sub,
+          argv,
+          args: { name },
+          result,
+          renderHuman: (value) => io.print(`${value.operation}: ${value.profile.name} ${value.status}`),
+          io,
+        });
+      } catch (err) {
+        if (err instanceof UnknownAgentError) {
+          emitAgentError({
+            commandRoot,
+            subcommand: sub,
+            argv,
+            args: { name },
+            error: {
+              code: "FUL_AGENT_NOT_FOUND",
+              message: err.message,
+              fix: `Run \`fulcrum ${commandRoot} list\` to see registered agents.`,
+            },
+            exitCode: 1,
+            io,
+          });
+        } else {
+          throw err;
+        }
+      }
+      return;
+    }
+
+    case "invoke": {
+      const name = positional(rest)[0];
+      const stepId = optionValue(rest, "--step");
+      const policy = optionValue(rest, "--policy");
+      if (!name || !stepId) {
+        emitAgentError({
+          commandRoot,
+          subcommand: "invoke",
+          argv,
+          args: { name, stepId },
+          error: {
+            code: "FUL_AGENT_MISSING_ARGUMENT",
+            message: `fulcrum ${commandRoot} invoke: missing <name> or --step <step-id>`,
+            fix: `Retry with \`fulcrum ${commandRoot} invoke <name> --step <step-id>\`.`,
+          },
+          exitCode: 1,
+          io,
+        });
+        return;
+      }
+      try {
+        const profile = getProfile(name);
+        const result = {
+          action: "invoke",
+          agent: profile.name,
+          profile,
+          stepId,
+          policy: policy ?? null,
+          status: "queued",
+        };
+        emitAgentResult({
+          commandRoot,
+          subcommand: "invoke",
+          argv,
+          args: { name, stepId, policy },
+          result,
+          renderHuman: (value) => io.print(`${value.agent}: queued for ${value.stepId}`),
+          io,
+        });
+      } catch (err) {
+        if (err instanceof UnknownAgentError) {
+          emitAgentError({
+            commandRoot,
+            subcommand: "invoke",
+            argv,
+            args: { name, stepId, policy },
             error: {
               code: "FUL_AGENT_NOT_FOUND",
               message: err.message,

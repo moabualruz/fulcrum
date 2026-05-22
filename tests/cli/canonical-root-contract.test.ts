@@ -63,6 +63,10 @@ describe("canonical CLI root live contract", () => {
       { args: ["module", "list", "--json"], command: "fulcrum module list" },
       { args: ["run", "view", "run-1", "--json"], command: "fulcrum run view" },
       { args: ["doc", "new", "--title", "T", "--json"], command: "fulcrum doc new" },
+      { args: ["agent", "enable", "codex", "--json"], command: "fulcrum agent enable" },
+      { args: ["agent", "disable", "codex", "--json"], command: "fulcrum agent disable" },
+      { args: ["agent", "reload", "codex", "--json"], command: "fulcrum agent reload" },
+      { args: ["agent", "invoke", "codex", "--step", "step-1", "--json"], command: "fulcrum agent invoke" },
     ];
 
     for (const entry of cases) {
@@ -148,6 +152,24 @@ describe("canonical CLI root live contract", () => {
     expect((envelope["errors"] as Array<{ code: string }>)[0]?.code).toBe("FUL_CLI_UNKNOWN_COMMAND");
   });
 
+  test("Operate MCP test/reload verbs run through the canonical envelope", async () => {
+    await runCli(["mcp", "register", "closure8", "--http", "https://example.com/mcp", "--vendor", "test", "--agent", "codex"]);
+
+    const testRun = await runCli(["mcp", "test", "closure8", "--agent", "codex", "--json"]);
+    expect(testRun.exitCode, testRun.stderr).toBe(0);
+    const testEnvelope = parseEnvelope(testRun);
+    expect(testEnvelope["command"]).toBe("fulcrum mcp test");
+    expect(testEnvelope["errors"]).toEqual([]);
+    expect(testEnvelope["result"]).toMatchObject({ name: "closure8", agent: "codex", status: "configured" });
+
+    const reloadRun = await runCli(["mcp", "reload", "closure8", "--agent", "codex", "--json"]);
+    expect(reloadRun.exitCode, reloadRun.stderr).toBe(0);
+    const reloadEnvelope = parseEnvelope(reloadRun);
+    expect(reloadEnvelope["command"]).toBe("fulcrum mcp reload");
+    expect(reloadEnvelope["errors"]).toEqual([]);
+    expect(reloadEnvelope["result"]).toMatchObject({ name: "closure8", reloaded: true, agents: ["codex"] });
+  });
+
   test("every advertised root has bin-level help and command-specific json schema", async () => {
     const help = await runCli(["--help"]);
     expect(help.exitCode, help.stderr).toBe(0);
@@ -180,6 +202,7 @@ describe("canonical CLI root live contract", () => {
       { command: "ship", properties: ["stage", "surface", "channels", "message"] },
       { command: "agent", properties: ["profiles"] },
       { command: "ai send", properties: ["action", "threadId", "message", "status"] },
+      { command: "runs feed", properties: ["runs", "filters", "watch", "stream", "sentinel"] },
     ];
 
     for (const entry of cases) {
