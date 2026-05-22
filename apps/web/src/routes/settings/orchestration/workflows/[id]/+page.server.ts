@@ -1,27 +1,29 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import { loadWorkflowDef, upsertWorkflowDef } from "$lib/server/orchestration";
+import { createOrchestrationConfigApiForEvent } from "$lib/server/orchestration-config-api";
 import { actionOk } from "$lib/feedback/action-result";
 
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = (event) => {
   return {
-    workflowId: params.id,
-    activeProjectId: locals?.activeProjectId ?? null,
+    workflowId: event.params.id,
+    activeProjectId: event.locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
-        const def = await loadWorkflowDef(em, ctx, params.id);
-        if (!def) throw error(404, "Workflow not found");
-        return { workflow: def };
+        const api = createOrchestrationConfigApiForEvent(event);
+        try {
+          const workflow = await api.workflows.get({ id: event.params.id });
+          return { workflow };
+        } catch {
+          throw error(404, "Workflow not found");
+        }
       })(),
     },
   };
 };
 
 export const actions: Actions = {
-  save: async ({ params, request, locals }) => {
-    const form = await request.formData();
+  save: async (event) => {
+    const form = await event.request.formData();
     const name = (form.get("name") as string)?.trim();
     const description = (form.get("description") as string)?.trim() || null;
     const yamlConfig = (form.get("yaml_config") as string) ?? "";
@@ -29,9 +31,9 @@ export const actions: Actions = {
 
     if (!name) return fail(400, { error: "Name is required" });
 
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
-    await upsertWorkflowDef(em, ctx, {
-      id: params.id,
+    const api = createOrchestrationConfigApiForEvent(event);
+    await api.workflows.save({
+      id: event.params.id,
       name,
       description,
       yamlConfig,

@@ -30,6 +30,7 @@ import { DataSource } from "typeorm";
 import type { z } from "zod";
 
 import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { loadDashboard } from "@work-management/application/dashboard/queries.ts";
 import {
   ProjectPublicStore,
   type ProjectPublicKind,
@@ -100,6 +101,7 @@ export class ProjectPublicApiService {
   constructor(
     private readonly options: ProjectPublicApiOptions | null = null,
     private readonly store: ProjectPublicStore | null = null,
+    private readonly dataSource: DataSource | null = null,
   ) {}
 
   async listProjects(query: ProjectListQueryDto): Promise<{ data: unknown[] }> {
@@ -166,6 +168,12 @@ export class ProjectPublicApiService {
     return result;
   }
 
+  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
+    this.requireApplication();
+    const dataSource = this.requireDataSource();
+    return await loadDashboard(dataSource.manager, query.orgId, query.projectId ?? query.project_id ?? null);
+  }
+
   private requireApplication(): ProjectPublicApplication {
     const env = this.options?.featuresEnv ?? process.env.FULCRUM_FEATURES;
     if (!isFeatureEnabled("public-api", env)) {
@@ -195,6 +203,18 @@ export class ProjectPublicApiService {
     }
     return method as NonNullable<ProjectPublicApplication[Name]>;
   }
+
+  private requireDataSource(): DataSource {
+    if (!this.dataSource) {
+      throw new InternalServerErrorException("Project public API data source is not configured.");
+    }
+    return this.dataSource;
+  }
+}
+
+export class ProjectDashboardQueryDto extends ProjectRequestContextDto {
+  projectId?: string | null;
+  project_id?: string | null;
 }
 
 export class ProjectPublicApiController {
@@ -223,6 +243,10 @@ export class ProjectPublicApiController {
   async projectStats(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
     return await this.projects.projectStats(params, query);
   }
+
+  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
+    return await this.projects.dashboard(query);
+  }
 }
 
 export class ProjectPublicApiModule {
@@ -243,6 +267,7 @@ export class ProjectPublicApiModule {
 
 Inject(PROJECT_PUBLIC_API_OPTIONS)(ProjectPublicApiService, undefined, 0);
 Inject(ProjectPublicStore)(ProjectPublicApiService, undefined, 1);
+Inject(DataSource)(ProjectPublicApiService, undefined, 2);
 Inject(DataSource)(ProjectPublicStore, undefined, 0);
 Inject(ProjectPublicApiService)(ProjectPublicApiController, undefined, 0);
 
@@ -267,6 +292,7 @@ const getProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiCon
 const patchProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "patchProject");
 const deleteProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "deleteProject");
 const projectStatsDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "projectStats");
+const dashboardDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "dashboard");
 
 if (
   !listProjectsDescriptor ||
@@ -274,7 +300,8 @@ if (
   !getProjectDescriptor ||
   !patchProjectDescriptor ||
   !deleteProjectDescriptor ||
-  !projectStatsDescriptor
+  !projectStatsDescriptor ||
+  !dashboardDescriptor
 ) {
   throw new Error("ProjectPublicApiController route descriptors are missing");
 }
@@ -293,6 +320,19 @@ ApiOkResponse({ description: "Project list" })(
   ProjectPublicApiController.prototype,
   "listProjects",
   listProjectsDescriptor,
+);
+
+Get("dashboard")(ProjectPublicApiController.prototype, "dashboard", dashboardDescriptor);
+Query()(ProjectPublicApiController.prototype, "dashboard", 0);
+ApiOperation({ summary: "Load workspace dashboard" })(
+  ProjectPublicApiController.prototype,
+  "dashboard",
+  dashboardDescriptor,
+);
+ApiOkResponse({ description: "Workspace dashboard" })(
+  ProjectPublicApiController.prototype,
+  "dashboard",
+  dashboardDescriptor,
 );
 
 Post()(ProjectPublicApiController.prototype, "createProject", createProjectDescriptor);

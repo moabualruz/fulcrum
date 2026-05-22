@@ -14,6 +14,11 @@ export function activeOrgId(locals: App.Locals): string {
   return localOrgId && localOrgId.trim() ? localOrgId : DEFAULT_ORG_ID;
 }
 
+export function activeUserId(locals: App.Locals): string {
+  const localUserId = (locals as App.Locals & { userId?: string | null }).userId;
+  return localUserId && localUserId.trim() ? localUserId : "local-user";
+}
+
 export function cookieHeaders(request: Request): Record<string, string> {
   const cookie = request.headers.get("cookie");
   return cookie ? { cookie } : {};

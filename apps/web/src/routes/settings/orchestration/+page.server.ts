@@ -1,21 +1,18 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import {
-  loadOrchestrationConfig,
-  listWorkflowDefs,
-  upsertOrchestrationConfig,
-} from "$lib/server/orchestration";
+import { createOrchestrationConfigApiForEvent } from "$lib/server/orchestration-config-api";
 import { actionOk } from "$lib/feedback/action-result";
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = (event) => {
   return {
-    activeProjectId: locals?.activeProjectId ?? null,
+    activeProjectId: event.locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
-        const config = await loadOrchestrationConfig(em, ctx);
-        const workflows = await listWorkflowDefs(em, ctx);
+        const api = createOrchestrationConfigApiForEvent(event);
+        const [config, workflows] = await Promise.all([
+          api.orchestration.getConfig(),
+          api.workflows.list(),
+        ]);
         return {
           config: config ?? {
             poll_interval_s: 5,
@@ -31,8 +28,8 @@ export const load: PageServerLoad = ({ locals }) => {
 };
 
 export const actions: Actions = {
-  save: async ({ request, locals }) => {
-    const form = await request.formData();
+  save: async (event) => {
+    const form = await event.request.formData();
     const pollIntervalS = Number(form.get("poll_interval_s") ?? 5);
     const maxConcurrency = Number(form.get("max_concurrency") ?? 4);
     const stallTimeoutS = Number(form.get("stall_timeout_s") ?? 300);
@@ -45,8 +42,8 @@ export const actions: Actions = {
     if (stallTimeoutS < 10 || stallTimeoutS > 86400)
       return fail(400, { error: "Stall timeout must be 10-86400s" });
 
-    const { em, ctx } = await requestServiceScope(locals, locals?.activeProjectId ?? null);
-    await upsertOrchestrationConfig(em, ctx, {
+    const api = createOrchestrationConfigApiForEvent(event);
+    await api.orchestration.saveConfig({
       pollIntervalS,
       maxConcurrency,
       stallTimeoutS,

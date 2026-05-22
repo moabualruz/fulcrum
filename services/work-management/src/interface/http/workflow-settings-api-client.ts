@@ -1,11 +1,11 @@
-export interface CredentialApiEnvironment {
+export interface WorkflowSettingsApiEnvironment {
   FULCRUM_SERVER_URL?: string;
   FULCRUM_PUBLIC_API_URL?: string;
   FULCRUM_ORG_ID?: string;
   FULCRUM_USER_ID?: string;
 }
 
-export interface CredentialApiClientOptions {
+export interface WorkflowSettingsApiClientOptions {
   baseUrl: string;
   orgId: string;
   userId?: string | null;
@@ -15,50 +15,59 @@ export interface CredentialApiClientOptions {
 
 type JsonRecord = Record<string, unknown>;
 
-export function createCredentialApiCaller(options: CredentialApiClientOptions) {
-  const request = credentialRequest(options);
+export function createWorkflowSettingsApiCaller(options: WorkflowSettingsApiClientOptions) {
+  const request = workflowSettingsRequest(options);
   return {
-    settingsSecrets: {
-      list: async () =>
-        await request("/api/v1/credentials/settings-secrets", {
-          query: scopedQuery(options, {}),
-        }),
-      add: async (input: JsonRecord) =>
-        await request("/api/v1/credentials/settings-secrets", {
+    orchestration: {
+      getConfig: async (input: JsonRecord = {}) =>
+        await request("/api/v1/workflows/orchestration/config/get", {
           method: "POST",
           body: scopedBody(options, input),
         }),
-      rotate: async (input: JsonRecord & { id: string }) => {
-        const { id, ...body } = input;
-        return await request(`/api/v1/credentials/settings-secrets/${encodeURIComponent(id)}/rotate`, {
+      saveConfig: async (input: JsonRecord) =>
+        await request("/api/v1/workflows/orchestration/config/update", {
           method: "POST",
-          body: scopedBody(options, body),
-        });
-      },
-      archive: async (input: JsonRecord & { id: string }) => {
-        const { id, ...body } = input;
-        return await request(`/api/v1/credentials/settings-secrets/${encodeURIComponent(id)}/archive`, {
+          body: scopedBody(options, input),
+        }),
+      dashboard: async (input: JsonRecord = {}) =>
+        await request("/api/v1/workflows/orchestration/dashboard", {
           method: "POST",
-          body: scopedBody(options, body),
-        });
-      },
-      delete: async (input: JsonRecord & { id: string }) =>
-        await request(`/api/v1/credentials/settings-secrets/${encodeURIComponent(input.id)}`, {
-          method: "DELETE",
-          query: scopedQuery(options, input),
+          body: scopedBody(options, input),
+        }),
+      projects: async (input: JsonRecord = {}) =>
+        await request("/api/v1/workflows/orchestration/projects", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+    },
+    workflows: {
+      list: async (input: JsonRecord = {}) =>
+        await request("/api/v1/workflows/orchestration/definitions/list", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      get: async (input: JsonRecord & { id: string }) =>
+        await request("/api/v1/workflows/orchestration/definitions/get", {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      save: async (input: JsonRecord) =>
+        await request("/api/v1/workflows/orchestration/definitions/upsert", {
+          method: "POST",
+          body: scopedBody(options, input),
         }),
     },
   };
 }
 
-export function createCredentialApiCallerFromEnv(
-  env: CredentialApiEnvironment = process.env as unknown as CredentialApiEnvironment,
+export function createWorkflowSettingsApiCallerFromEnv(
+  env: WorkflowSettingsApiEnvironment = process.env as unknown as WorkflowSettingsApiEnvironment,
   fetchFn: typeof fetch = fetch,
 ) {
   const baseUrl = env.FULCRUM_SERVER_URL ?? env.FULCRUM_PUBLIC_API_URL;
   const orgId = env.FULCRUM_ORG_ID;
   if (!baseUrl || !orgId) return null;
-  return createCredentialApiCaller({
+  return createWorkflowSettingsApiCaller({
     baseUrl,
     orgId,
     userId: env.FULCRUM_USER_ID,
@@ -66,7 +75,7 @@ export function createCredentialApiCallerFromEnv(
   });
 }
 
-function credentialRequest(options: CredentialApiClientOptions) {
+function workflowSettingsRequest(options: WorkflowSettingsApiClientOptions) {
   const baseUrl = options.baseUrl.replace(/\/+$/, "");
   const fetchFn = options.fetch ?? fetch;
 
@@ -93,11 +102,7 @@ function credentialRequest(options: CredentialApiClientOptions) {
   };
 }
 
-function scopedQuery(options: CredentialApiClientOptions, input: JsonRecord): JsonRecord {
-  return compact({ orgId: options.orgId, userId: options.userId, ...input });
-}
-
-function scopedBody(options: CredentialApiClientOptions, input: JsonRecord): JsonRecord {
+function scopedBody(options: WorkflowSettingsApiClientOptions, input: JsonRecord): JsonRecord {
   return compact({ ...input, orgId: options.orgId, userId: options.userId });
 }
 
@@ -117,5 +122,5 @@ async function parseResponseBody(response: Response): Promise<unknown> {
 
 function extractErrorMessage(body: unknown, status: number): string {
   const record = body as { message?: string; error?: { message?: string; json?: { message?: string } } } | null;
-  return record?.error?.json?.message ?? record?.error?.message ?? record?.message ?? `Credential API request failed with ${status}.`;
+  return record?.error?.json?.message ?? record?.error?.message ?? record?.message ?? `Workflow settings API request failed with ${status}.`;
 }
