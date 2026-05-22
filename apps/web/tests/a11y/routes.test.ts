@@ -64,6 +64,14 @@ async function renderA11yFixture(page: import("@playwright/test").Page, route: s
   }
 }
 
+async function expectNoSeriousOrCriticalAxeViolations(page: import("@playwright/test").Page) {
+  const results = await new AxeBuilder({ page }).disableRules(["color-contrast"]).analyze();
+  const severe = results.violations.filter((violation) =>
+    violation.impact === "serious" || violation.impact === "critical"
+  );
+  expect(severe).toEqual([]);
+}
+
 test.describe("Surface route accessibility sweep", () => {
   for (const route of stableRoutes) {
     test(`${route} has no serious or critical axe violations`, async ({ page, fulcrumHome }) => {
@@ -82,13 +90,31 @@ test.describe("Surface route accessibility sweep", () => {
       await expect(page.locator("main, [data-route-skeleton]").first()).toBeVisible({ timeout: 10_000 });
       expect((await page.title()).trim(), `${route} must provide a document title for the a11y sweep.`).not.toBe("");
 
-      const results = await new AxeBuilder({ page }).disableRules(["color-contrast"]).analyze();
-      const severe = results.violations.filter((violation) =>
-        violation.impact === "serious" || violation.impact === "critical"
-      );
-      expect(severe).toEqual([]);
+      await expectNoSeriousOrCriticalAxeViolations(page);
     });
   }
+
+  test("docs empty and filtered states have no serious or critical axe violations", async ({ page }) => {
+    await page.goto("/auth/auto-session");
+
+    for (const route of ["/docs", "/docs?q=missing-docs"]) {
+      const response = await page.goto(route);
+      expect(response?.ok(), `${route} must render for docs a11y coverage.`).toBe(true);
+      await expect(page.locator("[data-docs-hub]")).toBeVisible({ timeout: 10_000 });
+      await expectNoSeriousOrCriticalAxeViolations(page);
+    }
+  });
+
+  test("plan-session transcript payload is keyboard focusable", async ({ page }) => {
+    await page.goto("/auth/auto-session");
+    const response = await page.goto("/plan-session");
+    expect(response?.ok(), "/plan-session must render for transcript a11y coverage.").toBe(true);
+
+	const payload = page.locator("[data-transcript-payload]").first();
+	await expect(payload).toBeVisible({ timeout: 10_000 });
+	await payload.focus();
+	await expect(payload).toBeFocused();
+});
 
   test("icon-button sweep compatibility: operational routes expose named controls", async ({ page }) => {
     await page.goto("/");

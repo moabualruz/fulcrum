@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants, Select } from "@fulcrum/ui-kit";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import DocTree from "$lib/components/docs/DocTree.svelte";
 	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
@@ -84,6 +84,7 @@
 		<select
 			data-kind-filter
 			name="kind"
+			aria-label="Filter documents by kind"
 			onchange={autoSubmit}
 			class={cn(
 				"border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs",

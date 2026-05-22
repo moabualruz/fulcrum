@@ -50,10 +50,12 @@
 		</nav>
 	{/if}
 
-	<div role="tree" aria-label={title} class={cn("max-h-[70vh] overflow-auto p-1")}>
-		{#if flatNodes.length === 0}
+	{#if flatNodes.length === 0}
+		<div class={cn("max-h-[70vh] overflow-auto p-1")}>
 			<p data-empty-doc-tree class={cn("px-2 py-6 text-sm text-muted-foreground")}>No documents.</p>
-		{:else}
+		</div>
+	{:else}
+		<div role="tree" aria-label={title} class={cn("max-h-[70vh] overflow-auto p-1")}>
 			{#each flatNodes as item (item.node.id)}
 				{@const node = item.node}
 				{@const meta = docTypeMeta(node.docType)}
@@ -93,6 +95,6 @@
 					</div>
 				</div>
 			{/each}
-		{/if}
-	</div>
+		</div>
+	{/if}
 </section>

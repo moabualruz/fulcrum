@@ -566,10 +566,14 @@
 						<span class="font-mono text-[11px] text-muted-foreground">{selectedEvent.id}</span>
 					</div>
 					<h3 class="mt-3 text-sm font-semibold text-foreground">{selectedEvent.summary}</h3>
-					<pre
+					<textarea
 						data-transcript-payload
 						aria-label={`Payload for ${selectedEvent.summary}`}
-						class="mt-3 max-h-72 overflow-auto rounded-md border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">{selectedEvent.payload}</pre>
+						readonly
+						rows="10"
+						value={selectedEvent.payload}
+						class="mt-3 block w-full max-h-72 resize-none overflow-auto rounded-md border border-border bg-background p-3 font-mono text-xs leading-5 text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+					></textarea>
 				{/if}
 			</aside>
 		</div>

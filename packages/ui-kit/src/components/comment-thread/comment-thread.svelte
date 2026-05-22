@@ -101,8 +101,12 @@
 			.toUpperCase();
 	}
 
-	/** The composer's own draft text, seeded once from the `reply` prop. */
-	let draft = $state(reply);
+	/** The composer's own draft text, synced when the upstream reply changes. */
+	let draft = $state("");
+
+	$effect(() => {
+		draft = reply;
+	});
 
 	/** Whether the inline composer renders (open + failed-save + empty accept replies). */
 	const composerVisible = $derived(
@@ -115,7 +119,6 @@
 
 <section
 	bind:this={ref}
-	role="region"
 	aria-label={`Comment thread for ${anchorLabel}`}
 	data-slot="comment-thread"
 	data-comment-thread={threadId}

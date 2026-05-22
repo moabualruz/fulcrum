@@ -196,40 +196,73 @@
 		{/if}
 		{#each stages as item (item.stage)}
 			{@const active = current === item.stage}
-			<svelte:element
-				this={item.href ? "a" : "button"}
-				href={item.href}
-				type={item.href ? undefined : "button"}
-				aria-current={active ? "page" : undefined}
-				aria-label={STAGE_LABEL[item.stage]}
-				title={collapsed ? STAGE_LABEL[item.stage] : undefined}
-				data-slot="stage-rail-item"
-				data-stage={item.stage}
-				data-active={active ? "true" : undefined}
-				class={cn(
-					"flex h-9 items-center gap-2 rounded-md text-sm font-medium transition-colors",
-					collapsed ? "justify-center px-0" : "px-2",
-					active
-						? "bg-accent text-primary-foreground"
-						: "text-fg-subtle hover:bg-surface-elevated hover:text-fg",
-					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-				)}
-				onclick={() => pick(item.stage)}
-			>
-				<span aria-hidden="true" data-slot="stage-rail-glyph" class="text-base leading-none"
-					>{STAGE_GLYPH[item.stage]}</span
+			{#if item.href}
+				<a
+					href={item.href}
+					aria-current={active ? "page" : undefined}
+					aria-label={STAGE_LABEL[item.stage]}
+					title={collapsed ? STAGE_LABEL[item.stage] : undefined}
+					data-slot="stage-rail-item"
+					data-stage={item.stage}
+					data-active={active ? "true" : undefined}
+					class={cn(
+						"flex h-9 items-center gap-2 rounded-md text-sm font-medium transition-colors",
+						collapsed ? "justify-center px-0" : "px-2",
+						active
+							? "bg-accent text-primary-foreground"
+							: "text-fg-subtle hover:bg-surface-elevated hover:text-fg",
+						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					)}
+					onclick={() => pick(item.stage)}
 				>
-				{#if !collapsed}
-					<span data-slot="stage-rail-label" class="flex-1 text-left">{STAGE_LABEL[item.stage]}</span>
-					{#if item.count !== undefined}
-						<span
-							data-slot="stage-rail-count"
-							class={cn("font-mono text-xs", active ? "text-primary-foreground" : "text-fg-muted")}
-							>{item.count}</span
-						>
+					<span aria-hidden="true" data-slot="stage-rail-glyph" class="text-base leading-none"
+						>{STAGE_GLYPH[item.stage]}</span
+					>
+					{#if !collapsed}
+						<span data-slot="stage-rail-label" class="flex-1 text-left">{STAGE_LABEL[item.stage]}</span>
+						{#if item.count !== undefined}
+							<span
+								data-slot="stage-rail-count"
+								class={cn("font-mono text-xs", active ? "text-primary-foreground" : "text-fg-muted")}
+								>{item.count}</span
+							>
+						{/if}
 					{/if}
-				{/if}
-			</svelte:element>
+				</a>
+			{:else}
+				<button
+					type="button"
+					aria-current={active ? "page" : undefined}
+					aria-label={STAGE_LABEL[item.stage]}
+					title={collapsed ? STAGE_LABEL[item.stage] : undefined}
+					data-slot="stage-rail-item"
+					data-stage={item.stage}
+					data-active={active ? "true" : undefined}
+					class={cn(
+						"flex h-9 items-center gap-2 rounded-md text-sm font-medium transition-colors",
+						collapsed ? "justify-center px-0" : "px-2",
+						active
+							? "bg-accent text-primary-foreground"
+							: "text-fg-subtle hover:bg-surface-elevated hover:text-fg",
+						"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					)}
+					onclick={() => pick(item.stage)}
+				>
+					<span aria-hidden="true" data-slot="stage-rail-glyph" class="text-base leading-none"
+						>{STAGE_GLYPH[item.stage]}</span
+					>
+					{#if !collapsed}
+						<span data-slot="stage-rail-label" class="flex-1 text-left">{STAGE_LABEL[item.stage]}</span>
+						{#if item.count !== undefined}
+							<span
+								data-slot="stage-rail-count"
+								class={cn("font-mono text-xs", active ? "text-primary-foreground" : "text-fg-muted")}
+								>{item.count}</span
+							>
+						{/if}
+					{/if}
+				</button>
+			{/if}
 		{/each}
 	{/if}
 

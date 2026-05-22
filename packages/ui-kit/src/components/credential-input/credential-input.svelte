@@ -29,7 +29,11 @@
 		...restProps
 	}: CredentialInputProps = $props();
 
-	let visible = $state(defaultVisible);
+	let visible = $state(false);
+
+	$effect(() => {
+		visible = defaultVisible;
+	});
 
 	function toggle() {
 		visible = !visible;
