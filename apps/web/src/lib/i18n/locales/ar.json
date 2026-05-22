@@ -6,7 +6,7 @@
   "common.create": "إنشاء",
   "common.search": "بحث",
   "common.loading": "جارٍ التحميل…",
-  "common.error": "حدث خطأ ما",
+  "common.error": "تعذر إكمال الإجراء. أعد المحاولة.",
   "common.confirm": "تأكيد",
   "common.close": "إغلاق",
   "nav.dashboard": "لوحة التحكم",

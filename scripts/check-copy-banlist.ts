@@ -27,6 +27,7 @@ const BAN_RULES: BanRule[] = [
 const SOURCE_ROOTS = [
   "apps/web/src/routes",
   "apps/web/src/lib/components",
+  "apps/web/src/lib/i18n/locales",
   "apps/cli/src",
   "apps/tui/src",
   "packages/ui-kit/src",

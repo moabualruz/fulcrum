@@ -6,7 +6,7 @@
   "common.create": "Create",
   "common.search": "Search",
   "common.loading": "Loading…",
-  "common.error": "Something went wrong",
+  "common.error": "Action could not finish. Retry.",
   "common.confirm": "Confirm",
   "common.close": "Close",
   "nav.dashboard": "Dashboard",
