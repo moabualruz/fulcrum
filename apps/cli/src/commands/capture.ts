@@ -98,6 +98,7 @@ export interface CaptureApiEnvironment {
 
 export interface CaptureRunOptions {
   caller?: CaptureCaller;
+  commandRoot?: "capture" | "note";
   env?: CaptureApiEnvironment;
   fetch?: typeof fetch;
   print?: (line: string) => void;
@@ -219,14 +220,14 @@ export async function run(argv: readonly string[], opts: CaptureRunOptions = {})
     emitErrorResult(
       {
         argv: rest,
-        command: `fulcrum capture ${verb}`,
+        command: commandName(opts, failedCommandParts(verb, rest)),
         error: {
           code: apiErrorCode(error) ?? "FUL_CAPTURE_FAILED",
-          message: `fulcrum capture ${verb}: ${formatApiError(error)}`,
-          fix: "fulcrum capture --help",
+          message: `${commandName(opts, failedCommandParts(verb, rest))}: ${formatApiError(error)}`,
+          fix: `${commandName(opts, [])} --help`,
         },
         env: opts.env as NodeJS.ProcessEnv | undefined,
-        renderHuman: () => io.printErr(`fulcrum capture ${verb}: ${formatApiError(error)}`),
+        renderHuman: () => io.printErr(`${commandName(opts, failedCommandParts(verb, rest))}: ${formatApiError(error)}`),
       },
       io,
     );
@@ -250,7 +251,7 @@ async function runNote(
         projectId: flagValue(rest, "--project"),
         traceId: flagValue(rest, "--trace"),
       });
-      printIntake(result, "fulcrum capture note new", rest, io.print, opts.env);
+      printIntake(result, commandName(opts, ["note", "new"]), rest, io.print, opts.env);
       return;
     }
     case "list": {
@@ -263,7 +264,7 @@ async function runNote(
       emitResult(
         {
           argv: rest,
-          command: "fulcrum capture note list",
+          command: commandName(opts, ["note", "list"]),
           result: rows,
           renderHuman: (value) => {
             if (value.length === 0) {
@@ -289,6 +290,17 @@ async function runNote(
       io.printErr(HELP);
       io.exit(2);
   }
+}
+
+function failedCommandParts(verb: string, rest: readonly string[]): readonly string[] {
+  const sub = verb === "note" ? rest.find((arg) => !arg.startsWith("-")) : undefined;
+  return sub ? [verb, sub] : [verb];
+}
+
+function commandName(opts: CaptureRunOptions, parts: readonly string[]): string {
+  const root = opts.commandRoot ?? "capture";
+  const commandParts = root === "note" && parts[0] === "note" ? parts.slice(1) : parts;
+  return ["fulcrum", root, ...commandParts].join(" ").trim();
 }
 
 async function resolveCaller(opts: CaptureRunOptions): Promise<CaptureCaller> {
