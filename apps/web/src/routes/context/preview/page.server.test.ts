@@ -1,7 +1,4 @@
-import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
-
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
-import { contextQueriesMock, useContextQueries } from "$lib/test/context-queries-mock";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 type LoadResult = {
   activeProjectId: string | null;
@@ -13,50 +10,48 @@ type LoadResult = {
   };
 };
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. Both factories route through a shared slot; this suite publishes its
-// seam/overrides while active (beforeAll/afterAll) so sibling suites that mock
-// the same paths are never hijacked. In particular `context/queries.ts` keeps
-// a complete export set: `previewContext` stays defined for foreign suites
-// (`/runs/[id]` pulls it in transitively) instead of being frozen out.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
-mock.module("@knowledge-workspace/application/context/queries.ts", () => contextQueriesMock());
+const calls: Array<{ method: string; input: unknown }> = [];
 
-describe("/context/preview +page.server.ts load()", () => {
-  let disposeScope: (() => void) | undefined;
-  let disposeQueries: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) => ({
-      em: { marker: "em" },
-      ctx: { orgId: "org1", userId: "user1", projectId: projectId ?? null },
-    }));
-    disposeQueries = useContextQueries({
-      loadContextPreviewOptions: async (_em: unknown, _ctx: unknown, selectedProjectId: string | null) => ({
+mock.module("$lib/server/context-preview-api", () => ({
+  createContextPreviewApiForEvent: () => ({
+    options: async (selectedProjectId: string | null) => {
+      calls.push({ method: "options", input: selectedProjectId });
+      return {
         projects: [{ id: "project-1", name: "Project 1" }],
         tasks: selectedProjectId ? [{ id: "task-1", title: "Task 1", status: "ready" }] : [],
-      }),
-      loadContextBundle: async (_em: unknown, _ctx: unknown, input: unknown) => ({
+      };
+    },
+    bundle: async (input: unknown) => {
+      calls.push({ method: "bundle", input });
+      return {
         documents: [],
         memories: [],
         recentRuns: [],
         artifacts: [],
         tokenBudget: { used: 0, total: 8000 },
         input,
-      }),
-    });
-  });
-  afterAll(() => {
-    disposeScope?.();
-    disposeQueries?.();
-  });
+      };
+    },
+  }),
+}));
 
-  test("loads preview options and selected task bundle from application services", async () => {
+beforeEach(() => {
+  calls.splice(0, calls.length);
+});
+
+afterEach(() => {
+  calls.splice(0, calls.length);
+});
+
+describe("/context/preview +page.server.ts load()", () => {
+  test("loads preview options and selected task bundle through the context preview public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       url: new URL("http://localhost/context/preview?projectId=project-1&taskId=task-1"),
       locals: { activeProjectId: null },
     } as Parameters<typeof mod.load>[0]) as LoadResult;
 
+    expect(result.activeProjectId).toBeNull();
     expect(result.selectedProjectId).toBe("project-1");
     expect(result.selectedTaskId).toBe("task-1");
     await expect(result.streamed.options).resolves.toEqual({
@@ -66,6 +61,10 @@ describe("/context/preview +page.server.ts load()", () => {
     await expect(result.streamed.bundle).resolves.toMatchObject({
       input: { selectedProjectId: "project-1", selectedTaskId: "task-1" },
     });
+    expect(calls).toEqual([
+      { method: "options", input: "project-1" },
+      { method: "bundle", input: { selectedProjectId: "project-1", selectedTaskId: "task-1" } },
+    ]);
   });
 
   test("does not request a bundle when no task is selected", async () => {
@@ -75,8 +74,13 @@ describe("/context/preview +page.server.ts load()", () => {
       locals: { activeProjectId: "project-1" },
     } as Parameters<typeof mod.load>[0]) as LoadResult;
 
+    expect(result.activeProjectId).toBe("project-1");
     expect(result.selectedProjectId).toBe("project-1");
     expect(result.selectedTaskId).toBeNull();
+    await expect(result.streamed.options).resolves.toMatchObject({
+      projects: [{ id: "project-1", name: "Project 1" }],
+    });
     expect(result.streamed.bundle).toBeNull();
+    expect(calls).toEqual([{ method: "options", input: "project-1" }]);
   });
 });

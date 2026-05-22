@@ -1,10 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
+const calls: Array<{ method: string; input: unknown }> = [];
 
-const calls: string[] = [];
 const boardTasks = [
   {
     id: "task-1",
@@ -28,88 +27,75 @@ const workbench = {
   emptyState: { allTasksEmpty: false, visibleTasksEmpty: false, message: "" },
 };
 
-function form(data: Record<string, string>): Request {
-  const fd = new FormData();
-  for (const [key, value] of Object.entries(data)) fd.set(key, value);
-  return new Request("http://localhost/projects/project-1/board", { method: "POST", body: fd });
-}
-
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its seam while active (beforeAll/afterAll) so sibling suites that
-// mock the same path are never hijacked.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
-
-mock.module("@work-management/interface/project-board.ts", () => ({
-  TASK_STATE_GROUP_ORDER: ["backlog", "unstarted", "started", "completed", "cancelled"],
-  listProjectBoardWorkItems: async (_em: unknown, ctx: { projectId?: string | null }) => {
-    calls.push(`list:${ctx.projectId ?? ""}`);
-    return boardTasks;
-  },
-  buildProjectTaskWorkbench: async (_em: unknown, _ctx: unknown, input: { traceId?: string; viewMode?: string; filters?: { stateGroups?: string[] } }) => {
-    calls.push(`workbench:${input.traceId ?? ""}:${input.viewMode ?? ""}:${input.filters?.stateGroups?.join("|") ?? ""}`);
-    return workbench;
-  },
-  createProjectBoardWorkItem: async (_em: unknown, _ctx: unknown, input: { title: string; status?: string | null }) => {
-    calls.push(`create:${input.title}:${input.status ?? ""}`);
-    return { id: "task-new" };
-  },
-  updateProjectBoardWorkItem: async (_em: unknown, _ctx: unknown, id: string, patch: { status?: string | null; title?: string }) => {
-    calls.push(`update:${id}:${patch.title ?? ""}:${patch.status ?? ""}`);
-    return { ok: true };
-  },
-  deleteProjectBoardWorkItem: async (_em: unknown, _ctx: unknown, id: string) => {
-    calls.push(`delete:${id}`);
-    return { ok: true };
-  },
+mock.module("$lib/server/task-api", () => ({
+  createTaskApiForEvent: () => ({
+    tasks: {
+      list: async (input: unknown) => {
+        calls.push({ method: "tasks.list", input });
+        return boardTasks;
+      },
+      manualWorkbench: async (input: unknown) => {
+        calls.push({ method: "tasks.manualWorkbench", input });
+        return workbench;
+      },
+      create: async (input: unknown) => {
+        calls.push({ method: "tasks.create", input });
+        return { id: "task-new" };
+      },
+      update: async (input: unknown) => {
+        calls.push({ method: "tasks.update", input });
+        return { ok: true };
+      },
+      delete: async (input: unknown) => {
+        calls.push({ method: "tasks.delete", input });
+        return { ok: true };
+      },
+    },
+  }),
 }));
 
-mock.module("@execution-orchestration/interface/dependency-run-actions.ts", () => ({
-  previewDependencyRunForTasks: async (_em: unknown, _ctx: unknown, input: { targetTaskIds: string[]; traceId?: string }) => {
-    calls.push(`preview:${input.targetTaskIds.join("|")}:${input.traceId ?? ""}`);
-    return { traceId: input.traceId, orderedTaskIds: input.targetTaskIds };
-  },
-  dispatchDependencyRunForTasks: async (_em: unknown, _ctx: unknown, input: { targetTaskIds: string[]; agent: string; traceId?: string }) => {
-    calls.push(`dispatch:${input.targetTaskIds.join("|")}:${input.agent}:${input.traceId ?? ""}`);
-    return { runGroupId: input.traceId, scheduledRuns: [] };
-  },
-}));
-
-mock.module("@execution-orchestration/interface/task-run-reviews.ts", () => ({
-  recordTaskQaReview: async (_em: unknown, _ctx: unknown, input: { taskId: string; reviewText: string; traceId?: string }) => {
-    calls.push(`review:${input.taskId}:${input.traceId ?? ""}:${input.reviewText}`);
-    return { taskId: input.taskId, verdict: "REVISE", nextAction: "feedback_run_scheduled" };
-  },
+mock.module("$lib/server/workflow-api", () => ({
+  webWorkflowApiUrl: () => null,
+  workflowApiProjectMetadata: (_event: unknown, projectId: string) => ({ orgId: "org-1", userId: "user-1", projectId }),
+  createWebWorkflowApiCaller: () => ({
+    tasks: {
+      previewDependencyRun: async (input: unknown) => {
+        calls.push({ method: "workflow.tasks.previewDependencyRun", input });
+        return { traceId: (input as { traceId?: string }).traceId, orderedTaskIds: (input as { targetTaskIds: string[] }).targetTaskIds };
+      },
+      dispatchDependencyRun: async (input: unknown) => {
+        calls.push({ method: "workflow.tasks.dispatchDependencyRun", input });
+        return { runGroupId: (input as { traceId?: string }).traceId, scheduledRuns: [] };
+      },
+      recordQaReview: async (input: unknown) => {
+        calls.push({ method: "workflow.tasks.recordQaReview", input });
+        return { taskId: (input as { taskId: string }).taskId, verdict: "REVISE", nextAction: "feedback_run_scheduled" };
+      },
+    },
+  }),
 }));
 
 beforeEach(() => {
   calls.splice(0, calls.length);
 });
 
+function form(data: Record<string, string>): Request {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return new Request("http://localhost/projects/project-1/board", { method: "POST", body: fd });
+}
+
 describe("/projects/[id]/board +page.server.ts", () => {
-  let disposeScope: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId, taskId) => ({
-      em: { kind: "mock-em" },
-      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null, taskId },
-    }));
-  });
-  afterAll(() => {
-    disposeScope?.();
-  });
-
-  test("server route uses service interfaces instead of direct application imports", () => {
+  test("server route uses public API clients instead of request service scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@work-management/interface/project-board");
-    expect(source).toContain("@execution-orchestration/interface/dependency-run-actions");
-    expect(source).toContain("@execution-orchestration/interface/task-run-reviews");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@work-management/application/");
-    expect(source).not.toContain("@execution-orchestration/application/");
-    expect(source).not.toContain("$lib/server/application-scope");
+    expect(source).toContain("createTaskApiForEvent");
+    expect(source).toContain("createWebWorkflowApiCaller");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("@work-management/interface/project-board");
+    expect(source).not.toContain("@execution-orchestration/interface/");
   });
 
-  test("load returns project board and workbench data through service boundaries", async () => {
+  test("load returns project board and workbench data through task public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       params: { id: "project-1" },
@@ -122,10 +108,22 @@ describe("/projects/[id]/board +page.server.ts", () => {
     const payload = await result.streamed.data;
     expect(payload.tasks).toEqual(boardTasks);
     expect(payload.manualWorkbench).toEqual(workbench);
-    expect(calls).toEqual(["list:project-1", "workbench:trace-1:board:started"]);
+    expect(calls).toEqual([
+      { method: "tasks.list", input: { projectId: "project-1" } },
+      {
+        method: "tasks.manualWorkbench",
+        input: {
+          projectId: "project-1",
+          traceId: "trace-1",
+          viewMode: "board",
+          filters: { stateGroups: ["started"] },
+          projectCapabilities: { estimateEnabled: false },
+        },
+      },
+    ]);
   });
 
-  test("create, update, delete, and move actions delegate through project board boundary", async () => {
+  test("create, update, delete, and move actions delegate through task public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const eventBase = { params: { id: "project-1" }, locals: {} };
 
@@ -136,14 +134,14 @@ describe("/projects/[id]/board +page.server.ts", () => {
 
     expect(move).toEqual({ ok: true, message: "Task moved" });
     expect(calls).toEqual([
-      "create:New task:pending",
-      "update:task-1:Renamed:in_progress",
-      "delete:task-1",
-      "update:task-1::completed",
+      { method: "tasks.create", input: { projectId: "project-1", title: "New task", status: "pending" } },
+      { method: "tasks.update", input: { id: "task-1", projectId: "project-1", title: "Renamed", status: "in_progress" } },
+      { method: "tasks.delete", input: { id: "task-1", projectId: "project-1" } },
+      { method: "tasks.update", input: { id: "task-1", projectId: "project-1", status: "completed" } },
     ]);
   });
 
-  test("local fallback run and review actions delegate through orchestration boundaries", async () => {
+  test("local fallback run and review actions delegate through workflow public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const eventBase = { params: { id: "project-1" }, locals: {} };
 
@@ -164,9 +162,18 @@ describe("/projects/[id]/board +page.server.ts", () => {
     expect(dispatch).toMatchObject({ ok: true, dispatch: { runGroupId: "trace-3" } });
     expect(review).toMatchObject({ ok: true, review: { taskId: "task-1" } });
     expect(calls).toEqual([
-      "preview:task-1|task-2:trace-2",
-      "dispatch:task-1:codex:trace-3",
-      "review:task-1:trace-4:needs follow-up",
+      {
+        method: "workflow.tasks.previewDependencyRun",
+        input: { orgId: "org-1", userId: "user-1", projectId: "project-1", mode: "board", targetTaskIds: ["task-1", "task-2"], traceId: "trace-2" },
+      },
+      {
+        method: "workflow.tasks.dispatchDependencyRun",
+        input: { orgId: "org-1", userId: "user-1", projectId: "project-1", mode: "task", targetTaskIds: ["task-1"], traceId: "trace-3", agent: "codex" },
+      },
+      {
+        method: "workflow.tasks.recordQaReview",
+        input: { orgId: "org-1", userId: "user-1", projectId: "project-1", taskId: "task-1", traceId: "trace-4", reviewType: "code", reviewText: "needs follow-up" },
+      },
     ]);
   });
 });

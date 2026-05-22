@@ -1,12 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import { applicationScopeMock, useApplicationScope } from "$lib/test/application-scope-mock";
-import { planningReviewMock } from "$lib/test/planning-review-mock";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-const calls: string[] = [];
-let loadShouldThrowNotFound = false;
+const calls: Array<{ method: string; input: unknown }> = [];
+let projectPageShouldFail = false;
 
 function form(data: Record<string, string>): Request {
   const fd = new FormData();
@@ -14,100 +11,64 @@ function form(data: Record<string, string>): Request {
   return new Request("http://localhost/projects/project-1/reports", { method: "POST", body: fd });
 }
 
-// `mock.module` is process-wide and only one factory closure survives per
-// path. `applicationScopeMock()` routes through a shared seam slot; this suite
-// publishes its seam while active (beforeAll/afterAll) so sibling suites that
-// mock the same path are never hijacked.
-mock.module("$lib/server/application-scope", () => applicationScopeMock());
-
-mock.module("@work-management/interface/project-reports.ts", () => ({
-  loadProjectReportsPage: async (_em: unknown, _ctx: unknown, input: { projectId: string; sprintId?: string }) => {
-    calls.push(`load:${input.projectId}:${input.sprintId ?? ""}`);
-    if (loadShouldThrowNotFound) throw new AppNotFoundError("Project not found");
-    return {
-      project: { id: input.projectId, name: "Project" },
-      reports: { sprints: [], burndown: [], velocity: [], cycleTime: { bins: [], p50: 0, p90: 0 }, throughput: [], wip: [], cfd: [] },
-      selectedSprintId: input.sprintId ?? null,
-      orgId: "org-1",
-    };
-  },
+mock.module("$lib/server/report-api", () => ({
+  createReportApiForEvent: () => ({
+    reports: {
+      projectPage: async (input: unknown) => {
+        calls.push({ method: "reports.projectPage", input });
+        if (projectPageShouldFail) throw new Error("Project not found");
+        const projectId = (input as { projectId: string }).projectId;
+        return {
+          project: { id: projectId, name: "Project" },
+          reports: { sprints: [], burndown: [], velocity: [], cycleTime: { bins: [], p50: 0, p90: 0 }, throughput: [], wip: [], cfd: [] },
+          selectedSprintId: (input as { sprintId?: string }).sprintId ?? null,
+          orgId: "org-1",
+        };
+      },
+    },
+  }),
 }));
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => planningReviewMock({
-  buildFinalQaReport: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
-    calls.push(`final-qa:${input.projectId}:${input.traceId ?? ""}`);
-    return { projectId: input.projectId, traceId: input.traceId, status: "passed" };
-  },
-  buildFinalQaFeedbackGate: async (_em: unknown, _ctx: unknown, input: { projectId: string; maxIterations?: number }) => {
-    calls.push(`final-gate:${input.projectId}:${input.maxIterations ?? ""}`);
-    return { projectId: input.projectId, readyForUserAcceptance: true };
-  },
-  buildUatCodeReviewHandoff: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
-    calls.push(`handoff:${input.projectId}:${input.traceId ?? ""}`);
-    return { projectId: input.projectId, status: "ready" };
-  },
-  recordUatCodeReviewDecision: async (_em: unknown, _ctx: unknown, input: { projectId: string; decision: string; reviewType: string }) => {
-    calls.push(`decision:${input.projectId}:${input.decision}:${input.reviewType}`);
-    return { projectId: input.projectId, status: "approved" };
-  },
-  applyConfiguredUatCodeReviewDecision: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
-    calls.push(`auto:${input.projectId}:${input.traceId ?? ""}`);
-    return { projectId: input.projectId, status: "applied" };
-  },
-  runGeneratedE2eRegressionTests: async (_em: unknown, _ctx: unknown, input: { projectId: string; runner?: string; planOnly?: boolean }) => {
-    calls.push(`e2e:${input.projectId}:${input.runner ?? ""}:${input.planOnly ? "plan" : "run"}`);
-    return { projectId: input.projectId, status: input.planOnly ? "planned" : "passed" };
-  },
-  listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
-    calls.push(`history:${input.projectId}:${input.limit ?? ""}`);
-    return [];
-  },
-  buildReviewWorkbenchModel: async (input: { projectId?: string; reviewId?: string }) => {
-    calls.push(`workbench:${input.projectId ?? ""}:${input.reviewId ?? ""}`);
-    return { projectId: input.projectId, reviewId: input.reviewId, files: [] };
-  },
-  saveReviewWorkbenchSession: async (_em: unknown, _ctx: unknown, input: { projectId: string; reviewId?: string }) => {
-    calls.push(`save:${input.projectId}:${input.reviewId ?? ""}`);
-    return { projectId: input.projectId, reviewId: input.reviewId ?? "review-1", status: "saved" };
-  },
-  loadReviewWorkbenchSession: async (_em: unknown, _ctx: unknown, input: { projectId: string; reviewId?: string }) => {
-    calls.push(`session-load:${input.projectId}:${input.reviewId ?? ""}`);
-    return { projectId: input.projectId, reviewId: input.reviewId ?? "review-1", status: "loaded" };
-  },
-  appendReviewWorkbenchAnnotation: async (_em: unknown, _ctx: unknown, input: { projectId: string; reviewId?: string; filePath: string }) => {
-    calls.push(`annotate:${input.projectId}:${input.reviewId ?? ""}:${input.filePath}`);
-    return { projectId: input.projectId, reviewId: input.reviewId ?? "review-1", status: "annotated" };
-  },
+mock.module("$lib/server/workflow-api", () => ({
+  webWorkflowApiUrl: () => null,
+  workflowApiProjectMetadata: (_event: unknown, projectId: string) => ({ orgId: "org-1", userId: "user-1", projectId }),
+  createWebWorkflowApiCaller: () => ({
+    reports: {
+      finalQa: async (input: unknown) => record("reports.finalQa", input, { status: "passed" }),
+      finalQaFeedbackGate: async (input: unknown) => record("reports.finalQaFeedbackGate", input, { readyForUserAcceptance: true }),
+      uatCodeReviewHandoff: async (input: unknown) => record("reports.uatCodeReviewHandoff", input, { status: "ready" }),
+      recordUatCodeReviewDecision: async (input: unknown) => record("reports.recordUatCodeReviewDecision", input, { status: "approved" }),
+      applyConfiguredUatCodeReviewDecision: async (input: unknown) => record("reports.applyConfiguredUatCodeReviewDecision", input, { status: "applied" }),
+      runGeneratedE2eRegressionTests: async (input: unknown) => record("reports.runGeneratedE2eRegressionTests", input, { status: "passed" }),
+      reviewWorkbench: async (input: unknown) => record("reports.reviewWorkbench", input, { files: [] }),
+      saveReviewWorkbenchSession: async (input: unknown) => record("reports.saveReviewWorkbenchSession", input, { reviewId: "review-1", status: "saved" }),
+      loadReviewWorkbenchSession: async (input: unknown) => record("reports.loadReviewWorkbenchSession", input, { reviewId: "review-1", status: "loaded" }),
+      appendReviewWorkbenchAnnotation: async (input: unknown) => record("reports.appendReviewWorkbenchAnnotation", input, { reviewId: "review-1", status: "annotated" }),
+    },
+  }),
 }));
+
+function record(method: string, input: unknown, result: Record<string, unknown>) {
+  calls.push({ method, input });
+  return { projectId: (input as { projectId?: string }).projectId, ...result };
+}
 
 beforeEach(() => {
   calls.splice(0, calls.length);
-  loadShouldThrowNotFound = false;
+  projectPageShouldFail = false;
 });
 
 describe("/projects/[id]/reports +page.server.ts", () => {
-  let disposeScope: (() => void) | undefined;
-  beforeAll(() => {
-    disposeScope = useApplicationScope((_locals, projectId) => ({
-      em: { kind: "mock-em" },
-      ctx: { orgId: "org-1", userId: "user-1", projectId: projectId ?? null },
-    }));
-  });
-  afterAll(() => {
-    disposeScope?.();
-  });
-
-  test("server route uses service interfaces instead of direct application imports", () => {
+  test("server route uses report and workflow public APIs instead of application scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@work-management/interface/project-reports");
-    expect(source).toContain("@planning-review/interface/project-review-reports");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@work-management/application/");
-    expect(source).not.toContain("@planning-review/application/");
+    expect(source).toContain("createReportApiForEvent");
+    expect(source).toContain("createWebWorkflowApiCaller");
+    expect(source).not.toContain("requestServiceScope");
     expect(source).not.toContain("$lib/server/application-scope");
+    expect(source).not.toContain("@planning-review/interface/project-review-reports");
   });
 
-  test("load maps project reports and preserves not-found behavior", async () => {
+  test("load maps project reports and preserves sprint filter delegation", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
       params: { id: "project-1" },
@@ -117,41 +78,47 @@ describe("/projects/[id]/reports +page.server.ts", () => {
 
     expect(result.project.id).toBe("project-1");
     expect(result.selectedSprintId).toBe("sprint-1");
-    expect(calls).toEqual(["load:project-1:sprint-1"]);
+    expect(calls).toEqual([{ method: "reports.projectPage", input: { projectId: "project-1", sprintId: "sprint-1" } }]);
+  });
 
-    calls.splice(0, calls.length);
-    loadShouldThrowNotFound = true;
+  test("load propagates public API failure", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    projectPageShouldFail = true;
     await expect(mod.load({
       params: { id: "missing" },
       url: new URL("http://localhost/projects/missing/reports"),
       locals: {},
-    } as Parameters<typeof mod.load>[0])).rejects.toMatchObject({ status: 404 });
-    expect(calls).toEqual(["load:missing:"]);
+    } as Parameters<typeof mod.load>[0])).rejects.toThrow("Project not found");
+    expect(calls).toEqual([{ method: "reports.projectPage", input: { projectId: "missing", sprintId: undefined } }]);
   });
 
-  test("report workflow actions delegate through planning-review boundaries", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+  test("report workflow actions delegate through workflow public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
     const base = { params: { id: "project-1" }, locals: {} };
 
-    await mod.actions.finalQa({ ...base, request: form({ traceId: "trace-1" }) } as Parameters<typeof mod.actions.finalQa>[0]);
-    await mod.actions.finalQaGate({ ...base, request: form({ maxIterations: "3" }) } as Parameters<typeof mod.actions.finalQaGate>[0]);
+    await mod.actions.finalQa({ ...base, request: form({ traceId: "trace-1", taskIds: "task-1,task-2" }) } as Parameters<typeof mod.actions.finalQa>[0]);
+    await mod.actions.finalQaGate({ ...base, request: form({ maxIterations: "3", copyToWorktree: "a,b" }) } as Parameters<typeof mod.actions.finalQaGate>[0]);
     await mod.actions.uatHandoff({ ...base, request: form({ traceId: "trace-2" }) } as Parameters<typeof mod.actions.uatHandoff>[0]);
-    await mod.actions.uatDecision({ ...base, request: form({ decision: "approve_without_manual_review", reviewType: "uat" }) } as Parameters<typeof mod.actions.uatDecision>[0]);
+    await mod.actions.uatDecision({ ...base, request: form({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" }) } as Parameters<typeof mod.actions.uatDecision>[0]);
     await mod.actions.autoDecision({ ...base, request: form({ traceId: "trace-3" }) } as Parameters<typeof mod.actions.autoDecision>[0]);
     await mod.actions.e2eRun({ ...base, request: form({ runner: "bun", planOnly: "1" }) } as Parameters<typeof mod.actions.e2eRun>[0]);
 
-    expect(calls).toEqual([
-      "final-qa:project-1:trace-1",
-      "final-gate:project-1:3",
-      "handoff:project-1:trace-2",
-      "decision:project-1:approve_without_manual_review:uat",
-      "auto:project-1:trace-3",
-      "e2e:project-1:bun:plan",
+    expect(calls.map((call) => call.method)).toEqual([
+      "reports.finalQa",
+      "reports.finalQaFeedbackGate",
+      "reports.uatCodeReviewHandoff",
+      "reports.recordUatCodeReviewDecision",
+      "reports.applyConfiguredUatCodeReviewDecision",
+      "reports.runGeneratedE2eRegressionTests",
     ]);
+    expect(calls[0].input).toMatchObject({ projectId: "project-1", traceId: "trace-1", taskIds: ["task-1", "task-2"] });
+    expect(calls[1].input).toMatchObject({ maxIterations: 3, copyToWorktree: ["a", "b"] });
+    expect(calls[3].input).toMatchObject({ decision: "approve_without_manual_review", reviewType: "uat", e2eRunner: "bun" });
+    expect(calls[5].input).toMatchObject({ runner: "bun", planOnly: true });
   });
 
-  test("review workbench actions delegate through planning-review boundaries", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+  test("review workbench actions delegate through workflow public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const base = { params: { id: "project-1" }, locals: {} };
 
     await mod.actions.reviewWorkbench({ ...base, request: form({ reviewId: "review-1", filesJson: "[]", annotationsJson: "[]" }) } as Parameters<typeof mod.actions.reviewWorkbench>[0]);
@@ -162,11 +129,13 @@ describe("/projects/[id]/reports +page.server.ts", () => {
       request: form({ reviewId: "review-1", filePath: "src/app.ts", lineStart: "1", lineEnd: "1", annotationText: "fix" }),
     } as Parameters<typeof mod.actions.reviewSessionAnnotate>[0]);
 
-    expect(calls).toEqual([
-      "workbench:project-1:review-1",
-      "save:project-1:review-1",
-      "session-load:project-1:review-1",
-      "annotate:project-1:review-1:src/app.ts",
+    expect(calls.map((call) => call.method)).toEqual([
+      "reports.reviewWorkbench",
+      "reports.saveReviewWorkbenchSession",
+      "reports.loadReviewWorkbenchSession",
+      "reports.appendReviewWorkbenchAnnotation",
     ]);
+    expect(calls[0].input).toMatchObject({ projectId: "project-1", reviewId: "review-1", files: [], annotations: [] });
+    expect(calls[3].input).toMatchObject({ projectId: "project-1", reviewId: "review-1", filePath: "src/app.ts", lineStart: 1, lineEnd: 1, text: "fix" });
   });
 });
