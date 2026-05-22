@@ -23,13 +23,14 @@
  */
 
 import pc from "picocolors";
+import { WorkflowModeValues, type WorkflowMode } from "@fulcrum/shared-dto";
 
 /**
  * A canonical workflow mode: the TUI mirror of the web `@fulcrum/ui-kit`
  * `WorkflowMode`. The web primitive names AI Assist `assist`; the TUI uses the
  * same id so the surfaces stay locked.
  */
-export type WorkflowMode = "manual" | "play" | "discuss" | "assist";
+export type { WorkflowMode } from "@fulcrum/shared-dto";
 
 /** One mode affordance: id, OD glyph, label, and its per-Step selector. */
 export interface ModeAffordance {
@@ -48,15 +49,18 @@ export interface ModeAffordance {
 /** ModePicker chord prefix. Bare screen keys remain owned by each workbench. */
 export const MODE_CHORD_PREFIX = "m";
 
-/**
- * The four canonical mode affordances, in OD left→right order.
- */
-export const MODE_AFFORDANCES: readonly ModeAffordance[] = [
-  { mode: "manual", glyph: "✋", label: "Manual", keybinding: "m" },
-  { mode: "play", glyph: "▶", label: "Play", keybinding: "m p" },
-  { mode: "discuss", glyph: "💬", label: "Discuss", keybinding: "m d" },
-  { mode: "assist", glyph: "⊞", label: "AI Assist", keybinding: "m a", aliases: ["i"] },
-];
+const MODE_DETAILS: Record<WorkflowMode, Omit<ModeAffordance, "mode">> = {
+  manual: { glyph: "✋", label: "Manual", keybinding: "m" },
+  play: { glyph: "▶", label: "Play", keybinding: "m p" },
+  discuss: { glyph: "💬", label: "Discuss", keybinding: "m d" },
+  assist: { glyph: "⊞", label: "AI Assist", keybinding: "m a", aliases: ["i"] },
+};
+
+/** The four canonical mode affordances, in OD left→right order. */
+export const MODE_AFFORDANCES: readonly ModeAffordance[] = WorkflowModeValues.map((mode) => ({
+  mode,
+  ...MODE_DETAILS[mode],
+}));
 
 /** The mode-selector keystrokes claimed by the picker (`m` chord prefix only). */
 export const MODE_RESERVED_KEYS: readonly string[] = [MODE_CHORD_PREFIX];

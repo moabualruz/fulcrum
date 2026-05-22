@@ -2,6 +2,7 @@ import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { TuiSubscription, SubscriptionBridge } from "../subscriptions.ts";
 import { StatusBarWidget } from "../widgets/StatusBar.ts";
+import type { RunId, SpanId, TraceId } from "@fulcrum/shared-dto";
 import {
   renderStatusBadge,
   renderWorkbenchEmptyState,
@@ -10,15 +11,15 @@ import {
 } from "./runs-screen.ts";
 
 export interface TuiRun {
-  id: string;
+  id: RunId;
   agent: string;
   status: string;
   taskTitle?: string | null;
   projectName?: string | null;
   startedAt?: string | Date | null;
   logLines?: string[];
-  traceId?: string | null;
-  spanId?: string | null;
+  traceId?: TraceId | null;
+  spanId?: SpanId | null;
   observability?: TuiRunObservability;
 }
 
@@ -33,7 +34,7 @@ export interface TuiRunObservability {
 
 export interface RunsScreenOptions {
   /** Active trace id rendered into the error frame (CLI-TUI-UX.md §5). */
-  traceId?: string | null;
+  traceId?: TraceId | null;
   caller: {
     agent_runs: {
       list: () => Promise<TuiRun[]>;
@@ -162,7 +163,7 @@ export class RunsScreen {
 }
 
 export interface RunDetailScreenOptions {
-  runId: string;
+  runId: RunId;
   caller: {
     agent_runs: {
       get: (input: { id: string }) => Promise<TuiRun>;
@@ -171,12 +172,12 @@ export interface RunDetailScreenOptions {
   };
   /** caller subscription path: TuiCaller.runsSubscriptions -> EventBus-backed runsSubscriptions. */
   subscriptions?: SubscriptionBridge;
-  traceId?: string | null;
-  spanId?: string | null;
+  traceId?: TraceId | null;
+  spanId?: SpanId | null;
 }
 
 export interface RunUpdatePayload {
-  id: string;
+  id: RunId;
   status?: string;
   logLine?: string;
 }

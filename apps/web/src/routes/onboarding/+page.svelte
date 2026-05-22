@@ -38,7 +38,7 @@
 	 * mirrors hydrated markup and is never re-forced once the operator advances.
 	 */
 	import { Button, Card, Input, Kbd, ModeRow, TraceChip } from "@fulcrum/ui-kit";
-	import type { WorkflowMode } from "@fulcrum/ui-kit";
+	import type { WorkflowMode } from "@fulcrum/shared-dto";
 	import { goto } from "$app/navigation";
 	import { page } from "$app/state";
 

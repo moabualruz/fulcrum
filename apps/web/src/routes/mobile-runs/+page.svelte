@@ -22,6 +22,7 @@
    * is a responsive presentation of one run, not a separate data path.
    */
   import { page } from "$app/stores";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Button,
     Chip,
@@ -30,7 +31,6 @@
     RunFeedItem,
     StatusBadge,
     TraceChip,
-    type WorkflowMode,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

@@ -1,4 +1,5 @@
-import type { StageRailSubnavItem, WorkflowStage } from "@fulcrum/ui-kit";
+import type { WorkflowStage } from "@fulcrum/shared-dto";
+import type { StageRailSubnavItem } from "@fulcrum/ui-kit";
 import {
 	canonicalStageFor,
 	DEFAULT_CANONICAL_PROJECT,
@@ -8,7 +9,7 @@ import {
 	stageSubroute,
 } from "./route-map.ts";
 
-export type { WorkflowStage } from "@fulcrum/ui-kit";
+export type { WorkflowStage } from "@fulcrum/shared-dto";
 
 /**
  * Navigation data for the OD shell (DESIGN.md §3.1, IA-MAP.md §3).

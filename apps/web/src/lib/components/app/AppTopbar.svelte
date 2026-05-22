@@ -5,7 +5,8 @@
 	import Settings2 from "@lucide/svelte/icons/settings-2";
 	import UserCircle from "@lucide/svelte/icons/user-circle";
 
-	import { ScopeBar, TraceChip, type WorkflowStage } from "@fulcrum/ui-kit";
+	import { WorkflowStageValues, type WorkflowStage } from "@fulcrum/shared-dto";
+	import { ScopeBar, TraceChip } from "@fulcrum/ui-kit";
 	import { STAGE_WORKBENCH_ROUTE, stageRoute, withTrace } from "$lib/components/app/route-map.ts";
 	import { cn } from "$lib/utils.js";
 
@@ -45,7 +46,7 @@
 		{ id: "comfortable", label: "Comfortable" },
 	];
 
-	const stageOrder: WorkflowStage[] = ["capture", "plan", "build", "review", "ship", "operate"];
+	const stageOrder = WorkflowStageValues;
 
 	function stageForPath(path: string): WorkflowStage {
 		const lower = path.toLowerCase();

@@ -3,6 +3,8 @@
  * Tab state machine + keypress → action mapping.
  */
 
+import type { RunStatus } from "@fulcrum/shared-dto";
+
 export type RunDetailTab = "summary" | "transcript" | "diff" | "artifacts";
 
 export const TABS: readonly RunDetailTab[] = [
@@ -11,8 +13,6 @@ export const TABS: readonly RunDetailTab[] = [
   "diff",
   "artifacts",
 ] as const;
-
-type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 const CANCELLABLE: ReadonlySet<RunStatus> = new Set(["queued", "running"]);
 const RETRYABLE: ReadonlySet<RunStatus> = new Set(["failed", "cancelled"]);

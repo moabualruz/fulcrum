@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Badge, Button, EmptyState, ModeRow, StatusBadge, TraceChip } from "@fulcrum/ui-kit";
-  import type { WorkflowMode, WorkflowStatus } from "@fulcrum/ui-kit";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
+  import type { WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";
 
   /**

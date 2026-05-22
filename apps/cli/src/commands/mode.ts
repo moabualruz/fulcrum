@@ -22,6 +22,8 @@
  * header line so a moded Step is followable in web / TUI by the same trace id.
  */
 
+import type { WorkflowMode } from "@fulcrum/shared-dto";
+
 import { emitResult } from "../lib/cli-output.ts";
 
 /** A canonical workflow mode: the CLI mirror of the web `WorkflowMode`. */
@@ -30,12 +32,11 @@ export type ModeVerb = "manual" | "play" | "discuss" | "ai";
 /**
  * The four canonical modes (DESIGN.md §4.13). `glyph` + `label` match the web
  * `ModeRow` primitive exactly so the surfaces never drift. `verb` is the CLI
- * subcommand; `webMode` is the `@fulcrum/ui-kit` `WorkflowMode` it corresponds
- * to (the web primitive names AI Assist `assist`).
+ * subcommand; `webMode` is the shared `WorkflowMode` it corresponds to.
  */
 export const MODE_AFFORDANCES: ReadonlyArray<{
   verb: ModeVerb;
-  webMode: "manual" | "play" | "discuss" | "assist";
+  webMode: WorkflowMode;
   glyph: string;
   label: string;
   description: string;

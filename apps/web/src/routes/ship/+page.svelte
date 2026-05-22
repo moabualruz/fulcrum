@@ -36,6 +36,7 @@
    * fixture projection of that future model (PRD problem statement).
    */
   import { page } from "$app/state";
+  import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Button,
     EmptyState,
@@ -43,7 +44,6 @@
     ModeRow,
     StatusBadge,
     TraceChip,
-    type WorkflowMode,
     type WorkflowStatus,
   } from "@fulcrum/ui-kit";
   import { cn } from "$lib/utils.js";

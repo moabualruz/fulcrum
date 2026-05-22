@@ -15,6 +15,8 @@
  * and a planning run started here is followable in web / TUI by its trace id.
  */
 
+import { normalizeTraceId } from "@fulcrum/shared-dto";
+
 import { apiErrorCode, formatApiError } from "../api-errors.ts";
 import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
@@ -516,11 +518,6 @@ function formatHuman(value: unknown): string {
   if (Array.isArray(value) && value.length === 0) return "[]";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
   return String(value);
-}
-
-/** A 32-char lowercase-hex trace id passes through; anything else is unset. */
-function normalizeTraceId(value: string | undefined): string | undefined {
-  return value && /^[0-9a-f]{32}$/i.test(value) ? value.toLowerCase() : undefined;
 }
 
 function positionalArgs(argv: readonly string[]): string[] {

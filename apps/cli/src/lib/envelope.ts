@@ -12,6 +12,9 @@
  */
 
 import { randomBytes } from "node:crypto";
+import type { RunId, SpanId, TraceId, TraceIdentity } from "@fulcrum/shared-dto";
+
+export type { TraceIdentity } from "@fulcrum/shared-dto";
 
 /** The locked envelope schema identifier (`CLI-TUI-UX.md` §3). */
 export const ENVELOPE_SCHEMA = "fulcrum.cli.v1" as const;
@@ -63,14 +66,6 @@ export interface EnvelopeStreamSentinel {
   trace_id: string;
 }
 
-/** Trace identity carried by every envelope in a single command invocation. */
-export interface TraceIdentity {
-  trace_id: string;
-  span_id: string;
-  run_id: string | null;
-  project_id: string | null;
-}
-
 /** Inputs that fully describe one envelope payload. */
 export interface EnvelopeInput<TResult> {
   command: string;
@@ -97,19 +92,19 @@ function hexId(bytes: number): string {
 }
 
 /** 32-char lowercase hex trace id. Honours `FULCRUM_TRACE_ID` when set. */
-export function newTraceId(env: NodeJS.ProcessEnv = process.env): string {
+export function newTraceId(env: NodeJS.ProcessEnv = process.env): TraceId {
   const fromEnv = env["FULCRUM_TRACE_ID"];
   if (fromEnv && /^[0-9a-f]{32}$/i.test(fromEnv)) return fromEnv.toLowerCase();
   return hexId(16);
 }
 
 /** 16-char lowercase hex span id: fresh per command invocation. */
-export function newSpanId(): string {
+export function newSpanId(): SpanId {
   return hexId(8);
 }
 
 /** 26-char Crockford-base32 ULID-shaped run id. */
-export function newRunId(now: () => number = Date.now): string {
+export function newRunId(now: () => number = Date.now): RunId {
   let time = now();
   const timeChars: string[] = [];
   for (let i = 9; i >= 0; i -= 1) {
