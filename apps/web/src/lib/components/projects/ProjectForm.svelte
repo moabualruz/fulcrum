@@ -93,7 +93,7 @@
 			bind:value={slugValue}
 			oninput={onSlugInput}
 			aria-invalid={slugError ? "true" : undefined}
-			pattern="[a-z0-9][a-z0-9-]{0,63}"
+			pattern={"[a-z0-9][a-z0-9-]{0,63}"}
 			required
 			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
 		/>
