@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Select } from "@fulcrum/ui-kit";
+	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 	import { untrack } from "svelte";
 	import { enhance } from "$app/forms";
 	import type { SuperValidated } from "sveltekit-superforms";
@@ -35,6 +35,9 @@
 	const repoPathError = $derived<string | undefined>(form.errors?.repoPath?.[0]);
 	const templateError = $derived<string | undefined>(form.errors?.template?.[0]);
 	const parentIdError = $derived<string | undefined>(form.errors?.parentId?.[0]);
+	const parentProjectLabel = $derived(
+		parentProjects.find((project) => project.id === parentIdValue)?.name ?? "No parent",
+	);
 
 	function onNameInput(event: Event): void {
 		const target = event.target as HTMLInputElement;
@@ -121,20 +124,27 @@
 	</div>
 
 	<div class="flex flex-col gap-1.5">
-		<label for="project-kind" class="text-sm font-medium">Kind</label>
-		<select
-			id="project-kind"
+		<label id="project-kind-label" class="text-sm font-medium">Kind</label>
+		<input type="hidden" name="kind" value={kindValue} data-project-kind />
+		<Select
 			name="kind"
-			data-project-kind
-			data-slot="select"
 			bind:value={kindValue}
+			type="single"
+			data-project-kind-select
 			aria-invalid={kindError ? "true" : undefined}
-			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
 		>
-			<option value="workspace">Workspace</option>
-			<option value="project">Project</option>
-			<option value="subproject">Subproject</option>
-		</select>
+			<SelectTrigger
+				aria-labelledby="project-kind-label"
+				aria-invalid={kindError ? "true" : undefined}
+			>
+				<SelectValue placeholder="Project" />
+			</SelectTrigger>
+			<SelectContent>
+				<SelectItem value="workspace" label="Workspace" />
+				<SelectItem value="project" label="Project" />
+				<SelectItem value="subproject" label="Subproject" />
+			</SelectContent>
+		</Select>
 		{#if kindError}
 			<p data-error-kind class="text-destructive text-xs">{kindError}</p>
 		{/if}
@@ -161,18 +171,28 @@
 		</div>
 
 		<div class="flex flex-col gap-1.5">
-			<label for="project-template" class="text-sm font-medium">Template</label>
-			<select
-				id="project-template"
+			<label id="project-template-label" class="text-sm font-medium">Template</label>
+			<input type="hidden" name="template" value={templateValue} data-project-template />
+			<Select
 				name="template"
-				data-project-template
-				data-slot="select"
 				bind:value={templateValue}
+				type="single"
+				data-project-template-select
 				aria-invalid={templateError ? "true" : undefined}
-				class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
 			>
-				<option value="agent-os-software-project">Agent OS Software Project</option>
-			</select>
+				<SelectTrigger
+					aria-labelledby="project-template-label"
+					aria-invalid={templateError ? "true" : undefined}
+				>
+					<SelectValue placeholder="Agent OS Software Project" />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem
+						value="agent-os-software-project"
+						label="Agent OS Software Project"
+					/>
+				</SelectContent>
+			</Select>
 			{#if templateError}
 				<p data-error-template class="text-destructive text-xs">{templateError}</p>
 			{/if}
@@ -180,21 +200,28 @@
 	</div>
 
 	<div class="flex flex-col gap-1.5">
-		<label for="project-parent-id" class="text-sm font-medium">Parent project</label>
-		<select
-			id="project-parent-id"
+		<label id="project-parent-id-label" class="text-sm font-medium">Parent project</label>
+		<input type="hidden" name="parentId" value={parentIdValue} data-project-parent />
+		<Select
 			name="parentId"
-			data-project-parent
-			data-slot="select"
 			bind:value={parentIdValue}
+			type="single"
+			data-project-parent-select
 			aria-invalid={parentIdError ? "true" : undefined}
-			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs"
 		>
-			<option value="">No parent</option>
-			{#each parentProjects as project (project.id)}
-				<option value={project.id}>{project.name}</option>
-			{/each}
-		</select>
+			<SelectTrigger
+				aria-labelledby="project-parent-id-label"
+				aria-invalid={parentIdError ? "true" : undefined}
+			>
+				<SelectValue placeholder={parentProjectLabel} />
+			</SelectTrigger>
+			<SelectContent>
+				<SelectItem value="" label="No parent" />
+				{#each parentProjects as project (project.id)}
+					<SelectItem value={project.id} label={project.name} />
+				{/each}
+			</SelectContent>
+		</Select>
 		{#if parentIdError}
 			<p data-error-parent-id class="text-destructive text-xs">{parentIdError}</p>
 		{/if}

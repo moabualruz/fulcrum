@@ -241,7 +241,8 @@ function rendersUiKitSelectParts(source: string): boolean {
 
 // Existing import-only native selects are documented debt from the closure-9
 // review. Keeping the baseline explicit lets the standing gate fail any new
-// native Select reimplementation instead of false-passing by import alone.
+// native Select reimplementation instead of false-passing by import alone. A
+// file must be removed from this set as soon as it composes ui-kit Select parts.
 const DOCUMENTED_NATIVE_SELECT_SURFACES = new Set([
   "apps/web/src/routes/agents/+page.svelte",
   "apps/web/src/routes/boards/+page.svelte",
@@ -296,7 +297,6 @@ const DOCUMENTED_NATIVE_SELECT_SURFACES = new Set([
   "apps/web/src/routes/theme-picker/+page.svelte",
   "apps/web/src/routes/view-controls/+page.svelte",
   "apps/web/src/routes/views-custom-fields/+page.svelte",
-  "apps/web/src/lib/components/projects/ProjectForm.svelte",
   "apps/web/src/lib/components/repos/BranchSelector.svelte",
   "apps/web/src/lib/components/review/ReviewWorkbench.svelte",
   "apps/web/src/lib/components/saved-views/SavedViewFilterBuilder.svelte",
@@ -393,15 +393,20 @@ for (const rootRel of SURFACE_ROOTS) {
           });
         }
       }
-      if (
-        hasNativeSelectResponsibility(source) &&
-        !rendersUiKitSelectParts(source) &&
-        !DOCUMENTED_NATIVE_SELECT_SURFACES.has(rel)
-      ) {
+      const hasNativeSelect = hasNativeSelectResponsibility(source);
+      const rendersUiKitSelect = rendersUiKitSelectParts(source);
+      if (hasNativeSelect && !rendersUiKitSelect && !DOCUMENTED_NATIVE_SELECT_SURFACES.has(rel)) {
         violations.push({
           file: rel,
           rule: "native-select-reimplementation",
           detail: "renders a native select/listbox; use @fulcrum/ui-kit Select parts instead",
+        });
+      }
+      if (rendersUiKitSelect && DOCUMENTED_NATIVE_SELECT_SURFACES.has(rel)) {
+        violations.push({
+          file: rel,
+          rule: "stale-native-select-baseline",
+          detail: "composes ui-kit Select parts but remains in the documented native-select suppression baseline",
         });
       }
       const s = stem(abs);
