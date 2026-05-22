@@ -196,9 +196,12 @@ export class DoctorScreen {
         Math.max(20, renderer.width),
       ),
     );
+    for (const line of this.modePicker.renderPopover()) {
+      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
+    }
 
     renderer.separator();
-    renderer.writeln(c.dim("  j/k navigate  Enter expand  m/p/d modes  q back"));
+    renderer.writeln(c.dim("  j/k navigate  Enter expand  p play  d discuss  m picker  q back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 }

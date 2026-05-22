@@ -358,7 +358,8 @@ describe("TUI root navigation: OD stage launcher parity", () => {
       expect(rendered).toContain(expected.heading);
       expect(rendered).toContain(expected.chrome);
       expect(rendered).toContain(expected.mode);
-      expect(rendered).toContain("Manual [m a]");
+      expect(rendered).toContain("Manual [m]");
+      expect(rendered).toContain("Play [p]");
 
       app.stop();
     }
@@ -366,8 +367,8 @@ describe("TUI root navigation: OD stage launcher parity", () => {
 
   test("runs and doctor routes open canonical workbenches", async () => {
     const cases = [
-      { route: ":runs", chord: "b", chrome: "fulcrum · :runs", heading: "Stage: Build", pane: "live agent sessions" },
-      { route: ":doctor", chord: "o", chrome: "fulcrum · :doctor", heading: "Stage: Operate", pane: "status spine" },
+      { route: ":runs", chord: "b", chrome: "fulcrum · :runs", heading: "Build", pane: "live agent sessions" },
+      { route: ":doctor", chord: "o", chrome: "fulcrum · :doctor", heading: "Operate", pane: "status spine" },
     ] as const;
 
     for (const expected of cases) {
@@ -377,6 +378,7 @@ describe("TUI root navigation: OD stage launcher parity", () => {
       await routeApp.navigateColon(expected.route);
 
       const routeRendered = routeTty.plainText();
+      expect(routeApp.screen).not.toBe("nav");
       expect(routeRendered).toContain(expected.heading);
       expect(routeRendered).toContain(expected.chrome);
       expect(routeRendered).toContain("step modes");
@@ -390,12 +392,69 @@ describe("TUI root navigation: OD stage launcher parity", () => {
       await chordApp.handleKey(expected.chord);
 
       const chordRendered = chordTty.plainText();
+      expect(chordApp.screen).not.toBe("nav");
       expect(chordRendered).toContain(expected.heading);
       expect(chordRendered).toContain(expected.chrome);
       expect(chordRendered).toContain("step modes");
       expect(chordRendered).toContain(expected.pane);
       chordApp.stop();
     }
+  });
+
+  test("focused run route drives the visible footer and trace yanks", async () => {
+    const copied: string[] = [];
+    const tty = new FakeTTY({ columns: 140, rows: 40 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        ...createCaller(),
+        agent_runs: {
+          list: async () => [{
+            id: "run-root",
+            agent: "codex",
+            status: "running",
+            taskTitle: "Root run",
+            projectName: "Fulcrum",
+          }],
+          get: async (input) => ({
+            id: input.id,
+            agent: "codex",
+            status: "running",
+            taskTitle: "Focused run",
+            projectName: "Fulcrum",
+            logLines: ["boot"],
+            traceId: `trace-${input.id}`,
+            spanId: `span-${input.id}`,
+          }),
+          create: async (input) => ({ id: "run-new", agent: input.agent, status: "queued" }),
+          cancel: async () => ({ ok: true }),
+        },
+      },
+      traceContext: {
+        projectId: "fulcrum",
+        runId: "run-root",
+        spanId: "span-root",
+        traceId: "trace-root",
+      },
+      traceYankClipboard: { write: (value) => copied.push(value) },
+    });
+    await app.mount();
+    await app.navigateColon(":run/run-42");
+
+    const rendered = tty.plainText();
+    expect(rendered).toContain("RUN DETAIL");
+    expect(rendered).toContain("run: run-42");
+    expect(rendered).toContain("trace:run-42");
+    expect(rendered).toContain("span-run-42");
+
+    for (const key of ["t", "r", "s"] as const) {
+      await app.handleKey("y");
+      await app.handleKey(key);
+    }
+    expect(copied).toEqual(["trace-run-42", "run-42", "span-run-42"]);
+
+    app.stop();
   });
 
   test("palette and help are visible from the root launcher", async () => {
@@ -867,11 +926,9 @@ describe("TUI status vocabulary + empty/error contract: runs/planning/review", (
 //
 // Every Step-bearing TUI screen renders one ModePicker row carrying the four
 // canonical modes: ✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist: the same
-// action set as the web `@fulcrum/ui-kit` ModeRow. The modes are reached
-// through a collision-free `m` chord. These tests are the terminal-snapshot
-// proof that the row + its key hints render on the representative screens
-// runs-screen / review-screen / task-board / artifacts / doctor, and that the
-// `m` chord drives a mode selection without colliding with screen keys.
+// action set as the web `@fulcrum/ui-kit` ModeRow. The direct p/d/m keys match
+// CLI-TUI-UX.md §7.4: Play opens a picker, Discuss opens a thread, and m opens
+// the picker without committing a mode.
 // ───────────────────────────────────────────────────────────────────────────
 
 describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", () => {
@@ -894,9 +951,11 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     expect(snap).toContain("▶ Play");
     expect(snap).toContain("💬 Discuss");
     expect(snap).toContain("⊞ AI Assist");
-    // The collision-free `m`-chord key hints (interaction_assertion).
-    expect(snap).toContain("[m a]");
-    expect(snap).toContain("[m i]");
+    // Direct p/d/m/a key hints (interaction_assertion).
+    expect(snap).toContain("[m]");
+    expect(snap).toContain("[p]");
+    expect(snap).toContain("[d]");
+    expect(snap).toContain("[a]");
   }
 
   test("Build runs workbench (runs-screen.ts) renders the ModePicker row", async () => {
@@ -988,7 +1047,7 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     assertModeRow(tty.plainText());
   });
 
-  test("the `m` chord selects a Step mode on the runs workbench without colliding", async () => {
+  test("p/d/m honor the Play/Discuss/mode-picker contract on the runs workbench", async () => {
     const { RunsControlScreen } = await import("../screens/runs-screen.ts");
     const screen = new RunsControlScreen({
       caller: {
@@ -1005,19 +1064,24 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     });
     await screen.load();
 
-    // Bare `m` arms the chord; the selector commits the mode: `m d` → Discuss.
-    expect(await screen.handleKey("m")).toBe(true);
+    expect(await screen.handleKey("p")).toBe(true);
+    expect(screen.currentStepMode).toBe("play");
+    let rendered = await renderAsync(120, 32, screen);
+    expect(rendered).toContain("Play current step");
+    expect(rendered).toContain("Enter Play");
+
     expect(await screen.handleKey("d")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
+    rendered = await renderAsync(120, 32, screen);
+    expect(rendered).toContain("Discuss current step");
 
-    // Without the `m` prefix a bare `d` is the screen's own dispatch action,
-    // never a mode selection: the chord does not shadow screen keys.
+    expect(await screen.handleKey("m")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
-    expect(await screen.handleKey("d")).toBe(true); // dispatch overlay, not a mode
-    expect(screen.currentStepMode).toBe("discuss");
+    rendered = await renderAsync(120, 32, screen);
+    expect(rendered).toContain("Mode picker");
   });
 
-  test("the `m` chord selects a Step mode on the doctor workbench", async () => {
+  test("p/d/m honor the Play/Discuss/mode-picker contract on the doctor workbench", async () => {
     const { DoctorScreen } = await import("../screens/doctor.ts");
     const screen = new DoctorScreen({
       results: [
@@ -1030,8 +1094,11 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
         },
       ],
     });
+    expect(await screen.handleKey("p")).toBe(true);
+    expect(screen.currentStepMode).toBe("play");
+    expect(await screen.handleKey("d")).toBe(true);
+    expect(screen.currentStepMode).toBe("discuss");
     expect(await screen.handleKey("m")).toBe(true);
-    expect(await screen.handleKey("i")).toBe(true);
-    expect(screen.currentStepMode).toBe("assist");
+    expect(screen.currentStepMode).toBe("discuss");
   });
 });

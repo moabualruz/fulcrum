@@ -182,9 +182,12 @@ export class ArtifactsScreen {
         Math.max(20, renderer.width),
       ),
     );
+    for (const line of this.modePicker.renderPopover()) {
+      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
+    }
 
     renderer.writeln();
-    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m mode  Enter preview  q back", Math.max(20, renderer.width))));
+    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m picker  Enter preview  q back", Math.max(20, renderer.width))));
 
     if (this.overlay === "upload") {
       renderer.writeln();

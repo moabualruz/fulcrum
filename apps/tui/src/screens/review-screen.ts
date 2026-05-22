@@ -182,9 +182,12 @@ export class ReviewScreen {
         Math.max(20, renderer.width),
       ),
     );
+    for (const line of this.modePicker.renderPopover()) {
+      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
+    }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  m=mode  j/k=navigate  Enter=open  q=back"));
+    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  p play  d discuss  m picker  j/k=navigate  Enter=open  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 
@@ -201,7 +204,7 @@ export class ReviewScreen {
       return true;
     }
 
-    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`).
+    // Step mode picker direct keys.
     if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "R" || key === "r") {
@@ -288,4 +291,3 @@ export class ReviewScreen {
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
 }
-

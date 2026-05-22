@@ -622,7 +622,7 @@ export class TuiApp {
   private readonly traceYankHandler: TraceYankHandler;
   private keyHandler: ((key: string) => void) | null = null;
 
-  private currentScreen: Screen = "nav";
+  private currentScreen: TuiScreen = "nav";
   private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
   /**
@@ -848,17 +848,23 @@ export class TuiApp {
    * against the exact identity the footer renders.
    */
   private _statusFooter(): StatusBarWidget {
+    const focusedRun = this.currentRunForFooter;
+    const runId = focusedRun?.id ?? this.traceContext.runId ?? null;
+    const traceId = focusedRun
+      ? focusedRun.traceId ?? this.traceContext.traceId ?? null
+      : this.traceContext.traceId ?? null;
+    const spanId = focusedRun ? focusedRun.spanId ?? null : this.traceContext.spanId ?? null;
     return new StatusBarWidget({
       currentScreen: this._currentScreenLabel(),
-      orgName: this.statusInfo?.orgId ?? "local",
+      orgName: focusedRun?.projectName ?? this.statusInfo?.orgId ?? "local",
       branch: this.traceContext.projectId ?? "main",
-      run: this.traceContext.runId ?? null,
-      agent: this.inferenceModels[0]?.id ?? "claude-opus-4-7",
+      run: runId,
+      agent: focusedRun?.agent ?? this.inferenceModels[0]?.id ?? "claude-opus-4-7",
       mcpHealth: this.inferenceInfo.status === "ok" ? "ok" : this.inferenceInfo.status,
       mcpDegraded: this.inferenceInfo.tone !== "green",
-      traceId: this.traceContext.traceId ?? null,
-      runId: this.traceContext.runId ?? null,
-      spanId: this.traceContext.spanId ?? null,
+      traceId,
+      runId,
+      spanId,
       time: this._footerClock(),
       bellCount: this.bellCount,
       width: this.renderer.width,
@@ -999,7 +1005,7 @@ export class TuiApp {
           this.runDetailScreen?.render(this.renderer);
           break;
       }
-      if (this.domainScreen && this.currentScreen === "nav") {
+      if (this.domainScreen) {
         this._renderDomainScreen(this.domainScreen);
       }
       this._renderHelpOverlay();
@@ -1146,7 +1152,7 @@ export class TuiApp {
     // `mode` segment, which `StatusBarWidget` upper-cases: so `:ai` renders
     // as `:AI`.
     if (this.currentScreen === "ai-assist") return CHAT_PANE_FOOTER_MODE;
-    return screenTitle(this.currentScreen);
+    return screenTitle(this.currentScreen as Screen);
   }
 
   private _currentHelpBindings(): KeyBinding[] {
@@ -1207,6 +1213,7 @@ export class TuiApp {
   }
 
   private get currentRunForFooter(): TuiRun | null {
+    if (this.currentScreen !== "run" && this.domainScreen !== "runs") return null;
     return this.runDetailScreen?.currentRun ?? null;
   }
 
@@ -1876,7 +1883,7 @@ export class TuiApp {
   private async _navigate(screen: TuiScreen): Promise<void> {
     this.currentPath = null;
     this.domainScreen = null;
-    this.currentScreen = "nav";
+    this.currentScreen = screen;
     this.paletteOpen = false;
     this.paletteFeedback = null;
 
@@ -2413,7 +2420,7 @@ export class TuiApp {
   }
 
   /** Current screen name (for tests). */
-  get screen(): Screen {
+  get screen(): TuiScreen {
     return this.currentScreen;
   }
 
@@ -2588,7 +2595,7 @@ function domainTitle(screen: DomainScreen): string {
     search: "Search",
     skills: "Skills",
     components: "Components",
-    doctor: "Doctor/Settings",
+    doctor: "Doctor",
   };
   return titles[screen];
 }

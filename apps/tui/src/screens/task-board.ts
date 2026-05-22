@@ -154,7 +154,10 @@ export class TaskBoardScreen {
         Math.max(20, renderer.width),
       ),
     );
-    renderer.writeln(c.dim("  h/l move  Enter detail  c create  m mode  q back"));
+    for (const line of this.modePicker.renderPopover()) {
+      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
+    }
+    renderer.writeln(c.dim("  h/l move  Enter detail  c create  p play  d discuss  m picker  q back"));
 
     if (this.createActive) {
       renderer.writeln();
@@ -173,8 +176,7 @@ export class TaskBoardScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
-    // Step mode picker: the collision-free `m` chord (`m a/p/d/i`). Checked
-    // before list nav so an armed selector key is not stolen by h/l/j/k.
+    // Step mode picker direct keys. Checked before list nav so picker keys are not stolen.
     if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "h" || key === "\x1b[D") return this.moveCurrent(-1);
