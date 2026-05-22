@@ -59,6 +59,6 @@
 			onRetry={retryRoute}
 			surface="block"
 		/>
-		<a href="/" class={cn(buttonVariants({ variant: "default" }))}>{errorCopy.actionLabel}</a>
+		<a href="/" class={cn(buttonVariants({ variant: "primary" }))}>{errorCopy.actionLabel}</a>
 	</section>
 </main>

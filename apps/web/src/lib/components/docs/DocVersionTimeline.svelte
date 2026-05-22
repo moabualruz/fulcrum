@@ -156,7 +156,7 @@
                   <!-- Show diff toggle -->
                   <button
                     data-show-diff={version.id}
-                    class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-7 shrink-0")}
+                    class={cn(buttonVariants({ variant: "ghost", size: "md" }), "size-7 shrink-0 px-0")}
                     onclick={() => toggleDiff(version.id)}
                     title={showDiff[version.id] ? "Hide diff" : "Show diff"}
                     aria-expanded={showDiff[version.id] ?? false}
@@ -172,7 +172,7 @@
                   {#if !isCurrent}
                     <button
                       data-restore-version={version.id}
-                      class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-7 shrink-0")}
+                      class={cn(buttonVariants({ variant: "ghost", size: "md" }), "size-7 shrink-0 px-0")}
                       onclick={() => { confirmRestore = version.id; }}
                       title="Restore this version"
                     >

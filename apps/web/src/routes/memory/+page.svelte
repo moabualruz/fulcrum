@@ -52,7 +52,7 @@
 			data-create-memory
 			type="button"
 			onclick={() => (showCreate = !showCreate)}
-			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+			class={cn(buttonVariants({ variant: "primary" }), "gap-2")}
 		>
 			{showCreate ? "Cancel" : "Create memory"}
 		</button>
@@ -117,7 +117,7 @@
 			</div>
 			<button
 				type="submit"
-				class={cn(buttonVariants({ variant: "default" }))}
+				class={cn(buttonVariants({ variant: "primary" }))}
 			>Save memory</button>
 		</form>
 	{/if}
@@ -161,7 +161,7 @@
 		</select>
 		<button
 			type="submit"
-			class={cn(buttonVariants({ variant: "outline" }))}
+			class={cn(buttonVariants({ variant: "secondary" }))}
 		>Apply</button>
 	</form>
 

@@ -21,7 +21,7 @@
 		<a
 			href="/docs"
 			data-doc-history-error-back
-			class={cn(buttonVariants({ variant: "outline" }), "mt-3 inline-flex")}
+			class={cn(buttonVariants({ variant: "secondary" }), "mt-3 inline-flex")}
 		>Back to documents</a>
 	</section>
 </main>

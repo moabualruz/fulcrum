@@ -121,7 +121,7 @@
         <button
           type="submit"
           data-start-button
-          class={cn(buttonVariants({ variant: "default" }))}
+          class={cn(buttonVariants({ variant: "primary" }))}
         >Start sidecar</button>
       </form>
     {:else}
@@ -129,7 +129,7 @@
         <button
           type="submit"
           data-stop-button
-          class={cn(buttonVariants({ variant: "destructive" }))}
+          class={cn(buttonVariants({ variant: "danger" }))}
         >Stop sidecar</button>
       </form>
     {/if}
@@ -216,14 +216,14 @@
                       <button
                         type="submit"
                         data-start-backend={row.name.toLowerCase()}
-                        class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                        class={cn(buttonVariants({ variant: "primary", size: "sm" }))}
                       >Start</button>
                     </form>
                   {:else if row.action === "probe"}
                     <button
                       type="button"
                       data-probe-backend={row.name.toLowerCase()}
-                      class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                      class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                     >Probe</button>
                   {:else}
                     <span class={cn("text-xs text-muted-foreground")}>-</span>
@@ -288,14 +288,14 @@
                   data-pull-button={model.id}
                   type="button"
                   onclick={() => handlePull(model.id)}
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >Pull</button>
               {/if}
               {#if model.downloaded}
                 <button
                   data-set-default-button={model.id}
                   type="button"
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                   onclick={async () => {
                     await fetch(`/api/inference/models/${encodeURIComponent(model.id)}/set-default`, { method: "POST" });
                     await invalidateAll();
@@ -308,7 +308,7 @@
                     await fetch(`/api/inference/models/${encodeURIComponent(model.id)}`, { method: "DELETE" });
                     await invalidateAll();
                   }}
-                  class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "danger", size: "sm" }))}
                 >Remove</button>
               {/if}
             </div>
@@ -380,7 +380,7 @@
       <button
         type="submit"
         data-save-backend
-        class={cn(buttonVariants({ variant: "default" }))}
+        class={cn(buttonVariants({ variant: "primary" }))}
       >Save</button>
     </form>
   </section>

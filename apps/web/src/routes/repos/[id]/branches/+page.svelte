@@ -26,7 +26,7 @@
     </div>
     <form method="POST" action="?/create" use:enhance class={cn("flex gap-2")}>
       <input name="name" aria-label="Branch name" placeholder="new/branch" class={cn("h-10 rounded-md border border-input bg-background px-3 text-sm")} disabled={!payload.writeOpsEnabled} />
-      <button type="submit" data-new-branch disabled={!payload.writeOpsEnabled} class={cn(buttonVariants({ variant: "default" }))}>New branch</button>
+      <button type="submit" data-new-branch disabled={!payload.writeOpsEnabled} class={cn(buttonVariants({ variant: "primary" }))}>New branch</button>
     </form>
   </header>
 
@@ -59,11 +59,11 @@
               <div class={cn("flex justify-end gap-2")}>
                 <form method="POST" action="?/checkout" use:enhance>
                   <input type="hidden" name="name" value={branch.name} />
-                  <button type="submit" disabled={!payload.writeOpsEnabled || branch.isCurrent} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Checkout</button>
+                  <button type="submit" disabled={!payload.writeOpsEnabled || branch.isCurrent} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Checkout</button>
                 </form>
                 <form method="POST" action="?/delete" use:enhance>
                   <input type="hidden" name="name" value={branch.name} />
-                  <button type="submit" disabled={!payload.writeOpsEnabled || branch.isDefault} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Delete</button>
+                  <button type="submit" disabled={!payload.writeOpsEnabled || branch.isDefault} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Delete</button>
                 </form>
               </div>
             </td>

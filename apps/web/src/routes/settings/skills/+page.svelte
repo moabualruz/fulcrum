@@ -248,7 +248,7 @@
     data-install-submit
     type="submit"
     disabled={installing}
-    class={cn(buttonVariants({ variant: "default" }))}
+    class={cn(buttonVariants({ variant: "primary" }))}
   >{installing ? "Installing…" : "Install"}</button>
   {#if installError}
     <span data-install-error class={cn("text-sm text-destructive")}>{installError}</span>

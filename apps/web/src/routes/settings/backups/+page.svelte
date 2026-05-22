@@ -64,7 +64,7 @@
     };
   }}>
     <button type="submit" data-create-backup disabled={creating}
-      class={cn(buttonVariants({ variant: "default" }))}>
+      class={cn(buttonVariants({ variant: "primary" }))}>
       {creating ? "Creating…" : "Create backup"}
     </button>
   </form>
@@ -95,7 +95,7 @@
         class={cn("text-sm")}
         onchange={(e) => { restoreFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-restore-submit disabled={!restoreFile}
-        class={cn(buttonVariants({ variant: "default" }))}>Preflight check</button>
+        class={cn(buttonVariants({ variant: "primary" }))}>Preflight check</button>
       <button type="submit" data-backup-verify disabled={!restoreFile}
         class={cn(buttonVariants({ variant: "secondary" }))}>Verify backup</button>
     </div>
@@ -120,7 +120,7 @@
         <button onclick={() => { confirmOpen = false; }} class={cn(buttonVariants({ variant: "ghost" }))}>Cancel</button>
         <form method="POST" action="?/confirmRestore" use:enhance>
           <input type="hidden" name="entityCounts" value={JSON.stringify(preflightCounts)} />
-          <button type="submit" data-confirm-restore class={cn(buttonVariants({ variant: "default" }))}>Confirm restore</button>
+          <button type="submit" data-confirm-restore class={cn(buttonVariants({ variant: "primary" }))}>Confirm restore</button>
         </form>
       </div>
     </div>

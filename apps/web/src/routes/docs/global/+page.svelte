@@ -60,7 +60,7 @@
 		href="/docs/new"
 		data-new-doc
 		data-slot="button"
-		class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+		class={cn(buttonVariants({ variant: "primary" }), "gap-2")}
 	>New document</a>
 </header>
 
@@ -76,7 +76,7 @@
 		<a
 			href="/docs/global"
 			data-global-docs-error-retry
-			class={cn(buttonVariants({ variant: "outline" }), "mt-3 inline-flex")}
+			class={cn(buttonVariants({ variant: "secondary" }), "mt-3 inline-flex")}
 		>Retry</a>
 	</section>
 {:else if data.tree.length === 0}

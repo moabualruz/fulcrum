@@ -42,7 +42,7 @@
 			<button
 				type="submit"
 				data-sync-now
-				class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+				class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 			>Sync now</button>
 		</form>
 	</header>

@@ -33,7 +33,7 @@
 		<h2 class={cn("text-sm font-semibold")}>{title}</h2>
 		<a
 			href="/docs/new?scope={scope}"
-			class={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}
+			class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-8")}
 		>New</a>
 	</header>
 

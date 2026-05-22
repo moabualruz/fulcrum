@@ -341,7 +341,7 @@
                 Model
                 <input name="model" value="" class={cn(fieldCls, "text-xs")} />
               </label>
-              <button type="submit" data-task-run-submit class={cn(buttonVariants({ variant: "default" }))}>Run</button>
+              <button type="submit" data-task-run-submit class={cn(buttonVariants({ variant: "primary" }))}>Run</button>
             </div>
             <input name="prompt" value={`Run dependency tree for ${payload.task.id}`} class={cn(fieldCls, "text-xs")} />
           </form>
@@ -355,7 +355,7 @@
           <button
             type="button"
             data-task-ai-assist-open
-            class={cn(buttonVariants({ variant: "default" }), "md:col-span-2 justify-center")}
+            class={cn(buttonVariants({ variant: "primary" }), "md:col-span-2 justify-center")}
             onclick={() => (aiAssistOpen = true)}
           >
             Start AI Assist
@@ -513,8 +513,8 @@
 
       <!-- Actions -->
       <footer class="flex items-center gap-2 border-t border-border pt-4">
-        <button type="button" data-task-save onclick={onSave} class={cn(buttonVariants({ variant: "default" }))}>Save</button>
-        <button type="button" data-task-delete onclick={onDelete} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
+        <button type="button" data-task-save onclick={onSave} class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
+        <button type="button" data-task-delete onclick={onDelete} class={cn(buttonVariants({ variant: "danger" }))}>Delete</button>
       </footer>
 
       {#if aiAssistOpen}
@@ -633,7 +633,7 @@
             <input type="hidden" name="agent" value={aiAssistAgent} />
             <input type="hidden" name="route" value={aiAssistRoute} />
             <input type="hidden" name="workspacePath" value={aiAssistWorkspacePath} />
-            <button type="submit" data-ai-assist-start-session class={cn(buttonVariants({ variant: "default" }), "w-full")}>
+            <button type="submit" data-ai-assist-start-session class={cn(buttonVariants({ variant: "primary" }), "w-full")}>
               Start session
             </button>
           </form>

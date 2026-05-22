@@ -36,6 +36,6 @@
 	disabled={busy}
 	{onclick}
 	class={cn(
-		buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
+		buttonVariants({ variant: active ? "primary" : "secondary", size: "sm" }),
 	)}
 >{active ? "Active project" : "Set active"}</button>

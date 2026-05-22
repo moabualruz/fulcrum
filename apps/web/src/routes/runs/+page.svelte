@@ -156,7 +156,7 @@
       <button
         type="button"
         data-action="reassign"
-        class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         onclick={() => reassignOpen = !reassignOpen}
       >Reassign agent</button>
     </div>

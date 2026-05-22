@@ -452,7 +452,7 @@
             class={cn("cwd-input rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground")}
           />
           {#if canUseFolderPicker}
-            <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "folder-picker-btn")} onclick={chooseWorkingDirectory}>
+            <button type="button" class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "folder-picker-btn")} onclick={chooseWorkingDirectory}>
               Choose folder
             </button>
           {/if}
@@ -469,10 +469,10 @@
     <button type="button" disabled={!model.controls.canPrompt} class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>
       Prompt
     </button>
-    <button type="button" disabled={!model.controls.canCancel} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+    <button type="button" disabled={!model.controls.canCancel} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
       Cancel
     </button>
-    <button type="button" disabled={!model.controls.canDisconnect} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+    <button type="button" disabled={!model.controls.canDisconnect} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
       Disconnect
     </button>
     <button type="button" disabled={!model.controls.canAbort} onclick={requestAbort} class={cn(buttonVariants({ variant: "danger", size: "sm" }), "abort-btn")}>
@@ -480,7 +480,7 @@
     </button>
     {#if model.controls.canPauseSession}
       <form method="POST" action="?/pauseSession">
-        <button type="submit" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "pause-btn border-amber-500/60 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300")}>
+        <button type="submit" class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "pause-btn border-amber-500/60 text-amber-700 hover:bg-amber-500/10 dark:text-amber-300")}>
           Pause
         </button>
       </form>
@@ -534,7 +534,7 @@
             <textarea name="note" required data-abort-note class={cn("min-h-24 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground")} placeholder="Why this AI Assist session is being stopped"></textarea>
           </label>
           <div class={cn("flex justify-end gap-2")}>
-            <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
+            <button type="button" data-abort-cancel class={cn(buttonVariants({ variant: "secondary", size: "sm" }))} onclick={() => (abortConfirmOpen = false)}>
               Keep running
             </button>
             <button type="submit" data-abort-confirm class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>
@@ -622,7 +622,7 @@
           <button
             data-traffic-pause
             type="submit"
-            class={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs")}
+            class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "text-xs")}
           >
             {model.traffic.paused ? "Resume" : "Pause"}
           </button>
@@ -725,7 +725,7 @@
                           <button type="button" class={cn(buttonVariants({ variant: "primary", size: "sm" }), "diff-accept-btn h-7 px-2 text-xs")}>
                             Accept
                           </button>
-                          <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "diff-reject-btn h-7 px-2 text-xs")}>
+                          <button type="button" class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "diff-reject-btn h-7 px-2 text-xs")}>
                             Reject
                           </button>
                         </div>
@@ -791,12 +791,12 @@
               {#if checkpoint.id === newestCheckpointId}
                 <form method="POST" action="?/restoreCheckpoint">
                   <input type="hidden" name="checkpointId" value={checkpoint.id} />
-                  <button type="submit" data-restore-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                  <button type="submit" data-restore-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
                     Resume from checkpoint
                   </button>
                 </form>
               {:else}
-                <button type="button" data-fork-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (forkCheckpointId = checkpoint.id)}>
+                <button type="button" data-fork-checkpoint={checkpoint.id} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))} onclick={() => (forkCheckpointId = checkpoint.id)}>
                   Fork into new session
                 </button>
               {/if}
@@ -815,7 +815,7 @@
           This restores {forkCheckpoint.label ?? forkCheckpoint.id} into a new AI Assist session.
         </p>
         <div class={cn("mt-4 flex justify-end gap-2")}>
-          <button type="button" data-fork-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (forkCheckpointId = null)}>
+          <button type="button" data-fork-cancel class={cn(buttonVariants({ variant: "secondary", size: "sm" }))} onclick={() => (forkCheckpointId = null)}>
             Cancel
           </button>
           <form method="POST" action="?/forkFromCheckpoint">
@@ -880,7 +880,7 @@
               <button
                 type="submit"
                 data-permission-option={option.optionId}
-                class={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full justify-center", permissionOptionClass(option.optionId, option.kind))}
+                class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full justify-center", permissionOptionClass(option.optionId, option.kind))}
               >
                 {option.name}
               </button>
@@ -916,7 +916,7 @@
             <div class={cn("flex flex-wrap gap-2 sm:justify-end")}>
               <form method="POST" action="?/resumeSavedSession">
                 <input type="hidden" name="savedSessionId" value={session.id} />
-                <button type="submit" data-resume-session={session.id} class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+                <button type="submit" data-resume-session={session.id} class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>
                   Resume
                 </button>
               </form>
@@ -938,7 +938,7 @@
           This removes the saved AI Assist session from this list. Running agent work is not deleted from disk.
         </p>
         <div class={cn("mt-4 flex justify-end gap-2")}>
-          <button type="button" data-delete-session-cancel class={cn(buttonVariants({ variant: "outline", size: "sm" }))} onclick={() => (deleteSessionId = null)}>
+          <button type="button" data-delete-session-cancel class={cn(buttonVariants({ variant: "secondary", size: "sm" }))} onclick={() => (deleteSessionId = null)}>
             Keep session
           </button>
           <form method="POST" action="?/deleteSavedSession">
@@ -956,7 +956,7 @@
     <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
       <h3 class={cn("text-sm font-medium")}>Messages</h3>
       {#if autoscrollLocked}
-        <button type="button" class={cn(buttonVariants({ variant: "outline", size: "sm" }), "autoscroll-lock-btn text-xs")} onclick={resumeAutoscroll}>
+        <button type="button" class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "autoscroll-lock-btn text-xs")} onclick={resumeAutoscroll}>
           Resume autoscroll
         </button>
       {/if}

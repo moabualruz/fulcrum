@@ -22,7 +22,7 @@
 			<a
 				href="/docs"
 				data-doc-edit-error-back
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Back to documents</a>
 		</div>
 	</section>

@@ -21,8 +21,8 @@
       <div class={cn("mt-1 font-mono text-xs text-muted-foreground")}>{payload.commit.sha}</div>
     </div>
     <div class={cn("flex gap-2")}>
-      <a href="?view=unified" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Unified</a>
-      <a href="?view=split" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Split</a>
+      <a href="?view=unified" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Unified</a>
+      <a href="?view=split" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Split</a>
     </div>
   </header>
 

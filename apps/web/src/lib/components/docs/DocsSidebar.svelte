@@ -99,7 +99,7 @@
     <h2 class={cn("text-sm font-semibold truncate")}>{title}</h2>
     <button
       data-new-doc
-      class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-6 shrink-0")}
+      class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "size-6 shrink-0 px-0")}
       onclick={() => { showNewDocInput = !showNewDocInput; }}
       title="New document"
       aria-label="New document"
