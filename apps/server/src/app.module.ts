@@ -18,6 +18,7 @@ import { ThemeSettingsApiModule } from "@platform-core/interface/http/theme-sett
 import { AuthPublicApiModule } from "@identity-access/interface/http/auth-public-api.controller.ts";
 import { InvitationPublicApiModule } from "@identity-access/interface/http/invitation-public-api.controller.ts";
 import { OrganizationPublicApiModule } from "@identity-access/interface/http/organization-public-api.controller.ts";
+import { AgentProfilePublicApiModule } from "@execution-orchestration/interface/http/agent-profile-public-api.controller.ts";
 import { AgentRunPublicApiModule } from "@execution-orchestration/interface/http/agent-run-public-api.controller.ts";
 import { RoutingPublicApiModule } from "@execution-orchestration/interface/http/routing-public-api.controller.ts";
 import { ConnectorPublicApiModule } from "@integration-hub/interface/http/connector-public-api.controller.ts";
@@ -68,6 +69,7 @@ Module({
     AuthPublicApiModule,
     InvitationPublicApiModule,
     OrganizationPublicApiModule,
+    AgentProfilePublicApiModule,
     AgentRunPublicApiModule,
     RoutingPublicApiModule,
     ConnectorPublicApiModule,

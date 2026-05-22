@@ -1,6 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { listProjectRuns } from "@execution-orchestration/interface/run-pages.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createAgentRunApiForEvent } from "$lib/server/agent-run-api";
 import { ensureProjectExists } from "$lib/server/project-api";
 
 export const load: PageServerLoad = async (event) => {
@@ -11,8 +10,7 @@ export const load: PageServerLoad = async (event) => {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, params.id);
-        const runs = await listProjectRuns(em, ctx);
+        const runs = await createAgentRunApiForEvent(event).runs.projectRuns({ projectId: params.id });
         return { runs };
       })(),
     },
