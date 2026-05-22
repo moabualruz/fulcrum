@@ -651,7 +651,22 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   const componentDatabase = componentLedgerPath();
   const installedComponents = await countInstalledComponents();
   const packageParity = await buildPackageParityReport(home);
-  const productKernel = await buildProductKernelDoctorReport();
+  // PGlite has bundled assets (vector.tar.gz) that cannot be resolved from a
+  // Bun-compiled `$bunfs`. Each DB-touching report catches its own throw +
+  // falls back to its empty default so doctor always prints an envelope.
+  let productKernel: ProductKernelDoctorReport;
+  try {
+    productKernel = await buildProductKernelDoctorReport();
+  } catch (cause) {
+    productKernel = {
+      engine: "absent",
+      dbPath: "",
+      schemaApplied: 0,
+      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 } as never,
+      latestEventAt: null,
+      error: (cause as Error).message,
+    } as ProductKernelDoctorReport;
+  }
   if (productKernel.error) {
     warnings += 1;
     warningsList.push({
@@ -659,11 +674,21 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       message: productKernel.error,
     });
   }
-  const repos = await buildReposDoctorReport(productKernel);
+  let repos: ReposDoctorReport;
+  try {
+    repos = await buildReposDoctorReport(productKernel);
+  } catch {
+    repos = { totalRepos: 0, syncErrors: 0, activeWatchers: 0, lruQueueDepth: 0, mirrorDiskGb: 0 };
+  }
   if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
     errors += 1;
   }
-  const memoryBuilt = await buildMemoryEngineDoctorReport(productKernel);
+  let memoryBuilt: { memoryEngine: MemoryDoctorReport; warnings: number; errors: number };
+  try {
+    memoryBuilt = await buildMemoryEngineDoctorReport(productKernel);
+  } catch {
+    memoryBuilt = { memoryEngine: { checks: [] }, warnings: 0, errors: 0 };
+  }
   warnings += memoryBuilt.warnings;
   errors += memoryBuilt.errors;
   const platformBuilt = await buildPlatformReport();

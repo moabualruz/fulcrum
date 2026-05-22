@@ -426,8 +426,17 @@ export class TaskPublicStore {
 
   private async resolveProject(input: TaskScope): Promise<FulcrumProject | null> {
     if (!input.projectId) return null;
-    return await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({
+    // Accept either canonical UUID or slug — web routes (e.g. /projects/<slug>/board)
+    // pass the slug; the public API and direct CLI calls pass the UUID. Either
+    // identifier resolves to the same workspace-scoped project.
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({
       id: input.projectId,
+      workspaceId: input.orgId,
+    });
+    if (byId) return byId;
+    return await repo.findOneBy({
+      slug: input.projectId,
       workspaceId: input.orgId,
     });
   }

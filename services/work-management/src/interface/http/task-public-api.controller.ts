@@ -231,6 +231,61 @@ export class TaskPublicApiService {
     return { id, traceId: extractTraceId(task) ?? undefined };
   }
 
+  // NOTE: listBoardWorkItems / createBoardWorkItem / bulk-status / bulk-delete
+  // are declared here, BEFORE `getTask`, so NestJS RouterExplorer maps the
+  // literal `tasks/board` and `tasks/board/bulk-*` GET/POST routes before the
+  // parametric `tasks/:id` route. Reordering matters: the scanner walks
+  // class methods in source order and Express picks the first matching route.
+  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
+    this.requirePublicApiFeature();
+    // Board list reads from the canonical `fulcrum_tasks` table via
+    // TaskPublicStore so it returns the same rows the plain `/api/v1/tasks`
+    // endpoint does. Without this, the legacy `tasks` table view returned 0
+    // rows for any task created through the public API.
+    const store = this.requireStore();
+    const tasks = await this.mapAppErrors(() =>
+      store.listTasks({
+        orgId: query.orgId,
+        userId: query.userId ?? "local",
+        projectId: resolveProjectId(query),
+        includeDeleted: false,
+      })
+    );
+    return tasks.map((task) => toJsonDates({
+      id: task.id,
+      title: task.title,
+      status: task.status ?? "todo",
+      priority: task.priority ?? 0,
+      project_id: task.projectId,
+      updated_at: task.updatedAt,
+    }));
+  }
+
+  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
+    this.requirePublicApiFeature();
+    return toJsonDates(await this.mapAppErrors(() =>
+      createBoardWorkItem(this.requireDataSource().manager, boardContext(body), {
+        title: body.title,
+        status: body.status,
+        projectId: resolveProjectId(body),
+      })
+    ));
+  }
+
+  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
+    this.requirePublicApiFeature();
+    return await this.mapAppErrors(() =>
+      bulkUpdate(this.requireDataSource().manager, boardContext(body), body.ids, { status: body.status })
+    );
+  }
+
+  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
+    this.requirePublicApiFeature();
+    return await this.mapAppErrors(() =>
+      bulkDelete(this.requireDataSource().manager, boardContext(body), body.ids)
+    );
+  }
+
   async getTask(params: TaskIdParamsDto, query: TaskRequestContextDto): Promise<unknown> {
     const task = await this.requireApplication().getTask({
       orgId: query.orgId,
@@ -361,25 +416,10 @@ export class TaskPublicApiService {
     }
   }
 
-  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
-    this.requirePublicApiFeature();
-    const rows = await this.mapAppErrors(() =>
-      listBoardTaskRows(this.requireDataSource().manager, boardContext(query))
-    );
-    return rows.map(toJsonDates);
-  }
-
-  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
-    this.requirePublicApiFeature();
-    return toJsonDates(await this.mapAppErrors(() =>
-      createBoardWorkItem(this.requireDataSource().manager, boardContext(body), {
-        title: body.title,
-        status: body.status,
-        projectId: resolveProjectId(body),
-      })
-    ));
-  }
-
+  // /tasks/board/:id updates + move stay below the parametric /tasks/:id
+  // declarations because their literal prefix (`tasks/board/...`) does NOT
+  // collide with `tasks/:id`: Express matches segment-by-segment and
+  // `tasks/board/...` cannot be served by a `tasks/:id` route.
   async updateBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardPatchBodyDto): Promise<unknown> {
     this.requirePublicApiFeature();
     return toJsonDates(await this.mapAppErrors(() =>
@@ -402,20 +442,6 @@ export class TaskPublicApiService {
         status: body.status,
       })
     ));
-  }
-
-  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
-    this.requirePublicApiFeature();
-    return await this.mapAppErrors(() =>
-      bulkUpdate(this.requireDataSource().manager, boardContext(body), body.ids, { status: body.status })
-    );
-  }
-
-  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
-    this.requirePublicApiFeature();
-    return await this.mapAppErrors(() =>
-      bulkDelete(this.requireDataSource().manager, boardContext(body), body.ids)
-    );
   }
 
   private requireApplication(): TaskPublicApplication {
@@ -481,6 +507,13 @@ export class TaskPublicApiService {
     }
     return this.dataSource;
   }
+
+  private requireStore(): TaskPublicStore {
+    if (!this.store) {
+      throw new InternalServerErrorException("Task public store is not configured.");
+    }
+    return this.store;
+  }
 }
 
 export class TaskBoardScopeDto {
@@ -532,6 +565,26 @@ export class TaskPublicApiController {
     return await this.tasks.createTask(body);
   }
 
+  // Board literal routes declared BEFORE `getTask`/`patchTask` (the parametric
+  // `tasks/:id` routes) so NestJS RouterExplorer maps the literal `tasks/board`
+  // first — otherwise Express matches `tasks/:id` with `id="board"` and the
+  // board GET 404s.
+  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
+    return await this.tasks.listBoardWorkItems(query);
+  }
+
+  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
+    return await this.tasks.createBoardWorkItem(body);
+  }
+
+  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
+    return await this.tasks.bulkUpdateBoardWorkItems(body);
+  }
+
+  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
+    return await this.tasks.bulkDeleteBoardWorkItems(body);
+  }
+
   async getTask(params: TaskIdParamsDto, query: TaskRequestContextDto): Promise<unknown> {
     return await this.tasks.getTask(params, query);
   }
@@ -570,14 +623,6 @@ export class TaskPublicApiController {
     return await this.tasks.importTasksCsv(body);
   }
 
-  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
-    return await this.tasks.listBoardWorkItems(query);
-  }
-
-  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
-    return await this.tasks.createBoardWorkItem(body);
-  }
-
   async updateBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardPatchBodyDto): Promise<unknown> {
     return await this.tasks.updateBoardWorkItem(params, body);
   }
@@ -589,14 +634,9 @@ export class TaskPublicApiController {
   async moveBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardMoveBodyDto): Promise<unknown> {
     return await this.tasks.moveBoardWorkItem(params, body);
   }
-
-  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
-    return await this.tasks.bulkUpdateBoardWorkItems(body);
-  }
-
-  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
-    return await this.tasks.bulkDeleteBoardWorkItems(body);
-  }
+  // Bulk endpoints (`bulkUpdateBoardWorkItems`/`bulkDeleteBoardWorkItems`) are
+  // declared earlier in the class so RouterExplorer maps their literal paths
+  // before the parametric `tasks/:id` patches.
 }
 
 export class TaskPublicApiModule {

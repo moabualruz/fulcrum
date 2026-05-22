@@ -95,6 +95,13 @@ export async function startFulcrumNestServerWithLifecycle(
   const readiness = createRuntimeReadiness();
   const env = options.env ?? process.env;
 
+  // AGENTS.md: local dev defaults `public-api` on so web + CLI + TUI work
+  // out-of-the-box. Inject only when FULCRUM_FEATURES is unset — an explicit
+  // empty string ("") still disables, matching prod's opt-in posture.
+  if (typeof process.env.FULCRUM_FEATURES === "undefined") {
+    process.env.FULCRUM_FEATURES = "public-api";
+  }
+
   try {
     recordStartupStep(readiness, "config", options.runtimeLog);
     const port = options.port ?? resolveFulcrumServerPort(env);

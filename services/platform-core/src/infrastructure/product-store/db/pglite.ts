@@ -20,8 +20,29 @@ export async function openPglite(dataDir: string): Promise<ProductDb> {
     await mkdir(dataDir, { recursive: true });
   }
   const { PGlite } = await import("@electric-sql/pglite");
-  const { vector } = await import("@electric-sql/pglite/vector");
-  const db = new PGlite(dataDir, { extensions: { vector } });
+  // The vector extension ships as a tarball PGlite extracts on first run. A
+  // Bun-compiled CLI binary cannot load that tarball from its embedded
+  // `$bunfs` (`Extension bundle not found: file:///$bunfs/vector.tar.gz`).
+  // Inside the compiled binary, skip the extension entirely — non-vector
+  // queries keep working; only embedding / similarity calls degrade. Outside
+  // the compiled binary, load it normally and fall back silently on failure.
+  let vectorExtension: unknown = null;
+  if (!isCompiledBunBinary()) {
+    try {
+      // Use a string-keyed dynamic import so `bun build --compile` does NOT
+      // statically resolve + bundle the vector.tar.gz asset. The compiled
+      // binary cannot read tarballs from its embedded `$bunfs`.
+      const vectorModule = "@electric-sql/pglite/vector";
+      const mod = await import(vectorModule);
+      vectorExtension = (mod as { vector?: unknown }).vector ?? null;
+    } catch {
+      vectorExtension = null;
+    }
+  }
+  const options = vectorExtension
+    ? { extensions: { vector: vectorExtension as never } }
+    : undefined;
+  const db = new PGlite(dataDir, options);
   await db.waitReady;
   return {
     engine: "pglite",
