@@ -154,10 +154,7 @@ export class TaskBoardScreen {
         Math.max(20, renderer.width),
       ),
     );
-    for (const line of this.modePicker.renderPopover()) {
-      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
-    }
-    renderer.writeln(c.dim("  h/l move  Enter detail  c create  p play  d discuss  m picker  q back"));
+    renderer.writeln(c.dim("  h/l move  Enter detail  c create  m/m p/m d/m a step modes  q back"));
 
     if (this.createActive) {
       renderer.writeln();

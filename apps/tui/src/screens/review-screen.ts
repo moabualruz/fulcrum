@@ -182,12 +182,9 @@ export class ReviewScreen {
         Math.max(20, renderer.width),
       ),
     );
-    for (const line of this.modePicker.renderPopover()) {
-      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
-    }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  p play  d discuss  m picker  j/k=navigate  Enter=open  q=back"));
+    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  m/m p/m d/m a step modes  j/k=navigate  Enter=open  q=back"));
     renderStageWorkbenchFooter(renderer, this.scope);
   }
 

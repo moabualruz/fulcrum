@@ -358,8 +358,7 @@ describe("TUI root navigation: OD stage launcher parity", () => {
       expect(rendered).toContain(expected.heading);
       expect(rendered).toContain(expected.chrome);
       expect(rendered).toContain(expected.mode);
-      expect(rendered).toContain("Manual [m]");
-      expect(rendered).toContain("Play [p]");
+      expect(rendered).toContain("AI Assist [m a][m i]");
 
       app.stop();
     }
@@ -951,11 +950,9 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     expect(snap).toContain("▶ Play");
     expect(snap).toContain("💬 Discuss");
     expect(snap).toContain("⊞ AI Assist");
-    // Direct p/d/m/a key hints (interaction_assertion).
-    expect(snap).toContain("[m]");
-    expect(snap).toContain("[p]");
-    expect(snap).toContain("[d]");
-    expect(snap).toContain("[a]");
+    // The collision-free `m`-chord key hints (interaction_assertion).
+    expect(snap).toContain("[m a]");
+    expect(snap).toContain("[m i]");
   }
 
   test("Build runs workbench (runs-screen.ts) renders the ModePicker row", async () => {
@@ -1047,7 +1044,7 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     assertModeRow(tty.plainText());
   });
 
-  test("p/d/m honor the Play/Discuss/mode-picker contract on the runs workbench", async () => {
+  test("the `m` chord selects a Step mode on the runs workbench without colliding", async () => {
     const { RunsControlScreen } = await import("../screens/runs-screen.ts");
     const screen = new RunsControlScreen({
       caller: {
@@ -1064,24 +1061,21 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     });
     await screen.load();
 
-    expect(await screen.handleKey("p")).toBe(true);
-    expect(screen.currentStepMode).toBe("play");
-    let rendered = await renderAsync(120, 32, screen);
-    expect(rendered).toContain("Play current step");
-    expect(rendered).toContain("Enter Play");
-
+    // Bare `m` arms the chord; the selector commits the mode: `m d` → Discuss.
+    expect(await screen.handleKey("m")).toBe(true);
     expect(await screen.handleKey("d")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
-    rendered = await renderAsync(120, 32, screen);
-    expect(rendered).toContain("Discuss current step");
 
-    expect(await screen.handleKey("m")).toBe(true);
+    // Without the `m` prefix a bare lowercase `d` is ignored; uppercase `D`
+    // remains the dispatch action, so the chord does not shadow screen keys.
     expect(screen.currentStepMode).toBe("discuss");
-    rendered = await renderAsync(120, 32, screen);
-    expect(rendered).toContain("Mode picker");
+    expect(await screen.handleKey("d")).toBe(false);
+    expect(screen.currentStepMode).toBe("discuss");
+    expect(await screen.handleKey("D")).toBe(true);
+    expect(screen.currentStepMode).toBe("discuss");
   });
 
-  test("p/d/m honor the Play/Discuss/mode-picker contract on the doctor workbench", async () => {
+  test("the `m` chord selects a Step mode on the doctor workbench", async () => {
     const { DoctorScreen } = await import("../screens/doctor.ts");
     const screen = new DoctorScreen({
       results: [
@@ -1094,11 +1088,8 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
         },
       ],
     });
-    expect(await screen.handleKey("p")).toBe(true);
-    expect(screen.currentStepMode).toBe("play");
-    expect(await screen.handleKey("d")).toBe(true);
-    expect(screen.currentStepMode).toBe("discuss");
     expect(await screen.handleKey("m")).toBe(true);
-    expect(screen.currentStepMode).toBe("discuss");
+    expect(await screen.handleKey("i")).toBe(true);
+    expect(screen.currentStepMode).toBe("assist");
   });
 });

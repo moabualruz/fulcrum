@@ -240,51 +240,52 @@ describe("TUI widgets", () => {
 // Every Step-bearing TUI screen (runs / review / board / artifacts / doctor)
 // renders one ModePicker row exposing the four canonical modes: ✋ Manual /
 // ▶ Play / 💬 Discuss / ⊞ AI Assist: the same action set as the web
-// `@fulcrum/ui-kit` `ModeRow` primitive. The direct p/d/m keys match
-// CLI-TUI-UX.md §7.4: Play opens a picker, Discuss opens a thread, m opens the
-// picker without committing a mode.
+// `@fulcrum/ui-kit` `ModeRow` primitive. The modes are reached through a
+// collision-free `m` chord so they never shadow the palette (`:`), help (`?`),
+// or navigation chords. These snapshot tests lock the row labels + key hints.
 // ───────────────────────────────────────────────────────────────────────────
 
 describe("ModePicker: TUI per-Step mode affordance row", () => {
-  test("snapshot: the compact row renders all four mode labels + direct key hints", () => {
+  test("snapshot: the compact row renders all four mode labels + `m`-chord hints", () => {
     const line = stripAnsi(new ModePicker({ stepId: "run" }).render());
     // Mode labels: copy_assertion: Manual / Play / Discuss / AI Assist.
     expect(line).toContain("✋ Manual");
     expect(line).toContain("▶ Play");
     expect(line).toContain("💬 Discuss");
     expect(line).toContain("⊞ AI Assist");
-    // Key hints: every mode shows its direct p/d/m/a keybinding.
-    expect(line).toContain("[m]");
-    expect(line).toContain("[p]");
-    expect(line).toContain("[d]");
-    expect(line).toContain("[a]");
+    // Key hints: every mode shows its full `m`-chord keybinding.
+    expect(line).toContain("[m a]");
+    expect(line).toContain("[m p]");
+    expect(line).toContain("[m d]");
+    expect(line).toContain("[m i]");
   });
 
-  test("snapshot: Play opens an agent/model/policy picker without chord state", () => {
+  test("snapshot: the selected mode is reverse-video and an armed chord shows the cue", () => {
     const picker = new ModePicker({ stepId: "run" });
     // Default-pressed mode is Manual (OD default).
     expect(picker.value).toBe("manual");
 
-    expect(stripAnsi(picker.render())).toContain("Manual");
-    expect(picker.handleKey("p")?.kind).toBe("play-picker");
+    // Arming the `m` chord adds the `m>` selector cue to the rendered row.
+    expect(stripAnsi(picker.render())).not.toContain("m>");
+    picker.handleChordKey(MODE_CHORD_PREFIX);
+    expect(stripAnsi(picker.render())).toContain("m>");
+
+    // Completing the chord selects the mode and clears the cue.
+    picker.handleChordKey("p");
     expect(picker.value).toBe("play");
-    const popover = stripAnsi(picker.renderPopover().join("\n"));
-    expect(popover).toContain("Play current step");
-    expect(popover).toContain("agent");
-    expect(popover).toContain("model");
-    expect(popover).toContain("policy");
-    expect(popover).toContain("Enter Play");
-    expect(picker.isChordArmed).toBe(false);
+    expect(stripAnsi(picker.render())).not.toContain("m>");
   });
 
   test("mode keybindings do not collide with palette / help / navigation chords", () => {
-    // Acceptance: direct picker keys are disjoint from `:` `?` `/` `j` `k`
+    // Acceptance: the `m` chord prefix is disjoint from `:` `?` `/` `j` `k`
     // `q` `H` `L` `g`. modeKeyCollidesWith proves the contract.
     expect(modeKeyCollidesWith(MODE_CHORD_PREFIX)).toBe(false);
     expect(PALETTE_HELP_NAV_KEYS).not.toContain(MODE_CHORD_PREFIX);
-    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m", "p", "d", "a"]);
+    // The documented keybindings use the collision-free `m` prefix.
+    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m", "m p", "m d", "m a", "m i"]);
+    // Each keybinding starts with the collision-free `m` prefix.
     for (const binding of MODE_CHORD_KEYBINDINGS) {
-      expect(modeKeyCollidesWith(binding)).toBe(false);
+      expect(binding === MODE_CHORD_PREFIX || binding.startsWith(`${MODE_CHORD_PREFIX} `)).toBe(true);
     }
   });
 
@@ -315,11 +316,8 @@ describe("ModePicker: TUI per-Step mode affordance row", () => {
       bindings: new ModePicker({ stepId: "run" }).keybindings(),
     });
     const rendered = help.render().join("\n");
-    expect(rendered).toContain("m");
-    expect(rendered).toContain("p");
-    expect(rendered).toContain("d");
-    expect(rendered).toContain("✋ Open mode picker");
-    expect(rendered).toContain("▶ Play current step");
+    expect(rendered).toContain("m a");
+    expect(rendered).toContain("✋ Manual");
     expect(rendered).toContain("⊞ AI Assist");
   });
 });

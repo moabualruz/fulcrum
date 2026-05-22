@@ -4,7 +4,6 @@ import { stripAnsi } from "../testing/fake-tty.ts";
 import {
   MODE_AFFORDANCES,
   ModePicker,
-  type ModePickerAction,
   type WorkflowMode,
 } from "./ModePicker.ts";
 
@@ -14,12 +13,12 @@ import {
  * DESIGN.md §4.13, CLI-TUI-UX.md §7.4).
  *
  * The compact mode row mirrors the web `ModeRow` primitive: the same four
- * modes, the same OD glyphs. The picker owns the direct `m` / `p` / `d`
+ * modes, the same OD glyphs. The picker owns the collision-free `m` chord
  * contract from CLI-TUI-UX. These tests are the TUI snapshot proof for the
  * universal Step affordance.
  */
 describe("ModePicker: TUI Step mode row", () => {
-  test("declares the four canonical modes with OD glyphs and p/d/m selectors", () => {
+  test("declares the four canonical modes with OD glyphs and m-chord selectors", () => {
     expect(MODE_AFFORDANCES.map((m) => m.mode)).toEqual([
       "manual",
       "play",
@@ -27,7 +26,7 @@ describe("ModePicker: TUI Step mode row", () => {
       "assist",
     ]);
     expect(MODE_AFFORDANCES.map((m) => m.glyph)).toEqual(["✋", "▶", "💬", "⊞"]);
-    expect(MODE_AFFORDANCES.map((m) => m.keybinding)).toEqual(["m", "p", "d", "a"]);
+    expect(MODE_AFFORDANCES.map((m) => m.keybinding)).toEqual(["m", "m p", "m d", "m a"]);
   });
 
   test("renders the compact row: four labelled modes, selected reverse-video", () => {
@@ -39,94 +38,46 @@ describe("ModePicker: TUI Step mode row", () => {
     expect(line).toContain("💬 Discuss");
     expect(line).toContain("⊞ AI Assist");
     expect(line).toContain("[m]");
-    expect(line).toContain("[p]");
-    expect(line).toContain("[d]");
-    expect(line).toContain("[a]");
+    expect(line).toContain("[m p]");
+    expect(line).toContain("[m d]");
+    expect(line).toContain("[m a]");
+    expect(line).toContain("[m i]");
   });
 
-  test("p opens the Play picker with configured agent, model, policy, and actions", () => {
-    const actions: ModePickerAction[] = [];
-    const picker = new ModePicker({
-      stepId: "AUTH-42",
-      agents: [{ id: "codex", label: "Codex" }],
-      models: [{ id: "gpt-5.4", label: "GPT-5.4" }],
-      policies: [{ id: "review_each_tool", label: "Review each tool" }],
-      onAction: (action) => actions.push(action),
-    });
-
-    expect(picker.handleKey("p")).toEqual({
-      kind: "play-picker",
-      stepId: "AUTH-42",
-      mode: "play",
-      agentId: "codex",
-      modelId: "gpt-5.4",
-      policyId: "review_each_tool",
-    });
-    expect(picker.value).toBe("play");
-    expect(actions).toEqual([{
-      kind: "play-picker",
-      stepId: "AUTH-42",
-      mode: "play",
-      agentId: "codex",
-      modelId: "gpt-5.4",
-      policyId: "review_each_tool",
-    }]);
-
-    const popover = stripAnsi(picker.renderPopover().join("\n"));
-    expect(popover).toContain("Play current step");
-    expect(popover).toContain("Codex");
-    expect(popover).toContain("GPT-5.4");
-    expect(popover).toContain("Review each tool");
-    expect(popover).toContain("Enter Play");
-    expect(popover).toContain("P Preset");
-  });
-
-  test("d opens the focused Step discussion thread", () => {
-    const actions: ModePickerAction[] = [];
-    const picker = new ModePicker({ stepId: "AUTH-42", onAction: (action) => actions.push(action) });
-
-    expect(picker.handleKey("d")).toEqual({
-      kind: "discuss-thread",
-      stepId: "AUTH-42",
-      mode: "discuss",
-    });
-    expect(picker.value).toBe("discuss");
-    expect(actions).toEqual([{ kind: "discuss-thread", stepId: "AUTH-42", mode: "discuss" }]);
-    expect(stripAnsi(picker.renderPopover().join("\n"))).toContain("Discuss current step");
-  });
-
-  test("m opens the mode picker without committing a mode", () => {
-    const actions: ModePickerAction[] = [];
+  test("m-chord selectors select their modes on the focused Step", () => {
     const selected: WorkflowMode[] = [];
     const picker = new ModePicker({
       stepId: "AUTH-42",
-      value: "play",
       onSelect: (mode) => selected.push(mode),
-      onAction: (action) => actions.push(action),
     });
 
-    expect(picker.handleKey("m")).toEqual({
-      kind: "mode-picker",
-      stepId: "AUTH-42",
-      mode: "play",
-    });
-    expect(picker.value).toBe("play");
-    expect(selected).toEqual([]);
-    expect(actions).toEqual([{ kind: "mode-picker", stepId: "AUTH-42", mode: "play" }]);
-    expect(stripAnsi(picker.renderPopover().join("\n"))).toContain("Mode picker");
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("p")).toBe("play");
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("d")).toBe("discuss");
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("a")).toBe("assist");
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("i")).toBe("assist");
+
+    expect(selected).toEqual(["manual", "play", "manual", "discuss", "manual", "assist", "manual", "assist"]);
+    expect(picker.value).toBe("assist");
   });
 
-  test("compatibility handler consumes direct p/d/m picker keys", () => {
+  test("compatibility handler consumes m-prefixed picker keys", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
+    expect(picker.handleChordKey("m")).toBe(true);
     expect(picker.handleChordKey("p")).toBe(true);
     expect(picker.value).toBe("play");
     expect(picker.handleChordKey("x")).toBe(false);
   });
 
-  test("direct selectors do not arm a pending chord", () => {
+  test("bare m arms a pending chord without claiming bare screen selectors", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
-    expect(picker.handleKey("m")).toEqual({ kind: "mode-picker", stepId: "AUTH-42", mode: "manual" });
+    expect(picker.handleKey("m")).toBe("manual");
     expect(picker.value).toBe("manual");
+    expect(picker.isChordArmed).toBe(true);
+    expect(picker.handleKey("d")).toBe("discuss");
     expect(picker.isChordArmed).toBe(false);
   });
 
@@ -137,12 +88,20 @@ describe("ModePicker: TUI Step mode row", () => {
     expect(picker.handleKey("?")).toBeNull();
   });
 
-  test("handleKey resolves bare selector keys", () => {
+  test("handleKey resolves m-chord selector keys", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
-    expect(picker.handleKey("p")?.kind).toBe("play-picker");
-    expect(picker.handleKey("d")?.kind).toBe("discuss-thread");
-    expect(picker.handleKey("m")?.kind).toBe("mode-picker");
-    expect(picker.handleKey("a")?.kind).toBe("ai-assist");
+    expect(picker.handleKey("p")).toBeNull();
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("p")).toBe("play");
+    expect(picker.handleKey("d")).toBeNull();
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("d")).toBe("discuss");
+    expect(picker.handleKey("a")).toBeNull();
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("a")).toBe("assist");
+    expect(picker.handleKey("i")).toBeNull();
+    expect(picker.handleKey("m")).toBe("manual");
+    expect(picker.handleKey("i")).toBe("assist");
     expect(picker.handleKey("x")).toBeNull();
   });
 
@@ -158,15 +117,16 @@ describe("ModePicker: TUI Step mode row", () => {
     expect(events).toEqual([["discuss", "REV-7"]]);
   });
 
-  test("keybindings() feeds the HelpOverlay so `?` lists the direct keys", () => {
+  test("keybindings() feeds the HelpOverlay so `?` lists the chord keys", () => {
     const picker = new ModePicker({ stepId: "AUTH-42" });
     const bindings = picker.keybindings();
 
     expect(bindings).toEqual([
-      { key: "m", action: "✋ Open mode picker" },
-      { key: "p", action: "▶ Play current step" },
-      { key: "d", action: "💬 Discuss current step" },
-      { key: "a", action: "⊞ AI Assist current step" },
+      { key: "m", action: "✋ Manual" },
+      { key: "m p", action: "▶ Play" },
+      { key: "m d", action: "💬 Discuss" },
+      { key: "m a", action: "⊞ AI Assist" },
+      { key: "m i", action: "⊞ AI Assist" },
     ]);
   });
 
