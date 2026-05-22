@@ -48,6 +48,7 @@ const SERVICE_INTERFACE_PERSISTENCE_RESIDUALS = [
   "services/work-management/src/interface/http/planning-structure-public-api.controller.ts",
   "services/work-management/src/interface/http/project-public-api.controller.ts",
   "services/work-management/src/interface/http/project-status-public-api.controller.ts",
+  "services/work-management/src/interface/http/project-timeline-public-api.controller.ts",
   "services/work-management/src/interface/http/relationship-public-api.controller.ts",
   "services/work-management/src/interface/http/report-public-api.controller.ts",
   "services/work-management/src/interface/http/saved-view-public-api.controller.ts",
