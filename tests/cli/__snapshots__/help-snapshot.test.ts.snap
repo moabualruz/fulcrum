@@ -77,7 +77,7 @@ OPERATE
   fulcrum mcp <list|register|unregister|enable|disable|test|reload>
                                                Manage the MCP server registry.
   fulcrum plugin <list|install|enable|disable|update|remove>
-                                               Manage agent plugin scope.
+                                               List plugin markers; mutation verbs are deferred until plugins.cross_agent.
   fulcrum hooks <list|enable|disable|test>     Manage agent hook recipes.
   fulcrum skills <sync|upstream|lint|list>     Mirror and validate authored skills.
   fulcrum component|components <list|info|plan|status>
