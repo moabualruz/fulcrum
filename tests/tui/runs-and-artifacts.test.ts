@@ -512,30 +512,25 @@ describe("Build stage workbench (:runs): OD parity", () => {
     }
   });
 
-  test("p/d/m honor the Play/Discuss/mode-picker contract", async () => {
+  test("m-chord selectors select ModePicker modes without opening run actions", async () => {
     const screen = buildScreen();
     await screen.load();
 
+    await screen.handleKey("m");
     await screen.handleKey("p");
     expect(screen.currentStepMode).toBe("play");
-    let rendered = renderPlain((renderer) => screen.render(renderer));
-    expect(rendered).toContain("Play current step");
-    expect(rendered).toContain("agent");
-    expect(rendered).toContain("model");
-    expect(rendered).toContain("policy");
-    expect(rendered).toContain("Enter Play");
-    expect(rendered).not.toContain("Dependencies for");
-
-    await screen.handleKey("d");
-    expect(screen.currentStepMode).toBe("discuss");
-    rendered = renderPlain((renderer) => screen.render(renderer));
-    expect(rendered).toContain("Discuss current step");
-    expect(rendered).not.toContain("Dispatch run");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dependencies for");
 
     await screen.handleKey("m");
+    await screen.handleKey("d");
     expect(screen.currentStepMode).toBe("discuss");
-    rendered = renderPlain((renderer) => screen.render(renderer));
-    expect(rendered).toContain("Mode picker");
+    expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dispatch run");
+
+    await screen.handleKey("m");
+    expect(screen.currentStepMode).toBe("manual");
+
+    await screen.handleKey("i");
+    expect(screen.currentStepMode).toBe("assist");
   });
 
   test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {

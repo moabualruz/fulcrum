@@ -182,12 +182,9 @@ export class ArtifactsScreen {
         Math.max(20, renderer.width),
       ),
     );
-    for (const line of this.modePicker.renderPopover()) {
-      renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
-    }
 
     renderer.writeln();
-    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m picker  Enter preview  q back", Math.max(20, renderer.width))));
+    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m/m p/m d/m a modes  Enter preview  q back", Math.max(20, renderer.width))));
 
     if (this.overlay === "upload") {
       renderer.writeln();
@@ -254,7 +251,17 @@ export class ArtifactsScreen {
       return true;
     }
 
-    if (this.overlay === "none" && key === "m" && this.modePicker.handleKey(key)) return true;
+    // The `m` chord owns mode selection: the bare `m` arms the picker and the
+    // follow-up selector (m p / m d / m a / m i) completes it. While the chord
+    // is armed the next key is routed to the picker so it never collides with
+    // the bare screen keys (`d` download, `a` archive).
+    if (
+      this.overlay === "none" &&
+      (key === "m" || this.modePicker.isChordArmed) &&
+      this.modePicker.handleKey(key)
+    ) {
+      return true;
+    }
 
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.artifacts.length - 1));
