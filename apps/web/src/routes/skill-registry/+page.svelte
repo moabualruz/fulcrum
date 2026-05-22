@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type Source = "bundled" | "npm" | "local";
   type Skill = { name: string; version: string; author: string; description: string; source: Source };
 

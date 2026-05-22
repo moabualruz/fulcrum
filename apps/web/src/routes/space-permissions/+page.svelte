@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type SpaceRole = "viewer" | "editor" | "admin";
   type Assignment = { id: string; principal: string; role: SpaceRole };
 

@@ -10,6 +10,7 @@
   workbench consumes the template set as a composer affordance.
 -->
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type TemplateKind = "missing-criteria" | "stale-context" | "prototype-mismatch" | "test-gap" | "code-risk";
   type Scope = "workspace" | "planning" | "uat" | "code-review";
 

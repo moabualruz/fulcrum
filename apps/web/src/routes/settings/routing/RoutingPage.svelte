@@ -8,6 +8,7 @@
     CardHeader,
     CardTitle,
     Input,
+    Select,
     Switch,
     Tabs,
     TabsContent,

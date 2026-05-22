@@ -7,7 +7,7 @@
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { SYMPHONY_COLORS, type SymphonyState } from "$lib/orchestration";
   import { formatDuration } from "$lib/util/duration";
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

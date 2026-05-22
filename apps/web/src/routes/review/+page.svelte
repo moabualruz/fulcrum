@@ -37,16 +37,7 @@
 	 * its `⊞ AI Assist` button opens the one shell `AcpDrawer`
 	 * (`prd-web-global-ai-assist-drawer`).
 	 */
-	import {
-		Avatar,
-		AvatarFallback,
-		Badge,
-		Button,
-		EmptyState,
-		StatusBadge,
-		statusLabel,
-		type WorkflowStatus,
-	} from "@fulcrum/ui-kit";
+	import { Avatar, AvatarFallback, Badge, Button, EmptyState, Select, StatusBadge, statusLabel, type WorkflowStatus } from "@fulcrum/ui-kit";
 	import {
 		ModeRow,
 		createStepModeRow,

@@ -3,7 +3,7 @@
   import type { PageData } from "./$types";
   import AgentSessionWorkbench from "$lib/components/agents/AgentSessionWorkbench.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
   import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {

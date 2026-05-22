@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   type FieldType = "text" | "select" | "number" | "date";
 
