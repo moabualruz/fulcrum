@@ -97,6 +97,24 @@ export class PlanningStructurePublicApiService {
     return await this.requireStore().list(scope(query));
   }
 
+  async listModules(query: PlanningStructureScopeDto): Promise<PlanningModulePublicRow[]> {
+    // A missing project surfaces as a 404 so web routes can render
+    // "Project not found"; an existing project with no modules is an empty list.
+    return await this.requireResult(this.requireStore().listModules(scope(query)));
+  }
+
+  async getModule(params: PlanningStructureIdParamsDto, query: PlanningStructureScopeDto): Promise<PlanningModulePublicRow> {
+    return await this.requireResult(this.requireStore().getModule({ ...scope(query), id: params.id }));
+  }
+
+  async listIntake(query: PlanningStructureScopeDto): Promise<PlanningIntakePublicRow[]> {
+    return await this.requireResult(this.requireStore().listIntake(scope(query)));
+  }
+
+  async getIntake(params: PlanningStructureIdParamsDto, query: PlanningStructureScopeDto): Promise<PlanningIntakePublicRow> {
+    return await this.requireResult(this.requireStore().getIntake({ ...scope(query), id: params.id }));
+  }
+
   async createModule(body: PlanningModuleCreateDto): Promise<PlanningModulePublicRow> {
     return await this.requireResult(this.requireStore().createModule({ ...scope(body), ...body }));
   }
@@ -172,6 +190,22 @@ export class PlanningStructurePublicApiController {
 
   async list(query: PlanningStructureScopeDto) {
     return await this.structures.list(query);
+  }
+
+  async listModules(query: PlanningStructureScopeDto) {
+    return await this.structures.listModules(query);
+  }
+
+  async getModule(params: PlanningStructureIdParamsDto, query: PlanningStructureScopeDto) {
+    return await this.structures.getModule(params, query);
+  }
+
+  async listIntake(query: PlanningStructureScopeDto) {
+    return await this.structures.listIntake(query);
+  }
+
+  async getIntake(params: PlanningStructureIdParamsDto, query: PlanningStructureScopeDto) {
+    return await this.structures.getIntake(params, query);
   }
 
   async createModule(body: PlanningModuleCreateDto) {
@@ -310,6 +344,10 @@ IsIn(PLANNING_INTAKE_STATUSES)(PlanningIntakePatchDto.prototype, "status");
 
 const routeDescriptors = {
   list: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "list"),
+  listModules: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "listModules"),
+  getModule: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "getModule"),
+  listIntake: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "listIntake"),
+  getIntake: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "getIntake"),
   createModule: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "createModule"),
   updateModule: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "updateModule"),
   deleteModule: Object.getOwnPropertyDescriptor(PlanningStructurePublicApiController.prototype, "deleteModule"),
@@ -335,6 +373,30 @@ Get()(PlanningStructurePublicApiController.prototype, "list", routeDescriptors.l
 Query()(PlanningStructurePublicApiController.prototype, "list", 0);
 ApiOperation({ summary: "List manual planning structures" })(PlanningStructurePublicApiController.prototype, "list", routeDescriptors.list!);
 ApiOkResponse({ description: "Planning structures" })(PlanningStructurePublicApiController.prototype, "list", routeDescriptors.list!);
+
+Get("modules")(PlanningStructurePublicApiController.prototype, "listModules", routeDescriptors.listModules!);
+Query()(PlanningStructurePublicApiController.prototype, "listModules", 0);
+ApiOperation({ summary: "List modules for a project" })(PlanningStructurePublicApiController.prototype, "listModules", routeDescriptors.listModules!);
+ApiOkResponse({ description: "Project modules" })(PlanningStructurePublicApiController.prototype, "listModules", routeDescriptors.listModules!);
+
+Get("modules/:id")(PlanningStructurePublicApiController.prototype, "getModule", routeDescriptors.getModule!);
+Param()(PlanningStructurePublicApiController.prototype, "getModule", 0);
+Query()(PlanningStructurePublicApiController.prototype, "getModule", 1);
+ApiOperation({ summary: "Get a module by ID" })(PlanningStructurePublicApiController.prototype, "getModule", routeDescriptors.getModule!);
+ApiParam({ name: "id", required: true })(PlanningStructurePublicApiController.prototype, "getModule", routeDescriptors.getModule!);
+ApiOkResponse({ description: "Project module" })(PlanningStructurePublicApiController.prototype, "getModule", routeDescriptors.getModule!);
+
+Get("intake")(PlanningStructurePublicApiController.prototype, "listIntake", routeDescriptors.listIntake!);
+Query()(PlanningStructurePublicApiController.prototype, "listIntake", 0);
+ApiOperation({ summary: "List intake requests for a project" })(PlanningStructurePublicApiController.prototype, "listIntake", routeDescriptors.listIntake!);
+ApiOkResponse({ description: "Project intake requests" })(PlanningStructurePublicApiController.prototype, "listIntake", routeDescriptors.listIntake!);
+
+Get("intake/:id")(PlanningStructurePublicApiController.prototype, "getIntake", routeDescriptors.getIntake!);
+Param()(PlanningStructurePublicApiController.prototype, "getIntake", 0);
+Query()(PlanningStructurePublicApiController.prototype, "getIntake", 1);
+ApiOperation({ summary: "Get an intake request by ID" })(PlanningStructurePublicApiController.prototype, "getIntake", routeDescriptors.getIntake!);
+ApiParam({ name: "id", required: true })(PlanningStructurePublicApiController.prototype, "getIntake", routeDescriptors.getIntake!);
+ApiOkResponse({ description: "Intake request" })(PlanningStructurePublicApiController.prototype, "getIntake", routeDescriptors.getIntake!);
 
 Post("modules")(PlanningStructurePublicApiController.prototype, "createModule", routeDescriptors.createModule!);
 Body()(PlanningStructurePublicApiController.prototype, "createModule", 0);

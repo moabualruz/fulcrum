@@ -2,29 +2,36 @@ import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
 import {
-  getProjectModule,
-  updateProjectModule,
-  type ProjectModuleStatus,
-} from "@work-management/interface/pm-structure.ts";
-import { requestProjectScope } from "../../../project-request-scope";
+  createPlanningStructureApiForEvent,
+  PlanningStructureApiError,
+} from "$lib/server/planning-structure-api";
 
 const MODULE_STATUSES = ["planned", "active", "completed", "archived"] as const;
+type ProjectModuleStatus = (typeof MODULE_STATUSES)[number];
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const { em, ctx } = await requestProjectScope(locals, params.id);
-  const module = await getProjectModule(em, ctx, params.moduleId);
-  if (!module) throw error(404, "Module not found");
-  return { projectId: params.id, module };
+export const load: PageServerLoad = async (event) => {
+  try {
+    const projectModule = await createPlanningStructureApiForEvent(event).modules.get({
+      id: event.params.moduleId,
+      projectId: event.params.id,
+    });
+    return { projectId: event.params.id, module: projectModule };
+  } catch (err) {
+    if (err instanceof PlanningStructureApiError && err.status === 404) {
+      throw error(404, "Module not found");
+    }
+    throw err;
+  }
 };
 
 export const actions: Actions = {
-  update: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  update: async (event) => {
+    const fd = await event.request.formData();
     const name = field(fd, "name");
     if (!name) return fail(400, { error: "Name is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await updateProjectModule(em, ctx, {
-      moduleId: params.moduleId,
+    await createPlanningStructureApiForEvent(event).modules.update({
+      id: event.params.moduleId,
+      projectId: event.params.id,
       name,
       status: moduleStatus(field(fd, "status")) ?? "planned",
       leadUserId: field(fd, "leadUserId") || null,

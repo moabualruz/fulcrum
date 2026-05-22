@@ -104,6 +104,41 @@ export class PlanningStructurePublicStore {
     };
   }
 
+  async listModules(input: PlanningScope): Promise<PlanningModulePublicRow[] | null> {
+    // Routes need an isolated module list; `resolveProject` keeps a missing
+    // project distinguishable from an empty list so the route can answer 404.
+    const project = await this.resolveProject(input);
+    if (!project) return null;
+    const modules = await this.moduleRepository().find({
+      where: { projectId: input.projectId },
+      order: { createdAt: "ASC", id: "ASC" },
+    });
+    const counts = await this.moduleTaskCounts(input.projectId);
+    return modules.map((module) => toModuleRow(input.orgId, module, counts.get(module.id) ?? 0));
+  }
+
+  async getModule(input: PlanningScope & { id: string }): Promise<PlanningModulePublicRow | null> {
+    const module = await this.findModule(input);
+    if (!module) return null;
+    return toModuleRow(input.orgId, module, await this.moduleTaskCount(module.id));
+  }
+
+  async listIntake(input: PlanningScope): Promise<PlanningIntakePublicRow[] | null> {
+    const project = await this.resolveProject(input);
+    if (!project) return null;
+    const intakes = await this.intakeRepository().find({
+      where: { projectId: input.projectId },
+      order: { createdAt: "DESC", id: "ASC" },
+    });
+    return intakes.map((intake) => toIntakeRow(input.orgId, intake));
+  }
+
+  async getIntake(input: PlanningScope & { id: string }): Promise<PlanningIntakePublicRow | null> {
+    const intake = await this.findIntake(input);
+    if (!intake) return null;
+    return toIntakeRow(input.orgId, intake);
+  }
+
   async createModule(input: PlanningScope & {
     name: string;
     status?: PlanningModuleStatus;
