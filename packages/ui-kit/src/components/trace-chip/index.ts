@@ -1,6 +1,6 @@
 import Root from "./trace-chip.svelte";
 
-export type { TraceChipProps } from "./trace-chip.svelte";
+export type { TraceChipProps } from "./trace-chip.exports.js";
 export {
 	Root,
 	//

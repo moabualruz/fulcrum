@@ -36,6 +36,6 @@
         </li>
       {/each}
     </ul>
-    <Button variant="outline" size="sm" data-notif-clear onclick={clearAll}>Clear all</Button>
+    <Button variant="secondary" size="sm" data-notif-clear onclick={clearAll}>Clear all</Button>
   {/if}
 </main>

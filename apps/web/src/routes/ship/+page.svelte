@@ -490,7 +490,7 @@
       <!-- `Cut release` primary: OD `.cut-release` gradient action + `⌘R` -->
       <Button
         data-ship-cut-release
-        variant="default"
+        variant="primary"
         size="sm"
         title="Cut a new release from current main"
         onclick={() => requestConfirm("cut-release")}
@@ -527,7 +527,7 @@
       <Button variant="ghost" size="sm" data-ship-confirm-cancel onclick={cancelConfirm}>
         Cancel
       </Button>
-      <Button variant="default" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
+      <Button variant="primary" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
         Confirm cut release
       </Button>
     </div>
@@ -550,7 +550,7 @@
         description="Artifacts are produced by runs in Build. Approved reviews send them here."
       >
         {#snippet actions()}
-          <Button variant="outline" size="sm" href="/build-runs">Open Build</Button>
+          <Button variant="secondary" size="sm" href="/build-runs">Open Build</Button>
         {/snippet}
       </EmptyState>
     </div>
@@ -854,7 +854,7 @@
                     Cancel
                   </Button>
                   <Button
-                    variant="destructive"
+                    variant="danger"
                     size="sm"
                     data-ship-confirm-yes
                     onclick={resolveConfirm}
@@ -874,7 +874,7 @@
                   <Button variant="ghost" size="sm" data-ship-confirm-cancel onclick={cancelConfirm}>
                     Cancel
                   </Button>
-                  <Button variant="default" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
+                  <Button variant="primary" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
                     Confirm pause
                   </Button>
                 </span>
@@ -890,13 +890,13 @@
                   <Button variant="ghost" size="sm" data-ship-confirm-cancel onclick={cancelConfirm}>
                     Cancel
                   </Button>
-                  <Button variant="default" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
+                  <Button variant="primary" size="sm" data-ship-confirm-yes onclick={resolveConfirm}>
                     Confirm promote
                   </Button>
                 </span>
               {:else}
                 <Button
-                  variant="destructive"
+                  variant="danger"
                   size="sm"
                   data-ship-action="roll-back"
                   onclick={() => requestConfirm("roll-back")}
@@ -904,7 +904,7 @@
                   ⏪ Roll back
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   data-ship-action="pause-rollout"
                   onclick={() => requestConfirm("pause-rollout")}
@@ -916,7 +916,7 @@
                   Open run feed
                 </Button>
                 <Button
-                  variant="default"
+                  variant="primary"
                   size="sm"
                   data-ship-action="promote"
                   onclick={() => requestConfirm("promote")}

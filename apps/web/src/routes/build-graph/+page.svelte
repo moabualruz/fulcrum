@@ -215,8 +215,8 @@
       {/each}
     </ul>
 
-    <Button size="sm" variant="outline" data-build-graph-module>⊞ Module: auth ▾</Button>
-    <Button size="sm" variant="outline" data-build-graph-layout-select>⇆ Layout: Sugiyama ▾</Button>
+    <Button size="sm" variant="secondary" data-build-graph-module>⊞ Module: auth ▾</Button>
+    <Button size="sm" variant="secondary" data-build-graph-layout-select>⇆ Layout: Sugiyama ▾</Button>
   </header>
 
   {#if NODES.length === 0}
@@ -231,7 +231,7 @@
         {/snippet}
         {#snippet actions()}
           <Button size="sm" href="/build-list" data-build-graph-empty-primary>Open Build list</Button>
-          <Button size="sm" variant="outline" href="/build-board" data-build-graph-empty-secondary>
+          <Button size="sm" variant="secondary" href="/build-board" data-build-graph-empty-secondary>
             View Board
           </Button>
         {/snippet}

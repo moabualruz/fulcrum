@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "svelte/server";
 import CommentThreadRoot from "./comment-thread.svelte";
-import type { ThreadComment } from "./comment-thread.svelte";
+import type { ThreadComment } from "./comment-thread.exports.js";
 
 const COMMENTS: ThreadComment[] = [
 	{ id: "c1", author: "Jamie Black", body: "Returning kid leaks revocation surface.", ts: "2m", context: "sec-review" },

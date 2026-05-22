@@ -4,7 +4,7 @@ export type {
 	LoadingStateDensity,
 	LoadingStateProps,
 	LoadingStateShape,
-} from "./loading-state.svelte";
+} from "./loading-state.exports.js";
 export {
 	Root,
 	//

@@ -769,9 +769,9 @@
 												</div>
 											</div>
 											{#if row.action.tone === "disabled"}
-												<Button variant="outline" size="sm" disabled>{row.action.label}</Button>
+												<Button variant="secondary" size="sm" disabled>{row.action.label}</Button>
 											{:else if row.action.tone === "destructive"}
-												<Button variant="destructive" size="sm">{row.action.label}</Button>
+												<Button variant="danger" size="sm">{row.action.label}</Button>
 											{:else}
 												<Button variant={row.action.tone} size="sm">{row.action.label}</Button>
 											{/if}
@@ -1087,11 +1087,11 @@
 			Request changes
 		</Button>
 		{#if openAnnotationCount === 0}
-			<Button variant="outline" data-reopen-threads onclick={reopenAllThreads}>
+			<Button variant="secondary" data-reopen-threads onclick={reopenAllThreads}>
 				Re-open threads
 			</Button>
 		{/if}
-		<Button variant="outline" data-save-without-promoting onclick={saveWithoutPromoting}>
+		<Button variant="secondary" data-save-without-promoting onclick={saveWithoutPromoting}>
 			Save without promoting
 		</Button>
 		<!--

@@ -435,7 +435,7 @@
       <Button size="sm" variant="ghost" data-build-board-group>Group: Status</Button>
       <Button size="sm" variant="ghost" data-build-board-sort>Sort: Manual</Button>
       <Button size="sm" variant="ghost" data-build-board-properties>Properties</Button>
-      <Button size="sm" variant="outline" data-build-board-filter>+ Filter</Button>
+      <Button size="sm" variant="secondary" data-build-board-filter>+ Filter</Button>
       <Button
         size="sm"
         data-build-board-new-task
@@ -481,12 +481,11 @@
             <span data-build-column-count class={cn("rounded-full border border-border bg-card px-1.5 font-mono text-[10px] text-muted-foreground")}>{column.tasks.length}</span>
             <span class={cn("flex-1")}></span>
             <Button
-              size="icon"
+              size="sm"
               variant="ghost"
               aria-label={`Add task to ${column.title}`}
               data-build-column-add
-              onclick={() => openInlineCreate(column.id)}
-            >+</Button>
+              onclick={() => openInlineCreate(column.id)} class="size-8 px-0">+</Button>
           </header>
 
           <div class={cn("flex flex-col gap-2 overflow-y-auto p-2")}>
@@ -541,7 +540,7 @@
                     <div class={cn("flex items-center gap-2 pt-1")}>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         data-build-task-retry
                         onclick={() => retryOptimisticTask(entry.id)}
                       >Retry</Button>
@@ -646,12 +645,12 @@
       <p class={cn("flex-1 text-xs text-muted-foreground")}>
         Errors render inline at the surface that triggered them: never as toasts.
       </p>
-      <Button size="sm" variant="outline" data-build-board-empty-toggle onclick={() => { showEmptyState = !showEmptyState; }}>
+      <Button size="sm" variant="secondary" data-build-board-empty-toggle onclick={() => { showEmptyState = !showEmptyState; }}>
         {showEmptyState ? "Show populated board" : "Show empty board"}
       </Button>
-      <Button size="sm" variant="outline" data-build-error-trigger-validation onclick={triggerValidationError}>Trigger 400</Button>
-      <Button size="sm" variant="outline" data-build-error-trigger-network onclick={triggerNetworkError}>Trigger 500</Button>
-      <Button size="sm" variant="outline" data-build-error-trigger-unexpected onclick={triggerUnexpectedError}>Trigger unexpected</Button>
+      <Button size="sm" variant="secondary" data-build-error-trigger-validation onclick={triggerValidationError}>Trigger 400</Button>
+      <Button size="sm" variant="secondary" data-build-error-trigger-network onclick={triggerNetworkError}>Trigger 500</Button>
+      <Button size="sm" variant="secondary" data-build-error-trigger-unexpected onclick={triggerUnexpectedError}>Trigger unexpected</Button>
       <Button size="sm" variant="ghost" data-build-error-reset onclick={resetErrorDemo}>Reset</Button>
     </header>
 

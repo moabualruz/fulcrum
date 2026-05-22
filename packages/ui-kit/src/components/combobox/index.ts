@@ -3,10 +3,10 @@ import Input from "./combobox-input.svelte";
 import Content from "./combobox-content.svelte";
 import Item from "./combobox-item.svelte";
 
-export type { ComboboxProps } from "./combobox.svelte";
-export type { ComboboxInputProps } from "./combobox-input.svelte";
-export type { ComboboxContentProps } from "./combobox-content.svelte";
-export type { ComboboxItemProps } from "./combobox-item.svelte";
+export type { ComboboxProps } from "./combobox.exports.js";
+export type { ComboboxInputProps } from "./combobox-input.exports.js";
+export type { ComboboxContentProps } from "./combobox-content.exports.js";
+export type { ComboboxItemProps } from "./combobox-item.exports.js";
 
 export {
 	Root,

@@ -461,7 +461,7 @@
 			>
 				{#snippet actions()}
 					<Button data-review-empty-board href="/build-board">Open board</Button>
-					<Button data-review-empty-completed variant="outline" onclick={() => (activeTab = "merged")}>
+					<Button data-review-empty-completed variant="secondary" onclick={() => (activeTab = "merged")}>
 						View completed
 					</Button>
 				{/snippet}

@@ -219,7 +219,7 @@
     <!-- Set Status -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Status
         </Button>
       </PopoverTrigger>
@@ -239,7 +239,7 @@
     <!-- Set Assignee -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Assignee
         </Button>
       </PopoverTrigger>
@@ -257,7 +257,7 @@
     <!-- Set Priority -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Priority
         </Button>
       </PopoverTrigger>
@@ -277,7 +277,7 @@
     <!-- Add Label -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Add Label
         </Button>
       </PopoverTrigger>
@@ -290,7 +290,7 @@
         />
         <div class="flex gap-1">
           <Button size="sm" class="flex-1 h-7 text-xs" on:click={handleAddLabel}>Add</Button>
-          <Button variant="outline" size="sm" class="flex-1 h-7 text-xs" on:click={handleRemoveLabel}>Remove</Button>
+          <Button variant="secondary" size="sm" class="flex-1 h-7 text-xs" on:click={handleRemoveLabel}>Remove</Button>
         </div>
       </PopoverContent>
     </Popover>
@@ -298,7 +298,7 @@
     <!-- Move to Sprint -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Move to Sprint
         </Button>
       </PopoverTrigger>
@@ -316,7 +316,7 @@
     <!-- Set Due Date -->
     <Popover>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Set Due Date
         </Button>
       </PopoverTrigger>
@@ -333,7 +333,7 @@
     <!-- Edit Custom Fields -->
     <Popover bind:open={showCustomFieldEdit}>
       <PopoverTrigger asChild let:builder>
-        <Button builders={[builder]} variant="outline" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
+        <Button builders={[builder]} variant="secondary" size="sm" disabled={isOverLimit || loading} class="h-8 text-xs">
           Custom Fields
         </Button>
       </PopoverTrigger>
@@ -350,7 +350,7 @@
 
     <!-- Archive -->
     <Button
-      variant="outline"
+      variant="secondary"
       size="sm"
       disabled={isOverLimit || loading}
       class="h-8 text-xs"

@@ -5,7 +5,7 @@ export type {
 	CommentThreadState,
 	ThreadComment,
 	CommentAuthorKind,
-} from "./comment-thread.svelte";
+} from "./comment-thread.exports.js";
 export {
 	Root,
 	//

@@ -25,7 +25,7 @@
     The artifacts list is now the Ship stage workbench. This page redirects to
     <code class={cn("font-mono")}>/ship</code> automatically.
   </p>
-  <Button data-artifacts-ship-link variant="default" size="sm" href="/ship" class={cn("mt-4")}>
+  <Button data-artifacts-ship-link variant="primary" size="sm" href="/ship" class={cn("mt-4")}>
     Open Ship
   </Button>
 </div>

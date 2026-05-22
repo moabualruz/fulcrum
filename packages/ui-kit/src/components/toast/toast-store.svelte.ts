@@ -1,4 +1,4 @@
-import type { AlertTone } from "../alert/alert.svelte";
+import type { AlertTone } from "../alert/alert.exports.js";
 
 export type ToastTone = AlertTone;
 

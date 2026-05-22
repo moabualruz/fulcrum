@@ -4,7 +4,7 @@ export type {
 	StatusFooterProps,
 	StatusFooterMode,
 	StatusFooterSegment,
-} from "./status-footer.svelte";
+} from "./status-footer.exports.js";
 export {
 	Root,
 	//

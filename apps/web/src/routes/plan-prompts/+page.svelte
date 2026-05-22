@@ -329,7 +329,7 @@
       {/snippet}
       {#snippet actions()}
         <Button data-plan-prompts-empty-action="new-prompt" size="sm">New prompt</Button>
-        <Button data-plan-prompts-empty-action="import" variant="outline" size="sm">
+        <Button data-plan-prompts-empty-action="import" variant="secondary" size="sm">
           Import from project
         </Button>
       {/snippet}
@@ -391,7 +391,7 @@
         {#snippet actions()}
           <Button
             data-plan-prompts-clear-filter
-            variant="outline"
+            variant="secondary"
             size="sm"
             onclick={() => {
               activeStage = "all";

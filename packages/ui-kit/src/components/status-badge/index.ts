@@ -4,12 +4,12 @@ export type {
 	StatusBadgeProps,
 	WorkflowStatus,
 	CanonicalStatus,
-} from "./status-badge.svelte";
+} from "./status-badge.exports.js";
 export {
 	CANONICAL_STATUS_VOCAB,
 	BANNED_STATUS_SYNONYMS,
 	statusLabel,
-} from "./status-badge.svelte";
+} from "./status-badge.exports.js";
 export {
 	Root,
 	//

@@ -629,7 +629,7 @@
                 <p class="type-caption mt-1 text-muted-foreground">
                   Connect a CLI agent to route planning, build, and review actions. Press <Kbd>a</Kbd> to add one.
                 </p>
-                <Button data-settings-add-agent variant="outline" size="sm" class="mt-4">+ Add CLI agent</Button>
+                <Button data-settings-add-agent variant="secondary" size="sm" class="mt-4">+ Add CLI agent</Button>
               </div>
             {:else}
               <ul class="flex flex-col gap-2" aria-label="Configured CLI agents">
@@ -662,12 +662,12 @@
                       </p>
                     </div>
                     <Badge variant="outline" class="capitalize">{agent.ring}</Badge>
-                    <Button variant="ghost" size="icon-sm" aria-label={`Configure MCP & plugins for ${agent.name}`}>⚙</Button>
-                    <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${agent.name}`}>⋯</Button>
+                    <Button variant="ghost" size="sm" aria-label={`Configure MCP & plugins for ${agent.name}`} class="size-8 px-0">⚙</Button>
+                    <Button variant="ghost" size="sm" aria-label={`More actions for ${agent.name}`} class="size-8 px-0">⋯</Button>
                   </li>
                 {/each}
               </ul>
-              <Button data-settings-add-agent variant="outline" size="sm" class="mt-3.5 w-full justify-start">
+              <Button data-settings-add-agent variant="secondary" size="sm" class="mt-3.5 w-full justify-start">
                 + Add CLI agent (claude-code · codex · gemini-cli · opencode · pi-cli · custom)
               </Button>
             {/if}
@@ -725,14 +725,14 @@
                         <Switch checked aria-label={`Allow inline override for ${rule.action}`} />
                       </td>
                       <td class="px-2.5 py-2">
-                        <Button variant="outline" size="xs">Edit</Button>
+                        <Button variant="secondary" size="xs">Edit</Button>
                       </td>
                     </tr>
                   {/each}
                 </tbody>
               </table>
             </div>
-            <Button variant="outline" size="sm" class="mt-3.5">+ Add route rule</Button>
+            <Button variant="secondary" size="sm" class="mt-3.5">+ Add route rule</Button>
           </div>
 
           {#each subRouteLinks.routes ?? [] as link}
@@ -766,9 +766,9 @@
                 <p class="type-caption text-muted-foreground">{integration.desc}</p>
               </div>
               {#if integration.connected}
-                <Button variant="destructive" size="xs" data-settings-integration-action="disconnect">Disconnect</Button>
+                <Button variant="danger" size="xs" data-settings-integration-action="disconnect">Disconnect</Button>
               {:else}
-                <Button variant="default" size="xs" data-settings-integration-action="connect">Connect</Button>
+                <Button variant="primary" size="xs" data-settings-integration-action="connect">Connect</Button>
               {/if}
             </div>
           {/each}
@@ -810,7 +810,7 @@
               <p class="type-body font-medium">Plan</p>
               <p class="type-caption text-muted-foreground">Free tier · local-only · no cloud sync.</p>
             </div>
-            <Button variant="outline" size="xs" data-settings-account-action="upgrade" class="border-primary text-primary">Upgrade</Button>
+            <Button variant="secondary" size="xs" data-settings-account-action="upgrade" class="border-primary text-primary">Upgrade</Button>
           </div>
         </section>
       {/if}
@@ -845,7 +845,7 @@
               <AlertDialog>
                 <AlertDialogTrigger>
                   {#snippet child({ props })}
-                    <Button {...props} variant="destructive" size="xs" data-settings-danger-action="reset">Reset</Button>
+                    <Button {...props} variant="danger" size="xs" data-settings-danger-action="reset">Reset</Button>
                   {/snippet}
                 </AlertDialogTrigger>
                 <AlertDialogContent data-settings-confirm="reset">
@@ -856,12 +856,12 @@
                   <div class="mt-4 flex justify-end gap-2">
                     <AlertDialogCancel>
                       {#snippet child({ props })}
-                        <Button {...props} variant="outline" size="sm">Cancel</Button>
+                        <Button {...props} variant="secondary" size="sm">Cancel</Button>
                       {/snippet}
                     </AlertDialogCancel>
                     <AlertDialogAction>
                       {#snippet child({ props })}
-                        <Button {...props} variant="destructive" size="sm" data-settings-confirm-action="reset" onclick={resetLocalState}>Reset</Button>
+                        <Button {...props} variant="danger" size="sm" data-settings-confirm-action="reset" onclick={resetLocalState}>Reset</Button>
                       {/snippet}
                     </AlertDialogAction>
                   </div>
@@ -881,7 +881,7 @@
               <AlertDialog>
                 <AlertDialogTrigger>
                   {#snippet child({ props })}
-                    <Button {...props} variant="destructive" size="xs" data-settings-danger-action="delete">Delete workspace</Button>
+                    <Button {...props} variant="danger" size="xs" data-settings-danger-action="delete">Delete workspace</Button>
                   {/snippet}
                 </AlertDialogTrigger>
                 <AlertDialogContent data-settings-confirm="delete">
@@ -892,12 +892,12 @@
                   <div class="mt-4 flex justify-end gap-2">
                     <AlertDialogCancel>
                       {#snippet child({ props })}
-                        <Button {...props} variant="outline" size="sm">Cancel</Button>
+                        <Button {...props} variant="secondary" size="sm">Cancel</Button>
                       {/snippet}
                     </AlertDialogCancel>
                     <AlertDialogAction>
                       {#snippet child({ props })}
-                        <Button {...props} variant="destructive" size="sm" data-settings-confirm-action="delete" onclick={deleteWorkspace}>Delete workspace</Button>
+                        <Button {...props} variant="danger" size="sm" data-settings-confirm-action="delete" onclick={deleteWorkspace}>Delete workspace</Button>
                       {/snippet}
                     </AlertDialogAction>
                   </div>

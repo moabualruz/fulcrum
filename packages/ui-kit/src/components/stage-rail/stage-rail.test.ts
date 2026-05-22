@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "svelte/server";
-import StageRailRoot, { WORKFLOW_STAGES } from "./stage-rail.svelte";
+import StageRailRoot from "./stage-rail.svelte";
+import { WORKFLOW_STAGES } from "./stage-rail.exports.js";
 
 describe("StageRail", () => {
 	test("renders the active-stage sub-navigation group labelled by the current stage", () => {

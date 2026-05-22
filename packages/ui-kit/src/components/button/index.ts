@@ -4,7 +4,7 @@ export {
 	type ButtonProps,
 	type ButtonSize,
 	type ButtonVariant,
-} from "./button.svelte";
+} from "./button.exports.js";
 
 export {
 	Root,

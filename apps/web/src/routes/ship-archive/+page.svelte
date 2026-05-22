@@ -297,11 +297,11 @@
           description="Approved reviews send artifacts here. Cut a release once review is green."
         >
           {#snippet actions()}
-            <Button variant="default" size="sm" href="/ship">
+            <Button variant="primary" size="sm" href="/ship">
               <span aria-hidden="true">🚀</span>
               Open Ship
             </Button>
-            <Button variant="outline" size="sm" href="/artifacts">View artifacts</Button>
+            <Button variant="secondary" size="sm" href="/artifacts">View artifacts</Button>
           {/snippet}
         </EmptyState>
       </div>

@@ -253,7 +253,7 @@
   <!-- Add filter popover -->
   <Popover bind:open={addFilterOpen}>
     <PopoverTrigger asChild let:builder>
-      <Button builders={[builder]} variant="outline" size="sm" class="h-7 gap-1 text-xs">
+      <Button builders={[builder]} variant="secondary" size="sm" class="h-7 gap-1 text-xs">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
         </svg>
@@ -346,7 +346,7 @@
   </label>
 
   <!-- Export button -->
-  <Button variant="outline" size="sm" class="h-7 text-xs" on:click={handleExport}>
+  <Button variant="secondary" size="sm" class="h-7 text-xs" on:click={handleExport}>
     Export
   </Button>
 </div>

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "svelte/server";
 import ModeRowRoot from "./mode-row.svelte";
-import { TIGHT_MODES, WORKFLOW_MODES, modeGlyph, modeLabel } from "./index.ts";
+import { TIGHT_MODES, WORKFLOW_MODES, modeGlyph, modeLabel } from "./index.js";
 
 /**
  * ModeRow: the universal per-Step mode affordance row.

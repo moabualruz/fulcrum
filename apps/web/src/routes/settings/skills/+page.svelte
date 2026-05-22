@@ -212,7 +212,7 @@
   <Button
     data-upgrade-all
     onclick={handleUpgradeAll}
-    variant="outline"
+    variant="secondary"
   >Upgrade all</Button>
 </header>
 
@@ -344,7 +344,7 @@
                   <Button
                     data-upgrade-skill
                     onclick={() => void handleUpgrade(skill.slug)}
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                   >Upgrade</Button>
                   {#if confirmUninstall === skill.slug}
@@ -361,7 +361,7 @@
                         <Button
                           data-confirm-uninstall
                           onclick={() => void handleUninstall(skill.slug)}
-                          variant="destructive"
+                          variant="danger"
                           size="sm"
                         >Confirm</Button>
                         <Button
@@ -376,7 +376,7 @@
                     <Button
                       data-uninstall-skill
                       onclick={() => (confirmUninstall = skill.slug)}
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                     >Uninstall</Button>
                   {/if}
@@ -477,7 +477,7 @@
                       <DialogFooter class="flex-wrap gap-2">
                         <Button
                           data-alt-version-confirm
-                          variant="default"
+                          variant="primary"
                           size="sm"
                           disabled={skill.upstream_conflict.alt_versions.length === 0}
                           onclick={() => void handleResolveConflict(
@@ -488,20 +488,20 @@
                         >Use alt version</Button>
                         <Button
                           data-force-conflict
-                          variant="destructive"
+                          variant="danger"
                           size="sm"
                           disabled={!skill.upstream_conflict.force_safe || !forceAcknowledged}
                           onclick={() => void handleResolveConflict(skill.slug, "force")}
                         >Force</Button>
                         <Button
                           data-skip-conflict
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           onclick={() => void handleResolveConflict(skill.slug, "skip")}
                         >Skip</Button>
                         <Button
                           data-upgrade-installed-first
-                          variant="outline"
+                          variant="secondary"
                           size="sm"
                           onclick={() => void handleResolveConflict(skill.slug, "upgrade_installed")}
                         >Upgrade installed first</Button>

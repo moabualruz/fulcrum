@@ -382,7 +382,7 @@
 			</ul>
 
 			<div class="grid gap-2" data-session-actions>
-				<Button type="button" variant="outline" size="sm" onclick={pause}>Pause</Button>
+				<Button type="button" variant="secondary" size="sm" onclick={pause}>Pause</Button>
 				<Button type="button" size="sm" data-resume-session onclick={resume}>Resume session</Button>
 				<Button type="button" variant="ghost" size="sm" data-clear-sessions onclick={clearAllSessions}>
 					Clear sessions
@@ -507,7 +507,7 @@
 			{/if}
 
 			<div class="flex flex-wrap justify-between gap-2">
-				<Button type="button" variant="outline" size="sm" data-clear-ids onclick={clearSourceIds}>
+				<Button type="button" variant="secondary" size="sm" data-clear-ids onclick={clearSourceIds}>
 					Clear required IDs
 				</Button>
 				<Button type="submit" size="sm" data-submit-prompt>Submit prompt</Button>

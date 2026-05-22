@@ -44,6 +44,6 @@
         <li data-sessions-row={s.id} class="rounded-md border border-border p-3 text-sm">{s.title}</li>
       {/each}
     </ul>
-    <Button variant="outline" size="sm" data-sessions-clear onclick={clear}>Clear</Button>
+    <Button variant="secondary" size="sm" data-sessions-clear onclick={clear}>Clear</Button>
   {/if}
 </main>

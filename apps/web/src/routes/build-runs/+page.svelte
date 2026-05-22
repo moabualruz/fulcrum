@@ -351,7 +351,7 @@
           description="Or press ▶ Play on any task."
         >
           {#snippet actions()}
-            <Button variant="default" size="sm">Dispatch first run</Button>
+            <Button variant="primary" size="sm">Dispatch first run</Button>
           {/snippet}
         </EmptyState>
       </div>
@@ -482,7 +482,7 @@
           {paused ? "▶ Resume" : "⏸ Pause"}
         </Button>
         <Button
-          variant="destructive"
+          variant="danger"
           size="sm"
           data-session-stop
           onclick={() => (abortOpen = true)}
@@ -557,9 +557,9 @@
           "flex flex-wrap gap-2 border-b border-border bg-background px-4 py-2",
         )}
       >
-        <Button variant="outline" size="sm" data-run-fork>Fork from this turn</Button>
-        <Button variant="outline" size="sm" data-run-retry-policy>Retry policy</Button>
-        <Button variant="outline" size="sm" data-run-retry-prompt>Retry with prompt</Button>
+        <Button variant="secondary" size="sm" data-run-fork>Fork from this turn</Button>
+        <Button variant="secondary" size="sm" data-run-retry-policy>Retry policy</Button>
+        <Button variant="secondary" size="sm" data-run-retry-prompt>Retry with prompt</Button>
       </div>
 
       <!-- transcript -->
@@ -604,7 +604,7 @@
                     </code>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     data-permission-option="deny"
                     onclick={() => (permissionResolved = true)}
@@ -620,7 +620,7 @@
                     Allow once
                   </Button>
                   <Button
-                    variant="default"
+                    variant="primary"
                     size="sm"
                     data-permission-option="allow-always"
                     onclick={() => (permissionResolved = true)}
@@ -774,7 +774,7 @@
                 {/if}
                 <span class="flex-1"></span>
                 {#if ck.current}
-                  <Button variant="outline" size="sm" data-checkpoint-resume>
+                  <Button variant="secondary" size="sm" data-checkpoint-resume>
                     Resume from checkpoint
                   </Button>
                 {:else}
@@ -877,7 +877,7 @@
       ></textarea>
       <div class="mt-4 flex justify-end gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           data-abort-cancel
           onclick={() => (abortOpen = false)}
@@ -885,7 +885,7 @@
           Keep running
         </Button>
         <Button
-          variant="destructive"
+          variant="danger"
           size="sm"
           data-abort-confirm
           onclick={() => (abortOpen = false)}

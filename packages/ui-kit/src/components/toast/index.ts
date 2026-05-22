@@ -1,6 +1,6 @@
 import Region from "./toast-region.svelte";
 
-export type { ToastRegionProps } from "./toast-region.svelte";
+export type { ToastRegionProps } from "./toast-region.exports.js";
 export {
 	ToastStore,
 	defaultToastStore,
