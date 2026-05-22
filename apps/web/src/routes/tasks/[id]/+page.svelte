@@ -1,10 +1,9 @@
 <script lang="ts">
   import type { TaskDetailPayload, SubtaskRow, EdgeRow, EventRow } from "$lib/server/task-detail";
   import type { TaskStatus } from "$lib/server/tasks";
-  import { describeStatus } from "$lib/components/board/board-helpers";
+  import { describeStatus, TASK_STATUSES } from "$lib/components/board/board-helpers";
   import { matchTaskShortcut } from "$lib/components/task-detail/task-detail-helpers";
-  import { buttonVariants, Select, TASK_STATUSES } from "@fulcrum/ui-kit";
-  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props {

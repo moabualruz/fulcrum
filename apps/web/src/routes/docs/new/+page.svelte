@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { PageData } from "./$types";
+	import type { ActionData, PageData } from "./$types";
 	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
 	import { untrack } from "svelte";
 	import { enhance } from "$app/forms";
-	import type { ActionData } from "@fulcrum/ui-kit";
 	import {
 		applyTemplateSelectionChange,
 		buildDocTypeOptions,

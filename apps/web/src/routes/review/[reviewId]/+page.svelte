@@ -43,7 +43,8 @@
 	 * from `@fulcrum/ui-kit` per the AGENTS.md ui-kit rule; the `waiting-input`
 	 * badge resolves through `StatusBadge`, the trace identity through `TraceChip`.
 	 */
-	import { Button, CommentThread, Kbd, page } from "$app/state";
+	import { page } from "$app/state";
+	import { Button, CommentThread, Kbd } from "@fulcrum/ui-kit";
 	import {
 		Badge, Select, StatusBadge, TraceChip, type CommentThreadState, type ThreadComment, type WorkflowStatus } from "@fulcrum/ui-kit";
 	import { cn } from "@fulcrum/ui-kit";

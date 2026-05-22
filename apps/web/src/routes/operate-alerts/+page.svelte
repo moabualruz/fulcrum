@@ -31,7 +31,7 @@
    * state uses the locked `COPY.md` operate-alerts strings (the divergent OD
    * hidden `empty-state` copy is intentionally NOT used: COPY.md is canonical).
    */
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     EmptyState,

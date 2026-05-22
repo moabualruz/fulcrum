@@ -27,7 +27,7 @@
    * (CLI-TUI-UX.md §1.6 `--all-agents`, design-alignment/operate.md
    * §operate-plugins.html "Migration notes").
    */
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Chip,

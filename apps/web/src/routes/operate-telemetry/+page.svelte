@@ -38,7 +38,7 @@
    * failure banner, forced with `?state=error`).
    */
   import { browser } from "$app/environment";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { BarChart, LineChart } from "layerchart";
   import { Badge, ErrorBanner, RadioGroup, RadioGroupItem, Stat } from "@fulcrum/ui-kit";
   import {

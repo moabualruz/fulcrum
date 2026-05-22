@@ -21,7 +21,7 @@
    * `build-runs` feed (`prd-web-build-runs-feed-od-fidelity`): the mobile sheet
    * is a responsive presentation of one run, not a separate data path.
    */
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Button,

@@ -14,7 +14,8 @@
    * retry prompt, fork-from-turn, rate limits, and the cost strip are inline
    * states of this one pane, not separate routes.
    */
-  import { Button, EmptyState, LoadingState, ModeRow, page } from "$app/stores";
+  import { page } from "$app/state";
+  import { Button, EmptyState, LoadingState, ModeRow } from "@fulcrum/ui-kit";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
     Badge, RunFeedItem, Select, StatusBadge, TraceChip, type WorkflowStatus } from "@fulcrum/ui-kit";
