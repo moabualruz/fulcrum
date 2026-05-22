@@ -43,6 +43,9 @@ export class MemorySearchQueryDto extends MemoryListQueryDto {
 
 export class MemoryPatchBodyDto {
   body?: string;
+  kind?: PublicMemoryKind;
+  scope?: "project" | "global" | "task" | "user";
+  key?: string;
   tags?: string[];
   importance?: PublicMemoryImportance;
   forceEdit?: boolean;

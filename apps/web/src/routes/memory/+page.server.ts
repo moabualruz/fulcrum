@@ -1,9 +1,15 @@
 import { fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { createScopedMemoryAction, listMemoryRows, MEMORY_SCOPES, type MemoryScope } from "@knowledge-workspace/interface/memory-records.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import {
+  createMemoryApiForEvent,
+  memoryOrgId,
+  MEMORY_SCOPES,
+  toWebMemoryRow,
+  type MemoryScope,
+} from "$lib/server/memory-api";
 
-export const load: PageServerLoad = ({ url, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { url, locals } = event;
   const activeProjectId = locals?.activeProjectId ?? null;
   const scope = (url.searchParams.get("scope") ?? "") as MemoryScope | "";
   const kind = url.searchParams.get("kind") ?? "";
@@ -13,12 +19,15 @@ export const load: PageServerLoad = ({ url, locals }) => {
     kind,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, activeProjectId);
-        const memories = await listMemoryRows(em, ctx, {
-          scope: scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined,
-          kind: kind ? kind as Parameters<typeof listMemoryRows>[2]["kind"] : undefined,
-          projectId: ctx.projectId,
-        });
+        const memoryApi = createMemoryApiForEvent(event);
+        const validScope = scope && MEMORY_SCOPES.includes(scope as MemoryScope) ? scope as MemoryScope : undefined;
+        const rows = await memoryApi.memories.list({
+          global: validScope === "global" ? true : validScope === "project" ? false : undefined,
+          kind: kind || undefined,
+          projectId: validScope === "global" ? null : activeProjectId,
+          limit: 100,
+        }) as unknown[];
+        const memories = rows.map((memory) => toWebMemoryRow(memory, memoryOrgId(event)));
         return { memories };
       })(),
     },
@@ -26,7 +35,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
 };
 
 export const actions: Actions = {
-  create: async ({ request, locals }) => {
+  create: async (event) => {
+    const { request, locals } = event;
     const formData = await request.formData();
     const key = (formData.get("key") as string)?.trim();
     const body = (formData.get("body") as string)?.trim();
@@ -37,14 +47,15 @@ export const actions: Actions = {
     if (!MEMORY_SCOPES.includes(scope as MemoryScope)) return fail(400, { error: "Invalid scope" });
 
     const projectId = locals?.activeProjectId ?? null;
-    const { em, ctx } = await requestServiceScope(locals, projectId);
-    const { id } = await createScopedMemoryAction(em, ctx, {
-      projectId: scope === "global" ? null : ctx.projectId ?? null,
-      scope: scope as MemoryScope,
+    const memoryApi = createMemoryApiForEvent(event);
+    const { id } = await memoryApi.memories.create({
+      projectId: scope === "global" ? null : projectId,
+      global: scope === "global",
       kind,
-      key,
       body,
-    });
+      source: "manual",
+      sourceRef: { key, scope },
+    }) as { id: string };
     return { success: true, id };
   },
 };
