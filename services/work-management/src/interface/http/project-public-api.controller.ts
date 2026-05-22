@@ -338,6 +338,23 @@ export class ProjectPublicApiController {
     return await this.projects.createProject(body);
   }
 
+  // Literal-segment routes (`dashboard`, `options`, `setup`) MUST be declared
+  // before the `:id` parametric routes — NestJS's RouterExplorer registers
+  // routes in method-definition order, and Express matches in registration
+  // order, so a parametric `:id` registered first would swallow GET /dashboard
+  // etc. as `getProject({ id: "dashboard" })` → 404 "Project not found".
+  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
+    return await this.projects.dashboard(query);
+  }
+
+  async listProjectOptions(query: ProjectListQueryDto): Promise<unknown> {
+    return await this.projects.listProjectOptions(query);
+  }
+
+  async createProjectFromSetup(body: ProjectSetupBodyDto): Promise<unknown> {
+    return await this.projects.createProjectFromSetup(body);
+  }
+
   async getProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
     return await this.projects.getProject(params, query);
   }
@@ -356,18 +373,6 @@ export class ProjectPublicApiController {
 
   async projectOverview(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
     return await this.projects.projectOverview(params, query);
-  }
-
-  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
-    return await this.projects.dashboard(query);
-  }
-
-  async listProjectOptions(query: ProjectListQueryDto): Promise<unknown> {
-    return await this.projects.listProjectOptions(query);
-  }
-
-  async createProjectFromSetup(body: ProjectSetupBodyDto): Promise<unknown> {
-    return await this.projects.createProjectFromSetup(body);
   }
 
   async loadProjectBacklog(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
