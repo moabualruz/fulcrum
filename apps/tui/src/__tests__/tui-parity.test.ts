@@ -358,7 +358,7 @@ describe("TUI root navigation: OD stage launcher parity", () => {
       expect(rendered).toContain(expected.heading);
       expect(rendered).toContain(expected.chrome);
       expect(rendered).toContain(expected.mode);
-      expect(rendered).toContain("Manual [m a]");
+      expect(rendered).toContain("AI Assist [m a][m i]");
 
       app.stop();
     }
@@ -1010,10 +1010,12 @@ describe("TUI per-Step ModePicker: runs / review / board / artifacts / doctor", 
     expect(await screen.handleKey("d")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
 
-    // Without the `m` prefix a bare `d` is the screen's own dispatch action,
-    // never a mode selection: the chord does not shadow screen keys.
+    // Without the `m` prefix a bare lowercase `d` is ignored; uppercase `D`
+    // remains the dispatch action, so the chord does not shadow screen keys.
     expect(screen.currentStepMode).toBe("discuss");
-    expect(await screen.handleKey("d")).toBe(true); // dispatch overlay, not a mode
+    expect(await screen.handleKey("d")).toBe(false);
+    expect(screen.currentStepMode).toBe("discuss");
+    expect(await screen.handleKey("D")).toBe(true);
     expect(screen.currentStepMode).toBe("discuss");
   });
 

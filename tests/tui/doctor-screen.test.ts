@@ -343,14 +343,18 @@ describe("Operate stage workbench (:doctor): OD parity", () => {
     }
   });
 
-  it("p/d/m select ModePicker modes", async () => {
+  it("m-chord selectors select ModePicker modes", async () => {
     const screen = new DoctorScreen({ results: checks });
+    await screen.handleKey("m");
     await screen.handleKey("p");
     expect(screen.currentStepMode).toBe("play");
+    await screen.handleKey("m");
     await screen.handleKey("d");
     expect(screen.currentStepMode).toBe("discuss");
     await screen.handleKey("m");
     expect(screen.currentStepMode).toBe("manual");
+    await screen.handleKey("i");
+    expect(screen.currentStepMode).toBe("assist");
   });
 
   it("empty Operate workbench renders the shared one-sentence/one-action contract", () => {

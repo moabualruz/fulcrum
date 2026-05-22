@@ -10,10 +10,10 @@
  * `ModeRow` primitive.
  *
  * Mode keys (CLI-TUI-UX §7.4 + DESIGN.md §4.11, per focused Step):
- *   m   ✋ Manual   : work the step yourself (the leftmost mode)
- *   p   ▶ Play      : hand off to an AI agent
- *   d   💬 Discuss  : open the step's inline thread
- *   a   ⊞ AI Assist : open the TUI-native inline AI Assist pane (`:ai`)
+ *   m m   ✋ Manual   : work the step yourself (the leftmost mode)
+ *   m p   ▶ Play      : hand off to an AI agent
+ *   m d   💬 Discuss  : open the step's inline thread
+ *   m a/i ⊞ AI Assist : open the TUI-native inline AI Assist pane (`:ai`)
  *
  * The widget owns no business logic: `handleKey` resolves the mode key
  * to a `WorkflowMode` and fires the registered `onSelect` callback; the screen
@@ -39,14 +39,13 @@ export interface ModeAffordance {
   glyph: string;
   /** Long-form label (DESIGN.md §4.13). */
   label: string;
-  /**
-   * The single-key mode selector (`m` Manual, `p` Play, `d` Discuss,
-   * `a` AI Assist).
-   */
+  /** The rendered chord hint (`m`, `m p`, `m d`, `m a`). */
   keybinding: string;
+  /** Extra selector keys accepted after the `m` prefix. */
+  aliases?: readonly string[];
 }
 
-/** @deprecated ModePicker now uses direct p/d/m/a selectors; kept for legacy tests. */
+/** ModePicker chord prefix. Bare screen keys remain owned by each workbench. */
 export const MODE_CHORD_PREFIX = "m";
 
 /**
@@ -54,18 +53,19 @@ export const MODE_CHORD_PREFIX = "m";
  */
 export const MODE_AFFORDANCES: readonly ModeAffordance[] = [
   { mode: "manual", glyph: "✋", label: "Manual", keybinding: "m" },
-  { mode: "play", glyph: "▶", label: "Play", keybinding: "p" },
-  { mode: "discuss", glyph: "💬", label: "Discuss", keybinding: "d" },
-  { mode: "assist", glyph: "⊞", label: "AI Assist", keybinding: "a" },
+  { mode: "play", glyph: "▶", label: "Play", keybinding: "m p" },
+  { mode: "discuss", glyph: "💬", label: "Discuss", keybinding: "m d" },
+  { mode: "assist", glyph: "⊞", label: "AI Assist", keybinding: "m a", aliases: ["i"] },
 ];
 
-/** The mode-selector keystrokes claimed by the picker (`m p d a`). */
-export const MODE_RESERVED_KEYS: readonly string[] = MODE_AFFORDANCES.map(
-  (m) => m.keybinding,
-);
+/** The mode-selector keystrokes claimed by the picker (`m` chord prefix only). */
+export const MODE_RESERVED_KEYS: readonly string[] = [MODE_CHORD_PREFIX];
 
-/** @deprecated Direct selectors are canonical; legacy name now mirrors them. */
-export const MODE_CHORD_KEYBINDINGS: readonly string[] = MODE_AFFORDANCES.map((m) => m.keybinding);
+/** Chord hints rendered in the ModePicker row. */
+export const MODE_CHORD_KEYBINDINGS: readonly string[] = MODE_AFFORDANCES.flatMap((m) => [
+  m.keybinding,
+  ...(m.aliases ?? []).map((alias) => `${MODE_CHORD_PREFIX} ${alias}`),
+]);
 
 /**
  * The global keystrokes the ModePicker must never shadow: the command palette
@@ -92,12 +92,13 @@ export function modeKeyCollidesWith(
   return reserved.includes(keybinding);
 }
 
-/** Mode-selector keystroke -> `WorkflowMode`. */
+/** Post-prefix mode selector -> `WorkflowMode`. */
 const MODE_KEY_ALIASES: Record<string, WorkflowMode> = {
   m: "manual",
   p: "play",
   d: "discuss",
   a: "assist",
+  i: "assist",
 };
 
 export interface ModePickerOpts {
@@ -111,13 +112,12 @@ export interface ModePickerOpts {
 
 /**
  * The per-Step mode row for the TUI. Renders the four mode affordances as a
-   * single line (a toolbar of mode buttons) and resolves p/d/m/a selections.
+   * single line (a toolbar of mode buttons) and resolves `m`-prefixed mode selections.
  */
 export class ModePicker {
   private _value: WorkflowMode;
   private readonly stepId?: string;
   private readonly onSelect?: (mode: WorkflowMode, stepId?: string) => void;
-  /** @deprecated Direct selectors do not arm a chord. */
   private chordArmed = false;
 
   constructor(opts: ModePickerOpts = {}) {
@@ -126,7 +126,6 @@ export class ModePicker {
     this.onSelect = opts.onSelect;
   }
 
-  /** @deprecated Direct selectors do not arm a chord. */
   get isChordArmed(): boolean {
     return this.chordArmed;
   }
@@ -148,10 +147,18 @@ export class ModePicker {
   }
 
   /**
-   * Resolve a mode-selector keystroke to a mode and select it. A non-selector
-   * key returns `null` so the caller can fall through to its own handling.
+   * Resolve the collision-free `m` chord. Bare screen keys (`p`, `d`, `a`, ...)
+   * return `null` until `m` arms the picker, so workbenches keep their own keys.
    */
   handleKey(key: string): WorkflowMode | null {
+    if (!this.chordArmed) {
+      if (key !== MODE_CHORD_PREFIX) return null;
+      this.chordArmed = true;
+      this.select("manual");
+      return "manual";
+    }
+
+    this.chordArmed = false;
     const mode = MODE_KEY_ALIASES[key];
     if (!mode) return null;
     this.select(mode);
@@ -172,20 +179,25 @@ export class ModePicker {
   }
 
   /**
-   * The keybindings this row exposes: fed to the `HelpOverlay` so `?` lists
-   * them.
+   * The keybindings this row exposes: fed to the `HelpOverlay` so `?` lists them.
    */
   keybindings(): Array<{ key: string; action: string }> {
-    return MODE_AFFORDANCES.map((m) => ({
-      key: m.keybinding,
-      action: `${m.glyph} ${m.label}`,
-    }));
+    return MODE_AFFORDANCES.flatMap((m) => {
+      const action = `${m.glyph} ${m.label}`;
+      return [
+        { key: m.keybinding, action },
+        ...(m.aliases ?? []).map((alias) => ({
+          key: `${MODE_CHORD_PREFIX} ${alias}`,
+          action,
+        })),
+      ];
+    });
   }
 
   /**
    * Render the mode row as one line: the four mode affordances with labels,
    * the selected one reverse-video (the OD `aria-pressed` equivalent), each
-   * followed by its key hint in dim (`[m]`, `[p]`, …).
+   * followed by its key hint in dim (`[m]`, `[m p]`, …).
    *
    * The row is a single line; a consuming screen on a width-starved terminal
    * clips it through `truncateWide`, never wrapping it.
@@ -195,9 +207,12 @@ export class ModePicker {
       const active = m.mode === this._value;
       const cell = `${m.glyph} ${m.label}`;
       const painted = active ? pc.inverse(` ${cell} `) : ` ${cell} `;
-      return `${painted}${pc.dim(`[${m.keybinding}]`)}`;
+      const hints = [m.keybinding, ...(m.aliases ?? []).map((alias) => `${MODE_CHORD_PREFIX} ${alias}`)]
+        .map((hint) => pc.dim(`[${hint}]`))
+        .join("");
+      return `${painted}${hints}`;
     });
-    const row = cells.join("  ");
+    const row = `${this.chordArmed ? `${pc.dim("m>")} ` : ""}${cells.join("  ")}`;
     return row;
   }
 }

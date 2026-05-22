@@ -512,20 +512,25 @@ describe("Build stage workbench (:runs): OD parity", () => {
     }
   });
 
-  test("p/d/m select ModePicker modes instead of opening legacy run actions", async () => {
+  test("m-chord selectors select ModePicker modes without opening run actions", async () => {
     const screen = buildScreen();
     await screen.load();
 
+    await screen.handleKey("m");
     await screen.handleKey("p");
     expect(screen.currentStepMode).toBe("play");
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dependencies for");
 
+    await screen.handleKey("m");
     await screen.handleKey("d");
     expect(screen.currentStepMode).toBe("discuss");
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("Dispatch run");
 
     await screen.handleKey("m");
     expect(screen.currentStepMode).toBe("manual");
+
+    await screen.handleKey("i");
+    expect(screen.currentStepMode).toBe("assist");
   });
 
   test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {

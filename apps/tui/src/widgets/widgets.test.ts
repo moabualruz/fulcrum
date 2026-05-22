@@ -281,11 +281,11 @@ describe("ModePicker: TUI per-Step mode affordance row", () => {
     // `q` `H` `L` `g`. modeKeyCollidesWith proves the contract.
     expect(modeKeyCollidesWith(MODE_CHORD_PREFIX)).toBe(false);
     expect(PALETTE_HELP_NAV_KEYS).not.toContain(MODE_CHORD_PREFIX);
-    // The documented full keybindings are the `m`-chord forms only.
-    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m a", "m p", "m d", "m i"]);
-    // Each chord keybinding starts with the collision-free `m` prefix.
+    // The documented keybindings use the collision-free `m` prefix.
+    expect(MODE_CHORD_KEYBINDINGS).toEqual(["m", "m p", "m d", "m a", "m i"]);
+    // Each keybinding starts with the collision-free `m` prefix.
     for (const binding of MODE_CHORD_KEYBINDINGS) {
-      expect(binding.startsWith(`${MODE_CHORD_PREFIX} `)).toBe(true);
+      expect(binding === MODE_CHORD_PREFIX || binding.startsWith(`${MODE_CHORD_PREFIX} `)).toBe(true);
     }
   });
 
