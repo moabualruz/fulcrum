@@ -13,7 +13,8 @@ interface BanRule {
 }
 
 const BAN_RULES: BanRule[] = [
-  { name: "protocol-chrome", pattern: /\bACP\b|AcpDrawer/, reason: "COPY.md §1 says visible agent affordances say AI Assist, not ACP." },
+  { name: "protocol-chrome", pattern: /\bACP\b|\bacp\b|AcpDrawer/i, reason: "COPY.md §1.10 says visible agent affordances say AI Assist, not ACP." },
+  { name: "chat-label", pattern: /\bchat\b/i, reason: "COPY.md §1.10 says visible agent affordances say AI Assist, not chat." },
   { name: "no-em-dash", pattern: /—|\\u2014/i, reason: "COPY.md §1 bans em dashes in visible copy." },
   { name: "no-decorative-sparkle", pattern: /✨|\\u2728/i, reason: "COPY.md §1 bans decorative sparkle glyphs in visible copy." },
   { name: "marketing-start", pattern: /\bWelcome to Fulcrum!?|\bGet started!?/i, reason: "COPY.md §1 bans marketing/onboarding CTA copy." },
@@ -32,6 +33,11 @@ const SOURCE_ROOTS = [
 
 const RENDERED_OUTPUT_ROOTS = [
   "tests/cli/__snapshots__",
+  "tests/tui/__snapshots__",
+  "apps/web/tests/__snapshots__",
+  "apps/web/src/__snapshots__",
+  "apps/tui/src/__snapshots__",
+  "packages/ui-kit/src/__snapshots__",
 ];
 
 const FILE_EXTENSIONS = new Set([".svelte", ".ts", ".tsx", ".js", ".jsx", ".json", ".snap"]);
@@ -41,6 +47,7 @@ interface Candidate {
   line: number;
   text: string;
   source: "source" | "rendered";
+  origin: "quoted" | "template" | "svelte-text" | "rendered";
 }
 
 interface Finding extends Candidate {
@@ -87,12 +94,54 @@ function stripInlineComment(line: string): string {
 
 function quotedLiterals(line: string): string[] {
   const out: string[] = [];
-  for (const pattern of [/"([^"\\]*(?:\\.[^"\\]*)*)"/g, /'([^'\\]*(?:\\.[^'\\]*)*)'/g, /`([^`\\]*(?:\\.[^`\\]*)*)`/g]) {
+  for (const pattern of [/"([^"\\]*(?:\\.[^"\\]*)*)"/g, /'([^'\\]*(?:\\.[^'\\]*)*)'/g]) {
     for (const match of line.matchAll(pattern)) {
       const value = match[1].replace(/\\n/g, " ").replace(/\\"/g, "\"").replace(/\\'/g, "'");
       if (/[A-Za-z🎉✨—]/.test(value) || /\\u(?:2014|2728)/i.test(value)) out.push(value);
     }
   }
+  return out;
+}
+
+function visibleTemplateText(segment: string): string {
+  return segment
+    .replace(/\$\{[^}]*\}/g, " ")
+    .replace(/\\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findUnescapedBacktick(line: string, from: number): number {
+  let index = from;
+  while (index < line.length) {
+    const next = line.indexOf("`", index);
+    if (next === -1) return -1;
+    if (next === 0 || line[next - 1] !== "\\") return next;
+    index = next + 1;
+  }
+  return -1;
+}
+
+function templateSegments(line: string): { text: string; open: boolean }[] {
+  const out: { text: string; open: boolean }[] = [];
+  let index = 0;
+
+  while (true) {
+    const start = findUnescapedBacktick(line, index);
+    if (start === -1) break;
+
+    const end = findUnescapedBacktick(line, start + 1);
+    if (end === -1) {
+      const text = visibleTemplateText(line.slice(start + 1));
+      if (text) out.push({ text, open: true });
+      return out;
+    }
+
+    const text = visibleTemplateText(line.slice(start + 1, end));
+    if (text) out.push({ text, open: false });
+    index = end + 1;
+  }
+
   return out;
 }
 
@@ -108,24 +157,85 @@ function svelteText(line: string): string[] {
   return /[A-Za-z🎉✨—]/.test(withoutTags) || /\\u(?:2014|2728)/i.test(withoutTags) ? [withoutTags] : [];
 }
 
+function bareSvelteText(line: string): string[] {
+  const text = line.replace(/\{[^}]*\}/g, " ").replace(/\s+/g, " ").trim();
+  if (!text || !/[A-Za-z🎉✨—]/.test(text)) return [];
+  if (/[<>]/.test(text) || /^data-[\w-]+$/.test(text) || /^[A-Za-z0-9_:-]+(?:=|:)/.test(text)) return [];
+  if (/^(?:<\/?[A-Za-z]|[{}/:;]|#|{:|{\/)/.test(text)) return [];
+  if (/^(?:const|let|type|interface|function|import|export|return|if|for|await|async)\b/.test(text)) return [];
+  return [text];
+}
+
 function candidatesForFile(absPath: string, source: Candidate["source"]): Candidate[] {
   const rel = relative(repoRoot, absPath);
   const isSvelte = absPath.endsWith(".svelte");
   const lines = readFileSync(absPath, "utf8").split(/\r?\n/);
   const candidates: Candidate[] = [];
+  let openTemplate = false;
+  let inSvelteScript = false;
+  let inSvelteStyle = false;
+  let inSvelteComment = false;
 
   lines.forEach((raw, index) => {
-    const line = stripInlineComment(raw);
+    const rawTrimmed = raw.trim();
+    if (isSvelte && (inSvelteComment || rawTrimmed.startsWith("<!--"))) {
+      if (!rawTrimmed.includes("-->")) inSvelteComment = true;
+      if (rawTrimmed.includes("-->")) inSvelteComment = false;
+      return;
+    }
+
+    let line = stripInlineComment(raw);
     if (!line.trim()) return;
-    const texts = source === "rendered" ? [line] : [...quotedLiterals(line), ...(isSvelte ? svelteText(line) : [])];
-    for (const text of texts) candidates.push({ file: rel, line: index + 1, text, source });
+    const trimmed = line.trim();
+    const startsSvelteScript = isSvelte && /<script\b/.test(trimmed);
+    const startsSvelteStyle = isSvelte && /<style\b/.test(trimmed);
+    if (startsSvelteScript) inSvelteScript = true;
+    if (startsSvelteStyle) inSvelteStyle = true;
+    const inSvelteMarkup = isSvelte && !inSvelteScript && !inSvelteStyle;
+
+    if (source === "rendered") {
+      candidates.push({ file: rel, line: index + 1, text: line, source, origin: "rendered" });
+      return;
+    }
+
+    if (openTemplate) {
+      const close = findUnescapedBacktick(line, 0);
+      const segment = close === -1 ? line : line.slice(0, close);
+      const text = visibleTemplateText(segment);
+      if (text) candidates.push({ file: rel, line: index + 1, text, source, origin: "template" });
+      if (close === -1) return;
+      openTemplate = false;
+      line = line.slice(close + 1);
+    }
+
+    for (const text of quotedLiterals(line)) {
+      candidates.push({ file: rel, line: index + 1, text, source, origin: "quoted" });
+    }
+    for (const segment of templateSegments(line)) {
+      candidates.push({ file: rel, line: index + 1, text: segment.text, source, origin: "template" });
+      if (segment.open) openTemplate = true;
+    }
+    if (inSvelteMarkup) {
+      for (const text of [...svelteText(line), ...bareSvelteText(line)]) {
+        candidates.push({ file: rel, line: index + 1, text, source, origin: "svelte-text" });
+      }
+    }
+
+    if (isSvelte && /<\/script>/.test(trimmed)) inSvelteScript = false;
+    if (isSvelte && /<\/style>/.test(trimmed)) inSvelteStyle = false;
   });
 
   return candidates;
 }
 
+function isMachineToken(text: string): boolean {
+  const value = text.trim();
+  if (!value || /\s/.test(value)) return false;
+  return /^[-_:./@A-Za-z0-9]+$/.test(value);
+}
+
 function allowed(candidate: Candidate, rule: BanRule): boolean {
-  const { file, text, source } = candidate;
+  const { file, text, source, origin } = candidate;
 
   // Non-visible tests may assert banned strings are absent.
   if (source === "rendered" && !file.includes("__snapshots__")) {
@@ -135,9 +245,12 @@ function allowed(candidate: Candidate, rule: BanRule): boolean {
   // Internal protocol/type names are allowed when they are source identifiers
   // rather than user-facing copy.
   if (rule.name === "protocol-chrome") {
-    if (/packages\/ui-kit\/src\/(?:components\/acp-drawer|index\.ts)/.test(file)) return true;
-    if (/\b(?:AcpDrawer[A-Za-z]*|ACP[A-Za-z]*|[A-Za-z]*ACP[A-Za-z]*)\b/.test(text) && !/\s/.test(text)) return true;
+    if (source === "source" && origin !== "svelte-text" && isMachineToken(text)) return true;
     if (/acp-session\.spec\.ts$/.test(file)) return true;
+  }
+
+  if (rule.name === "chat-label" && source === "source" && origin !== "svelte-text" && isMachineToken(text)) {
+    return true;
   }
 
   // The ui-kit status badge exports a banned vocabulary list so tests and
@@ -179,7 +292,7 @@ function scan(candidates: Candidate[]): Finding[] {
 
 function runSelfTest(): void {
   const temp = join(tmpdir(), `fulcrum-copy-banlist-${process.pid}.svelte`);
-  writeFileSync(temp, `<button>Get started</button>\n<p>Trace — Run</p>\n<p>✨ AI Assist</p>\n`);
+  writeFileSync(temp, `<button>Get started</button>\n<p>Trace — Run</p>\n<p>✨ AI Assist</p>\n<p>Open chat</p>\n<p>acp session</p>\n`);
   try {
     const findings = scan(candidatesForFile(temp, "source"));
     if (!findings.some((finding) => finding.rule.name === "marketing-start")) {
@@ -190,6 +303,12 @@ function runSelfTest(): void {
     }
     if (!findings.some((finding) => finding.rule.name === "no-decorative-sparkle")) {
       throw new Error("self-test failed: injected visible sparkle glyph was not detected");
+    }
+    if (!findings.some((finding) => finding.rule.name === "chat-label")) {
+      throw new Error("self-test failed: injected visible chat label was not detected");
+    }
+    if (!findings.some((finding) => finding.rule.name === "protocol-chrome")) {
+      throw new Error("self-test failed: injected visible acp protocol label was not detected");
     }
     console.log("check-copy-banlist self-test ok: injected banned visible string detected.");
   } finally {

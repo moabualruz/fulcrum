@@ -606,8 +606,8 @@
 				Comments
 				<Badge variant="outline" class="font-mono text-[10px]">{threadCount}</Badge>
 			</TabsTrigger>
-			<TabsTrigger value="chat" data-review-tab="chat" class="gap-1.5">
-				Free chat
+				<TabsTrigger value="chat" data-review-tab="chat" class="gap-1.5">
+					AI Assist
 				<Badge variant="outline" class="font-mono text-[10px]">{chatCount}</Badge>
 			</TabsTrigger>
 			<TabsTrigger value="history" data-review-tab="history" class="gap-1.5">
@@ -921,7 +921,7 @@
 				class="sticky top-0 z-[2] flex items-center gap-2.5 border-b border-border bg-muted/30 px-6 py-2.5"
 			>
 				<span class="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-					Free chat · plan reviewers + AI
+						AI Assist · plan reviewers
 				</span>
 			</div>
 			<div class="flex flex-1 flex-col gap-3 overflow-y-auto p-4" data-chat-stream>

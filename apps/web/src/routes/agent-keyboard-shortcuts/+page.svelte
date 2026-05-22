@@ -5,7 +5,7 @@
     { keys: "Cmd/Ctrl+K", action: "Focus command palette", scope: "global" },
     { keys: "Cmd/Ctrl+Tab", action: "Next session", scope: "global" },
     { keys: "Cmd/Ctrl+Shift+Tab", action: "Previous session", scope: "global" },
-    { keys: "Cmd/Ctrl+L", action: "Clear chat input", scope: "input" },
+    { keys: "Cmd/Ctrl+L", action: "Clear AI Assist input", scope: "input" },
     { keys: "Cmd/Ctrl+Z", action: "Abort current operation", scope: "session" },
     { keys: "Enter", action: "Submit message (desktop)", scope: "input" },
     { keys: "Shift+Enter", action: "Insert newline (desktop)", scope: "input" },

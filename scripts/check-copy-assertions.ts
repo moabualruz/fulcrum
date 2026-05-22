@@ -40,10 +40,21 @@ const ledgerRelpath =
  * `.scratch/` does not exist, so the default target prefers the script-root
  * copy and falls back to a CWD-relative copy (the primary checkout).
  */
+function ledgerCandidates(start: string): string[] {
+  const candidates: string[] = [];
+  let cursor = resolve(start);
+  while (true) {
+    candidates.push(resolve(cursor, ledgerRelpath));
+    const parent = dirname(cursor);
+    if (parent === cursor) return candidates;
+    cursor = parent;
+  }
+}
+
 function resolveDefaultLedger(): string {
   for (const candidate of [
-    resolve(repoRoot, ledgerRelpath),
-    resolve(process.cwd(), ledgerRelpath),
+    ...ledgerCandidates(repoRoot),
+    ...ledgerCandidates(process.cwd()),
   ]) {
     if (existsSync(candidate)) return candidate;
   }
@@ -64,7 +75,7 @@ interface PrdRow {
  * least one quoted token to forbid.
  */
 const BAN_KEYWORDS =
-  /\b(banned|ban|never\s+(?:say|says|render|renders|use|uses|shows?|appears?)|absent|must\s+not\s+(?:say|render|appear|show)|no\s+(?:longer\s+)?(?:visible\s+)?(?:renders?|says?|contains?|reads?|has))\b/i;
+  /\b(banned|ban|leaks?|never\s+(?:say|says|render|renders|use|uses|shows?|appears?)|absent|must\s+not\s+(?:say|render|appear|show|use)|no\s+(?:longer\s+)?(?:visible\s+)?(?:renders?|says?|contains?|reads?|has|uses?))\b/i;
 
 /**
  * Phrasing that, on its own, marks an assertion as a paraphrase: it defers to a
@@ -76,6 +87,15 @@ const PARAPHRASE_MARKERS =
 
 /** Words that, alongside a multi-token quoted list, mark it an exact lock. */
 const EXACTNESS_SIGNAL = /\b(exact(?:ly)?|verbatim|literal(?:ly)?)\b/i;
+
+const BANNED_TOKEN_PATTERNS = [
+  /\bACP\b/i,
+  /\bchat\b/i,
+  /\bWIP\b/,
+  /\bem dash(?: character)?\b/i,
+  /\bdecorative sparkle glyph\b/i,
+  /✨|\\u2728/i,
+];
 
 /** A quoted run is "real visible copy" when it has a letter and is non-trivial. */
 function quotedLiterals(text: string): string[] {
@@ -129,8 +149,17 @@ function hasExactTokenEnumeration(text: string): boolean {
  * ban list legitimately enumerates short tokens (e.g. `WIP`, `Oops!`).
  */
 function hasBannedStringAssertion(text: string): boolean {
-  if (!BAN_KEYWORDS.test(text)) return false;
-  return quotedLiterals(text).length > 0;
+  const bansSomething = BAN_KEYWORDS.test(text) || /\bno\b/i.test(text);
+  if (!bansSomething) return false;
+  return quotedLiterals(text).length > 0 || BANNED_TOKEN_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function hasVerbatimCopySectionAssertion(text: string): boolean {
+  return /\bmatches?\b/i.test(text) && /\bCOPY\.md\s+§\d+(?:\.\d+)?\b/i.test(text) && /\bverbatim\b/i.test(text);
+}
+
+function hasExitCodeAssertion(text: string): boolean {
+  return /\b[\w./-]+\.(?:ts|js|sh)\s+exits\s+0\b/i.test(text);
 }
 
 /**
@@ -143,6 +172,8 @@ function isLiteralAssertion(text: string): boolean {
   if (hasVisibleStringLiteral(text)) return true;
   if (hasExactTokenEnumeration(text)) return true;
   if (hasBannedStringAssertion(text)) return true;
+  if (hasVerbatimCopySectionAssertion(text)) return true;
+  if (hasExitCodeAssertion(text)) return true;
   return false;
 }
 
@@ -154,6 +185,10 @@ function classify(text: string): string {
     reasons.push("no exact-token enumeration");
   if (!hasBannedStringAssertion(text))
     reasons.push("no explicit banned-string assertion");
+  if (!hasVerbatimCopySectionAssertion(text))
+    reasons.push("no exact COPY.md section lock");
+  if (!hasExitCodeAssertion(text))
+    reasons.push("no exact exit-code assertion");
   if (PARAPHRASE_MARKERS.test(text)) reasons.push("paraphrase phrasing present");
   return reasons.join("; ");
 }

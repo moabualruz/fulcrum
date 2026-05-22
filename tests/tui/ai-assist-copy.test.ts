@@ -54,5 +54,7 @@ describe("TUI AI Assist visible copy", () => {
     const text = renderPlain(screen);
     expect(text).toContain("AI Assist session");
     expect(text).not.toContain("ACP");
+    expect(text).not.toMatch(/\bacp\b/i);
+    expect(text).not.toMatch(/\bchat\b/i);
   });
 });
