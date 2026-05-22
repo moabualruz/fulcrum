@@ -2,12 +2,12 @@
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
   import RunsTable from "$lib/components/runs/RunsTable.svelte";
-  import { applyRunsFilters, type RunRow } from "$lib/components/runs/runs-filters";
-  import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
-  import type { SortColumn, SortDirection } from "$lib/components/runs/runs-table-sort";
+  import { applyRunsFilters, SortDirection } from "$lib/components/runs/runs-table-sort";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "@fulcrum/ui-kit";
-  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants, type RunRow } from "$lib/components/runs/runs-filters";
+  import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
+  import type { SortColumn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

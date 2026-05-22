@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   /**
    * GanttView.svelte: task workflow (D-60, D-61, D-62, D-102, D-103, D-104)
    *

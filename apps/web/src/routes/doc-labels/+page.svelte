@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type LabelScope = "global" | "project";
   type Label = { id: string; name: string; color: string; scope: LabelScope; project?: string };
   type Doc = { id: string; title: string; labels: string[] };

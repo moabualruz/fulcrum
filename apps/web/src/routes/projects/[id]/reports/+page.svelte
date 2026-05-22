@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
-	import { cn } from "@fulcrum/ui-kit";
+	import { cn, Select } from "@fulcrum/ui-kit";
 	import BurndownChart from "$lib/components/reports/BurndownChart.svelte";
 	import VelocityChart from "$lib/components/reports/VelocityChart.svelte";
 	import CfdChart from "$lib/components/reports/CfdChart.svelte";

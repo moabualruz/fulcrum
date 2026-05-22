@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

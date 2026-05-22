@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   import { createVirtualizer } from "@tanstack/svelte-virtual";
   import { tick } from "svelte";
 

@@ -25,16 +25,10 @@
    * Probe, show-tools, and the `CredentialInput`-based credential field carry
    * forward from the pre-migration route: no feature loss.
    */
-  import { page } from "$app/stores";
+  import { EmptyState, ErrorBanner, ModeRow, page } from "$app/stores";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
-    CredentialInput,
-    EmptyState,
-    ErrorBanner,
-    ModeRow,
-    StatusBadge,
-    type WorkflowStatus,
-  } from "@fulcrum/ui-kit";
+    CredentialInput, Select, StatusBadge, type WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "@fulcrum/ui-kit";
 
   type Protocol = "http" | "stdio";

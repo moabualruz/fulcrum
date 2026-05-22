@@ -170,75 +170,6 @@ const ALLOWLIST = new Set<string>([
   "apps/web/src/lib/components/command-palette/CommandPalette.svelte",
 ]);
 
-const LEGACY_NATIVE_SELECT_ALLOWLIST = new Set<string>([
-  "apps/web/src/routes/agents/+page.svelte",
-  "apps/web/src/routes/boards/+page.svelte",
-  "apps/web/src/routes/build-runs/+page.svelte",
-  "apps/web/src/routes/comments/+page.svelte",
-  "apps/web/src/routes/context/preview/+page.svelte",
-  "apps/web/src/routes/cross-cutting-perf/+page.svelte",
-  "apps/web/src/routes/doc-labels/+page.svelte",
-  "apps/web/src/routes/docs/+page.svelte",
-  "apps/web/src/routes/docs/[id]/edit/+page.svelte",
-  "apps/web/src/routes/docs/new/+page.svelte",
-  "apps/web/src/routes/inference/+page.svelte",
-  "apps/web/src/routes/member-remove/+page.svelte",
-  "apps/web/src/routes/members/+page.svelte",
-  "apps/web/src/routes/memory/+page.svelte",
-  "apps/web/src/routes/memory/[id]/+page.svelte",
-  "apps/web/src/routes/operate-mcp/+page.svelte",
-  "apps/web/src/routes/orchestration/+page.svelte",
-  "apps/web/src/routes/project-settings/+page.svelte",
-  "apps/web/src/routes/projects/+page.svelte",
-  "apps/web/src/routes/projects/[id]/activity/+page.svelte",
-  "apps/web/src/routes/projects/[id]/backlog/+page.svelte",
-  "apps/web/src/routes/projects/[id]/board/+page.svelte",
-  "apps/web/src/routes/projects/[id]/e2e/+page.svelte",
-  "apps/web/src/routes/projects/[id]/gantt/+page.svelte",
-  "apps/web/src/routes/projects/[id]/intake/[intakeId]/+page.svelte",
-  "apps/web/src/routes/projects/[id]/modules/+page.svelte",
-  "apps/web/src/routes/projects/[id]/modules/[moduleId]/+page.svelte",
-  "apps/web/src/routes/projects/[id]/reports/+page.svelte",
-  "apps/web/src/routes/projects/[id]/review/+page.svelte",
-  "apps/web/src/routes/projects/[id]/runs/[runId]/+page.svelte",
-  "apps/web/src/routes/projects/[id]/settings/fields/+page.svelte",
-  "apps/web/src/routes/projects/[id]/settings/import/+page.svelte",
-  "apps/web/src/routes/projects/[id]/settings/views/+page.svelte",
-  "apps/web/src/routes/projects/[id]/settings/views/[viewId]/+page.svelte",
-  "apps/web/src/routes/projects/[id]/updates/+page.svelte",
-  "apps/web/src/routes/review/+page.svelte",
-  "apps/web/src/routes/review/[reviewId]/+page.svelte",
-  "apps/web/src/routes/review-search/+page.svelte",
-  "apps/web/src/routes/review-templates/+page.svelte",
-  "apps/web/src/routes/runs/+page.svelte",
-  "apps/web/src/routes/settings/ai-assist/+page.svelte",
-  "apps/web/src/routes/settings/i18n/+page.svelte",
-  "apps/web/src/routes/settings/notifications/+page.svelte",
-  "apps/web/src/routes/settings/routing/RoutingPage.svelte",
-  "apps/web/src/routes/settings/theme/+page.svelte",
-  "apps/web/src/routes/settings/users/+page.svelte",
-  "apps/web/src/routes/skill-registry/+page.svelte",
-  "apps/web/src/routes/space-permissions/+page.svelte",
-  "apps/web/src/routes/task-filters/+page.svelte",
-  "apps/web/src/routes/tasks/[id]/+page.svelte",
-  "apps/web/src/routes/theme-picker/+page.svelte",
-  "apps/web/src/routes/view-controls/+page.svelte",
-  "apps/web/src/routes/views-custom-fields/+page.svelte",
-  "apps/web/src/lib/components/projects/ProjectForm.svelte",
-  "apps/web/src/lib/components/repos/BranchSelector.svelte",
-  "apps/web/src/lib/components/review/ReviewWorkbench.svelte",
-  "apps/web/src/lib/components/saved-views/SavedViewFilterBuilder.svelte",
-  "apps/web/src/lib/components/tasks/AutomationRuleList.svelte",
-  "apps/web/src/lib/components/tasks/FieldDependencyConfig.svelte",
-  "apps/web/src/lib/components/tasks/GanttView.svelte",
-  "apps/web/src/lib/components/tasks/MentionSuggestion.svelte",
-  "apps/web/src/lib/components/tasks/QuickCreateForm.svelte",
-  "apps/web/src/lib/components/tasks/RecurrenceConfig.svelte",
-  "apps/web/src/lib/components/tasks/TaskBoard.svelte",
-  "apps/web/src/lib/components/tasks/TaskListView.svelte",
-  "apps/web/src/lib/components/tasks/TaskTable.svelte",
-]);
-
 interface Violation {
   file: string;
   rule: string;
@@ -387,8 +318,7 @@ for (const rootRel of SURFACE_ROOTS) {
       }
       if (
         hasNativeSelectResponsibility(source) &&
-        missingUiKitImports(source, ["Select"]).length > 0 &&
-        !LEGACY_NATIVE_SELECT_ALLOWLIST.has(rel)
+        missingUiKitImports(source, ["Select"]).length > 0
       ) {
         violations.push({
           file: rel,

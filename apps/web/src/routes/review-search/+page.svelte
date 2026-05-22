@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type SourceKind = "plan" | "diff" | "prototype" | "annotation" | "feedback";
   type Status = "open" | "resolved" | "blocker";
 

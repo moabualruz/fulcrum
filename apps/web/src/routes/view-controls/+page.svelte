@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SortDirection } from "@fulcrum/shared-dto";
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   type SortField = "key" | "title" | "state" | "priority" | "estimate" | "updated";
 

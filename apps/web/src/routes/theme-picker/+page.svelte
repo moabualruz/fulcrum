@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   type FontFamily = "inter" | "system" | "mono";
   type AnimationSpeed = "normal" | "reduced" | "off";
   type Preset = "default" | "ocean" | "forest" | "sunset" | "monochrome";

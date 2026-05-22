@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { PageData } from "./$types";
+	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
 	import { untrack } from "svelte";
 	import { enhance } from "$app/forms";
-	import type { ActionData, PageData } from "./$types";
-	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
-	import { buttonVariants } from "@fulcrum/ui-kit";
+	import type { ActionData } from "@fulcrum/ui-kit";
 	import {
 		applyTemplateSelectionChange,
 		buildDocTypeOptions,
@@ -12,7 +12,7 @@
 		type TemplatePickerState,
 	} from "$lib/docs/template-picker";
 	import { DOC_TYPE_DESCRIPTIONS, DOC_TYPE_LABELS } from "$lib/docs/doc-templates";
-	import { cn } from "@fulcrum/ui-kit";
+	import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;

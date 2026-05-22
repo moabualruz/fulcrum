@@ -3,7 +3,7 @@
   import type { PageData } from "./$types";
   import GanttView from "$lib/components/tasks/GanttView.svelte";
   import ProjectViewSwitcher from "$lib/components/board/ProjectViewSwitcher.svelte";
-  import { cn } from "@fulcrum/ui-kit";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;

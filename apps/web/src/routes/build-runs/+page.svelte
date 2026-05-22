@@ -14,19 +14,10 @@
    * retry prompt, fork-from-turn, rate limits, and the cost strip are inline
    * states of this one pane, not separate routes.
    */
-  import { page } from "$app/stores";
+  import { Button, EmptyState, LoadingState, ModeRow, page } from "$app/stores";
   import type { WorkflowMode } from "@fulcrum/shared-dto";
   import {
-    Badge,
-    Button,
-    EmptyState,
-    LoadingState,
-    ModeRow,
-    RunFeedItem,
-    StatusBadge,
-    TraceChip,
-    type WorkflowStatus,
-  } from "@fulcrum/ui-kit";
+    Badge, RunFeedItem, Select, StatusBadge, TraceChip, type WorkflowStatus } from "@fulcrum/ui-kit";
   import { cn } from "@fulcrum/ui-kit";
 
   type SparkTone = "ok" | "warn" | "bad" | "run";
