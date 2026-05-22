@@ -200,59 +200,23 @@ ApiTags("project-timeline")(ProjectTimelinePublicApiController);
 Get(":id/calendar")(ProjectTimelinePublicApiController.prototype, "calendar", calendarDescriptor);
 Param()(ProjectTimelinePublicApiController.prototype, "calendar", 0);
 Query()(ProjectTimelinePublicApiController.prototype, "calendar", 1);
-ApiOperation({ summary: "Get the project calendar read-model" })(
-  ProjectTimelinePublicApiController.prototype,
-  "calendar",
-  calendarDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectTimelinePublicApiController.prototype,
-  "calendar",
-  calendarDescriptor,
-);
-ApiOkResponse({ description: "Project calendar" })(
-  ProjectTimelinePublicApiController.prototype,
-  "calendar",
-  calendarDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectTimelinePublicApiController.prototype, "calendar", calendarDescriptor);
+ApiOperation({ summary: "Get the project calendar read-model" })(ProjectTimelinePublicApiController.prototype, "calendar", calendarDescriptor);
+ApiOkResponse({ description: "Project calendar" })(ProjectTimelinePublicApiController.prototype, "calendar", calendarDescriptor);
 
 Get(":id/gantt")(ProjectTimelinePublicApiController.prototype, "gantt", ganttDescriptor);
 Param()(ProjectTimelinePublicApiController.prototype, "gantt", 0);
 Query()(ProjectTimelinePublicApiController.prototype, "gantt", 1);
-ApiOperation({ summary: "Get the project gantt read-model" })(
-  ProjectTimelinePublicApiController.prototype,
-  "gantt",
-  ganttDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectTimelinePublicApiController.prototype,
-  "gantt",
-  ganttDescriptor,
-);
-ApiOkResponse({ description: "Project gantt" })(
-  ProjectTimelinePublicApiController.prototype,
-  "gantt",
-  ganttDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectTimelinePublicApiController.prototype, "gantt", ganttDescriptor);
+ApiOperation({ summary: "Get the project gantt read-model" })(ProjectTimelinePublicApiController.prototype, "gantt", ganttDescriptor);
+ApiOkResponse({ description: "Project gantt" })(ProjectTimelinePublicApiController.prototype, "gantt", ganttDescriptor);
 
 Post(":id/reschedule")(ProjectTimelinePublicApiController.prototype, "reschedule", rescheduleDescriptor);
 Param()(ProjectTimelinePublicApiController.prototype, "reschedule", 0);
 Body()(ProjectTimelinePublicApiController.prototype, "reschedule", 1);
-ApiOperation({ summary: "Reschedule a project task" })(
-  ProjectTimelinePublicApiController.prototype,
-  "reschedule",
-  rescheduleDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectTimelinePublicApiController.prototype,
-  "reschedule",
-  rescheduleDescriptor,
-);
-ApiOkResponse({ description: "Rescheduled" })(
-  ProjectTimelinePublicApiController.prototype,
-  "reschedule",
-  rescheduleDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectTimelinePublicApiController.prototype, "reschedule", rescheduleDescriptor);
+ApiOperation({ summary: "Reschedule a project task" })(ProjectTimelinePublicApiController.prototype, "reschedule", rescheduleDescriptor);
+ApiOkResponse({ description: "Rescheduled" })(ProjectTimelinePublicApiController.prototype, "reschedule", rescheduleDescriptor);
 
 Module({
   imports: [TypeOrmModule.forFeature(FULCRUM_WORKFLOW_SPINE_ENTITIES)],

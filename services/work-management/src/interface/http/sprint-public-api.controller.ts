@@ -558,52 +558,23 @@ ApiCreatedResponse({ description: "Created sprint" })(
 // literal path rather than treating the segment as a sprint id.
 Get("project-board")(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
 Query()(SprintPublicApiController.prototype, "loadProjectSprints", 0);
-ApiOperation({ summary: "List project sprints with velocity" })(
-  SprintPublicApiController.prototype,
-  "loadProjectSprints",
-  loadProjectSprintsDescriptor,
-);
-ApiOkResponse({ description: "Project sprint board" })(
-  SprintPublicApiController.prototype,
-  "loadProjectSprints",
-  loadProjectSprintsDescriptor,
-);
+ApiOperation({ summary: "List project sprints with velocity" })(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
+ApiOkResponse({ description: "Project sprint board" })(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
 
 Post("project-board")(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
 Body()(SprintPublicApiController.prototype, "createProjectSprint", 0);
-ApiOperation({ summary: "Create a project sprint" })(
-  SprintPublicApiController.prototype,
-  "createProjectSprint",
-  createProjectSprintDescriptor,
-);
-ApiCreatedResponse({ description: "Created project sprint" })(
-  SprintPublicApiController.prototype,
-  "createProjectSprint",
-  createProjectSprintDescriptor,
-);
+ApiOperation({ summary: "Create a project sprint" })(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
+ApiCreatedResponse({ description: "Created project sprint" })(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
 
-Patch("project-tasks/:taskId")(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintTask",
-  updateProjectSprintTaskDescriptor,
-);
+Patch("project-tasks/:taskId")(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
 Param()(SprintPublicApiController.prototype, "updateProjectSprintTask", 0);
 Body()(SprintPublicApiController.prototype, "updateProjectSprintTask", 1);
-ApiOperation({ summary: "Update a project sprint task" })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintTask",
-  updateProjectSprintTaskDescriptor,
-);
-ApiParam({ name: "taskId", required: true })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintTask",
-  updateProjectSprintTaskDescriptor,
-);
-ApiOkResponse({ description: "Updated project sprint task" })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintTask",
-  updateProjectSprintTaskDescriptor,
-);
+ApiParam({ name: "taskId", required: true })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+ApiOperation({ summary: "Update a project sprint task" })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+ApiOkResponse({ description: "Updated project sprint task" })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+
+
+
 
 Get(":id")(SprintPublicApiController.prototype, "getSprint", getSprintDescriptor);
 Param()(SprintPublicApiController.prototype, "getSprint", 0);
@@ -740,120 +711,40 @@ ApiOkResponse({ description: "Removed sprint task assignment" })(
   removeTaskDescriptor,
 );
 
-Get(":id/detail")(
-  SprintPublicApiController.prototype,
-  "loadProjectSprintDetail",
-  loadProjectSprintDetailDescriptor,
-);
+Get(":id/detail")(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
 Param()(SprintPublicApiController.prototype, "loadProjectSprintDetail", 0);
 Query()(SprintPublicApiController.prototype, "loadProjectSprintDetail", 1);
-ApiOperation({ summary: "Get the project sprint detail read-model" })(
-  SprintPublicApiController.prototype,
-  "loadProjectSprintDetail",
-  loadProjectSprintDetailDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  SprintPublicApiController.prototype,
-  "loadProjectSprintDetail",
-  loadProjectSprintDetailDescriptor,
-);
-ApiOkResponse({ description: "Project sprint detail" })(
-  SprintPublicApiController.prototype,
-  "loadProjectSprintDetail",
-  loadProjectSprintDetailDescriptor,
-);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+ApiOperation({ summary: "Get the project sprint detail read-model" })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+ApiOkResponse({ description: "Project sprint detail" })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
 
-Post(":id/start-board")(
-  SprintPublicApiController.prototype,
-  "startProjectSprint",
-  startProjectSprintDescriptor,
-);
+Post(":id/start-board")(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
 Param()(SprintPublicApiController.prototype, "startProjectSprint", 0);
 Body()(SprintPublicApiController.prototype, "startProjectSprint", 1);
-ApiOperation({ summary: "Start a project sprint" })(
-  SprintPublicApiController.prototype,
-  "startProjectSprint",
-  startProjectSprintDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  SprintPublicApiController.prototype,
-  "startProjectSprint",
-  startProjectSprintDescriptor,
-);
-ApiOkResponse({ description: "Started project sprint" })(
-  SprintPublicApiController.prototype,
-  "startProjectSprint",
-  startProjectSprintDescriptor,
-);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+ApiOperation({ summary: "Start a project sprint" })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+ApiOkResponse({ description: "Started project sprint" })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
 
-Post(":id/complete-board")(
-  SprintPublicApiController.prototype,
-  "completeProjectSprint",
-  completeProjectSprintDescriptor,
-);
+Post(":id/complete-board")(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
 Param()(SprintPublicApiController.prototype, "completeProjectSprint", 0);
 Body()(SprintPublicApiController.prototype, "completeProjectSprint", 1);
-ApiOperation({ summary: "Complete a project sprint" })(
-  SprintPublicApiController.prototype,
-  "completeProjectSprint",
-  completeProjectSprintDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  SprintPublicApiController.prototype,
-  "completeProjectSprint",
-  completeProjectSprintDescriptor,
-);
-ApiOkResponse({ description: "Completed project sprint" })(
-  SprintPublicApiController.prototype,
-  "completeProjectSprint",
-  completeProjectSprintDescriptor,
-);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+ApiOperation({ summary: "Complete a project sprint" })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+ApiOkResponse({ description: "Completed project sprint" })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
 
-Patch(":id/goal")(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintGoal",
-  updateProjectSprintGoalDescriptor,
-);
+Patch(":id/goal")(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
 Param()(SprintPublicApiController.prototype, "updateProjectSprintGoal", 0);
 Body()(SprintPublicApiController.prototype, "updateProjectSprintGoal", 1);
-ApiOperation({ summary: "Update a project sprint goal" })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintGoal",
-  updateProjectSprintGoalDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintGoal",
-  updateProjectSprintGoalDescriptor,
-);
-ApiOkResponse({ description: "Updated project sprint goal" })(
-  SprintPublicApiController.prototype,
-  "updateProjectSprintGoal",
-  updateProjectSprintGoalDescriptor,
-);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+ApiOperation({ summary: "Update a project sprint goal" })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+ApiOkResponse({ description: "Updated project sprint goal" })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
 
-Post(":id/board-tasks")(
-  SprintPublicApiController.prototype,
-  "createProjectSprintTask",
-  createProjectSprintTaskDescriptor,
-);
+Post(":id/board-tasks")(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
 Param()(SprintPublicApiController.prototype, "createProjectSprintTask", 0);
 Body()(SprintPublicApiController.prototype, "createProjectSprintTask", 1);
-ApiOperation({ summary: "Create a task within a project sprint" })(
-  SprintPublicApiController.prototype,
-  "createProjectSprintTask",
-  createProjectSprintTaskDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  SprintPublicApiController.prototype,
-  "createProjectSprintTask",
-  createProjectSprintTaskDescriptor,
-);
-ApiCreatedResponse({ description: "Created project sprint task" })(
-  SprintPublicApiController.prototype,
-  "createProjectSprintTask",
-  createProjectSprintTaskDescriptor,
-);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
+ApiOperation({ summary: "Create a task within a project sprint" })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
+ApiCreatedResponse({ description: "Created project sprint task" })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
 
 Module({
   imports: [TypeOrmModule.forFeature(WORK_MANAGEMENT_ENTITIES)],

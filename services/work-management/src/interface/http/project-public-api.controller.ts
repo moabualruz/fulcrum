@@ -503,29 +503,17 @@ ApiOkResponse({ description: "Workspace dashboard" })(
 // picker is not shadowed by the get-by-id route.
 Get("options")(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
 Query()(ProjectPublicApiController.prototype, "listProjectOptions", 0);
-ApiOperation({ summary: "List candidate parent projects" })(
-  ProjectPublicApiController.prototype,
-  "listProjectOptions",
-  listProjectOptionsDescriptor,
-);
-ApiOkResponse({ description: "Candidate parent projects" })(
-  ProjectPublicApiController.prototype,
-  "listProjectOptions",
-  listProjectOptionsDescriptor,
-);
+ApiOperation({ summary: "List candidate parent projects" })(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
+ApiOkResponse({ description: "Candidate parent projects" })(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
 
 Post("setup")(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
 Body()(ProjectPublicApiController.prototype, "createProjectFromSetup", 0);
-ApiOperation({ summary: "Create a project with template, repo, and workflow setup" })(
-  ProjectPublicApiController.prototype,
-  "createProjectFromSetup",
-  createProjectFromSetupDescriptor,
-);
-ApiCreatedResponse({ description: "Created project with setup links" })(
-  ProjectPublicApiController.prototype,
-  "createProjectFromSetup",
-  createProjectFromSetupDescriptor,
-);
+ApiOperation({ summary: "Create a project with template, repo, and workflow setup" })(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
+ApiCreatedResponse({ description: "Created project with setup links" })(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
+
+
+
+
 
 Post()(ProjectPublicApiController.prototype, "createProject", createProjectDescriptor);
 Body()(ProjectPublicApiController.prototype, "createProject", 0);
@@ -620,96 +608,32 @@ ApiOkResponse({ description: "Project stats" })(
 Get(":id/overview")(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
 Param()(ProjectPublicApiController.prototype, "projectOverview", 0);
 Query()(ProjectPublicApiController.prototype, "projectOverview", 1);
-ApiOperation({ summary: "Get the project detail read-model" })(
-  ProjectPublicApiController.prototype,
-  "projectOverview",
-  projectOverviewDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectPublicApiController.prototype,
-  "projectOverview",
-  projectOverviewDescriptor,
-);
-ApiOkResponse({ description: "Project overview" })(
-  ProjectPublicApiController.prototype,
-  "projectOverview",
-  projectOverviewDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+ApiOperation({ summary: "Get the project detail read-model" })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+ApiOkResponse({ description: "Project overview" })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
 
 Get(":id/backlog")(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
 Param()(ProjectPublicApiController.prototype, "loadProjectBacklog", 0);
 Query()(ProjectPublicApiController.prototype, "loadProjectBacklog", 1);
-ApiOperation({ summary: "Get the project backlog read-model" })(
-  ProjectPublicApiController.prototype,
-  "loadProjectBacklog",
-  loadProjectBacklogDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectPublicApiController.prototype,
-  "loadProjectBacklog",
-  loadProjectBacklogDescriptor,
-);
-ApiOkResponse({ description: "Project backlog" })(
-  ProjectPublicApiController.prototype,
-  "loadProjectBacklog",
-  loadProjectBacklogDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+ApiOperation({ summary: "Get the project backlog read-model" })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+ApiOkResponse({ description: "Project backlog" })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
 
-Post(":id/backlog/sprint-tasks")(
-  ProjectPublicApiController.prototype,
-  "addBacklogTaskToSprint",
-  addBacklogTaskToSprintDescriptor,
-);
+Post(":id/backlog/sprint-tasks")(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
 Param()(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", 0);
 Body()(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", 1);
-ApiOperation({ summary: "Assign a backlog task to a sprint" })(
-  ProjectPublicApiController.prototype,
-  "addBacklogTaskToSprint",
-  addBacklogTaskToSprintDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectPublicApiController.prototype,
-  "addBacklogTaskToSprint",
-  addBacklogTaskToSprintDescriptor,
-);
-ApiCreatedResponse({ description: "Sprint task assignment" })(
-  ProjectPublicApiController.prototype,
-  "addBacklogTaskToSprint",
-  addBacklogTaskToSprintDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+ApiOperation({ summary: "Assign a backlog task to a sprint" })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+ApiCreatedResponse({ description: "Sprint task assignment" })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
 
-Delete(":id/backlog/sprints/:sprintId/tasks/:taskId")(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
+Delete(":id/backlog/sprints/:sprintId/tasks/:taskId")(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
 Param()(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", 0);
 Query()(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", 1);
-ApiOperation({ summary: "Unassign a backlog task from a sprint" })(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
-ApiParam({ name: "id", required: true })(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
-ApiParam({ name: "sprintId", required: true })(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
-ApiParam({ name: "taskId", required: true })(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
-ApiOkResponse({ description: "Removed sprint task assignment" })(
-  ProjectPublicApiController.prototype,
-  "removeBacklogTaskFromSprint",
-  removeBacklogTaskFromSprintDescriptor,
-);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiParam({ name: "sprintId", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiParam({ name: "taskId", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiOperation({ summary: "Unassign a backlog task from a sprint" })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiOkResponse({ description: "Removed sprint task assignment" })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
 
 Module({
   imports: [TypeOrmModule.forFeature(FULCRUM_WORKFLOW_SPINE_ENTITIES)],
