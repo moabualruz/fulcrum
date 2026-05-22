@@ -1271,7 +1271,7 @@
 				<Dialog bind:open={skillConflictOpen}>
 					<DialogTrigger>
 						{#snippet child({ props })}
-							<Button {...props} variant="outline" data-design-kit-skill-conflict-trigger>
+							<Button {...props} variant="secondary" data-design-kit-skill-conflict-trigger>
 								Resolve conflict
 							</Button>
 						{/snippet}
@@ -1325,7 +1325,7 @@
 								Use alt version
 							</Button>
 							<Button
-								variant="outline"
+								variant="secondary"
 								data-design-kit-skill-conflict-skip
 								onclick={() => (skillConflictChoice = "skip")}
 							>

@@ -421,7 +421,7 @@
 				<Button size="sm" data-empty-new-template onclick={restoreTemplates}>
 					+ New template
 				</Button>
-				<Button size="sm" variant="outline" data-empty-import-preset onclick={restoreTemplates}>
+				<Button size="sm" variant="secondary" data-empty-import-preset onclick={restoreTemplates}>
 					Import preset
 				</Button>
 			{/snippet}
@@ -558,7 +558,7 @@
 						{:else}
 							<Button
 								size="sm"
-								variant="outline"
+								variant="secondary"
 								class="mt-1 w-max"
 								data-use-template={tpl.id}
 								onclick={() => selectTemplate(tpl.id)}

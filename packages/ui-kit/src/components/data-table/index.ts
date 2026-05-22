@@ -5,7 +5,7 @@ export type {
 	DataTableColumn,
 	SortDirection,
 	SortState,
-} from "./data-table.svelte";
+} from "./data-table.exports.js";
 
 export {
 	Root,

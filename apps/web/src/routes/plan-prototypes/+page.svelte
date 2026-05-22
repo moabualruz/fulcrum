@@ -276,7 +276,7 @@
 							<span class="flex-1"></span>
 							{#if archived}
 								<Button
-									variant="outline"
+									variant="secondary"
 									size="sm"
 									data-prototype-restore
 									onclick={() => restore(prototype)}
@@ -285,7 +285,7 @@
 								</Button>
 							{:else}
 								<Button
-									variant="outline"
+									variant="secondary"
 									size="sm"
 									data-prototype-open
 									onclick={() => openInReview(prototype)}

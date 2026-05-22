@@ -181,7 +181,7 @@
           {#if firstUnhealthy}
             <Button
               size="sm"
-              variant="outline"
+              variant="secondary"
               data-doctor-banner-probe
               onclick={() => toggleExpanded(firstUnhealthy.subsystem)}
             >Probe {firstUnhealthy.subsystem}</Button>
@@ -288,7 +288,7 @@
                       <code class={cn("rounded bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] text-fg")}>{check.recoveryCommand}</code>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         data-doctor-copy-command
                         data-subsystem={check.subsystem}
                         onclick={() => copyCommand(check.subsystem, check.recoveryCommand ?? "")}
@@ -305,7 +305,7 @@
                   {#if isUnhealthy(check)}
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="secondary"
                       data-doctor-probe
                       data-subsystem={check.subsystem}
                       aria-expanded={expanded[check.subsystem] ?? false}
@@ -320,7 +320,7 @@
                       >{RECOVERY_ACTION_LABEL[check.recoveryActionKind]}</Button>
                     {/if}
                   {:else}
-                    <Button size="sm" variant="outline" data-doctor-probe data-subsystem={check.subsystem}>Probe</Button>
+                    <Button size="sm" variant="secondary" data-doctor-probe data-subsystem={check.subsystem}>Probe</Button>
                   {/if}
                   <div class={cn("basis-full")}>
                     <ModeRow

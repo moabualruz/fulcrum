@@ -3,10 +3,10 @@ import List from "./tabs-list.svelte";
 import Trigger from "./tabs-trigger.svelte";
 import Content from "./tabs-content.svelte";
 
-export type { TabsProps } from "./tabs.svelte";
-export type { TabsListProps } from "./tabs-list.svelte";
-export type { TabsTriggerProps } from "./tabs-trigger.svelte";
-export type { TabsContentProps } from "./tabs-content.svelte";
+export type { TabsProps } from "./tabs.exports.js";
+export type { TabsListProps } from "./tabs-list.exports.js";
+export type { TabsTriggerProps } from "./tabs-trigger.exports.js";
+export type { TabsContentProps } from "./tabs-content.exports.js";
 
 export {
 	Root,

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "svelte/server";
-import StatusBadgeRoot, {
+import StatusBadgeRoot from "./status-badge.svelte";
+import {
 	BANNED_STATUS_SYNONYMS,
 	CANONICAL_STATUS_VOCAB,
 	statusLabel,
 	type CanonicalStatus,
-} from "./status-badge.svelte";
+} from "./status-badge.exports.js";
 
 describe("StatusBadge: COPY.md §6 status-label lock", () => {
 	test("canonical 8-state vocab is exactly the COPY.md §6 closing line", () => {

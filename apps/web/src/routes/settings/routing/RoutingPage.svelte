@@ -146,7 +146,7 @@
         </div>
         <details data-routing-create-panel class="rounded-md border border-border p-2" open={rules.length === 0}>
           <summary class="cursor-pointer text-sm font-medium">
-            <Button type="button" class="pointer-events-none" variant="outline">New rule</Button>
+            <Button type="button" class="pointer-events-none" variant="secondary">New rule</Button>
           </summary>
           <form method="POST" action="?/create" class="mt-4 grid gap-3 md:grid-cols-2">
               <Input type="hidden" name="enabled" value="true" />
@@ -235,16 +235,16 @@
                         <Input name="name" aria-label={`Edit name ${rule.name}`} value={rule.name} />
                         <Input name="actionAgent" aria-label={`Edit agent ${rule.name}`} value={rule.actionAgent} />
                         <Textarea name="conditionsJson" aria-label={`Edit conditions ${rule.name}`} class="font-mono text-xs">{JSON.stringify(rule.conditionsJson)}</Textarea>
-                        <Button type="submit" variant="outline">Save</Button>
+                        <Button type="submit" variant="secondary">Save</Button>
                       </form>
                     </details>
                     <form method="POST" action="?/reorder">
                       <Input type="hidden" name="orderedIds" value={[rule.id, ...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id)].join(",")} />
-                      <Button type="submit" data-routing-reorder-up disabled={index === 0} variant="outline" size="xs">Up</Button>
+                      <Button type="submit" data-routing-reorder-up disabled={index === 0} variant="secondary" size="xs">Up</Button>
                     </form>
                     <form method="POST" action="?/reorder">
                       <Input type="hidden" name="orderedIds" value={[...rules.filter((candidate) => candidate.id !== rule.id).map((candidate) => candidate.id), rule.id].join(",")} />
-                      <Button type="submit" data-routing-reorder-down disabled={index === rules.length - 1} variant="outline" size="xs">Down</Button>
+                      <Button type="submit" data-routing-reorder-down disabled={index === rules.length - 1} variant="secondary" size="xs">Down</Button>
                     </form>
                     <form method="POST" action="?/delete">
                       <Input type="hidden" name="id" value={rule.id} />

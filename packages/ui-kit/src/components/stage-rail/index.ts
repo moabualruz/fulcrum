@@ -4,7 +4,7 @@ import MobileStageTabs from "./mobile-stage-tabs.svelte";
 export type {
 	MobileStageTabItem,
 	MobileStageTabsProps,
-} from "./mobile-stage-tabs.svelte";
+} from "./mobile-stage-tabs.exports.js";
 
 export type {
 	StageRailProps,
@@ -13,8 +13,8 @@ export type {
 	StageRailSystemItem,
 	StageRailWorkspaceItem,
 	WorkflowStage,
-} from "./stage-rail.svelte";
-export { WORKFLOW_STAGES } from "./stage-rail.svelte";
+} from "./stage-rail.exports.js";
+export { WORKFLOW_STAGES } from "./stage-rail.exports.js";
 export {
 	Root,
 	MobileStageTabs,

@@ -5,10 +5,10 @@ import Fallback from "./avatar-fallback.svelte";
 export type {
 	AvatarProps,
 	AvatarSize,
-} from "./avatar.svelte";
-export type { AvatarImageProps } from "./avatar-image.svelte";
-export type { AvatarFallbackProps } from "./avatar-fallback.svelte";
-export { avatarVariants } from "./avatar.svelte";
+} from "./avatar.exports.js";
+export type { AvatarImageProps } from "./avatar-image.exports.js";
+export type { AvatarFallbackProps } from "./avatar-fallback.exports.js";
+export { avatarVariants } from "./avatar.exports.js";
 
 export {
 	Root,

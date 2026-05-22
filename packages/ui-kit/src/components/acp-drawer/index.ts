@@ -5,7 +5,7 @@ export type {
 	AcpDrawerSide,
 	AcpDrawerMetaItem,
 	AcpDrawerAgentRow,
-} from "./acp-drawer.svelte";
+} from "./acp-drawer.exports.js";
 export {
 	Root,
 	//

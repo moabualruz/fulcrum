@@ -83,7 +83,7 @@
     {#if task}
       <SheetHeader class="flex-row items-center justify-between border-b border-border">
         <SheetTitle data-testid="task-detail-title">{task.title}</SheetTitle>
-        <Button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} variant="ghost" size="icon-sm">×</Button>
+        <Button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} variant="ghost" size="sm" class="size-8 px-0">×</Button>
       </SheetHeader>
 
       <form data-board-sheet-form onsubmit={submit} class="space-y-3 px-4">
@@ -119,7 +119,7 @@
 
       <SheetFooter class="flex-row px-0 py-0">
         <Button type="submit" data-board-sheet-save variant="primary">Save</Button>
-        <Button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} variant="outline">Run</Button>
+        <Button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} variant="secondary">Run</Button>
         <Button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} variant="danger">Delete</Button>
       </SheetFooter>
     </form>
@@ -137,7 +137,7 @@
           bind:value={commentDraft}
           aria-label="Comment"
         />
-        <Button type="submit" data-testid="comment-submit" variant="outline">Add</Button>
+        <Button type="submit" data-testid="comment-submit" variant="secondary">Add</Button>
       </form>
     </section>
     {/if}

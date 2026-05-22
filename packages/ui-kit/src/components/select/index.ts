@@ -4,11 +4,11 @@ import Content from "./select-content.svelte";
 import Item from "./select-item.svelte";
 import Value from "./select-value.svelte";
 
-export type { SelectProps } from "./select.svelte";
-export type { SelectTriggerProps } from "./select-trigger.svelte";
-export type { SelectContentProps } from "./select-content.svelte";
-export type { SelectItemProps } from "./select-item.svelte";
-export type { SelectValueProps } from "./select-value.svelte";
+export type { SelectProps } from "./select.exports.js";
+export type { SelectTriggerProps } from "./select-trigger.exports.js";
+export type { SelectContentProps } from "./select-content.exports.js";
+export type { SelectItemProps } from "./select-item.exports.js";
+export type { SelectValueProps } from "./select-value.exports.js";
 
 export {
 	Root,

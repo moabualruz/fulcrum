@@ -125,7 +125,7 @@
     </label>
 
     <!-- Export button -->
-    <Button variant="outline" size="sm" class="w-full h-7 text-xs" on:click={handleExport}>
+    <Button variant="secondary" size="sm" class="w-full h-7 text-xs" on:click={handleExport}>
       Export
     </Button>
   </div>

@@ -607,8 +607,8 @@
 			<span>17 commits</span><span class="text-border">·</span><span>7 files</span>
 		</span>
 		<TraceChip traceId="8f29a4c1b3e0d5f7a2c4e6b8" data-review-trace />
-		<Button variant="outline" size="sm" data-review-action="rerun">Re-run checks</Button>
-		<Button variant="outline" size="sm" data-review-action="comment">Comment</Button>
+		<Button variant="secondary" size="sm" data-review-action="rerun">Re-run checks</Button>
+		<Button variant="secondary" size="sm" data-review-action="comment">Comment</Button>
 		<Button size="sm" data-review-action="approve" onclick={recordDecision}>
 			Approve &amp; merge
 			<Kbd class="ml-1.5">⌘↵</Kbd>

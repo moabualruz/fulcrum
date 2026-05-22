@@ -180,7 +180,7 @@
     >
       Apply to {"{N}"} tasks
     </Button>
-    <Button variant="outline" size="sm" class="h-8 text-xs" on:click={handleCancel}>
+    <Button variant="secondary" size="sm" class="h-8 text-xs" on:click={handleCancel}>
       Cancel
     </Button>
   </div>

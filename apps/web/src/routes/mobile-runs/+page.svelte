@@ -385,7 +385,7 @@
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size="sm"
         data-mobile-runs-assist
         aria-label="Open AI Assist"
         class="h-9 w-9 shrink-0"
@@ -433,7 +433,7 @@
             description="Or press ▶ Play on any task."
           >
             {#snippet actions()}
-              <Button variant="default" size="sm">Dispatch first run</Button>
+              <Button variant="primary" size="sm">Dispatch first run</Button>
             {/snippet}
           </EmptyState>
         </div>

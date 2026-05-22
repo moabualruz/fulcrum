@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "svelte/server";
-import ButtonRoot, { buttonVariants, type ButtonSize, type ButtonVariant } from "./button.svelte";
+import ButtonRoot from "./button.svelte";
+import { buttonVariants, type ButtonSize, type ButtonVariant } from "./button.exports.js";
 
 const designButtonVariants = ["primary", "secondary", "ghost", "danger", "link"] as const satisfies readonly ButtonVariant[];
 const designButtonSizes = ["xs", "sm", "md", "lg"] as const satisfies readonly ButtonSize[];

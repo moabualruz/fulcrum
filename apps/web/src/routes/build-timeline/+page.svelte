@@ -328,7 +328,7 @@
     <!-- Data-state switcher: drives the OD hidden empty-state branch. -->
     <div data-build-timeline-state-controls class={cn("flex items-center gap-2 pt-1")}>
       <a href="/build-timeline?state=empty" data-build-timeline-show-empty>
-        <Button size="sm" variant="outline">Show empty timeline</Button>
+        <Button size="sm" variant="secondary">Show empty timeline</Button>
       </a>
     </div>
   {/if}
@@ -336,7 +336,7 @@
   {#if timeline.isEmpty}
     <div data-build-timeline-state-controls class={cn("flex items-center gap-2 pt-1")}>
       <a href="/build-timeline" data-build-timeline-show-populated>
-        <Button size="sm" variant="outline">Show populated timeline</Button>
+        <Button size="sm" variant="secondary">Show populated timeline</Button>
       </a>
     </div>
   {/if}
