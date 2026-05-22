@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { DOC_TYPE_LABELS, groupTemplatesByDocType, type WebDocTemplate } from "$lib/docs/doc-templates";
 	import { SEEDED_DOC_TYPES } from "$lib/docs/template-picker";
-	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, buttonVariants } from "@fulcrum/ui-kit";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -10,6 +10,7 @@
 	}
 
 	let { templates, projectId = null }: Props = $props();
+	let selectedDocType = $state(SEEDED_DOC_TYPES[0]);
 	const grouped = $derived(groupTemplatesByDocType(templates));
 </script>
 
@@ -31,11 +32,17 @@
 		</label>
 		<label class={cn("flex flex-col gap-1 text-sm")}>
 			<span class={cn("font-medium")}>Type</span>
-			<select name="docType" class={cn("border-input bg-background h-9 rounded-md border px-3 text-sm")}>
-				{#each SEEDED_DOC_TYPES as docType (docType)}
-					<option value={docType}>{DOC_TYPE_LABELS[docType]}</option>
-				{/each}
-			</select>
+			<input type="hidden" name="docType" value={selectedDocType} />
+			<Select bind:value={selectedDocType} type="single">
+				<SelectTrigger aria-label="Template type">
+					<SelectValue placeholder={DOC_TYPE_LABELS[selectedDocType]} />
+				</SelectTrigger>
+				<SelectContent>
+					{#each SEEDED_DOC_TYPES as docType (docType)}
+						<SelectItem value={docType} label={DOC_TYPE_LABELS[docType]} />
+					{/each}
+				</SelectContent>
+			</Select>
 		</label>
 		<button type="submit" name="intent" value="create" class={cn(buttonVariants({ variant: "primary" }), "self-end")}>Create</button>
 		<label class={cn("md:col-span-3 flex flex-col gap-1 text-sm")}>

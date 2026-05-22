@@ -3,6 +3,7 @@
   import type { TaskStatus } from "$lib/server/tasks";
   import { TASK_STATUSES, describeStatus } from "./board-helpers";
   import { cn } from "$lib/utils.js";
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 
   interface Props {
     tasks: BoardTask[];
@@ -66,17 +67,26 @@
           >
             <span class={cn("w-16 shrink-0 text-xs text-muted-foreground font-mono")}>{task.id.slice(0, 8)}</span>
             <span class={cn("flex-1 truncate")}>{task.title}</span>
-            <select
-              data-status-select
-              class={cn("h-7 rounded border border-input bg-background px-2 text-xs")}
+            <Select
               value={task.status}
-              onchange={(e) => onStatusChange?.(task.id, (e.target as HTMLSelectElement).value as TaskStatus)}
-              onclick={(e) => e.stopPropagation()}
+              type="single"
+              onValueChange={(value) => onStatusChange?.(task.id, value as TaskStatus)}
             >
-              {#each TASK_STATUSES as s}
-                <option value={s}>{describeStatus(s)}</option>
-              {/each}
-            </select>
+              <SelectTrigger
+                data-status-select
+                aria-label={`Status for ${task.title}`}
+                size="sm"
+                class="h-7 w-32 text-xs"
+                onclick={(e) => e.stopPropagation()}
+              >
+                <SelectValue placeholder={describeStatus(task.status)} />
+              </SelectTrigger>
+              <SelectContent>
+                {#each TASK_STATUSES as s}
+                  <SelectItem value={s} label={describeStatus(s)} />
+                {/each}
+              </SelectContent>
+            </Select>
             <span class={cn("w-8 text-center text-xs", {
               "text-destructive": task.priority === 1,
               "text-orange-500": task.priority === 2,

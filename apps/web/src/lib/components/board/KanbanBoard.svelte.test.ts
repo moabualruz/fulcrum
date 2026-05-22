@@ -65,9 +65,8 @@ describe("KanbanBoard component (SSR)", () => {
     });
 
     expect(body).toMatch(/data-sprint-filter/);
-    expect(body).toMatch(/>All</);
-    expect(body).toMatch(/>Backlog</);
-    expect(body).toMatch(/>Sprint 1</);
+    expect(body).toMatch(/data-slot="select-trigger"/);
+    expect(body).toMatch(/>all</);
     expect(body).toMatch(/data-swimlane-toggle/);
   });
 });
