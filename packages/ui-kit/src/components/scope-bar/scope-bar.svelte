@@ -82,14 +82,28 @@
 		-->
 		<svg
 			aria-hidden="true"
-			class="size-6 rounded-sm bg-accent p-1 text-primary-foreground"
+			class="size-8 rounded-md bg-fg p-1.5 ring-1 ring-border shadow-sm"
 			viewBox="0 0 32 32"
 			fill="none"
 		>
-			<line x1="4" y1="11" x2="28" y2="17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
-			<path d="M9 25 L23 25 L16 14 Z" fill="currentColor" />
-			<line x1="6" y1="27" x2="26" y2="27" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-			<circle cx="16" cy="14" r="1.6" fill="currentColor" />
+			<defs>
+				<linearGradient id="sb-fulcrum-beam" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+					<stop offset="0%" stop-color="#60a5fa" />
+					<stop offset="100%" stop-color="#1d4ed8" />
+				</linearGradient>
+				<linearGradient id="sb-fulcrum-pivot" x1="0" y1="14" x2="0" y2="25" gradientUnits="userSpaceOnUse">
+					<stop offset="0%" stop-color="#fde047" />
+					<stop offset="100%" stop-color="#d97706" />
+				</linearGradient>
+			</defs>
+			<!-- Ground baseline (light slate for contrast on dark fg) -->
+			<line x1="6" y1="27" x2="26" y2="27" stroke="#cbd5e1" stroke-width="1.6" stroke-linecap="round" />
+			<!-- Pivot triangle (the fulcrum) — gold gradient -->
+			<path d="M9 25 L23 25 L16 14 Z" fill="url(#sb-fulcrum-pivot)" />
+			<!-- Beam: the lever, tilted to show mechanical advantage — blue gradient -->
+			<line x1="4" y1="11" x2="28" y2="17" stroke="url(#sb-fulcrum-beam)" stroke-width="2.8" stroke-linecap="round" />
+			<!-- Pivot contact dot at the apex -->
+			<circle cx="16" cy="14" r="1.8" fill="#fef3c7" stroke="#92400e" stroke-width="0.6" />
 		</svg>
 		<span class={cn(variant === "mobile" && "sr-only")}>{brand}</span>
 	</span>

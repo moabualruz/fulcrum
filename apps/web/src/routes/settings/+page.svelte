@@ -82,14 +82,17 @@
   };
 
   /** The nine OD settings sections, in IA-MAP `§3` line-280 order. */
+  // Settings-tab glyphs: terminal-safe Unicode marks (no emoji), consistent
+  // with the sidebar StageRail vocabulary so the same icon column reads the
+  // same across surfaces.
   const navSections = [
     { id: "general", label: "General", icon: "⚙" },
     { id: "appearance", label: "Appearance", icon: "◐" },
-    { id: "keyboard", label: "Keyboard", icon: "⌘" },
-    { id: "privacy", label: "Privacy & safety", icon: "🛡" },
+    { id: "keyboard", label: "Keyboard", icon: "⌨" },
+    { id: "privacy", label: "Privacy & safety", icon: "◈" },
     { id: "agents", label: "AI agents", icon: "✦" },
     { id: "routes", label: "Default routes", icon: "⤳" },
-    { id: "integrations", label: "Integrations", icon: "🔌" },
+    { id: "integrations", label: "Integrations", icon: "⏚" },
     { id: "account", label: "Account", icon: "◍" },
     { id: "danger", label: "Danger zone", icon: "⚠", danger: true },
   ] as const;

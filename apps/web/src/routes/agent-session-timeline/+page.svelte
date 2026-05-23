@@ -11,7 +11,9 @@
     { id: "e6", kind: "assist", ts: "10:00:24", summary: "Assistant: fixed the typing issue" },
   ];
 
-  const ICONS: Record<EventKind, string> = { assist: "💬", tool: "🛠", lock: "🔒", error: "⚠" };
+  // Unicode-glyph icons (no emoji) — render consistently across OSes and
+  // accept palette color via the rendering span's text-color class.
+  const ICONS: Record<EventKind, string> = { assist: "✎", tool: "✦", lock: "⊘", error: "⚠" };
 
   let expandedId = $state<string | null>(null);
   let scrolledTo = $state<string | null>(null);
