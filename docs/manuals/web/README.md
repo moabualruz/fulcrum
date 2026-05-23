@@ -1092,6 +1092,129 @@ seeded above.
 | Export JSON | `Export JSON` button | `fulcrum audit export --format=json` | Streams attachment |
 | Set retention | n/a (settings) | `fulcrum audit retention set --days=<n>` | Per-org policy |
 
+## Operate stage routes
+
+Operate covers the live-running supervisor surfaces: subsystem health, MCP servers, plugin packs, alerts, telemetry, repos, and the local inference sidecar. Six legacy top-level paths (`/operate`, `/operate-mcp`, `/operate-plugins`, `/operate-alerts`, `/operate-telemetry`, `/doctor`) all 308-redirect to their canonical IA position under `/<ws>/projects/<projId>/operate/<sub>` and render the same workbench. The legacy paths remain stable for bookmarks and external links.
+
+### `/operate`
+
+[![Operate · Doctor](../screenshots/web/06-operate.png)](../screenshots/web/06-operate.png)
+
+308 to `/<ws>/projects/<projId>/operate/doctor` — Operate's default sub-view per `STAGE_DEFAULT_SUB` in `apps/web/src/lib/components/app/route-map.ts`. Renders the `Doctor · system health` workbench: a status row (subsystems passing / failing / degraded / failed / last check) on top, then a table of every subsystem with status badge, latency, accuracy, latest event, and per-subsystem actions (`Logs` / `Probe` / `Run fix`). Data comes from the doctor read-model exposed by the platform-core public API (mirrors `fulcrum doctor`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List subsystems | `/operate` (auto-redirects to `/<ws>/projects/<projId>/operate/doctor`) | `fulcrum doctor` | Same checks both sides |
+| Probe one subsystem | `Probe` button per row | `fulcrum doctor --only <id>` | Re-runs the single check |
+| Run an auto-fix | `Run fix` button per row | `fulcrum doctor --run-fix=<id>` | Side-effects logged to `/audit` |
+| Open subsystem logs | `Logs` button per row | `fulcrum doctor logs <id>` | Stream from `~/.fulcrum/logs/` |
+
+### `/operate-mcp` and `/operate/mcp`
+
+[![Operate · MCP servers](../screenshots/web/22-operate-mcp.png)](../screenshots/web/22-operate-mcp.png)
+
+Per-CLI-agent MCP server registry. Top-of-page summary reads `N registered · X passing · Y failing · scoped to <agent>`. Below that, a **scope selector** as a `radiogroup` chips every configured CLI agent (Claude Opus / Sonnet / GPT / Gemini / OpenCode / Pi / Codex); switching the chip swaps the table for that agent's registry. Each row carries: server name + protocol/URL or command, `StatusBadge` (passing / failing / down), tool count, p50 / p99 RTT, auth (token / oauth / none), last probe time, and actions (`Probe`, `Logs`, compact `ModeRow` for default workflow mode). DESIGN.md §11 item 9 enforces per-agent scoping; new agents are added via `/settings#agents`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List MCP servers | `/operate/mcp` table | `fulcrum mcp list --agent <id>` | Scoped per CLI agent |
+| Add server | `Add server` button (top right) | `fulcrum mcp add --agent <id> --name <name> --protocol http\|stdio` | Form supports HTTP URL+port and stdio command+args+env |
+| Probe one | `Probe` button per row | `fulcrum mcp probe <id>` | Updates last-probe stamp and tool count |
+| Probe all | `Probe all` button (top right) | `fulcrum mcp probe --all` | Sequential probe over the agent's registry |
+| Show tools | `Show tools` after a probe | `fulcrum mcp tools <id>` | Lists `name / description / input-schema preview` |
+| Set default mode | `ModeRow` per row | `fulcrum mcp mode <id> <manual\|auto\|review>` | Persisted in the agent's MCP config |
+
+### `/operate-plugins` and `/operate/plugins`
+
+[![Operate · Plugins](../screenshots/web/23-operate-plugins.png)](../screenshots/web/23-operate-plugins.png)
+
+Per-CLI-agent plugin registry. Counts row reads `N installed · X enabled · Y queued · scoped to <agent>`. Tabs filter the grid (`Enabled` / `All` / `Updates available` / `By me`). Cards show plugin name + version, install scope, summary, owner, last-updated, and per-card actions (`Enable / Disable`, `Configure`, `Open`). The same scope selector as MCP is used to switch which agent's plugin set the view shows. `Install plugin` button (top right) opens the registry wizard.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List plugins | `/operate/plugins` cards | `fulcrum plugins list --agent <id>` | Per-agent |
+| Install | `Install plugin` (top right) | `fulcrum plugins install <pkg>` | Pulls from the configured marketplace |
+| Enable / Disable | toggle per card | `fulcrum plugins enable\|disable <id>` | Persisted in the agent's plugin config |
+| Configure | `Configure` per card | `fulcrum plugins configure <id>` | Opens the plugin's settings panel |
+| Update | `Updates available` tab | `fulcrum plugins update <id>` | When newer version is in marketplace |
+
+### `/operate-alerts` and `/operate/alerts`
+
+[![Operate · Alerts](../screenshots/web/62-operate-alerts.png)](../screenshots/web/62-operate-alerts.png)
+
+Alert center. Header reads `N firing · M awaiting ack · K resolved today` plus `Notification rules` and `New rule` buttons. Tabs (`Firing` / `Awaiting ack` / `Resolved` / `Silenced`) filter the alert list. Each row shows: severity dot, alert title (`MCP server context-mode latency > 5s`), threshold + rule id, a `StatusBadge` (failing / passing / pending), associated `traceId`, age, current state (`ongoing` / `acknowledged` / `resolved`), and inline actions (`Acknowledge`, `Resolve`, compact `ModeRow` for routing mode). Alert rules wire into `/settings/notifications` for routing channels.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List firing alerts | `Firing` tab | `fulcrum alerts list --state=firing` | Default tab |
+| Acknowledge | `Acknowledge` per row | `fulcrum alerts ack <id>` | Moves alert to `Awaiting ack` |
+| Resolve | `Resolve` per row | `fulcrum alerts resolve <id>` | Moves to `Resolved` |
+| Add a rule | `New rule` (top right) | `fulcrum alerts rule add ...` | Threshold + channel routing |
+| Configure routing | `Notification rules` (top right) | n/a (web only) | Channels per severity |
+
+### `/operate-telemetry` and `/operate/telemetry`
+
+[![Operate · Telemetry](../screenshots/web/63-operate-telemetry.png)](../screenshots/web/63-operate-telemetry.png)
+
+Observability dashboard with two top tabs: `Observability` (default) and `Telemetry settings`. Header reads `last 24h · Nk events · M drops` with a time-window picker (`1h / 6h / 24h / 7d / 30d`). Four KPI cards: `Agent runs`, `p50 step latency`, `p99 step latency`, `Error rate`, each carrying a delta vs. previous window. Below: a `Step latency (p50 / p99)` rolling-5-min chart over the selected window, a per-surface error-rate table (`web shell` / `CLI` / `TUI` / `mobile` / `API`), a `Runs by step` bar chart across `capture → plan → build → review → ship → operate`, and a `Local resources` panel (CPU / memory / disk / MCP RTT avg / cold-boot). Wires into the OpenTelemetry pipeline configured at `/settings/telemetry`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Switch window | `1h / 6h / 24h / 7d / 30d` | `fulcrum telemetry --since=24h` | Persists in URL |
+| Inspect surface error rate | `Agent error rate by surface` table | `fulcrum telemetry errors --by surface` | One row per surface |
+| Configure exporter | `Telemetry settings` tab | `fulcrum telemetry config` | OTel endpoint, sampling |
+
+### `/doctor`
+
+[![Workspace doctor](../screenshots/web/26-doctor.png)](../screenshots/web/26-doctor.png)
+
+308 to `/<ws>/projects/<projId>/operate/doctor` — workspace-level doctor is the same view as the Operate stage Doctor. Mirrors the `fulcrum doctor` CLI 1:1 by design, so a check that fails on the CLI fails here too. The web variant adds inline `Run fix` and `Logs` actions; the CLI prints the same fix recipe via `--run-fix=<id>`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Run all checks | `Run all` button (top right of doctor) | `fulcrum doctor` | Sequential probe |
+| Run one fix | `Run fix` per row | `fulcrum doctor --run-fix=<id>` | E.g. `pglite-rebuild` |
+| Open subsystem logs | `Logs` per row | `fulcrum doctor logs <id>` | Stream `~/.fulcrum/logs/` |
+
+### `/repos`
+
+[![Repos](../screenshots/web/64-repos.png)](../screenshots/web/64-repos.png)
+
+Workspace-wide repo list. Each row shows: `Slug`, `Path` (local fs path for `kind=local`, remote URL for `kind=remote`), `Branch`, dirty `State`, `Last sync`, `Recent commit`, `Tasks` (open count linked to this repo), `Health` (`healthy` / `stale` / `failed`), and a `Sync` action. The page is a pure invocation layer over `GET /api/v1/repos?orgId=<org>` (no direct DB access from `apps/web`). `Sync` posts to `POST /api/v1/repos/<id>/sync` and tail-updates `last_sync_at` once the integration-hub finishes. The seeded set includes `/Users/mkh/workspace/fulcrum` (local, branch `dev/v1.0`) and a remote fixture.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List repos | `/repos` table | `fulcrum repos list` | Org-scoped |
+| Add a repo | `Add repo` (top right) | `fulcrum repos add --kind local --path <p>` | Local or remote |
+| Sync | `Sync` per row | `fulcrum repos sync <id>` | Updates branches, commits, last-sync-at |
+| Open a repo | row link to `/repos/<id>` | `fulcrum repos show <id>` | Branches + commits + files |
+| Unregister | row context menu (detail page) | `fulcrum repos rm <id>` | Soft-delete (`archived=true`) |
+
+### `/inference`
+
+[![Inference sidecar](../screenshots/web/27-inference.png)](../screenshots/web/27-inference.png)
+
+Local inference sidecar control panel. Top row shows the sidecar state (`Stopped` / `Running`) + `Start sidecar` / `Stop sidecar` button. The `Backend Status` table lists every supported backend (Embedded / Ollama / LM Studio / OpenAI-compatible) with status, reason, current model, embed / generate capability badges, dimensions, and per-backend actions. Below that, the `Models` panel lists models loaded in the sidecar (empty until sidecar starts). The `Backend configuration` form picks which backend is the default. Read-model from `GET /api/v1/inference/health` + `/api/v1/inference/backends`; backend probes via `GET /api/v1/inference/backends/probe`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Start sidecar | `Start sidecar` button | `fulcrum inference start` | Spawns the local sidecar |
+| Switch backend | `Backend configuration` select + `Save` | `fulcrum inference config --backend <id>` | Persists in app config |
+| Probe a backend | row action | `fulcrum inference probe <id>` | Updates status / dimensions |
+| Test provider | `Backend configuration` (advanced) | `fulcrum inference provider test` | One-shot embed/generate call |
+
+### `/inference-models`
+
+[![Inference models](../screenshots/web/28-inference-models.png)](../screenshots/web/28-inference-models.png)
+
+Model catalog across providers. Table columns: `Name`, `Version`, `Provider` (`anthropic` / `openai` / `meta` / …), `Status` (`available` / `downloaded` / `pulling`), `Context` window (tokens), `Cost / 1k`, `Updated`. Per-row `Pull` action queues a download (no-op for cloud providers). Reads from `GET /api/v1/inference/models`; pull via `POST /api/v1/inference/models/<modelId>/pull`; delete via `DELETE /api/v1/inference/models/<modelId>`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List models | `/inference-models` table | `fulcrum inference models list` | Across all backends |
+| Pull a model | `Pull` per row | `fulcrum inference models pull <id>` | Streams progress |
+| Remove a model | row context menu | `fulcrum inference models rm <id>` | Local backends only |
+
 ## Cross-cutting affordances
 
 - **Trace identity** — every page header carries a copy-trace-id button (`tr_…`).
