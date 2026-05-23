@@ -121,11 +121,17 @@ export const handle: Handle = async ({ event, resolve }) => {
   });
 };
 
+// Seeded local admin (matches services/identity-access seed; same as /api/v1/auth/whoami
+// resolves for the local Better-Auth bypass). Using the real UUID lets server commands
+// that hydrate Org/User by id (e.g. addSettingsSecret) succeed without auth wiring.
+const LOCAL_DEV_USER_ID = "ac09598f-ce28-4c3a-9ba0-262771456a19";
+
 function localDevSession(): HydratedSession {
+  const userId = process.env["FULCRUM_USER_ID"] ?? LOCAL_DEV_USER_ID;
   return {
-    session: { userId: "local-user" },
+    session: { userId },
     orgId: process.env["FULCRUM_ORG_ID"] ?? "00000000-0000-0000-0000-000000000001",
-    userId: process.env["FULCRUM_USER_ID"] ?? "local-user",
+    userId,
   };
 }
 

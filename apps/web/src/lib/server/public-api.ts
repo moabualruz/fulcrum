@@ -1,4 +1,6 @@
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
+// Seeded local admin UUID — matches the user the Better-Auth bypass resolves to in dev.
+const DEFAULT_USER_ID = "ac09598f-ce28-4c3a-9ba0-262771456a19";
 
 export function publicApiBaseUrl(url: URL): string {
   return (
@@ -16,7 +18,7 @@ export function activeOrgId(locals: App.Locals): string {
 
 export function activeUserId(locals: App.Locals): string {
   const localUserId = (locals as App.Locals & { userId?: string | null }).userId;
-  return localUserId && localUserId.trim() ? localUserId : "local-user";
+  return localUserId && localUserId.trim() ? localUserId : DEFAULT_USER_ID;
 }
 
 export function cookieHeaders(request: Request): Record<string, string> {
