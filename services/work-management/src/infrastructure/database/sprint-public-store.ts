@@ -6,6 +6,7 @@ import {
   WorkManagementCycleEntity,
   WorkManagementCycleTaskEntity,
 } from "@work-management/infrastructure/database/work-structure.entities.ts";
+import { FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export type SprintPublicStatus = "planning" | "active" | "completed" | "cancelled";
 
@@ -155,8 +156,10 @@ export class SprintPublicStore {
     orgId: string;
     projectId: string;
   }): Promise<{ sprints: unknown[]; velocity: Array<Record<string, unknown>> }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) return { sprints: [], velocity: [] };
     const queries = await import("@work-management/application/work-cycle-queries.ts");
-    return await queries.loadProjectSprints(this.dataSource.manager, projectContext(input));
+    return await queries.loadProjectSprints(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }));
   }
 
   async loadProjectSprintDetail(input: {
@@ -164,10 +167,12 @@ export class SprintPublicStore {
     projectId: string;
     sprintId: string;
   }): Promise<unknown> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
     const queries = await import("@work-management/application/work-cycle-queries.ts");
     return await queries.loadProjectSprintDetail(
       this.dataSource.manager,
-      projectContext(input),
+      projectContext({ orgId: input.orgId, projectId }),
       input.sprintId,
     );
   }
@@ -179,8 +184,10 @@ export class SprintPublicStore {
     goal?: string | null;
     capacity?: number | null;
   }): Promise<{ id: string }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
     const commands = await import("@work-management/application/work-cycle-commands.ts");
-    return await commands.createProjectSprint(this.dataSource.manager, projectContext(input), {
+    return await commands.createProjectSprint(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), {
       name: input.name,
       goal: input.goal,
       capacity: input.capacity,
@@ -221,8 +228,10 @@ export class SprintPublicStore {
     title: string;
     status?: string | null;
   }): Promise<{ id: string }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
     const commands = await import("@work-management/application/projects/commands.ts");
-    return await commands.createProjectTask(this.dataSource.manager, projectContext(input), {
+    return await commands.createProjectTask(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), {
       title: input.title,
       status: input.status,
       sprintId: input.sprintId,
@@ -235,10 +244,21 @@ export class SprintPublicStore {
     taskId: string;
     status?: string | null;
   }): Promise<{ ok: true }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
     const commands = await import("@work-management/application/projects/commands.ts");
-    return await commands.updateProjectTask(this.dataSource.manager, projectContext(input), input.taskId, {
+    return await commands.updateProjectTask(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), input.taskId, {
       status: input.status,
     });
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(input: { orgId: string; projectId: string }): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: input.projectId, workspaceId: input.orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: input.projectId, workspaceId: input.orgId });
+    return bySlug?.id ?? null;
   }
 
   private repository() {

@@ -34,7 +34,7 @@ import {
   type ProjectStatusRow,
 } from "@work-management/interface/project-statuses.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
-import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+import { FULCRUM_WORKFLOW_SPINE_ENTITIES, FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export const PROJECT_STATUS_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.projectStatusPublicApi.options");
 
@@ -76,20 +76,31 @@ export class ProjectStatusPublicApiService {
   async list(params: unknown, query: unknown): Promise<ProjectStatusRow[]> {
     void this.options;
     const parsedParams = ProjectStatusParamsSchema.parse(params);
-    ProjectStatusQuerySchema.parse(query);
-    return await listProjectStatuses(this.dataSource.manager, parsedParams.id);
+    const parsedQuery = ProjectStatusQuerySchema.parse(query);
+    const projectId = (await this.resolveProjectId(parsedParams.id, parsedQuery.orgId)) ?? parsedParams.id;
+    return await listProjectStatuses(this.dataSource.manager, projectId);
   }
 
   async create(params: unknown, body: unknown): Promise<{ id: string }> {
     const parsedParams = ProjectStatusParamsSchema.parse(params);
     const parsedBody = ProjectStatusCreateBodySchema.parse(body);
+    const projectId = (await this.resolveProjectId(parsedParams.id, parsedBody.orgId)) ?? parsedParams.id;
     return await createProjectStatus(this.dataSource.manager, {
       orgId: parsedBody.orgId,
-      projectId: parsedParams.id,
+      projectId,
       name: parsedBody.name,
       color: parsedBody.color,
       isFinal: parsedBody.isFinal,
     });
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(projectId: string, orgId: string): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: projectId, workspaceId: orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: projectId, workspaceId: orgId });
+    return bySlug?.id ?? null;
   }
 
   async update(params: unknown, body: unknown): Promise<{ ok: true }> {

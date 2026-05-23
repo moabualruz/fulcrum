@@ -81,21 +81,22 @@ export class PlanningStructurePublicStore {
   }> {
     const project = await this.resolveProject(input);
     if (!project) return { modules: [], labels: [], intakeRequests: [] };
+    const projectId = project.id;
 
     const modules = await this.moduleRepository().find({
-      where: { projectId: input.projectId },
+      where: { projectId },
       order: { createdAt: "ASC", id: "ASC" },
     });
     const labels = await this.labelRepository().find({
-      where: { projectId: input.projectId },
+      where: { projectId },
       order: { createdAt: "ASC", id: "ASC" },
     });
     const intakes = await this.intakeRepository().find({
-      where: { projectId: input.projectId },
+      where: { projectId },
       order: { createdAt: "DESC", id: "ASC" },
     });
-    const moduleCounts = await this.moduleTaskCounts(input.projectId);
-    const labelCounts = await this.labelTaskCounts(input.projectId);
+    const moduleCounts = await this.moduleTaskCounts(projectId);
+    const labelCounts = await this.labelTaskCounts(projectId);
 
     return {
       modules: modules.map((module) => toModuleRow(input.orgId, module, moduleCounts.get(module.id) ?? 0)),
@@ -109,11 +110,12 @@ export class PlanningStructurePublicStore {
     // project distinguishable from an empty list so the route can answer 404.
     const project = await this.resolveProject(input);
     if (!project) return null;
+    const projectId = project.id;
     const modules = await this.moduleRepository().find({
-      where: { projectId: input.projectId },
+      where: { projectId },
       order: { createdAt: "ASC", id: "ASC" },
     });
-    const counts = await this.moduleTaskCounts(input.projectId);
+    const counts = await this.moduleTaskCounts(projectId);
     return modules.map((module) => toModuleRow(input.orgId, module, counts.get(module.id) ?? 0));
   }
 
@@ -127,7 +129,7 @@ export class PlanningStructurePublicStore {
     const project = await this.resolveProject(input);
     if (!project) return null;
     const intakes = await this.intakeRepository().find({
-      where: { projectId: input.projectId },
+      where: { projectId: project.id },
       order: { createdAt: "DESC", id: "ASC" },
     });
     return intakes.map((intake) => toIntakeRow(input.orgId, intake));
@@ -149,7 +151,7 @@ export class PlanningStructurePublicStore {
     const id = randomUUID();
     const module = await this.moduleRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       name: input.name,
       status: input.status ?? "planned",
       leadUserId: input.leadUserId ?? null,
@@ -182,6 +184,8 @@ export class PlanningStructurePublicStore {
   }
 
   async addModuleTask(input: PlanningScope & { id: string; taskId: string }): Promise<PlanningTaskAssignmentPublicRow | null> {
+    const project = await this.resolveProject(input);
+    if (!project) return null;
     const module = await this.findModule(input);
     if (!module || !(await this.taskExists(input))) return null;
     const existing = await this.moduleTaskRepository().findOneBy({ moduleId: module.id, taskId: input.taskId });
@@ -189,7 +193,7 @@ export class PlanningStructurePublicStore {
     const id = randomUUID();
     const row = await this.moduleTaskRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       moduleId: module.id,
       taskId: input.taskId,
       traceId: `trace-module-task-${module.id}-${input.taskId}`,
@@ -198,8 +202,10 @@ export class PlanningStructurePublicStore {
   }
 
   async removeModuleTask(input: PlanningScope & { id: string; taskId: string }): Promise<PlanningTaskAssignmentPublicRow | null> {
+    const project = await this.resolveProject(input);
+    if (!project) return null;
     const row = await this.moduleTaskRepository().findOneBy({
-      projectId: input.projectId,
+      projectId: project.id,
       moduleId: input.id,
       taskId: input.taskId,
     });
@@ -214,7 +220,7 @@ export class PlanningStructurePublicStore {
     const id = randomUUID();
     const label = await this.labelRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       name: input.name,
       color: input.color ?? "#64748b",
       traceId: `trace-label-${id}`,
@@ -240,6 +246,8 @@ export class PlanningStructurePublicStore {
   }
 
   async addLabelTask(input: PlanningScope & { id: string; taskId: string }): Promise<PlanningTaskAssignmentPublicRow | null> {
+    const project = await this.resolveProject(input);
+    if (!project) return null;
     const label = await this.findLabel(input);
     if (!label || !(await this.taskExists(input))) return null;
     const existing = await this.taskLabelRepository().findOneBy({ labelId: label.id, taskId: input.taskId });
@@ -247,7 +255,7 @@ export class PlanningStructurePublicStore {
     const id = randomUUID();
     const row = await this.taskLabelRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       labelId: label.id,
       taskId: input.taskId,
       traceId: `trace-label-task-${label.id}-${input.taskId}`,
@@ -256,8 +264,10 @@ export class PlanningStructurePublicStore {
   }
 
   async removeLabelTask(input: PlanningScope & { id: string; taskId: string }): Promise<PlanningTaskAssignmentPublicRow | null> {
+    const project = await this.resolveProject(input);
+    if (!project) return null;
     const row = await this.taskLabelRepository().findOneBy({
-      projectId: input.projectId,
+      projectId: project.id,
       labelId: input.id,
       taskId: input.taskId,
     });
@@ -277,7 +287,7 @@ export class PlanningStructurePublicStore {
     const id = randomUUID();
     const intake = await this.intakeRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       title: input.title,
       description: input.description ?? null,
       status: "open",
@@ -315,30 +325,46 @@ export class PlanningStructurePublicStore {
   }
 
   private async resolveProject(input: PlanningScope) {
-    return await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({
+    // Accept either canonical UUID or slug — web routes (e.g. /projects/<slug>/modules)
+    // pass the slug; CLI/public API pass the UUID. Same workspace-scoped project either way.
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({
       id: input.projectId,
+      workspaceId: input.orgId,
+    });
+    if (byId) return byId;
+    return await repo.findOneBy({
+      slug: input.projectId,
       workspaceId: input.orgId,
     });
   }
 
   private async taskExists(input: PlanningScope & { taskId: string }): Promise<boolean> {
+    const project = await this.resolveProject(input);
+    if (!project) return false;
     return await this.dataSource.getRepository(FulcrumTaskEntity).existsBy({
       id: input.taskId,
-      projectId: input.projectId,
+      projectId: project.id,
       deletedAt: IsNull(),
     });
   }
 
   private async findModule(input: PlanningScope & { id: string }) {
-    return await this.moduleRepository().findOneBy({ id: input.id, projectId: input.projectId });
+    const project = await this.resolveProject(input);
+    if (!project) return null;
+    return await this.moduleRepository().findOneBy({ id: input.id, projectId: project.id });
   }
 
   private async findLabel(input: PlanningScope & { id: string }) {
-    return await this.labelRepository().findOneBy({ id: input.id, projectId: input.projectId });
+    const project = await this.resolveProject(input);
+    if (!project) return null;
+    return await this.labelRepository().findOneBy({ id: input.id, projectId: project.id });
   }
 
   private async findIntake(input: PlanningScope & { id: string }) {
-    return await this.intakeRepository().findOneBy({ id: input.id, projectId: input.projectId });
+    const project = await this.resolveProject(input);
+    if (!project) return null;
+    return await this.intakeRepository().findOneBy({ id: input.id, projectId: project.id });
   }
 
   private moduleRepository() {

@@ -13,6 +13,7 @@ import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
 import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
 import { Migration20260519AcpSessionPauseResumeCheckpoints1778841600000 } from "./migrations/Migration20260519_acp_session_checkpoints.ts";
 import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
+import { ProjectStatuses20260523001778932800000 } from "./migrations/Migration20260523_project_statuses.ts";
 import { PlatformFeatureFlags1778753400000 } from "../../../../feature-flags/src/infrastructure/database/migrations/feature-flag.migration.ts";
 import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
 import { ErrorLog1778758800000 } from "@platform-core/infrastructure/database/error-log.migration.ts";
@@ -283,6 +284,7 @@ export const applicationMigrations = [
   ErrorLog1778758800000,
   NotificationReadState1778750400000,
   NotificationSettings1778750500000,
+  ProjectStatuses20260523001778932800000,
 ];
 
 export function createDataSourceOptions(

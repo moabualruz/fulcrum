@@ -54,18 +54,20 @@ export class SavedViewPublicStore {
     isDefault?: boolean;
   }): Promise<SavedViewPublicRow | null> {
     if (!input.projectId) return null;
-    const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({
-      id: input.projectId,
-      ...(input.orgId ? { workspaceId: input.orgId } : {}),
-    });
+    // Accept slug or UUID; the row uses the canonical UUID downstream.
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const baseScope = input.orgId ? { workspaceId: input.orgId } : {};
+    const project =
+      (await repo.findOneBy({ id: input.projectId, ...baseScope })) ??
+      (await repo.findOneBy({ slug: input.projectId, ...baseScope }));
     if (!project) return null;
 
-    if (input.isDefault) await this.clearDefault(input.projectId);
+    if (input.isDefault) await this.clearDefault(project.id);
 
     const id = randomUUID();
     const saved = await this.repository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       name: input.name,
       layout: input.viewType ?? "list",
       filters: objectValue(input.filters),
@@ -123,11 +125,13 @@ export class SavedViewPublicStore {
 
   private async resolveProjectIds(input: { orgId?: string; projectId?: string }): Promise<string[]> {
     if (input.projectId) {
-      const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({
-        id: input.projectId,
-        ...(input.orgId ? { workspaceId: input.orgId } : {}),
-      });
-      return project ? [project.id] : [];
+      // Accept either canonical UUID or slug — web routes pass slug, CLI passes UUID.
+      const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+      const baseScope = input.orgId ? { workspaceId: input.orgId } : {};
+      const byId = await repo.findOneBy({ id: input.projectId, ...baseScope });
+      if (byId) return [byId.id];
+      const bySlug = await repo.findOneBy({ slug: input.projectId, ...baseScope });
+      return bySlug ? [bySlug.id] : [];
     }
     if (!input.orgId) return [];
 

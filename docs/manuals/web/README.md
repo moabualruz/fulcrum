@@ -133,17 +133,310 @@ each its own URL:
 | `/settings/telemetry` | OpenTelemetry config |
 | `/settings/ai-assist` | AI-Assist model + token defaults |
 
-## Project-detail routes
+## Project workspace routes — `/projects/<slug>/...`
 
-`/projects/<slug>/{board,backlog,sprints,modules,intake,calendar,gantt,
-repos,uat,review,reports,routing,e2e,updates,runs,settings/*}`.
+The project-workspace surfaces sit under `/projects/<slug>/<area>`, with `<slug>` accepting **either the canonical UUID or the human slug** (e.g. `manual-test-project`). The slug → UUID resolution lives in each service-public store (TaskPublicStore, PlanningStructurePublicStore, SprintPublicStore, CustomFieldStore, SavedViewPublicStore, AutomationStore, WorkflowSettingsStore, ProjectStatusPublicApiService). The shared captures below use `manual-test-project` (UUID `47c09a2c-77c9-4c6c-a9f1-2cbe09ab4941`) on the `dev/v1.0` audit dataset (8 tasks, 2 sprints with Sprint 1 active, 2 modules, 2 intake items, 2 custom fields, 2 saved views, 2 automations, 1 project-status override).
 
-Notable:
-- **`/projects/<slug>`** — overview card with task counts + sprint days remaining (`70-proj-detail.png`).
-- **`/projects/<slug>/backlog`** — backlog list + sprint panel; seeded sample shows 6 open tasks + Sprint 1 with 0/40 points (`72-proj-backlog.png`).
-- **`/projects/<slug>/board`** — kanban with full task workbench (`71-proj-board.png`).
-- **`/projects/<slug>/modules`** — module list (3 seeded: Capture & Plan, Build & Ship, Operate & Audit).
-- **`/projects/<slug>/intake`** — intake queue (2 seeded: feedback, bug).
+### `/projects`
+
+[![All projects](../screenshots/web/10-projects.png)](../screenshots/web/10-projects.png)
+
+Workspace project list. Server load calls `/api/v1/projects?orgId=…` and renders one row per project with status pill, counts (`open / tasks / docs`), latest activity, and `Open` + `Set active` actions. Header carries `Import` and `+ New project`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `+ New project` button | `fulcrum project create` | POSTs `/api/v1/projects` |
+| Import | `Import` button | `fulcrum project import` | wizard at `/projects/new/import` |
+| Filter | Search box + status `<select>` | `fulcrum project list --status <s>` | client-side filter |
+| Open | row `Open` link | `fulcrum project open <slug>` | slug or UUID accepted |
+| Set active | row `Set active` button | `fulcrum project use <slug>` | persists workspace cookie |
+
+### `/projects/<slug>`
+
+[![Project overview](../screenshots/web/70-proj-detail.png)](../screenshots/web/70-proj-detail.png)
+
+Overview workbench. Shows the project name + slug pill + `Set active`, headline counts (`Open tasks / In progress / Done / Sprint days`), inline editable Name + Description form, and a `Danger zone` panel with Delete project. Tab strip below the header navigates to Board, Backlog, Modules, Intake, Views, Sprints, Reports, Repos, Docs.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Edit metadata | Name / Description fields + Save | `fulcrum project patch <id>` | PATCH `/api/v1/projects/{id}` |
+| Set active | header button | `fulcrum project use <slug>` | persists workspace cookie |
+| Delete | Danger zone `Delete project` | `fulcrum project delete <id>` | confirmation modal |
+| Navigate | section pills (Board / Backlog / …) | `fulcrum project <slug> <area>` | resolves to same route |
+
+### `/projects/<slug>/board`
+
+[![Project board](../screenshots/web/71-proj-board.png)](../screenshots/web/71-proj-board.png)
+
+Project kanban with manual-task-workbench banner (kanban layout, filter chips for each canonical status). Columns are Pending · In progress · Blocked · Completed · Cancelled, populated from `/api/v1/tasks/board?orgId=…&projectId=<slug>` through TaskPublicStore. Each card shows priority pill, assignee, due date, story points. Per-column `+ Add task` quick-create row.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | column `+ Add task` | `fulcrum task create --status <s> --project <slug>` | POSTs `/api/v1/tasks` |
+| Move status | drag card | `fulcrum task patch <id> --status <s>` | server enforces workflow transitions |
+| Bulk status | row select + Bulk menu | `fulcrum task patch …` | `bulkStatus` form action |
+| Filter sprint | header `Sprint: All` toggle | `fulcrum task list --sprint <id>` | client-side filter |
+
+### `/projects/<slug>/backlog`
+
+[![Project backlog](../screenshots/web/72-proj-backlog.png)](../screenshots/web/72-proj-backlog.png)
+
+Sprint Planning workbench: left column is the backlog (filterable by priority), right column is the selected sprint with capacity, points used, and the assigned tasks. Header sprint `<select>` chooses Sprint 1 — Foundation (active, 40 pt capacity) or Sprint 2 — UI polish (planned, 30 pt). Each backlog row carries a `→ Sprint` button that drops the task into the active sprint.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Move to sprint | row `→ Sprint` button | `fulcrum sprint add-task <sprintId> <taskId>` | POSTs `/api/v1/sprints/{id}/board-tasks` |
+| Switch sprint | header `<select>` | `fulcrum sprint use <id>` | scopes the sprint panel |
+| Filter | All priorities `<select>` | `fulcrum task list --priority <n>` | client-side filter |
+
+### `/projects/<slug>/sprints`
+
+[![Project sprints](../screenshots/web/73-proj-sprints.png)](../screenshots/web/73-proj-sprints.png)
+
+Sprints board: `Active` section renders the running sprint with a `Complete` action; `Planned` section lists upcoming sprints each with `Start Sprint`. Header `New Sprint` opens the create modal. Data comes from `/api/v1/sprints/project-board?orgId=…&projectId=<slug>` and accepts either slug or UUID after the SprintPublicStore.resolveProjectId fix.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `New Sprint` button | `fulcrum sprint create --project <slug> --name <n> --capacity <pts>` | POSTs `/api/v1/sprints/project-board` |
+| Start | `Start Sprint` link | `fulcrum sprint start <id>` | POSTs `/api/v1/sprints/{id}/start-board` |
+| Complete | active sprint `Complete` link | `fulcrum sprint complete <id>` | POSTs `/api/v1/sprints/{id}/complete-board` |
+| Edit goal | open detail at `/sprint/<id>` | `fulcrum sprint patch <id>` | PATCH goal/capacity |
+
+### `/projects/<slug>/modules`
+
+[![Project modules](../screenshots/web/74-proj-modules.png)](../screenshots/web/74-proj-modules.png)
+
+Module list — durable workstream containers used for module-status rollups. Inline `Module name`, `Status` (Planned / Active / Completed / Archived), `Lead user id` form + `Create module` button. Table lists Name · Status pill · Trace id · Delete. Seeded rows: Backend platform (active), Web client (planned).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | inline form + `Create module` | `fulcrum module create --project <slug> --name <n>` | POSTs `/api/v1/planning-structures/modules` |
+| Edit | drill into module page | `fulcrum module patch <id>` | PATCH `/api/v1/planning-structures/modules/{id}` |
+| Delete | row `Delete` button | `fulcrum module delete <id>` | DELETE `/api/v1/planning-structures/modules/{id}` |
+| Assign tasks | module detail page | `fulcrum module add-task <id> <taskId>` | POST `/api/v1/planning-structures/modules/{id}/tasks` |
+
+### `/projects/<slug>/intake`
+
+[![Project intake](../screenshots/web/75-proj-intake.png)](../screenshots/web/75-proj-intake.png)
+
+Intake queue. Inline `Request title`, `Source`, `Description` form + `Add request` button. Table lists Title · Status (`open` by default) · Trace id · Delete. Seeded rows: "Feedback — calendar lacks week-view" + "Bug — sprint goal modal not closing".
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | inline form + `Add request` | `fulcrum intake create --project <slug> --title <t>` | POSTs `/api/v1/planning-structures/intake` |
+| Promote | detail page `Promote to task` | `fulcrum intake promote <id>` | PATCH `taskId` |
+| Decline | detail page `Decline` | `fulcrum intake patch <id> --status declined` | PATCH `/api/v1/planning-structures/intake/{id}` |
+| Delete | row `Delete` button | `fulcrum intake delete <id>` | DELETE `/api/v1/planning-structures/intake/{id}` |
+
+### `/projects/<slug>/calendar`
+
+[![Project calendar](../screenshots/web/76-proj-calendar.png)](../screenshots/web/76-proj-calendar.png)
+
+Month / Week / Day calendar view of tasks with due dates. Header carries Board · Table · Calendar · Gantt · Timeline · List view-switcher plus `today`, `‹`, `›` nav. Seeded tasks have no due dates so the cells are empty in the audit dataset; cell renders highlight today (May 23, 2026).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Switch view | View `Month/Week/Day` toggles | `fulcrum task list --view calendar --range <m|w|d>` | client-side toggle |
+| Switch surface | header view-switcher | n/a | navigates to `/board`, `/gantt`, etc. |
+| Open task | click event chip | `fulcrum task open <id>` | nav `/tasks/<id>` |
+
+### `/projects/<slug>/gantt`
+
+[![Project gantt](../screenshots/web/77-proj-gantt.png)](../screenshots/web/77-proj-gantt.png)
+
+Weekly Gantt timeline grouped by Epic (configurable Group selector). Zoom toggles between Week and Sprint scales. Bars come from the task date range; the audit dataset has no start/end dates so the chart is empty (`0 critical tasks`). The `+` column-add control opens an inline create row.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `+` row at top | `fulcrum task create --project <slug>` | POSTs `/api/v1/tasks` |
+| Change zoom | Zoom `<select>` | `fulcrum task list --view gantt --zoom <w|s>` | client-side |
+| Change group | Group by `<select>` | `fulcrum task list --view gantt --group <epic|module|status>` | client-side |
+
+### `/projects/<slug>/repos`
+
+[![Project repos](../screenshots/web/78-proj-repos.png)](../screenshots/web/78-proj-repos.png)
+
+Linked git repositories. Header carries `Link existing` (pick a repo already known to the workspace) and `Add repo` (register a new one). Audit dataset shows the empty-state copy "No repos linked to this project."
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Link existing | `Link existing` button | `fulcrum repo link <projectId> <repoId>` | POSTs link |
+| Add new | `Add repo` button | `fulcrum repo create --path <p>` | wizard |
+| Unlink | row context menu | `fulcrum repo unlink <projectId> <repoId>` | DELETE link |
+
+### `/projects/<slug>/uat`
+
+[![Project UAT](../screenshots/web/79-proj-uat.png)](../screenshots/web/79-proj-uat.png)
+
+User Acceptance Testing handoff. `Handoff Status` panel exposes the latest UAT report when one exists. Header `Review Workbench` link jumps to the review surface. Audit dataset shows "No UAT handoff available. Run final QA from the reports page first." — the UAT artifact is created from `/reports` → Final QA.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create handoff | `/reports` → Final QA tab | `fulcrum review uat <projectId>` | populates this surface |
+| Open review | `Review Workbench` link | `fulcrum review open <projectId>` | nav `/projects/<slug>/review` |
+
+### `/projects/<slug>/review`
+
+[![Project review](../screenshots/web/80-proj-review.png)](../screenshots/web/80-proj-review.png)
+
+Final-gate review workbench. Top card carries the code-review prompt, three action buttons (Open UAT handoff, Generated E2E runner, Final QA report), and the trace id (`trace-review-manual-test-project`). Sidebar lists the executable E2E artifact paths (`apps/web/tests/e2e/projects-manual-test-project-uat.spec.ts` + `…-review.spec.ts`). Below sits the QA Report panel, a Start Review form (search query + diff JSON + `Start Review`), and Review Sessions history.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Start review | `Start Review` form | `fulcrum review start <projectId>` | POSTs review session |
+| Open UAT | `Open UAT handoff` button | `fulcrum review uat <projectId>` | nav `/uat` |
+| Run E2E | `Generated E2E runner` button | `fulcrum review e2e <projectId>` | nav `/e2e` |
+| Approve | review session detail | `fulcrum review approve <sessionId>` | PATCH approval state |
+
+### `/projects/<slug>/reports`
+
+[![Project reports](../screenshots/web/81-proj-reports.png)](../screenshots/web/81-proj-reports.png)
+
+Reports workbench. Header shows the active date range (`Apr 23, 2026 – May 23, 2026`) with quick toggles (Last 7 / 14 / 30 / 90 days) and a Sprint scope `<select>`. Tabs: Burndown · Velocity · Cycle Time · Throughput · Active work · CFD · Forecast · Final QA. The active tab name is followed by a `Export CSV` button. Chart renders use real task / sprint data from `/api/v1/reports/*`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Switch chart | tab buttons | `fulcrum report <kind> --project <slug>` | route param `?tab=…` |
+| Change range | range buttons | `fulcrum report --range <d>` | client filter |
+| Export CSV | `Export CSV` button | `fulcrum report <kind> --format csv` | GET `…&format=csv` |
+| Final QA | `Final QA` tab | `fulcrum review final-qa <projectId>` | publishes UAT handoff |
+
+### `/projects/<slug>/routing`
+
+[![Project routing](../screenshots/web/82-proj-routing.png)](../screenshots/web/82-proj-routing.png)
+
+Deterministic task → agent routing rules. Tabs: Rules · Drafts · Test · LLM Gate · Evidence. Right-side `New rule` panel collects Rule name · Agent · Skill set · Priority · Conditions JSON, with `Save rule`. Below renders the rules table (Priority · Name · Scope · Source · Conditions · Agent · Skill set · Status · Updated · Actions). Header `Project scope` pill scopes the rules to this project rather than the workspace default.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `Save rule` after filling the panel | `fulcrum routing create --project <slug>` | POSTs `/api/v1/routing/rules` |
+| Edit | row Actions | `fulcrum routing patch <id>` | PATCH |
+| Test | `Test` tab | `fulcrum routing test --task <id>` | dry-run match |
+| Switch JSON view | `Raw JSON` toggle | n/a | reads/writes the same source |
+
+### `/projects/<slug>/e2e`
+
+[![Project E2E runner](../screenshots/web/83-proj-e2e.png)](../screenshots/web/83-proj-e2e.png)
+
+Generated E2E test runner. Form: Runner (`bun` / `playwright` / `vitest`), Test files (comma-separated), Trace ID input. `Run E2E Tests` dispatches the run; results land in the `Run History` panel ("No runs recorded yet." until the first run). The runner is the same surface the review workbench points at via its `Generated E2E runner` button.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Run | `Run E2E Tests` button | `fulcrum e2e run --project <slug>` | POSTs run record |
+| Cancel | run row action | `fulcrum e2e cancel <runId>` | aborts the runner |
+| Download artifact | run detail | `fulcrum e2e artifact <runId>` | GET artifact URL |
+
+### `/projects/<slug>/updates`
+
+[![Project updates](../screenshots/web/84-proj-updates.png)](../screenshots/web/84-proj-updates.png)
+
+Continuous-updates console. `Trigger Update` form selects a trigger type (`Manual doc edit` / scheduled / commit / external), captures a user prompt, and optionally pins a Trace ID. `Trigger Update` posts the run; `Trigger & Return to Project` runs and navigates back to `/projects/<slug>`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Trigger | `Trigger Update` button | `fulcrum update trigger --project <slug> --kind <type>` | POSTs an update job |
+| Trigger + return | second button variant | `fulcrum update trigger … --then-open <slug>` | helper for human flow |
+
+### `/projects/<slug>/runs`
+
+[![Project runs](../screenshots/web/85-proj-runs.png)](../screenshots/web/85-proj-runs.png)
+
+Agent run history scoped to this project. Empty-state: "No runs for this project." (runs land here when an agent dispatch carries this project id). Each populated row links to the run detail at `/runs/<runId>`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Dispatch | `/agents` workbench with project preselect | `fulcrum agent dispatch --project <slug>` | POSTs `/api/v1/agent-runs` |
+| Open detail | row link | `fulcrum run show <runId>` | nav `/runs/<runId>` |
+| Cancel | run detail `Cancel` | `fulcrum run cancel <runId>` | PATCH state |
+
+### `/projects/<slug>/settings/connectors`
+
+[![Project connectors](../screenshots/web/86-proj-settings-connectors.png)](../screenshots/web/86-proj-settings-connectors.png)
+
+External-system connector config (Jira / Linear / GitHub / Plane …). `Connector Type` input + `Configuration (JSON)` textarea + `Enable connector` checkbox + `Save Connector`. Audit dataset shows "No connectors configured." after the form.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Add | fill form + `Save Connector` | `fulcrum connector create --project <slug> --kind <jira|linear|…>` | POSTs `/api/v1/connectors` |
+| Enable / disable | `Enable connector` checkbox | `fulcrum connector patch <id> --enabled <bool>` | PATCH `enabled` |
+| Delete | row context menu | `fulcrum connector delete <id>` | DELETE |
+
+### `/projects/<slug>/settings/statuses`
+
+[![Project statuses](../screenshots/web/87-proj-settings-statuses.png)](../screenshots/web/87-proj-settings-statuses.png)
+
+Per-project status overrides on top of the canonical Pending / In progress / Blocked / Completed / Cancelled set. Form: Status Name · Color picker · `Mark as final (done) state` checkbox · `Add Status`. Table lists Color swatch · Name · Final · Delete. Audit dataset shows the seeded override `In QA` (`#a78bfa`, not final). Backed by the new `project_statuses` table introduced in migration `ProjectStatuses20260523001778932800000`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Add | fill form + `Add Status` | `fulcrum status create --project <slug> --name <n>` | POSTs `/api/v1/projects/{id}/statuses` |
+| Mark final | checkbox before save | `fulcrum status patch <statusId> --is-final` | PATCH `isFinal` |
+| Reorder | drag row | `fulcrum status patch <statusId> --sort-order <n>` | PATCH `sortOrder` |
+| Delete | row `Delete` | `fulcrum status delete <statusId>` | DELETE |
+
+### `/projects/<slug>/settings/fields`
+
+[![Project custom fields](../screenshots/web/88-proj-settings-fields.png)](../screenshots/web/88-proj-settings-fields.png)
+
+Custom field definitions for tasks. Form: Field Name · Type (`text` / `number` / `date` / `select` / `multi_select` / `checkbox` / `user` / `url` / `json`) · Options · Required · `Add Field`. Table lists Name · Type · Required · Archive. Audit dataset shows the seeded fields `Story points` (number) and `Squad` (select with Platform / Web / CLI options).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Add | fill form + `Add Field` | `fulcrum field create --project <slug> --name <n> --type <t>` | POSTs `/api/v1/custom-fields` |
+| Reorder | drag rows | `fulcrum field reorder --project <slug> --ids <ids>` | POSTs `/custom-fields/reorder` |
+| Archive | row `Archive` | `fulcrum field patch <id> --archived` | PATCH `archived` |
+| Set value on task | task detail panel | `fulcrum task field set <taskId> <slug> <value>` | POSTs `/task-custom-fields/set` |
+
+### `/projects/<slug>/settings/workflow`
+
+[![Project workflow](../screenshots/web/89-proj-settings-workflow.png)](../screenshots/web/89-proj-settings-workflow.png)
+
+Visual workflow-transitions editor. Header `Reset to Default` + `Save Workflow` actions, intro copy "Define which status transitions are allowed. Click a status to edit its allowed targets." Component reads `/api/v1/workflows/transitions/get` then renders a 5-column status grid (Backlog / Unstarted / In progress / Completed / Cancelled). Known issue: the current `WorkflowEditor.svelte` uses legacy Svelte 5 reactivity (`let loading = true` instead of `$state(true)`) so the loading flag does not toggle even after the API resolves; the surface is stuck on "Loading…" until the component is migrated to runes (tracked separately).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Edit transitions | click a status pill, toggle targets | `fulcrum workflow patch --project <slug>` | POSTs `/api/v1/workflows/transitions/update` |
+| Reset | `Reset to Default` button | `fulcrum workflow reset --project <slug> --methodology <scrum|kanban|none>` | POSTs `/api/v1/workflows/default` |
+| Validate | n/a (consumed by board drag) | `fulcrum workflow validate --from <s> --to <s>` | POSTs `/api/v1/workflows/transitions/validate` |
+
+### `/projects/<slug>/settings/views`
+
+[![Project saved views](../screenshots/web/90-proj-settings-views.png)](../screenshots/web/90-proj-settings-views.png)
+
+Saved-view definitions. Form: View Name · Scope (`private` / `project` / `org`) · Filters JSON · `Set as default view` · `Save View`. Table lists Name · Scope · Default · Delete. Audit dataset shows `Active sprint board` (scope `project`, default `Yes`, filters `{ sprintId: <sprint1-id> }`) and `High-priority backlog` (scope `project`, default `No`, filters `{ priority: [1,2] }`, sortBy `priority`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Save | fill form + `Save View` | `fulcrum view create --project <slug> --name <n>` | POSTs `/api/v1/saved-views` |
+| Set default | checkbox + save | `fulcrum view patch <id> --is-default` | clears other defaults in same project |
+| Delete | row `Delete` | `fulcrum view delete <id>` | DELETE |
+| Open | row name link | `fulcrum view open <id>` | applies filter to `/board` or `/list` |
+
+### `/projects/<slug>/settings/automations`
+
+[![Project automations](../screenshots/web/91-proj-settings-automations.png)](../screenshots/web/91-proj-settings-automations.png)
+
+Automation rules. Header `Automation rules` + `Use Template` + `+ Add Rule`. Search-rules combobox filters by name / status / trigger. Each rule renders as a card with enable/disable toggle. Audit dataset shows `Auto-assign new bugs` (trigger `task.created` where type=bug → action `task.assign` to the admin user) and `Close stale in-review tasks` (trigger `task.idle` daysIdle=7 → action `task.status_change` to `completed`). Backed by `/api/v1/automations`, which the SvelteKit catch-all proxy `apps/web/src/routes/api/v1/[...path]/+server.ts` forwards to the NestJS server so client-side fetches no longer trip on the vite 404 HTML.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Add | `+ Add Rule` → rule builder | `fulcrum automation create --project <slug>` | POSTs `/api/v1/automations` |
+| Use template | `Use Template` button | `fulcrum automation list-templates` | GET `/api/v1/automations/templates` |
+| Toggle | rule card toggle | `fulcrum automation patch <id> --enabled <bool>` | PATCH `enabled` |
+| Delete | card overflow menu | `fulcrum automation delete <id>` | DELETE |
+
+### `/projects/<slug>/settings/import`
+
+[![Project import wizard](../screenshots/web/92-proj-settings-import.png)](../screenshots/web/92-proj-settings-import.png)
+
+5-step import wizard. Step 1 selects a source: CSV / Linear / Jira / Plane (all gated by their feature flags off by default in the audit dataset, hence the `Feature flag off` chips). Subsequent steps map columns, preview, confirm, and run the import. `Next →` advances; the wizard persists draft state per project.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Start | pick a source + `Next →` | `fulcrum import start --project <slug> --source <kind>` | POSTs import draft |
+| Upload CSV | step 2 file picker | `fulcrum import csv --file <p>` | multipart upload |
+| Map fields | step 3 | `fulcrum import map --draft <id> --map <json>` | PATCHes mapping |
+| Run | step 5 `Run import` | `fulcrum import run --draft <id>` | POSTs run |
 
 ![Project · backlog with sprint](../screenshots/web/72-proj-backlog.png) ![Project · modules](../screenshots/web/74-proj-modules.png) ![Project · intake](../screenshots/web/75-proj-intake.png)
 

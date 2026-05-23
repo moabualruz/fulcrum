@@ -66,9 +66,15 @@ export class CustomFieldStore {
     entityType?: string;
   }): Promise<CustomFieldPublicRow[]> {
     if (input.entityType && input.entityType !== "task") return [];
+    let projectId: string | undefined = input.projectId;
+    if (input.projectId) {
+      const resolved = await this.resolveProjectId(input.projectId, input.orgId);
+      if (!resolved) return [];
+      projectId = resolved;
+    }
     const where = {
       orgId: input.orgId,
-      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(projectId ? { projectId } : {}),
       ...(input.includeArchived ? {} : { archived: false }),
     };
     const fields = await this.fieldRepository().find({
@@ -86,15 +92,16 @@ export class CustomFieldStore {
     configJson?: JsonRecord;
     required?: boolean;
   }): Promise<CustomFieldPublicRow | null> {
-    if (!(await this.projectBelongsToOrg(input.projectId, input.orgId))) return null;
-    const position = await this.nextPosition(input.projectId);
+    const projectId = await this.resolveProjectId(input.projectId, input.orgId);
+    if (!projectId) return null;
+    const position = await this.nextPosition(projectId);
     const field = await this.fieldRepository().save({
       id: randomUUID(),
       orgId: input.orgId,
-      projectId: input.projectId,
+      projectId,
       entityType: "task",
       name: input.name,
-      slug: await this.uniqueSlug(input.projectId, input.name),
+      slug: await this.uniqueSlug(projectId, input.name),
       type: normalizeFieldType(input.type),
       configJson: validateFieldConfig(input.type, input.configJson),
       required: input.required ?? false,
@@ -138,8 +145,9 @@ export class CustomFieldStore {
   }
 
   async reorder(input: { orgId: string; projectId: string; orderedIds: string[] }): Promise<boolean> {
-    if (!(await this.projectBelongsToOrg(input.projectId, input.orgId))) return false;
-    const fields = await this.fieldRepository().findBy({ orgId: input.orgId, projectId: input.projectId });
+    const projectId = await this.resolveProjectId(input.projectId, input.orgId);
+    if (!projectId) return false;
+    const fields = await this.fieldRepository().findBy({ orgId: input.orgId, projectId });
     const byId = new Map(fields.map((field) => [field.id, field]));
     input.orderedIds.forEach((id, position) => {
       const field = byId.get(id);
@@ -260,6 +268,15 @@ export class CustomFieldStore {
       workspaceId: orgId,
     });
     return Boolean(project);
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(projectId: string, orgId: string): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: projectId, workspaceId: orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: projectId, workspaceId: orgId });
+    return bySlug?.id ?? null;
   }
 
   private async nextPosition(projectId: string): Promise<number> {
