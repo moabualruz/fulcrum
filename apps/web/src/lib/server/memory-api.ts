@@ -2,7 +2,10 @@ import type { RequestEvent } from "@sveltejs/kit";
 import { createMemoryApiCaller } from "@knowledge-workspace/interface/http/memory-api-client";
 import { activeOrgId, cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
-const DEFAULT_MEMORY_API_TOKEN = "web-local";
+// Server treats the bearer token as the active org id. Default to the canonical
+// local org so manual / dev sessions land in the same org as seeded data instead
+// of an isolated "web-local" silo. Override with FULCRUM_API_TOKEN for prod.
+const DEFAULT_MEMORY_API_TOKEN = "00000000-0000-0000-0000-000000000001";
 
 type MemoryApiEvent = Pick<RequestEvent, "fetch" | "locals" | "request" | "url">;
 

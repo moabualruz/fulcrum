@@ -126,7 +126,7 @@ describe("/search +page.server.ts public API route", () => {
       },
     ]);
     expect(calls).toEqual([
-      "GET /api/v1/search/saved?org_id=org-1&user_id=user-1 Bearer web-local sid=test-session",
+      "GET /api/v1/search/saved?org_id=org-1&user_id=user-1 Bearer 00000000-0000-0000-0000-000000000001 sid=test-session",
     ]);
   });
 
@@ -138,7 +138,7 @@ describe("/search +page.server.ts public API route", () => {
     expect(result.grouped.task).toHaveLength(1);
     expect(result.grouped.run).toHaveLength(1);
     expect(result.grouped.artifact).toHaveLength(1);
-    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&limit=50 Bearer web-local sid=test-session");
+    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&limit=50 Bearer 00000000-0000-0000-0000-000000000001 sid=test-session");
   });
 
   test("kind facet is passed to the public API and filters to doc only", async () => {
@@ -147,7 +147,7 @@ describe("/search +page.server.ts public API route", () => {
     const result = await mod.load(eventFor("kernel", { kinds: "doc" }, fetchSearch(calls))) as SearchPayload;
     expect(result.grouped.doc).toHaveLength(1);
     expect(result.grouped.task).toBeUndefined();
-    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&kind=doc&limit=50 Bearer web-local sid=test-session");
+    expect(calls).toContain("GET /api/v1/search?q=kernel&org_id=org-1&kind=doc&limit=50 Bearer 00000000-0000-0000-0000-000000000001 sid=test-session");
   });
 
   test("run and artifact facets retrieve workflow context by trace/source terms", async () => {
@@ -157,7 +157,7 @@ describe("/search +page.server.ts public API route", () => {
     expect(result.grouped.run?.map((row) => row.source_id)).toEqual(["run-1"]);
     expect(result.grouped.artifact?.map((row) => row.source_id)).toEqual(["artifact-1"]);
     expect(result.hits.every((row) => row.body.includes("trace-kernel") || row.body.includes("source"))).toBe(true);
-    expect(calls).toContain("GET /api/v1/search?q=trace-kernel&org_id=org-1&kind=run%2Cartifact&limit=50 Bearer web-local sid=test-session");
+    expect(calls).toContain("GET /api/v1/search?q=trace-kernel&org_id=org-1&kind=run%2Cartifact&limit=50 Bearer 00000000-0000-0000-0000-000000000001 sid=test-session");
   });
 
   test("date facets still narrow public API hits locally", async () => {
@@ -197,7 +197,7 @@ describe("/search +page.server.ts public API route", () => {
 
     expect(result).toEqual({ saved: true });
     expect(calls).toEqual([
-      "POST /api/v1/search/saved Bearer web-local sid=test-session",
+      "POST /api/v1/search/saved Bearer 00000000-0000-0000-0000-000000000001 sid=test-session",
     ]);
   });
 });

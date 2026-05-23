@@ -119,7 +119,170 @@ each its own URL:
 | `/api-tokens` | API token management | `30-api-tokens.png` |
 | `/members` | Workspace members | `31-members.png` |
 
-## Settings sub-routes
+## Knowledge routes
+
+Docs, memory, context preview, and search live under
+`@knowledge-workspace`. Routes read through the NestJS public API
+(`/api/v1/docs`, `/api/v1/memory`, `/api/v1/context/preview`,
+`/api/v1/search`) via the SvelteKit page-server loaders. The active
+project cookie (set by the project switcher or `POST
+/api/active-project`) is resolved slug → UUID inside each loader so
+tree/list filters match the canonical `project_id` on every row.
+
+### `/docs`
+
+[![Documents](../screenshots/web/15-docs.png)](../screenshots/web/15-docs.png)
+
+Workspace-wide document browser. Loads `GET /api/v1/docs` and partitions
+the result into a **Project docs** tree (matching the active project's
+UUID) and **Global docs** tree (project_id = null). Below the trees a
+flat table lists every document the API returned with kind, project,
+and updated timestamp. The search box does in-memory title/body
+filtering; the kind `<select>` filters by `frontmatter.kind`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `New document` (top-right) → `/docs/new` | `fulcrum docs create --project <slug> --title <t>` | preselects active project |
+| Open | row link / tree node | `fulcrum docs show <id>` | navigates to `/docs/<id>` |
+| Rename | tree row `Rename` action | `fulcrum docs patch <id> --title <t>` | inline |
+| Reorder | drag-and-drop in tree | – | `POST /api/v1/docs/<id>` parentId+sortPosition |
+| Filter | `Filter by text` / `All kinds` | `fulcrum docs list --kind <k>` | client-side |
+
+### `/docs/new`
+
+[![New document wizard](../screenshots/web/17-docs-new.png)](../screenshots/web/17-docs-new.png)
+
+Doc creation wizard. Nine doc templates (Spec, ADR, Wiki, Runbook,
+Meeting, Postmortem, RFC, Note, Scratch) — selecting one previews the
+`Default <kind>` template body, then `Use template` populates the
+editor. The footer carries Title, Kind, and Create. `?project=<slug>`
+preselects the owning project; submission posts to `POST /api/v1/docs`
+and redirects to `/docs/<id>`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Pick template | click any card | `fulcrum docs create --type <kind>` | renders template body |
+| Create | bottom `Create document` button | `fulcrum docs create` | redirects to detail page |
+| Cancel | `← Documents` breadcrumb | – | returns to `/docs` |
+
+### `/docs/global`
+
+[![Global documents](../screenshots/web/18-docs-global.png)](../screenshots/web/18-docs-global.png)
+
+Read-only listing of documents whose `project_id` is null. Currently
+the public API's document store enforces a non-null project_id on
+create, so the canonical visible state is **"No global documents yet."**
+Promote a project doc with `POST /api/v1/docs/<id>` setting projectId
+to null once the entity is migrated to allow null project_id; until
+then this surface is an empty-state. Reorder + reparent actions only
+fire when rows exist.
+
+### `/doc-labels`
+
+[![Document labels](../screenshots/web/29-doc-labels.png)](../screenshots/web/29-doc-labels.png)
+
+Standalone label management workbench. Local state only — three seed
+labels (`rfc (global)`, `runbook (global)`, `api-design (project)`)
+applied to three demo docs (Search indexing plan, Local-first deploy,
+Migration policies). Toggle the permission checkbox to disable the Add
+/ toggle / save controls; the audit log at the bottom captures every
+mutation. Persistent label storage will live on the public API once
+the labels schema lands; this page is the UX target.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create label | `Add label` after typing name + scope | – | local state |
+| Toggle on doc | click `<label>` chip in doc row | – | adds ✓ |
+| Filter | `Filter` `<select>` | – | local state |
+| Save view | type name → `Save view` | – | local state |
+| Revoke edit | uncheck `User can edit labels` | – | disables mutations |
+
+### `/memory`
+
+[![Memory](../screenshots/web/12-memory.png)](../screenshots/web/12-memory.png)
+
+Persistent knowledge — facts, decisions, blockers, file refs, section
+anchors, links, notes. Reads `GET /api/v1/memory` with Bearer token =
+orgId. The page-server loader resolves the active project slug → UUID
+before querying so project-scoped rows match. Scope dropdown switches
+between `project | global | task | user`; kind dropdown filters by
+the seven canonical kinds.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `Create memory` (top-right form) | `fulcrum memory create --kind <k> --body <b>` | requires key + body + scope |
+| Edit | row link → `/memory/<id>` | `fulcrum memory patch <id>` | |
+| Delete | row link → detail → `Delete` | `fulcrum memory delete <id>` | confirms |
+| Promote | row → detail → `Promote` | `fulcrum memory promote <id>` | heuristic → durable |
+| Archive | row → detail → `Archive` | `fulcrum memory archive <id>` | |
+| Filter | scope + kind selects → `Apply` | `fulcrum memory list --scope <s> --kind <k>` | |
+
+Seeded for the manual project: `task-status-vocab` (note),
+`backend-convergence` (decision). Global: `local-org-id` (fact),
+`output-style` (fact).
+
+### `/context`
+
+[![Context preview](../screenshots/web/04-context-preview.png)](../screenshots/web/04-context-preview.png)
+
+Inspect the context bundle that would be assembled for a given task —
+memories, linked docs, recent runs, artifacts, token budget. The
+`/context` index re-uses `/context/preview` as its canonical surface;
+both URLs render the same component.
+
+Pick a project + task and click `Preview` to fetch
+`GET /api/v1/context/preview?taskId=<id>`. **Current known limitation:**
+the `MemoryPublicApiModule` ships without a `context` application
+backend wired in the default registration
+(`apps/server/src/app.module.ts` uses the static module not
+`.register(options)`). When the form posts, the API returns
+`Internal Server Error` and the page shows
+`Failed to assemble context`. The selectors themselves render correctly
+(Project list, Task list scoped to the active project). The fix lands
+when `MemoryPublicApiModule.register({ context })` is wired with a
+`ContextPreviewPublicApplication` provider.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Pick project | Project `<select>` | `--project <slug>` | options come from `/api/v1/projects` |
+| Pick task | Task `<select>` | `--task <id>` | scoped to selected project |
+| Preview | `Preview` button → submits form | `fulcrum context preview --task <id>` | blocked on context app wiring |
+
+### `/search`
+
+[![Search](../screenshots/web/11-search.png)](../screenshots/web/11-search.png)
+
+Federated full-text search across docs, tasks, runs, artifacts, and
+memory. The page-server loader calls `GET /api/v1/search?q=<q>` with
+Bearer token = orgId. The dev fixture index returns matches across
+seeded docs (`Architecture overview`, `Migration plan v2`,
+`Decision log entry 001 — NestJS as single backend`, …).
+
+Fast actions on top — `Open command palette`, `New document`,
+`Start run`. Left rail filters by Kind (`doc | task | run | artifact |
+memory`) and a Date Range (`From` / `To`). `Save this search`
+persists the current query+filters as a saved search via
+`POST /api/v1/search/saved`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Search | type query → `Search` | `fulcrum search "<q>"` | enter also submits |
+| Filter kind | check `doc / task / run / artifact / memory` | `--kind <k>` | comma-separated |
+| Filter date | `From` / `To` date pickers | `--date-from <iso> --date-to <iso>` | inclusive |
+| Apply filters | `Apply filters` button | – | rerun with current state |
+| Save search | name → `Save this search` | `fulcrum search saved create --name <n>` | private scope |
+| Open hit | click result title | – | navigates to `/docs/<id>` / `/tasks/<id>` / … |
+
+### Fixes landed during this audit
+
+- **`apps/web/src/routes/api/v1/[...path]/+server.ts`** — proxy now forwards the `authorization` header. Previously the proxy stripped it, breaking every web→server call that uses Bearer auth (memory + search) from the browser side.
+- **`apps/web/src/lib/server/memory-api.ts` + `search-api.ts`** — default Bearer token changed from `web-local` (which the server interpreted as a separate, isolated org) to the canonical local org id `00000000-0000-0000-0000-000000000001`. `FULCRUM_API_TOKEN` env var still overrides for production deployments.
+- **`apps/web/src/routes/docs/+page.server.ts`** — page loader resolves the active project slug → UUID via `GET /api/v1/projects` before partitioning docs into project vs global trees. Previously the slug never matched the document's UUID `project_id` and the project tree always rendered "No documents."
+- **`apps/web/src/routes/memory/+page.server.ts`** — list loader + `create` action both resolve slug → UUID before querying or persisting, so project-scoped memory items appear under their owning project and new entries land in the canonical project rather than under the slug-as-id.
+- **`apps/web/src/routes/context/preview/+page.server.ts`** — page loader resolves slug → UUID before fetching the task option list, so the Task `<select>` is scoped to the canonical project tasks.
+- **`apps/web/src/lib/server/context-preview-api.ts`** — unwraps the `{ data: [...] }` envelope from `GET /api/v1/projects` before rendering the Project `<select>`; previously the dropdown was always empty.
+
+
 
 | Route | Purpose |
 |---|---|

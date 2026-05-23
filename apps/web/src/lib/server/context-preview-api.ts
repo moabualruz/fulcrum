@@ -27,7 +27,13 @@ export function createContextPreviewApiForEvent(event: ContextPreviewApiEvent) {
 
   return {
     options: async (selectedProjectId: string | null): Promise<{ projects: ProjectOption[]; tasks: TaskOption[] }> => {
-      const projects = await projectApi.projects.list() as ProjectOption[];
+      // project-api.projects.list returns the public envelope `{ data: [...] }`
+      // when public-api is on. Unwrap to a flat array so the <select> in
+      // /context/preview can iterate it.
+      const projectsResponse = await projectApi.projects.list() as { data?: ProjectOption[] } | ProjectOption[];
+      const projects: ProjectOption[] = Array.isArray(projectsResponse)
+        ? projectsResponse
+        : projectsResponse.data ?? [];
       const tasks = selectedProjectId
         ? await taskApi.tasks.list({ projectId: selectedProjectId }) as TaskOption[]
         : [];

@@ -1,6 +1,7 @@
 import type { PageServerLoad } from "./$types";
 import { buildDocTree, type DocScope, type DocTreeNode } from "$lib/components/docs/doc-tree";
 import { createDocumentApiForEvent } from "$lib/server/document-api";
+import { createProjectApiForEvent } from "$lib/server/project-api";
 
 interface DocRow {
   id: string;
@@ -39,6 +40,16 @@ function toDocRow(doc: PublicDocument): DocRow {
   };
 }
 
+type ProjectListEntry = { id: string; slug?: string | null };
+
+function unwrapProjectList(response: unknown): ProjectListEntry[] {
+  if (Array.isArray(response)) return response as ProjectListEntry[];
+  if (response && typeof response === "object" && Array.isArray((response as { data?: unknown }).data)) {
+    return (response as { data: ProjectListEntry[] }).data;
+  }
+  return [];
+}
+
 function loadDocTree(docs: DocRow[], scope: DocScope, activeProjectId: string | null): DocTreeNode[] {
   return buildDocTree(
     docs
@@ -70,7 +81,21 @@ export const load: PageServerLoad = ({ url, locals, fetch, request }) => {
     streamed: {
       data: (async () => {
         try {
-          const allDocs = await createDocumentApiForEvent({ url, locals, fetch, request }).docs.list();
+          const event = { url, locals, fetch, request };
+          const [allDocs, projectsResponse] = await Promise.all([
+            createDocumentApiForEvent(event).docs.list(),
+            // Resolve the active project slug → UUID so the tree filter matches
+            // docs that were created with the canonical UUID project_id. Without
+            // this, the slug-based cookie value never equals the UUID stored on
+            // the document and the project tree renders empty.
+            createProjectApiForEvent(event).projects.list().catch(() => [] as unknown),
+          ]);
+          const projectList = unwrapProjectList(projectsResponse);
+          const resolved = activeProjectId
+            ? projectList.find(
+                (project) => project.slug === activeProjectId || project.id === activeProjectId,
+              )?.id ?? activeProjectId
+            : null;
           let documents = (allDocs as PublicDocument[]).map((doc) => toDocRow(doc));
           if (kind) documents = documents.filter((doc) => doc.kind === kind);
           if (q.trim()) {
@@ -79,7 +104,7 @@ export const load: PageServerLoad = ({ url, locals, fetch, request }) => {
               doc.title.toLowerCase().includes(needle) || doc.body_excerpt.toLowerCase().includes(needle)
             );
           }
-          const projectTree = loadDocTree(documents, "project", activeProjectId);
+          const projectTree = loadDocTree(documents, "project", resolved);
           const globalTree = loadDocTree(documents, "global", null);
           return { documents, projectTree, globalTree, error: null };
         } catch (error) {

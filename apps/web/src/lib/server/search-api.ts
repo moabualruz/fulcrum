@@ -3,7 +3,10 @@ import { createSearchApiCaller } from "@knowledge-workspace/interface/http/searc
 import { activeOrgId, cookieHeaders, publicApiBaseUrl } from "$lib/server/public-api";
 
 const DEFAULT_USER_ID = "local";
-const DEFAULT_SEARCH_API_TOKEN = "web-local";
+// Server treats the bearer token as the active org id. Default to the canonical
+// local org so manual / dev sessions land in the same org as seeded data.
+// Override with FULCRUM_API_TOKEN for prod.
+const DEFAULT_SEARCH_API_TOKEN = "00000000-0000-0000-0000-000000000001";
 
 type SearchApiEvent = Pick<RequestEvent, "fetch" | "locals" | "request" | "url">;
 

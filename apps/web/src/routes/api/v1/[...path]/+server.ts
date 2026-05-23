@@ -28,6 +28,11 @@ async function proxy(event: Parameters<RequestHandler>[0]) {
   };
   const contentType = event.request.headers.get("content-type");
   if (contentType) headers["content-type"] = contentType;
+  // Forward bearer auth so server-side callers (e.g. memory/search api clients)
+  // and browser-issued fetches can hit token-gated NestJS endpoints. The server
+  // currently treats the bearer token as the active org id.
+  const authorization = event.request.headers.get("authorization");
+  if (authorization) headers["authorization"] = authorization;
 
   return await event.fetch(targetUrl(event), {
     method,
