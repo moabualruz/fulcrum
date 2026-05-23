@@ -301,6 +301,260 @@ dispatches yet." / "No runs awaiting retry."). Filter by project.
 | Cancel dispatch | row context | `fulcrum run cancel <id>` | same path as `/runs` |
 | Retry from queue | row context | `fulcrum run retry <id>` | same path as `/runs` |
 
+## Review stage routes
+
+The Review stage exposes one production queue surface and four ancillary
+review affordance surfaces. All `/review*` and `/comments*` paths share
+the Review stage rail. `/review`, `/review-queue` 308-redirect to the
+canonical `/<ws>/projects/<projId>/review`; the remaining surfaces
+resolve under the Review StageRail with their own sub-paths.
+
+### `/review`
+
+[![Review queue](../screenshots/web/04-review.png)](../screenshots/web/04-review.png)
+
+Production review queue: the intake list of PRs / review sessions
+awaiting an operator decision. Head shows live count ("3 awaiting review
+· 2 merged today"). Four-tab lifecycle strip — `Awaiting review` /
+`Changes requested` / `Approved` / `Merged today` — drives a canonical
+`WorkflowStatus` for each row. Re-homes the `/review-search`
+kind/author/status facets into per-tab filters (no feature loss). Each
+row carries a four-dot pre-merge check ribbon (lint/test/bench/a11y),
+stacked reviewer avatars, `StatusBadge`, relative age, and the universal
+ModeRow (`Manual` / `Play` / `Discuss` / `⊞ AI Assist`). Empty state
+copy reconciled to `COPY.md` (`No reviews waiting.`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Filter by tab | Click `Awaiting review` / `Changes requested` / `Approved` / `Merged today` | `fulcrum review list --status=<state>` | Tab pill carries count |
+| Filter by kind | `Kind` select (`diff`/`plan`/`prototype`/`annotation`/`feedback`) | `fulcrum review list --kind=<kind>` | Re-homed from `/review-search` |
+| Filter by author | `Author` text input | `fulcrum review list --author=<id>` | Substring match |
+| Open review | Click row | `fulcrum review open <key>` | Loads `/review/<reviewId>` workbench |
+| Hand to agent | Per-row `▶ Play` mode | `fulcrum review play <key>` | Dispatches an agent run |
+| AI Assist | Per-row `⊞ AI Assist` mode | n/a | Opens scoped AcpDrawer |
+
+### `/review-queue`
+
+Redirects (308) to `/<ws>/projects/<projId>/review`. Legacy alias for
+deep links into the queue; resolves to the same surface as `/review`.
+
+[![Review queue alias](../screenshots/web/51-review-queue.png)](../screenshots/web/51-review-queue.png)
+
+### `/review-search`
+
+[![Review search](../screenshots/web/52-review-search.png)](../screenshots/web/52-review-search.png)
+
+Cross-source review search across plans, diffs, prototypes, annotations,
+and feedback. Filter facets: `Kind` (`all`/`plan`/`diff`/`prototype`/
+`annotation`/`feedback`), `Status` (`any`/`open`/`resolved`/`blocker`),
+`Author` (text), and `Source` toggle (`main`/`split`). Renders 6 seeded
+matches as cards with `Jump to <kind>` actions wired to the appropriate
+workbench (plan section, diff hunk, prototype artifact, annotation
+target).
+
+**Migration disposition**: this route's kind/status/author facets are
+re-homed into the `/review` queue tab + filter model
+(`design-alignment/review.md` §review-queue). The route stays as a
+demo / search-tool surface.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Search | Type in the query input | `fulcrum review search "<text>"` | Full-text across all sources |
+| Filter by kind | `Kind` select | `--kind=<kind>` | Same vocabulary as `/review` tabs |
+| Filter by status | `Status` select | `--status=<state>` | `open` / `resolved` / `blocker` / `any` |
+| Filter by author | `Author` text input | `--author=<id>` | Substring match |
+| Jump to source | `Jump to <kind>` button | `fulcrum review open <id>` | Navigates to the originating workbench |
+
+### `/review-templates`
+
+[![Review templates](../screenshots/web/53-review-templates.png)](../screenshots/web/53-review-templates.png)
+
+Reusable structured feedback templates for planning, UAT, and code
+review. Five built-in templates: `missing-criteria`, `stale-context`,
+`prototype-mismatch`, `test-gap`, `code-risk`. Each template has a
+`Scope` (`all`/`workspace`/`planning`/`uat`/`code-review`), a set of
+placeholder fields, and a body that renders against the filled fields.
+`Render` previews the message; `Submit` posts it as a review comment.
+The custom-template panel below adds named templates with arbitrary
+placeholder bodies.
+
+**Migration disposition**: the five built-in templates are absorbed
+into the Review workbench Comments-panel template picker
+(`design-alignment/review.md`). This route stays as the
+template-library management surface — no feature loss.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Pick template | `Template` select | `fulcrum review template list` | Seeds the form with placeholders |
+| Filter by scope | `Scope` select | n/a | Library-management filter |
+| Render preview | `Render` button | `fulcrum review template render --id=<id>` | Shows the resolved body |
+| Submit comment | `Submit` button | `fulcrum review comment add --template=<id>` | Posts to the active review |
+| Add custom | `Add custom template` | `fulcrum review template create` | Workspace-scoped by default |
+
+### `/comments`
+
+[![Comments task detail](../screenshots/web/54-comments.png)](../screenshots/web/54-comments.png)
+
+Task context panel demonstration: the Review-comment-aware task detail
+surface (`Task context panel` heading). Renders the four related-card
+strip (Blocks · Blocked by · Latest run · Doc), an editable
+title/description with autosave status pills (`Title saved`,
+`Description saved`), a Properties panel (State / Priority / Assignee /
+Sprint / Module / Labels), and a Related tasks/runs grid. The right
+panel shows the active task FUL-132 with its description, properties,
+labels, and downstream runs. Comments themselves are seeded via
+`POST /api/v1/comments/create` on real tasks.
+
+Seeded for the audit: 2 task comments on `manual-test-project` tasks
+(`383b6fe2-9728-4f0a-8622-bcfface8f2ce` — open;
+`7a1ef580-d78a-42b3-b434-a1ccdf16fde7` — resolved).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | Inline composer (per task) | `POST /api/v1/comments/create` | `body` is rich tiptap JSON |
+| Edit | Inline edit | `POST /api/v1/comments/update` | Author-only |
+| Resolve | Row context menu | `POST /api/v1/comments/resolve` | Marks `resolved=true` |
+| Unresolve | Row context menu | `POST /api/v1/comments/unresolve` | Reverts resolve |
+| React | Emoji picker | `POST /api/v1/comments/add-reaction` | Emoji is required |
+| Subscribe | `Watch` toggle | `POST /api/v1/comments/subscribe` | Notifies on new replies |
+| Delete | Row context menu | `POST /api/v1/comments/delete` | Author-only |
+
+### `/comments-block-thread`
+
+[![Block-anchored threads](../screenshots/web/55-comments-block-thread.png)](../screenshots/web/55-comments-block-thread.png)
+
+Block-anchored doc comment threads: the doc-version-review surface.
+Each row is a selection-anchored thread on a document line (`L12`,
+`L19`, `L27`). Active threads carry a `Thread (n)` action; resolved
+threads fade and show a checkmark instead. The selection-anchored
+resolvable-thread responsibility is promoted to the
+`@fulcrum/ui-kit` `CommentThread` primitive, which the Review workbench
+consumes for inline diff annotations.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Open thread | `Thread (n)` button | n/a | Opens the inline comment editor |
+| Reply | Comment composer inside the thread | n/a | Anchored to the selection |
+| Resolve | `Resolve` button in thread | n/a | Resolved threads fade to dim |
+| Unresolve | `Re-open` in resolved-thread context menu | n/a | Restores active state |
+
+## Ship stage routes
+
+The Ship stage groups three surfaces under one workflow: the artifact
+release workbench (`/ship`), the release timeline archive
+(`/ship-archive`), and the legacy generic artifact list (`/artifacts`,
+which 301-redirects to `/ship`). All Ship routes share the Ship stage
+rail.
+
+### `/ship`
+
+[![Ship workbench](../screenshots/web/05-ship.png)](../screenshots/web/05-ship.png)
+
+Ship stage workbench: the release table. Toolbar shows live count
+("7 releases · 1 in flight · channel stable"), a segmented
+Channel/Sort/Filter group, and the primary `Cut release` action
+(`⌘R`). Each row carries the release artifact name, channel
+(`stable`/`canary`), `StatusBadge` (`Running` / `Completed` /
+`Cancelled` / `Failing`), check ribbon (`✓ 12 · ✗ 1`), author, promoted
+time, trace id, size, and a per-row ModeRow. A row click opens the
+List+Detail peek-overview (Release / Checks / Includes / Timeline) with
+`Roll back` / `Pause rollout` / `Open run feed` / `Promote` actions.
+
+Confirmation tiers: `Cut release` / `Pause rollout` / `Promote to 100%`
+use the inline 3-2-1 countdown (`COPY.md` §4); `Roll back` is the
+destructive tier with explicit inline confirmation.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Cut release | `Cut release` button (`⌘R`) | `fulcrum ship release cut` | 3-2-1 countdown |
+| Promote | Per-row peek `Promote` | `fulcrum ship release promote --id=<id>` | Inline confirm |
+| Pause | Per-row peek `Pause rollout` | `fulcrum ship release pause --id=<id>` | Reversible |
+| Roll back | Per-row peek `Roll back` | `fulcrum ship release rollback --id=<id>` | Destructive — text confirm |
+| Filter | `Channel` / `Filter` toolbar | `fulcrum ship list --channel=<c>` | Defaults: channel `stable` |
+| Sort | `Newest` toolbar segment | `fulcrum ship list --sort=<key>` | Default: `Newest` |
+| Open peek | Row click | `fulcrum ship show <id>` | List+Detail peek, no route change |
+| Open run feed | Per-row peek `Open run feed` | `fulcrum runs show --release=<id>` | Cross-stage navigation |
+
+### `/ship-archive`
+
+[![Ship archive](../screenshots/web/56-ship-archive.png)](../screenshots/web/56-ship-archive.png)
+
+Release archive: vertical timeline of past releases grouped by date
+bucket. Head shows live count ("6 releases · last 90 days"). Each
+release card carries a semver `tag-pill` (e.g. `v0.18.0`), a title, a
+summary paragraph, a metadata row (`commit <sha>` · `<n> PRs merged` ·
+`<n> LOC`), the author handle, and the per-row ModeRow. The connector
+rail draws date dots + lines via CSS pseudo-elements per OD
+`ship-archive.html`.
+
+Empty state copy reconciled to `COPY.md` §72: `No releases shipped.`
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Filter window | Date-range picker (planned) | `fulcrum ship archive --since=<ts>` | Default: last 90 days |
+| Open release | Click release card | `fulcrum ship show <tag>` | Loads release detail |
+| Open run feed | Per-row `▶ Play` mode | `fulcrum runs show --release=<id>` | Cross-stage |
+| Discuss | Per-row `💬 Discuss` mode | n/a | Inline thread |
+| AI Assist | Per-row `⊞ AI Assist` mode | n/a | Scoped AcpDrawer |
+
+### `/artifacts`
+
+[![Artifacts redirects to /ship](../screenshots/web/57-artifacts.png)](../screenshots/web/57-artifacts.png)
+
+Legacy generic artifact list. The list view is re-homed to the Ship
+stage workbench (`/ship`): `+page.server.ts` issues a
+**301 MOVED_PERMANENTLY** redirect carrying the original query string
+forward, so a bookmarked `/artifacts?mime=…` lands on the same filtered
+Ship view.
+
+**No feature loss for mutation endpoints**: the `upload` and `bulk`
+(archive/delete) server actions and the `/artifacts/[id]/download`
+endpoint are preserved at their existing paths — only the *list* moved.
+
+Seeded for the audit: 2 artifacts under `manual-test-project`
+(`artifact-3215e85e-7457-42d1-ac7e-7ac52afd83a9` — PDF, "Release notes
+0.18.0"; `artifact-92fd1ff0-0cf1-42c0-ae21-378b1bf050e5` — ZIP,
+"Compliance evidence bundle"). Both auto-emit an `artifact / created`
+audit event visible at `/audit`.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| List | `/ship` (redirected from `/artifacts`) | `fulcrum artifacts list` | Filter by `mime`/`kind`/`lifecycle` |
+| Upload | `POST /artifacts` form action | `fulcrum artifacts upload <path>` | Carries `traceId` + `projectId` |
+| Bulk archive | `POST /artifacts?/bulk action=archive` | `fulcrum artifacts archive --ids=<...>` | Soft delete |
+| Bulk delete | `POST /artifacts?/bulk action=delete` | `fulcrum artifacts delete --ids=<...>` | Hard delete |
+| Download | `GET /artifacts/<id>/download` | `fulcrum artifacts download <id>` | Streams body + checksum |
+
+## Audit
+
+### `/audit`
+
+[![Audit log](../screenshots/web/19-audit.png)](../screenshots/web/19-audit.png)
+
+Audit log: the immutable event stream for the workspace. Filter by
+`Actor`, `Event kind`, `Verb`, `Project`, date range (`From` / `To`),
+and free-text `Reason / text`. Renders a server-paginated table
+(time / actor / kind / subject / verb). Read-model from
+`GET /api/v1/audit?orgId=<org>` (see
+`services/workflow-coordination/src/interface/http/audit-public-api.controller.ts`).
+`Export CSV` / `Export JSON` actions stream the filtered set.
+
+Audit events auto-populate as side effects of public-API mutations
+(artifact upload, task patch, document edit, run dispatch, etc.). The
+seeded sample shows two `artifact / created` events from the artifacts
+seeded above.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Filter by actor | `Actor` input | `fulcrum audit list --actor=<id>` | `system` for unattributed |
+| Filter by kind | `Event kind` input | `--kind=<kind>` | `task`/`doc`/`run`/`artifact`/... |
+| Filter by verb | `Verb` input | `--verb=<v>` | `created`/`updated`/... |
+| Filter by project | `Project` input | `--project=<id>` | UUID, not slug |
+| Filter by date | `From` / `To` date pickers | `--since=<ts>` / `--until=<ts>` | Inclusive |
+| Export CSV | `Export CSV` button | `fulcrum audit export --format=csv` | Streams attachment |
+| Export JSON | `Export JSON` button | `fulcrum audit export --format=json` | Streams attachment |
+| Set retention | n/a (settings) | `fulcrum audit retention set --days=<n>` | Per-org policy |
+
 ## Cross-cutting affordances
 
 - **Trace identity** — every page header carries a copy-trace-id button (`tr_…`).
