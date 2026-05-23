@@ -117,6 +117,36 @@ The same data drives the CLI (`fulcrum tasks list --json`, `fulcrum runs graph -
 
 ---
 
+## Plan → Review → Ship
+
+Every stage shares the same vocabulary (status badges, ModeRow per step, trace badge in the topbar) so the UI tells the same story across the workflow:
+
+### Plan — `/planning`
+
+The Plan stage owns AI Assist sessions, traffic streams, and the persistent planning workspace. Sessions list left, planning workspace centre, source-doc + trace-summary on the right.
+
+![Plan stage with active AI Assist session and traffic stream](docs/manuals/screenshots/web/02-plan.png)
+
+### Review — `/review`
+
+Code, QA, E2E, and Final QA review queues with diff + comments tripane.
+
+![Review stage tripane](docs/manuals/screenshots/web/04-review.png)
+
+### Ship — `/ship`
+
+Release cuts, archive timeline, artifact bundle download — same data as `fulcrum ship list --json`.
+
+![Ship stage release list](docs/manuals/screenshots/web/05-ship.png)
+
+### Operate — `/operate`
+
+Doctor system health (subsystems, latency, error rate), MCP inventory, plugins, alerts, telemetry. Mirrors `fulcrum doctor`.
+
+![Operate stage doctor view](docs/manuals/screenshots/web/06-operate.png)
+
+---
+
 ## How it Works
 
 ```

@@ -1567,3 +1567,162 @@ Model catalog across providers. Table columns: `Name`, `Version`, `Provider` (`a
 - A `/settings/*` sub-route returns 500 → check the server log; missing tables (`project_statuses`, `project_connectors`) now return `[]` rather than 500 so the page renders empty-state.
 - `/projects/<slug>/sprints` is empty → expected: sprint↔task model is being unified across `FulcrumTaskEntity` (no sprint_id) and the legacy `Task` entity (has sprint_id). See [findings.md](../findings.md) bug E.
 - Web has stale data → restart the NestJS server first (`lsof -ti:3000 | xargs kill -9; cd apps/server && bun run src/index.ts`). PGlite is single-writer; the web doesn't open it directly, but the data behind it lives in `~/.fulcrum/db/main`.
+
+---
+
+## Screenshot catalog
+
+Every PNG under `docs/manuals/screenshots/web/` mapped to the route that produced it. Numbering is canonical — agents writing/updating manuals reuse the same `NN-<slug>.png` filenames.
+
+### Marketing + portfolio
+
+| File | Route | Surface |
+|---|---|---|
+| 00-root.png · 00-root-portfolio.png | `/projects` | Portfolio (Capture stage) |
+| 01-projects.png · 10-projects.png | `/projects` | Project list |
+| 70-proj-detail.png | `/projects/<slug>` | Project detail + danger zone |
+| 71-proj-board.png | `/projects/<slug>/board` | Project kanban + manual workbench |
+| 72-proj-backlog.png | `/projects/<slug>/backlog` | Sprint backlog |
+| 73-proj-sprints.png | `/projects/<slug>/sprints` | Sprint roster |
+| 74-proj-modules.png | `/projects/<slug>/modules` | Module list |
+| 75-proj-intake.png | `/projects/<slug>/intake` | Intake (bug/feedback) |
+| 76-proj-calendar.png | `/projects/<slug>/calendar` | Calendar |
+| 77-proj-gantt.png | `/projects/<slug>/gantt` | Gantt |
+| 78-proj-repos.png | `/projects/<slug>/repos` | Linked repos |
+| 79-proj-uat.png | `/projects/<slug>/uat` | UAT handoff |
+| 80-proj-review.png | `/projects/<slug>/review` | Project review workbench |
+| 81-proj-reports.png | `/projects/<slug>/reports` | Reports + Export CSV |
+| 82-proj-routing.png | `/projects/<slug>/routing` | Routing rules |
+| 83-proj-e2e.png | `/projects/<slug>/e2e` | E2E runner |
+| 84-proj-updates.png | `/projects/<slug>/updates` | Status updates |
+| 85-proj-runs.png | `/projects/<slug>/runs` | Project run feed |
+| 86-proj-settings-connectors.png | `/projects/<slug>/settings/connectors` | External connectors |
+| 87-proj-settings-statuses.png | `/projects/<slug>/settings/statuses` | Status overrides |
+| 88-proj-settings-fields.png | `/projects/<slug>/settings/fields` | Custom fields |
+| 89-proj-settings-workflow.png | `/projects/<slug>/settings/workflow` | Workflow rules |
+| 90-proj-settings-views.png | `/projects/<slug>/settings/views` | Saved views |
+| 91-proj-settings-automations.png | `/projects/<slug>/settings/automations` | Automations |
+| 92-proj-settings-import.png | `/projects/<slug>/settings/import` | Importers |
+
+### Tasks · Boards · Build
+
+| File | Route | Surface |
+|---|---|---|
+| 01-tasks-list.png | `/tasks` | Flat task list (TaskRow primitive) |
+| 02-boards.png · 19-boards.png · 22-boards.png | `/boards` | Workspace kanban |
+| 03-build.png | `/boards` | Build stage entry |
+| 03-build-graph.png | `/build-graph` | Sugiyama dep graph |
+| 04-build-board.png | `/build-board` | Compact board (4-col fixture) |
+| 93-task-detail.png | `/tasks/<id>` | Task detail panel |
+| 94-build-list.png | `/build-list` | Flat list of build items |
+| 95-build-timeline.png | `/build-timeline` | Build timeline |
+| 96-build-runs.png | `/build-runs` | Build run feed |
+| 97-agent-dependency-board.png | `/agent-dependency-board` | Multi-agent dep board (alias) |
+| 98-run-detail.png | `/run-detail` | Run detail panel |
+| 17-runs.png · 21-runs.png | `/runs` | Workspace runs feed |
+| 18-agents.png · 20-agents.png | `/agents` | Agent session workbench |
+| 20-orchestration.png · 23-orchestration.png | `/orchestration` | Orchestrator dashboard |
+
+### Plan · Capture
+
+| File | Route | Surface |
+|---|---|---|
+| 01-capture.png | `/capture` | Capture stage workbench |
+| 25-capture-inbox.png | `/capture/inbox` | Capture intake |
+| 26-capture-docs.png · 101-stage-capture-docs.png | `/capture/docs` | Capture-stage docs |
+| 40-stage-capture.png | `/capture` (legacy) | Stage redirect target |
+| 41-stage-capture-drafts.png | `/capture/drafts` | Drafts |
+| 42-stage-capture-promoted.png | `/capture/promoted` | Promoted captures |
+| 43-stage-capture-inbox.png | `/capture/inbox` (legacy) | Stage redirect |
+| 02-plan.png · 42-planning.png | `/planning` | Plan stage workbench |
+| 43-plan-prompts.png · 100-plan-prompts.png | `/plan-prompts` | Prompt library |
+| 45-plan-prototypes.png | `/plan-prototypes` | Plan prototypes |
+| 45-plan-sessions.png · 47-plan-session.png | `/plan-session` | Plan session detail |
+| 46-plan-templates.png | `/plan-templates` | Templates |
+| 48-plan-review.png | `/plan-review` | Plan review tripane |
+| 44-stage-plan.png | `/planning` (legacy) | Stage redirect |
+
+### Review · Ship · Audit
+
+| File | Route | Surface |
+|---|---|---|
+| 04-review.png | `/review` | Review stage workbench |
+| 51-review-queue.png | `/review-queue` | Review queue |
+| 52-review-search.png | `/review-search` | Cross-source search |
+| 53-review-templates.png | `/review-templates` | Review templates |
+| 54-comments.png | `/comments` | Comment thread preview |
+| 55-comments-block-thread.png | `/comments-block-thread` | Block-anchored threads |
+| 05-ship.png | `/ship` | Ship stage release list |
+| 56-ship-archive.png | `/ship-archive` | Release archive |
+| 57-artifacts.png | `/artifacts` | Artifact bundle list |
+| 19-audit.png | `/audit` | Audit log |
+
+### Operate · Doctor · MCP
+
+| File | Route | Surface |
+|---|---|---|
+| 06-operate.png | `/operate` | Operate stage entry |
+| 26-doctor.png · 33-doctor.png | `/doctor` | Doctor (legacy redirect) |
+| 24-operate-doctor.png · 59-operate-doctor.png | `/operate/doctor` | Doctor canonical |
+| 22-operate-mcp.png · 60-operate-mcp.png | `/operate/mcp` | MCP inventory |
+| 23-operate-plugins.png · 61-operate-plugins.png | `/operate/plugins` | Plugins |
+| 62-operate-alerts.png | `/operate/alerts` | Alerts |
+| 63-operate-telemetry.png | `/operate/telemetry` | Telemetry |
+| 64-repos.png | `/repos` | Repo inventory |
+| 27-inference.png | `/inference` | Inference runtime |
+| 28-inference-models.png | `/inference-models` | Model registry |
+
+### Knowledge · Docs · Memory · Search
+
+| File | Route | Surface |
+|---|---|---|
+| 15-docs.png · 16-docs.png · 21-docs.png | `/docs` | Docs list |
+| 17-docs-new.png | `/docs/new` | New doc templates |
+| 18-docs-global.png | `/docs/global` | Global docs |
+| 29-doc-labels.png | `/doc-labels` | Doc labels |
+| 99-doc-detail.png | `/docs/<id>` | Doc detail |
+| 03-memory.png · 12-memory.png · 23-memory.png | `/memory` | Memory browser |
+| 04-context-preview.png · 13-context.png | `/context` | Context preview |
+| 02-search.png · 11-search.png · 25-search.png | `/search` | Cross-source search |
+
+### Settings · Identity · Notifications
+
+| File | Route | Surface |
+|---|---|---|
+| 05-settings.png · 14-settings.png | `/settings` | Settings hub |
+| 06-settings-secrets.png | `/settings/secrets` | Secrets |
+| 07-settings-feature-flags.png | `/settings/feature-flags` | Feature flags |
+| 08-settings-orchestration.png | `/settings/orchestration` | Orchestration defaults |
+| 09-settings-data.png | `/settings/data` | Data export/import |
+| 10-settings-backups.png | `/settings/backups` | Backups |
+| 11-settings-skills.png | `/settings/skills` | Skill registry |
+| 12-settings-notifications.png · 33-notifications-settings.png | `/settings/notifications` · `/notifications-settings` | Notification rules |
+| 13-settings-telemetry.png | `/settings/telemetry` | Telemetry consent |
+| 14-settings-ai-assist.png | `/settings/ai-assist` | AI Assist defaults |
+| 30-api-tokens.png | `/api-tokens` | API tokens |
+| 31-members.png | `/members` | Member roster |
+| 39-member-remove.png | `/member-remove` | Member removal flow |
+| 38-space-permissions.png | `/space-permissions` | Workspace permissions |
+| 32-notifications-inbox.png | `/notifications-inbox` | Notification inbox |
+| 34-notifications-empty.png | `/notifications-empty` | Notifications empty state |
+| 15-inbox.png · 16-inbox.png | `/inbox` | Workspace inbox |
+| 37-sessions-empty.png | `/sessions-empty` | Sessions empty state |
+| 36-workspace.png | `/workspace` | Workspace switcher |
+
+### Auth + onboarding
+
+| File | Route | Surface |
+|---|---|---|
+| 35-onboarding.png | `/onboarding` | First-run wizard |
+| 43-auth-login.png | `/auth` | Login |
+| 40-auth-flows.png | `/auth-flows` | Auth flow picker |
+| 41-auth-2fa-verify.png | `/auth-2fa-verify` | 2FA verify |
+| 42-account-2fa-setup.png | `/account-2fa-setup` | 2FA setup |
+
+### Misc
+
+| File | Route | Surface |
+|---|---|---|
+| 21-design-kit.png · 24-design-kit.png · 70-design-kit.png | `/design-kit` | Design system showcase |
+| 25-design-tokens.png | `/design-tokens` | Design tokens |
+| 34-offline.png | `/offline` | Offline state |
