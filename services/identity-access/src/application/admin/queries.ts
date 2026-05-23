@@ -78,7 +78,7 @@ async function columnsForTable(em: EntityManager, table: string): Promise<{
       select column_name, data_type
       from information_schema.columns
       where table_schema = 'public'
-        and table_name = ?
+        and table_name = $1
       order by ordinal_position
     `,
     [table],

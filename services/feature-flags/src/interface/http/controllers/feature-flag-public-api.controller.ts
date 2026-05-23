@@ -13,6 +13,7 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
   Query,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -26,6 +27,7 @@ import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { PLATFORM_FEATURE_FLAG_ENTITIES } from "@feature-flags/infrastructure/database/entities/feature-flag.entities.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
 import {
+  addSettingsFeatureFlag,
   setSettingsFeatureFlagCohortRules,
   setSettingsFeatureFlagRollout,
   toggleSettingsFeatureFlag,
@@ -117,6 +119,16 @@ export class FeatureFlagPublicApiService {
     );
   }
 
+  async addSettingsFlag(input: FeatureFlagSettingsCreateDto): Promise<{ success: true; id: string }> {
+    this.requireStore();
+    return await this.mapAppErrors(() =>
+      addSettingsFeatureFlag(this.requireDataSource().manager, settingsContext(input), {
+        flag: input.flag,
+        enabled: input.enabled,
+      })
+    );
+  }
+
   private async mapUnknown<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();
@@ -173,6 +185,11 @@ export class FeatureFlagSettingsCohortRulesDto extends FeatureFlagSettingsScopeD
   rules!: Record<string, unknown>;
 }
 
+export class FeatureFlagSettingsCreateDto extends FeatureFlagSettingsScopeDto {
+  flag!: string;
+  enabled?: boolean;
+}
+
 export class FeatureFlagPublicApiController {
   constructor(private readonly flags: FeatureFlagPublicApiService) {}
 
@@ -198,6 +215,10 @@ export class FeatureFlagPublicApiController {
 
   async listSettingsFlags(query: FeatureFlagSettingsScopeDto) {
     return await this.flags.listSettingsFlags(query);
+  }
+
+  async addSettingsFlag(body: FeatureFlagSettingsCreateDto): Promise<{ success: true; id: string }> {
+    return await this.flags.addSettingsFlag(body);
   }
 
   async toggleSettingsFlag(params: FeatureFlagSettingsIdParamsDto, body: FeatureFlagSettingsScopeDto): Promise<{ success: true }> {
@@ -266,12 +287,16 @@ IsInt()(FeatureFlagRolloutDto.prototype, "rolloutPercent");
 Min(0)(FeatureFlagRolloutDto.prototype, "rolloutPercent");
 Max(100)(FeatureFlagRolloutDto.prototype, "rolloutPercent");
 
-for (const target of [FeatureFlagSettingsScopeDto, FeatureFlagSettingsRolloutDto, FeatureFlagSettingsCohortRulesDto] as const) {
+for (const target of [FeatureFlagSettingsScopeDto, FeatureFlagSettingsRolloutDto, FeatureFlagSettingsCohortRulesDto, FeatureFlagSettingsCreateDto] as const) {
   IsString()(target.prototype, "orgId");
   MinLength(1)(target.prototype, "orgId");
   IsOptional()(target.prototype, "userId");
   IsString()(target.prototype, "userId");
 }
+IsString()(FeatureFlagSettingsCreateDto.prototype, "flag");
+MinLength(1)(FeatureFlagSettingsCreateDto.prototype, "flag");
+IsOptional()(FeatureFlagSettingsCreateDto.prototype, "enabled");
+IsBoolean()(FeatureFlagSettingsCreateDto.prototype, "enabled");
 IsString()(FeatureFlagSettingsIdParamsDto.prototype, "id");
 MinLength(1)(FeatureFlagSettingsIdParamsDto.prototype, "id");
 IsInt()(FeatureFlagSettingsRolloutDto.prototype, "rolloutPercent");
@@ -285,6 +310,7 @@ const routeDescriptors = {
   setOverride: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "setOverride"),
   setRollout: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "setRollout"),
   listSettingsFlags: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "listSettingsFlags"),
+  addSettingsFlag: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "addSettingsFlag"),
   toggleSettingsFlag: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "toggleSettingsFlag"),
   setSettingsFlagRollout: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "setSettingsFlagRollout"),
   setSettingsFlagCohortRules: Object.getOwnPropertyDescriptor(FeatureFlagPublicApiController.prototype, "setSettingsFlagCohortRules"),
@@ -301,6 +327,7 @@ ApiForbiddenResponse({ description: "Feature flag operation is forbidden for the
 );
 
 applyGetRoute("listSettingsFlags", "settings", FeatureFlagSettingsScopeDto, "List settings feature flags");
+applyPostRoute("addSettingsFlag", "settings", FeatureFlagSettingsCreateDto, "Create settings feature flag");
 applyPatchIdRoute("toggleSettingsFlag", "settings/:id/toggle", FeatureFlagSettingsScopeDto, "Toggle settings feature flag");
 applyPatchIdRoute("setSettingsFlagRollout", "settings/:id/rollout", FeatureFlagSettingsRolloutDto, "Set settings feature flag rollout");
 applyPatchIdRoute("setSettingsFlagCohortRules", "settings/:id/cohort-rules", FeatureFlagSettingsCohortRulesDto, "Set settings feature flag cohort rules");
@@ -343,6 +370,20 @@ function applyPatchRoute(
 ): void {
   const descriptor = routeDescriptors[method]!;
   Patch(path)(FeatureFlagPublicApiController.prototype, method, descriptor);
+  Body()(FeatureFlagPublicApiController.prototype, method, 0);
+  ApiBody({ type: bodyType })(FeatureFlagPublicApiController.prototype, method, descriptor);
+  ApiOperation({ summary })(FeatureFlagPublicApiController.prototype, method, descriptor);
+  ApiOkResponse({ description: summary })(FeatureFlagPublicApiController.prototype, method, descriptor);
+}
+
+function applyPostRoute(
+  method: keyof typeof routeDescriptors,
+  path: string,
+  bodyType: new () => unknown,
+  summary: string,
+): void {
+  const descriptor = routeDescriptors[method]!;
+  Post(path)(FeatureFlagPublicApiController.prototype, method, descriptor);
   Body()(FeatureFlagPublicApiController.prototype, method, 0);
   ApiBody({ type: bodyType })(FeatureFlagPublicApiController.prototype, method, descriptor);
   ApiOperation({ summary })(FeatureFlagPublicApiController.prototype, method, descriptor);

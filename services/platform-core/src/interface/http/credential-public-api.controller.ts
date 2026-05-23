@@ -195,6 +195,30 @@ export class CredentialSettingsRotateDto extends CredentialSettingsScopeDto {
 export class CredentialPublicApiController {
   constructor(private readonly credentials: CredentialPublicApiService) {}
 
+  // Settings-secrets routes MUST be declared before `:name` routes so Nest
+  // registers GET/POST/DELETE /settings-secrets ahead of GET/POST/DELETE /:name.
+  // Otherwise Express matches `settings-secrets` against the `:name` param route.
+
+  async listSettingsSecrets(query: CredentialSettingsScopeDto) {
+    return await this.credentials.listSettingsSecrets(query);
+  }
+
+  async addSettingsSecret(body: CredentialSettingsSetDto): Promise<{ success: true }> {
+    return await this.credentials.addSettingsSecret(body);
+  }
+
+  async rotateSettingsSecret(params: CredentialSettingsIdParamsDto, body: CredentialSettingsRotateDto): Promise<{ success: true }> {
+    return await this.credentials.rotateSettingsSecret(params, body);
+  }
+
+  async toggleSettingsSecretArchive(params: CredentialSettingsIdParamsDto, body: CredentialSettingsScopeDto): Promise<{ success: true }> {
+    return await this.credentials.toggleSettingsSecretArchive(params, body);
+  }
+
+  async deleteSettingsSecret(params: CredentialSettingsIdParamsDto, query: CredentialSettingsScopeDto): Promise<{ success: true }> {
+    return await this.credentials.deleteSettingsSecret(params, query);
+  }
+
   async listCredentials(query: CredentialListQueryDto): Promise<CredentialPublicRow[]> {
     return await this.credentials.listCredentials(query);
   }
@@ -217,26 +241,6 @@ export class CredentialPublicApiController {
 
   async removeCredential(params: CredentialNameParamsDto, query: CredentialTargetDto): Promise<{ ok: true }> {
     return await this.credentials.removeCredential(params, query);
-  }
-
-  async listSettingsSecrets(query: CredentialSettingsScopeDto) {
-    return await this.credentials.listSettingsSecrets(query);
-  }
-
-  async addSettingsSecret(body: CredentialSettingsSetDto): Promise<{ success: true }> {
-    return await this.credentials.addSettingsSecret(body);
-  }
-
-  async rotateSettingsSecret(params: CredentialSettingsIdParamsDto, body: CredentialSettingsRotateDto): Promise<{ success: true }> {
-    return await this.credentials.rotateSettingsSecret(params, body);
-  }
-
-  async toggleSettingsSecretArchive(params: CredentialSettingsIdParamsDto, body: CredentialSettingsScopeDto): Promise<{ success: true }> {
-    return await this.credentials.toggleSettingsSecretArchive(params, body);
-  }
-
-  async deleteSettingsSecret(params: CredentialSettingsIdParamsDto, query: CredentialSettingsScopeDto): Promise<{ success: true }> {
-    return await this.credentials.deleteSettingsSecret(params, query);
   }
 }
 
