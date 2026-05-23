@@ -531,19 +531,19 @@ Set later via `fulcrum config telemetry on|anon|off` or
 - [CLI-TUI-UX.md](CLI-TUI-UX.md) §5 — CLI error code namespace `FUL_<DOMAIN>_<SPECIFIC>` (this file's error samples cite those codes).
 - [OD-PROMPT.md](OD-PROMPT.md).
 
-### 14.2 Research dossiers (`.scratch/design-research/`)
+### 14.2 Research dossiers (local research dossier)
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) §9 — empty-state template (one sentence + one action, no illustration).
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) §10–13 — permission prompt copy (inline transcript, never modal for non-destructive).
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) §10/§14/§16 — error template, telemetry first-run prompt, doctor row shape.
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) §4.1 — Plannotator `Mod+Enter` overload copy semantics.
+- [01-workflow-nav-ia.md](#) §9 — empty-state template (one sentence + one action, no illustration).
+- [02-agent-supervision.md](#) §10–13 — permission prompt copy (inline transcript, never modal for non-destructive).
+- [04-observability-trace.md](#) §10/§14/§16 — error template, telemetry first-run prompt, doctor row shape.
+- [07-copy-first-parity.md](#) §4.1 — Plannotator `Mod+Enter` overload copy semantics.
 
 ### 14.3 PRD glossary + impeccable
 
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 94 `error copy` mentions, 113 `empty state` mentions, 119 `error recovery` mentions in critique_focus.
-- [.claude/skills/impeccable/reference/ux-writing.md](.claude/skills/impeccable/reference/ux-writing.md).
-- [.claude/skills/impeccable/reference/clarify.md](.claude/skills/impeccable/reference/clarify.md).
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register copy rules.
+- local PRD glossary — 94 `error copy` mentions, 113 `empty state` mentions, 119 `error recovery` mentions in critique_focus.
+- [~/.claude/skills/impeccable/reference/ux-writing.md](~/.claude/skills/impeccable/reference/ux-writing.md).
+- [~/.claude/skills/impeccable/reference/clarify.md](~/.claude/skills/impeccable/reference/clarify.md).
+- [~/.claude/skills/impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md) — product register copy rules.
 
 ### 14.4 Transformation note
 

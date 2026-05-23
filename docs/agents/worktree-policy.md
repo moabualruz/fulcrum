@@ -4,7 +4,7 @@ Every PRD-driven adoption slice runs in its own git worktree. The policy keeps g
 
 ## Lifecycle
 
-1. Select one eligible PRD from `.scratch/prd.jsonl`.
+1. Select one eligible PRD from the local PRD glossary (kept locally, not tracked).
 2. Create `.claude/worktrees/<id>/` from `dev/v1.0` on branch `feat/prd-<id>`.
 3. Implement only the PRD's assigned paths unless verification exposes a directly related prerequisite.
 4. Run every command in the PRD's `verify` list.

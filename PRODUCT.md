@@ -475,18 +475,18 @@ Every section above is grounded in at least one of:
 - [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI subcommand tree, JSON envelope, TUI screens, status footer.
 - [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
 
-Research dossiers in `.scratch/design-research/`:
+Research dossiers in local research dossier:
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — IA, project hierarchy, scope chrome, agent identity, command palette (Linear, Plane, Devin, Cursor, GitHub Projects, Notion, k9s, dense-workbench).
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — live sessions, tool calls, run feeds, multi-agent orchestration, ACP protocol (Devin, Cursor, Claude Code, Codex, Aider, Replit, Linear Agents, LangSmith, Temporal, Argo, Dagster, Airflow, ACP).
-- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — editor, page tree, attachments, version history, memory tiers, provenance (Notion, Docmost, Outline, Coda, Anytype, Logseq, Obsidian, HedgeDoc, Tana, Roam, Linear docs, Slack Canvas).
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — doctor, audit, runs feed, trace-spine, telemetry (Datadog, Honeycomb, Sentry, LangSmith, Grafana, OpenTelemetry, GitHub Actions, Vercel, Healthchecks, k9s, CloudTrail/Stripe/Okta/Auth0, npm doctor).
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — CLI envelope, TUI screens, status footer, palette (gh, stripe, vercel, wrangler, flyctl, cargo, bun, kubectl, doctl, heroku, clig.dev, 12-factor; k9s, lazygit, tig, htop/btop, fzf, Helix, Charm, OpenTUI, gh-dash).
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — mobile, WCAG 2.2 AA, performance budgets, PWA, OKLCH tokens (Tailwind, Apple HIG, Material 3, shadcn-svelte, GitHub Mobile, Notion mobile, GOV.UK, Atlassian, IBM Carbon, Radix, Bits UI, Melt UI, Core Web Vitals, Workbox, Vercel Speed Insights, TanStack Virtual, OKLCH).
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — full parity audit of plane / docmost / fusion / plannotator / acp-ui with master adoption table + Top-30 must-copy.
+- [01-workflow-nav-ia.md](#) — IA, project hierarchy, scope chrome, agent identity, command palette (Linear, Plane, Devin, Cursor, GitHub Projects, Notion, k9s, dense-workbench).
+- [02-agent-supervision.md](#) — live sessions, tool calls, run feeds, multi-agent orchestration, ACP protocol (Devin, Cursor, Claude Code, Codex, Aider, Replit, Linear Agents, LangSmith, Temporal, Argo, Dagster, Airflow, ACP).
+- [03-knowledge-docs-memory.md](#) — editor, page tree, attachments, version history, memory tiers, provenance (Notion, Docmost, Outline, Coda, Anytype, Logseq, Obsidian, HedgeDoc, Tana, Roam, Linear docs, Slack Canvas).
+- [04-observability-trace.md](#) — doctor, audit, runs feed, trace-spine, telemetry (Datadog, Honeycomb, Sentry, LangSmith, Grafana, OpenTelemetry, GitHub Actions, Vercel, Healthchecks, k9s, CloudTrail/Stripe/Okta/Auth0, npm doctor).
+- [05-cli-tui-design.md](#) — CLI envelope, TUI screens, status footer, palette (gh, stripe, vercel, wrangler, flyctl, cargo, bun, kubectl, doctl, heroku, clig.dev, 12-factor; k9s, lazygit, tig, htop/btop, fzf, Helix, Charm, OpenTUI, gh-dash).
+- [06-mobile-a11y-perf-tokens.md](#) — mobile, WCAG 2.2 AA, performance budgets, PWA, OKLCH tokens (Tailwind, Apple HIG, Material 3, shadcn-svelte, GitHub Mobile, Notion mobile, GOV.UK, Atlassian, IBM Carbon, Radix, Bits UI, Melt UI, Core Web Vitals, Workbox, Vercel Speed Insights, TanStack Virtual, OKLCH).
+- [07-copy-first-parity.md](#) — full parity audit of plane / docmost / fusion / plannotator / acp-ui with master adoption table + Top-30 must-copy.
 
-PRD glossary: [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 entries, 22 seed-agent categories, 178 critique_focus mentions of `workflow parity`, 148 `traceability`, 142 `contract completeness`.
+PRD glossary: local PRD glossary — 1281 entries, 22 seed-agent categories, 178 critique_focus mentions of `workflow parity`, 148 `traceability`, 142 `contract completeness`.
 
-Impeccable register reference: [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md).
+Impeccable register reference: [~/.claude/skills/impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md).
 
-Goal loop: [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md) — Ralph-Wiggum-discipline-adapted-to-/goal.
+Goal loop: local UX remediation goal — Ralph-Wiggum-discipline-adapted-to-/goal.

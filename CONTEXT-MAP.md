@@ -209,3 +209,18 @@ System-wide architectural decisions live in [`docs/adr/`](./docs/adr/). Context-
 - Stale link in this map (path no longer exists) = correctness bug; fix before merging unrelated work in the same area.
 - An ADR conflict is surfaced explicitly, not silently overridden. See [`docs/agents/domain.md`](./docs/agents/domain.md) §"Flag ADR conflicts".
 - Sub-context `CONTEXT.md` files sharpen the parent service's vocabulary; do not promote area terms to the parent unless they're used outside the area.
+
+## Recent platform-wide fixes (2026-05-23)
+
+These changes touched multiple contexts and are listed here so future agents do not re-discover them by archaeology.
+
+- **`public-api` defaults on in dev.** `apps/server/src/nest-application.ts` auto-sets `FULCRUM_FEATURES=public-api` when the env is unset, so web + CLI + TUI work out-of-the-box without explicit flag wiring. Empty string still disables (matches prod's opt-in posture).
+- **Slug-or-UUID resolution across project-scoped public APIs.** Stores under `services/work-management/src/infrastructure/database/` (TaskPublicStore, PlanningStructurePublicStore, SprintPublicStore, SavedViewPublicStore, CustomFieldStore, AutomationStore, WorkflowSettingsStore) + `ProjectStatusPublicApiService` accept either a project UUID or its slug. Web routes pass the slug from the URL; CLI/TUI pass the UUID.
+- **Web → NestJS API proxy.** `apps/web/src/routes/api/v1/[...path]/+server.ts` is a catch-all forwarder so client-side `fetch('/api/v1/...')` calls reach the NestJS server without CORS dancing. Forwards the `authorization` header so Bearer-token auth works end-to-end.
+- **TaskPublicApiController route order.** `listBoardWorkItems` + `createBoardWorkItem` + `bulkUpdate*` + `bulkDelete*` are declared above `getTask` in the controller class so NestJS RouterExplorer maps the literal `/tasks/board` route before the parametric `/tasks/:id` route. Without this ordering Express matches `:id=board` first and the board endpoint 404s.
+- **Board list backed by `fulcrum_tasks`.** `listBoardWorkItems` reads through `TaskPublicStore` (canonical `fulcrum_tasks` table) rather than the legacy `tasks` entity, so `/api/v1/tasks/board` returns the same rows as `/api/v1/tasks`.
+- **PGlite in compiled binaries skips the vector extension.** `services/platform-core/src/infrastructure/product-store/db/pglite.ts` + `application-database/sql.ts` + `doctor/product-store-report.ts` use the `isCompiledBunBinary()` runtime guard to skip the WASM `vector.tar.gz` extension load + PGlite open path inside `$bunfs`. The CLI binary's `doctor` runs to completion; non-vector queries continue to work; embedding/similarity calls degrade.
+- **`addSettingsSecret` FK shape fixed.** `services/platform-core/src/application/settings/commands.ts` now passes the user via `{ user: { id: userId } }` to the TypeORM `ManyToOne`, not `{ user: userId }`. `POST /api/v1/credentials/settings-secrets` is no longer 500.
+- **Postgres SQL placeholders.** `services/integration-hub/src/application/import-export/commands.ts` + `services/identity-access/src/application/admin/queries.ts` use `$1` (Postgres) rather than `?` (MySQL/SQLite) for `information_schema.columns` lookups.
+- **Project status table migration.** `services/platform-core/src/infrastructure/application-database/migrations/Migration20260523_project_statuses.ts` creates the `project_statuses` table; previously `POST /api/v1/projects/{id}/statuses` 500'd because the table never existed.
+- **Local-dev userId defaults to seeded admin.** `apps/web/src/hooks.server.ts` + `apps/web/src/lib/server/public-api.ts` default the local-dev userId to a real UUID (`ac09598f-...`) instead of the literal string `"local-user"`, so FK inserts work without explicit cookie auth.

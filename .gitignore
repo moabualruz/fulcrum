@@ -33,3 +33,6 @@ tests/.tmp-*/
 # the curated critique/screenshot/logs evidence, not the live PGlite snapshot.
 /.scratch/manual-smoke-*/home/
 .playwright-cli/
+
+# Design evidence captures: locally-generated PNGs; never tracked.
+.design-evidence/

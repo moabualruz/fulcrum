@@ -1,12 +1,12 @@
 # DESIGN.md — Fulcrum
 
-> Visual + interaction system grounded in `.scratch/design-research/01..07` and the 1281-entry `.scratch/prd.jsonl` glossary. Drives every web / CLI / TUI / desktop surface. Pairs with [PRODUCT.md](PRODUCT.md).
+> Visual + interaction system grounded in a local research-dossier set + 1281-entry PRD glossary (both kept locally, not tracked). Drives every web / CLI / TUI / desktop surface. Pairs with [PRODUCT.md](PRODUCT.md).
 
 ---
 
 ## 0. Posture
 
-- **Register:** product (per [impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md)). Design serves the workbench.
+- **Register:** product (per [impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md)). Design serves the workbench.
 - **Vibe target:** Linear density + k9s status-spine + Plane multi-layout view ergonomics + Plannotator review surface + ACP-UI protocol clarity. Not Notion cream, not Jira ribbons, not crypto neon.
 - **Scene sentence (drives theme + density):** *Operator at a 27-inch monitor at 1am, switching between web shell + terminal, supervising five agents in parallel runs, glancing at trace IDs to cross-reference audit. Room is dim. Brightness is low. Eye fatigue is real. Density must not shout.*
 - That sentence forces a **dark-leaning theme with explicit light theme parity** (system colors flip; no theme baked into chrome), a calm one-accent palette, and a status-rich semantic vocabulary.
@@ -15,7 +15,7 @@
 
 ## 1. Foundation — design tokens
 
-Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-research/06-mobile-a11y-perf-tokens.md)).
+Source: local research-06 §5 (mobile / a11y / perf / tokens dossier).
 
 ### 1.1 Format
 
@@ -120,7 +120,7 @@ Global guards (research-06 §2, §5):
 
 ## 2. Typography
 
-System font stack ([impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md)):
+System font stack ([impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md)):
 
 ```css
 font-sans:  "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -586,23 +586,11 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 - [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, **TUI-native AI Assist pane** (not a drawer), per-agent MCP/plugin scoping, action-routing CLI, full parity table.
 - [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
 
-### 14.2 Research dossiers (`.scratch/design-research/`)
+### 14.2 Research dossiers + glossary
 
-Each section of this DESIGN.md cites the dossier it draws from.
+Each section of this DESIGN.md draws from a local research-dossier set (workflow-nav-IA, agent-supervision, knowledge-docs-memory, observability-trace, cli-tui-design, mobile-a11y-perf-tokens, copy-first-parity). The dossiers live in the project's local working directory and are not tracked. Top critique-focus themes from the PRD glossary drive every component spec: workflow parity, traceability, validation, contract completeness, service boundary, auth, error recovery, accessibility, empty state, mobile, hierarchy, workflow fit.
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §3 (chrome layout), §4.12 (palette), §4.10 (trace badge), §7 (density), §13 (invariants). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §4.5 (tool-call card), §8 (live session pane), §9 (run feed + orchestrator). Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
-- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — drives editor block set, slash menu, mentions, attachments, version history, comments, backlinks, memory tier model, presence/cursor overlays, connection health, offline retry, and contributor save status. Notion / Docmost / Outline / Coda / Anytype / Logseq / Obsidian / HedgeDoc / Tana / Linear docs / Slack Canvas.
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §4.9 (status vocabulary), §4.10 (trace-ID badge), §10 (doctor/audit/error logs). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — drives §3 (status footer), pairs with CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / doctl / heroku / clig.dev / 12-factor / k9s / lazygit / tig / htop/btop / fzf / Helix / Charm / OpenTUI / gh-dash.
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §1 (tokens), §1.5 (breakpoints), §1.6 (reduced motion / forced colors), §2 (typography), §13 (cross-surface). Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / GitHub Mobile / GOV.UK / Atlassian / IBM Carbon / Radix / Bits UI / Melt UI / Core Web Vitals / Workbox / Vercel Speed Insights / TanStack Virtual / OKLCH.
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §3.3 (multi-layout grid), §4.4 (board cards), §4.6 (inline diff), §8 (live session pane), §10 (doctor/audit). Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table + Top-30 must-copy.
-
-### 14.3 PRD glossary + impeccable + goal
-
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 entries, top critique_focus themes drive every component spec (`workflow parity` 178, `traceability` 148, `validation` 146, `contract completeness` 142, `service boundary` 141, `auth` 140, `error recovery` 119, `accessibility` 114, `empty state` 113, `mobile` 109, `hierarchy` 108, `workflow fit` 107).
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register laws (typography, color, layout, components, motion, bans, permissions).
-- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md) — Ralph-Wiggum-style /goal loop with append-only PRD discipline.
+Product register laws — typography, color, layout, components, motion, bans, permissions — live in the user-global `impeccable` skill (`~/.claude/skills/impeccable/reference/product.md`).
 
 ### 14.4 Transformation note
 

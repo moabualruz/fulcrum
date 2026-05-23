@@ -136,7 +136,7 @@ Fulcrum project instructions must preserve context-mode routing wherever Codex r
 
 ### Issue tracker
 
-Issues tracked as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Issues tracked as local markdown in a session-chosen working directory (kept locally, not in git). See `docs/agents/issue-tracker.md` for the file-naming + `Status:` convention.
 
 ### Triage labels
 

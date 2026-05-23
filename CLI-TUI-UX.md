@@ -1,6 +1,6 @@
 # CLI-TUI-UX.md — Fulcrum CLI + TUI UX Spec
 
-> Concrete CLI + TUI design proposal. Grounded in `.scratch/design-research/05-cli-tui-design.md` + PRDs `seed-internal-cli` (27) + `seed-internal-tui` (50) + IA-MAP.md §8/§9 + DESIGN.md §13 cross-surface invariants. Pairs with [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md), [IA-MAP.md](IA-MAP.md), [COPY.md](COPY.md).
+> Concrete CLI + TUI design proposal. Grounded in local research dossier + PRDs `seed-internal-cli` (27) + `seed-internal-tui` (50) + IA-MAP.md §8/§9 + DESIGN.md §13 cross-surface invariants. Pairs with [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md), [IA-MAP.md](IA-MAP.md), [COPY.md](COPY.md).
 
 ---
 
@@ -856,14 +856,14 @@ If first frame takes >200 ms, the boot is broken.
 - [COPY.md](COPY.md) §3 (error template), §10 (permission prompts), §13 (telemetry first-run prompt).
 - [OD-PROMPT.md](OD-PROMPT.md) — Open Design context block.
 
-### 17.2 Research dossiers (`.scratch/design-research/`)
+### 17.2 Research dossiers (local research dossier)
 
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — 4725 words, 29 sources; drives every section of this file.
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §3 (JSON envelope), §6 (live session TUI screen), §10 (ACP chat pane), §14 (agent-native parity). ACP `session/*` methods, tool-call lifecycle.
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §3 (trace_id key), §5 (error codes), §8 (status footer trace segment), §11 (status badges).
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §1 (workflow-stage subcommand grouping), §7.2 (chord nav `g c/p/b/r/s/o`), §9 (palette grammar).
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §7.8 (drag-and-drop a11y alternative — WCAG 2.5.7), §15/§16 (performance budgets).
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §7.7 (Plannotator Review shortcuts verbatim: `Mod+Enter`, `Alt Alt`, `V`, `Mod+B`, `Mod+.`).
+- [05-cli-tui-design.md](#) — 4725 words, 29 sources; drives every section of this file.
+- [02-agent-supervision.md](#) — drives §3 (JSON envelope), §6 (live session TUI screen), §10 (ACP chat pane), §14 (agent-native parity). ACP `session/*` methods, tool-call lifecycle.
+- [04-observability-trace.md](#) — drives §3 (trace_id key), §5 (error codes), §8 (status footer trace segment), §11 (status badges).
+- [01-workflow-nav-ia.md](#) — drives §1 (workflow-stage subcommand grouping), §7.2 (chord nav `g c/p/b/r/s/o`), §9 (palette grammar).
+- [06-mobile-a11y-perf-tokens.md](#) — drives §7.8 (drag-and-drop a11y alternative — WCAG 2.5.7), §15/§16 (performance budgets).
+- [07-copy-first-parity.md](#) — drives §7.7 (Plannotator Review shortcuts verbatim: `Mod+Enter`, `Alt Alt`, `V`, `Mod+B`, `Mod+.`).
 
 ### 17.3 External references
 
@@ -879,9 +879,9 @@ If first frame takes >200 ms, the boot is broken.
 
 ### 17.4 PRD glossary + impeccable
 
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 142 CLI + 149 TUI PRD entries; top critique themes for these surfaces: `exit codes` 96, `machine output` 96, `error copy` 94, `keyboard ux` 82, `selected state` 82, `status clarity` 80, `terminal density` 80.
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register laws.
-- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md).
+- local PRD glossary — 142 CLI + 149 TUI PRD entries; top critique themes for these surfaces: `exit codes` 96, `machine output` 96, `error copy` 94, `keyboard ux` 82, `selected state` 82, `status clarity` 80, `terminal density` 80.
+- [~/.claude/skills/impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md) — product register laws.
+- local UX remediation goal.
 
 ### 17.5 Transformation note
 

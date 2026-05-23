@@ -554,13 +554,13 @@ fulcrum doctor --json | jq '.verdict, .mcp.servers[] | {name, handshake, wiring,
 
 ### Active feature branches (pushed; PRs not yet opened)
 
-| Branch                                  | Issues                                                  | State                                                                                                       |
-| --------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `feat/component-lifecycle-management`   | `.scratch/component-lifecycle-management/issues/01-13`  | All 13 `Status: done`. Branch is at `main` plus the `.scratch/` issue tracker docs. No new code commits.    |
-| `feat/plugin-extension-surface-parity`  | `.scratch/plugin-extension-surface-parity/issues/01-14` | All 14 `Status: done`. Branch is at `main` plus the `.scratch/` issue tracker docs. No new code commits.    |
-| `feat/product-kernel`                   | `.scratch/product-kernel/issues/01-12`                  | All 12 `Status: done`. CLI surface, web shell, doctor + uninstall, docs.                                    |
+| Branch                                  | Issues                                       | State                                                                                                       |
+| --------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `feat/component-lifecycle-management`   | local issue-tracker: 13 issues               | All 13 `Status: done`. Branch is at `main` plus local-only issue-tracker docs. No new code commits.         |
+| `feat/plugin-extension-surface-parity`  | local issue-tracker: 14 issues               | All 14 `Status: done`. Branch is at `main` plus local-only issue-tracker docs. No new code commits.         |
+| `feat/product-kernel`                   | local issue-tracker: 12 issues               | All 12 `Status: done`. CLI surface, web shell, doctor + uninstall, docs.                                    |
 
-Merge order suggestion (no PR has been opened yet): the two done-feature branches can be merged in any order — they only carry post-hoc issue-tracker docs. `feat/product-kernel` should land after them so the `.scratch/` index in `main` already reflects every feature.
+Merge order suggestion (no PR has been opened yet): the two done-feature branches can be merged in any order — they only carry post-hoc issue-tracker docs. `feat/product-kernel` should land after them so the local-only issue-tracker index in `main` already reflects every feature.
 
 1. **Start layer §6.1: Repository supervisor.**
    Implement `fulcrum repo …` around repo registration, refresh, list/show, settings, SQLite migrations, doctor row counts, and the `repo-track` session hook.
