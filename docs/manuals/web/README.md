@@ -440,6 +440,250 @@ Automation rules. Header `Automation rules` + `Use Template` + `+ Add Rule`. Sea
 
 ![Project · backlog with sprint](../screenshots/web/72-proj-backlog.png) ![Project · modules](../screenshots/web/74-proj-modules.png) ![Project · intake](../screenshots/web/75-proj-intake.png)
 
+## Capture stage routes
+
+Capture is the first stage in the Capture→Operate workflow rail. Every
+flat `/capture*` workspace path resolves under the project-scoped Capture
+WorkflowStage (`/<ws>/projects/<projId>/capture[/<sub>]`); the four
+sub-views (`docs`, `drafts`, `promoted`, `inbox`) are tabs inside the
+same workbench, not standalone routes. Empty-state copy lives in
+`apps/web/src/lib/components/app/capture-stage.ts`. The Capture sidebar
+group exposes Inbox + Docs (project-scoped) above Workspace / System.
+
+### `/capture`
+
+[![Capture stage projects picker](../screenshots/web/01-capture.png)](../screenshots/web/01-capture.png)
+
+Workspace-level `/capture` 308-redirects to `/capture/projects` — a
+project picker that lets the operator choose which project's Capture
+WorkflowStage to enter. Rows show project name, slug, `<N> open` task
+count, and `<N> docs` count. Clicking a row navigates to
+`/<ws>/projects/<slug>/capture` (the canonical Docs view).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Pick project | row click | `fulcrum project use <slug>` | Navigates to Capture WorkflowStage |
+| Filter | `Search` box (header) | `fulcrum project list` | Client-side substring |
+
+### `/<ws>/projects/<projId>/capture` — Docs view
+
+[![Capture · docs (3 captures seeded)](../screenshots/web/40-stage-capture.png)](../screenshots/web/40-stage-capture.png)
+
+Document tree + freeform editor — the default Capture sub-view. Header
+shows `Docs · Document tree and freeform editor`, the running capture
+count (`<N> captures`), and the universal action strip (`Write`, `Link`,
+`Promote`, `Hand off to Plan`). With seeded data the audit dataset
+renders 3 captures (Auth rewrite RFC, Migration plan v2, Sprint 1
+retrospective notes) each with per-row `Suggest` and `Discuss` mode
+buttons. Reads `/api/v1/docs?orgId=…&projectId=<slug>` via
+DocumentPublicApiController.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `Write` button / `New document` empty-state | `fulcrum doc create --project <slug> --title <t>` | POSTs `/api/v1/docs` |
+| Edit | row click → `/docs/<id>` | `fulcrum doc patch <id>` | PATCH `/api/v1/docs/{id}` |
+| Link | `Link` button | `fulcrum doc link <docId> <targetId>` | POSTs `/links` |
+| Promote | `Promote` button | `fulcrum doc promote <id>` | Moves draft → Plan or Build |
+| Hand off | `Hand off to Plan` button | `fulcrum plan handoff --doc <id>` | Opens Plan with `source_doc_id` preset |
+
+### `/<ws>/projects/<projId>/capture/drafts`
+
+[![Capture · drafts (empty)](../screenshots/web/41-stage-capture-drafts.png)](../screenshots/web/41-stage-capture-drafts.png)
+
+Unsent captures not yet promoted — half-formed ideas that have not been
+committed to Plan or Build. Empty-state copy: `No drafts yet.` /
+`Drafts collect half-formed ideas. Press c to capture, or hand off from
+intake.` Primary action `New draft`; secondary `Open inbox` (keyboard
+shortcut `c`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `New draft` button | `fulcrum capture draft create` | POSTs draft to docs API |
+| Promote | row `Promote` action | `fulcrum capture promote <id>` | Moves draft → Docs / Plan |
+| Discard | row context menu | `fulcrum capture delete <id>` | DELETE `/api/v1/docs/{id}` |
+
+### `/<ws>/projects/<projId>/capture/promoted`
+
+[![Capture · promoted (empty)](../screenshots/web/42-stage-capture-promoted.png)](../screenshots/web/42-stage-capture-promoted.png)
+
+Captures that moved into a plan or run. Empty-state copy: `No promoted
+captures yet.` / `Promotions appear here once a draft moves into Plan or
+Build. Promote one from Drafts to start.` Primary action `Open Drafts`;
+secondary `Learn more` (keyboard shortcut `g d`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Open Drafts | `Open Drafts` button | `fulcrum capture drafts list` | Navigates to Drafts tab |
+| Open source | row click | `fulcrum capture open <id>` | Opens originating capture |
+
+### `/<ws>/projects/<projId>/capture/inbox`
+
+[![Capture · inbox (clear)](../screenshots/web/43-stage-capture-inbox.png)](../screenshots/web/43-stage-capture-inbox.png)
+
+Intake queue: snooze, accept, decline. Empty-state copy: `Inbox is
+clear.` / `New captures arrive here for triage. Capture something to
+start.` Primary action `New capture`; secondary `Open Drafts` (keyboard
+shortcut `c`).
+
+The workspace-level `/inbox` is a different surface (notification
+center), and `/capture/inbox` and `/capture/docs` at the workspace level
+correctly 404 — capture intake is project-scoped.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Capture | `New capture` button / press `c` | `fulcrum capture create` | POSTs intake item |
+| Snooze | row Snooze button | `fulcrum capture snooze <id>` | PATCH intake state |
+| Accept | row Accept button | `fulcrum capture accept <id>` | Promotes to Drafts |
+| Decline | row Decline button | `fulcrum capture decline <id>` | Closes the intake item |
+
+### `/inbox` — workspace notification inbox
+
+[![Workspace inbox](../screenshots/web/15-inbox.png)](../screenshots/web/15-inbox.png)
+
+Workspace-level notification inbox (notification-center service). Two
+tabs: `For you` (notifications fanned out from rule-engine matches) and
+`My activity` (audit-log activity for the current user). Empty-state
+copy is `No notifications.` when no rules have matched. Distinct from
+the Capture stage Inbox tab, which is the per-project capture intake.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Mark all read | `Mark all read` button | `fulcrum notify mark-all-read` | POSTs `/api/v1/notifications/mark-all-read` |
+| Mark one read | row click / form `markRead` action | `fulcrum notify mark-read <id>` | PATCH `/api/v1/notifications/<id>` |
+| Manage rules | `/settings/notifications` | `fulcrum notify rules list` | Rule CRUD UI |
+| View activity | `My activity` tab | `fulcrum audit query --user $USER` | Reads `/api/v1/audit/query` |
+
+### `/onboarding` — first-run wizard
+
+[![First-run onboarding](../screenshots/web/35-onboarding.png)](../screenshots/web/35-onboarding.png)
+
+Two-step first-run wizard. Step 1 (`What's your workspace called?`)
+seeds the workspace name (default `local`). Step 2 picks the first
+project. Subsequent visits redirect into the canonical Capture stage.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Set workspace name | `Workspace name` input + `Continue` | `fulcrum workspace patch --name <n>` | PATCH `/api/v1/workspaces/me` |
+| Skip | `Continue` with default | n/a | `local` workspace persists |
+
+## Plan stage routes
+
+Plan is the AI-Assist planning workbench between Capture and Build.
+Every flat `/planning`, `/plan-session`, `/plan-prompts`,
+`/plan-prototypes`, `/plan-templates`, and `/plan-review` workspace path
+308-redirects to the canonical project-scoped Plan WorkflowStage at
+`/<ws>/projects/<projId>/plan[/<sub>]`. Sub-views (`missions`,
+`sessions`, `review`, `prompts`, `prototypes`, `templates`) are
+projections of the same plan session, not standalone routes. The Plan
+sidebar group exposes Sessions / Missions / Reviews / Prototypes /
+Templates / Prompts.
+
+### `/planning`
+
+[![Plan session workbench](../screenshots/web/42-planning.png)](../screenshots/web/42-planning.png)
+
+Persistent planning workbench. Three-column layout: the left column is
+the active session card (`AI Assist planning` with `running` /
+`paused` badge, plan id, trace id, Pause / Resume / Clear sessions
+actions). Centre column carries the workbench: `Source doc ID`,
+`Session ID`, `Trace ID` inputs, a `Prompt` textarea, Clear / Submit
+controls, and the `Traffic stream` log of session/update, tool_call,
+and agent_message_chunk events. Right column is the workspace dock
+(Shell / Files / Browser / Plan / Cost tabs) with the trace summary.
+Reads the canonical plan session via the workflow-coordination service.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Submit prompt | `Submit prompt` button | `fulcrum plan submit --doc <id> --prompt <p>` | POSTs to plan session |
+| Pause | session card `Pause` | `fulcrum plan pause <sessionId>` | PATCH session state |
+| Resume | session card `Resume session` | `fulcrum plan resume <sessionId>` | PATCH session state |
+| Clear sessions | session card `Clear sessions` | `fulcrum plan reset` | Wipes local plan-session cache |
+| Open trace | dock `Open trace summary` link | `fulcrum trace show <traceId>` | Navigates to `/trace/<id>` |
+
+### `/plan-session`
+
+Alias for `/planning` — 308-redirects to
+`/<ws>/projects/<projId>/plan` (same canonical workbench).
+
+[![Plan · session (same workbench)](../screenshots/web/47-plan-session.png)](../screenshots/web/47-plan-session.png)
+
+### `/plan-prompts`
+
+[![Plan · prompt library (9 prompts)](../screenshots/web/43-plan-prompts.png)](../screenshots/web/43-plan-prompts.png)
+
+`Prompt library · 9 prompts · synced from project + global`. Reusable
+prompts for agent hand-off, tagged by step, model, and policy. Header
+search box + tag pills (`All`, `Capture`, `Plan`, `Build`, `Review`,
+`Ship`, `Operate`, `My prompts`). Each row carries title, two-line
+preview, model badge (`opus` / `sonnet`), tag, usage count + relative
+age, and the universal ModeRow (`Manual` / `Play` / `Discuss` /
+`AI Assist`). Audit dataset shows: Plan from a capture, Critique a PR
+for correctness, Repro a bug from a trace, Migration risk analysis,
+Draft release notes, STRIDE threat model, Flame-graph hypothesis, +2.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Search | `Search prompts…` input | `fulcrum plan prompts list --query <q>` | Substring filter |
+| Filter by step | tag pill click | `fulcrum plan prompts list --step <s>` | Tag-scoped list |
+| Run | per-row `▶ Play` | `fulcrum plan prompts run <id>` | Dispatches an agent run |
+| Discuss | per-row `💬 Discuss` | `fulcrum plan prompts comment <id>` | Opens comment thread |
+| Edit | row → detail editor | `fulcrum plan prompts patch <id>` | PATCH prompt body |
+
+### `/plan-prototypes`
+
+[![Plan · prototypes (2 live)](../screenshots/web/45-plan-prototypes.png)](../screenshots/web/45-plan-prototypes.png)
+
+`Prototypes · 2 live · 1 archived`. Throwaway scaffolds attached to a
+plan; live only until the plan ships. Audit dataset shows: Offline-first
+token refresh (3 screens, last edit 1h ago), Cross-surface trace stitch
+(2 panes, last edit 3h ago), Board layout (archived). Each card has
+`Open`, `Duplicate`, and the universal ModeRow.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Open | card `Open` button | `fulcrum plan prototypes open <id>` | Navigates to `/plan/review` tripane |
+| Duplicate | card `Duplicate` button | `fulcrum plan prototypes dup <id>` | Forks the scaffold |
+| Archive | per-card context menu | `fulcrum plan prototypes archive <id>` | PATCH state |
+| Embed in review | from `/plan-review` `Add prototype` | `fulcrum plan review attach <id>` | Threaded into plan-review tripane |
+
+### `/plan-templates`
+
+[![Plan · templates (12 templates)](../screenshots/web/46-plan-templates.png)](../screenshots/web/46-plan-templates.png)
+
+`Plan templates · 12 templates · 4 used this week`. Reusable plan
+structures for new plans. Pick one to skip the cold-start prompt /
+approach / breakdown / acceptance criteria. Header carries `+ New
+template`. Left rail filters by Category (Refactor, New feature, Bug
+investigation, Scheme migration, Spike / prototype, Security review,
+Performance investigation, Library upgrade, Extract a service) and
+Owner. Each card carries a `Create from template` button.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create from template | card `Create from template` | `fulcrum plan create --template <id>` | Seeds a new plan session |
+| New template | header `+ New template` | `fulcrum plan template create` | Opens editor |
+| Filter | Category / Owner left rail | `fulcrum plan templates list --category <c>` | Server-side filter |
+
+### `/plan-review`
+
+[![Plan · review tripane](../screenshots/web/48-plan-review.png)](../screenshots/web/48-plan-review.png)
+
+Plan + Prototype + Comments tripane review. The canonical "what-it-does"
+plan-review surface. Left pane: the plan content (Why / Approach /
+Risks). Middle pane: the embedded live prototype preview. Right pane:
+the threaded review comments + active sessions device matrix (Mac, iPad
+Air, iPhone 15). Header carries plan title + meta strip (`auth-rewrite`,
+last edit timestamp), `Comments`, `AI Assist`, plus the universal
+ModeRow (`Manual` / `▶ Play` / `💬 Discuss` / `⊞ AI Assist`).
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Add prototype | pane header `+ Add prototype` | `fulcrum plan review attach <prototypeId>` | Pulls from `/plan-prototypes` |
+| Comment | right pane comment input | `fulcrum plan review comment add <text>` | POSTs threaded comment |
+| Resolve | comment row `Resolve` | `fulcrum plan review comment resolve <id>` | PATCH comment state |
+| Approve | header `Approve plan` | `fulcrum plan review approve <planId>` | PATCH plan to approved |
+| Discuss | universal mode `💬 Discuss` | `fulcrum plan review play <planId>` | Opens scoped AcpDrawer |
+
 ## Build stage routes (tasks, boards, runs, orchestration)
 
 All build-stage URLs live on the workspace and consume the public API at
