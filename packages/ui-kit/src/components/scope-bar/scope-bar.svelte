@@ -74,9 +74,23 @@
 	{...restProps}
 >
 	<span data-slot="scope-bar-brand" class="flex min-w-0 shrink-0 items-center gap-2 font-semibold text-fg">
-		<span aria-hidden="true" class="grid size-6 place-items-center rounded-sm bg-accent text-primary-foreground"
-			>⚡</span
+		<!--
+			Fulcrum mark: the lever pivot. A horizontal beam balanced on a
+			triangular pivot (the "fulcrum" itself) over a ground baseline.
+			Replaces the prior `⚡` thunderbolt emoji, which referenced no
+			part of what Fulcrum actually is.
+		-->
+		<svg
+			aria-hidden="true"
+			class="size-6 rounded-sm bg-accent p-1 text-primary-foreground"
+			viewBox="0 0 32 32"
+			fill="none"
 		>
+			<line x1="4" y1="11" x2="28" y2="17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+			<path d="M9 25 L23 25 L16 14 Z" fill="currentColor" />
+			<line x1="6" y1="27" x2="26" y2="27" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+			<circle cx="16" cy="14" r="1.6" fill="currentColor" />
+		</svg>
 		<span class={cn(variant === "mobile" && "sr-only")}>{brand}</span>
 	</span>
 

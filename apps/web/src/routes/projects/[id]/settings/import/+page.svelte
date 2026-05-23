@@ -16,10 +16,15 @@
     targetField: string;
   }
 
+  // Source identity glyphs: simple Unicode marks selected to evoke the source
+  // without depending on emoji fonts (which render inconsistently across OSes
+  // and break the OKLCH-tokened brand palette). The web shell renders these
+  // inside a square chip; the connector page header carries the real
+  // brand label next to them.
   const SOURCE_DETAILS: Record<Source, { label: string; icon: string; description: string }> = {
-    csv: { label: "CSV", icon: "📄", description: "Import tasks from a CSV file" },
-    jira: { label: "Jira", icon: "🔵", description: "Import from Atlassian Jira project" },
-    linear: { label: "Linear", icon: "⚡", description: "Import from Linear workspace" },
+    csv: { label: "CSV", icon: "≣", description: "Import tasks from a CSV file" },
+    jira: { label: "Jira", icon: "J", description: "Import from Atlassian Jira project" },
+    linear: { label: "Linear", icon: "L", description: "Import from Linear workspace" },
     plane: { label: "Plane", icon: "▦", description: "Import from a Plane workspace export" },
   };
 

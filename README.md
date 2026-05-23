@@ -1,8 +1,12 @@
 <div align="center">
 
-# ⚡ Fulcrum
+<img src="apps/web/src/lib/assets/fulcrum-logo.svg" width="72" alt="Fulcrum — lever pivot" />
+
+# Fulcrum
 
 **Your repo, your work board, your agents — one local-first Agent OS.**
+
+> *A fulcrum is the pivot point of a lever — the supporting structure that turns small effort into large output. Same idea here: small commits land big outcomes through the agents you supervise.*
 
 Project management + agent orchestration + docs + memory + a CLI/TUI/Web triad,
 all running on your machine. PGlite by default; swap in Postgres with one env

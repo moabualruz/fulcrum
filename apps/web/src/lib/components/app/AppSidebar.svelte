@@ -52,25 +52,76 @@
 		displayProjectId ?? DEFAULT_CANONICAL_PROJECT,
 	);
 
+	// Stage-substage glyph map. Keyed by substage `id` (which embeds the parent
+	// stage like `plan-sessions`), and falls back to a label-prefix lookup so
+	// future additions don't break the rail.
+	const GLYPH_BY_SUBSTAGE_ID: Record<string, string> = {
+		"capture-inbox": "▤",
+		"capture-docs": "▥",
+		"plan-sessions": "◷",
+		"plan-missions": "◯",
+		"plan-reviews": "⌥",
+		"plan-prototypes": "◇",
+		"plan-templates": "▦",
+		"plan-prompts": "▱",
+		"build-board": "▤",
+		"build-graph": "⌬",
+		"build-runs": "▶",
+		"build-timeline": "▭",
+		"review-queue": "⏵",
+		"review-search": "⌕",
+		"review-comments": "▣",
+		"review-templates": "▦",
+		"ship-artifacts": "▣",
+		"ship-archive": "▥",
+		"operate-doctor": "✚",
+		"operate-alerts": "⚠",
+		"operate-audit": "▤",
+		"operate-telemetry": "⌁",
+	};
+	function substageGlyph(id: string): string {
+		return GLYPH_BY_SUBSTAGE_ID[id] ?? "·";
+	}
+
 	const substages = $derived(
 		subnavForStageScope(activeStage, effectiveWorkspace, effectiveProjectId).map((item) => ({
 			id: item.id,
 			label: item.label,
 			href: item.href,
 			count: item.count,
+			glyph: substageGlyph(item.id),
 		})),
 	);
+
+	// Map lucide icon names to terminal-safe Unicode glyphs the StageRail
+	// renders inline. Keeps the rail font-driven (no per-item SVG imports),
+	// matches TUI/CLI glyph vocabulary, and stays OKLCH-tokened.
+	const GLYPH_BY_ICON_NAME: Record<string, string> = {
+		Folder: "▦",
+		Search: "⌕",
+		FileText: "▤",
+		Settings: "⚙",
+		BookOpen: "▥",
+		Server: "▤",
+		Plug: "⏚",
+		Activity: "⌁",
+	};
+	function glyphFor(iconName: string | undefined): string {
+		return iconName ? (GLYPH_BY_ICON_NAME[iconName] ?? "·") : "·";
+	}
 
 	const workspace = WORKSPACE_NAV_ITEMS.map((item) => ({
 		id: item.id,
 		label: item.label,
 		href: item.href,
+		glyph: glyphFor(item.iconName),
 	}));
 
 	const system = $derived(
 		SYSTEM_NAV_ITEMS.map((item) => ({
 			id: item.id,
 			label: item.label,
+			glyph: glyphFor(item.iconName),
 			href:
 				item.id === "mcp" || item.id === "plugins"
 					? stageSubroute(effectiveWorkspace, effectiveProjectId, "operate", item.id)
