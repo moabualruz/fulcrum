@@ -87,6 +87,32 @@ Full per-surface guides + every screen captured against live data live in
 
 ---
 
+## Tasks, Boards, and the Build Graph
+
+The work spine — what your team is doing, who's doing it, and what's blocked.
+
+### Workspace kanban — `/boards`
+
+Five-column board over canonical statuses (`pending`, `in_progress`, `blocked`, `completed`, `cancelled`) with every task in the workspace. Tabs swap into List, Table, Gantt, or Calendar views without leaving the page. New tasks are created inline per column.
+
+![Workspace boards across 5 columns](docs/manuals/screenshots/web/02-boards.png)
+
+### Project board — `/projects/<slug>/board`
+
+Same kanban, scoped to one project. The "manual task workbench" header summarizes Backlog / Unstarted / Started / Completed / Canceled so a PM can read status at a glance before drilling into cards.
+
+![Per-project board with manual workbench summary](docs/manuals/screenshots/web/71-proj-board.png)
+
+### Build dependency graph — `/build-graph`
+
+Sugiyama-layered DAG of the running build. Nodes color-code by lifecycle (queued, running, awaiting, blocked, completed), edges curve along the running chain, and the selected node opens an info card with `Open run` + `Open task` actions.
+
+![Build dependency graph with selected node panel](docs/manuals/screenshots/web/03-build-graph.png)
+
+The same data drives the CLI (`fulcrum tasks list --json`, `fulcrum runs graph --json`) and the TUI (`Build · Graph` chord), so a human and an agent see identical state.
+
+---
+
 ## How it Works
 
 ```
