@@ -1,152 +1,371 @@
-# CLI user manual (`fulcrum`)
+# Fulcrum CLI manual
 
-The Fulcrum CLI is one Bun-compiled binary. Every subcommand accepts
-`--help` (root help printed when no command-specific entry exists), and
-every subcommand emits a canonical `fulcrum.cli.v1` envelope under
-`--json` for machine consumers.
+The `fulcrum` binary is the keyboard-and-pipe surface for the Fulcrum Agent OS. One compiled artifact, every workflow stage, the same `fulcrum.cli.v1` JSON envelope behind every `--json` invocation. This manual is the comprehensive command reference + parity guide against the web and TUI surfaces. Every screenshot below is taken from the compiled binary at `dist/fulcrum-darwin-arm64`.
 
-## Getting started
+## Install
 
-```bash
-# install (per project)
-fulcrum init                           # creates AGENTS.md, .claude/CLAUDE.md, .gitignore
-fulcrum install --profile minimal      # splices rules + hooks + skills into each detected agent
-fulcrum doctor                         # confirms everything is wired
-```
-
-## Top-level help
+The CLI is a single Bun-compiled binary. After `bun install` and `bun run build` in the repo, copy the artifact onto `$PATH`:
 
 ```bash
-fulcrum --help        # root help (also: fulcrum, fulcrum help)
-fulcrum --version     # 0.1.0
+# Build (≈30s on M1, ≈90s on Intel)
+bun run build
+
+# Drop on PATH (any directory in your $PATH works)
+cp dist/fulcrum-darwin-arm64 ~/.local/bin/fulcrum
+chmod +x ~/.local/bin/fulcrum
+
+# Verify
+fulcrum --version
 ```
 
-![fulcrum --help](../screenshots/cli/01-help.png)
 ![fulcrum --version](../screenshots/cli/02-version.png)
 
-## doctor — system health
+The binary is self-contained: no `node_modules`, no second runtime. It loads PGlite from `~/.fulcrum/db/main` (or the remote URL in `FULCRUM_DATABASE_URL`), reads policy from `~/.fulcrum/tool-output-policy.toml`, and writes audit / cache state under `$FULCRUM_HOME` (defaults to `~/.fulcrum`).
+
+## Command tree
+
+`fulcrum --help` prints the full command tree, grouped by workflow stage. Each stage matches the same vocabulary used by the web shell (`Capture → Plan → Build → Review → Ship → Operate`) and the TUI launcher.
+
+![fulcrum --help (top-level tree)](../screenshots/cli/01-help.png)
+
+Each command accepts:
+
+- `--json` — emit a machine-readable `fulcrum.cli.v1` envelope (schema below)
+- `--jq <expr>` — pipe through jq inline (saves a shell hop)
+- `--no-color` — disable ANSI colors (useful for log capture)
+
+The `FULCRUM_HOME`, `FULCRUM_POLICY`, and `FULCRUM_HEAD_LINES` environment variables override the per-user defaults.
+
+---
+
+## Capture stage
+
+Intake — docs, notes, and search across captured content.
 
 ```bash
-fulcrum doctor                        # human-readable envelope
-fulcrum doctor --json                 # canonical fulcrum.cli.v1 envelope; pipe to jq
-fulcrum doctor --checks               # detailed per-check breakdown
-fulcrum doctor --subsystem <name>     # gate one subsystem (mcp / runs / skills / agents)
-fulcrum doctor --probe                # active probes (network, ports, MCP handshakes)
+fulcrum capture <text|url|file|inbox|review|status|action>
+fulcrum note <new|list>
+fulcrum doc <list|new|view|edit|attach|history|restore|comment|link|search|delete|template>
+fulcrum search query <query>
 ```
 
-![fulcrum doctor](../screenshots/cli/03-doctor.png) ![fulcrum doctor --json](../screenshots/cli/04-doctor-json.png) ![fulcrum doctor --checks](../screenshots/cli/17-doctor-checks.png)
-
-Use the JSON form in CI; pipe into `jq '.result.checks[] | select(.status!="ok")'` to surface failures.
-
-## hooks — recipe registration
+Examples:
 
 ```bash
-fulcrum hooks                          # root help (also fulcrum hooks --help)
-fulcrum hooks list                     # show every recipe + which agents have it
-fulcrum hooks enable <name>            # register the recipe across detected agents
-fulcrum hooks enable --help            # per-subcommand help
-fulcrum hook <name> [args...]          # run one recipe; reads JSON envelope on stdin
+fulcrum note list --json
+fulcrum doc new --title "Release plan" --json
+fulcrum capture status <id> --status review --json
+fulcrum search query "release plan" --json
 ```
 
-Recipes: `format`, `lint-gate`, `pm-policy`, `test-on-edit`, `audit-log`, `index-check`, `index-rebuild`, `router`.
+Web parity: `/inbox`, `/docs`, `/docs/new`, `/search`, `/capture` (stage workbench). TUI parity: `g c` chord opens Capture.
 
-![fulcrum hooks list](../screenshots/cli/05-hooks-list.png) ![fulcrum hooks --help](../screenshots/cli/11-hooks-help.png) ![fulcrum hooks enable --help](../screenshots/cli/16-hooks-enable-help.png)
+---
 
-## skills — authored + upstream
+## Plan stage
+
+Turn captured intent into approved plans, sprints, and prototypes.
 
 ```bash
-fulcrum skills --help                  # subcommands
-fulcrum skills list                    # authored skills the orchestrator can sync
-fulcrum skills list --installed        # what's actually installed in each agent
-fulcrum skills sync                    # mirror authored skills to each agent
-fulcrum skills sync --help             # flags (codex-global, codex-project)
-fulcrum skills upstream [--update-pins]  # mirror curated third-party skills
-fulcrum skills upstream --help         # see all flags
-fulcrum skills lint <path>             # validate a SKILL.md
+fulcrum plan <start|list|view|edit|approve|reject|materialize|preview>
+fulcrum mission <create|list|show|activate|delete>
+fulcrum prototype <new|view|attach>
+fulcrum sprints <list|get|create|update|delete|add-task|remove-task>
 ```
 
-![fulcrum skills --help](../screenshots/cli/12-skills-help.png) ![fulcrum skills list](../screenshots/cli/06-skills-list.png) ![fulcrum skills list --installed](../screenshots/cli/07-skills-installed.png) ![fulcrum skills sync --help](../screenshots/cli/15-skills-sync-help.png) ![fulcrum skills upstream --help](../screenshots/cli/18-skills-upstream-help.png)
-
-## install — bootstrap the agent layer
-
-`fulcrum install` splices rules, mounts hooks, syncs skills, installs caveman.
+Examples:
 
 ```bash
-fulcrum install --help                 # all flags + profiles
-fulcrum install --profile minimal      # rules + hooks (default)
-fulcrum install --profile rules-only   # rules only, no hooks or skills
-fulcrum install --profile full         # historical bootstrap (everything)
-fulcrum install --with-project <dir>   # also drop rules/AGENTS.md into <dir>
-fulcrum install --no-skills            # skip the skills sync step
-fulcrum install --enable-all-mcps      # enable every builtin MCP across all agents
-fulcrum install --dry-run              # preview without writing
+fulcrum plan list --status approved --json
+fulcrum mission list --depth 2
+fulcrum prototype view pro-1 --json
+fulcrum sprints list --json
 ```
 
-Re-running `fulcrum install` is idempotent — the sentinel-block splice only replaces the previously-spliced block.
+Web parity: `/planning`, `/plan-prompts`, `/plan-prototypes`, `/plan-templates`, `/plan-session`, `/plan-review`, `/projects/<slug>/sprints`. TUI parity: `g p` chord opens Plan.
+
+---
+
+## Build stage
+
+Execute the plan — tasks, agent runs, work items, and routing.
+
+```bash
+fulcrum task|tasks <list|get|new|create|update|delete>
+fulcrum work <create|inspect|move|link|report>
+fulcrum run <new|view|cancel|retry|attach>
+fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs>
+fulcrum cycle <list|activate|complete>
+fulcrum module <list|new|view>
+fulcrum context <pack|inspect|diff>
+fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
+fulcrum route <rules|assign|simulate>
+fulcrum symphony runs list --state ready
+```
+
+Examples:
+
+```bash
+fulcrum task list --project <slug-or-uuid> --json | jq '.[] | select(.status=="in_progress")'
+fulcrum task new --title "Wire dependency graph" --priority 2 --project <slug>
+fulcrum runs dispatch --task <id> --agent claude-opus-4-7 --json
+fulcrum route simulate --task <id> --json
+```
+
+Web parity: `/boards`, `/tasks`, `/build-board`, `/build-graph`, `/build-list`, `/build-timeline`, `/build-runs`, `/agents`, `/runs`, `/orchestration`. TUI parity: `g b` (runs feed) or `g B` (board); Tasks/Agents/Routing live in domain nav.
+
+---
+
+## Review stage
+
+Quality gates — UAT, code review, and final-handoff decisions.
+
+```bash
+fulcrum review <list|view|approve|request-changes>
+fulcrum qa <run|report>
+fulcrum uat <run|handoff|decision>
+fulcrum e2e <run|report>
+```
+
+Web parity: `/review`, `/review-queue`, `/review-search`, `/review-templates`, `/comments`. TUI parity: `g r` chord opens Review.
+
+---
+
+## Ship stage
+
+Release outputs — artifacts, repositories, and promoted memory.
+
+```bash
+fulcrum ship <list|view>
+fulcrum release <cut|roll-back|pause|promote>
+fulcrum artifact <list|view|diff|export|download>
+fulcrum repo <list|status|sync>
+fulcrum branch <list|switch|finish>
+fulcrum pr <list|view|create>
+fulcrum memory <list|get|add|delete|search|promote>
+```
+
+Web parity: `/ship`, `/ship-archive`, `/artifacts`, `/repos`, `/memory`. TUI parity: `g s` opens Ship · artifacts.
+
+---
+
+## Operate stage
+
+Run the system — health, installs, MCP, hooks, config, audit.
+
+### Doctor — `fulcrum doctor`
+
+The single command every CI run, every smoke test, every triage session starts with. Reports a verdict across **agent install state, MCP servers, hooks, skills, the local PGlite kernel, Sandcastle providers, caveman compression, and policy files**.
+
+![fulcrum doctor (human-readable)](../screenshots/cli/03-doctor.png)
+
+Useful flavors:
+
+```bash
+fulcrum doctor --json                   # canonical fulcrum.cli.v1 envelope
+fulcrum doctor --subsystem mcp          # narrow to one subsystem
+fulcrum doctor --checks                 # list the registered check names
+fulcrum doctor --probe                  # active probe (network + spawn tests)
+fulcrum doctor --run-fix pglite-rebuild # quarantine and rebuild a corrupt PGlite dir
+```
+
+![fulcrum doctor --json (head)](../screenshots/cli/04-doctor-json.png)
+
+![fulcrum doctor --json | jq '.checks[]?.name'](../screenshots/cli/17-doctor-checks.png)
+
+### Install — `fulcrum install`
+
+Splices `rules/AGENTS.md` into each detected agent's primary rules file, vendors hook recipes, syncs authored + upstream skills, and registers default MCP servers.
 
 ![fulcrum install --help](../screenshots/cli/08-install-help.png)
 
-## init — bootstrap a project
+Profiles:
 
-```bash
-fulcrum init                           # bootstrap current dir
-fulcrum init <dir>                     # bootstrap <dir>
-fulcrum init --help                    # see options
-```
+- `--profile minimal` (default) — rules + skills + MCPs, no hook snippets
+- `--profile rules-only` — only splice rules into each agent
+- `--profile full` — also vendor hook snippets to `~/.fulcrum/hooks/`
 
-Writes `AGENTS.md`, `.claude/CLAUDE.md`, and `.gitignore`. Safe to re-run.
+The splice is idempotent — re-running replaces only the content inside the `<!-- BEGIN/END FULCRUM RULES -->` sentinels. User content outside the block is preserved verbatim.
+
+### Init — `fulcrum init`
+
+Bootstrap a project with `AGENTS.md`, `CLAUDE.md`, `.gitignore`, and the recommended `docs/agents/` scaffolding.
 
 ![fulcrum init --help](../screenshots/cli/09-init-help.png)
 
-## uninstall — remove install artifacts
+### Uninstall — `fulcrum uninstall`
 
-```bash
-fulcrum uninstall --help
-fulcrum uninstall --dry-run            # preview what would be removed
-fulcrum uninstall --purge              # also remove caveman + upstream packs
-fulcrum uninstall --include-caveman    # explicit caveman uninstall
-```
+Remove the spliced rules + vendored hooks across every detected agent.
 
 ![fulcrum uninstall --help](../screenshots/cli/13-uninstall-help.png)
 
-## compress — caveman-compress markdown
+### Hooks — `fulcrum hooks`
+
+Manage agent hook recipes (the bridge between agent tool calls and the eight hook subcommands the compiled binary exposes).
+
+![fulcrum hooks --help](../screenshots/cli/11-hooks-help.png)
+
+![fulcrum hooks list](../screenshots/cli/05-hooks-list.png)
+
+![fulcrum hooks enable --help](../screenshots/cli/16-hooks-enable-help.png)
+
+### Skills — `fulcrum skills`
+
+Mirror authored skills to every detected agent's native skill namespace (`fulcrum:<name>`), plus sync upstream skills from the configured registries.
+
+![fulcrum skills --help](../screenshots/cli/12-skills-help.png)
+
+![fulcrum skills list](../screenshots/cli/06-skills-list.png)
+
+![fulcrum skills list (tail — installed metadata)](../screenshots/cli/07-skills-installed.png)
+
+![fulcrum skills sync --help](../screenshots/cli/15-skills-sync-help.png)
+
+![fulcrum skills upstream --help](../screenshots/cli/18-skills-upstream-help.png)
+
+### MCP — `fulcrum mcp`
 
 ```bash
-fulcrum compress                       # compress default targets in-place
-fulcrum compress --check               # CI: fail if anything would change
-fulcrum compress <files...>            # compress specific files
-fulcrum compress --help                # all flags
+fulcrum mcp list                           # registry + per-agent enable state
+fulcrum mcp register <id> --transport stdio --command "..."
+fulcrum mcp enable <id> --agent claude-code
+fulcrum mcp test <id>                      # smoke the server
 ```
 
-![fulcrum compress --help](../screenshots/cli/10-compress-help.png) ![fulcrum compress --check](../screenshots/cli/14-compress-check.png)
+### Compress — `fulcrum compress`
 
-## Driving the CLI in a browser (ttyd)
+Idempotent caveman-compression of in-repo content (rules, skills, prompts). The `--check` flag is a hard CI gate.
 
-For demos / docs / remote sessions:
+![fulcrum compress --help](../screenshots/cli/10-compress-help.png)
+
+![fulcrum compress --check (CI gate)](../screenshots/cli/14-compress-check.png)
+
+### Other Operate verbs
 
 ```bash
-brew install ttyd
-ttyd -W -p 7681 -t titleFixed=fulcrum -t rendererType=dom \
-  bash -lc 'fulcrum doctor; exec bash'
-open http://localhost:7681/
+fulcrum settings <list|get|set>
+fulcrum flags <list|set>
+fulcrum audit <query|export>
+fulcrum db <migrate|status|history>
+fulcrum inference <start|status|embed|generate|stop>
+fulcrum telemetry <status|opt-in|opt-out|purge>
+fulcrum notify list [--unread]
+fulcrum offline <status|sync-now>
+fulcrum backup <create|restore|verify>
+fulcrum data <export|import>
+fulcrum secrets <set|get|rotate|init-keyring>
+fulcrum errors <list|get|purge>
+fulcrum webhooks <list|test>
+fulcrum connectors <enable|sync> <id>
+fulcrum component <list|info|plan|status>
+fulcrum plugin <list|install|enable|disable|update|remove>
+fulcrum i18n <list|set>
+fulcrum theme <list|set>
 ```
 
-Every screenshot in this manual was taken that way via `playwright-cli` in Microsoft Edge.
+---
 
-## Parity with the web manual
+## AI Assist
 
-| Concern | CLI | Web |
-|---|---|---|
-| Health check | `fulcrum doctor` | `/<ws>/projects/<id>/operate/doctor` |
-| Skills inventory | `fulcrum skills list --installed` | `/settings/skills` |
-| MCP servers | `fulcrum doctor --subsystem mcp` | `/<ws>/projects/<id>/operate/mcp` |
-| Recipes | `fulcrum hooks list` | n/a (operator-only) |
-| Project bootstrap | `fulcrum init <dir>` | `/projects/new` |
-| Install rules | `fulcrum install --profile minimal` | n/a (operator-only) |
+Step-scoped agent sessions — the CLI side of the AI Assist drawer that appears in web + TUI.
 
-## Troubleshooting
+```bash
+fulcrum mode <manual|play|discuss|ai> <step>   # per-step mode affordance
+fulcrum ai <start|send|attach|pause|resume|abort|checkpoint|restore|preview|rerun>
+fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>
+```
 
-- A subcommand prints `unknown subcommand '--help'` — pre-`5f007f31` build. Rebuild: `bun run build && cp dist/fulcrum-darwin-arm64 ~/.local/bin/fulcrum`.
-- `fulcrum doctor` red flags on `mcp` — re-run `fulcrum install --enable-all-mcps` or check the failing server's auth config.
-- `fulcrum skills sync` writes to the wrong place — check the agent identification with `fulcrum doctor`. Each agent has its own folder (Claude → `~/.claude/plugins/cache/fulcrum/`, Codex → `~/.codex/skills/`, …).
-- `fulcrum install` "already installed" — sentinel block already present; rerun is a no-op by design.
+---
+
+## Cross-cutting / global
+
+```bash
+fulcrum init [DIR]                  # bootstrap project files
+fulcrum projects <list|stats>       # workspace scope
+fulcrum auth <whoami|invite|login|logout>
+fulcrum web                         # open the web shell
+fulcrum tui                         # open the keyboard-first TUI
+fulcrum completion <bash|zsh|fish|powershell>
+fulcrum version
+fulcrum help [stage]
+```
+
+---
+
+## JSON envelope (`fulcrum.cli.v1`)
+
+Every command supports `--json`. The envelope is the contract every CI script + agent integration relies on:
+
+```json
+{
+  "schema": "fulcrum.cli.v1",
+  "command": "doctor",
+  "args": { "subsystem": null },
+  "run_id": "run_…",
+  "project_id": null,
+  "duration_ms": 1234,
+  "result": { /* command-specific payload */ },
+  "errors": [],
+  "next_actions": []
+}
+```
+
+- `result` is the command's structured payload. Pipe into `jq` to slice it.
+- `errors` is `[]` on success; populated array on failure (each entry has `code`, `message`, optional `recovery`).
+- `next_actions` carries actionable follow-ups (e.g. `pglite-rebuild` when doctor detects a corrupt DB).
+
+Add `--jq '.result.checks[]?'` to filter inline without a shell pipe.
+
+---
+
+## Common workflows
+
+### Bootstrap a new project
+
+```bash
+cd ~/code/my-app
+fulcrum init                              # writes AGENTS.md, CLAUDE.md, .gitignore
+fulcrum install --profile minimal         # rules + skills + MCPs across every agent
+fulcrum doctor                            # verify install
+```
+
+### Install across all agents at once
+
+```bash
+fulcrum install --profile full            # also vendors hook snippets
+fulcrum doctor --json | jq '.result.agents[]'
+```
+
+### Sync skills from upstream
+
+```bash
+fulcrum skills upstream                   # pull from configured registries
+fulcrum skills sync                       # mirror authored skills into agents
+fulcrum skills list                       # confirm
+```
+
+### Run doctor as a CI gate
+
+```yaml
+# .github/workflows/ci.yml (or any CI)
+- run: fulcrum doctor --json > doctor.json
+- run: jq -e '.errors == []' doctor.json
+```
+
+### Compress check as a CI gate
+
+`fulcrum compress --check` returns non-zero if any in-repo content is out of date relative to the caveman-compression contract — wire it as a tier-6 step.
+
+```bash
+bun run ci   # local equivalent of the CI pipeline; gates compress + lint + tests + build
+```
+
+---
+
+## Status as of this manual pass
+
+- 18 canonical command surfaces captured at `docs/manuals/screenshots/cli/`.
+- No vector.tar.gz / `pglite.data` crashes in the compiled binary. The `isCompiledBunBinary()` guards in `services/platform-core/src/infrastructure/product-store/db/pglite.ts`, `application-database/sql.ts`, and `doctor/product-store-report.ts` short-circuit the WASM extension + PGlite open paths inside `$bunfs`.
+- The compiled binary's `doctor` reports zero rows for the productKernel section because it does not open PGlite from a Bun-compiled `$bunfs`. When you run `bun run dev` (uncompiled, against the same `~/.fulcrum/db/main`), the counts are accurate.
+
+For a per-command deep-dive, run `fulcrum help <stage>` — e.g. `fulcrum help build` prints stage-specific commands + examples.
