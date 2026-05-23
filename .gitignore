@@ -36,3 +36,5 @@ tests/.tmp-*/
 
 # Design evidence captures: locally-generated PNGs; never tracked.
 .design-evidence/
+
+.codegraph/
