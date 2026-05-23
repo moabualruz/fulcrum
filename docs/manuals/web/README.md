@@ -118,6 +118,18 @@ each its own URL:
 | `/doctor` | Workspace-level doctor | `26-doctor.png` |
 | `/api-tokens` | API token management | `30-api-tokens.png` |
 | `/members` | Workspace members | `31-members.png` |
+| `/member-remove` | Confirm-flow preview for member removal | `39-member-remove.png` |
+| `/space-permissions` | Per-space ACL editor | `38-space-permissions.png` |
+| `/workspace` | Workspace landing (redirects to `/workspace/projects`) | `36-workspace.png` |
+| `/sessions-empty` | Agent sessions empty state | `37-sessions-empty.png` |
+| `/notifications-inbox` | Per-user notifications inbox sample | `32-notifications-inbox.png` |
+| `/notifications-settings` | Legacy notification preferences | `33-notifications-settings.png` |
+| `/notifications-empty` | Notifications empty state | `34-notifications-empty.png` |
+| `/auth/login` | Better-Auth sign-in page | `43-auth-login.png` |
+| `/auth-flows` | Reference layout for the auth screen | `40-auth-flows.png` |
+| `/auth-2fa-verify` | Two-step sign-in (password → TOTP) | `41-auth-2fa-verify.png` |
+| `/account-2fa-setup` | TOTP enrollment landing | `42-account-2fa-setup.png` |
+| `/onboarding` | First-run wizard | `35-onboarding.png` |
 
 ## Knowledge routes
 
@@ -284,17 +296,180 @@ persists the current query+filters as a saved search via
 
 
 
-| Route | Purpose |
-|---|---|
-| `/settings/secrets` | Credential vault entries |
-| `/settings/feature-flags` | Toggle settings flags + rollout percent |
-| `/settings/orchestration` | Workflow defs + orchestration config |
-| `/settings/data` | Export / import workspace JSON |
-| `/settings/backups` | Backup history + restore |
-| `/settings/skills` | Installed skill packs (CLI parity: `fulcrum skills list --installed`) |
-| `/settings/notifications` | Notification routing rules |
-| `/settings/telemetry` | OpenTelemetry config |
-| `/settings/ai-assist` | AI-Assist model + token defaults |
+## Settings routes — `/settings/...`
+
+All settings surfaces sit under `/settings/<area>`. Each page is an invocation layer: load functions hit the NestJS public API on `:3000` (credentials, feature flags, telemetry, settings data) and SvelteKit form actions POST back through the same caller. The default `userId` resolves to the seeded local admin (`ac09598f-…`) so commands that require a signed-in user succeed in dev without an explicit login.
+
+### `/settings`
+
+[![Settings hub](../screenshots/web/05-settings.png)](../screenshots/web/05-settings.png)
+
+Hub for workspace-wide configuration: General (experience mode, default stage on launch, cold-boot prefetch, deep links to feature flags + secrets rotation), Appearance (theme + density + reduce-motion), Keyboard, Privacy & safety, AI agents, Default routes, Integrations, Account, Danger zone. Layout is a left filter rail (settings groups) and a stacked content column; each card carries `Suggest` and `Discuss` chips to file feedback against that setting. Search input filters cards by title.
+
+### `/settings/secrets`
+
+[![Settings secrets](../screenshots/web/06-settings-secrets.png)](../screenshots/web/06-settings-secrets.png)
+
+Credential vault for inference providers and connectors. Reads from `GET /api/v1/credentials/settings-secrets`; mutations go through POST `…/settings-secrets`, POST `…/settings-secrets/:id/rotate`, POST `…/settings-secrets/:id/archive`, DELETE `…/settings-secrets/:id`. Seeded with `ANTHROPIC_API_KEY` (anthropic) and `OPENAI_API_KEY` (openai). Values are masked (`••••••••`) and never returned by the API.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create | `Add secret` button | n/a | name + value + provider; provider defaults to `local` |
+| Rotate | row `Rotate` action | n/a | replaces ciphertext, bumps `last_used_at` |
+| Archive | row `Archive` action | n/a | hides from default list (returns when `includeArchived=true`) |
+| Delete | row `Delete` action | n/a | hard-deletes the credential row |
+
+### `/settings/feature-flags`
+
+[![Settings feature flags](../screenshots/web/07-settings-feature-flags.png)](../screenshots/web/07-settings-feature-flags.png)
+
+Per-org tenant flag overrides on top of the canonical `FEATURE_FLAGS` registry (`services/feature-flags/src/application/registry.ts`). Reads `GET /api/v1/feature-flags/settings`; toggle/rollout/cohort mutations go through `PATCH …/settings/:id/{toggle,rollout,cohort-rules}`. New rows are created via `POST /api/v1/feature-flags/settings` (added in this audit). Seeded with `public-api` and `experiments`, both enabled at 100 %.
+
+| Action | How (web) | How (CLI) | Notes |
+|---|---|---|---|
+| Create row | `POST /api/v1/feature-flags/settings` | `fulcrum flags set <flag> --enabled` (parity) | rejected if `<flag>` is not in the canonical registry |
+| Toggle | row toggle switch | `fulcrum flags toggle <flag>` (parity) | flips `enabled` |
+| Set rollout | `Edit` next to `Rollout %` | n/a | integer 0..100; persisted in `FeatureFlagRollout` |
+| Set cohort rules | `Edit` next to `Cohort rules` | n/a | free-form JSON object |
+
+### `/settings/orchestration`
+
+[![Settings orchestration](../screenshots/web/08-settings-orchestration.png)](../screenshots/web/08-settings-orchestration.png)
+
+Orchestrator runtime configuration (poll interval, max concurrency, stall timeout, workspace root) plus a `Workflow definitions` list. Empty-state copy: `No workflow definitions yet.` Form `Save` persists per-org `TenantSetting` rows.
+
+### `/settings/data`
+
+[![Settings data export/import](../screenshots/web/09-settings-data.png)](../screenshots/web/09-settings-data.png)
+
+Cross-service portability surface. `Export` builds a JSON dump (defaults to all tables; checkboxes scope to `projects`, `tasks`, `credentials`, `feature_flags`, `tenant_settings`). `Import` accepts the same JSON; `Preflight check` runs the manifest summary (`integration-hub` import-export commands) before any rows land.
+
+### `/settings/backups`
+
+[![Settings backups](../screenshots/web/10-settings-backups.png)](../screenshots/web/10-settings-backups.png)
+
+Snapshot history for the org, persisted in the `BACKUP_HISTORY_KEY` tenant setting. `Create backup` calls `POST /api/v1/data-portability/settings/backups`; the dump is base64-encoded JSON of every exportable table. `Restore` is a two-step `Preflight check` → `Verify backup` flow. After this audit a backup row appears with status `complete`, size `≈ 86 KB`.
+
+### `/settings/skills`
+
+[![Settings skills](../screenshots/web/11-settings-skills.png)](../screenshots/web/11-settings-skills.png)
+
+Installed skill packs across the five agent runtimes (claude/codex/gemini/opencode/pi). Header `Upgrade all` and per-row `Upgrade`/`Uninstall`. `Install` accepts a slug + optional upstream repo URL. Source column distinguishes `local` packs (bundled) from upstream installs. CLI parity: `fulcrum skills list --installed`, `fulcrum skills sync`, `fulcrum skills upgrade <slug>`.
+
+### `/settings/notifications`
+
+[![Notification settings](../screenshots/web/12-settings-notifications.png)](../screenshots/web/12-settings-notifications.png)
+
+Delivery preferences for the org. `Delivery` toggles Email and In-app channels and configures quiet-hours windows. `Categories` are per-channel-mute toggles for Mentions / Comments / Page Updates / Subscriptions. `Per-page rules` adds page-level mute overrides. `Email digest` chooses `Off / Hourly / Daily / Weekly`.
+
+### `/settings/telemetry`
+
+[![Settings telemetry](../screenshots/web/13-settings-telemetry.png)](../screenshots/web/13-settings-telemetry.png)
+
+Local telemetry control. `Telemetry opt-in` flips the `TELEMETRY_OPT_IN_KEY` tenant setting. `Purge local telemetry` calls `purgeSettingsTelemetry` which deletes the org's `TelemetryEvent` rows and reports the row count back (`0 rows` in the audit snapshot).
+
+### `/settings/ai-assist`
+
+[![AI Assist settings](../screenshots/web/14-settings-ai-assist.png)](../screenshots/web/14-settings-ai-assist.png)
+
+Per-session, user, and org defaults for AI-Assist checkpointing. Effective resolution panel shows the merged values (built-in defaults + my-preference + org-default). The form below scopes saves to `my preference` or `org default` and edits `Checkpoint mode` (auto/off/manual), `Retention (count)`, `Retention (days)`, `Events transport` (memory/disk/network). `Save` persists per-scope `TenantSetting` rows.
+
+## Identity routes — auth, members, tokens, sessions, notifications
+
+These surfaces sit at the workspace root (no project scope) and own the identity, access, and notification primitives for the local-first install.
+
+### `/api-tokens`
+
+[![API tokens](../screenshots/web/30-api-tokens.png)](../screenshots/web/30-api-tokens.png)
+
+Personal API tokens for programmatic access. Form accepts `Token name` plus `Scopes` (read / write / admin). On `Create token`, the cleartext value is revealed exactly once (`Token created. Copy now: you will not see the full value again.`); subsequent reads return only the preview prefix. Audit snapshot shows `ci-deploy` and `agent-bot`. State is currently client-only; the canonical home for these is the credentials API once a token-issuing endpoint lands.
+
+### `/members`
+
+[![Workspace members](../screenshots/web/31-members.png)](../screenshots/web/31-members.png)
+
+Workspace membership management. `Send invite` collects email + role (Guest by default). Existing rows show Email · Role (`<select>` to mutate) · Status (`active` / `invited`) · row actions (`Remove`, `Resend` for invited). Audit dataset has four rows: owner, admin, guest, pending invite. Role changes and removals are local-only today; the API surfaces live under `services/identity-access/src/interface/http/invitation-public-api.controller.ts`.
+
+### `/member-remove`
+
+[![Member remove](../screenshots/web/39-member-remove.png)](../screenshots/web/39-member-remove.png)
+
+Confirm-flow preview for member removal. Lists each member's owned docs + tasks so the operator sees the impact before clicking `Remove`. Mockup-only; consumed by `/members` row `Remove` once wired to identity-access.
+
+### `/space-permissions`
+
+[![Space permissions](../screenshots/web/38-space-permissions.png)](../screenshots/web/38-space-permissions.png)
+
+Per-space ACL editor. `Inherit from workspace` toggle controls whether the space falls back to workspace-level membership. Below: `Principal` + `Role` (`viewer / editor / admin / owner`) row creator plus the current ACL list with per-row role mutation and `Remove`. Audit snapshot: `engineering@team` (editor) + `alice` (admin).
+
+### `/auth-flows`
+
+[![Auth login flow](../screenshots/web/40-auth-flows.png)](../screenshots/web/40-auth-flows.png)
+
+Reference layout for the local-auth sign-in screen. Left card runs the form (OAuth → Google + GitHub buttons, email + password, passkey sign-in/register). Right column documents the request contract and recovery guidance: password stays masked, OAuth busy state disables OAuth buttons only, passkey failures keep email + password visible.
+
+### `/auth/login` (the actual `/auth` entry point)
+
+[![Auth login](../screenshots/web/43-auth-login.png)](../screenshots/web/43-auth-login.png)
+
+The live login page used by Better-Auth in production. `/auth` itself has no `+page.svelte` — it falls through `[ws]` (workspace param) and renders the workspace projects index. The canonical auth entry is `/auth/login` (sibling: `/auth/signup`, `/auth/verify-email`, `/auth/passkey`, `/auth/invite`, `/auth/auto-session`, `/auth/logout`).
+
+### `/auth-2fa-verify`
+
+[![2FA verify](../screenshots/web/41-auth-2fa-verify.png)](../screenshots/web/41-auth-2fa-verify.png)
+
+Two-step sign-in: password → 6-digit TOTP code (or recovery code via `Use recovery code instead`). Validates `^\d{6}$` for the code and `^[A-Z0-9]{4}-[A-Z0-9]{4}$` for recovery; `000000` and `0000-0000` are documented failure cases for design tests. Screenshot captures the 2FA step after a valid password.
+
+### `/account-2fa-setup`
+
+[![Account 2FA setup](../screenshots/web/42-account-2fa-setup.png)](../screenshots/web/42-account-2fa-setup.png)
+
+First-run 2FA enrollment landing. Documents supported TOTP apps (1Password, Authy, Google Authenticator) and exposes `Start setup` which steps through QR enrollment → recovery codes. Currently client-only; the API surface lives under `services/identity-access/src/interface/http/auth-public-api.controller.ts`.
+
+### `/notifications-inbox`
+
+[![Notifications inbox](../screenshots/web/32-notifications-inbox.png)](../screenshots/web/32-notifications-inbox.png)
+
+Per-user inbox sample. Each row carries time + evidence reference (`task:FUL-202`, `doc:doc-12`, `run:r-431`, `review:rev-9`) and the human title. Mirrors the structure of `notification-collaboration` events so the real inbox plugs in by swapping the static array for an API call.
+
+### `/notifications-settings`
+
+[![Notification settings (legacy)](../screenshots/web/33-notifications-settings.png)](../screenshots/web/33-notifications-settings.png)
+
+Legacy notification preferences layout (per-category × per-channel matrix: in-app, email, push). Co-exists with `/settings/notifications`; the consolidated entry is `/settings/notifications` (Delivery / Categories / Per-page rules / Email digest). `Quiet hours` window is shared between the two.
+
+### `/notifications-empty`
+
+[![Notifications empty](../screenshots/web/34-notifications-empty.png)](../screenshots/web/34-notifications-empty.png)
+
+Empty-state for the inbox: `No notifications yet · When someone @mentions you, assigns a task, or comments on your doc, it shows up here.` `Add a sample notification` injects a fixture row to exercise the rest of the surface during design review.
+
+### `/sessions-empty`
+
+[![Sessions empty](../screenshots/web/37-sessions-empty.png)](../screenshots/web/37-sessions-empty.png)
+
+Empty-state for agent sessions: `No sessions yet · A session captures one agent run. Pick a task and start a run to see it here, with full transcript and tool calls.` Primary CTA `Start a Run`; secondary link `simulate one` injects a mock session for design testing.
+
+### `/workspace`
+
+[![Workspace projects](../screenshots/web/36-workspace.png)](../screenshots/web/36-workspace.png)
+
+Workspace landing — redirects to `/workspace/projects`. Lists the workspace's projects with task + doc counts (`Local Project` = 0 open / 0 docs, `Manual Test Project` = 6 open / 5 docs in the audit dataset).
+
+### `/onboarding`
+
+[![Onboarding](../screenshots/web/35-onboarding.png)](../screenshots/web/35-onboarding.png)
+
+First-run wizard. Step 1 of 2: `What's your workspace called?` (defaults to `local`). Step 2 collects the canonical project bootstrap. Documented in detail under the Capture stage manual section but reachable directly here for design review.
+
+### Fixes landed during this audit
+
+- **`POST /api/v1/credentials/settings-secrets` 500 → 201.** Three root causes, all fixed:
+  - `services/platform-core/src/interface/http/credential-public-api.controller.ts` — method declaration order put the `Get/Post/:name` routes before the literal `settings-secrets` routes, so Express's path-to-regexp matched the `:name` route first and `getCredential` ran for every `settings-secrets` call. Reordered so settings-secrets methods land first in the controller class body.
+  - `services/platform-core/src/application/settings/commands.ts` — `addSettingsSecret` used `user: userId` instead of `user: { id: userId }` in the TypeORM `where`, breaking the duplicate check. Fixed to the relation-object form.
+  - `apps/web/src/hooks.server.ts` + `apps/web/src/lib/server/public-api.ts` — local-dev session and the activeUserId fallback both defaulted to the string `"local-user"`, which is not a valid UUID; downstream FK inserts on `Credential.user_id` failed. Both now default to the seeded admin UUID `ac09598f-ce28-4c3a-9ba0-262771456a19`, matching what `/api/v1/auth/whoami` already resolves to.
+- **`POST /api/v1/data-portability/settings/backups` 500 → 201.** `services/integration-hub/src/application/import-export/commands.ts` and `services/identity-access/src/application/admin/queries.ts` both ran `information_schema.columns` with `?` placeholders. PG only accepts `$N`. Both swapped to `$1`.
+- **New `POST /api/v1/feature-flags/settings` endpoint.** Settings-level feature flags previously had no POST — toggle/rollout/cohort-rules required a row to exist first, so the page rendered `No flags configured.` permanently. Added `addSettingsFeatureFlag` command + `FeatureFlagSettingsCreateDto` + controller route. Backed by the legacy `feature_flags` table that `listSettingsFeatureFlags` reads; the long-term consolidation onto `fulcrum_feature_flags` is deferred.
 
 ## Project workspace routes — `/projects/<slug>/...`
 
