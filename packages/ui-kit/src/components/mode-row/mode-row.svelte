@@ -1,7 +1,19 @@
 <script lang="ts" module>
 	import { WorkflowModeValues, type WorkflowMode } from "@fulcrum/shared-dto";
 	import type { HTMLAttributes } from "svelte/elements";
+	import type { Component } from "svelte";
 	import { cn, type WithElementRef } from "../../utils.js";
+
+	// Lucide iconography for the four canonical Step modes. Replaces the prior
+	// emoji glyphs (`✋ ▶ 💬 ⊞`) per the project's "use @lucide/svelte instead
+	// of emoji" rule. The DESIGN.md §4.13 contract is satisfied: each mode has
+	// a stable visual identity, the tab strip stays one-keyboard-stop, the
+	// ariaLabel + title strings remain canonical.
+	import HandIcon from "@lucide/svelte/icons/hand";
+	import PlayIcon from "@lucide/svelte/icons/play";
+	import MessageCircleIcon from "@lucide/svelte/icons/message-circle";
+	import SparklesIcon from "@lucide/svelte/icons/sparkles";
+	import ClockIcon from "@lucide/svelte/icons/clock";
 
 	/**
 	 * ModeRow: the universal per-Step mode affordance row (DESIGN.md §4.11, §4.13).
@@ -48,24 +60,34 @@
 		trace: "Trace",
 	};
 
-	/** The OD glyph for each mode (DESIGN.md §4.13: `✋ ▶ 💬 ⊞`). */
+	/** The canonical glyph for each mode (DESIGN.md §4.13 names + lucide icons). */
 	const MODE_GLYPH: Record<ModeRowMode, string> = {
-		manual: "✋",
-		play: "▶",
-		discuss: "💬",
-		assist: "⊞",
-		"ai-assist": "⊞",
-		trace: "◷",
+		manual: "Manual",
+		play: "Play",
+		discuss: "Discuss",
+		assist: "AI Assist",
+		"ai-assist": "AI Assist",
+		trace: "Trace",
+	};
+
+	/** Lucide icon component for each mode — rendered alongside (or instead of) the label. */
+	const MODE_ICON: Record<ModeRowMode, Component> = {
+		manual: HandIcon as unknown as Component,
+		play: PlayIcon as unknown as Component,
+		discuss: MessageCircleIcon as unknown as Component,
+		assist: SparklesIcon as unknown as Component,
+		"ai-assist": SparklesIcon as unknown as Component,
+		trace: ClockIcon as unknown as Component,
 	};
 
 	/** Per-action `title`/tooltip text: DESIGN.md §4.13 requires every mode carries one. */
 	const MODE_TITLE: Record<ModeRowMode, string> = {
 		manual: "Manual: work this step yourself",
-		play: "▶ Play: hand off to an AI agent",
-		discuss: "💬 Discuss: open the comment thread",
-		assist: "⊞ AI Assist: open the AI Assist drawer scoped to this step",
-		"ai-assist": "⊞ AI Assist: open the AI Assist drawer scoped to this step",
-		trace: "◷ Trace: inspect the run trace and timeline",
+		play: "Play: hand off to an AI agent",
+		discuss: "Discuss: open the comment thread",
+		assist: "AI Assist: open the AI Assist drawer scoped to this step",
+		"ai-assist": "AI Assist: open the AI Assist drawer scoped to this step",
+		trace: "Trace: inspect the run trace and timeline",
 	};
 
 	export type ModeRowProps = WithElementRef<HTMLAttributes<HTMLDivElement>> & {
@@ -139,6 +161,7 @@
 	{#each resolvedModes as mode (mode)}
 		{@const active = value === mode}
 		{@const assist = mode === "assist" || mode === "ai-assist"}
+		{@const Icon = MODE_ICON[mode]}
 		<button
 			type="button"
 			aria-pressed={active}
@@ -158,7 +181,7 @@
 			)}
 			onclick={() => pick(mode)}
 		>
-			<span aria-hidden="true">{MODE_GLYPH[mode]}</span>
+			<Icon aria-hidden="true" class="size-3.5" />
 			{#if density !== "compact"}
 				<span>{labelFor(mode)}</span>
 			{/if}

@@ -29,11 +29,13 @@ describe("ModeRow: universal Step mode affordance (DESIGN.md §4.13)", () => {
 		expect(body).toContain("Discuss");
 		expect(body).toContain("AI Assist");
 
-		// §4.13 OD glyphs: ✋ ▶ 💬 ⊞.
-		expect(body).toContain("✋");
-		expect(body).toContain("▶");
-		expect(body).toContain("💬");
-		expect(body).toContain("⊞");
+		// §4.13 mode icons now render as lucide-svelte SVG components (Hand,
+		// Play, MessageCircle, Sparkles) instead of the prior emoji glyphs.
+		// Lucide emits a stable `lucide-*` class per icon name.
+		expect(body).toMatch(/lucide-hand/);
+		expect(body).toMatch(/lucide-play/);
+		expect(body).toMatch(/lucide-message-circle/);
+		expect(body).toMatch(/lucide-sparkles/);
 	});
 
 	test("uses toolbar semantics: role=toolbar, aria-label, per-action titles", () => {
@@ -44,11 +46,13 @@ describe("ModeRow: universal Step mode affordance (DESIGN.md §4.13)", () => {
 		expect(body).toContain('aria-label="Step modes"');
 
 		// Interaction assertion: every mode button carries a `title`/tooltip.
+		// Titles drop the emoji prefix that previously matched the row glyph
+		// since icons now render as lucide SVG components.
 		expect(body).toContain('title="Manual: work this step yourself"');
-		expect(body).toContain('title="▶ Play: hand off to an AI agent"');
-		expect(body).toContain('title="💬 Discuss: open the comment thread"');
+		expect(body).toContain('title="Play: hand off to an AI agent"');
+		expect(body).toContain('title="Discuss: open the comment thread"');
 		expect(body).toContain(
-			'title="⊞ AI Assist: open the AI Assist drawer scoped to this step"',
+			'title="AI Assist: open the AI Assist drawer scoped to this step"',
 		);
 
 		// Toolbar buttons expose pressed state, not radio state.
@@ -76,9 +80,9 @@ describe("ModeRow: universal Step mode affordance (DESIGN.md §4.13)", () => {
 		expect(body).toContain('data-density="compact"');
 		expect(body).toContain("min-h-6");
 		expect(body).toContain("min-w-6");
-		// Glyphs still present; labels suppressed in compact form.
-		expect(body).toContain("✋");
-		expect(body).toContain("⊞");
+		// Lucide icons still rendered; labels suppressed in compact form.
+		expect(body).toMatch(/lucide-hand/);
+		expect(body).toMatch(/lucide-sparkles/);
 	});
 
 	test("tight density renders Suggest / Discuss only", () => {
@@ -107,13 +111,15 @@ describe("ModeRow: universal Step mode affordance (DESIGN.md §4.13)", () => {
 	});
 
 	test("modeGlyph / modeLabel resolve the OD vocabulary for sibling surfaces", () => {
-		expect(modeGlyph("manual")).toBe("✋");
-		expect(modeGlyph("play")).toBe("▶");
-		expect(modeGlyph("discuss")).toBe("💬");
-		expect(modeGlyph("assist")).toBe("⊞");
+		// modeGlyph now returns the mode label string (the lucide icons render
+		// inline; sibling surfaces use the label as the readable identifier).
+		expect(modeGlyph("manual")).toBe("Manual");
+		expect(modeGlyph("play")).toBe("Play");
+		expect(modeGlyph("discuss")).toBe("Discuss");
+		expect(modeGlyph("assist")).toBe("AI Assist");
 		expect(modeLabel("assist")).toBe("AI Assist");
 		// `ai-assist` is a back-compat alias of `assist`.
-		expect(modeGlyph("ai-assist")).toBe("⊞");
+		expect(modeGlyph("ai-assist")).toBe("AI Assist");
 		expect(modeLabel("ai-assist")).toBe("AI Assist");
 	});
 });

@@ -1,6 +1,7 @@
 <script lang="ts" module>
 	import { WorkflowStageValues, type WorkflowStage } from "@fulcrum/shared-dto";
 	import type { HTMLAttributes } from "svelte/elements";
+	import type { Component } from "svelte";
 	import { cn, type WithElementRef } from "../../utils.js";
 
 	export type { WorkflowStage } from "@fulcrum/shared-dto";
@@ -36,6 +37,8 @@
 	export type StageRailSubnavItem = {
 		id: string;
 		label: string;
+		/** Optional `@lucide/svelte` icon component. Renders before the label; if absent, `glyph` is used. */
+		icon?: Component;
 		glyph?: string;
 		href?: string;
 		/** Optional mono count badge mirroring the OD rail (`Sessions 3`). */
@@ -46,6 +49,7 @@
 	export type StageRailSystemItem = {
 		id: string;
 		label: string;
+		icon?: Component;
 		glyph?: string;
 		href?: string;
 	};
@@ -60,6 +64,7 @@
 	export type StageRailWorkspaceItem = {
 		id: string;
 		label: string;
+		icon?: Component;
 		glyph?: string;
 		href?: string;
 		/** Optional mono count badge mirroring the OD rail (`Inbox 2`). */
@@ -158,6 +163,7 @@
 			</p>
 		{/if}
 		{#each substages as item (item.id)}
+			{@const SubIcon = item.icon}
 			<svelte:element
 				this={item.href ? "a" : "button"}
 				href={item.href}
@@ -172,7 +178,11 @@
 					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 				)}
 			>
-				<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{#if SubIcon}
+					<SubIcon aria-hidden="true" class="size-4" />
+				{:else}
+					<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{/if}
 				{#if !collapsed}
 					<span data-slot="stage-rail-substage-label" class="flex-1 text-left">{item.label}</span>
 					{#if item.count !== undefined}
@@ -277,6 +287,7 @@
 			</p>
 		{/if}
 		{#each workspace as item (item.id)}
+			{@const WsIcon = item.icon}
 			<svelte:element
 				this={item.href ? "a" : "button"}
 				href={item.href}
@@ -291,7 +302,11 @@
 					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 				)}
 			>
-				<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{#if WsIcon}
+					<WsIcon aria-hidden="true" class="size-4" />
+				{:else}
+					<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{/if}
 				{#if !collapsed}
 					<span class="flex-1 text-left">{item.label}</span>
 					{#if item.count !== undefined}
@@ -315,6 +330,7 @@
 			</p>
 		{/if}
 		{#each system as item (item.id)}
+			{@const SysIcon = item.icon}
 			<svelte:element
 				this={item.href ? "a" : "button"}
 				href={item.href}
@@ -329,7 +345,11 @@
 					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
 				)}
 			>
-				<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{#if SysIcon}
+					<SysIcon aria-hidden="true" class="size-4" />
+				{:else}
+					<span aria-hidden="true" class="text-base leading-none">{item.glyph ?? "·"}</span>
+				{/if}
 				{#if !collapsed}
 					<span class="flex-1 text-left">{item.label}</span>
 				{/if}

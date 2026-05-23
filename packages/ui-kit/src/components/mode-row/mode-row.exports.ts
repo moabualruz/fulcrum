@@ -47,24 +47,24 @@ const MODE_TIGHT_LABEL: Record<ModeRowMode, string> = {
 	trace: "Trace",
 };
 
-/** The OD glyph for each mode (DESIGN.md §4.13: `✋ ▶ 💬 ⊞`). */
+/** Canonical text identifier per mode (icons render as lucide SVG components in the view). */
 const MODE_GLYPH: Record<ModeRowMode, string> = {
-	manual: "✋",
-	play: "▶",
-	discuss: "💬",
-	assist: "⊞",
-	"ai-assist": "⊞",
-	trace: "◷",
+	manual: "Manual",
+	play: "Play",
+	discuss: "Discuss",
+	assist: "AI Assist",
+	"ai-assist": "AI Assist",
+	trace: "Trace",
 };
 
 /** Per-action `title`/tooltip text: DESIGN.md §4.13 requires every mode carries one. */
 const MODE_TITLE: Record<ModeRowMode, string> = {
 	manual: "Manual: work this step yourself",
-	play: "▶ Play: hand off to an AI agent",
-	discuss: "💬 Discuss: open the comment thread",
-	assist: "⊞ AI Assist: open the AI Assist drawer scoped to this step",
-	"ai-assist": "⊞ AI Assist: open the AI Assist drawer scoped to this step",
-	trace: "◷ Trace: inspect the run trace and timeline",
+	play: "Play: hand off to an AI agent",
+	discuss: "Discuss: open the comment thread",
+	assist: "AI Assist: open the AI Assist drawer scoped to this step",
+	"ai-assist": "AI Assist: open the AI Assist drawer scoped to this step",
+	trace: "Trace: inspect the run trace and timeline",
 };
 
 export type ModeRowProps = WithElementRef<HTMLAttributes<HTMLDivElement>> & {
