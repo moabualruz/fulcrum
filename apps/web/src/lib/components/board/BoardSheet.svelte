@@ -1,7 +1,20 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
-  import { buttonVariants } from "$lib/components/ui/button/index.js";
-  import { cn } from "$lib/utils.js";
+  import {
+    Button,
+    Input,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+  } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
   import type { TaskStatus } from "$lib/server/tasks";
   import TaskDescriptionEditor from "$lib/components/tasks/TaskDescriptionEditor.svelte";
   import type { JSONContent } from "@tiptap/core";
@@ -20,7 +33,6 @@
   const { open, task, onSave, onDelete, onRun, onClose }: Props = $props();
 
   const isStatus = (s: string): s is TaskStatus => (TASK_STATUSES as readonly string[]).includes(s);
-  const fieldCls = "mt-1 w-full rounded border border-border bg-background p-2";
 
   // Seed from `task` so SSR renders populated controls; `$effect` resyncs on swap.
   /* svelte-ignore state_referenced_locally */
@@ -70,40 +82,51 @@
   }
 </script>
 
-<aside
-  data-board-sheet
-  data-testid="task-detail-panel"
-  data-state={open ? "open" : "closed"}
-  aria-hidden={!open}
-  class={cn("fixed inset-y-0 right-0 w-96 border-l border-border bg-background p-6 transition-transform", open ? "translate-x-0" : "translate-x-full")}
->
-  {#if task}
-    <header class="mb-4 flex items-center justify-between">
-      <h2 data-testid="task-detail-title" class="text-lg font-semibold">{task.title}</h2>
-      <button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} class="text-muted-foreground hover:text-foreground">×</button>
-    </header>
+<Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose?.(); }}>
+  <SheetContent
+    data-board-sheet
+    data-testid="task-detail-panel"
+    data-state={open ? "open" : "closed"}
+    aria-hidden={!open}
+    side="right"
+    class="w-96 p-0 sm:max-w-md"
+    portalProps={{ disabled: true }}
+    showCloseButton={false}
+  >
+    {#if task}
+      <SheetHeader class="flex-row items-center justify-between border-b border-border">
+        <SheetTitle data-testid="task-detail-title">{task.title}</SheetTitle>
+        <Button type="button" data-board-sheet-close aria-label="close" onclick={() => onClose?.()} variant="ghost" size="sm" class="size-8 px-0">×</Button>
+      </SheetHeader>
 
-    <form data-board-sheet-form onsubmit={submit} class="space-y-3">
+      <form data-board-sheet-form onsubmit={submit} class="space-y-3 px-4">
       <label class="block text-sm">
         Title
-        <input data-board-sheet-title bind:value={title} required minlength="1" maxlength="200" class={fieldCls} />
+        <Input data-board-sheet-title bind:value={title} required minlength="1" maxlength="200" class="mt-1" />
       </label>
 
       <label class="block text-sm">
         Status
-        <select data-board-sheet-status data-testid="task-detail-status" bind:value={status} class={fieldCls}>
-          {#each TASK_STATUSES as s (s)}<option value={s}>{describeStatus(s)}</option>{/each}
-        </select>
+        <Select bind:value={status} type="single">
+          <SelectTrigger data-board-sheet-status data-testid="task-detail-status" aria-label="Task status" class="mt-1">
+            <SelectValue placeholder={describeStatus(status)} />
+          </SelectTrigger>
+          <SelectContent>
+            {#each TASK_STATUSES as s (s)}
+              <SelectItem value={s} label={describeStatus(s)} />
+            {/each}
+          </SelectContent>
+        </Select>
       </label>
 
       <label class="block text-sm">
         Priority
-        <input data-board-sheet-priority type="number" bind:value={priority} min="0" max="20" class={fieldCls} />
+        <Input data-board-sheet-priority type="number" bind:value={priority} min="0" max="20" class="mt-1" />
       </label>
 
       <label class="block text-sm">
         Description
-        <div data-board-sheet-description data-testid="task-detail-description" class={cn(fieldCls, "p-0")}>
+        <div data-board-sheet-description data-testid="task-detail-description" class="mt-1 w-full rounded border border-border bg-background p-0">
           <TaskDescriptionEditor
             taskId={task.id}
             content={tiptapContent}
@@ -114,29 +137,29 @@
         </div>
       </label>
 
-      <div class="flex items-center gap-2">
-        <button type="submit" data-board-sheet-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
-        <button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} class={cn(buttonVariants({ variant: "outline" }))}>Run</button>
-        <button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
-      </div>
+      <SheetFooter class="flex-row px-0 py-0">
+        <Button type="submit" data-board-sheet-save variant="primary">Save</Button>
+        <Button type="button" data-board-sheet-run onclick={() => onRun?.(task.id)} variant="secondary">Run</Button>
+        <Button type="button" data-board-sheet-delete onclick={() => onDelete?.(task.id)} variant="danger">Delete</Button>
+      </SheetFooter>
     </form>
 
-    <section class="mt-5 border-t border-border pt-4">
-      <button type="button" data-testid="tab-comments" class="mb-3 text-sm font-medium">Comments</button>
+    <section class="border-t border-border px-4 pt-4">
+      <Button type="button" data-testid="tab-comments" variant="ghost" class="mb-3 px-0 text-sm font-medium">Comments</Button>
       <div data-testid="comment-list" class="min-h-6 space-y-2">
         {#each comments as comment}
           <div data-testid="comment-item" class="rounded border border-border px-3 py-2 text-sm">{comment}</div>
         {/each}
       </div>
       <form class="mt-3 flex gap-2" onsubmit={submitComment}>
-        <input
+        <Input
           data-testid="comment-input"
           bind:value={commentDraft}
-          class={cn(fieldCls, "mt-0")}
           aria-label="Comment"
         />
-        <button type="submit" data-testid="comment-submit" class={cn(buttonVariants({ variant: "outline" }))}>Add</button>
+        <Button type="submit" data-testid="comment-submit" variant="secondary">Add</Button>
       </form>
     </section>
-  {/if}
-</aside>
+    {/if}
+  </SheetContent>
+</Sheet>

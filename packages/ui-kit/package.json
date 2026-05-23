@@ -1,0 +1,35 @@
+{
+	"name": "@fulcrum/ui-kit",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./styles/tokens.css": "./src/styles/tokens.css"
+	},
+	"scripts": {
+		"build": "svelte-kit sync && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css && bun run --bun tsc -p tsconfig.json --noEmit",
+		"lint": "bun run scripts/lint-token-purity.ts && svelte-check --no-tsconfig --threshold error --diagnostic-sources svelte,css"
+	},
+	"peerDependencies": {
+		"svelte": "^5.55.2"
+	},
+	"dependencies": {
+		"@fulcrum/shared-dto": "workspace:*",
+		"@lucide/svelte": "^1.14.0",
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
+		"lucide-svelte": "^1.0.1",
+		"tailwind-merge": "^3.5.0",
+		"tailwind-variants": "^3.2.2"
+	},
+	"devDependencies": {
+		"@sveltejs/kit": "^2.59.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@vitest/browser-playwright": "4.1.5",
+		"happy-dom": "^16.7.0",
+		"svelte-check": "^4.4.6",
+		"typescript": "^5.6.0",
+		"vitest": "^4.1.5"
+	}
+}

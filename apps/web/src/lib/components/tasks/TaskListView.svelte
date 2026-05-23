@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
   import {
     createSvelteTable,
     flexRender,
@@ -75,7 +75,7 @@
         visibleColIds = columns;
       }
     } catch {
-      // non-fatal — use default columns
+      // non-fatal: use default columns
     }
   }
 

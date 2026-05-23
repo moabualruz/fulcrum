@@ -1,7 +1,5 @@
 export * from "./credential.dto.ts";
 export * from "./error-log.dto.ts";
-export * from "./feature-experiment.dto.ts";
-export * from "./feature-flag.dto.ts";
 export * from "./inference.dto.ts";
 export * from "./settings.dto.ts";
 export * from "./skill-supply.dto.ts";

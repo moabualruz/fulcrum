@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
-const calls: string[] = [];
+const calls: Array<{ method: string; input: unknown }> = [];
 
 const mockRun = {
   id: "run-1",
@@ -17,6 +17,8 @@ const mockRun = {
   started_at: "2026-05-15T10:00:00.000Z",
   ended_at: "2026-05-15T10:05:00.000Z",
   transcript_path: null,
+  token_used: 4200,
+  cost_usd: "0.0123",
   last_error_kind: null,
   retry_count: 0,
   workspace_path: "/tmp/workspace",
@@ -39,44 +41,34 @@ const mockEvents = [
 const mockPageData = {
   run: mockRun,
   transcript: "Hello world transcript",
+  diff: "diff --git a/src/app.ts b/src/app.ts\n@@ -1 +1 @@\n-old\n+new\n",
   artifacts: [],
   events: mockEvents,
+  approvalQueue: [],
 };
 
-mock.module("$lib/server/request-service-scope", () => ({
-  requestServiceScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
+mock.module("$lib/server/agent-run-api", () => ({
+  createAgentRunApiForEvent: () => ({
+    runs: {
+      pageDetail: async (input: { id: string; projectId: string }) => {
+        calls.push({ method: "pageDetail", input });
+        if (input.id === "not-found") throw new Error("Run not found");
+        return mockPageData;
+      },
+      cancel: async (input: { id: string }) => {
+        calls.push({ method: "cancel", input });
+        return { ok: true };
+      },
+      retry: async (input: { id: string }) => {
+        calls.push({ method: "retry", input });
+        return { id: "run-2" };
+      },
+      recordApprovalDecision: async (input: unknown) => {
+        calls.push({ method: "recordApprovalDecision", input });
+        return { ok: true };
+      },
+    },
   }),
-}));
-
-mock.module("@execution-orchestration/interface/run-pages.ts", () => ({
-  getProjectRunPageData: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`getRunPage:${runId}`);
-    if (runId === "not-found") throw new Error("Run not found");
-    return mockPageData;
-  },
-  listProjectRuns: async () => [],
-}));
-
-mock.module("@execution-orchestration/interface/run-actions.ts", () => ({
-  cancelRun: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`cancel:${runId}`);
-    return { ok: true };
-  },
-  retryRun: async (_em: unknown, _ctx: unknown, runId: string) => {
-    calls.push(`retry:${runId}`);
-    return { id: "run-2" };
-  },
-}));
-
-mock.module("$lib/server/project-api", () => ({
-  ensureProjectExists: async () => {},
-}));
-
-mock.module("$lib/feedback/action-result", () => ({
-  actionOk: (msg: string) => ({ ok: true, message: msg }),
-  actionFail: (msg: string) => ({ ok: false, message: msg }),
 }));
 
 beforeEach(() => {
@@ -90,12 +82,12 @@ function form(data: Record<string, string>): Request {
 }
 
 describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
-  test("server route imports from service interface boundaries, not application layer", () => {
+  test("server route uses the agent run public API instead of request service scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@execution-orchestration/interface/run-pages");
-    expect(source).toContain("@execution-orchestration/interface/run-actions");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@execution-orchestration/application/");
+    expect(source).toContain("createAgentRunApiForEvent");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("@execution-orchestration/interface/run-pages");
+    expect(source).not.toContain("@execution-orchestration/interface/run-actions");
   });
 
   test("load returns run detail data with events and transcript", async () => {
@@ -111,12 +103,15 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     expect(payload.run.agent).toBe("codex");
     expect(payload.run.status).toBe("succeeded");
     expect(payload.transcript).toBe("Hello world transcript");
+    expect(payload.diff).toContain("diff --git");
+    expect(payload.run.token_used).toBe(4200);
+    expect(payload.run.cost_usd).toBe("0.0123");
     expect(payload.events).toHaveLength(1);
     expect(payload.events[0].verb).toBe("run.started");
-    expect(calls).toEqual(["getRunPage:run-1"]);
+    expect(calls).toEqual([{ method: "pageDetail", input: { id: "run-1", projectId: "project-1" } }]);
   });
 
-  test("cancel action delegates through run-actions boundary", async () => {
+  test("cancel action delegates through the agent run public API", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.actions.cancel({
       params: { id: "project-1", runId: "run-1" },
@@ -125,7 +120,7 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
     } as Parameters<typeof mod.actions.cancel>[0]);
 
     expect(result).toEqual({ ok: true, message: "Run cancelled" });
-    expect(calls).toEqual(["cancel:run-1"]);
+    expect(calls).toEqual([{ method: "cancel", input: { id: "run-1" } }]);
   });
 
   test("retry action dispatches new run and redirects", async () => {
@@ -142,6 +137,29 @@ describe("/projects/[id]/runs/[runId] +page.server.ts", () => {
       expect(redirectErr.status).toBe(303);
       expect(redirectErr.location).toBe("/projects/project-1/runs/run-2");
     }
-    expect(calls).toEqual(["retry:run-1"]);
+    expect(calls).toEqual([{ method: "retry", input: { id: "run-1" } }]);
+  });
+
+  test("approval action records the decision through the agent run public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.actions.approvalDecision({
+      params: { id: "project-1", runId: "run-1" },
+      locals: {},
+      request: form({ approvalId: "approval-1", decision: "approve" }),
+    } as Parameters<typeof mod.actions.approvalDecision>[0]);
+
+    expect(result).toEqual({ ok: true, message: "Approval decision recorded" });
+    expect(calls).toEqual([
+      {
+        method: "recordApprovalDecision",
+        input: {
+          id: "run-1",
+          projectId: "project-1",
+          approvalId: "approval-1",
+          decision: "approve",
+          note: null,
+        },
+      },
+    ]);
   });
 });

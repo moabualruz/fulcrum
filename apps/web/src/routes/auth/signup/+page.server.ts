@@ -1,6 +1,8 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 import { isSaasAuthFeatureEnabled } from "@identity-access/interface/auth-feature.ts";
 import type { Actions, PageServerLoad } from "./$types";
+import { createAuthApiForEvent } from "$lib/server/auth-api";
+import { activeOrgId, publicApiBaseUrl } from "$lib/server/public-api";
 
 export function _isSaasAuthEnabled(): boolean {
   return isSaasAuthFeatureEnabled();
@@ -35,7 +37,7 @@ function authErrorMessage(body: unknown): string {
 }
 
 export const actions: Actions = {
-  default: async ({ fetch, request }) => {
+  default: async ({ fetch, locals, request, url }) => {
     if (!_isSaasAuthEnabled()) {
       throw error(404, "Sign-up is not available");
     }
@@ -45,7 +47,7 @@ export const actions: Actions = {
     const password = String(form.get("password") ?? "");
     const name = String(form.get("name") ?? "");
 
-    const response = await fetch("/api/auth/sign-up/email", {
+    const response = await fetch(`${publicApiBaseUrl(url)}/api/auth/sign-up/email`, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -59,6 +61,47 @@ export const actions: Actions = {
       return fail(400, { error: authErrorMessage(body), email, name });
     }
 
-    throw redirect(302, "/");
+    const body = await response.json().catch(() => null);
+    const userId = readSignupUserId(body) ?? email;
+    const orgId = readSignupOrgId(body) ?? activeOrgId(locals);
+
+    try {
+      const verification = await createAuthApiForEvent({ fetch, locals, request, url }).auth.requestEmailVerification({
+        orgId,
+        userId,
+        email,
+        baseUrl: url.origin,
+      });
+      return {
+        created: true,
+        email,
+        verificationUrl: verification.verificationUrl,
+        verificationNotice: `Verification email sent to ${verification.email}.`,
+      };
+    } catch (cause) {
+      return fail(400, { error: authErrorMessage(cause), email, name });
+    }
   },
 };
+
+function readSignupUserId(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as Record<string, unknown>;
+  const user = record["user"];
+  if (user && typeof user === "object" && typeof (user as { id?: unknown }).id === "string") {
+    return (user as { id: string }).id;
+  }
+  return typeof record["userId"] === "string" ? record["userId"] : null;
+}
+
+function readSignupOrgId(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as Record<string, unknown>;
+  const session = record["session"];
+  if (session && typeof session === "object") {
+    const scoped = session as { orgId?: unknown; activeOrganizationId?: unknown };
+    if (typeof scoped.orgId === "string") return scoped.orgId;
+    if (typeof scoped.activeOrganizationId === "string") return scoped.activeOrganizationId;
+  }
+  return typeof record["orgId"] === "string" ? record["orgId"] : null;
+}

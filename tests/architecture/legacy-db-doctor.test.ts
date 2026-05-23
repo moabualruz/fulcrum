@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   buildProductKernelDoctorReport,
   buildReposDoctorReport,
+  rebuildLocalPgliteDatabase,
 } from "@platform-core/infrastructure/doctor/product-store-report.ts";
 import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
 import { openLocalSqlStore } from "@platform-core/infrastructure/application-database/sql.ts";
@@ -44,7 +45,7 @@ describe("legacy DB doctor reports", () => {
     const report = await buildProductKernelDoctorReport();
 
     expect(report.engine).toBe("absent");
-    expect(report.dbPath).toBe(join(process.env.FULCRUM_HOME, "pglite.data"));
+    expect(report.dbPath).toBe(join(process.env.FULCRUM_HOME, "db", "main"));
     expect(report.schemaApplied).toBe(0);
     expect(report.rows).toEqual({ orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 });
     expect(report.latestEventAt).toBeNull();
@@ -52,7 +53,7 @@ describe("legacy DB doctor reports", () => {
 
   test("reads migrated pglite schema counts, latest event, and repo sync stats from real tables", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-doctor-live-home-"));
-    const dataDir = join(home, "pglite.data");
+    const dataDir = join(home, "db", "main");
     process.env.FULCRUM_HOME = home;
     delete process.env.DATABASE_URL;
 
@@ -154,5 +155,38 @@ describe("legacy DB doctor reports", () => {
       lruQueueDepth: 0,
       mirrorDiskGb: 0,
     });
+  });
+
+  test("reports pglite corruption with exact rebuild recovery command and rebuild quarantines old data", async () => {
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-doctor-corrupt-home-"));
+    const dataDir = join(home, "db", "main");
+    process.env.FULCRUM_HOME = home;
+    delete process.env.DATABASE_URL;
+
+    const db = await openLocalSqlStore(dataDir);
+    try {
+      await applyProductMigrations(db);
+      await db.exec("DROP TABLE tasks CASCADE");
+    } finally {
+      await db.close();
+    }
+
+    const corrupt = await buildProductKernelDoctorReport();
+    expect(corrupt.engine).toBe("pglite");
+    expect(corrupt.error).toContain("tasks");
+    expect(corrupt.recoveryAction).toBe("pglite-rebuild");
+    expect(corrupt.recoveryCommand).toBe("fulcrum doctor --run-fix=pglite-rebuild");
+
+    const rebuilt = await rebuildLocalPgliteDatabase();
+    expect(rebuilt).toMatchObject({
+      action: "pglite-rebuild",
+      dbPath: dataDir,
+      verified: true,
+    });
+    expect(rebuilt.quarantinedPath).toContain(".corrupt-");
+
+    const verified = await buildProductKernelDoctorReport();
+    expect(verified.error).toBeUndefined();
+    expect(verified.schemaApplied).toBeGreaterThan(0);
   });
 });

@@ -181,8 +181,8 @@ describe("audit tRPC router", () => {
       expect(csv).toEqual({
         format: "csv",
         csv: [
-          "id,org_id,user_id,verb,subject_kind,subject_id,payload,created_at",
-          `00000000-0000-4000-8000-000000000201,00000000-0000-0000-0000-000000000001,${db.seed.userId},task.created,task,task-3,{},2026-03-01T10:00:00.000Z`,
+          "id,org_id,user_id,verb,subject_kind,subject_id,causation_id,field_name,before,after,payload,created_at",
+          `00000000-0000-4000-8000-000000000201,00000000-0000-0000-0000-000000000001,${db.seed.userId},task.created,task,task-3,,,,,{},2026-03-01T10:00:00.000Z`,
         ].join("\n"),
       });
 

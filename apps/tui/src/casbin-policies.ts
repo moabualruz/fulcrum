@@ -64,7 +64,7 @@ export class CasbinPoliciesPanel {
     return `p, ${rule.subject}, ${rule.object}, ${rule.action}, ${rule.effect}`;
   }
 
-  /** Persist rules — returns structured save result. */
+  /** Persist rules: returns structured save result. */
   save(): SaveResult {
     return {
       type: "casbin-policies",

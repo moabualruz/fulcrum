@@ -3,8 +3,9 @@
   import { TASK_STATUSES, describeStatus } from "./board-helpers";
   import { applyBoardMove, buildSwimlanes, filterTasksBySprint, revertBoardMove, type BoardMove, type SwimlaneMode } from "./kanban-board";
   import BoardColumn from "./BoardColumn.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { DndMovePayload } from "./board-column-handlers";
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 
   interface SprintOption {
     id: string;
@@ -70,32 +71,32 @@
   <header data-board-controls class={cn("flex flex-wrap items-center justify-between gap-3")}>
     <div class={cn("flex items-center gap-2")}>
       <label for="sprint-filter" class={cn("text-sm font-medium")}>Sprint</label>
-      <select
-        id="sprint-filter"
-        data-sprint-filter
-        bind:value={sprintFilter}
-        class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}
-      >
-        <option value="all">All</option>
-        <option value="backlog">Backlog</option>
-        {#each sprints as sprint (sprint.id)}
-          <option value={sprint.id}>{sprint.name}</option>
-        {/each}
-      </select>
+      <Select bind:value={sprintFilter} type="single">
+        <SelectTrigger id="sprint-filter" data-sprint-filter aria-label="Sprint" size="sm" class="w-40">
+          <SelectValue placeholder="All" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all" label="All" />
+          <SelectItem value="backlog" label="Backlog" />
+          {#each sprints as sprint (sprint.id)}
+            <SelectItem value={sprint.id} label={sprint.name} />
+          {/each}
+        </SelectContent>
+      </Select>
     </div>
     <div class={cn("flex items-center gap-2")}>
       <label for="swimlane-toggle" class={cn("text-sm font-medium")}>Swimlane</label>
-      <select
-        id="swimlane-toggle"
-        data-swimlane-toggle
-        bind:value={swimlane}
-        class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")}
-      >
-        <option value="none">None</option>
-        <option value="assignee">Assignee</option>
-        <option value="priority">Priority</option>
-        <option value="epic">Epic</option>
-      </select>
+      <Select bind:value={swimlane} type="single">
+        <SelectTrigger id="swimlane-toggle" data-swimlane-toggle aria-label="Swimlane" size="sm" class="w-36">
+          <SelectValue placeholder="None" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none" label="None" />
+          <SelectItem value="assignee" label="Assignee" />
+          <SelectItem value="priority" label="Priority" />
+          <SelectItem value="epic" label="Epic" />
+        </SelectContent>
+      </Select>
     </div>
   </header>
 

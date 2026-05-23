@@ -2,14 +2,14 @@
  * Format a duration between two ISO timestamps.
  *
  * Rules:
- *   - `null` end → "—" (run still in flight)
+ *   - `null` end → "-" (run still in flight)
  *   - diff < 60s → "<n>s"
  *   - diff < 1h  → "<m>m <s>s"
  *   - diff < 24h → "<h>h <m>m"
  *   - ≥24h       → "<d>d <h>h"
  */
 export function formatDuration(startISO: string, endISO: string | null): string {
-  if (endISO === null) return "—";
+  if (endISO === null) return "-";
   const start = Date.parse(startISO);
   const end = Date.parse(endISO);
   const diffMs = Math.max(0, end - start);

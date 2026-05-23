@@ -113,7 +113,7 @@ export async function indexSearchDocumentOrm(
   const candidateValues: Array<[string, unknown]> = [
     ["title", input.title],
     ["body", input.body],
-    ["labels", input.labels ?? []],
+    ["labels", input.labels?.join(",") ?? ""],
     ["updated_at", new Date()],
     ["project_id", input.projectId ?? null],
   ];

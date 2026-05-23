@@ -16,8 +16,11 @@
 		"paths": {
 			"@agent-client-protocol/*": ["../../services/agent-client-protocol/src/*"],
 			"@execution-orchestration/*": ["../../services/execution-orchestration/src/*"],
+			"@feature-flags/*": ["../../services/feature-flags/src/*"],
 			"@fulcrum/cli": ["../cli/src"],
 			"@fulcrum/cli/*": ["../cli/src/*"],
+			"@fulcrum/shared-dto": ["../../packages/shared-dto/src/index.ts"],
+			"@fulcrum/shared-dto/*": ["../../packages/shared-dto/src/*"],
 			"@fulcrum/server": ["../server/src"],
 			"@fulcrum/server/*": ["../server/src/*"],
 			"@fulcrum/tui": ["../tui/src"],

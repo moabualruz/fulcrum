@@ -175,7 +175,16 @@ async function runRules(
     case "update": {
       const id = firstArg(rest);
       if (!id) return usage(io, "usage: fulcrum notify rules update <id>");
-      return printValue(await caller.notify.rules.update({ id }), rest, io.print);
+      const patch: Record<string, unknown> = { id };
+      const name = flagValue(rest, "--name");
+      const pattern = flagValue(rest, "--pattern");
+      const channels = flagValue(rest, "--channels");
+      if (name) patch["name"] = name;
+      if (pattern) patch["eventPattern"] = JSON.parse(pattern) as Record<string, unknown>;
+      if (channels) patch["channels"] = channels.split(",").map((channel) => channel.trim()).filter(Boolean);
+      if (rest.includes("--enable")) patch["enabled"] = true;
+      if (rest.includes("--disable")) patch["enabled"] = false;
+      return printValue(await caller.notify.rules.update(patch), rest, io.print);
     }
     case "delete": {
       const id = firstArg(rest);

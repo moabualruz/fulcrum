@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ActionData, PageData } from "./$types";
   import type { ConnectorName } from "./+page.server.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -19,6 +20,12 @@
     <h1 class="text-xl font-semibold tracking-tight">Connectors</h1>
     <p class="text-sm text-muted-foreground">Connect Fulcrum to external knowledge sources.</p>
   </header>
+
+  {#if data.loadError}
+    <p data-connector-route-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      {data.loadError}
+    </p>
+  {/if}
 
   <div class="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
     {#each data.connectors as connector (connector.name)}
@@ -84,13 +91,11 @@
             </div>
             <div class="flex flex-col gap-1.5">
               <label for="token-{connector.name}" class="text-sm font-medium">API Token</label>
-              <input
+              <CredentialInput
                 id="token-{connector.name}"
                 name="token"
-                type="password"
                 placeholder="••••••••"
                 value={connector.config?.token ?? ""}
-                class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
               />
             </div>
             <button

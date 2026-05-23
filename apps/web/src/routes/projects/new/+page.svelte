@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ActionData, PageData } from "./$types";
 	import ProjectForm from "$lib/components/projects/ProjectForm.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;

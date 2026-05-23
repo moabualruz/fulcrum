@@ -14,6 +14,12 @@ interface SkillSupplyRow {
   enabledAgents?: string[];
 }
 
+interface SkillSupplyConflictRow {
+  slug: string;
+  localHash: string;
+  upstreamHash: string;
+}
+
 export const load: PageServerLoad = (event) => {
   const skillsApi = createSkillSupplyApiCaller({
     baseUrl: publicApiBaseUrl(event.url),
@@ -24,15 +30,19 @@ export const load: PageServerLoad = (event) => {
   return {
     streamed: {
       data: (async () => {
-        const rows = await skillsApi.fulcrumSkills.list() as SkillSupplyRow[];
-        const skills = rows.map(toPageSkill);
+        const [rows, conflicts] = await Promise.all([
+          skillsApi.fulcrumSkills.list() as Promise<SkillSupplyRow[]>,
+          skillsApi.fulcrumSkills.conflicts.list() as Promise<SkillSupplyConflictRow[]>,
+        ]);
+        const conflictBySlug = new Map(conflicts.map((conflict) => [conflict.slug, conflict]));
+        const skills = rows.map((skill) => toPageSkill(skill, conflictBySlug.get(skill.slug)));
         return { skills };
       })(),
     },
   };
 };
 
-function toPageSkill(skill: SkillSupplyRow) {
+function toPageSkill(skill: SkillSupplyRow, conflict?: SkillSupplyConflictRow) {
   return {
     id: skill.id,
     name: skill.name,
@@ -43,6 +53,20 @@ function toPageSkill(skill: SkillSupplyRow) {
     upstream_ref: skill.upstreamRef ?? null,
     content_hash: skill.hash ?? null,
     enabled_agents: skill.enabledAgents ?? [],
-    upstream_conflict: null,
+    upstream_conflict: conflict
+      ? {
+          local_content: conflict.localHash,
+          upstream_content: conflict.upstreamHash,
+          installed_skill: skill.slug,
+          installed_version: skill.version ?? "v1",
+          requested_skill: `${skill.slug}-candidate`,
+          requested_version: "v2",
+          reason: "Incompatible tool/API requirements between installed and requested skill versions.",
+          alt_versions: ["v1.latest", "v2.compat"],
+          recommended_resolution: "alt_version",
+          force_safe: false,
+          session_resolution: null,
+        }
+      : null,
   };
 }

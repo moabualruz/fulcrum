@@ -10,6 +10,7 @@ const config = {
 		alias: {
 			'@fulcrum/cli': '../cli/src',
 			'@fulcrum/server': '../server/src',
+			'@fulcrum/shared-dto': '../../packages/shared-dto/src',
 			'@test-support': '../../tests/support',
 			'@fulcrum/tui': '../tui/src',
 			'@fulcrum/web': './src'

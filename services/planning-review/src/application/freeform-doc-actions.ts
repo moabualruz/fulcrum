@@ -1,6 +1,7 @@
 import type { EntityManager } from "typeorm";
 
 import { createDoc } from "@knowledge-workspace/application/docs/commands.ts";
+import { listDocumentVersions } from "@knowledge-workspace/application/docs/version-queries.ts";
 import { getDoc, listDocs } from "@knowledge-workspace/application/docs/queries.ts";
 import type { AppContext, DocDto } from "@knowledge-workspace/application/docs/types.ts";
 import { appendEventOrm } from "@platform-core/application/orm-helpers.ts";
@@ -49,7 +50,7 @@ export async function buildFreeformPlanningPromptFromDocs(
 ): Promise<FreeformPlanningPromptFromDocsResult> {
   const docs = await loadPlanningContextDocs(em, ctx, input.selectedDocIds);
   const context = buildFreeformDocsPlanningContext({
-    docs: docs.map(mapDocDtoToPlanningContextDoc),
+    docs: await Promise.all(docs.map((doc) => mapDocDtoToPlanningContextDoc(em, doc))),
     selectedDocIds: input.selectedDocIds,
     traceId: input.traceId,
     maxDocChars: input.maxDocChars,
@@ -135,7 +136,8 @@ async function loadPlanningContextDocs(
   return [...docsById.values()];
 }
 
-function mapDocDtoToPlanningContextDoc(doc: DocDto): FreeformPlanningContextDoc {
+async function mapDocDtoToPlanningContextDoc(em: EntityManager, doc: DocDto): Promise<FreeformPlanningContextDoc> {
+  const latestVersion = (await listDocumentVersions(em, doc.id))[0];
   return {
     id: doc.id,
     slugId: doc.slug,
@@ -145,6 +147,8 @@ function mapDocDtoToPlanningContextDoc(doc: DocDto): FreeformPlanningContextDoc 
     parentId: doc.parentId,
     sortPosition: String(doc.sortPosition),
     projectId: doc.projectId,
+    versionId: latestVersion?.id,
+    versionNum: latestVersion?.version,
     updatedAt: doc.updatedAt.toISOString(),
   };
 }

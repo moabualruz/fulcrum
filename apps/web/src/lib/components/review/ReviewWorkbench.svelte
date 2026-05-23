@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface ReviewFile {
     path: string;
@@ -185,7 +185,7 @@
   }
 
   function handleMouseUp(): void {
-    // Selection finalized on mouseup — draft already set via drag
+    // Selection finalized on mouseup: draft already set via drag
   }
 
   function scrollToLine(line: number): void {
@@ -325,7 +325,7 @@
           <span class={cn("text-red-500 ml-1")}>-{model.selectedFile.deletions}</span>
         </span>
       </header>
-      <div class={cn("flex-1 overflow-auto font-mono text-xs leading-5")} role="listbox" aria-label="Diff lines" onmouseup={handleMouseUp}>
+      <div class={cn("flex-1 overflow-auto font-mono text-xs leading-5")} role="listbox" aria-label="Diff lines" tabindex="0" onmouseup={handleMouseUp}>
         {#each model.selectedFile.patch.split("\n") as line, i (i)}
           <div
             data-diff-line={i}
@@ -385,7 +385,7 @@
         {#if annotationDraft}
           <div data-annotation-draft class={cn("mb-3 rounded border border-primary/30 bg-primary/5 p-2")}>
             <p class={cn("text-xs font-medium mb-1")}>
-              New annotation — {annotationDraft.lineStart === annotationDraft.lineEnd ? `Line ${annotationDraft.lineStart}` : `Lines ${annotationDraft.lineStart}-${annotationDraft.lineEnd}`}
+              New annotation: {annotationDraft.lineStart === annotationDraft.lineEnd ? `Line ${annotationDraft.lineStart}` : `Lines ${annotationDraft.lineStart}-${annotationDraft.lineEnd}`}
             </p>
             {#if annotationDraft.selectedText}
               <pre data-annotation-selected-text class={cn("mb-2 max-h-24 overflow-y-auto rounded bg-background/80 p-1.5 text-[11px] whitespace-pre-wrap")}>{annotationDraft.selectedText}</pre>

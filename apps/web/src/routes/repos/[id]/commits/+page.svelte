@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -79,7 +79,7 @@
 				{#if payload.page > 1}
 					<a
 						href="?page={payload.page - 1}"
-						class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+						class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					>← Prev</a>
 				{:else}
 					<span></span>
@@ -92,7 +92,7 @@
 				{#if payload.page < payload.totalPages}
 					<a
 						href="?page={payload.page + 1}"
-						class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+						class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					>Next →</a>
 				{:else}
 					<span></span>

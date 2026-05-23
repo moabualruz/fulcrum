@@ -157,6 +157,7 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
   feedbackRuns: [],
   generatedE2eTests: [{
     artifactId: "artifact-generated-e2e",
+    generationTaskId: "task-generated-e2e",
     filename: "uat-trace-trpc-approval.spec.ts",
     path: "generated/e2e/uat-trace-trpc-approval.spec.ts",
     runner: "playwright",
@@ -175,6 +176,41 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
       runIds: ["run-proof"],
       latestReviewEventId: "event-review",
     }],
+    manualSimulationChecklist: {
+      id: "manual-simulation:trace-trpc-approval",
+      projectId: PROJECT_ID,
+      traceId: "trace-trpc-approval",
+      status: "approved",
+      steps: [{
+        id: "task-1:manual-simulation:1",
+        taskId: "task-1",
+        taskTitle: "UAT task",
+        criterion: "UAT passes",
+        setup: "Open the workflow state for UAT task.",
+        action: "Exercise the user-visible path for success criterion 1.",
+        expectedObservation: "UAT passes",
+        evidenceField: "evidence.task-1.1",
+      }],
+      e2eSeed: {
+        sourceTaskIds: ["task-1"],
+        sourceCriteria: ["UAT passes"],
+        approvedForE2e: true,
+      },
+    },
+    scenarioData: {
+      traceId: "trace-trpc-approval",
+      projectId: PROJECT_ID,
+      taskId: "task-1",
+      taskTitle: "UAT task",
+      taskStatus: "done",
+      latestReviewEventId: "event-review",
+      evidenceArtifactIds: ["artifact-proof"],
+      evidenceRunIds: ["run-proof"],
+    },
+    mockPolicy: {
+      usesMocks: false,
+      impossibilityReason: null,
+    },
     ciCommand: ["bun", "run", "scripts/ci-generated-e2e.ts"],
     ciEnv: {
       FULCRUM_GENERATED_E2E_RUNNER: "playwright",
@@ -187,12 +223,14 @@ const recordUatCodeReviewDecision = mock(async (): Promise<UatCodeReviewDecision
 const runGeneratedE2eRegressionTests = mock(async (): Promise<GeneratedE2eRegressionRunOutput> => ({
   projectId: PROJECT_ID,
   traceId: "trace-trpc-approval",
+  runId: "generated-e2e-project-trpc-trace-trpc-approval-playwright",
   runner: "playwright",
   status: "planned",
   command: ["bun", "run", "web:e2e:generated", "--", "/tmp/fulcrum-artifacts/org/project/run/uat-trace-trpc-approval.spec.ts"],
   cwd: "apps/web",
   testFiles: ["/tmp/fulcrum-artifacts/org/project/run/uat-trace-trpc-approval.spec.ts"],
   artifactIds: ["artifact-generated-e2e"],
+  generatedSpecArtifactIds: ["generated-e2e-project-trpc-trace-trpc-approval-playwright-spec-1"],
   stdout: "",
   stderr: "",
   exitCode: null,
@@ -486,6 +524,7 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.finalQa({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-final-qa",
+      taskIds: ["task-final-qa"],
     });
 
     expect(result).toMatchObject({
@@ -505,6 +544,7 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-final-qa",
+      taskIds: ["task-final-qa"],
     });
   });
 
@@ -514,11 +554,14 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.finalQaFeedbackGate({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-feedback-gate",
+      taskIds: ["task-feedback"],
       workerId: "worker-trpc",
+      reviewerAgent: "qa-reviewer",
       feedbackAgent: "codex",
       feedbackModel: "gpt-feedback",
       maxIterations: 3,
       cwd: "/repo",
+      copyToWorktree: ["services/planning-review"],
     });
 
     expect(result).toMatchObject({
@@ -542,11 +585,14 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-feedback-gate",
+      taskIds: ["task-feedback"],
       workerId: "worker-trpc",
+      reviewerAgent: "qa-reviewer",
       feedbackAgent: "codex",
       feedbackModel: "gpt-feedback",
       maxIterations: 3,
       cwd: "/repo",
+      copyToWorktree: ["services/planning-review"],
     });
   });
 
@@ -622,6 +668,7 @@ describe("reports final QA tRPC", () => {
     const result = await trpc.review.runGeneratedE2eRegressionTests({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
+      taskIds: ["task-e2e"],
       runner: "playwright",
       planOnly: true,
     });
@@ -645,6 +692,7 @@ describe("reports final QA tRPC", () => {
     expect(input).toEqual({
       projectId: PROJECT_ID,
       traceId: "trace-trpc-approval",
+      taskIds: ["task-e2e"],
       runner: "playwright",
       planOnly: true,
     });

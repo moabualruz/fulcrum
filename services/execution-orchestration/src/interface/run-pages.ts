@@ -2,6 +2,7 @@ import type { EntityManager } from "typeorm";
 import type { AppContext } from "@execution-orchestration/application/runs/types.ts";
 import type {
   AgentRunDetailRow,
+  ApprovalQueueItem,
   ProjectRunRow,
   RunEventRow,
   RunRowsFilter,
@@ -10,6 +11,7 @@ import type {
 
 export type {
   AgentRunDetailRow,
+  ApprovalQueueItem,
   ProjectRunRow,
   RunEventRow,
   RunRow,
@@ -20,6 +22,7 @@ export type {
 export interface ProjectRunPageData {
   run: AgentRunDetailRow;
   transcript: string | null;
+  diff: string | null;
   artifacts: Array<{
     id: string;
     org_id: string;
@@ -33,10 +36,17 @@ export interface ProjectRunPageData {
     size: number | null;
     mime: string | null;
     archived: boolean;
+    lifecycle_state: string;
+    retention_until: string | null;
+    preview_kind: string;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string;
     downloadHref: string;
   }>;
   events: Array<RunEventRow & { created_at: string }>;
+  approvalQueue: ApprovalQueueItem[];
 }
 
 export async function loadRunsPageData(

@@ -34,7 +34,7 @@
         }
       }
     } catch {
-      // ignore — oauthBusy reset below
+      // ignore: oauthBusy reset below
     }
     oauthBusy = false;
   }

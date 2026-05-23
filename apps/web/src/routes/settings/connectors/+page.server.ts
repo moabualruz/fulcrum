@@ -1,5 +1,5 @@
 /**
- * /settings/connectors — gated connector management (Confluence, Notion, GitHub Issues).
+ * /settings/connectors: gated connector management (Confluence, Notion, GitHub Issues).
  *
  * Gated by FULCRUM_FEATURES (C1, default OFF).
  * Each connector is independently gated:
@@ -42,13 +42,19 @@ interface ConnectorRunRow {
 export const load: PageServerLoad = async (event) => {
   if (!event.locals.session) throw redirect(302, "/auth/login");
   const api = createConnectorApiForEvent(event);
-  const [connectors, syncRuns] = await Promise.all([
+  const [connectorsResult, syncRunsResult] = await Promise.allSettled([
     api.connectors.list() as Promise<ConnectorDescriptor[]>,
     api.connectors.runs.list() as Promise<ConnectorRunRow[]>,
   ]);
+  const connectors = connectorsResult.status === "fulfilled" ? connectorsResult.value : defaultConnectors();
+  const syncRuns = syncRunsResult.status === "fulfilled" ? syncRunsResult.value : [];
+
   return {
     connectors,
     syncLog: syncRuns.map(toSyncLogEntry),
+    loadError: connectorsResult.status === "rejected" || syncRunsResult.status === "rejected"
+      ? "Connector API unavailable. Verify /settings/api base URL, then retry sync from /settings/connectors."
+      : null,
   };
 };
 
@@ -98,6 +104,10 @@ function isConnectorName(value: string): value is ConnectorName {
 function stringField(form: FormData, key: string): string {
   const value = form.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function defaultConnectors(): ConnectorDescriptor[] {
+  return CONNECTOR_NAMES.map((name) => ({ name, enabled: false }));
 }
 
 function toSyncLogEntry(row: ConnectorRunRow) {

@@ -66,6 +66,11 @@ describe("/docs/new +page.server.ts", () => {
         cookie: new Headers(init?.headers).get("cookie"),
         body: init?.body ? JSON.parse(String(init.body)) : null,
       });
+      // The default action resolves a non-UUID active project slug by
+      // listing projects through the public project API before creating.
+      if (String(input).startsWith("http://localhost/api/v1/projects")) {
+        return Response.json([]);
+      }
       return Response.json({ id: "doc-created", title: "My Doc", type: "spec" }, { status: 201 });
     }) as typeof fetch;
 
@@ -90,22 +95,30 @@ describe("/docs/new +page.server.ts", () => {
       caught = error;
     }
 
-    expect(calls).toEqual([{
-      url: "http://localhost/api/v1/docs",
-      method: "POST",
-      cookie: "sid=test-session",
-      body: {
-        projectId: "project-1",
-        title: "My Doc",
-        type: "spec",
-        bodyMd: "# Hello\nbody\n",
-        frontmatter: {
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/projects?orgId=org-1",
+        method: "GET",
+        cookie: "sid=test-session",
+        body: null,
+      },
+      {
+        url: "http://localhost/api/v1/docs",
+        method: "POST",
+        cookie: "sid=test-session",
+        body: {
+          projectId: "project-1",
           title: "My Doc",
-          kind: "spec",
-          labels: ["alpha", "beta"],
+          type: "spec",
+          bodyMd: "# Hello\nbody\n",
+          frontmatter: {
+            title: "My Doc",
+            kind: "spec",
+            labels: ["alpha", "beta"],
+          },
         },
       },
-    }]);
+    ]);
     expect(isRedirect(caught)).toBe(true);
     if (isRedirect(caught)) {
       expect(caught.status).toBe(303);

@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants, CredentialInput } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import * as Sheet from "$lib/components/ui/sheet";
+  import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@fulcrum/ui-kit";
 
   interface Props { data: PageData }
   let { data }: Props = $props();
@@ -23,16 +23,16 @@
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Secrets</h1>
   <button
     data-add-secret
-    class={cn(buttonVariants({ variant: "default" }))}
+    class={cn(buttonVariants({ variant: "primary" }))}
     onclick={() => { sheetOpen = true; }}
   >Add secret</button>
 </header>
 
-<Sheet.Root bind:open={sheetOpen}>
-  <Sheet.Content side="right" class="w-96">
-    <Sheet.Header>
-      <Sheet.Title>Add secret</Sheet.Title>
-    </Sheet.Header>
+<Sheet bind:open={sheetOpen}>
+  <SheetContent side="right" class="w-96">
+    <SheetHeader>
+      <SheetTitle>Add secret</SheetTitle>
+    </SheetHeader>
     <form
       method="POST"
       action="?/add"
@@ -62,15 +62,17 @@
       </label>
       <label class={cn("flex flex-col gap-1 text-sm font-medium")}>
         Value
-        <!-- Value field: type=password ensures value never visible in DOM as plain text -->
-        <input name="value" type="password" bind:value={addValue} required autocomplete="new-password"
+        <CredentialInput
+          name="value"
+          bind:value={addValue}
+          required
           data-secret-value-input
-          class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm")} />
+        />
       </label>
-      <button type="submit" class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+      <button type="submit" class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
     </form>
-  </Sheet.Content>
-</Sheet.Root>
+  </SheetContent>
+</Sheet>
 
 {#await data.streamed.data}
   <RouteSkeleton kind="list" />
@@ -99,7 +101,7 @@
               class={cn("hover:bg-muted/50 border-b transition-colors", cred.archived && "opacity-50")}
             >
               <td class={cn("p-2 align-middle font-medium")}>{cred.name}</td>
-              <td class={cn("p-2 align-middle text-muted-foreground")}>{cred.provider || "—"}</td>
+              <td class={cn("p-2 align-middle text-muted-foreground")}>{cred.provider || "-"}</td>
               <td class={cn("p-2 align-middle font-mono text-xs")} data-secret-masked>••••••••</td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>
                 {cred.last_used_at ?? "never"}
@@ -108,10 +110,15 @@
                 {#if rotateId === cred.id}
                   <form method="POST" action="?/rotate" use:enhance={() => ({ update }) => { rotateId = null; rotateValue = ""; update(); }}>
                     <input type="hidden" name="id" value={cred.id} />
-                    <input name="value" type="password" placeholder="New value" bind:value={rotateValue} required
+                    <CredentialInput
+                      name="value"
+                      placeholder="New value"
+                      bind:value={rotateValue}
+                      required
                       data-rotate-value-input
-                      class={cn("border-input bg-background h-7 w-32 rounded-md border px-2 text-xs mr-1")} />
-                    <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }))}>Save</button>
+                      class="h-7 w-32 mr-1"
+                    />
+                    <button type="submit" class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>Save</button>
                     <button type="button" onclick={() => { rotateId = null; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Cancel</button>
                   </form>
                 {:else}
@@ -129,7 +136,7 @@
                 </form>
                 <form method="POST" action="?/delete" use:enhance>
                   <input type="hidden" name="id" value={cred.id} />
-                  <button type="submit" data-delete-btn class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Delete</button>
+                  <button type="submit" data-delete-btn class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Delete</button>
                 </form>
               </td>
             </tr>

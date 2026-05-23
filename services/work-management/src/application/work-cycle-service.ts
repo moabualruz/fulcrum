@@ -249,15 +249,18 @@ export class WorkCycleService {
     const sprint = await findSprint(this.em, orgId, sprintId);
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
     await assertTaskInOrg(this.em, orgId, taskId);
+    // TypeORM em.query passes SQL to the native driver — Postgres expects
+    // `$N` placeholders, not `?` (the `?` form only works through the
+    // PGlite-compat `ormSqlConnection.execute` wrapper used elsewhere).
     await this.em.query(
       `update tasks
-       set sprint_id = ?,
+       set sprint_id = $1,
            project_id = case
-             when exists (select 1 from projects where org_id = ? and id = ?) then ?
+             when exists (select 1 from projects where org_id = $2 and id = $3) then $4
              else project_id
            end,
            updated_at = now()
-       where org_id = ? and id = ?`,
+       where org_id = $5 and id = $6`,
       [sprint.id, orgId, sprint.projectId, sprint.projectId, orgId, taskId],
     );
     return { moved: true };
@@ -268,7 +271,7 @@ export class WorkCycleService {
     if (!sprint) throw new AppNotFoundError("Sprint not found.");
     await assertTaskInOrg(this.em, orgId, taskId);
     await this.em.query(
-      `update tasks set sprint_id = null, updated_at = now() where org_id = ? and id = ? and sprint_id = ?`,
+      `update tasks set sprint_id = null, updated_at = now() where org_id = $1 and id = $2 and sprint_id = $3`,
       [orgId, taskId, sprint.id],
     );
     return { moved: true };

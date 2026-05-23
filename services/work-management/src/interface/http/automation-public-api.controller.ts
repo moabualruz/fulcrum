@@ -20,7 +20,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsBoolean, IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { WORK_AUTOMATION_ENTITIES } from "@work-management/infrastructure/database/automation.entities.ts";
 import {
   AutomationStore,

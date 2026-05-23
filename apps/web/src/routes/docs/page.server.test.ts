@@ -75,6 +75,9 @@ function fetchDocs(calls: string[] = []): typeof fetch {
     if (url === "http://localhost/api/v1/docs?orgId=org-1") {
       return Response.json(documentRows());
     }
+    if (url === "http://localhost/api/v1/projects?orgId=org-1") {
+      return Response.json({ data: [{ id: "project-1", slug: "project-1", name: "Project One" }] });
+    }
     return Response.json({ message: `unexpected ${url}` }, { status: 500 });
   }) as typeof fetch;
 }
@@ -105,7 +108,12 @@ describe("/docs +page.server.ts public API route", () => {
     });
     expect(payload.projectTree).toHaveLength(2);
     expect(payload.globalTree).toHaveLength(1);
-    expect(calls).toEqual(["GET http://localhost/api/v1/docs?orgId=org-1 sid=test-session"]);
+    // Loader also fetches /projects to resolve slug → UUID for the tree
+    // filter; tolerate the order of parallel fetches.
+    expect(calls.sort()).toEqual([
+      "GET http://localhost/api/v1/docs?orgId=org-1 sid=test-session",
+      "GET http://localhost/api/v1/projects?orgId=org-1 sid=test-session",
+    ]);
   });
 
   test("kind filter narrows rows locally without changing the public API request", async () => {
@@ -115,7 +123,12 @@ describe("/docs +page.server.ts public API route", () => {
     expect(result.kind).toBe("spec");
     const payload = await streamedData<DocsPayload>(result);
     expect(payload.documents.map((doc) => doc.id)).toEqual(["spec-doc"]);
-    expect(calls).toEqual(["GET http://localhost/api/v1/docs?orgId=org-1 sid=test-session"]);
+    // Loader also fetches /projects to resolve slug → UUID for the tree
+    // filter; tolerate the order of parallel fetches.
+    expect(calls.sort()).toEqual([
+      "GET http://localhost/api/v1/docs?orgId=org-1 sid=test-session",
+      "GET http://localhost/api/v1/projects?orgId=org-1 sid=test-session",
+    ]);
   });
 
   test("free-text q filters title and body excerpts locally", async () => {

@@ -12,6 +12,7 @@ export class DocumentWorkspacePageOperationsRequestDto implements DocumentWorksp
   pages!: DocumentWorkspacePageOperationsInput["pages"];
   rootPageId!: string;
   accessibleTreePageIds!: string[];
+  operations?: DocumentWorkspacePageOperationsInput["operations"];
   sidebar!: DocumentWorkspacePageOperationsInput["sidebar"];
   recent!: DocumentWorkspacePageOperationsInput["recent"];
 }

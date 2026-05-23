@@ -50,18 +50,29 @@ export async function loadProjectBacklog(
   const project = await getProjectOrNull(em, ctx, projectId);
   if (!project) throw new Error("Project not found");
   const conn = ormSqlConnection(em);
-  const sprints = await conn.execute<SprintListRow[]>(
-    `SELECT id, name, status, capacity_points
-       FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
-    [projectId],
-  );
+  // Sprint↔task model is currently in flux (see findings.md bug E). Tolerate
+  // missing `sprints` table on the canonical schema by returning an empty
+  // sprint list rather than 500-ing the backlog page.
+  let sprints: SprintListRow[] = [];
+  try {
+    sprints = await conn.execute<SprintListRow[]>(
+      `SELECT id, name, status, capacity_points
+         FROM sprints WHERE project_id = $1 ORDER BY created_at DESC, id ASC`,
+      [project.id],
+    );
+  } catch {
+    sprints = [];
+  }
+  // `fulcrum_tasks` has no `sprint_id` column — every open task is backlog
+  // until the sprint↔task model unifies.
   const backlogTasks = await conn.execute<BacklogTaskRow[]>(
-    `SELECT id, title, status, priority, points AS estimate_points, sprint_id
-       FROM tasks
-      WHERE project_id = $1 AND sprint_id IS NULL
-        AND status NOT IN ('completed', 'cancelled')
-      ORDER BY priority DESC, updated_at DESC, id ASC`,
-    [projectId],
+    `SELECT id, title, status, COALESCE(priority, 0) AS priority,
+            points AS estimate_points, NULL::text AS sprint_id
+       FROM fulcrum_tasks
+      WHERE project_id = $1 AND deleted_at IS NULL
+        AND status NOT IN ('completed', 'cancelled', 'done')
+      ORDER BY COALESCE(priority, 0) DESC, updated_at DESC, id ASC`,
+    [project.id],
   );
   return { project: { id: project.id, name: project.name }, sprints, backlogTasks };
 }

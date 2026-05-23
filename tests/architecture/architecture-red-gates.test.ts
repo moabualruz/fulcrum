@@ -6,13 +6,14 @@ async function read(path: string): Promise<string> {
 }
 
 describe("architecture RED gates", () => {
-  test("root CI has 4 tiers: lint, unit, integration, build", async () => {
+  test("root CI has 5 tiers: lint+arch, unit, integration, design E2E, real E2E", async () => {
     const ci = await read("scripts/ci.ts");
 
-    expect(ci).toContain('tier: "lint"');
-    expect(ci).toContain('tier: "unit"');
-    expect(ci).toContain('tier: "integration"');
-    expect(ci).toContain('tier: "build"');
+    expect(ci).toContain('tier: "tier1"');
+    expect(ci).toContain('tier: "tier2"');
+    expect(ci).toContain('tier: "tier3"');
+    expect(ci).toContain('tier: "tier4"');
+    expect(ci).toContain('tier: "tier5"');
   });
 
   test("web Vitest enforces coverage.thresholds.lines at 80", async () => {

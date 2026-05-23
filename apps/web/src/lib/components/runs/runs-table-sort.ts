@@ -1,7 +1,8 @@
+import type { SortDirection } from "@fulcrum/shared-dto";
 import type { RunRow } from "./runs-filters.ts";
 
-export type SortColumn = "agent" | "model" | "status" | "started_at" | "duration";
-export type SortDirection = "asc" | "desc";
+export type SortColumn = "agent" | "model" | "status" | "task_title" | "started_at" | "last_event_at" | "duration";
+export type { SortDirection } from "@fulcrum/shared-dto";
 
 function durationKey(row: RunRow, direction: SortDirection): number {
   if (row.ended_at === null) {
@@ -75,10 +76,17 @@ export function sortRunRows(
       case "model":
         cmp = compareString(a.row.model, b.row.model, direction);
         break;
+      case "task_title":
+        cmp = compareString(a.row.task_title ?? a.row.task_id ?? null, b.row.task_title ?? b.row.task_id ?? null, direction);
+        break;
       case "started_at": {
         const ka = Date.parse(a.row.started_at);
         const kb = Date.parse(b.row.started_at);
         cmp = compareNumber(ka, kb, direction);
+        break;
+      }
+      case "last_event_at": {
+        cmp = compareString(a.row.last_event_at ?? null, b.row.last_event_at ?? null, direction);
         break;
       }
       case "duration": {

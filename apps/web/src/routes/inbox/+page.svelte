@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import type { NotificationRow, ActivityRow } from "./+page.server.ts";
+  import { cn } from "@fulcrum/ui-kit";
+  import type { NotificationRow, NotificationRuleRow, ActivityRow } from "./+page.server.ts";
 
   interface Props {
     data: {
       notifications: NotificationRow[];
+      notificationRules: NotificationRuleRow[];
       unreadCount: number;
       activity: ActivityRow[];
       activityPage: number;
@@ -29,7 +30,7 @@
   }
 </script>
 
-<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
+<header data-inbox-header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>
     Inbox
     {#if data.unreadCount > 0}
@@ -102,6 +103,20 @@
         class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
       >No notifications.</div>
     {:else}
+      {#if data.notificationRules.length > 0}
+        <aside data-notification-rules-summary class={cn("mb-3 rounded-md border border-border bg-card p-3 text-xs text-muted-foreground")}>
+          <p class={cn("font-medium text-foreground")}>Notification rules</p>
+          <ul class={cn("mt-2 space-y-1")}>
+            {#each data.notificationRules as rule (rule.id)}
+              <li data-notification-rule={rule.id}>
+                <span class={cn("font-medium text-foreground")}>{rule.name}</span>
+                {" · "}{rule.enabled ? "enabled" : "disabled"}
+                {" · "}{rule.channels.length > 0 ? rule.channels.join(", ") : "in-app"}
+              </li>
+            {/each}
+          </ul>
+        </aside>
+      {/if}
       <ul class={cn("divide-y divide-border rounded-md border border-border")}>
         {#each data.notifications as n (n.id)}
           <li
@@ -118,16 +133,30 @@
             {:else}
               <span aria-hidden="true" class={cn("mt-1.5 h-2 w-2 shrink-0")}></span>
             {/if}
-            <div>
+            <div class={cn("min-w-0 flex-1")}>
               <p class={cn("text-sm font-medium")}>
                 <span data-notification-actor>{n.title}</span>
                 {" "}<span data-notification-verb>{n.body}</span>
                 {" "}<span data-notification-subject>{n.entityKind}:{n.entityId}</span>
               </p>
-              <p class={cn("mt-0.5 text-xs text-muted-foreground")} data-notification-time>
-                {formatDate(n.createdAt)}
-              </p>
+              <div class={cn("mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground")}>
+                <span data-notification-time>{formatDate(n.createdAt)}</span>
+                <a data-notification-evidence href={n.evidenceHref} class={cn("font-medium text-primary hover:underline")}>
+                  Evidence: {n.evidenceLabel}
+                </a>
+                <span data-notification-read-state>{n.readAt === null ? "unread" : `read ${formatDate(n.readAt)}`}</span>
+              </div>
             </div>
+            {#if n.readAt === null}
+              <form method="POST" action="?/markRead" class={cn("shrink-0")}>
+                <input type="hidden" name="id" value={n.id} />
+                <button
+                  type="submit"
+                  data-mark-read={n.id}
+                  class={cn("rounded border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent")}
+                >Mark read</button>
+              </form>
+            {/if}
           </li>
         {/each}
       </ul>

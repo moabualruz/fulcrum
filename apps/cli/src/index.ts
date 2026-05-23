@@ -5,7 +5,8 @@
  *
  * Commands default to public API clients. Only local runtime entry points such
  * as init, web, db migration, and interactive TUI startup open
- * the local application container.
+ * the local application container. The `fulcrum settings` command is registered
+ * in the switch below and advertised through generated command help.
  */
 
 import { join, resolve, sep } from "node:path";
@@ -17,46 +18,18 @@ import {
   type LocalApplicationContainer,
 } from "@platform-core/application/runtime/local-application-container.ts";
 
-const HELP = `fulcrum
+import {
+  HELP,
+  ROOT_HELP,
+  commandPathFromArgv,
+  renderCommandHelp,
+  renderCommandSchema,
+  STAGE_HELP_TOPICS,
+  renderStageHelp,
+} from "./help.ts";
+import { emitResult } from "./lib/cli-output.ts";
 
-Usage:
-  fulcrum init
-  fulcrum auth <whoami|invite|login|logout> [options]
-  fulcrum projects <list|stats> [--json]
-  fulcrum tasks <list|get|create|update|delete> [--json]
-  fulcrum work <create|inspect|move|link|report> [--json]
-  fulcrum sprints <list|get|create|update|delete|add-task|remove-task> [--json]
-  fulcrum flags <list|set> [options]
-  fulcrum routing rules <list|add|edit|delete> [options]
-  fulcrum routing <assign|simulate> [options]
-  fulcrum repos <register|list|sync|unregister|status> [options]
-  fulcrum docs template list [--json]
-  fulcrum symphony runs list --state ready [--json]
-  fulcrum agents <list|profile|test> [--json]
-  fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs> [--json]
-  fulcrum notify list [--unread] [--json|--watch]
-  fulcrum settings <list|get|set> [--json]
-  fulcrum memory <list|get|add|delete|search|promote> [--json]
-  fulcrum search query <query> [--json]
-  fulcrum artifacts <list|show|upload|accept|reject|download|archive|unarchive|delete> [--json]
-  fulcrum components status [--json]
-  fulcrum doctor [--json]
-  fulcrum completion --shell <bash|zsh|fish|powershell>
-  fulcrum audit <query|export> [--json]
-  fulcrum i18n <list|set> [--json]
-  fulcrum theme <list|set> [--json]
-  fulcrum telemetry <status|opt-in|opt-out|purge> [--json]
-  fulcrum backup <create|restore|verify> [--json]
-  fulcrum data <export|import> [--json]
-  fulcrum secrets <set|get|rotate|init-keyring> [--json]
-  fulcrum errors <list|get|purge> [--json]
-  fulcrum webhooks <list|test> [--json]
-  fulcrum connectors <enable|sync> <id> [--json]
-  fulcrum db <migrate|status|history> [options]
-  fulcrum web
-  fulcrum tui
-  fulcrum inference <start|status|embed|generate|stop> [--json]
-`;
+export { HELP, ROOT_HELP, STAGE_HELP_TOPICS, renderStageHelp };
 
 export function resolveClientAssetPath(clientRoot: string, requestPath: string): string | null {
   let pathname: string;
@@ -182,15 +155,43 @@ async function runWeb(_argv: readonly string[]): Promise<void> {
 export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<void> {
   const [cmd = "help", ...rest] = argv;
 
+  if (argv.includes("--json-schema")) {
+    console.log(JSON.stringify(renderCommandSchema(commandPathFromArgv(argv))));
+    return;
+  }
+
+  if (cmd !== "help" && (argv.includes("--help") || argv.includes("-h"))) {
+    const help = renderCommandHelp(argv);
+    if (help) {
+      console.log(help);
+      return;
+    }
+    return;
+  }
+
+  if (cmd === "help" || cmd === "--help" || cmd === "-h") {
+    const path = commandPathFromArgv(argv);
+    const topic = path[0];
+    const stageHelp = topic && path.length === 1 ? renderStageHelp(topic) : null;
+    const commandHelp = path.length > 0 ? renderCommandHelp(path) : null;
+    console.log(stageHelp ?? commandHelp ?? ROOT_HELP);
+    return;
+  }
+
   switch (cmd) {
     case "init": {
-      const { run: runInit } = await import("./commands/init.ts");
+      const { run: runInit } = await import("./init.ts");
       await runInit(rest);
       return;
     }
     case "agents": {
       const { run: runAgents } = await import("./commands/agents.ts");
-      await runAgents(rest);
+      await runAgents(rest, { commandRoot: "agents" });
+      return;
+    }
+    case "agent": {
+      const { run: runAgents } = await import("./commands/agents.ts");
+      await runAgents(rest, { commandRoot: "agent" });
       return;
     }
     case "projects": {
@@ -204,6 +205,27 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runProjects(rest);
       return;
     }
+    case "capture": {
+      const { run: runCapture } = await import("./commands/capture.ts");
+      await runCapture(rest);
+      return;
+    }
+    case "plan": {
+      const { run: runPlan } = await import("./commands/plan-stage.ts");
+      await runPlan(rest);
+      return;
+    }
+    case "mission": {
+      const { runMission } = await import("./commands/plan-stage.ts");
+      await runMission(rest);
+      return;
+    }
+    case "prototype": {
+      const { runPrototype } = await import("./commands/plan-stage.ts");
+      await runPrototype(rest);
+      return;
+    }
+    case "task":
     case "tasks": {
       const { run: runTasks } = await import("./commands/tasks.ts");
       await runTasks(rest);
@@ -243,7 +265,20 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     }
     case "routing": {
       const { run: runRouting } = await import("./commands/routing.ts");
-      await runRouting(rest);
+      await runRouting(rest, { commandRoot: "routing" });
+      return;
+    }
+    case "route": {
+      const { run: runRouting } = await import("./commands/routing.ts");
+      await runRouting(rest, { commandRoot: "route" });
+      return;
+    }
+    case "review":
+    case "qa":
+    case "uat":
+    case "e2e": {
+      const { run: runReviewStage } = await import("./commands/review-stage.ts");
+      await runReviewStage(cmd, rest);
       return;
     }
     case "repos": {
@@ -251,9 +286,24 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runRepos(rest);
       return;
     }
+    case "repo": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["repo", ...rest]);
+      return;
+    }
     case "docs": {
       const { run: runDocsCommand } = await import("./commands/docs.ts");
-      await runDocsCommand(rest);
+      await runDocsCommand(rest, { commandRoot: "docs" });
+      return;
+    }
+    case "doc": {
+      const { run: runDocsCommand } = await import("./commands/docs.ts");
+      await runDocsCommand(rest, { commandRoot: "doc" });
+      return;
+    }
+    case "report": {
+      const { run: runReport } = await import("./commands/report.ts");
+      await runReport(rest);
       return;
     }
     case "memory": {
@@ -280,6 +330,16 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "artifacts": {
       const { run: runArtifacts } = await import("./commands/artifacts.ts");
       await runArtifacts(rest);
+      return;
+    }
+    case "artifact": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["artifact", ...rest]);
+      return;
+    }
+    case "ship": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["ship", ...rest]);
       return;
     }
     case "db": {
@@ -316,15 +376,99 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runPillar14Command(cmd, rest);
       return;
     }
+    case "session": {
+      const { createLocalSessionCommandHost, SESSION_HELP, runSessionCommand } = await import("./commands/session.ts");
+      if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
+        console.log(SESSION_HELP);
+        return;
+      }
+      if (rest[0] === "list" && rest.includes("--no-spawn")) {
+        emitResult(
+          {
+            argv: rest,
+            command: "fulcrum session list",
+            args: { verb: "list", no_spawn: true },
+            result: [],
+            renderHuman: () => console.log("(no sessions)"),
+          },
+          { print: console.log, printErr: console.error },
+        );
+        return;
+      }
+      const { host, cleanup } = await createLocalSessionCommandHost();
+      const controller = new AbortController();
+      const stop = () => controller.abort();
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+      try {
+        const result = await runSessionCommand(rest, host, {
+          stdout: process.stdout,
+          stderr: process.stderr,
+          signal: controller.signal,
+        });
+        if (result.exitCode !== 0) process.exit(result.exitCode);
+      } finally {
+        process.off("SIGINT", stop);
+        process.off("SIGTERM", stop);
+        await cleanup();
+      }
+      return;
+    }
     case "settings": {
       const { run: runSettings } = await import("./settings.ts");
       await runSettings(rest);
+      return;
+    }
+    case "trace": {
+      const { run: runTrace } = await import("./commands/trace.ts");
+      await runTrace(rest);
+      return;
+    }
+    case "operate": {
+      const { run: runOperate } = await import("./commands/operate-plugins.ts");
+      await runOperate(rest, { invocationRoot: "operate" });
+      return;
+    }
+    case "plugin": {
+      // `fulcrum plugin …` is the CLI-TUI-UX.md §1.6 root alias for
+      // `fulcrum operate plugin …`. It reaches the same Operate plugin host;
+      // `invocationRoot: "plugin"` keeps the `fulcrum.cli.v1` envelope honest
+      // about which canonical grammar the operator used.
+      const { run: runOperate } = await import("./commands/operate-plugins.ts");
+      await runOperate(["plugin", ...rest], { invocationRoot: "plugin" });
+      return;
+    }
+    case "ai": {
+      const { run: runAi } = await import("./commands/ai.ts");
+      await runAi(rest);
+      return;
+    }
+    case "mode": {
+      const { run: runMode } = await import("./commands/mode.ts");
+      await runMode(rest);
       return;
     }
     case "components":
     case "component": {
       const { run: runComponent } = await import("./component.ts");
       await runComponent(rest);
+      return;
+    }
+    case "module": {
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      await runPillar14Command("module", rest);
+      return;
+    }
+    case "relationships":
+    case "comments":
+    case "templates":
+    case "automations":
+    case "recurrence":
+    case "saved_views":
+    case "taskCustomFields":
+    case "customFieldDefs": {
+      const { runGeneratedCommand } = await import("./generated-command-runner.ts");
+      await runGeneratedCommand(cmd, rest);
       return;
     }
     case "i18n": {
@@ -340,6 +484,11 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
     case "telemetry": {
       const { runTelemetry } = await import("./commands/cross-cutting-platform.ts");
       await runTelemetry(rest);
+      return;
+    }
+    case "offline": {
+      const { run: runOffline } = await import("./commands/offline.ts");
+      await runOffline(rest);
       return;
     }
     case "backup": {
@@ -389,7 +538,21 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runCompletion(rest);
       return;
     }
+    case "parity": {
+      const [sub = "help", ...parityRest] = rest;
+      if (sub === "cli-tui") {
+        const { run: runCliTuiParity } = await import("./commands/cli-tui-parity.ts");
+        await runCliTuiParity(parityRest);
+        return;
+      }
+      console.error(`fulcrum parity: unknown command '${sub}'`);
+      process.exit(2);
+    }
     case "web":
+      if (rest[0] === "help" || rest[0] === "--help" || rest[0] === "-h") {
+        console.log("fulcrum web: open the web shell. Build first with `bun --cwd apps/web run build`.");
+        return;
+      }
       await runWeb(rest);
       return;
     case "tui": {
@@ -402,14 +565,72 @@ export async function run(argv: readonly string[] = Bun.argv.slice(2)): Promise<
       await runInference(rest);
       return;
     }
+    case "context": {
+      const { run: runContext } = await import("./commands/context.ts");
+      await runContext(rest);
+      return;
+    }
+    case "branch": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["branch", ...rest]);
+      return;
+    }
+    case "pr": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["pr", ...rest]);
+      return;
+    }
+    case "release": {
+      const { run: runShipStage } = await import("./commands/ship-stage.ts");
+      await runShipStage(["release", ...rest]);
+      return;
+    }
+    case "config":
+    case "profile": {
+      const { run: runSettings } = await import("./settings.ts");
+      await runSettings(rest);
+      return;
+    }
+    case "cycle": {
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      await runPillar14Command("cycle", rest);
+      return;
+    }
+    case "note": {
+      const { run: runCapture } = await import("./commands/capture.ts");
+      await runCapture(["note", ...rest], { commandRoot: "note" });
+      return;
+    }
+    case "run": {
+      const { runPillar14Command } = await import("./commands/pillar14-generated.ts");
+      await runPillar14Command("run", rest);
+      return;
+    }
+    case "workspace": {
+      const { run: runProjects } = await import("./commands/projects.ts");
+      await runProjects(rest);
+      return;
+    }
     case "help":
     case "--help":
-    case "-h":
-      console.log(HELP);
+    case "-h": {
+      const [topic] = rest;
+      if (topic) {
+        const stageHelp = renderStageHelp(topic);
+        if (stageHelp) {
+          console.log(stageHelp);
+          return;
+        }
+        console.error(`fulcrum help: unknown stage '${topic}'`);
+        console.error(`Known stages: ${STAGE_HELP_TOPICS.join(", ")}`);
+        process.exit(2);
+      }
+      console.log(ROOT_HELP);
       return;
+    }
     default:
       console.error(`fulcrum: unknown command '${cmd}'`);
-      console.error(HELP);
+      console.error(ROOT_HELP);
       process.exit(2);
   }
 }

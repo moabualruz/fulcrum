@@ -36,10 +36,25 @@ export interface DocumentPositioned {
 
 export function sortDocumentPositionKeys<T extends DocumentPositioned>(keys: T[]): T[] {
   return keys.sort((a, b) => {
-    if (a.position < b.position) return -1;
-    if (a.position > b.position) return 1;
-    return 0;
+    const positionCompare = compareDocumentPositions(a.position, b.position);
+    if (positionCompare !== 0) return positionCompare;
+    const aRecord = a as Record<string, unknown>;
+    const bRecord = b as Record<string, unknown>;
+    const nameCompare = String(aRecord["name"] ?? aRecord["title"] ?? "").localeCompare(
+      String(bRecord["name"] ?? bRecord["title"] ?? ""),
+    );
+    if (nameCompare !== 0) return nameCompare;
+    return String(aRecord["id"] ?? "").localeCompare(String(bRecord["id"] ?? ""));
   });
+}
+
+function compareDocumentPositions(left: string | number, right: string | number): number {
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber;
+  }
+  return String(left).localeCompare(String(right));
 }
 
 export function buildDocumentPageTree(pages: FulcrumDocTreePage[]): DocumentTreeNode[] {
@@ -225,4 +240,116 @@ export function mergeDocumentRootTrees(
   });
 
   return sortDocumentPositionKeys(merged);
+}
+
+export interface DocumentTreeAppendChildrenOperation {
+  nodeId: string;
+  children: DocumentTreeNode[];
+}
+
+export interface DocumentTreeMoveOperation {
+  nodeId: string;
+  parentPageId: string | null;
+  previousSiblingPosition?: string | number | null;
+  nextSiblingPosition?: string | number | null;
+}
+
+export interface DocumentTreeOperationsPreviewInput {
+  tree: DocumentTreeNode[];
+  rename?: { nodeId: string; name: string };
+  icon?: { nodeId: string; icon: string };
+  deleteIds?: string[];
+  appendChildren?: DocumentTreeAppendChildrenOperation[];
+  mergeRoots?: DocumentTreeNode[];
+  move?: DocumentTreeMoveOperation;
+}
+
+export interface DocumentTreeOperationsPreviewOutput {
+  tree: DocumentTreeNode[];
+  persistedMoves: Array<{ id: string; parentPageId: string | null; position: string }>;
+  applied: string[];
+}
+
+export function previewDocumentTreeOperations(
+  input: DocumentTreeOperationsPreviewInput,
+): DocumentTreeOperationsPreviewOutput {
+  let tree = cloneDocumentTree(input.tree);
+  const applied: string[] = [];
+  const persistedMoves: Array<{ id: string; parentPageId: string | null; position: string }> = [];
+
+  if (input.rename) {
+    tree = renameDocumentTreeNode(tree, input.rename.nodeId, input.rename.name);
+    applied.push("rename");
+  }
+
+  if (input.icon) {
+    tree = setDocumentTreeNodeIcon(tree, input.icon.nodeId, input.icon.icon);
+    applied.push("icon");
+  }
+
+  for (const id of input.deleteIds ?? []) {
+    tree = deleteDocumentTreeNode(tree, id);
+    applied.push("delete");
+  }
+
+  for (const append of input.appendChildren ?? []) {
+    tree = appendDocumentTreeNodeChildren(tree, append.nodeId, sortDocumentPositionKeys(cloneDocumentTree(append.children)));
+    applied.push("append");
+  }
+
+  if (input.mergeRoots) {
+    tree = mergeDocumentRootTrees(tree, cloneDocumentTree(input.mergeRoots));
+    applied.push("merge");
+  }
+
+  if (input.move) {
+    const position = midpointPosition(
+      input.move.previousSiblingPosition ?? null,
+      input.move.nextSiblingPosition ?? null,
+    );
+    tree = moveDocumentTreeNode(tree, input.move.nodeId, input.move.parentPageId, position);
+    persistedMoves.push({ id: input.move.nodeId, parentPageId: input.move.parentPageId, position });
+    applied.push("move");
+  }
+
+  return { tree, persistedMoves, applied };
+}
+
+function moveDocumentTreeNode(
+  tree: DocumentTreeNode[],
+  nodeId: string,
+  parentPageId: string | null,
+  position: string,
+): DocumentTreeNode[] {
+  const flat = flattenDocumentTree(tree).map((node) =>
+    node.id === nodeId ? { ...node, parentPageId, position, children: [] } : { ...node, children: [] },
+  );
+  return buildDocumentTreeWithChildren(flat);
+}
+
+function flattenDocumentTree(nodes: DocumentTreeNode[]): DocumentTreeNode[] {
+  return nodes.flatMap((node) => [
+    { ...node, children: [] },
+    ...flattenDocumentTree(node.children),
+  ]);
+}
+
+function cloneDocumentTree(nodes: DocumentTreeNode[]): DocumentTreeNode[] {
+  return nodes.map((node) => ({ ...node, children: cloneDocumentTree(node.children) }));
+}
+
+function midpointPosition(previous: string | number | null, next: string | number | null): string {
+  const previousNumber = previous === null ? null : Number(previous);
+  const nextNumber = next === null ? null : Number(next);
+  if (previousNumber === null && nextNumber === null) return "1";
+  if (previousNumber === null) {
+    return nextNumber !== null && Number.isFinite(nextNumber) ? String(nextNumber - 1) : "1";
+  }
+  if (nextNumber === null) {
+    return Number.isFinite(previousNumber) ? String(previousNumber + 1) : `${previous}.1`;
+  }
+  if (Number.isFinite(previousNumber) && Number.isFinite(nextNumber)) {
+    return String((previousNumber + nextNumber) / 2);
+  }
+  return previous === null ? "1" : `${previous}.1`;
 }

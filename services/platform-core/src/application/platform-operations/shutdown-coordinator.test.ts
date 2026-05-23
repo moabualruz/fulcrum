@@ -70,4 +70,45 @@ describe("createGracefulShutdown", () => {
     expect(second).toBe(first);
     expect(calls).toBe(5);
   });
+
+  test("reports the failed shutdown hook without running later cleanup", async () => {
+    const calls: string[] = [];
+    const shutdown = createGracefulShutdown({
+      stopWorkers: async () => { calls.push("stopWorkers"); },
+      closeSubscriptions: async () => { throw new Error("websocket close failed"); },
+      closeHttpServer: async () => { calls.push("closeHttpServer"); },
+      closeDatabase: async () => { calls.push("closeDatabase"); },
+      cleanupWorkspaces: async () => { calls.push("cleanupWorkspaces"); },
+      log: () => undefined,
+    });
+
+    const result = await shutdown.shutdown("SIGTERM");
+
+    expect(result).toEqual({
+      ok: false,
+      signal: "SIGTERM",
+      completed: ["stopWorkers"],
+      failed: "closeSubscriptions",
+      error: "websocket close failed",
+    });
+    expect(calls).toEqual(["stopWorkers"]);
+  });
+
+  test("allows callers to omit hooks for runtime components that are disabled", async () => {
+    const shutdown = createGracefulShutdown({
+      closeDatabase: async () => undefined,
+      log: () => undefined,
+    });
+
+    const result = await shutdown.shutdown("SIGTERM");
+
+    expect(result.ok).toBe(true);
+    expect(result.completed).toEqual([
+      "stopWorkers",
+      "closeSubscriptions",
+      "closeHttpServer",
+      "closeDatabase",
+      "cleanupWorkspaces",
+    ]);
+  });
 });

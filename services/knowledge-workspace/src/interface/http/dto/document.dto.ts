@@ -53,6 +53,7 @@ export class DocumentCreateBodyDto {
   title!: string;
   type?: PublicDocumentType;
   bodyMd?: string;
+  editorJson?: Record<string, unknown>;
   frontmatter?: Record<string, unknown>;
   parentId?: string | null;
   sortPosition?: number;
@@ -62,6 +63,7 @@ export class DocumentPatchBodyDto {
   title?: string;
   type?: PublicDocumentType;
   bodyMd?: string;
+  editorJson?: Record<string, unknown>;
   frontmatter?: Record<string, unknown>;
   parentId?: string | null;
   sortPosition?: number;

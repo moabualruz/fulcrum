@@ -6,7 +6,7 @@ Local-first product-store infrastructure for Fulcrum. Powers supervisor, task sy
 
 Fulcrum uses one Postgres-compatible database selection path (`resolveDatabaseConfig` in `services/platform-core/src/application/db/database-config.ts`):
 
-- **Local default — PGlite.** No separate database service. When no URL is configured, runtime uses `${FULCRUM_HOME:-~/.fulcrum}/pglite.data`.
+- **Local default — PGlite.** No separate database service. When no URL is configured, runtime uses `${FULCRUM_HOME:-~/.fulcrum}/db/main`.
 - **PostgreSQL server — local power, self-hosted, or SaaS.** Set `FULCRUM_DATABASE_URL` or `DATABASE_URL` to a `postgres://` or `postgresql://` connection string. CLI status, doctor, Nest/TypeORM startup, and application DB helpers select PostgreSQL without code changes.
 - **Explicit PGlite socket — tests/specialized runtime only.** `FULCRUM_TYPEORM_PGLITE_SOCKET_URL` may point Nest TypeORM at a prestarted PGlite socket. Normal local startup manages that socket automatically.
 
@@ -16,7 +16,7 @@ State paths (override root w/ `FULCRUM_HOME`):
 
 | Path                                       | Contents                                |
 | ------------------------------------------ | --------------------------------------- |
-| `~/.fulcrum/pglite.data`                   | Default PGlite data directory           |
+| `~/.fulcrum/db/main`                       | Default PGlite data directory           |
 | `~/.fulcrum/state/product/artifacts`       | Artifact bodies (per-file storage)      |
 
 `fulcrum product init` creates the selected local database when needed, runs migrations, and ensures the `default` local org. `fulcrum doctor` reports selected engine, schema count, row counts, and redacts PostgreSQL credentials. `fulcrum uninstall --purge` removes local Fulcrum state.

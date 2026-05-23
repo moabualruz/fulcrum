@@ -36,7 +36,7 @@ async function seedDb() {
   return { db, org, project };
 }
 
-describe("/projects/<id>/activity — filtered events", () => {
+describe("/projects/<id>/activity: filtered events", () => {
   test("listEventsFiltered filters by project", async () => {
     const { db, org, project } = await seedDb();
     const p2 = await createProject(db, {

@@ -15,7 +15,7 @@ export interface SubscriptionEventApiClientOptions {
 
 export interface SubscriptionEventStreamInput {
   signal?: AbortSignal;
-  onEvent(event: unknown): void;
+  onEvent(event: SerializedSubscriptionEvent): void;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -90,7 +90,7 @@ async function streamEvents(
 
 async function readEventStream(
   body: ReadableStream<Uint8Array>,
-  onEvent: (event: unknown) => void,
+  onEvent: (event: SerializedSubscriptionEvent) => void,
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -108,14 +108,14 @@ async function readEventStream(
   if (buffer.trim()) emitEventBlock(buffer, onEvent);
 }
 
-function emitEventBlock(block: string, onEvent: (event: unknown) => void): void {
+function emitEventBlock(block: string, onEvent: (event: SerializedSubscriptionEvent) => void): void {
   const data = block
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice("data:".length).trimStart())
     .join("\n");
   if (!data) return;
-  onEvent(JSON.parse(data));
+  onEvent(JSON.parse(data) as SerializedSubscriptionEvent);
 }
 
 function scopedQuery(options: SubscriptionEventApiClientOptions, input: JsonRecord): JsonRecord {
@@ -140,3 +140,4 @@ function extractErrorMessage(body: unknown, status: number): string {
   const record = body as { message?: string; error?: { message?: string; json?: { message?: string } } } | null;
   return record?.error?.json?.message ?? record?.error?.message ?? record?.message ?? `Subscription event API request failed with ${status}.`;
 }
+import type { SerializedSubscriptionEvent } from "@platform-core/application/subscriptions/event-bus.ts";

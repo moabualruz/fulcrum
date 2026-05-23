@@ -5,6 +5,7 @@ import {
   WorkAutomationEntity,
   type WorkAutomation,
 } from "@work-management/infrastructure/database/automation.entities.ts";
+import { FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export type AutomationConditionOperator =
   | "equals"
@@ -49,8 +50,10 @@ export class AutomationStore {
   constructor(private readonly dataSource: DataSource) {}
 
   async list(input: { orgId: string; projectId: string }): Promise<AutomationPublicRow[]> {
+    const projectId = await this.resolveProjectId(input.projectId, input.orgId);
+    if (!projectId) return [];
     const rows = await this.repository().find({
-      where: { orgId: input.orgId, projectId: input.projectId },
+      where: { orgId: input.orgId, projectId },
       order: { createdAt: "ASC", id: "ASC" },
     });
     return rows.map(toPublicRow);
@@ -66,10 +69,11 @@ export class AutomationStore {
     actionType: string;
     actionConfig?: Record<string, unknown> | null;
   }): Promise<AutomationPublicRow> {
+    const projectId = (await this.resolveProjectId(input.projectId, input.orgId)) ?? input.projectId;
     const row = await this.repository().save(this.repository().create({
       id: randomUUID(),
       orgId: input.orgId,
-      projectId: input.projectId,
+      projectId,
       name: input.name,
       triggerType: input.triggerType,
       triggerConfig: input.triggerConfig ?? {},
@@ -154,6 +158,15 @@ export class AutomationStore {
 
   private repository() {
     return this.dataSource.getRepository(WorkAutomationEntity);
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(projectId: string, orgId: string): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: projectId, workspaceId: orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: projectId, workspaceId: orgId });
+    return bySlug?.id ?? null;
   }
 }
 

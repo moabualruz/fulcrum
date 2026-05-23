@@ -26,6 +26,17 @@ describe("/projects/[id]/review +page.svelte source", () => {
     expect(source).toContain("data-save-session-result");
   });
 
+  test("makes final UAT/code-review gate discoverable with trace and E2E links", () => {
+    expect(source).toContain("data-final-gate");
+    expect(source).toContain("data-code-review-prompt");
+    expect(source).toContain("data-decision-event-trace");
+    expect(source).toContain("data-uat-handoff-link");
+    expect(source).toContain("data-generated-e2e-link");
+    expect(source).toContain("data-generated-e2e-artifacts");
+    expect(source).toContain("/projects/{data.projectId}/uat");
+    expect(source).toContain("/projects/{data.projectId}/e2e");
+  });
+
   test("renders annotation and UAT decision controls backed by route actions", () => {
     expect(source).toContain('action="?/annotate"');
     expect(source).toContain('name="lineStart"');
@@ -33,6 +44,7 @@ describe("/projects/[id]/review +page.svelte source", () => {
     expect(source).toContain('name="severity"');
     expect(source).toContain('action="?/uatDecision"');
     expect(source).toContain('name="decision"');
+    expect(source).toContain('name="traceId"');
     expect(source).toContain("approve_without_manual_review");
     expect(source).toContain("request_changes");
   });

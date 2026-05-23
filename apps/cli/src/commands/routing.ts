@@ -4,6 +4,7 @@ import {
   createRoutingApiCallerFromEnv,
   type RoutingApiEnvironment,
 } from "@execution-orchestration/interface/http/routing-api-client.ts";
+import { emitErrorResult, emitResult } from "../lib/cli-output.ts";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -41,6 +42,7 @@ type RoutingEnrichedDecision = {
 type RoutingCaller = {
   routing: {
     list: (input?: JsonRecord) => Promise<RoutingRuleRow[]>;
+    show?: (input: { action: string; projectId?: string }) => Promise<RoutingRuleRow | null>;
     create: (input: JsonRecord) => Promise<RoutingRuleRow>;
     update: (input: JsonRecord) => Promise<RoutingRuleRow | null>;
     delete: (input: { id: string }) => Promise<{ ok: true }>;
@@ -65,6 +67,8 @@ export interface RoutingRunOptions {
   print?: (line: string) => void;
   printErr?: (line: string) => void;
   exit?: (code: number) => void;
+  commandRoot?: "route" | "routing";
+  currentArgv?: readonly string[];
 }
 
 const HELP = `fulcrum routing
@@ -72,6 +76,10 @@ const HELP = `fulcrum routing
 Routing commands.
 
 Usage:
+  fulcrum route list [--project <id>] [--json]
+  fulcrum route show <action> [--project <id>] [--json]
+  fulcrum route set <action> <agent> [--project <id>] [--json]
+
   fulcrum routing rules list [--project <id>] [--json]
   fulcrum routing rules add --name <n> --agent <a> --conditions <json|@file.json> [--project <id>] [--skill <name>] [--priority <n>] [--json]
   fulcrum routing rules edit <id> [--name <n>] [--agent <a>] [--conditions <json|@file.json>] [--project <id>] [--skill <name>] [--priority <n>] [--enabled <true|false>] [--json]
@@ -96,12 +104,73 @@ export async function run(
   opts: RoutingRunOptions = {},
 ): Promise<void> {
   const { print = console.log, printErr = console.error, exit = process.exit } = opts;
-  const runOpts = { ...opts, print, printErr, exit };
+  const runOpts = { ...opts, print, printErr, exit, currentArgv: argv };
   const [scope = "help", ...rest] = argv;
+  const commandRoot = opts.commandRoot ?? "routing";
 
-  if (scope === "help" || scope === "--help" || scope === "-h") {
+  if (scope === "help" || argv.includes("--help") || argv.includes("-h")) {
     print(HELP);
     return;
+  }
+
+  if (scope === "list") {
+    return withErrors("list", runOpts, async () => {
+      const caller = await resolveCaller(runOpts);
+      const result = await caller.routing.list(compact({
+        projectId: flagValue(rest, "--project"),
+      }));
+      emitRoutingResult({
+        argv,
+        command: `fulcrum ${commandRoot} list`,
+        args: { projectId: flagValue(rest, "--project") },
+        result,
+        print,
+        human: formatRules,
+      });
+    });
+  }
+
+  if (scope === "set") {
+    return withErrors("set", runOpts, async () => {
+      const action = requireArg(rest, 0, "set", "<action>");
+      const agent = requireArg(rest, 1, "set", "<agent>");
+      const caller = await resolveCaller(runOpts);
+      const result = await caller.routing.create(compact({
+        name: `Default ${action}`,
+        projectId: flagValue(rest, "--project"),
+        actionAgent: agent,
+        conditionsJson: { action },
+        actionSkillSet: [],
+        priority: numberFlag(rest, "--priority") ?? 0,
+      }));
+      emitRoutingResult({
+        argv,
+        command: `fulcrum ${commandRoot} set`,
+        args: { action, agent, projectId: flagValue(rest, "--project") },
+        result,
+        print,
+        human: (value) => `Set ${action} route to ${(value as RoutingRuleRow).actionAgent}.`,
+      });
+    });
+  }
+
+  if (scope === "show") {
+    return withErrors("show", runOpts, async () => {
+      const action = requireArg(rest, 0, "show", "<action>");
+      const projectId = flagValue(rest, "--project");
+      const caller = await resolveCaller(runOpts);
+      const result = caller.routing.show
+        ? await caller.routing.show(compact({ action, projectId }) as { action: string; projectId?: string })
+        : findRouteForAction(await caller.routing.list(compact({ projectId })), action);
+      emitRoutingResult({
+        argv,
+        command: `fulcrum ${commandRoot} show`,
+        args: { action, projectId },
+        result,
+        print,
+        human: formatRoute,
+      });
+    });
   }
 
   if (scope === "rules") {
@@ -113,7 +182,7 @@ export async function run(
           const result = await caller.routing.list(compact({
             projectId: flagValue(args, "--project"),
           }));
-          printOutput(result, args, print, formatRules);
+          printOutput(result, args, print, "rules list", formatRules);
         });
       case "add":
       case "create":
@@ -121,7 +190,7 @@ export async function run(
           const input = await parseRuleCreate(args);
           const caller = await resolveCaller(runOpts);
           const result = await caller.routing.create(input);
-          printOutput(result, args, print, (value) => `Created routing rule ${(value as RoutingRuleRow).id}.`);
+          printOutput(result, args, print, `rules ${verb}`, (value) => `Created routing rule ${(value as RoutingRuleRow).id}.`);
         });
       case "edit":
       case "update":
@@ -130,7 +199,7 @@ export async function run(
           const input = await parseRuleUpdate(args.slice(1), id);
           const caller = await resolveCaller(runOpts);
           const result = await caller.routing.update(input);
-          printOutput(result, args, print, (value) => {
+          printOutput(result, args, print, `rules ${verb}`, (value) => {
             const row = value as RoutingRuleRow | null;
             return row ? `Updated routing rule ${row.id}.` : `Routing rule ${id} not found.`;
           });
@@ -140,7 +209,7 @@ export async function run(
           const id = requireArg(args, 0, "rules delete", "<id>");
           const caller = await resolveCaller(runOpts);
           const result = await caller.routing.delete({ id });
-          printOutput(result, args, print, () => `Deleted routing rule ${id}.`);
+          printOutput(result, args, print, "rules delete", () => `Deleted routing rule ${id}.`);
         });
       case "test":
         return runAssign(args, "rules test", runOpts);
@@ -152,9 +221,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing rules: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `rules ${verb}`, `fulcrum ${commandRoot} rules: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -168,14 +236,14 @@ export async function run(
           const result = await caller.routing.drafts.list(compact({
             status: flagValue(args, "--status"),
           }));
-          printOutput(result, args, print, formatDrafts);
+          printOutput(result, args, print, "drafts list", formatDrafts);
         });
       case "approve":
         return withErrors("drafts approve", runOpts, async () => {
           const draftId = requireArg(args, 0, "drafts approve", "<draft-id>");
           const caller = await resolveCaller(runOpts);
           const result = await caller.routing.drafts.approve({ draftId });
-          printOutput(result, args, print, () => `Approved draft ${draftId}.`);
+          printOutput(result, args, print, "drafts approve", () => `Approved draft ${draftId}.`);
         });
       case "update":
         return withErrors("drafts update", runOpts, async () => {
@@ -188,14 +256,14 @@ export async function run(
             conditionsJson: conditions,
             actionAgent,
           }));
-          printOutput(result, args, print, () => `Updated draft ${draftId}.`);
+          printOutput(result, args, print, "drafts update", () => `Updated draft ${draftId}.`);
         });
       case "delete":
         return withErrors("drafts delete", runOpts, async () => {
           const draftId = requireArg(args, 0, "drafts delete", "<draft-id>");
           const caller = await resolveCaller(runOpts);
           const result = await caller.routing.drafts.delete({ draftId });
-          printOutput(result, args, print, () => `Deleted draft ${draftId}.`);
+          printOutput(result, args, print, "drafts delete", () => `Deleted draft ${draftId}.`);
         });
       case "help":
       case "--help":
@@ -203,9 +271,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing drafts: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `drafts ${verb}`, `fulcrum ${commandRoot} drafts: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -220,7 +287,7 @@ export async function run(
           const inputMode = process.env["FULCRUM_LLM_INPUT_MODE"] ?? "full_context";
           const gateInfo = { enabled, inputMode, labels: [] as string[] };
           if (!enabled) gateInfo.labels.push("unavailable");
-          printOutput(gateInfo, args, print, (value) => {
+          printOutput(gateInfo, args, print, "llm-gate get", (value) => {
             const info = value as { enabled: boolean; inputMode: string };
             return `LLM gate: ${info.enabled ? "enabled" : "disabled"} (input mode: ${info.inputMode})`;
           });
@@ -235,7 +302,7 @@ export async function run(
             inputMode,
             enabled,
           }));
-          printOutput(result, args, print, () => "LLM gate updated.");
+          printOutput(result, args, print, "llm-gate set", () => "LLM gate updated.");
         });
       case "help":
       case "--help":
@@ -243,9 +310,8 @@ export async function run(
         print(HELP);
         return;
       default:
-        printErr(`fulcrum routing llm-gate: unknown command '${verb}'`);
-        printErr(HELP);
-        exit(2);
+        emitUnknownCommand(runOpts, `llm-gate ${verb}`, `fulcrum ${commandRoot} llm-gate: unknown command '${verb}'`);
+        return;
     }
     return;
   }
@@ -258,9 +324,8 @@ export async function run(
     case "dry-run":
       return runSimulate(rest, scope, runOpts);
     default:
-      printErr(`fulcrum routing: unknown command '${scope}'`);
-      printErr(HELP);
-      exit(2);
+      emitUnknownCommand(runOpts, scope, `fulcrum ${commandRoot}: unknown command '${scope}'`);
+      return;
   }
 }
 
@@ -273,7 +338,7 @@ async function runAssign(
     const taskId = requireArg(argv, 0, command, "<task-id>");
     const caller = await resolveCaller(opts);
     const result = await caller.routing.test({ taskId });
-    printOutput(result, argv, opts.print, formatEnrichedDecision);
+    printOutput(result, argv, opts.print, command, formatEnrichedDecision);
   });
 }
 
@@ -287,7 +352,7 @@ async function runSimulate(
     const taskJson = await parseJsonReference(raw, "--task-json");
     const caller = await resolveCaller(opts);
     const result = await caller.routing.dryRun({ taskJson });
-    printOutput(result, argv, opts.print, formatEnrichedDecision);
+    printOutput(result, argv, opts.print, command, formatEnrichedDecision);
   });
 }
 
@@ -387,9 +452,40 @@ function printOutput(
   value: unknown,
   argv: readonly string[],
   print: (line: string) => void,
+  command: string,
   human: (value: unknown) => string,
 ): void {
-  print(argv.includes("--json") ? JSON.stringify(value) : human(value));
+  emitResult(
+    {
+      argv,
+      command: `fulcrum routing ${command}`,
+      args: {},
+      result: value,
+      renderHuman: (result) => print(human(result)),
+    },
+    { print, printErr: print },
+  );
+}
+
+function emitRoutingResult(input: {
+  value?: never;
+  result: unknown;
+  argv: readonly string[];
+  command: string;
+  args: Record<string, unknown>;
+  print: (line: string) => void;
+  human: (value: unknown) => string;
+}): void {
+  emitResult(
+    {
+      argv: input.argv,
+      command: input.command,
+      args: compact(input.args),
+      result: input.result,
+      renderHuman: (value) => input.print(input.human(value)),
+    },
+    { print: input.print, printErr: input.print },
+  );
 }
 
 function formatRules(value: unknown): string {
@@ -400,6 +496,21 @@ function formatRules(value: unknown): string {
     ...rows.map((row) =>
       `${row.id}  ${row.priority}  ${row.enabled ? "true" : "false"}  ${row.actionAgent}  ${row.source}  ${row.name}`
     ),
+  ].join("\n");
+}
+
+function findRouteForAction(rows: readonly RoutingRuleRow[], action: string): RoutingRuleRow | null {
+  return rows.find((row) => row.conditionsJson["action"] === action || row.name === `Default ${action}`) ?? null;
+}
+
+function formatRoute(value: unknown): string {
+  const row = value as RoutingRuleRow | null;
+  if (!row) return "No route found.";
+  return [
+    `action: ${String(row.conditionsJson["action"] ?? "")}`,
+    `agent: ${row.actionAgent}`,
+    `ruleId: ${row.id}`,
+    `source: ${row.source}`,
   ].join("\n");
 }
 
@@ -452,9 +563,48 @@ async function withErrors(
     await fn();
   } catch (err) {
     const msg = formatApiError(err);
-    opts.printErr(`fulcrum routing ${command}: ${msg}`);
+    emitErrorResult(
+      {
+        argv: opts.currentArgv ?? [],
+        command: `fulcrum ${opts.commandRoot ?? "routing"} ${command}`,
+        args: {},
+        error: {
+          code: "FUL_ROUTING_ERROR",
+          message: `fulcrum ${opts.commandRoot ?? "routing"} ${command}: ${msg}`,
+          fix: "Configure the Fulcrum public API environment, then retry.",
+        },
+        renderHuman: () => opts.printErr(`fulcrum ${opts.commandRoot ?? "routing"} ${command}: ${msg}`),
+      },
+      { print: opts.print, printErr: opts.printErr },
+    );
     opts.exit(1);
   }
+}
+
+function emitUnknownCommand(
+  opts: Required<Pick<RoutingRunOptions, "print" | "printErr" | "exit">> & RoutingRunOptions,
+  command: string,
+  message: string,
+): void {
+  emitErrorResult(
+    {
+      argv: opts.currentArgv ?? [],
+      command: `fulcrum ${opts.commandRoot ?? "routing"} ${command}`,
+      args: {},
+      error: {
+        code: "FUL_ROUTING_UNKNOWN_COMMAND",
+        message,
+        fix: "Run `fulcrum route --help` for routing commands.",
+      },
+      renderHuman: () => {
+        opts.printErr(message);
+        opts.printErr(HELP);
+      },
+      recoveryCopy: false,
+    },
+    { print: opts.print, printErr: opts.printErr },
+  );
+  opts.exit(2);
 }
 
 async function resolveCaller(opts: RoutingRunOptions): Promise<RoutingCaller> {

@@ -25,7 +25,7 @@ import { Credential } from "@platform-core/infrastructure/application-database/e
 import { CredentialRepository } from "@platform-core/infrastructure/application-database/repositories/platform/CredentialRepository.ts";
 import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
 import { CasbinRuleRepository } from "@platform-core/infrastructure/application-database/repositories/flags/CasbinRuleRepository.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";

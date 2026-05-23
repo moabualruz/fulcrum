@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props { data: PageData }
@@ -57,6 +57,7 @@
                       flag.enabled ? "bg-primary" : "bg-muted",
                     )}
                     aria-pressed={flag.enabled}
+                    aria-label={`${flag.enabled ? "Disable" : "Enable"} ${flag.name}`}
                   >
                     <span class={cn(
                       "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform",
@@ -74,7 +75,7 @@
                       data-rollout-slider
                       class={cn("w-24")} />
                     <span class={cn("ml-1 text-xs")}>{rolloutDraft}%</span>
-                    <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }), "ml-1")}>Save</button>
+                    <button type="submit" class={cn(buttonVariants({ variant: "primary", size: "sm" }), "ml-1")}>Save</button>
                     <button type="button" onclick={() => { editingRollout = null; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Cancel</button>
                   </form>
                 {:else}
@@ -92,7 +93,7 @@
                       data-cohort-editor
                       class={cn("border-input bg-background w-full rounded-md border px-2 py-1 font-mono text-xs")}></textarea>
                     <div class={cn("flex gap-1 mt-1")}>
-                      <button type="submit" class={cn(buttonVariants({ variant: "default", size: "sm" }))}>Save</button>
+                      <button type="submit" class={cn(buttonVariants({ variant: "primary", size: "sm" }))}>Save</button>
                       <button type="button" onclick={() => { editingCohort = null; }} class={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>Cancel</button>
                     </div>
                   </form>

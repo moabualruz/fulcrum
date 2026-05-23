@@ -1,33 +1,101 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
+const webRoot = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(webRoot, "../..");
 const tempRoot = process.env.TMPDIR ?? "/tmp/fulcrum-e2e";
 const fulcrumHome = path.join(tempRoot, `fulcrum-e2e-${process.pid}`);
-const port = Number(process.env.FULCRUM_E2E_PORT ?? "5173");
+const designPort = Number(process.env.FULCRUM_DESIGN_E2E_PORT ?? "4200");
+const realPort = Number(process.env.FULCRUM_REAL_E2E_PORT ?? process.env.FULCRUM_E2E_PORT ?? "5173");
+const serverPort = Number(process.env.FULCRUM_SERVER_TEST_PORT ?? "3100");
+const quotedWebRoot = JSON.stringify(webRoot);
+const quotedRepoRoot = JSON.stringify(repoRoot);
+const syncUiKitCommand = `cd ${quotedRepoRoot} && cd packages/ui-kit && bun x svelte-kit sync`;
+const skipDesignE2eServer = process.env.FULCRUM_SKIP_DESIGN_E2E_SERVER === "1";
+const skipRealE2eServers = process.env.FULCRUM_SKIP_REAL_E2E_SERVERS === "1";
+
+export const PLAYWRIGHT_DOCKER_IMAGE = "mcr.microsoft.com/playwright:v1.50-jammy";
 
 process.env.FULCRUM_HOME ??= fulcrumHome;
 
 export default defineConfig({
-	testDir: "tests/e2e/",
+	testDir: path.join(webRoot, "tests"),
 	timeout: 30000,
-	retries: 0,
-	use: {
-		baseURL: `http://127.0.0.1:${port}`,
-	},
-	webServer: {
-		command: `bun run dev -- --host 127.0.0.1 --port ${port}`,
-		port,
-		env: {
-			FULCRUM_HOME: fulcrumHome,
-			FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
-			FULCRUM_E2E: "1",
+	workers: 1,
+	retries: 1,
+	expect: {
+		toHaveScreenshot: {
+			maxDiffPixelRatio: 0.01,
+			threshold: 0.2,
+			animations: "disabled",
 		},
-		reuseExistingServer: false,
 	},
+	use: {
+		trace: "retain-on-failure",
+	},
+	webServer: [
+		// Design-e2e preview server. The `run-design-e2e.ts` harness sets
+		// `FULCRUM_SKIP_DESIGN_E2E_SERVER=1` because it owns build + preview
+		// itself — it builds to a verified-complete `.svelte-kit/output` and
+		// waits for the preview to be genuinely ready before Playwright starts
+		// (see that file's determinism contract). This entry is only the
+		// fallback for running Playwright directly: `timeout` is wide enough
+		// that a cold `svelte-kit sync && vite build` is never killed mid-write,
+		// which would leave a partial `.svelte-kit/output` whose
+		// `manifest-full.js` imports `nodes/<n>.js` files that were never written.
+		...skipDesignE2eServer ? [] : [{
+			command: `${syncUiKitCommand} && cd ${quotedWebRoot} && bun run svelte-kit sync && bun --bun node_modules/vite/bin/vite.js build && bun --bun node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port ${designPort}`,
+			port: designPort,
+			timeout: 180_000,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
+				FULCRUM_FEATURES: "public-api",
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		}],
+		...skipRealE2eServers ? [] : [{
+			command: `cd ${quotedRepoRoot} && bun run apps/server/src/index.ts`,
+			port: serverPort,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_SERVER_PORT: String(serverPort),
+				PORT: String(serverPort),
+				FULCRUM_FEATURES: "public-api",
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		},
+		{
+			command: `${syncUiKitCommand} && cd ${quotedWebRoot} && bun --bun node_modules/vite/bin/vite.js dev --host 127.0.0.1 --port ${realPort}`,
+			port: realPort,
+			env: {
+				FULCRUM_HOME: fulcrumHome,
+				FULCRUM_ARTIFACT_STORE: path.join(fulcrumHome, "artifacts"),
+				FULCRUM_API_URL: `http://127.0.0.1:${serverPort}`,
+				FULCRUM_E2E: "1",
+			},
+			reuseExistingServer: false,
+		}],
+	],
 	projects: [
 		{
-			name: "chromium",
-			use: { ...devices["Desktop Chrome"] },
+			name: "design-e2e",
+			testMatch: "design-e2e/**/*.spec.ts",
+			use: {
+				...devices["Desktop Chrome"],
+				baseURL: `http://127.0.0.1:${designPort}`,
+			},
+		},
+		{
+			name: "real-e2e",
+			testMatch: ["a11y/**/*.test.ts", "e2e/**/*.spec.ts"],
+			use: {
+				...devices["Desktop Chrome"],
+				baseURL: `http://127.0.0.1:${realPort}`,
+			},
 		},
 	],
 });

@@ -14,6 +14,7 @@ import {
   fulcrumTypeOrmRootModule,
 } from "./typeorm-root.module.ts";
 import { AppModule } from "@fulcrum/server/app.module.ts";
+import { createDataSourceOptions, resolveApplicationDatabaseRuntime } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { FulcrumTypeOrmConnectionRuntime } from "@platform-core/infrastructure/database/typeorm-connection-runtime.ts";
 import {
   FULCRUM_TYPEORM_MIGRATIONS_TABLE,
@@ -140,7 +141,7 @@ describe("Nest + TypeORM persistence foundation", () => {
 
     expect(resolveFulcrumTypeOrmConnectionTarget({ FULCRUM_HOME: home })).toEqual({
       source: "pglite",
-      dataDir: join(home, "pglite.data"),
+      dataDir: join(home, "db", "main"),
     });
 
     const moduleOptions = await createFulcrumTypeOrmModuleOptions(
@@ -246,6 +247,25 @@ describe("Nest + TypeORM persistence foundation", () => {
     });
   });
 
+  test("explicit PGlite socket mode keeps TypeORM migrations on the Postgres protocol path", async () => {
+    const moduleOptions = await createFulcrumTypeOrmModuleOptions({
+      env: {
+        FULCRUM_TYPEORM_PGLITE_SOCKET_URL:
+          "postgresql://postgres:postgres@127.0.0.1:6543/postgres",
+      },
+    });
+
+    expect(moduleOptions).toMatchObject({
+      type: "postgres",
+      url: "postgresql://postgres:postgres@127.0.0.1:6543/postgres",
+      migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+      synchronize: false,
+      migrationsRun: true,
+    });
+    expect(moduleOptions.migrations).toBeArray();
+    expect(moduleOptions.migrations!.length).toBeGreaterThan(0);
+  });
+
   test("runtime closes managed local PGlite socket when switching to normal PostgreSQL", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-typeorm-switch-"));
     runtime = new FulcrumTypeOrmConnectionRuntime();
@@ -308,6 +328,36 @@ describe("Nest + TypeORM persistence foundation", () => {
       type: "postgres",
       url: "postgresql://fulcrum:fulcrum@db:5432/fulcrum",
     });
+  });
+
+  test("application database runtime switches only connection target while preserving entities and migrations", () => {
+    const local = createDataSourceOptions([], { FULCRUM_HOME: "/tmp/fulcrum-local-home" });
+    const postgres = createDataSourceOptions([], {
+      FULCRUM_HOME: "/tmp/fulcrum-local-home",
+      DATABASE_URL: "postgresql://fulcrum:fulcrum@db:5432/fulcrum",
+    });
+    const status = resolveApplicationDatabaseRuntime({
+      FULCRUM_HOME: "/tmp/fulcrum-local-home",
+      DATABASE_URL: "postgresql://fulcrum:fulcrum@db:5432/fulcrum",
+    });
+
+    expect(local.type).toBe("postgres");
+    expect(postgres.type).toBe("postgres");
+    expect(local.entities).toEqual(postgres.entities);
+    expect(local.migrations).toEqual(postgres.migrations);
+    expect(postgres).toMatchObject({
+      url: "postgresql://fulcrum:fulcrum@db:5432/fulcrum",
+      migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+      synchronize: false,
+    });
+    expect(status).toMatchObject({
+      backend: "postgres",
+      source: "database-url",
+      target: "postgresql://fulcrum:fulcrum@db:5432/fulcrum",
+      migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+    });
+    expect(status.entityCount).toBeGreaterThan(0);
+    expect(status.migrationCount).toBeGreaterThan(0);
   });
 
   test("Nest root module auto-loads feature entities from bounded service modules", async () => {

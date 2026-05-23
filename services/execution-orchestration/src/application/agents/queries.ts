@@ -30,7 +30,7 @@ export async function listProfiles(
   orgId: string,
 ): Promise<AgentProfileRow[]> {
   const conn = ormSqlConnection(em);
-  return conn.execute<AgentProfileRow[]>(
+  const rows = await conn.execute<Array<Omit<AgentProfileRow, "auth_env_vars"> & { auth_env_vars: unknown }>>(
     `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
             test_passed, last_tested_at, created_at, updated_at
        FROM agent_profiles
@@ -38,6 +38,18 @@ export async function listProfiles(
       ORDER BY name ASC`,
     [orgId],
   );
+  return rows.map(normalizeProfileRow);
+}
+
+/**
+ * `agent_profiles.auth_env_vars` is a plain text column; raw SQL hands it back
+ * as a comma-joined string. Normalise it to the `string[]` shape the
+ * `AgentProfileRow` contract (and the TypeORM `simple-array` entity) promises.
+ */
+function normalizeProfileRow(
+  row: Omit<AgentProfileRow, "auth_env_vars"> & { auth_env_vars: unknown },
+): AgentProfileRow {
+  return { ...row, auth_env_vars: parseAuthEnvVars(row.auth_env_vars) };
 }
 
 export interface AgentProfilesPageData {
@@ -64,7 +76,7 @@ export async function getProfile(
   name: string,
 ): Promise<AgentProfileRow | null> {
   if ("query" in db && typeof db.query === "function" && !("getRepository" in db)) {
-    const rows = await db.query<AgentProfileRow>(
+    const rows = await db.query<Omit<AgentProfileRow, "auth_env_vars"> & { auth_env_vars: unknown }>(
       `SELECT id, org_id, name, cli_path, default_flags, auth_env_vars,
               test_passed, last_tested_at, created_at, updated_at
          FROM agent_profiles
@@ -72,7 +84,7 @@ export async function getProfile(
         LIMIT 1`,
       [orgId, name],
     );
-    return rows[0] ?? null;
+    return rows[0] ? normalizeProfileRow(rows[0]) : null;
   }
   const profile = await (db as EntityManager).findOne(AgentProfile, {
     org: { id: orgId },
@@ -141,7 +153,7 @@ export async function upsertProfileAction(
   const id = randomUUID();
   const rows = await ormSqlConnection(em).execute<Array<{ id: string }>>(
     `INSERT INTO agent_profiles (id, org_id, name, cli_path, default_flags, auth_env_vars)
-     VALUES ($1, $2, $3, $4, CAST($5 AS text[]), CAST($6 AS text[]))
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (org_id, name)
      DO UPDATE SET
        cli_path = excluded.cli_path,
@@ -154,15 +166,46 @@ export async function upsertProfileAction(
       orgId,
       input.name,
       input.cliPath,
-      toPostgresTextArray([input.defaultFlags].filter(Boolean)),
-      toPostgresTextArray(input.authEnvVars),
+      // default_flags / auth_env_vars are plain text columns (the AgentProfile
+      // entity treats them as TypeORM `simple-array` — comma-joined strings).
+      // default_flags carries a single flag string; auth_env_vars is a list
+      // joined with commas so the entity and raw readers agree on the shape.
+      input.defaultFlags,
+      input.authEnvVars.join(","),
     ],
   );
   return { id: String(rows[0]!.id) };
 }
 
-function toPostgresTextArray(values: string[]): string {
-  return `{${values.map((value) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`).join(",")}}`;
+/**
+ * Normalise the stored `auth_env_vars` value into a string array.
+ *
+ * `agent_profiles.auth_env_vars` is a plain text column written as a
+ * comma-joined list (TypeORM `simple-array` semantics). Older rows may have
+ * been written as a PostgreSQL array literal (`{"A=1","B=2"}`); accept both
+ * shapes plus an already-parsed array so callers never see a raw literal.
+ */
+function parseAuthEnvVars(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    if (raw.length === 1 && typeof raw[0] === "string") {
+      const single = raw[0].trim();
+      if (single.startsWith("{") && single.endsWith("}")) return parsePgArrayLiteral(single);
+    }
+    return raw.filter((value): value is string => typeof value === "string");
+  }
+  if (typeof raw !== "string") return [];
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return [];
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return parsePgArrayLiteral(trimmed);
+  return trimmed.split(",").map((value) => value.trim()).filter(Boolean);
+}
+
+function parsePgArrayLiteral(literal: string): string[] {
+  return literal
+    .slice(1, -1)
+    .split(",")
+    .map((value) => value.replace(/^"|"$/g, "").replace(/\\"/g, '"').trim())
+    .filter(Boolean);
 }
 
 export async function testProfileAction(
@@ -171,15 +214,15 @@ export async function testProfileAction(
   orgId: string,
   passed: boolean,
 ): Promise<{ ok: boolean }> {
-  const profile = await em.findOne(AgentProfile, {
-    where: { id: profileId, org: { id: orgId } },
-  } as never);
-  if (profile) {
-    profile.testPassed = passed;
-    profile.lastTestedAt = new Date();
-    profile.updatedAt = new Date();
-    await em.save(AgentProfile, profile);
-  }
+  // Raw SQL update keeps this action usable against both the TypeORM
+  // EntityManager and the isolated raw-SQL product store, matching the rest
+  // of this module (upsertProfileAction / listProfiles / appendEventOrm).
+  await ormSqlConnection(em).execute(
+    `UPDATE agent_profiles
+        SET test_passed = $1, last_tested_at = now(), updated_at = now()
+      WHERE id = $2 AND org_id = $3`,
+    [passed, profileId, orgId],
+  );
 
   await appendEventOrm(em, {
     orgId,
@@ -240,22 +283,7 @@ export interface MaskedProfileRow {
 /** Mask secret values and reshape a raw profile row for the UI. */
 export function maskProfile(row: AgentProfileRow): MaskedProfileRow {
   const auth_env: Record<string, string> = {};
-  let rawVars = row.auth_env_vars;
-  // PGlite raw SQL may return PostgreSQL text[] as a string like '{KEY=val,KEY2=val2}'
-  if (typeof rawVars === "string") {
-    const s = (rawVars as string).trim();
-    rawVars = s.startsWith("{") && s.endsWith("}")
-      ? s.slice(1, -1).split(",").map((v) => v.replace(/^"|"$/g, "").replace(/\\"/g, '"')).filter(Boolean)
-      : [];
-  }
-  // TypeORM simple-array may wrap PG text[] in a single-element array like ['{KEY=val}']
-  if (Array.isArray(rawVars) && rawVars.length === 1 && typeof rawVars[0] === "string") {
-    const s = (rawVars[0] as string).trim();
-    if (s.startsWith("{") && s.endsWith("}")) {
-      rawVars = s.slice(1, -1).split(",").map((v) => v.replace(/^"|"$/g, "").replace(/\\"/g, '"')).filter(Boolean);
-    }
-  }
-  const vars: string[] = Array.isArray(rawVars) ? rawVars : [];
+  const vars: string[] = parseAuthEnvVars(row.auth_env_vars);
   for (const entry of vars) {
     const eq = (entry as string).indexOf("=");
     if (eq === -1) {

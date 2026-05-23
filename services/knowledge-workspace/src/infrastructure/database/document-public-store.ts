@@ -31,6 +31,7 @@ export interface DocumentPublicRow {
   title: string;
   type: string;
   bodyMd: string;
+  editorJson: Record<string, unknown>;
   frontmatter: Record<string, unknown>;
   traceId: string;
   createdAt: string | null;
@@ -119,7 +120,9 @@ export class DocumentPublicStore {
       order: { createdAt: "ASC", id: "ASC" },
     });
     const pagesByDocumentId = await this.pagesByDocumentId(documents.map((document) => document.id));
-    return documents.map((document) => toPublicRow(document, pagesByDocumentId.get(document.id)));
+    return documents
+      .map((document) => toPublicRow(document, pagesByDocumentId.get(document.id)))
+      .sort(compareDocumentRows);
   }
 
   async listTemplates(input: {
@@ -148,24 +151,37 @@ export class DocumentPublicStore {
     title: string;
     docType?: string;
     bodyMd?: string;
+    editorJson?: Record<string, unknown>;
     frontmatter?: Record<string, unknown>;
+    parentId?: string | null;
+    sortPosition?: number;
   }): Promise<DocumentPublicRow | null> {
     if (!input.projectId) return null;
-    const project = await this.dataSource.getRepository(FulcrumProjectEntity).findOneBy({ id: input.projectId });
+    // `projectId` may arrive as a uuid or a project slug (the Capture-stage
+    // create flow passes `?project=<slug>`): resolve either to the canonical id.
+    const projectRepo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const project =
+      (await projectRepo.findOneBy({ id: input.projectId })) ??
+      (await projectRepo.findOneBy({ slug: input.projectId }));
     if (!project) return null;
 
     const id = randomUUID();
     const document = await this.documentRepository().save({
       id,
-      projectId: input.projectId,
+      projectId: project.id,
       title: input.title,
       bodyMd: input.bodyMd ?? "",
       sourceType: input.docType ?? "note",
+      parentId: input.parentId ?? null,
       traceId: `trace-document-${id}`,
     });
-    const page = await this.ensurePageForDocument(document.id);
-    if (page && input.frontmatter !== undefined) {
-      page.editorJson = withFrontmatter(page.editorJson, input.frontmatter);
+    const page = await this.ensurePageForDocument(document.id, {
+      parentId: input.parentId ?? null,
+      sortPosition: input.sortPosition,
+      editorJson: input.editorJson,
+    });
+    if (page && (input.frontmatter !== undefined || input.editorJson !== undefined)) {
+      page.editorJson = documentEditorJson(input.editorJson ?? page.editorJson, input.frontmatter);
       await this.pageRepository().save(page);
     }
     if (page) await this.upsertSearchEntry(document, page);
@@ -184,6 +200,7 @@ export class DocumentPublicStore {
     title?: string;
     docType?: string;
     bodyMd?: string;
+    editorJson?: Record<string, unknown>;
     frontmatter?: Record<string, unknown>;
     parentId?: string | null;
     sortPosition?: number;
@@ -201,8 +218,10 @@ export class DocumentPublicStore {
     if (page) {
       if (input.title !== undefined) page.title = input.title;
       if (input.bodyMd !== undefined) page.bodyMd = input.bodyMd;
-      if (input.frontmatter !== undefined) page.editorJson = withFrontmatter(page.editorJson, input.frontmatter);
-      if (input.parentId !== undefined) page.parentPageId = input.parentId;
+      if (input.editorJson !== undefined || input.frontmatter !== undefined) {
+        page.editorJson = documentEditorJson(input.editorJson ?? page.editorJson, input.frontmatter);
+      }
+      if (input.parentId !== undefined) page.parentPageId = await this.resolveParentPageId(document.projectId, input.parentId);
       if (input.sortPosition !== undefined) page.position = String(input.sortPosition);
       page.traceId = document.traceId;
       await this.pageRepository().save(page);
@@ -610,7 +629,14 @@ export class DocumentPublicStore {
     return new Map(pages.map((page) => [page.documentId, page]));
   }
 
-  private async ensurePageForDocument(documentId: string): Promise<KnowledgeWorkspacePage | null> {
+  private async ensurePageForDocument(
+    documentId: string,
+    input: {
+      parentId?: string | null;
+      sortPosition?: number;
+      editorJson?: Record<string, unknown>;
+    } = {},
+  ): Promise<KnowledgeWorkspacePage | null> {
     const existing = await this.pageForDocument(documentId);
     if (existing) return existing;
 
@@ -620,13 +646,13 @@ export class DocumentPublicStore {
       id: randomUUID(),
       projectId: document.projectId,
       documentId: document.id,
-      parentPageId: null,
+      parentPageId: await this.resolveParentPageId(document.projectId, input.parentId ?? document.parentId),
       title: document.title,
       slug: `${slugOf(document.title)}-${document.id.slice(0, 8)}`,
       icon: null,
-      position: document.id,
+      position: input.sortPosition !== undefined ? String(input.sortPosition) : document.id,
       bodyMd: document.bodyMd,
-      editorJson: {},
+      editorJson: input.editorJson ?? {},
       yjsState: null,
       traceId: document.traceId,
     });
@@ -686,17 +712,27 @@ export class DocumentPublicStore {
     const existing = await this.searchRepository().findOneBy({ pageId });
     if (existing) await this.searchRepository().remove(existing);
   }
+
+  private async resolveParentPageId(projectId: string, parentId: string | null | undefined): Promise<string | null> {
+    if (!parentId) return null;
+    const parentPage = await this.pageRepository().findOneBy({ id: parentId, projectId });
+    if (parentPage) return parentPage.id;
+    const parentDocument = await this.documentRepository().findOneBy({ id: parentId, projectId });
+    if (!parentDocument) return parentId;
+    return (await this.ensurePageForDocument(parentDocument.id))?.id ?? parentId;
+  }
 }
 
 function toPublicRow(document: FulcrumDocument, page?: KnowledgeWorkspacePage): DocumentPublicRow {
   return {
     id: document.id,
     projectId: document.projectId,
-    parentId: page?.parentPageId ?? document.parentId,
+    parentId: document.parentId ?? page?.parentPageId ?? null,
     sortOrder: numericPosition(page?.position),
     title: document.title,
     type: document.sourceType,
     bodyMd: document.bodyMd,
+    editorJson: page?.editorJson ?? {},
     frontmatter: frontmatterFor(document, page),
     traceId: document.traceId,
     createdAt: document.createdAt?.toISOString() ?? null,
@@ -716,11 +752,20 @@ function frontmatterFor(document: FulcrumDocument, page?: KnowledgeWorkspacePage
   return { title: document.title, kind: document.sourceType };
 }
 
-function withFrontmatter(
+function documentEditorJson(
   editorJson: Record<string, unknown>,
-  frontmatter: Record<string, unknown>,
+  frontmatter: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
-  return { ...editorJson, frontmatter };
+  return frontmatter === undefined ? editorJson : { ...editorJson, frontmatter };
+}
+
+function compareDocumentRows(left: DocumentPublicRow, right: DocumentPublicRow): number {
+  const leftParent = left.parentId ?? "";
+  const rightParent = right.parentId ?? "";
+  return leftParent.localeCompare(rightParent)
+    || left.sortOrder - right.sortOrder
+    || left.title.localeCompare(right.title)
+    || left.id.localeCompare(right.id);
 }
 
 function toCommentPublicRow(

@@ -147,6 +147,31 @@ export async function toggleSettingsFeatureFlag(
   return { success: true as const };
 }
 
+export async function addSettingsFeatureFlag(
+  em: EntityManager,
+  ctx: AppContext,
+  input: { flag: string; enabled?: boolean },
+): Promise<{ success: true; id: string }> {
+  if (!input.flag) throw new AppValidationError("flag required");
+  return await em.transaction(async (txEm: EntityManager) => {
+    let row = await txEm.findOne(FeatureFlag, { where: { orgId: ctx.orgId, flag: input.flag, userId: null } as never });
+    if (!row) {
+      row = txEm.create(FeatureFlag, {
+        orgId: ctx.orgId,
+        userId: null,
+        flag: input.flag,
+        enabled: Boolean(input.enabled),
+        createdAt: new Date(),
+      });
+      await txEm.save(row);
+    } else if (input.enabled !== undefined) {
+      row.enabled = Boolean(input.enabled);
+      await txEm.save(row);
+    }
+    return { success: true as const, id: row.id };
+  });
+}
+
 async function rolloutForFlag(em: EntityManager, ctx: AppContext, id: string): Promise<FeatureFlagRollout> {
   const flag = await em.findOne(FeatureFlag, { where: { id, orgId: ctx.orgId, userId: null } as never });
   if (!flag) throw new AppNotFoundError(`Feature flag not found: ${id}`);
@@ -200,7 +225,7 @@ export async function addSettingsSecret(
 ): Promise<{ success: true }> {
   const userId = requireUserId(ctx);
   if (!input.name || !input.value) throw new AppValidationError("name and value required");
-  let credential = await em.findOne(Credential, { where: { org: { id: ctx.orgId }, user: userId, name: input.name } as never });
+  let credential = await em.findOne(Credential, { where: { org: { id: ctx.orgId }, user: { id: userId }, name: input.name } as never });
   if (!credential) {
     credential = em.create(Credential, {
       org: { id: ctx.orgId } as Org,

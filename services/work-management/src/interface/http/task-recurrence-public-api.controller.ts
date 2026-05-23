@@ -8,7 +8,7 @@ import { Type } from "class-transformer";
 import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import {
   FULCRUM_TASK_RECURRENCE_ENTITIES,
   type TaskRecurrenceTrigger,

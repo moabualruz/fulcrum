@@ -29,6 +29,15 @@ export interface CreateTestOrmOptions {
 let _cachedDs: DataSource | null = null;
 let _cachedSeed: SeedResult | null = null;
 let _initPromise: Promise<void> | null = null;
+let _cleanupRegistered = false;
+
+function registerProcessCleanup(): void {
+  if (_cleanupRegistered) return;
+  _cleanupRegistered = true;
+  process.once("beforeExit", async () => {
+    await destroyTestOrm();
+  });
+}
 
 function buildEphemeralPgDriver() {
   let instance: PGlite | null = null;
@@ -70,6 +79,7 @@ function buildEphemeralPgDriver() {
 }
 
 async function ensureInitialized(debug: boolean): Promise<{ ds: DataSource; seed: SeedResult }> {
+  registerProcessCleanup();
   if (_cachedDs?.isInitialized && _cachedSeed) return { ds: _cachedDs, seed: _cachedSeed };
   if (!_initPromise) {
     _initPromise = (async () => {
@@ -119,6 +129,24 @@ async function truncateAllTables(ds: DataSource): Promise<void> {
 
 export async function createTestOrm(opts: CreateTestOrmOptions = {}): Promise<TestOrm> {
   const { ds } = await ensureInitialized(opts.debug ?? false);
+
+  // Defense in depth: if the singleton DataSource somehow lost its schema
+  // (e.g. another file destroyed its PGlite handle), re-run migrations to
+  // restore tables before truncate+seed.
+  try {
+    await ds.query(`SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`, ["tenant_settings"]);
+    const hasTenantSettings = await ds.query(
+      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1 LIMIT 1`,
+      ["tenant_settings"],
+    );
+    if (!Array.isArray(hasTenantSettings) || hasTenantSettings.length === 0) {
+      await ds.runMigrations({ transaction: "none" });
+    }
+  } catch {
+    await destroyTestOrm();
+    return createTestOrm(opts);
+  }
+
   await truncateAllTables(ds);
   const seed = await new SeedService(ds.manager).run();
   const em = ds.manager as EntityManager & Record<string, unknown>;

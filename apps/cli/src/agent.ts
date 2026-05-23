@@ -4,7 +4,7 @@ import {
 } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
 import { formatApiError } from "./api-errors.ts";
 
-const HELP = `fulcrum agent — agent run commands
+const HELP = `fulcrum agent: agent run commands
 
 Usage:
   fulcrum agent run --task <id> [--agent <id>] [--json]

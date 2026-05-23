@@ -47,6 +47,16 @@ export class TaskCustomFieldSetDto {
   value!: unknown;
 }
 
+export class TaskCustomFieldBulkSetDto {
+  orgId!: string;
+  userId!: string;
+  changes!: Array<{
+    taskId: string;
+    fieldDefId: string;
+    value: unknown;
+  }>;
+}
+
 export class TaskCustomFieldClearDto {
   orgId!: string;
   userId!: string;

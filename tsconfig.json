@@ -20,9 +20,15 @@
     "paths": {
       "@agent-client-protocol/*": ["services/agent-client-protocol/src/*"],
       "@execution-orchestration/*": ["services/execution-orchestration/src/*"],
+      "@feature-flags/*": ["services/feature-flags/src/*"],
+      "@fulcrum/services/feature-flags/*": ["services/feature-flags/src/*"],
       "@fulcrum/cli/*": ["apps/cli/src/*"],
+      "@fulcrum/shared-dto": ["packages/shared-dto/src/index.ts"],
+      "@fulcrum/shared-dto/*": ["packages/shared-dto/src/*"],
       "@fulcrum/tui/*": ["apps/tui/src/*"],
       "@fulcrum/server/*": ["apps/server/src/*"],
+      "@fulcrum/test-fixtures": ["packages/test-fixtures/src/index.ts"],
+      "@fulcrum/test-fixtures/*": ["packages/test-fixtures/src/*"],
       "@fulcrum/web/*": ["apps/web/src/*"],
       "$lib/*": ["apps/web/src/lib/*"],
       "@identity-access/*": ["services/identity-access/src/*"],
@@ -39,5 +45,5 @@
     "useDefineForClassFields": false
   },
   "include": ["services/**/*.ts", "apps/cli/src/**/*.ts", "apps/tui/src/**/*.ts", "apps/server/src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist", "apps/web/**"]
+  "exclude": ["node_modules", "dist", "apps/web/**", "**/_archived-mikro-migrations/**"]
 }

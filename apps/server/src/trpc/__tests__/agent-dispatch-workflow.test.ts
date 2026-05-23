@@ -89,13 +89,14 @@ describe("workflow agent run dispatch", () => {
           context: { sourceRefs: expect.any(Array), includeGlobal: true },
           routing: { selectedAgent: "codex", reason: "explicit-agent" },
           authority: {
-            trustMode: "assisted",
-            approvalRequired: false,
+            trustMode: "manual",
+            permissionMode: "review_each_tool",
+            approvalRequired: true,
             reason: "most-restrictive-policy",
             sources: {
               agentProfile: "assisted",
               workflowDefault: "assisted",
-              projectPolicy: "assisted",
+              projectPolicy: "manual",
               runOverride: null,
             },
           },

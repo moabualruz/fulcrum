@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
-	import { cn } from "$lib/utils.js";
+	import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 	import {
 		getFrontmatterFields,
 		validateFrontmatter,
@@ -57,19 +58,26 @@
 			</label>
 
 			{#if field.type === "enum"}
-				<select
-					id={"frontmatter-" + field.name}
-					name={"frontmatter[" + field.name + "]"}
-					value={String(value[field.name] ?? "")}
-					aria-invalid={localErrors[field.name]?.length ? "true" : undefined}
-					onchange={(event) => setScalar(field.name, event.currentTarget.value)}
-					class={cn("border-input bg-background h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
+				{@const fieldValue = String(value[field.name] ?? "")}
+				<Select
+					value={fieldValue}
+					type="single"
+					onValueChange={(nextValue) => setScalar(field.name, nextValue)}
 				>
-					<option value="">Select {field.name}</option>
-					{#each field.options as option (option)}
-						<option value={option}>{option}</option>
-					{/each}
-				</select>
+					<SelectTrigger
+						id={"frontmatter-" + field.name}
+						name={"frontmatter[" + field.name + "]"}
+						aria-invalid={localErrors[field.name]?.length ? "true" : undefined}
+						aria-label={field.name}
+					>
+						<SelectValue placeholder={"Select " + field.name} />
+					</SelectTrigger>
+					<SelectContent>
+						{#each field.options as option (option)}
+							<SelectItem value={option} label={option} />
+						{/each}
+					</SelectContent>
+				</Select>
 			{:else if field.type === "array"}
 				<input
 					id={"frontmatter-" + field.name}

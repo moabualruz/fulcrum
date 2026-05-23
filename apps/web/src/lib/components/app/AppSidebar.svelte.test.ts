@@ -22,7 +22,7 @@ mock.module("$app/state", () => ({
   },
 }));
 
-type AppSidebarProps = { activeProjectId: string | null };
+type AppSidebarProps = { activeProjectId: string | null; railCollapsed?: boolean };
 
 describe("AppSidebar component", () => {
   let render: typeof import("svelte/server").render;
@@ -44,24 +44,87 @@ describe("AppSidebar component", () => {
     expect(matches).toHaveLength(1);
   });
 
-  test("emits a link for each NAV_ITEMS entry with the correct href", async () => {
-    const { NAV_ITEMS } = await import("./nav-items.ts");
+  test("mounts the @fulcrum/ui-kit StageRail primitive", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
-    for (const item of NAV_ITEMS) {
-      const re = new RegExp(`<a\\b[^>]*href="${item.href.replace(/\//g, "\\/")}"`);
-      expect(body).toMatch(re);
-      // Label visible in the rendered output.
-      expect(body).toContain(item.label);
+    expect(body).toContain('data-slot="stage-rail"');
+    expect(body).toContain('data-collapsed="false"');
+  });
+
+  test("passes the shell collapsed state through to the StageRail primitive", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null, railCollapsed: true },
+    });
+    expect(body).toContain('data-slot="stage-rail"');
+    expect(body).toContain('data-collapsed="true"');
+  });
+
+  test("does NOT render the six-stage workflow axis as rail items", () => {
+    // Axis ownership (`prd-web-shell-stage-axis-ownership-fix`): the six-stage
+    // Capture→Operate axis belongs to the ScopeBar tab strip: the rail must
+    // render zero six-stage list items.
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    const stageItems = body.match(/data-slot="stage-rail-item"/g) ?? [];
+    expect(stageItems).toHaveLength(0);
+    expect(body).not.toContain('data-slot="stage-rail-label"');
+  });
+
+  test("renders the active stage's sub-navigation as the rail's primary group", () => {
+    // Root `/` resolves to the Capture stage; the rail shows Capture's sub-nav.
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain('data-slot="stage-rail-substage-group"');
+    expect(body).toContain('data-stage="capture"');
+    const substageItems = body.match(/data-slot="stage-rail-substage-item"/g) ?? [];
+    expect(substageItems.length).toBeGreaterThan(0);
+    // Capture's sub-nav per nav-data: Inbox · Docs.
+    for (const label of ["Inbox", "Docs"]) {
+      expect(body).toContain(label);
+    }
+    expect(body).toContain('href="/mkh/projects/fulcrum/capture/inbox"');
+    expect(body).toContain('href="/mkh/projects/fulcrum/capture/docs"');
+  });
+
+  test("keeps the rail synced to the active stage via data-current", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    // data-current is the route→stage mapping kept as data for the ScopeBar.
+    expect(body).toContain('data-current="capture"');
+  });
+
+  test("supplies the persistent Workspace group with the preserved portfolio links", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain('data-slot="stage-rail-workspace-group"');
+    for (const label of ["All projects", "Search", "Memory", "Context"]) {
+      expect(body).toContain(label);
     }
   });
 
-  test("placeholder shows '—' when activeProjectId is null", () => {
+  test("supplies the System group with Settings · Knowledge · MCP · Plugins", () => {
     const { body } = render(AppSidebar, {
       props: { activeProjectId: null },
     });
-    expect(body).toContain("—");
+    const systemItems = body.match(/data-slot="stage-rail-system-item"/g) ?? [];
+    expect(systemItems).toHaveLength(4);
+    for (const label of ["Settings", "Knowledge", "MCP", "Plugins"]) {
+      expect(body).toContain(label);
+    }
+    expect(body).toContain('href="/mkh/projects/fulcrum/operate/mcp"');
+    expect(body).toContain('href="/mkh/projects/fulcrum/operate/plugins"');
+  });
+
+  test("placeholder shows '-' when activeProjectId is null", () => {
+    const { body } = render(AppSidebar, {
+      props: { activeProjectId: null },
+    });
+    expect(body).toContain("-");
   });
 
   test("placeholder shows the slug when activeProjectId is provided", () => {

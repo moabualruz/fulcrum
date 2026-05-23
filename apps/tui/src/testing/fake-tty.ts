@@ -1,5 +1,5 @@
 /**
- * FakeTTY — headless terminal driver for TUI tests.
+ * FakeTTY: headless terminal driver for TUI tests.
  *
  * Captures all output written via TuiOutput.write() and supports injecting
  * synthetic keypress events. Tests use FakeTTY to run TUI components without
@@ -16,7 +16,7 @@
 import { EventEmitter } from "node:events";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TuiOutput interface — satisfied by both FakeTTY and real stdout wrapper
+// TuiOutput interface: satisfied by both FakeTTY and real stdout wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface TuiOutput {
@@ -27,7 +27,7 @@ export interface TuiOutput {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TuiInput interface — satisfied by both FakeTTY and real stdin
+// TuiInput interface: satisfied by both FakeTTY and real stdin
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface TuiInput {
@@ -85,7 +85,7 @@ export class FakeTTY extends EventEmitter implements TuiOutput, TuiInput {
     return this.chunks.join("");
   }
 
-  /** Output with ANSI escapes stripped — use for content assertions. */
+  /** Output with ANSI escapes stripped: use for content assertions. */
   plainText(): string {
     return stripAnsi(this.raw());
   }

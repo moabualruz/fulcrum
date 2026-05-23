@@ -4,11 +4,28 @@ import { EventEmitter } from "node:events";
 import { Renderer } from "@fulcrum/tui/renderer.ts";
 import { ArtifactsScreen } from "@fulcrum/tui/screens/artifacts.ts";
 import { RunDetailScreen, RunsScreen } from "@fulcrum/tui/screens/runs.ts";
+import {
+  RunsControlScreen,
+  STATUS_BADGE_STATES,
+  statusBadgeLabel,
+  statusBadgeText,
+} from "@fulcrum/tui/screens/runs-screen.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
 
 function renderPlain(render: (renderer: Renderer) => void): string {
   const tty = new FakeTTY({ columns: 120, rows: 40 });
+  render(new Renderer(tty));
+  return tty.plainText();
+}
+
+/** Render a screen at an exact terminal geometry: for stage-workbench snapshots. */
+function renderAt(
+  cols: number,
+  rows: number,
+  render: (renderer: Renderer) => void,
+): string {
+  const tty = new FakeTTY({ columns: cols, rows });
   render(new Renderer(tty));
   return tty.plainText();
 }
@@ -38,7 +55,13 @@ describe("RunsScreen", () => {
 
     await screen.load();
     const listing = renderPlain((renderer) => screen.render(renderer));
-    for (const status of ["[running]", "[completed]", "[failed]", "[cancelled]"]) expect(listing).toContain(status);
+    // Canonical 8-state vocabulary (CLI-TUI-UX.md §11): glyph + exact label,
+    // never the legacy `[running]` ad hoc bracket labels.
+    for (const badge of ["● RUNNING", "✓ COMPLETE", "✗ FAILED", "⊘ CANCELLED"]) {
+      expect(listing).toContain(badge);
+    }
+    expect(listing).not.toContain("[running]");
+    expect(listing).not.toContain("[completed]");
 
     await screen.handleKey("d");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Dispatch run");
@@ -49,6 +72,107 @@ describe("RunsScreen", () => {
 
     await screen.handleKey("\r");
     expect(opened).toEqual(["run-new"]);
+  });
+
+  test("empty RunsScreen renders the shared one-sentence/one-action empty state", async () => {
+    const screen = new RunsScreen({
+      caller: {
+        agent_runs: {
+          list: async () => [],
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderPlain((renderer) => screen.render(renderer));
+    // Empty contract: one sentence naming the surface + one action hint.
+    expect(snap).toContain("No runs yet in this project.");
+    expect(snap).toContain("Press d to dispatch the first run.");
+    expect(snap).not.toContain("No runs.");
+  });
+
+  test("failed RunsScreen renders the error frame carrying trace=<id>", async () => {
+    const screen = new RunsScreen({
+      traceId: "tr_9c1e3a5b",
+      caller: {
+        agent_runs: {
+          list: async () => {
+            throw new Error("runs service unreachable");
+          },
+          create: async () => ({ id: "x", agent: "codex", status: "running" }),
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderPlain((renderer) => screen.render(renderer));
+    // Error frame: [what failed]. [why]. [next step]. trace=<id> (COPY.md §3).
+    expect(snap).toContain("Runs feed failed to load.");
+    expect(snap).toContain("runs service unreachable");
+    expect(snap).toContain("trace=tr_9c1e3a5b");
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-status-empty-error-contract: the shared 8-state status vocabulary.
+//
+// CLI-TUI-UX.md §11 / DESIGN.md §4.9 lock one universal status vocabulary:
+// 8 states, glyph + UPPERCASE label, never colour-only. These tests assert the
+// EXACT label and glyph for every state: not substring presence.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("Shared TUI status badge vocabulary (CLI-TUI-UX.md §11)", () => {
+  test("renders all 8 canonical states with exact glyph + label", () => {
+    const expected: Record<string, string> = {
+      pending: "◌ PENDING",
+      running: "● RUNNING",
+      complete: "✓ COMPLETE",
+      blocked: "⏸ BLOCKED",
+      awaiting: "⌛ AWAITING",
+      failed: "✗ FAILED",
+      cancelled: "⊘ CANCELLED",
+      degraded: "⚠ DEGRADED",
+    };
+    // The module exposes exactly the 8 states, in CLI-TUI-UX.md §11 order.
+    expect([...STATUS_BADGE_STATES]).toEqual([
+      "pending",
+      "running",
+      "complete",
+      "blocked",
+      "awaiting",
+      "failed",
+      "cancelled",
+      "degraded",
+    ]);
+    for (const state of STATUS_BADGE_STATES) {
+      expect(statusBadgeText(state)).toBe(expected[state] ?? "");
+    }
+  });
+
+  test("labels are exactly the uppercase canonical strings", () => {
+    expect(STATUS_BADGE_STATES.map((s) => statusBadgeLabel(s))).toEqual([
+      "PENDING",
+      "RUNNING",
+      "COMPLETE",
+      "BLOCKED",
+      "AWAITING",
+      "FAILED",
+      "CANCELLED",
+      "DEGRADED",
+    ]);
+  });
+
+  test("raw service status strings fold onto the 8 canonical states", () => {
+    // `complete` vs `completed` drift is gone: both resolve to COMPLETE.
+    expect(statusBadgeLabel("completed")).toBe("COMPLETE");
+    expect(statusBadgeLabel("complete")).toBe("COMPLETE");
+    expect(statusBadgeLabel("succeeded")).toBe("COMPLETE");
+    expect(statusBadgeLabel("ok")).toBe("COMPLETE");
+    expect(statusBadgeLabel("passed")).toBe("COMPLETE");
+    expect(statusBadgeLabel("in_progress")).toBe("RUNNING");
+    expect(statusBadgeLabel("error")).toBe("FAILED");
+    expect(statusBadgeLabel("changes_requested")).toBe("BLOCKED");
+    expect(statusBadgeLabel("awaiting_review")).toBe("AWAITING");
+    expect(statusBadgeLabel("archived")).toBe("CANCELLED");
   });
 });
 
@@ -90,6 +214,55 @@ describe("RunDetailScreen", () => {
     screen.dispose();
     bus.emit("runs.onRunUpdate", { id: "run-1", status: "completed", logLine: "after dispose" });
     expect(renderPlain((renderer) => screen.render(renderer))).not.toContain("after dispose");
+  });
+
+  test("dock tabs switch panes and footer carries run trace span identity", async () => {
+    const screen = new RunDetailScreen({
+      runId: "run-42",
+      traceId: "tr_8f29a4c1b3e0",
+      spanId: "span_0011223344",
+      caller: {
+        agent_runs: {
+          get: async () => ({
+            id: "run-42",
+            agent: "codex",
+            status: "running",
+            taskTitle: "Recover TUI dock",
+            projectName: "Fulcrum",
+            logLines: ["booted"],
+            traceId: "tr_8f29a4c1b3e0",
+            spanId: "span_0011223344",
+            observability: {
+              artifacts: [{ filename: "patch.diff", lifecycleState: "ready" }],
+              followUpTasks: [{ title: "verify footer identity" }],
+            },
+          }),
+          cancel: async () => ({ ok: true }),
+        },
+      },
+    });
+    await screen.load();
+
+    let text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Shell dock");
+    expect(text).toContain("run: run-42");
+    expect(text).toContain("trace:8f29a4c1");
+    expect(text).toContain("span_0011223344");
+
+    await screen.handleKey("f");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Files dock");
+    expect(text).toContain("patch.diff");
+
+    await screen.handleKey("p");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Plan dock");
+    expect(text).toContain("verify footer identity");
+
+    await screen.handleKey("c");
+    text = renderPlain((renderer) => screen.render(renderer));
+    expect(text).toContain("Cost dock");
+    expect(text).toContain("agent:codex");
   });
 });
 
@@ -289,3 +462,169 @@ describe("ArtifactsScreen", () => {
     expect(filters).toEqual([{ runId: "run-1", taskId: "task-1" }]);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// prd-tui-stage-workbenches-set: Build & Ship stage workbench OD parity.
+//
+// The Build (`:runs`) and Ship (`:ship`) workbenches must render the OD
+// `tui-runs.html` stage chrome: a `fulcrum · :<route> · <purpose>` header
+// carrying the exact stage name, the StatusFooter strip, and the shared
+// empty-state / error-frame contract. Snapshots are locked at 80x24 and
+// 120x32 so the dense layout holds at both the minimum and a wide terminal.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("Build stage workbench (:runs): OD parity", () => {
+  function buildScreen(runs: TuiManagedRunFixture[] = sampleRuns()) {
+    return new RunsControlScreen({
+      projectId: "auth/rewrite",
+      projectLabel: "auth/rewrite",
+      traceId: "tr_8f29a4c1b3e0",
+      mcp: "7/7",
+      caller: {
+        agent_runs: {
+          list: async () => runs,
+          dispatch: async (input) => ({ id: "run-new", status: "pending", ...input }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "run-r", agent: "codex", status: "pending" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+  }
+
+  test("renders the Build workbench header, footer, and ModePicker at 80x24 and 120x32", async () => {
+    const screen = buildScreen();
+    await screen.load();
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, (r) => screen.render(r));
+      // Exact stage name in the OD term-head.
+      expect(snap).toContain("Build");
+      expect(snap).toContain("fulcrum · :runs · live agent sessions");
+      // StatusFooter strip with the BUILD mode pill + OD segments.
+      expect(snap).toContain("BUILD");
+      expect(snap).toContain("profile: dev");
+      expect(snap).toContain("run: run-1");
+      expect(snap).toContain("trace tr_8f29a4");
+      expect(snap).toContain("span span:run-");
+      // Step-bearing rows expose the ModePicker affordance row.
+      expect(snap).toContain("step modes");
+      expect(snap).toContain("Manual");
+    }
+  });
+
+  test("bare p/d/m execute the CLI-TUI-UX ModePicker contract", async () => {
+    const screen = buildScreen();
+    await screen.load();
+
+    await screen.handleKey("p");
+    expect(screen.currentStepMode).toBe("play");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Play current step");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("policy:");
+
+    await screen.handleKey("d");
+    expect(screen.currentStepMode).toBe("discuss");
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Discuss thread");
+
+    const selectedBeforePicker = screen.currentStepMode;
+    await screen.handleKey("m");
+    expect(screen.currentStepMode).toBe(selectedBeforePicker);
+    expect(renderPlain((renderer) => screen.render(renderer))).toContain("Mode picker");
+  });
+
+  test("empty Build workbench renders the shared one-sentence/one-action contract", async () => {
+    const screen = buildScreen([]);
+    await screen.load();
+    const snap = renderAt(80, 24, (r) => screen.render(r));
+    expect(snap).toContain("No agent runs in this stage yet.");
+    expect(snap).toContain("Press D to dispatch a run.");
+  });
+
+  test("failed Build workbench renders the error frame with trace=<id>", async () => {
+    const screen = new RunsControlScreen({
+      traceId: "tr_56e3d12",
+      caller: {
+        agent_runs: {
+          list: async () => {
+            throw new Error("server unreachable");
+          },
+          dispatch: async () => ({ id: "x", agent: "codex", status: "pending" }),
+          cancel: async () => ({ ok: true }),
+          retry: async () => ({ id: "x", agent: "codex", status: "pending" }),
+          getDeps: async () => [],
+        },
+      },
+    });
+    await screen.load();
+    const snap = renderAt(120, 32, (r) => screen.render(r));
+    expect(snap).toContain("Runs feed failed to load.");
+    expect(snap).toContain("trace=tr_56e3d12");
+  });
+});
+
+describe("Ship stage workbench (:ship): OD parity", () => {
+  function shipScreen(list: () => Promise<unknown[]>) {
+    return new ArtifactsScreen({
+      projectLabel: "auth/rewrite",
+      traceId: "tr_8f29a4c1b3e0",
+      mcp: "7/7",
+      caller: {
+        artifacts: {
+          list: list as never,
+          get: async () => null,
+          upload: async () => ({ id: "x", filename: "x", mime: "text/plain", path: "x", sizeBytes: "0" }),
+          download: async () => ({ ok: true, path: "/tmp/x" }),
+          archive: async (input) => ({ ok: true, id: input.id }),
+          delete: async (input) => ({ ok: true, id: input.id }),
+        },
+      },
+    });
+  }
+
+  test("renders the Ship workbench header + footer at 80x24 and 120x32", async () => {
+    const screen = shipScreen(async () => [
+      { id: "v2.18.0", filename: "auth-rewrite", mime: "application/zip", path: "rel/auth.zip", sizeBytes: "100" },
+    ]);
+    await screen.load();
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, (r) => screen.render(r));
+      expect(snap).toContain("Ship");
+      expect(snap).toContain("fulcrum · :ship · artifacts");
+      expect(snap).toContain("SHIP");
+      expect(snap).toContain("trace tr_8f29a4");
+    }
+  });
+
+  test("empty Ship workbench renders the shared empty-state contract", async () => {
+    const screen = shipScreen(async () => []);
+    await screen.load();
+    const snap = renderAt(80, 24, (r) => screen.render(r));
+    expect(snap).toContain("No artifacts in this stage yet.");
+    expect(snap).toContain("Press u to upload a release artifact.");
+  });
+
+  test("failed Ship workbench renders the error frame with trace=<id>", async () => {
+    const screen = shipScreen(async () => {
+      throw new Error("artifact store offline");
+    });
+    await screen.load();
+    const snap = renderAt(120, 32, (r) => screen.render(r));
+    expect(snap).toContain("Artifacts feed failed to load.");
+    expect(snap).toContain("trace=tr_8f29a4c1b3e0");
+  });
+});
+
+interface TuiManagedRunFixture {
+  id: string;
+  agent: string;
+  status: string;
+  taskTitle?: string;
+  projectName?: string;
+}
+
+function sampleRuns(): TuiManagedRunFixture[] {
+  return [
+    { id: "run-1", agent: "claude-opus-4.7", status: "running", taskTitle: "persist issuance row", projectName: "auth/rewrite" },
+    { id: "run-2", agent: "gpt-5.4", status: "completed", taskTitle: "stripe webhook idempotency", projectName: "billing-3" },
+    { id: "run-3", agent: "gemini-3-pro", status: "failed", taskTitle: "auth.events schema", projectName: "telemetry" },
+  ];
+}

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
 
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 	import { docTypeMeta, flattenDocTree, type DocScope, type DocTreeNode } from "./doc-tree";
 
 	interface Props {
@@ -33,7 +33,7 @@
 		<h2 class={cn("text-sm font-semibold")}>{title}</h2>
 		<a
 			href="/docs/new?scope={scope}"
-			class={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-8")}
+			class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-8")}
 		>New</a>
 	</header>
 
@@ -50,10 +50,12 @@
 		</nav>
 	{/if}
 
-	<div role="tree" aria-label={title} class={cn("max-h-[70vh] overflow-auto p-1")}>
-		{#if flatNodes.length === 0}
+	{#if flatNodes.length === 0}
+		<div class={cn("max-h-[70vh] overflow-auto p-1")}>
 			<p data-empty-doc-tree class={cn("px-2 py-6 text-sm text-muted-foreground")}>No documents.</p>
-		{:else}
+		</div>
+	{:else}
+		<div role="tree" aria-label={title} class={cn("max-h-[70vh] overflow-auto p-1")}>
 			{#each flatNodes as item (item.node.id)}
 				{@const node = item.node}
 				{@const meta = docTypeMeta(node.docType)}
@@ -93,6 +95,6 @@
 					</div>
 				</div>
 			{/each}
-		{/if}
-	</div>
+		</div>
+	{/if}
 </section>

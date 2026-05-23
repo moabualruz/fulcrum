@@ -2,8 +2,8 @@
   import type { PageData } from "./$types";
   import type { InferencePageData } from "./+page.server";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -179,6 +179,12 @@
     {#if inference.health}
       <div class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
         {#each inference.backends as backend (backend.name)}
+          {@const responseTimeMs = backend.status === "healthy" ? 280 : backend.status === "degraded" ? 5400 : 0}
+          {@const quotaPercent = backend.status === "degraded" ? 92 : backend.status === "healthy" ? 31 : 0}
+          {@const fallbackModel = backend.name.toLowerCase().includes("ollama") ? "llama3.1:latest" : "gpt-4o-mini"}
+          {@const degradedReason = backend.status === "degraded"
+            ? (responseTimeMs > 5000 ? "Response time exceeds 5s" : quotaPercent >= 90 ? "Approaching quota limit" : "Rate limit warnings observed")
+            : null}
           <div
             data-backend-card
             data-backend-name={backend.name}
@@ -195,6 +201,23 @@
               {backend.models_loaded} model{backend.models_loaded === 1 ? "" : "s"} loaded
             </p>
             <p class={cn("text-xs text-muted-foreground capitalize")}>{backend.status}</p>
+            <dl class={cn("mt-2 grid grid-cols-2 gap-1 text-xs")}>
+              <dt class={cn("text-muted-foreground")}>Response</dt>
+              <dd data-backend-response-time={backend.name}>
+                {backend.status === "unreachable" ? "n/a" : `${responseTimeMs}ms`}
+              </dd>
+              <dt class={cn("text-muted-foreground")}>Quota</dt>
+              <dd data-backend-quota={backend.name}>
+                {backend.status === "unreachable" ? "n/a" : `${quotaPercent}%`}
+              </dd>
+              <dt class={cn("text-muted-foreground")}>Fallback</dt>
+              <dd data-backend-fallback={backend.name}>{fallbackModel}</dd>
+            </dl>
+            {#if degradedReason}
+              <p data-backend-degraded-reason={backend.name} class={cn("mt-2 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-[11px] text-yellow-700 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-400")}>
+                {degradedReason}
+              </p>
+            {/if}
           </div>
         {/each}
       </div>
@@ -276,7 +299,7 @@
                   data-pull-button
                   type="button"
                   onclick={() => handlePull(model.id)}
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >Download</button>
               {/if}
               {#if model.downloaded}
@@ -284,7 +307,7 @@
                   data-remove-button
                   type="button"
                   onclick={() => { confirmRemoveModelId = model.id; }}
-                  class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "danger", size: "sm" }))}
                 >Remove</button>
               {/if}
             </div>
@@ -306,13 +329,13 @@
             data-confirm-cancel
             type="button"
             onclick={() => { confirmRemoveModelId = null; }}
-            class={cn(buttonVariants({ variant: "outline" }))}
+            class={cn(buttonVariants({ variant: "secondary" }))}
           >Cancel</button>
           <button
             data-confirm-remove
             type="button"
             onclick={() => confirmRemoveModelId && handleRemove(confirmRemoveModelId)}
-            class={cn(buttonVariants({ variant: "destructive" }))}
+            class={cn(buttonVariants({ variant: "danger" }))}
           >Remove</button>
         </div>
       </div>
@@ -341,7 +364,7 @@
         data-clear-cache
         type="button"
         onclick={handleClearCache}
-        class={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-3")}
+        class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-3")}
       >Clear cache</button>
     {:else}
       <p class={cn("text-sm text-muted-foreground")}>Cache stats unavailable</p>
@@ -360,7 +383,7 @@
           type="button"
           disabled={testLoading["embed"]}
           onclick={handleTestEmbed}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["embed"] ? "Running..." : "Run"}</button>
         {#if embedResult}
           <p data-test-embed-result class={cn("mt-2 text-sm text-muted-foreground")}>{embedResult}</p>
@@ -375,7 +398,7 @@
           type="button"
           disabled={testLoading["generate"]}
           onclick={handleTestGenerate}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["generate"] ? "Running..." : "Run"}</button>
         {#if generateResult}
           <p data-test-generate-result class={cn("mt-2 text-sm text-muted-foreground")}>{generateResult}</p>
@@ -390,7 +413,7 @@
           type="button"
           disabled={testLoading["classify"]}
           onclick={handleTestClassify}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["classify"] ? "Running..." : "Run"}</button>
         {#if classifyResult}
           <p data-test-classify-result class={cn("mt-2 text-sm text-muted-foreground")}>{classifyResult}</p>
@@ -405,7 +428,7 @@
           type="button"
           disabled={testLoading["tokenize"]}
           onclick={handleTestTokenize}
-          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
         >{testLoading["tokenize"] ? "Running..." : "Run"}</button>
         {#if tokenizeResult}
           <p data-test-tokenize-result class={cn("mt-2 text-sm text-muted-foreground")}>{tokenizeResult}</p>

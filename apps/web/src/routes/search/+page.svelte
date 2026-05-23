@@ -1,6 +1,20 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
+  import { Breadcrumb, type BreadcrumbItem } from "@fulcrum/ui-kit";
   import type { SavedSearch, SearchHit } from "./+page.server.ts";
+
+  const PROJECT_CONTEXT = {
+    id: "proj-fulcrum",
+    name: "Fulcrum",
+    color: "oklch(0.72 0.16 250)",
+    icon: "F",
+  };
+
+  const breadcrumb: BreadcrumbItem[] = [
+    { label: "Workspace", href: "/" },
+    { label: PROJECT_CONTEXT.name, href: `/projects/${PROJECT_CONTEXT.id}` },
+    { label: "Search", current: true },
+  ];
 
   interface Props {
     data: {
@@ -16,7 +30,7 @@
 
   let { data }: Props = $props();
 
-  const ALL_KINDS = ["doc", "task", "memory", "run"];
+  const ALL_KINDS = ["doc", "task", "run", "artifact", "memory"];
 
   const groups = $derived(
     Object.entries(data.grouped).filter((entry) => entry[1].length > 0),
@@ -48,11 +62,21 @@
         return `/boards?task=${encodeURIComponent(hit.source_id)}`;
       case "run":
         return `/runs/${hit.source_id}`;
+      case "artifact":
+        return `/artifacts/${hit.source_id}`;
       case "memory":
         return `/memory/${hit.source_id}`;
       default:
         return `/search?q=${encodeURIComponent(data.q)}`;
     }
+  }
+
+  function workflowContext(hit: SearchHit): string {
+    const body = hit.body.toLowerCase();
+    if (body.includes("trace")) return "Trace-linked";
+    if (body.includes("source")) return "Source-linked";
+    if (body.includes("project")) return "Project context";
+    return "Workflow context";
   }
 
   function formatDate(iso: string): string {
@@ -82,9 +106,28 @@
   }
 </script>
 
-<header class={cn("mb-4 flex items-center justify-between gap-4 border-b border-border pb-4")}>
-  <h1 class={cn("text-2xl font-semibold tracking-tight")}>Search</h1>
+<header class={cn("mb-4 flex flex-col gap-2 border-b border-border pb-4")}>
+  <div data-breadcrumb-row class={cn("flex items-center gap-2")}>
+    <span
+      data-project-icon
+      data-project-id={PROJECT_CONTEXT.id}
+      class={cn("inline-flex h-6 w-6 items-center justify-center rounded text-xs font-semibold text-white")}
+      style="background-color: {PROJECT_CONTEXT.color}"
+      aria-label={`${PROJECT_CONTEXT.name} project icon`}
+    >{PROJECT_CONTEXT.icon}</span>
+    <Breadcrumb data-search-breadcrumb items={breadcrumb} />
+  </div>
+  <div class={cn("flex items-center justify-between gap-4")}>
+    <h1 class={cn("text-2xl font-semibold tracking-tight")}>Search</h1>
+  </div>
 </header>
+
+<section data-search-fast-actions class={cn("mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-background p-3 text-sm")}>
+  <span class={cn("font-medium")}>Fast actions</span>
+  <a href="/palette" data-search-command-action="open-palette" class={cn("rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent")}>Open command palette</a>
+  <a href="/docs/new" data-search-command-action="new-doc" class={cn("rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent")}>New document</a>
+  <a href="/runs" data-search-command-action="start-run" class={cn("rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent")}>Start run</a>
+</section>
 
 <form data-search-form method="GET" class={cn("mb-4 flex flex-wrap items-center gap-2")}>
   <input
@@ -106,9 +149,9 @@
   >Search</button>
 </form>
 
-<div class={cn("flex gap-4")}>
+<div class={cn("flex flex-col gap-4 md:flex-row")}>
   <!-- Facet rail -->
-  <aside data-facet-panel class={cn("w-48 shrink-0 space-y-4 text-sm")}>
+  <aside data-facet-panel class={cn("w-full shrink-0 space-y-4 text-sm md:w-48")}>
     <div data-facet-kinds>
       <p class={cn("mb-1 font-semibold text-muted-foreground uppercase text-xs")}>Kind</p>
       {#each ALL_KINDS as kind (kind)}
@@ -209,12 +252,18 @@
       <div
         data-search-no-query
         class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-      >Type a query to search product documents.</div>
+      >Type to search across docs, tasks, runs, artifacts, memory, and audit.</div>
     {:else if data.hits.length === 0}
       <div
         data-search-empty
-        class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-      >No results. Try different terms or fewer words.</div>
+        class={cn("space-y-3 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
+      >
+        <p>No results. Try a trace ID, source file, project name, or fewer words.</p>
+        <div class={cn("flex flex-wrap gap-2")}>
+          <a href="/palette" data-search-empty-action="palette" class={cn("rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent")}>Open command palette</a>
+          <a href="/docs/new" data-search-empty-action="doc" class={cn("rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent")}>Create document</a>
+        </div>
+      </div>
     {:else}
       <div class={cn("space-y-6")}>
         {#each groups as [kind, hits] (kind)}
@@ -226,6 +275,7 @@
                   <a href={hrefFor(hit)} class={cn("font-medium hover:underline")}>{hit.title}</a>
                   <div class={cn("mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground")}>
                     <span>{hit.source_kind}:{hit.source_id}</span>
+                    <span data-hit-workflow-context>{workflowContext(hit)}</span>
                     <span data-hit-date>{formatDate(hit.updated_at)}</span>
                   </div>
                   <p class={cn("mt-2 line-clamp-2 text-sm text-muted-foreground")}>{hit.body}</p>

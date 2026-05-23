@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageData } from "./$types";
-  import { buttonVariants } from "$lib/components/ui/button";
-  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
   import {
     DEFAULT_MEMORY_CONFIG,
     normalizeMemoryConfig,
@@ -109,8 +109,8 @@
     </label>
 
     <div class={cn("flex flex-wrap gap-2")}>
-      <button type="button" class={cn(buttonVariants({ variant: "default" }))} onclick={() => void save()}>Save</button>
-      <button type="button" class={cn(buttonVariants({ variant: "outline" }))} onclick={resetDefaults}>Reset defaults</button>
+      <button type="button" class={cn(buttonVariants({ variant: "primary" }))} onclick={() => void save()}>Save</button>
+      <button type="button" class={cn(buttonVariants({ variant: "secondary" }))} onclick={resetDefaults}>Reset defaults</button>
     </div>
 
     {#if saved}

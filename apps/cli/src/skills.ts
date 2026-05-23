@@ -1,8 +1,8 @@
-// fulcrum skills sync — fan out authored skills to agent-native surfaces.
-// fulcrum skills lint <path> — validate frontmatter (+ body section presence)
+// fulcrum skills sync: fan out authored skills to agent-native surfaces.
+// fulcrum skills lint <path>: validate frontmatter (+ body section presence)
 // against the strictest union of all 5 agents' rules.
-// fulcrum skills list — enumerate authored skills with name, desc preview, eval coverage.
-// fulcrum skills upstream — sync curated third-party skills.
+// fulcrum skills list: enumerate authored skills with name, desc preview, eval coverage.
+// fulcrum skills upstream: sync curated third-party skills.
 
 import { mkdir, readdir, readFile, copyFile, writeFile, stat, rm, rename } from "node:fs/promises";
 import { join, basename, dirname, resolve } from "node:path";
@@ -51,7 +51,7 @@ interface SyncSkillsOptions {
   agents?: readonly AgentId[];
 }
 
-// Skip patterns: .original.md backups are human-edit source-of-truth — agents
+// Skip patterns: .original.md backups are human-edit source-of-truth: agents
 // read the compressed .md only. Also skip .git, node_modules just in case.
 function shouldSkipForSync(name: string): boolean {
   if (name.endsWith(".original.md")) return true;
@@ -204,11 +204,11 @@ async function installClaudePlugin(root: string, opts: { dryRun: boolean }): Pro
         await refreshClaudePluginPackage(root, { dryRun: opts.dryRun });
         return;
       }
-    } catch { /* malformed — fall through to install */ }
+    } catch { /* malformed: fall through to install */ }
   }
 
   if (!(await which("claude"))) {
-    console.log(`    · claude not on PATH — manual: claude plugin marketplace add ${PLUGIN_MARKETPLACE} && claude plugin install ${PLUGIN_SPEC}`);
+    console.log(`    · claude not on PATH: manual: claude plugin marketplace add ${PLUGIN_MARKETPLACE} && claude plugin install ${PLUGIN_SPEC}`);
     return;
   }
 
@@ -276,13 +276,13 @@ async function uninstallClaudeFulcrumPlugin(opts: { dryRun: boolean }): Promise<
     return;
   }
   if (!(await which("claude"))) {
-    console.log(`    · claude not on PATH — skip plugin uninstall (${PLUGIN_SPEC})`);
+    console.log(`    · claude not on PATH: skip plugin uninstall (${PLUGIN_SPEC})`);
     return;
   }
   const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
   const r = await safeClaudePluginUninstall(PLUGIN_SPEC, { dryRun: opts.dryRun });
   if (!r.ran) {
-    console.log(`    · ${PLUGIN_SPEC}: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${PLUGIN_SPEC}`);
+    console.log(`    · ${PLUGIN_SPEC}: ${r.reason ?? "skipped"}: manual: claude plugin uninstall ${PLUGIN_SPEC}`);
     return;
   }
   if (r.ok) {
@@ -309,7 +309,7 @@ export async function removeAuthoredSkills(opts: { dryRun?: boolean; agents?: re
   const dryRun = opts.dryRun ?? false;
   const home = process.env["HOME"] ?? "";
 
-  console.log("fulcrum skills remove — authored skill surfaces\n");
+  console.log("fulcrum skills remove: authored skill surfaces\n");
 
   const claudeAgent = AGENTS.find((a) => a.id === "claude-code")!;
   if (selectedAgent(opts, "claude-code") && await isDir(claudeAgent.baseDir(home))) {
@@ -396,7 +396,7 @@ export async function syncSkills(opts: SyncSkillsOptions = {}): Promise<void> {
     return;
   }
 
-  console.log(`fulcrum skills sync — ${skills.length} skill(s): ${skills.join(", ")}\n`);
+  console.log(`fulcrum skills sync: ${skills.length} skill(s): ${skills.join(", ")}\n`);
 
   // Claude Code: install via plugin marketplace. Claude's loader only sees
   // top-level skills under ~/.claude/skills/<name>/SKILL.md; the
@@ -579,7 +579,7 @@ async function cmdLint(target: string | undefined): Promise<void> {
     for (const entry of await readdir(target, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       if (entry.name === "_template") continue;
-      // _archive/ holds deprecated skills — skip in lint.
+      // _archive/ holds deprecated skills: skip in lint.
       if (entry.name === "_archive") continue;
       const p = `${target}/${entry.name}/SKILL.md`;
       if (await exists(p)) files.push(p);

@@ -2,6 +2,7 @@ import type { Component } from "svelte";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { svelteTiptapMock } from "$lib/test/svelte-tiptap-mock";
 
 mock.module("$app/forms", () => ({
   enhance: () => ({ destroy() {} }),
@@ -9,10 +10,10 @@ mock.module("$app/forms", () => ({
   deserialize: (s: string) => JSON.parse(s),
 }));
 
-mock.module("svelte-tiptap", () => ({
-  createEditor: () => ({ subscribe: () => () => {} }),
-  EditorContent: "div",
-}));
+// `mock.module` freezes a module's export-name set on first registration.
+// `svelteTiptapMock()` carries every real `svelte-tiptap` export so sibling
+// suites that import other names (`NodeViewWrapper`, …) are not frozen out.
+mock.module("svelte-tiptap", () => svelteTiptapMock());
 
 interface EditDoc {
   id: string;
@@ -87,5 +88,11 @@ describe("/docs/[id]/edit +page.svelte", () => {
     expect(source).toContain("FeatureGate flag=\"real-time-collab-server\"");
     expect(source).toContain("provider.onPresenceChange");
     expect(source).toContain("provider.onCursorChange");
+    expect(source).toContain("data-collab-status-panel");
+    expect(source).toContain("data-collab-connection-state");
+    expect(source).toContain("data-collab-save-state");
+    expect(source).toContain("data-collab-risk-state");
+    expect(source).toContain("data-collab-history-context");
+    expect(source).toContain("data-collab-flag-off");
   });
 });

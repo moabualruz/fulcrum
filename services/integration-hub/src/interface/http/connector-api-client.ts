@@ -48,6 +48,22 @@ export function createConnectorApiCaller(options: ConnectorApiClientOptions) {
           }),
       },
     },
+    projectConnectors: {
+      list: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/connectors`, {
+          query: scopedQuery(options),
+        }),
+      upsert: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/connectors`, {
+          method: "POST",
+          body: scopedBody(options, input),
+        }),
+      sync: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/project-connectors/${encodeURIComponent(input.id)}/sync`, {
+          method: "POST",
+          body: scopedBody(options),
+        }),
+    },
   };
 }
 

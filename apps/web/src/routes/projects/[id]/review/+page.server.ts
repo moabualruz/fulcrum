@@ -1,31 +1,27 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
-import {
-  buildFinalQaReport,
-  buildReviewWorkbenchModel,
-  loadReviewWorkbenchSession,
-  saveReviewWorkbenchSession,
-  appendReviewWorkbenchAnnotation,
-  recordUatCodeReviewDecision,
-  type AppendReviewWorkbenchAnnotationInput,
-  type ReviewWorkbenchSessionType,
-  type UatCodeReviewDecision,
-} from "@planning-review/interface/project-review-reports.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { WorkflowApiError } from "@workflow-coordination/interface/http/workflow-api-client";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const projectId = params.id;
-  const { em, ctx } = await requestServiceScope(locals, projectId);
+type ReviewWorkbenchSessionType = "plan" | "uat" | "code_review";
+type UatCodeReviewDecision =
+  | "start_uat"
+  | "start_code_review"
+  | "request_changes"
+  | "approve_without_manual_review";
+type ReviewAnnotationSeverity = "important" | "nit" | "pre_existing" | undefined;
+
+export const load: PageServerLoad = async (event) => {
+  const projectId = event.params.id;
   try {
-    const qaReport = await buildFinalQaReport(em, ctx, {
+    const qaReport = await workflowApi(event).reports.finalQa({
+      ...workflowApiProjectMetadata(event, projectId),
       projectId,
       taskIds: [],
     });
     return { projectId, qaReport };
   } catch (err) {
-    if (err instanceof AppNotFoundError) throw error(404, err.message);
-    // Return empty state when no report data exists yet
+    if (err instanceof WorkflowApiError && err.status === 404) throw error(404, err.message);
     return {
       projectId,
       qaReport: null,
@@ -76,7 +72,7 @@ function uatDecision(value: string | null | undefined): UatCodeReviewDecision {
   throw new Error(`Unsupported UAT/code-review decision: ${normalized}`);
 }
 
-function reviewAnnotationSeverity(value: string | null | undefined): AppendReviewWorkbenchAnnotationInput["severity"] {
+function reviewAnnotationSeverity(value: string | null | undefined): ReviewAnnotationSeverity {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   if (normalized === "important" || normalized === "nit" || normalized === "pre_existing") return normalized;
@@ -84,16 +80,16 @@ function reviewAnnotationSeverity(value: string | null | undefined): AppendRevie
 }
 
 export const actions: Actions = {
-  startReview: async ({ params, request }) => {
-    const fd = await request.formData();
+  startReview: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const reviewWorkbench = await buildReviewWorkbenchModel({
-        projectId: params.id,
+      const reviewWorkbench = await workflowApi(event).reports.reviewWorkbench({
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         reviewId: raw["reviewId"]?.trim() || undefined,
-        files: parseJsonArray(raw["filesJson"], "filesJson") as never,
-        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson") as never,
+        files: parseJsonArray(raw["filesJson"], "filesJson"),
+        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson"),
         searchQuery: raw["searchQuery"]?.trim() || undefined,
       });
       return { ok: true, mode: "startReview", reviewWorkbench };
@@ -102,13 +98,13 @@ export const actions: Actions = {
     }
   },
 
-  loadSession: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  loadSession: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await loadReviewWorkbenchSession(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.loadReviewWorkbenchSession({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,
         traceId: raw["traceId"]?.trim() || undefined,
       });
@@ -118,19 +114,19 @@ export const actions: Actions = {
     }
   },
 
-  saveSession: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  saveSession: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await saveReviewWorkbenchSession(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.saveReviewWorkbenchSession({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         reviewId: raw["reviewId"]?.trim() || undefined,
         reviewType: reviewSessionType(raw["reviewType"]),
         title: raw["title"]?.trim() || undefined,
-        files: parseJsonArray(raw["filesJson"], "filesJson") as never,
-        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson") as never,
+        files: parseJsonArray(raw["filesJson"], "filesJson"),
+        annotations: parseJsonArray(raw["annotationsJson"], "annotationsJson"),
       });
       return { ok: true, mode: "saveSession", reviewSession };
     } catch (err) {
@@ -138,13 +134,13 @@ export const actions: Actions = {
     }
   },
 
-  annotate: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  annotate: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const reviewSession = await appendReviewWorkbenchAnnotation(em, ctx, {
-        projectId: params.id,
+      const reviewSession = await workflowApi(event).reports.appendReviewWorkbenchAnnotation({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         reviewId: raw["reviewId"]?.trim() || undefined,
         traceId: raw["traceId"]?.trim() || undefined,
         filePath: raw["filePath"]?.trim() || "",
@@ -159,13 +155,13 @@ export const actions: Actions = {
     }
   },
 
-  uatDecision: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  uatDecision: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const decision = await recordUatCodeReviewDecision(em, ctx, {
-        projectId: params.id,
+      const decision = await workflowApi(event).reports.recordUatCodeReviewDecision({
+        ...workflowApiProjectMetadata(event, event.params.id),
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
         decision: uatDecision(raw["decision"]),
         reviewType: "uat",
@@ -178,3 +174,9 @@ export const actions: Actions = {
     }
   },
 };
+
+function workflowApi(event: Parameters<typeof createWebWorkflowApiCaller>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}

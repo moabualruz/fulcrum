@@ -1,165 +1,215 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { AppNotFoundError } from "@platform-core/domain/errors.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-const calls: string[] = [];
-let loadShouldThrowNotFound = false;
-let handoffStatus = "ready";
+// The route delegates project existence to the project public API
+// (`GET /api/v1/projects/:id`) and the UAT handoff/decision to the workflow
+// public API (`POST /workflows/review/uat-code-review/...`). Both seams are
+// exercised through a fake `event.fetch` plus `FULCRUM_SERVER_URL` — no
+// `mock.module`, so sibling route suites in the same shard are never hijacked.
+const ORG_ID = "org-1";
+const originalServerUrl = process.env["FULCRUM_SERVER_URL"];
+const originalPublicApiUrl = process.env["FULCRUM_PUBLIC_API_URL"];
+const SERVER_URL = "http://127.0.0.1:3210";
 
-function form(data: Record<string, string>): Request {
-  const fd = new FormData();
-  for (const [key, value] of Object.entries(data)) fd.set(key, value);
-  return new Request("http://localhost/projects/project-1/uat", { method: "POST", body: fd });
+interface RecordedCall {
+  method: string;
+  pathname: string;
+  body: unknown;
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async (_locals: unknown, projectId: string | null) => ({
-    em: { kind: "mock-em" },
-    ctx: { orgId: "org-1", userId: "user-1", projectId },
-  }),
-}));
+interface FakeFetchOptions {
+  /** Status returned by the handoff endpoint; non-200 triggers `WorkflowApiError`. */
+  handoffStatus?: number;
+  handoffBody?: unknown;
+  decisionStatus?: string;
+}
 
-mock.module("@planning-review/interface/project-review-reports.ts", () => ({
-  listGeneratedE2eRunHistory: async (_em: unknown, _ctx: unknown, input: { projectId: string; limit?: number }) => {
-    calls.push(`history:${input.projectId}:${input.limit ?? ""}`);
-    return [];
-  },
-  runGeneratedE2eRegressionTests: async (_em: unknown, _ctx: unknown, input: { projectId: string; runner?: string }) => {
-    calls.push(`e2e:${input.projectId}:${input.runner ?? ""}`);
-    return { projectId: input.projectId, status: "passed" };
-  },
-  buildUatCodeReviewHandoff: async (_em: unknown, _ctx: unknown, input: { projectId: string; traceId?: string }) => {
-    calls.push(`handoff:${input.projectId}`);
-    if (loadShouldThrowNotFound) throw new AppNotFoundError("Project not found");
-    return {
-      projectId: input.projectId,
-      status: handoffStatus,
-      finalQaStatus: "passed",
-      nextAction: "prompt_user_for_uat_code_review",
-      decisionOptions: [
-        { id: "approve_without_manual_review", label: "Approve", description: "Approve." },
-        { id: "request_changes", label: "Request Changes", description: "Send feedback." },
-      ],
-      promptMarkdown: "# UAT Prompt",
-    };
-  },
-  recordUatCodeReviewDecision: async (_em: unknown, _ctx: unknown, input: { projectId: string; decision: string; reviewType: string; feedbackText?: string }) => {
-    calls.push(`decision:${input.projectId}:${input.decision}:${input.reviewType}`);
-    const statusMap: Record<string, string> = {
-      approve_without_manual_review: "approved",
-      request_changes: "changes_requested",
-      start_uat: "review_started",
-      start_code_review: "review_started",
-    };
-    return {
-      projectId: input.projectId,
-      decision: input.decision,
-      reviewType: input.reviewType,
-      status: statusMap[input.decision] ?? "review_started",
-      nextAction: input.decision === "approve_without_manual_review" ? "real_data_e2e_generated" : "feedback_run_scheduled",
-    };
-  },
-}));
+function fakeFetch(calls: RecordedCall[], options: FakeFetchOptions = {}): typeof fetch {
+  const handoffStatus = options.handoffStatus ?? 200;
+  const decisionStatus = options.decisionStatus ?? "approved";
+
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+
+    // Project existence guard.
+    const parts = url.pathname.split("/").filter(Boolean); // api v1 projects :id
+    if (parts.length === 4 && parts[2] === "projects" && method === "GET") {
+      calls.push({ method: "ensureProjectExists", pathname: url.pathname, body: decodeURIComponent(parts[3]!) });
+      return Response.json({ id: decodeURIComponent(parts[3]!), name: "Project 1" });
+    }
+
+    if (url.pathname === "/workflows/review/uat-code-review/handoff" && method === "POST") {
+      calls.push({ method: "reports.uatCodeReviewHandoff", pathname: url.pathname, body });
+      if (handoffStatus !== 200) {
+        return Response.json(options.handoffBody ?? { message: "Project not found" }, { status: handoffStatus });
+      }
+      return Response.json({
+        projectId: (body as { projectId: string }).projectId,
+        status: "ready",
+        finalQaStatus: "passed",
+        nextAction: "prompt_user_for_uat_code_review",
+        decisionOptions: [
+          { id: "approve_without_manual_review", label: "Approve", description: "Approve." },
+          { id: "request_changes", label: "Request Changes", description: "Send feedback." },
+        ],
+        promptMarkdown: "# UAT Prompt",
+      });
+    }
+
+    if (url.pathname === "/workflows/review/uat-code-review/decision/record" && method === "POST") {
+      calls.push({ method: "reports.recordUatCodeReviewDecision", pathname: url.pathname, body });
+      return Response.json({ projectId: (body as { projectId: string }).projectId, status: decisionStatus });
+    }
+
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
+  }) as typeof fetch;
+}
 
 beforeEach(() => {
-  calls.splice(0, calls.length);
-  loadShouldThrowNotFound = false;
-  handoffStatus = "ready";
+  process.env["FULCRUM_SERVER_URL"] = SERVER_URL;
+  delete process.env["FULCRUM_PUBLIC_API_URL"];
 });
 
+afterEach(() => {
+  if (originalServerUrl === undefined) delete process.env["FULCRUM_SERVER_URL"];
+  else process.env["FULCRUM_SERVER_URL"] = originalServerUrl;
+  if (originalPublicApiUrl === undefined) delete process.env["FULCRUM_PUBLIC_API_URL"];
+  else process.env["FULCRUM_PUBLIC_API_URL"] = originalPublicApiUrl;
+});
+
+function loadEvent(id: string, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/uat`);
+  return { params: { id }, url, locals: { orgId: ORG_ID }, request: new Request(url), fetch: fetchImpl };
+}
+
+function actionEvent(id: string, data: Record<string, string>, fetchImpl: typeof fetch) {
+  const url = new URL(`http://localhost/projects/${id}/uat`);
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return {
+    params: { id },
+    url,
+    locals: { orgId: ORG_ID },
+    request: new Request(url, { method: "POST", body: fd }),
+    fetch: fetchImpl,
+  };
+}
+
 describe("/projects/[id]/uat +page.server.ts", () => {
-  test("server route uses service interfaces instead of direct application imports", () => {
+  test("server route uses project and workflow public APIs instead of request service scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@planning-review/interface/project-review-reports");
-    expect(source).toContain("$lib/server/request-service-scope");
-    expect(source).not.toContain("@planning-review/application/");
-    expect(source).not.toContain("$lib/server/application-scope");
+    expect(source).toContain("ensureProjectExists");
+    expect(source).toContain("createWebWorkflowApiCaller");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("@planning-review/interface/project-review-reports");
   });
 
   test("load returns handoff data for a project", async () => {
+    const calls: RecordedCall[] = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load({
-      params: { id: "project-1" },
-      locals: {},
-    } as Parameters<typeof mod.load>[0]);
+    const result = await mod.load(loadEvent("project-1", fakeFetch(calls)) as Parameters<typeof mod.load>[0]);
 
     expect(result.projectId).toBe("project-1");
-    expect(result.handoff).toBeTruthy();
-    expect(result.handoff.status).toBe("ready");
-    expect(calls).toContain("handoff:project-1");
+    expect(result.handoff).toMatchObject({ projectId: "project-1", status: "ready", finalQaStatus: "passed" });
+    expect(calls.map((call) => call.method)).toEqual([
+      "ensureProjectExists",
+      "reports.uatCodeReviewHandoff",
+    ]);
+    expect(calls[0]!.body).toBe("project-1");
+    expect(calls[1]!.body).toMatchObject({ projectId: "project-1", workspaceId: "org-1" });
   });
 
-  test("load returns null handoff on error", async () => {
-    loadShouldThrowNotFound = true;
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+  test("load returns null handoff on non-404 workflow error", async () => {
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const result = await mod.load(
+      loadEvent("project-1", fakeFetch(calls, { handoffStatus: 500, handoffBody: { message: "handoff not ready" } })) as Parameters<typeof mod.load>[0],
+    );
 
-    try {
-      const result = await mod.load({
-        params: { id: "missing-project" },
-        locals: {},
-      } as Parameters<typeof mod.load>[0]);
-      expect(result.handoff).toBeNull();
-    } catch (err) {
-      expect((err as { status: number }).status).toBe(404);
-    }
+    expect(result).toEqual({ projectId: "project-1", handoff: null });
+    expect(calls.map((call) => call.method)).toEqual(["ensureProjectExists", "reports.uatCodeReviewHandoff"]);
+  });
+
+  test("load throws 404 for public API not-found handoff", async () => {
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    await expect(
+      mod.load(
+        loadEvent("missing", fakeFetch(calls, { handoffStatus: 404, handoffBody: { message: "Project not found" } })) as Parameters<typeof mod.load>[0],
+      ),
+    ).rejects.toMatchObject({ status: 404 });
   });
 
   test("decide action records approval and returns redirect to reports", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.actions.decide({
-      params: { id: "project-1" },
-      request: form({ decision: "approve_without_manual_review" }),
-      locals: {},
-    } as Parameters<typeof mod.actions.decide>[0]);
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const result = await mod.actions.decide(
+      actionEvent(
+        "project-1",
+        {
+          decision: "approve_without_manual_review",
+          traceId: "trace-1",
+          feedbackText: "ship it",
+          taskIds: "task-1,task-2",
+        },
+        fakeFetch(calls, { decisionStatus: "approved" }),
+      ) as Parameters<typeof mod.actions.decide>[0],
+    );
 
-    expect(result).toMatchObject({
-      ok: true,
-      mode: "decide",
-      redirectTo: "/projects/project-1/reports",
+    expect(result).toMatchObject({ ok: true, mode: "decide", decision: { status: "approved" }, redirectTo: "/projects/project-1/reports" });
+    expect(calls.map((call) => call.method)).toEqual(["reports.recordUatCodeReviewDecision"]);
+    expect(calls[0]!.body).toMatchObject({
+      projectId: "project-1",
+      traceId: "trace-1",
+      decision: "approve_without_manual_review",
+      reviewType: "uat",
+      feedbackText: "ship it",
+      taskIds: ["task-1", "task-2"],
     });
-    expect(result.decision.status).toBe("approved");
-    expect(calls).toContain("decision:project-1:approve_without_manual_review:uat");
   });
 
   test("decide action records request_changes and returns redirect to review", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.actions.decide({
-      params: { id: "project-1" },
-      request: form({ decision: "request_changes", feedbackText: "Fix the tests" }),
-      locals: {},
-    } as Parameters<typeof mod.actions.decide>[0]);
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 4}`);
+    const result = await mod.actions.decide(
+      actionEvent("project-1", { decision: "request_changes" }, fakeFetch(calls, { decisionStatus: "changes_requested" })) as Parameters<typeof mod.actions.decide>[0],
+    );
 
-    expect(result).toMatchObject({
-      ok: true,
-      mode: "decide",
-      redirectTo: "/projects/project-1/review",
+    expect(result).toMatchObject({ ok: true, mode: "decide", decision: { status: "changes_requested" }, redirectTo: "/projects/project-1/review" });
+    expect(calls[0]).toMatchObject({
+      method: "reports.recordUatCodeReviewDecision",
+      body: { projectId: "project-1", decision: "request_changes", reviewType: "uat" },
     });
-    expect(result.decision.status).toBe("changes_requested");
-    expect(calls).toContain("decision:project-1:request_changes:uat");
   });
 
   test("decide action returns error on invalid decision", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.actions.decide({
-      params: { id: "project-1" },
-      request: form({ decision: "invalid_decision" }),
-      locals: {},
-    } as Parameters<typeof mod.actions.decide>[0]);
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
+    const result = await mod.actions.decide(
+      actionEvent("project-1", { decision: "maybe" }, fakeFetch(calls)) as Parameters<typeof mod.actions.decide>[0],
+    ) as { status: number; data: unknown };
 
-    expect(result.data?.ok).toBe(false);
-    expect(result.data?.message).toContain("Unsupported UAT decision");
+    expect(result.status).toBe(400);
+    expect(result.data).toEqual({ ok: false, mode: "decide", message: "Unsupported UAT decision: maybe" });
+    expect(calls).toEqual([]);
   });
 
   test("decide action defaults to approve_without_manual_review when empty", async () => {
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.actions.decide({
-      params: { id: "project-1" },
-      request: form({}),
-      locals: {},
-    } as Parameters<typeof mod.actions.decide>[0]);
+    const calls: RecordedCall[] = [];
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 6}`);
+    await mod.actions.decide(
+      actionEvent("project-1", { decision: "" }, fakeFetch(calls)) as Parameters<typeof mod.actions.decide>[0],
+    );
 
-    expect(result).toMatchObject({ ok: true, mode: "decide" });
-    expect(result.decision.decision).toBe("approve_without_manual_review");
+    expect(calls.map((call) => call.method)).toEqual(["reports.recordUatCodeReviewDecision"]);
+    expect(calls[0]!.body).toMatchObject({
+      projectId: "project-1",
+      decision: "approve_without_manual_review",
+      reviewType: "uat",
+      taskIds: [],
+    });
   });
 });

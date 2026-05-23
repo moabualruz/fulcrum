@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { AcpClientBridge } from "@agent-client-protocol/application/acp-bridge.ts";
 import {
   createInMemoryTrafficRecorder,
+  limitTrafficEntries,
   type TrafficEntryInput,
 } from "@agent-client-protocol/application/traffic.ts";
 import {
@@ -92,6 +93,45 @@ describe("ACP ported protocol foundation", () => {
 
     expect(recorder.entries.map((item) => item.id)).toEqual(["traffic-1", "traffic-2"]);
     expect(recorder.filteredEntries.map((item) => item.method)).toEqual(["session/new", "session/prompt"]);
+    expect(recorder.entries[0]).toMatchObject({ truncated: true, droppedCount: 1 });
+  });
+
+  test("keeps noop traffic recorder empty", () => {
+    const recorder = createInMemoryTrafficRecorder({ maxEntries: 0 });
+
+    recorder.addEntry({
+      direction: "out",
+      type: "request",
+      method: "initialize",
+      payload: {},
+    });
+
+    expect(recorder.entries).toEqual([]);
+  });
+
+  test("preserves cumulative traffic truncation counts across persisted appends", () => {
+    const traffic = (method: string, droppedCount?: number) => ({
+      id: method,
+      timestamp: 1,
+      direction: "out" as const,
+      type: "request" as const,
+      method,
+      payload: {},
+      ...(droppedCount ? { truncated: true, droppedCount } : {}),
+    });
+
+    const retained = limitTrafficEntries(
+      [
+        traffic("older", 5),
+        traffic("first"),
+        traffic("second"),
+        traffic("third"),
+      ],
+      2,
+    );
+
+    expect(retained.map((entry) => entry.method)).toEqual(["second", "third"]);
+    expect(retained[0]).toMatchObject({ truncated: true, droppedCount: 7 });
   });
 
   test("sends JSON-RPC requests, resolves responses, and records method traffic", async () => {

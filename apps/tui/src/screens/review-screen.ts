@@ -1,21 +1,37 @@
 /**
- * ReviewScreen — TUI review workbench (W5).
+ * Review stage workbench: the TUI `:review` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `review` screen).
  *
+ * The Review stage's QA / review-session surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :review · …`
+ * header, StatusFooter strip, and empty/error contract as every other stage.
  * Shows QA report status (pass/fail per criterion), lists review sessions,
  * and provides actions: load session, start review, approve/request-changes.
  *
  * Keybindings:
- *   R       — refresh
- *   A       — approve
- *   X       — request changes
- *   S       — save session
- *   j/k     — navigate
- *   Enter   — open session detail
- *   q       — go back
+ *   R      : refresh
+ *   A      : approve
+ *   X      : request changes
+ *   S      : save session
+ *   m …    : Step mode picker chord: m a ✋ Manual / m p ▶ Play /
+ *             m d 💬 Discuss / m i ⊞ AI Assist (collision-free `m` prefix)
+ *   j/k    : navigate
+ *   Enter  : open session detail
+ *   q      : go back
  */
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderStatusBadge,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -38,6 +54,12 @@ export interface TuiReviewSession {
 
 export interface ReviewScreenOptions {
   projectId?: string;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
   caller: {
     reviews: {
       listSessions: (input?: { projectId?: string }) => Promise<TuiReviewSession[]>;
@@ -61,8 +83,36 @@ export class ReviewScreen {
   private cursor = 0;
   private scrollTop = 0;
   private error: string | null = null;
+  /** The focused review-item Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "review",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: ReviewScreenOptions) {}
+
+  /** The Step mode currently selected on the focused review item (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
+
+  /** The OD stage-scope chrome for the Review workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Review",
+      route: ":review",
+      purpose: "review queue",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.sessions.length} sessions`,
+      agent: this.sessions[this.cursor]?.reviewer ?? null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? null,
+    };
+  }
 
   async load(): Promise<void> {
     try {
@@ -78,14 +128,28 @@ export class ReviewScreen {
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Review Workbench"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
     if (this.error) {
-      renderer.writeln(c.red(`  ${this.error}`));
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Review sessions failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.sessions.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No review sessions in this stage yet.",
+        "Press R to start a review.",
+      );
       renderer.writeln();
+      renderer.writeln(c.dim("  R=refresh  q=back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
     }
 
     // QA summary for selected session
@@ -93,29 +157,35 @@ export class ReviewScreen {
     if (selected?.criteria && selected.criteria.length > 0) {
       renderer.writeln(c.bold("  QA Report"));
       for (const criterion of selected.criteria) {
-        renderer.writeln(`  ${criterionBadge(criterion.status)} ${criterion.name}${criterion.detail ? c.dim(`  ${criterion.detail}`) : ""}`);
+        renderer.writeln(`  ${renderStatusBadge(criterion.status)} ${criterion.name}${criterion.detail ? c.dim(`  ${criterion.detail}`) : ""}`);
       }
       renderer.writeln();
     }
 
     // Session list
     renderer.writeln(c.bold("  Sessions"));
-    if (this.sessions.length === 0) {
-      renderer.writeln(c.dim("  No review sessions."));
-    } else {
-      const visible = this.visibleSessions;
-      for (const session of visible) {
-        const index = this.sessions.indexOf(session);
-        const pointer = index === this.cursor ? c.bold(">") : " ";
-        const badge = sessionStatusBadge(session.status);
-        const reviewer = session.reviewer ? c.dim(` @${session.reviewer}`) : "";
-        const date = session.createdAt ? c.dim(` ${session.createdAt}`) : "";
-        renderer.writeln(`${pointer} ${badge} ${session.title}${reviewer}${date}  ${c.dim(session.id)}`);
-      }
+    const visible = this.visibleSessions;
+    for (const session of visible) {
+      const index = this.sessions.indexOf(session);
+      const pointer = index === this.cursor ? c.bold(">") : " ";
+      const badge = renderStatusBadge(session.status);
+      const reviewer = session.reviewer ? c.dim(` @${session.reviewer}`) : "";
+      const date = session.createdAt ? c.dim(` ${session.createdAt}`) : "";
+      renderer.writeln(`${pointer} ${badge} ${session.title}${reviewer}${date}  ${c.dim(session.id)}`);
     }
 
+    // ModePicker row for the focused review-item Step (acceptance: Step-bearing rows).
     renderer.writeln();
-    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  j/k=navigate  Enter=open  q=back"));
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+
+    renderer.writeln();
+    renderer.writeln(c.dim("  R=refresh  A=approve  X=request-changes  S=save  m/m p/m d/m a step modes  j/k=navigate  Enter=open  q=back"));
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -130,6 +200,9 @@ export class ReviewScreen {
       this.keepCursorVisible();
       return true;
     }
+
+    // Step mode picker direct keys.
+    if (this.modePicker.handleChordKey(key)) return true;
 
     if (key === "R" || key === "r") {
       await this.load();
@@ -214,25 +287,4 @@ export class ReviewScreen {
     if (this.cursor < this.scrollTop) this.scrollTop = this.cursor;
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function criterionBadge(status: string): string {
-  if (status === "pass") return c.green("[PASS]");
-  if (status === "fail") return c.red("[FAIL]");
-  if (status === "pending") return c.yellow("[PEND]");
-  if (status === "skipped") return c.dim("[SKIP]");
-  return `[${status}]`;
-}
-
-function sessionStatusBadge(status: string): string {
-  if (status === "approved") return c.green("[approved]");
-  if (status === "changes_requested") return c.red("[changes]");
-  if (status === "in_progress") return c.yellow("[in progress]");
-  if (status === "draft") return c.dim("[draft]");
-  if (status === "closed") return c.dim("[closed]");
-  return `[${status}]`;
 }

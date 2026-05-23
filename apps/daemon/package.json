@@ -1,0 +1,14 @@
+{
+  "name": "@fulcrum/daemon",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "bin": {
+    "fulcrumd": "src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "typecheck": "bun run --bun tsc --noEmit -p ../../tsconfig.json"
+  }
+}
+

@@ -9,6 +9,7 @@ import {
   formatConventionalPrefix,
   type CodeReviewAnnotation,
 } from "@planning-review/application/reviews/shared/review-feedback.ts";
+import type { PlanningTriageOutput } from "@planning-review/domain/planning-triage.ts";
 import {
   findReviewSearchMatches,
   groupReviewSearchMatches,
@@ -51,6 +52,7 @@ export interface ReviewWorkbenchInput {
   editorAnnotations?: ReviewWorkbenchEditorAnnotation[];
   currentPrUrl?: string;
   currentPrMeta?: ReviewWorkbenchPullRequestMeta;
+  planningTriage?: PlanningTriageOutput;
 }
 
 export interface ReviewWorkbenchFileState extends ReviewWorkbenchDiffFile {
@@ -147,6 +149,7 @@ export interface ReviewWorkbenchModel {
   feedbackMarkdown: string;
   submission: ReviewWorkbenchSubmission;
   liveLog: ReviewWorkbenchLiveLog;
+  planningTriage?: PlanningTriageOutput;
   summary: {
     fileCount: number;
     visibleFileCount: number;
@@ -528,6 +531,7 @@ export function buildReviewWorkbenchModel(input: ReviewWorkbenchInput): ReviewWo
       currentPrMeta: input.currentPrMeta,
     }),
     liveLog,
+    ...(input.planningTriage ? { planningTriage: input.planningTriage } : {}),
     summary: {
       fileCount: input.files.length,
       visibleFileCount: finalVisibleFiles.length,

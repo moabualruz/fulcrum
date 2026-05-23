@@ -1,7 +1,7 @@
 import type { BoardTask } from "$lib/product-queries";
 // SvelteKit's `$lib/server/*` rule blocks runtime imports of `tasks.ts` from
 // any module that ends up in the browser bundle. We pull the type only and
-// re-declare the canonical status order locally — the type guarantees the
+// re-declare the canonical status order locally: the type guarantees the
 // list matches the server's `TaskStatus` definition.
 import type { TaskStatus } from "$lib/server/tasks";
 

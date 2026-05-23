@@ -60,6 +60,13 @@ afterEach(async () => {
 });
 
 describe("fulcrum init source behavior", () => {
+  it("prints command help with optional DIR argument", async () => {
+    const output = await capture(() => run(["--help"]));
+
+    expect(output).toContain("fulcrum init [DIR]");
+    expect(output).toContain("fulcrum init --dry-run [DIR]");
+  });
+
   it("bootstraps project rules, Claude import, Gemini shim, gitignore, vendors, and index dry-run", async () => {
     const project = join(scratch, "project");
     await mkdir(join(project, ".gemini"), { recursive: true });

@@ -28,8 +28,12 @@ export function createProjectApiCaller(options: ProjectApiClientOptions) {
   return {
     projects: {
       list: async () => await request("/api/v1/projects", { method: "GET", query: projectContextQuery(options) }),
+      options: async () =>
+        await request("/api/v1/projects/options", { method: "GET", query: projectContextQuery(options) }),
       create: async (input: JsonRecord) =>
         await request("/api/v1/projects", { method: "POST", body: projectBody(options, input) }),
+      createFromSetup: async (input: JsonRecord) =>
+        await request("/api/v1/projects/setup", { method: "POST", body: projectBody(options, input) }),
       get: async (input: JsonRecord & { id: string }) =>
         await request(`/api/v1/projects/${encodeURIComponent(input.id)}`, {
           method: "GET",
@@ -52,6 +56,33 @@ export function createProjectApiCaller(options: ProjectApiClientOptions) {
           method: "GET",
           query: projectContextQuery(options),
         }),
+      overview: async (input: JsonRecord & { id: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.id)}/overview`, {
+          method: "GET",
+          query: projectContextQuery(options),
+        }),
+      dashboard: async (input: JsonRecord = {}) =>
+        await request("/api/v1/projects/dashboard", {
+          method: "GET",
+          query: { ...projectContextQuery(options), projectId: input.projectId, project_id: input.project_id },
+        }),
+    },
+    backlog: {
+      load: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/backlog`, {
+          method: "GET",
+          query: projectContextQuery(options),
+        }),
+      addTask: async (input: JsonRecord & { projectId: string; sprintId: string; taskId: string }) =>
+        await request(`/api/v1/projects/${encodeURIComponent(input.projectId)}/backlog/sprint-tasks`, {
+          method: "POST",
+          body: projectBody(options, { sprintId: input.sprintId, taskId: input.taskId }),
+        }),
+      removeTask: async (input: JsonRecord & { projectId: string; sprintId: string; taskId: string }) =>
+        await request(
+          `/api/v1/projects/${encodeURIComponent(input.projectId)}/backlog/sprints/${encodeURIComponent(input.sprintId)}/tasks/${encodeURIComponent(input.taskId)}`,
+          { method: "DELETE", query: projectContextQuery(options) },
+        ),
     },
   };
 }

@@ -10,7 +10,7 @@ import type { EventBus } from "./event-bus.ts";
 
 export interface PollingSource<T = unknown> {
   /** Fetch events newer than lastSeenId. Return [] when none. */
-  poll(lastSeenId: string | null): Promise<Array<{ id: string; topic: string; data: T }>>;
+  poll(lastSeenId: string | null): Promise<Array<{ id: string; topic: string; data: T; timestamp?: Date | string }>>;
 }
 
 export interface PollingFallbackOptions {
@@ -22,9 +22,25 @@ export interface PollingFallbackOptions {
 /**
  * Check whether ws-polling-fallback feature is enabled.
  */
-export function isPollingFallbackEnabled(): boolean {
-  const features = process.env["FULCRUM_FEATURES"] ?? "";
+export function isPollingFallbackEnabled(featuresEnv = process.env["FULCRUM_FEATURES"] ?? ""): boolean {
+  const features = featuresEnv;
   return features.split(",").some((f) => f.trim() === "ws-polling-fallback");
+}
+
+export interface PollingFallbackState {
+  mode: "polling";
+  enabled: boolean;
+  intervalMs: number;
+  recovery: string;
+}
+
+export function pollingFallbackState(featuresEnv = process.env["FULCRUM_FEATURES"] ?? "", intervalMs = 5_000): PollingFallbackState {
+  return {
+    mode: "polling",
+    enabled: isPollingFallbackEnabled(featuresEnv),
+    intervalMs,
+    recovery: "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
+  };
 }
 
 /**
@@ -41,7 +57,11 @@ export function startPollingFallback(opts: PollingFallbackOptions): () => void {
     try {
       const events = await source.poll(lastSeenId);
       for (const evt of events) {
-        eventBus.publish(evt.topic, evt.data);
+        eventBus.publishEvent({
+          topic: evt.topic,
+          payload: evt.data,
+          timestamp: evt.timestamp ? new Date(evt.timestamp) : new Date(),
+        });
         lastSeenId = evt.id;
       }
     } catch {

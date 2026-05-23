@@ -58,9 +58,9 @@ describe("P1 test coverage matrix", () => {
 });
 
 describe("scripts/ci.ts tiered pipeline gate", () => {
-  it("has 4 tiers in the pipeline", () => {
+  it("has 5 tiers in the pipeline", () => {
     const tiers = [...new Set(STEPS.map((s) => s.tier))];
-    expect(tiers).toEqual(["lint", "unit", "integration", "build"]);
+    expect(tiers).toEqual(["tier1", "tier2", "tier3", "tier4", "tier5"]);
   });
 
   it("unit tier runs fixture-backed test selector", () => {
@@ -77,9 +77,12 @@ describe("scripts/ci.ts tiered pipeline gate", () => {
     expect(integration!.cmd).toContain("integration");
   });
 
-  it("build tier includes web:check and web:build", () => {
-    const names = STEPS.filter((s) => s.tier === "build").map((s) => s.name);
-    expect(names).toContain("web:check");
-    expect(names).toContain("web:build");
+  it("design and real e2e tiers include web gates", () => {
+    const designNames = STEPS.filter((s) => s.tier === "tier4").map((s) => s.name);
+    const realNames = STEPS.filter((s) => s.tier === "tier5").map((s) => s.name);
+    expect(designNames).toContain("web:check");
+    expect(designNames).toContain("design-e2e");
+    expect(realNames).toContain("web:build");
+    expect(realNames).toContain("real-e2e");
   });
 });

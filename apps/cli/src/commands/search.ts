@@ -18,6 +18,7 @@ interface SearchCaller {
     savedList: (input?: { project?: string }) => Promise<unknown>;
     savedCreate: (input: { name: string; queryJson: unknown }) => Promise<unknown>;
     savedDelete: (input: { id: string }) => Promise<unknown>;
+    addToContext?: (input: { ids: string[]; project?: string; task?: string }) => Promise<unknown>;
   };
   tasks?: {
     create: (input: Record<string, unknown>) => Promise<unknown>;
@@ -55,6 +56,7 @@ Usage:
   fulcrum search <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
   fulcrum search query <query> [--kind <kind>] [--project <id>] [--all-projects|--global] [--status <status>] [--assignee <id|me>] [--tag <tag>] [--date-range <ISO>/<ISO>] [--author <id>] [--limit <n>] [--offset <n>] [--semantic] [--json]
   fulcrum search suggest <partial> [--kind <kind>] [--json]
+  fulcrum search context add --ids <id,id> [--project <id>] [--task <id>] [--json]
   fulcrum search saved list [--project <id>] [--json]
   fulcrum search saved create --name <name> --query-json <json> [--json]
   fulcrum search saved delete <id> [--json]
@@ -87,6 +89,8 @@ export async function run(
       return runQuery(rest, resolved);
     case "suggest":
       return runSuggest(rest, resolved);
+    case "context":
+      return runContext(rest, resolved);
     case "saved":
       return runSaved(rest, resolved);
     case "help":
@@ -97,6 +101,39 @@ export async function run(
     default:
       return runQuery(argv, resolved);
   }
+}
+
+async function runContext(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const [sub = "help", ...rest] = argv;
+  if (sub === "add") return runContextAdd(rest, opts);
+  if (sub === "help" || sub === "--help" || sub === "-h") {
+    opts.print(HELP);
+    return;
+  }
+  fail("fulcrum search context", `unknown command '${sub}'`, opts);
+}
+
+async function runContextAdd(argv: readonly string[], opts: ResolvedOptions): Promise<void> {
+  const flags = parseFlags(argv);
+  const ids = (flags.get("ids") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    fail("fulcrum search context add", "missing required flag --ids <id,id>", opts);
+    return;
+  }
+
+  await callAndPrint(
+    "fulcrum search context add",
+    argv.includes("--json"),
+    opts,
+    async (caller) => {
+      if (!caller.search.addToContext) throw new Error("search.addToContext procedure is not available");
+      return caller.search.addToContext(compact({ ids, project: flags.get("project"), task: flags.get("task") }));
+    },
+  );
 }
 
 export async function runCmdk(
@@ -182,7 +219,7 @@ async function runQuery(argv: readonly string[], opts: ResolvedOptions): Promise
         if (result.ast.facets.label?.length) resolvedTag = result.ast.facets.label[0];
       }
     } catch {
-      // NL→filter failed — continue with plain-text query
+      // NL→filter failed: continue with plain-text query
     }
   }
 
@@ -342,6 +379,8 @@ function firstPositional(argv: readonly string[]): string | undefined {
     "--query-json",
     "--args",
     "--id",
+    "--ids",
+    "--task",
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const item = argv[i];

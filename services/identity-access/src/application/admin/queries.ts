@@ -2,13 +2,13 @@ import type { EntityManager } from "typeorm";
 import { z } from "zod";
 
 import { ErrorLog } from "@platform-core/infrastructure/application-database/entities/platform/ErrorLog.ts";
-import { evaluateFeatureFlag } from "@platform-core/application/feature-flags/evaluation.ts";
+import { evaluateFeatureFlag } from "@feature-flags/application/evaluation.ts";
 import {
   FEATURE_FLAGS,
   FLAG_DESCRIPTIONS,
   FlagRegistry,
   type FeatureFlagName,
-} from "@platform-core/application/feature-flags/registry.ts";
+} from "@feature-flags/application/registry.ts";
 import type { InferenceModel } from "@platform-core/application/inference/protocol.ts";
 import { AppForbiddenError, AppInvariantError, AppValidationError } from "@platform-core/domain/errors.ts";
 
@@ -20,6 +20,7 @@ export interface AdminAppContext {
 }
 
 export const BACKUP_FORMAT = "fulcrum.db-dump.v1" as const;
+export const BACKUP_SCHEMA_VERSION = 1 as const;
 
 export const DumpTableSchema = z.object({
   columns: z.array(z.string()),
@@ -29,6 +30,7 @@ export const DumpTableSchema = z.object({
 
 export const DumpSchema = z.object({
   format: z.literal(BACKUP_FORMAT),
+  schemaVersion: z.literal(BACKUP_SCHEMA_VERSION),
   createdAt: z.string(),
   tables: z.record(z.string(), DumpTableSchema),
 });
@@ -76,7 +78,7 @@ async function columnsForTable(em: EntityManager, table: string): Promise<{
       select column_name, data_type
       from information_schema.columns
       where table_schema = 'public'
-        and table_name = ?
+        and table_name = $1
       order by ordinal_position
     `,
     [table],
@@ -114,6 +116,7 @@ export async function createBackupDump(ctx: AdminAppContext): Promise<BackupDump
 
   return {
     format: BACKUP_FORMAT,
+    schemaVersion: BACKUP_SCHEMA_VERSION,
     createdAt: new Date().toISOString(),
     tables,
   };

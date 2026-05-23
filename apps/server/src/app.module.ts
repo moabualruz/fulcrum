@@ -3,10 +3,11 @@ import "reflect-metadata";
 import { Module } from "@nestjs/common";
 
 import { ApplicationDatabaseModule } from "@platform-core/infrastructure/database/typeorm-root.module.ts";
+import { EventBusModule } from "@platform-core/application/event-bus/index.ts";
 import { CredentialPublicApiModule } from "@platform-core/interface/http/credential-public-api.controller.ts";
 import { DoctorPublicApiModule } from "@platform-core/interface/http/doctor-public-api.controller.ts";
-import { FeatureExperimentPublicApiModule } from "@platform-core/interface/http/feature-experiment-public-api.controller.ts";
-import { FeatureFlagPublicApiModule } from "@platform-core/interface/http/feature-flag-public-api.controller.ts";
+import { FeatureExperimentPublicApiModule } from "@feature-flags/interface/http/controllers/feature-experiment-public-api.controller.ts";
+import { FeatureFlagPublicApiModule } from "@feature-flags/interface/http/controllers/feature-flag-public-api.controller.ts";
 import { ErrorLogPublicApiModule } from "@platform-core/interface/http/error-log-public-api.controller.ts";
 import { InferencePublicApiModule } from "@platform-core/interface/http/inference-public-api.controller.ts";
 import { SkillSupplyPublicApiModule } from "@platform-core/interface/http/skill-supply-public-api.controller.ts";
@@ -17,6 +18,7 @@ import { ThemeSettingsApiModule } from "@platform-core/interface/http/theme-sett
 import { AuthPublicApiModule } from "@identity-access/interface/http/auth-public-api.controller.ts";
 import { InvitationPublicApiModule } from "@identity-access/interface/http/invitation-public-api.controller.ts";
 import { OrganizationPublicApiModule } from "@identity-access/interface/http/organization-public-api.controller.ts";
+import { AgentProfilePublicApiModule } from "@execution-orchestration/interface/http/agent-profile-public-api.controller.ts";
 import { AgentRunPublicApiModule } from "@execution-orchestration/interface/http/agent-run-public-api.controller.ts";
 import { RoutingPublicApiModule } from "@execution-orchestration/interface/http/routing-public-api.controller.ts";
 import { ConnectorPublicApiModule } from "@integration-hub/interface/http/connector-public-api.controller.ts";
@@ -35,7 +37,10 @@ import { SavedViewPublicApiModule } from "@work-management/interface/http/saved-
 import { AutomationPublicApiModule } from "@work-management/interface/http/automation-public-api.controller.ts";
 import { CustomFieldPublicApiModule } from "@work-management/interface/http/custom-field-public-api.controller.ts";
 import { FieldDependencyPublicApiModule } from "@work-management/interface/http/field-dependency-public-api.controller.ts";
+import { PlanningStructurePublicApiModule } from "@work-management/interface/http/planning-structure-public-api.controller.ts";
 import { ProjectPublicApiModule } from "@work-management/interface/http/project-public-api.controller.ts";
+import { ProjectStatusPublicApiModule } from "@work-management/interface/http/project-status-public-api.controller.ts";
+import { ProjectTimelinePublicApiModule } from "@work-management/interface/http/project-timeline-public-api.controller.ts";
 import { SprintPublicApiModule } from "@work-management/interface/http/sprint-public-api.controller.ts";
 import { TaskCommentPublicApiModule } from "@work-management/interface/http/task-comment-public-api.controller.ts";
 import { TaskRecurrencePublicApiModule } from "@work-management/interface/http/task-recurrence-public-api.controller.ts";
@@ -50,6 +55,7 @@ export class AppModule {}
 Module({
   imports: [
     TrpcModule,
+    EventBusModule,
     ApplicationDatabaseModule,
     CredentialPublicApiModule,
     DoctorPublicApiModule,
@@ -65,6 +71,7 @@ Module({
     AuthPublicApiModule,
     InvitationPublicApiModule,
     OrganizationPublicApiModule,
+    AgentProfilePublicApiModule,
     AgentRunPublicApiModule,
     RoutingPublicApiModule,
     ConnectorPublicApiModule,
@@ -83,7 +90,10 @@ Module({
     AutomationPublicApiModule,
     CustomFieldPublicApiModule,
     FieldDependencyPublicApiModule,
+    PlanningStructurePublicApiModule,
     ProjectPublicApiModule,
+    ProjectStatusPublicApiModule,
+    ProjectTimelinePublicApiModule,
     SprintPublicApiModule,
     TaskCommentPublicApiModule,
     TaskRecurrencePublicApiModule,

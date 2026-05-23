@@ -16,6 +16,8 @@ import { AGENTS } from "@execution-orchestration/interface/agent-catalog.ts";
 import type { AgentId } from "./mcp-registry.ts";
 
 export type RecipeName = (typeof RECIPE_NAMES)[number];
+type HookInputSource = "edit-file" | "bash-command" | "session" | "tool-result";
+type HookOutputPolicy = "silent-fail-open" | "blocking-stderr" | "stdout-advisory" | "bounded-router" | "state-file";
 type JsonAgentId = "claude-code" | "codex" | "gemini";
 type TsAgentId = "opencode" | "pi";
 
@@ -51,9 +53,85 @@ const RECIPE_NAMES = [
   "tool-output-router",
 ] as const;
 
+export interface HookRecipeContract {
+  name: RecipeName;
+  inputSource: HookInputSource;
+  outputPolicy: HookOutputPolicy;
+  blocking: boolean;
+  malformedPayload: "stderr-one-line-and-continue";
+  jsonMode: "hooks-list-only" | "none";
+}
+
+export const HOOK_RECIPE_CONTRACTS: Record<RecipeName, HookRecipeContract> = {
+  "format": {
+    name: "format",
+    inputSource: "edit-file",
+    outputPolicy: "silent-fail-open",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "lint-gate": {
+    name: "lint-gate",
+    inputSource: "edit-file",
+    outputPolicy: "blocking-stderr",
+    blocking: true,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "pm-policy": {
+    name: "pm-policy",
+    inputSource: "bash-command",
+    outputPolicy: "blocking-stderr",
+    blocking: true,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "test-on-edit": {
+    name: "test-on-edit",
+    inputSource: "edit-file",
+    outputPolicy: "state-file",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "audit-log": {
+    name: "audit-log",
+    inputSource: "bash-command",
+    outputPolicy: "state-file",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "index-check": {
+    name: "index-check",
+    inputSource: "session",
+    outputPolicy: "stdout-advisory",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "index-rebuild": {
+    name: "index-rebuild",
+    inputSource: "session",
+    outputPolicy: "silent-fail-open",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+  "tool-output-router": {
+    name: "tool-output-router",
+    inputSource: "tool-result",
+    outputPolicy: "bounded-router",
+    blocking: false,
+    malformedPayload: "stderr-one-line-and-continue",
+    jsonMode: "hooks-list-only",
+  },
+};
+
 const LABELS: Map<string, string> = new Map(AGENTS.map((agent) => [agent.id, agent.label]));
 
-/** All 5 supported agent IDs — used when `--all` is passed. */
+/** All 5 supported agent IDs: used when `--all` is passed. */
 const ALL_AGENT_IDS: Set<AgentId> = new Set(AGENTS.map((a) => a.id as AgentId));
 
 /**
@@ -68,7 +146,7 @@ async function detectedAgents(home: string): Promise<Set<AgentId>> {
       await stat(agent.rootDir(home));
       detected.add(agent.id as AgentId);
     } catch {
-      // dir absent — agent not installed
+      // dir absent: agent not installed
     }
   }
   return detected;
@@ -768,6 +846,7 @@ async function cmdList(args: string[] = []): Promise<void> {
   const enabled = await listEnabled();
   if (args.includes("--json")) {
     const recipes = RECIPE_NAMES.map((name) => ({
+      ...HOOK_RECIPE_CONTRACTS[name],
       name,
       enabled: enabled.has(name),
       marker: markerPath(name),
@@ -779,7 +858,9 @@ async function cmdList(args: string[] = []): Promise<void> {
   console.log("Available hooks (subcommands of `fulcrum hook <name>`):");
   for (const name of RECIPE_NAMES) {
     const mark = enabled.has(name) ? "✓" : " ";
-    console.log(`  ${mark} ${name}`);
+    const contract = HOOK_RECIPE_CONTRACTS[name];
+    const mode = contract.blocking ? "blocking" : "nonblocking";
+    console.log(`  ${mark} ${name}: ${contract.inputSource}; ${contract.outputPolicy}; ${mode}`);
   }
   console.log(`\n${enabled.size} of ${RECIPE_NAMES.length} marked enabled. Marker dir: ${homeFulcrum()}/hooks/enabled/`);
   console.log("`enable <name>` applies the per-agent registration and prints the snippet.");
@@ -809,7 +890,7 @@ async function cmdEnable(name: string | undefined, allAgents: boolean): Promise<
     }
   }
   if (!snippet) {
-    console.log("(no registration snippet documented — see docs/hooks.md §6 for the cross-agent mapping)");
+    console.log("(no registration snippet documented: see docs/hooks.md §6 for the cross-agent mapping)");
     return;
   }
   console.log("\n── Registration snippet (paste into each agent's config) ──");

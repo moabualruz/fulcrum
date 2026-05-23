@@ -246,7 +246,9 @@ describe("TUI dependency run preview", () => {
     expect(calls).toEqual([{ traceId: "trace-tui-dispatch", runGroupId: "trace-tui-dispatch" }]);
     const output = tty.plainText();
     expect(output).toContain("Dependency run feedback");
+    expect(output).toContain("Trace: trace-tui-dispatch");
     expect(output).toContain("Queued: 1");
+    expect(output).toContain("Group: trace-tui-dispatch");
     expect(output).toContain("Dependency tree dispatched");
   });
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants, Select } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -52,7 +52,7 @@
 			data-create-memory
 			type="button"
 			onclick={() => (showCreate = !showCreate)}
-			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+			class={cn(buttonVariants({ variant: "primary" }), "gap-2")}
 		>
 			{showCreate ? "Cancel" : "Create memory"}
 		</button>
@@ -117,7 +117,7 @@
 			</div>
 			<button
 				type="submit"
-				class={cn(buttonVariants({ variant: "default" }))}
+				class={cn(buttonVariants({ variant: "primary" }))}
 			>Save memory</button>
 		</form>
 	{/if}
@@ -138,6 +138,7 @@
 			data-scope-filter
 			data-testid="memory-search"
 			name="scope"
+			aria-label="Memory scope"
 			onchange={autoSubmit}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
 		>
@@ -149,6 +150,7 @@
 		<select
 			data-kind-filter
 			name="kind"
+			aria-label="Memory kind"
 			onchange={autoSubmit}
 			class={cn("border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs")}
 		>
@@ -159,7 +161,7 @@
 		</select>
 		<button
 			type="submit"
-			class={cn(buttonVariants({ variant: "outline" }))}
+			class={cn(buttonVariants({ variant: "secondary" }))}
 		>Apply</button>
 	</form>
 
@@ -170,7 +172,7 @@
 		<div
 			data-empty-memories
 			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-		>No memories yet — create one.</div>
+		>No memories yet: create one.</div>
 	{:else}
 		<div data-slot="table-container" class={cn("relative w-full overflow-x-auto")}>
 			<table data-slot="table" class={cn("w-full caption-bottom text-sm")}>

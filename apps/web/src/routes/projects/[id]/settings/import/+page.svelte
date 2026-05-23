@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -16,10 +16,15 @@
     targetField: string;
   }
 
+  // Source identity glyphs: simple Unicode marks selected to evoke the source
+  // without depending on emoji fonts (which render inconsistently across OSes
+  // and break the OKLCH-tokened brand palette). The web shell renders these
+  // inside a square chip; the connector page header carries the real
+  // brand label next to them.
   const SOURCE_DETAILS: Record<Source, { label: string; icon: string; description: string }> = {
-    csv: { label: "CSV", icon: "📄", description: "Import tasks from a CSV file" },
-    jira: { label: "Jira", icon: "🔵", description: "Import from Atlassian Jira project" },
-    linear: { label: "Linear", icon: "⚡", description: "Import from Linear workspace" },
+    csv: { label: "CSV", icon: "≣", description: "Import tasks from a CSV file" },
+    jira: { label: "Jira", icon: "J", description: "Import from Atlassian Jira project" },
+    linear: { label: "Linear", icon: "L", description: "Import from Linear workspace" },
     plane: { label: "Plane", icon: "▦", description: "Import from a Plane workspace export" },
   };
 
@@ -118,7 +123,7 @@
       step === s ? "bg-primary text-primary-foreground" :
       step > s ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
     )}>{step > s ? "✓" : s}</div>
-    {#if s < 5}<div class={cn("h-px flex-1 bg-border")} />{/if}
+    {#if s < 5}<div class={cn("h-px flex-1 bg-border")}></div>{/if}
   {/each}
 </div>
 
@@ -252,7 +257,7 @@
         {/each}
       </div>
     {:else}
-      <p class={cn("text-sm text-muted-foreground")}>No fields to map (non-CSV source — auto-mapped).</p>
+      <p class={cn("text-sm text-muted-foreground")}>No fields to map (non-CSV source: auto-mapped).</p>
     {/if}
 
     <div class={cn("flex gap-2 justify-between mt-2")}>
@@ -331,7 +336,7 @@
             <div
               class={cn("h-full bg-primary rounded-full transition-all duration-200")}
               style="width: {importProgress}%"
-            />
+            ></div>
           </div>
           <p class={cn("text-xs text-muted-foreground text-right")}>{importProgress}%</p>
         {/if}

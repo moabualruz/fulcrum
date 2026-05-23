@@ -6,6 +6,7 @@ import {
   WorkManagementCycleEntity,
   WorkManagementCycleTaskEntity,
 } from "@work-management/infrastructure/database/work-structure.entities.ts";
+import { FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export type SprintPublicStatus = "planning" | "active" | "completed" | "cancelled";
 
@@ -91,6 +92,37 @@ export class SprintPublicStore {
     await this.repository().remove(cycle);
   }
 
+  async startSprint(input: { orgId: string; id: string }): Promise<SprintPublicRow | null> {
+    const cycle = await this.repository().findOneBy({ id: input.id });
+    if (!cycle) return null;
+    if (cycle.status === "active") throw new Error("sprint_already_active");
+
+    const active = await this.repository().findOneBy({ projectId: cycle.projectId, status: "active" });
+    if (active) throw new Error("at_most_one_active");
+
+    cycle.status = "active";
+    const saved = await this.repository().save(cycle);
+    return toPublicRow(input.orgId, saved);
+  }
+
+  async closeSprint(input: { orgId: string; id: string; unfinishedDisposition?: "backlog" }): Promise<{
+    closed: true;
+    sprint: SprintPublicRow;
+    unfinishedDisposition: "backlog";
+  } | null> {
+    const cycle = await this.repository().findOneBy({ id: input.id });
+    if (!cycle) return null;
+    if (cycle.status !== "active") throw new Error("sprint_must_be_active");
+
+    cycle.status = "completed";
+    const saved = await this.repository().save(cycle);
+    return {
+      closed: true,
+      sprint: toPublicRow(input.orgId, saved),
+      unfinishedDisposition: input.unfinishedDisposition ?? "backlog",
+    };
+  }
+
   async addTask(input: { orgId: string; id: string; taskId: string }): Promise<SprintTaskPublicRow | null> {
     const cycle = await this.repository().findOneBy({ id: input.id });
     if (!cycle) return null;
@@ -111,6 +143,124 @@ export class SprintPublicStore {
     return toTaskPublicRow(input.orgId, row);
   }
 
+  /**
+   * Project-scoped sprint read/write methods backing the web `sprints` board.
+   *
+   * The cycle methods above operate on `WorkManagementCycleEntity`; these
+   * delegate to the `sprints`-table application queries/commands so the web
+   * `/projects/[id]/sprints` and `/sprint/[sprintId]` routes can stay pure
+   * invocation layers. They are kept on the same store to share one injected
+   * `DataSource` and one Nest module registration.
+   */
+  async loadProjectSprints(input: {
+    orgId: string;
+    projectId: string;
+  }): Promise<{ sprints: unknown[]; velocity: Array<Record<string, unknown>> }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) return { sprints: [], velocity: [] };
+    const queries = await import("@work-management/application/work-cycle-queries.ts");
+    return await queries.loadProjectSprints(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }));
+  }
+
+  async loadProjectSprintDetail(input: {
+    orgId: string;
+    projectId: string;
+    sprintId: string;
+  }): Promise<unknown> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
+    const queries = await import("@work-management/application/work-cycle-queries.ts");
+    return await queries.loadProjectSprintDetail(
+      this.dataSource.manager,
+      projectContext({ orgId: input.orgId, projectId }),
+      input.sprintId,
+    );
+  }
+
+  async createProjectSprint(input: {
+    orgId: string;
+    projectId: string;
+    name: string;
+    goal?: string | null;
+    capacity?: number | null;
+  }): Promise<{ id: string }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
+    const commands = await import("@work-management/application/work-cycle-commands.ts");
+    return await commands.createProjectSprint(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), {
+      name: input.name,
+      goal: input.goal,
+      capacity: input.capacity,
+    });
+  }
+
+  async startProjectSprint(input: { orgId: string; sprintId: string }): Promise<{ ok: true }> {
+    const commands = await import("@work-management/application/work-cycle-commands.ts");
+    return await commands.startProjectSprint(this.dataSource.manager, orgContext(input), input.sprintId);
+  }
+
+  async completeProjectSprint(input: {
+    orgId: string;
+    sprintId: string;
+  }): Promise<{ id: string; metrics: { velocity: number; completed_tasks: number } }> {
+    const commands = await import("@work-management/application/work-cycle-commands.ts");
+    return await commands.completeProjectSprint(this.dataSource.manager, orgContext(input), input.sprintId);
+  }
+
+  async updateProjectSprintGoal(input: {
+    orgId: string;
+    sprintId: string;
+    goal: string;
+  }): Promise<{ ok: true }> {
+    const commands = await import("@work-management/application/work-cycle-commands.ts");
+    return await commands.updateSprintGoal(
+      this.dataSource.manager,
+      orgContext(input),
+      input.sprintId,
+      input.goal,
+    );
+  }
+
+  async createProjectSprintTask(input: {
+    orgId: string;
+    projectId: string;
+    sprintId: string;
+    title: string;
+    status?: string | null;
+  }): Promise<{ id: string }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
+    const commands = await import("@work-management/application/projects/commands.ts");
+    return await commands.createProjectTask(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), {
+      title: input.title,
+      status: input.status,
+      sprintId: input.sprintId,
+    });
+  }
+
+  async updateProjectSprintTask(input: {
+    orgId: string;
+    projectId: string;
+    taskId: string;
+    status?: string | null;
+  }): Promise<{ ok: true }> {
+    const projectId = await this.resolveProjectId(input);
+    if (!projectId) throw new Error("Project not found");
+    const commands = await import("@work-management/application/projects/commands.ts");
+    return await commands.updateProjectTask(this.dataSource.manager, projectContext({ orgId: input.orgId, projectId }), input.taskId, {
+      status: input.status,
+    });
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(input: { orgId: string; projectId: string }): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: input.projectId, workspaceId: input.orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: input.projectId, workspaceId: input.orgId });
+    return bySlug?.id ?? null;
+  }
+
   private repository() {
     return this.dataSource.getRepository(WorkManagementCycleEntity);
   }
@@ -118,6 +268,20 @@ export class SprintPublicStore {
   private taskRepository() {
     return this.dataSource.getRepository(WorkManagementCycleTaskEntity);
   }
+}
+
+/** Build an `AppContext` carrying project scope for `sprints`-table queries/commands. */
+function projectContext(input: { orgId: string; projectId: string }): {
+  orgId: string;
+  userId: null;
+  projectId: string;
+} {
+  return { orgId: input.orgId, userId: null, projectId: input.projectId };
+}
+
+/** Build an `AppContext` for sprint-id-only commands that do not need project scope. */
+function orgContext(input: { orgId: string }): { orgId: string; userId: null; projectId: null } {
+  return { orgId: input.orgId, userId: null, projectId: null };
 }
 
 function toPublicRow(orgId: string, cycle: WorkManagementCycle): SprintPublicRow {

@@ -26,6 +26,7 @@ export type ContextSliceKey = keyof typeof CONTEXT_SLICE_WEIGHTS;
 export interface ContextSlice {
   content: string;
   tokenCount: number;
+  sourceRefs: ContextSourceRef[];
 }
 
 export interface ContextBundle {
@@ -34,7 +35,15 @@ export interface ContextBundle {
   projectId: string | null;
   tokenBudget: number;
   tokenCount: number;
+  sourceRefs: ContextSourceRef[];
   slices: Record<ContextSliceKey, ContextSlice>;
+}
+
+export interface ContextSourceRef {
+  kind: "task" | "doc" | "memory" | "run" | "repo" | "skill";
+  id: string;
+  reason: string;
+  scope: "project" | "global" | "org";
 }
 
 export interface ContextAssembleOptions {
@@ -42,6 +51,11 @@ export interface ContextAssembleOptions {
   agent?: string;
   agentType?: string;
   runId?: string;
+}
+
+interface ContextSliceDraft {
+  content: string;
+  sourceRefs: ContextSourceRef[];
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -114,7 +128,7 @@ export class ContextAssembler {
     const query = [title, description].filter((part) => part.trim() !== "").join(" ");
 
     const allocations = sliceAllocations(tokenBudget);
-    const rawSlices: Record<ContextSliceKey, string> = {
+    const rawSlices: Record<ContextSliceKey, ContextSliceDraft> = {
       memories: await this.memoriesSlice(query, orgId, projectId),
       linkedDocs: await this.linkedDocsSlice(description, orgId, projectId),
       recentRuns: await this.recentRunsSlice(taskId, task, allocations.recentRuns),
@@ -130,6 +144,10 @@ export class ContextAssembler {
       skillPrompts: makeSlice(rawSlices.skillPrompts, allocations.skillPrompts),
     };
     const tokenCount = SLICE_KEYS.reduce((sum, key) => sum + slices[key].tokenCount, 0);
+    const sourceRefs: ContextSourceRef[] = [
+      { kind: "task", id: taskId, reason: "selected-task", scope: "project" },
+      ...SLICE_KEYS.flatMap((key) => slices[key].sourceRefs),
+    ];
     const bundle: ContextBundle = {
       orgId,
       slices,
@@ -137,6 +155,7 @@ export class ContextAssembler {
       projectId,
       tokenCount,
       tokenBudget,
+      sourceRefs,
     };
 
     const snapshotId = await this.writeSnapshot(bundle, options.runId ?? null);
@@ -154,28 +173,36 @@ export class ContextAssembler {
     query: string,
     orgId: string,
     projectId: string | null,
-  ): Promise<string> {
+  ): Promise<ContextSliceDraft> {
     const memories = (await this.retriever.retrieve(query, {
       orgId,
       projectId,
       topK: 20,
     })).map(recordFrom);
-    return memories.map((memory) => {
-      const kind = stringOrNull(memory["kind"]);
-      const importance = stringOrNull(memory["importance"]);
-      const label = [kind, importance].filter(Boolean).join("/");
-      const body = stringOrNull(memory["body"]) ?? "";
-      return label === "" ? body : `- ${label}: ${body}`;
-    }).join("\n");
+    return {
+      content: memories.map((memory) => {
+        const kind = stringOrNull(memory["kind"]);
+        const importance = stringOrNull(memory["importance"]);
+        const label = [kind, importance].filter(Boolean).join("/");
+        const body = stringOrNull(memory["body"]) ?? "";
+        return label === "" ? body : `- ${label}: ${body}`;
+      }).join("\n"),
+      sourceRefs: memories.map((memory) => ({
+        kind: "memory" as const,
+        id: stringOrNull(memory["id"]) ?? stringOrNull(memory["key"]) ?? "memory",
+        reason: "retrieved-memory",
+        scope: stringOrNull(memory["projectId"]) === null ? "global" as const : "project" as const,
+      })),
+    };
   }
 
   private async linkedDocsSlice(
     description: string,
     orgId: string,
     projectId: string | null,
-  ): Promise<string> {
+  ): Promise<ContextSliceDraft> {
     const titles = wikilinkTitles(description).slice(0, 5);
-    if (titles.length === 0) return "";
+    if (titles.length === 0) return emptyDraft();
 
     const docs = (await this.documentRepository.find(
       {
@@ -191,18 +218,25 @@ export class ContextAssembler {
       if (title) byTitle.set(title, doc);
     }
 
-    return titles
+    const selectedDocs = titles
       .map((title) => byTitle.get(title))
-      .filter((doc): doc is UnknownRecord => doc != null)
-      .map((doc) => clipToTokenBudget(renderDocSection(doc), 200))
-      .join("\n---\n");
+      .filter((doc): doc is UnknownRecord => doc != null);
+    return {
+      content: selectedDocs.map((doc) => clipToTokenBudget(renderDocSection(doc), 200)).join("\n---\n"),
+      sourceRefs: selectedDocs.map((doc) => ({
+        kind: "doc" as const,
+        id: stringOrNull(doc["id"]) ?? docTitle(doc) ?? "doc",
+        reason: "wikilink-doc",
+        scope: stringOrNull(doc["scope"]) === "global" ? "global" as const : "project" as const,
+      })),
+    };
   }
 
   private async recentRunsSlice(
     taskId: string,
     task: UnknownRecord,
     allocation: number,
-  ): Promise<string> {
+  ): Promise<ContextSliceDraft> {
     const sameTask = (await this.runRepository.find(
       { task: { id: taskId } },
       { orderBy: { startedAt: "DESC" }, limit: 3 },
@@ -221,19 +255,27 @@ export class ContextAssembler {
     ];
     const withoutTranscripts = selected.map((run) => renderRun(run, false)).join("\n\n");
     const withTranscripts = selected.map((run) => renderRun(run, true)).join("\n\n");
-    return estimateContextTokens(withTranscripts) <= allocation ? withTranscripts : withoutTranscripts;
+    return {
+      content: estimateContextTokens(withTranscripts) <= allocation ? withTranscripts : withoutTranscripts,
+      sourceRefs: selected.map((run) => ({
+        kind: "run" as const,
+        id: stringOrNull(run["id"]) ?? "run",
+        reason: "recent-run",
+        scope: "project" as const,
+      })),
+    };
   }
 
   private async repoStateSlice(
     task: UnknownRecord,
     customFields: UnknownRecord,
     orgId: string,
-  ): Promise<string> {
+  ): Promise<ContextSliceDraft> {
     const repoRef = await readValue(task, "repo");
     const repoId = stringOrNull(customFields["repoId"] ?? task["repoId"] ?? readValueSync(repoRef, "id"));
-    if (!repoId) return "";
+    if (!repoId) return emptyDraft();
     const repoResult = await this.repoRepository.findOne({ org: { id: orgId }, id: repoId });
-    if (!repoResult) return "";
+    if (!repoResult) return emptyDraft();
     const repo = recordFrom(repoResult);
 
     const lines = [
@@ -252,21 +294,25 @@ export class ContextAssembler {
       lines.push("Tree:");
       lines.push(...tree.map((entry) => `- ${entry}`));
     }
-    return lines.join("\n");
+    return {
+      content: lines.join("\n"),
+      sourceRefs: [{ kind: "repo", id: repoId, reason: "task-repo", scope: "org" }],
+    };
   }
 
-  private async skillPromptsSlice(orgId: string, agent: string | null): Promise<string> {
+  private async skillPromptsSlice(orgId: string, agent: string | null): Promise<ContextSliceDraft> {
     const skills = (await this.skillRepository.find(
       { org: { id: orgId } },
       { orderBy: { slug: "ASC" } },
     )).map(recordFrom);
-    return skills
+    const selected = skills
       .filter((skill) => {
         if (!agent) return true;
         const enabledAgents = arrayOfStrings(skill["enabledAgents"]);
         return enabledAgents.length === 0 || enabledAgents.includes(agent);
-      })
-      .map((skill) => {
+      });
+    return {
+      content: selected.map((skill) => {
         const name = stringOrNull(skill["name"] ?? skill["slug"]) ?? "Skill";
         const description = stringOrNull(skill["description"]) ?? "";
         const triggers = arrayOfStrings(skill["triggers"]);
@@ -275,8 +321,14 @@ export class ContextAssembler {
           description,
           triggers.length > 0 ? `Triggers: ${triggers.join(", ")}` : "",
         ].filter((part) => part !== "").join("\n");
-      })
-      .join("\n\n");
+      }).join("\n\n"),
+      sourceRefs: selected.map((skill) => ({
+        kind: "skill" as const,
+        id: stringOrNull(skill["slug"] ?? skill["name"]) ?? "skill",
+        reason: "agent-skill",
+        scope: "org" as const,
+      })),
+    };
   }
 
   private async writeSnapshot(bundle: ContextBundle, runId: string | null): Promise<string> {
@@ -313,12 +365,17 @@ function sliceAllocations(tokenBudget: number): Record<ContextSliceKey, number> 
   };
 }
 
-function makeSlice(content: string, allocation: number): ContextSlice {
-  const clipped = clipToTokenBudget(content, allocation);
+function makeSlice(draft: ContextSliceDraft, allocation: number): ContextSlice {
+  const clipped = clipToTokenBudget(draft.content, allocation);
   return {
     content: clipped,
     tokenCount: estimateContextTokens(clipped),
+    sourceRefs: clipped === "" ? [] : draft.sourceRefs,
   };
+}
+
+function emptyDraft(): ContextSliceDraft {
+  return { content: "", sourceRefs: [] };
 }
 
 function clipToTokenBudget(content: string, tokenBudget: number): string {

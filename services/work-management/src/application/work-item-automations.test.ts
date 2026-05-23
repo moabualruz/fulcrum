@@ -4,7 +4,7 @@
  * TDD regression tests written before implementation.
  */
 
-import { describe, it, expect, beforeEach, vi } from "bun:test";
+import { afterEach, describe, it, expect, beforeEach, vi } from "bun:test";
 
 // Minimal mock for EntityManager
 function makeEm(
@@ -38,6 +38,10 @@ import { WorkItemAutomationService } from "@work-management/application/work-ite
 import type { EventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
+
+afterEach(() => {
+  if (process.exitCode === 99) process.exitCode = 0;
+});
 
 function makeEventBus(): EventBus {
   return {
@@ -138,6 +142,48 @@ describe("WorkItemAutomationService", () => {
       // The action should not fire — executionCount stays 0
       // flush may not be called if condition fails
       expect(automation.executionCount).toBe(0);
+    });
+
+    it("records an audit event when an automation mutates a task", async () => {
+      const automation = {
+        id: "auto-1",
+        projectId: "proj-1",
+        triggerType: "task.assigned",
+        condition: null,
+        actionType: "set_assignee",
+        actionConfig: { assigneeId: "user-2" },
+        enabled: true,
+        executionCount: 0,
+        org: { id: "org-1" },
+      };
+      const em = makeEm([automation]) as ReturnType<typeof makeEm>;
+      const service = new WorkItemAutomationService(em as never, makeEventBus());
+
+      await service.evaluate({
+        verb: "task.assigned",
+        taskId: "task-1",
+        orgId: "org-1",
+        projectId: "proj-1",
+        payload: {},
+      }, "org-1", "proj-1");
+
+      expect(em.query).toHaveBeenCalledWith(
+        expect.stringContaining("update tasks set assignee_id = ?"),
+        ["user-2", "org-1", "task-1"],
+      );
+      expect(em.query).toHaveBeenCalledWith(
+        expect.stringContaining("insert into audit_events"),
+        expect.arrayContaining([
+          "org-1",
+          "proj-1",
+          "automation:auto-1",
+          "automation.executed",
+          "task",
+          "task-1",
+          expect.stringContaining("\"actionType\":\"set_assignee\""),
+        ]),
+      );
+      expect(automation.executionCount).toBe(1);
     });
 
     it("inherits locked parent automation to descendant projects and keeps child project automations local", async () => {

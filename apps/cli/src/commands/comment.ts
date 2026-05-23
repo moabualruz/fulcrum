@@ -1,11 +1,11 @@
 /**
- * fulcrum comment — task comment commands.
+ * fulcrum comment: task comment commands.
  *
  * Usage:
- *   fulcrum comment list <taskId>            — list threaded comments
- *   fulcrum comment add <taskId> "body"      — add comment
- *   fulcrum comment reply <commentId> "body" — reply to comment
- *   fulcrum comment resolve <commentId>      — resolve comment
+ *   fulcrum comment list <taskId>           : list threaded comments
+ *   fulcrum comment add <taskId> "body"     : add comment
+ *   fulcrum comment reply <commentId> "body": reply to comment
+ *   fulcrum comment resolve <commentId>     : resolve comment
  */
 
 import {

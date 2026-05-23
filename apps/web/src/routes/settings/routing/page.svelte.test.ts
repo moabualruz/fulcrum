@@ -1,19 +1,27 @@
 import type { Component } from "svelte";
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
 import type { RoutingDecisionRow, RoutingRuleRow } from "./routing.types";
 
-mock.module("$app/state", () => ({
-  page: {
-    url: new URL("http://localhost/settings/routing"),
-    params: {},
-    route: { id: null },
-    status: 200,
-    error: null,
-    data: {},
-    state: {},
-    form: null,
-  },
-}));
+// `RoutingPage` derives its `activeTab` from `page.url.searchParams.get("tab")`
+// at component init. The mocked `page` object is mutable so a test can scope
+// the route to a specific tab (e.g. `?tab=test` to reach the dry-run form).
+const ROUTING_BASE_URL = "http://localhost/settings/routing";
+const mockPage = {
+  url: new URL(ROUTING_BASE_URL),
+  params: {},
+  route: { id: null },
+  status: 200,
+  error: null,
+  data: {},
+  state: {},
+  form: null,
+};
+
+function setRoutingTab(tab: string | null): void {
+  mockPage.url = new URL(tab ? `${ROUTING_BASE_URL}?tab=${tab}` : ROUTING_BASE_URL);
+}
+
+mock.module("$app/state", () => ({ page: mockPage }));
 
 mock.module("$app/navigation", () => ({
   goto: async () => {},
@@ -71,6 +79,11 @@ describe("/settings/routing RoutingPage.svelte", () => {
     Page = mod.default;
   });
 
+  afterEach(() => {
+    // Reset to the default (rules) tab so tab-scoped tests don't leak.
+    setRoutingTab(null);
+  });
+
   function makeData(rules: RoutingRuleRow[] = [], inherited: RoutingRuleRow[] = []): PageProps["data"] {
     return { projectId: null, rules, inheritedRules: inherited };
   }
@@ -83,6 +96,24 @@ describe("/settings/routing RoutingPage.svelte", () => {
   test("renders routing settings container", () => {
     const { body } = render(Page, { props: { data: makeData() } });
     expect(body).toContain("data-routing-settings");
+  });
+
+  test("composes routing controls from ui-kit primitives", () => {
+    const rules = render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body;
+    expect(rules).toContain('data-slot="tabs"');
+    expect(rules).toContain('data-slot="tabs-list"');
+    expect(rules).toContain('data-slot="tabs-trigger"');
+    expect(rules).toContain('data-slot="button"');
+    expect(rules).toContain('data-slot="input"');
+    expect(rules).toContain('data-slot="textarea"');
+    const buttons = rules.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons.every((button) => button.includes('data-slot="button"') || button.includes('data-slot="tabs-trigger"'))).toBe(true);
+
+    setRoutingTab("test");
+    expect(render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body).toContain('data-slot="card"');
+
+    setRoutingTab("llm-gate");
+    expect(render(Page, { props: { data: makeData([SAMPLE_RULE]) } }).body).toContain('data-slot="switch"');
   });
 
   test("create panel is open when no rules", () => {
@@ -113,6 +144,10 @@ describe("/settings/routing RoutingPage.svelte", () => {
   });
 
   test("shows dry run error from form", () => {
+    // The dry-run form + error live in the Test tab (`?tab=test`) since the
+    // routing settings route was rebuilt around the rules/drafts/test/llm-gate/
+    // evidence tab strip.
+    setRoutingTab("test");
     const { body } = render(Page, {
       props: { data: makeData(), form: { dryRunError: "Parse error" } },
     });
@@ -159,6 +194,8 @@ describe("/settings/routing RoutingPage.svelte", () => {
   });
 
   test("renders dry run form with taskJson textarea", () => {
+    // The dry-run form lives in the Test tab (`?tab=test`).
+    setRoutingTab("test");
     const { body } = render(Page, { props: { data: makeData() } });
     expect(body).toContain("action=\"?/dryRun\"");
     expect(body).toContain("taskJson");

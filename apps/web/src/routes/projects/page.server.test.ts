@@ -1,25 +1,26 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { openIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { migrateIsolatedStore } from "@test-support/product-workspace-fixtures.ts";
-import { createLocalOrg, createProject } from "@test-support/product-workspace-fixtures.ts";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-// The route uses the configured default PGlite data directory. We seed two
-// projects there with controlled `created_at` timestamps so ordering stays
-// deterministic.
+// `/projects/+page.server.ts` is a pure invocation layer: its `load` streams
+// `listProjectRowsForEvent` (from $lib/server/project-api), which calls the
+// NestJS project public API. This suite mocks that client seam — no in-process
+// database, no application-scope.
+let rows: Array<{
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  updated_at: string;
+}> = [];
+let suiteActive = false;
 
-let scratch: string;
+mock.module("$lib/server/project-api", () => ({
+  // `mock.module` is process-global; answer only while this suite is active so
+  // foreign suites get the real client.
+  listProjectRowsForEvent: async () => (suiteActive ? rows : []),
+}));
 
 interface ProjectPayload {
-  projects: Array<{
-    id: string;
-    slug: string;
-    name: string;
-    description: string | null;
-    updated_at: string;
-  }>;
+  projects: typeof rows;
 }
 
 function streamedData<T>(result: unknown): Promise<T> {
@@ -29,68 +30,41 @@ function streamedData<T>(result: unknown): Promise<T> {
 }
 
 beforeEach(() => {
-  scratch = mkdtempSync(join(tmpdir(), "fulcrum-web-projects-list-"));
-  process.env["FULCRUM_HOME"] = scratch;
+  rows = [];
 });
-
-afterEach(() => {
-  delete process.env["FULCRUM_HOME"];
-  rmSync(scratch, { recursive: true, force: true });
-});
-
-async function seedTwoProjects(): Promise<{ orgId: string; first: string; second: string }> {
-  const db = await openIsolatedStore(join(scratch, "pglite.data"));
-  await migrateIsolatedStore(db);
-  const org = await createLocalOrg(db, { slug: "default", name: "Default" });
-  const first = await createProject(db, {
-    orgId: org.id,
-    slug: "first",
-    name: "First",
-    description: "earlier project",
-  });
-  // Pin both rows' `created_at` so the ASC ordering assertion is invariant
-  // across PGlite's clock granularity (otherwise sub-millisecond inserts can
-  // collide and the secondary `id ASC` tie-break dominates).
-  await db.query(`UPDATE projects SET created_at = $2 WHERE id = $1`, [
-    first.id,
-    "2026-04-01T00:00:00.000Z",
-  ]);
-  const second = await createProject(db, {
-    orgId: org.id,
-    slug: "second",
-    name: "Second",
-    description: null,
-  });
-  await db.query(`UPDATE projects SET created_at = $2 WHERE id = $1`, [
-    second.id,
-    "2026-04-02T00:00:00.000Z",
-  ]);
-  await db.close();
-  return { orgId: org.id, first: first.id, second: second.id };
-}
 
 describe("/projects +page.server.ts load()", () => {
-  test("returns seeded projects in deterministic created_at-ASC order", async () => {
-    const { orgId, first, second } = await seedTwoProjects();
+  beforeAll(() => {
+    suiteActive = true;
+  });
+  afterAll(() => {
+    suiteActive = false;
+  });
+  afterEach(() => {
+    rows = [];
+  });
+
+  test("streams the project rows the public API returns", async () => {
+    rows = [
+      { id: "id-first", slug: "first", name: "First", description: "earlier project", updated_at: "2026-04-01T00:00:00.000Z" },
+      { id: "id-second", slug: "second", name: "Second", description: null, updated_at: "2026-04-02T00:00:00.000Z" },
+    ];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
     const result = await mod.load({
-      locals: { activeProjectId: "first", orgId },
+      locals: { activeProjectId: "first" },
     } as Parameters<typeof mod.load>[0]);
     expect(result.activeProjectId).toBe("first");
     const payload = await streamedData<ProjectPayload>(result);
     expect(Array.isArray(payload.projects)).toBe(true);
     expect(payload.projects).toHaveLength(2);
-    expect(payload.projects[0]?.id).toBe(first);
-    expect(payload.projects[1]?.id).toBe(second);
+    expect(payload.projects[0]?.id).toBe("id-first");
+    expect(payload.projects[1]?.id).toBe("id-second");
     expect(payload.projects[0]?.slug).toBe("first");
     expect(payload.projects[1]?.slug).toBe("second");
   });
 
-  test("returns empty array when the product DB has no projects", async () => {
-    // Initialise an empty DB at the expected path so the route does not crash.
-    const db = await openIsolatedStore(join(scratch, "pglite.data"));
-    await migrateIsolatedStore(db);
-    await db.close();
+  test("returns empty array when the public API has no projects", async () => {
+    rows = [];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
     const result = await mod.load({
       locals: { activeProjectId: null },

@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { createContext } from "../context.ts";
 import { reposRouter } from "./repos.ts";
 import { createTestContainer, createTestOrm } from "@test-support/index.ts";
+
+const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
 function session(userId: string, orgId: string) {
   return {
@@ -82,7 +85,7 @@ describe("reposRouter", () => {
   });
 
   test("router source stays a thin application adapter", () => {
-    const source = readFileSync("apps/server/src/trpc/routers/repos.ts", "utf8");
+    const source = readFileSync(`${repoRoot}/apps/server/src/trpc/routers/repos.ts`, "utf8");
     expect(source).toContain("repositoryOperations.");
     expect(source).not.toMatch(/ctx\.em|em\.find|em\.findOne|em\.create|em\.persist|em\.flush|em\.transactional/);
     expect(source).not.toMatch(/(?<!repositoryOperations)\.getRepository\(/);

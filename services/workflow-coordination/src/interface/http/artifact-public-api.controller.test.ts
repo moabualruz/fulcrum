@@ -29,6 +29,11 @@ import {
 } from "@planning-review/infrastructure/database/review-workflow.entities.ts";
 import { ReviewWorkflow1778623200002 } from "@planning-review/infrastructure/database/review-workflow.migration.ts";
 import {
+  WORKFLOW_AUDIT_ENTITIES,
+  WorkflowAuditEventEntity,
+} from "@workflow-coordination/infrastructure/database/audit-log.entities.ts";
+import { WorkflowAudit1778623200008 } from "@workflow-coordination/infrastructure/database/audit-log.migration.ts";
+import {
   buildFulcrumTypeOrmOptions,
   createFulcrumTypeOrmDataSource,
 } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
@@ -69,8 +74,8 @@ async function createTypeOrmStore() {
     buildFulcrumTypeOrmOptions({
       source: "pglite-socket",
       url,
-      entities: [...FULCRUM_WORKFLOW_SPINE_ENTITIES, ...FULCRUM_REVIEW_WORKFLOW_ENTITIES],
-      migrations: [WorkflowSpine1778623200001, ReviewWorkflow1778623200002],
+      entities: [...FULCRUM_WORKFLOW_SPINE_ENTITIES, ...FULCRUM_REVIEW_WORKFLOW_ENTITIES, ...WORKFLOW_AUDIT_ENTITIES],
+      migrations: [WorkflowSpine1778623200001, ReviewWorkflow1778623200002, WorkflowAudit1778623200008],
     }),
   );
 
@@ -299,12 +304,46 @@ describe("artifact public Nest API", () => {
         bodyPath: "artifacts/evidence.md",
         checksumSha256: "sha-evidence",
       });
+      await actions.uploadArtifact({
+        id: "artifact-unsafe-path",
+        projectId: "project-artifact-actions",
+        traceId: "trace-artifact-actions",
+        kind: "log",
+        title: "Unsafe path",
+        filename: "unsafe.log",
+        bodyPath: "../outside/unsafe.log",
+        checksumSha256: "sha-unsafe",
+      });
+      await expect(actions.downloadArtifact({ id: "artifact-unsafe-path" })).resolves.toMatchObject({
+        artifact: expect.objectContaining({ id: "artifact-unsafe-path" }),
+        bodyPath: null,
+        checksumSha256: "sha-unsafe",
+      });
       await expect(actions.deleteArtifact({ id: "artifact-actions" }, { hard: "true" })).resolves.toEqual({
         ok: true,
         id: "artifact-actions",
         hard: true,
       });
       await expect(controller.getArtifact({ id: "artifact-actions" })).rejects.toBeInstanceOf(NotFoundException);
+      const auditEvents = await dataSource.getRepository(WorkflowAuditEventEntity).find({
+        where: { subjectId: "artifact-actions" },
+        order: { createdAt: "ASC" },
+      });
+      expect(auditEvents.map((event) => event.verb)).toEqual([
+        "created",
+        "accepted",
+        "rejected",
+        "archived",
+        "unarchived",
+        "deleted",
+      ]);
+      expect(auditEvents).toContainEqual(expect.objectContaining({
+        orgId: "workspace-artifact-actions",
+        projectId: "project-artifact-actions",
+        subjectKind: "artifact",
+        subjectId: "artifact-actions",
+        traceId: "trace-artifact-actions",
+      }));
     } finally {
       await dataSource.destroy();
     }

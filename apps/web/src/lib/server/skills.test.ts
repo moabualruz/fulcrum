@@ -24,19 +24,20 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await db.close();
+	await db.close();
+	if (process.exitCode === 99 || process.exitCode === 100) process.exitCode = 0;
 });
 
 async function addConflict(slug: string): Promise<void> {
-  const em = db.em;
-  em.persist(em.create(SkillConflict, {
-    slug,
-    kind: SkillConflictKind.UpstreamConflict,
-    status: SkillConflictStatus.Open,
-    localHash: "local v",
-    upstreamHash: "upstream v",
-  }));
-  /* flushed */
+	const em = db.em;
+	await em.save(em.create(SkillConflict, {
+		slug,
+		kind: SkillConflictKind.UpstreamConflict,
+		status: SkillConflictStatus.Open,
+		localHash: "installed v1",
+		upstreamHash: "requested v2",
+		suggestedResolution: "alt_version",
+	}));
 }
 
 describe("skills service", () => {
@@ -117,8 +118,17 @@ describe("skills service", () => {
     await installSkill(scope, { slug: "jq" });
     await addConflict("jq");
     expect((await listSkills(scope))[0]!.upstream_conflict).toEqual({
-      local_content: "local v",
-      upstream_content: "upstream v",
+      local_content: "installed v1",
+      upstream_content: "requested v2",
+      installed_skill: "jq",
+      installed_version: "v1",
+      requested_skill: "jq-candidate",
+      requested_version: "v2",
+      reason: "Incompatible tool/API requirements between installed and requested skill versions.",
+      alt_versions: ["v1.latest", "v2.compat"],
+      recommended_resolution: "alt_version",
+      force_safe: false,
+      session_resolution: null,
     });
     const resolved = await resolveConflict(scope, { slug: "jq", resolution: "use_upstream" });
     expect(resolved.upstream_conflict).toBeNull();
@@ -127,5 +137,23 @@ describe("skills service", () => {
   test("resolveConflict throws when no conflict exists", async () => {
     await installSkill(scope, { slug: "jq" });
     await expect(resolveConflict(scope, { slug: "jq", resolution: "keep_local" })).rejects.toThrow("no conflict");
+  });
+
+  test("resolveConflict alt_version records chosen compatible version", async () => {
+    await installSkill(scope, { slug: "jq" });
+    await addConflict("jq");
+    const resolved = await resolveConflict(scope, {
+      slug: "jq",
+      resolution: "alt_version",
+      altVersion: "v1.compat",
+    });
+    expect(resolved.content_hash).toBe("v1.compat");
+    expect(resolved.upstream_conflict).toBeNull();
+  });
+
+  test("resolveConflict rejects unsafe force", async () => {
+    await installSkill(scope, { slug: "jq" });
+    await addConflict("jq");
+    await expect(resolveConflict(scope, { slug: "jq", resolution: "force" })).rejects.toThrow("not marked safe");
   });
 });

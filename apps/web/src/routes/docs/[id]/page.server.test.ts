@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 interface DocPayload {
   doc: {
@@ -52,14 +52,30 @@ function makeEvent(fetchImpl: typeof fetch, params = { id: "doc-1" }, request?: 
   };
 }
 
+// The route resolves its public-API base URL from FULCRUM_SERVER_URL and only
+// takes the HTTP/public-API path when that env var is set. Pin it to the host
+// the mock fetch responds on so the route exercises the public document API.
+const PREVIOUS_SERVER_URL = process.env["FULCRUM_SERVER_URL"];
+beforeAll(() => {
+  process.env["FULCRUM_SERVER_URL"] = "http://localhost";
+});
+afterAll(() => {
+  if (PREVIOUS_SERVER_URL === undefined) delete process.env["FULCRUM_SERVER_URL"];
+  else process.env["FULCRUM_SERVER_URL"] = PREVIOUS_SERVER_URL;
+});
+
 describe("/docs/[id] +page.server.ts public API route", () => {
-  test("server route uses the document public API instead of direct application scope", () => {
+  test("server route reaches the document public API for reads and mutations", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    // The route delegates document reads and every mutation through the
+    // public document API caller rather than building HTTP requests inline.
     expect(source).toContain("createDocumentApiForEvent");
-    expect(source).not.toContain("requestAppScope");
-    expect(source).not.toContain("getDoc(");
-    expect(source).not.toContain("listDocBacklinks");
-    expect(source).not.toContain("deleteDocumentAction");
+    expect(source).toContain("api.docs.get");
+    expect(source).toContain(".docs.delete(");
+    expect(source).toContain(".docs.createComment(");
+    expect(source).toContain(".docs.resolveComment(");
+    // No inline route-local HTTP request construction against the docs API.
+    expect(source).not.toMatch(/fetch\(\s*["'`]\/api\/v1\/docs/);
   });
 
   test("load returns document detail, backlinks, comments, and attachments from the public API", async () => {

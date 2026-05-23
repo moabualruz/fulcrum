@@ -1,30 +1,23 @@
 import { error } from "@sveltejs/kit";
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import type { RequestHandler } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import { getArtifactDetail } from "@workflow-coordination/interface/artifact-records.ts";
-import { assertArtifactPathInRoot, resolveArtifactStoreRoot } from "@workflow-coordination/infrastructure/artifacts/storage.ts";
+import { createArtifactApiForEvent } from "$lib/server/artifact-api";
 
-const require = createRequire(import.meta.url);
-const { lookup } = require("mime-types") as { lookup: (filename: string) => string | false };
-
-export const GET: RequestHandler = async ({ params, locals }) => {
-  const { em, ctx } = await requestServiceScope(locals);
+export const GET: RequestHandler = async (event) => {
+  const { params } = event;
   try {
-    const artifact = await getArtifactDetail(em, ctx, params.id);
-    if (!artifact.body_path) throw error(404, "Artifact not found");
-    let safePath: string;
-    try {
-      safePath = assertArtifactPathInRoot(resolveArtifactStoreRoot(), artifact.body_path);
-    } catch {
-      throw error(404, "Artifact not found");
-    }
-    const body = await readFile(safePath);
+    const download = await createArtifactApiForEvent(event).artifacts.download({ id: params.id }) as {
+      contentBase64?: string | null;
+      mime?: string | null;
+      filename?: string | null;
+      artifact?: { title?: string | null; filename?: string | null };
+    };
+    if (!download.contentBase64) throw error(404, "Artifact not found");
+    const body = Uint8Array.from(Buffer.from(download.contentBase64, "base64"));
+    const filename = download.filename ?? download.artifact?.filename ?? download.artifact?.title ?? params.id;
     return new Response(body, {
       headers: {
-        "content-type": artifact.mime ?? (lookup(artifact.title) || "application/octet-stream"),
-        "content-disposition": `attachment; filename="${downloadFilename(artifact.title)}"`,
+        "content-type": download.mime ?? "application/octet-stream",
+        "content-disposition": `attachment; filename="${downloadFilename(filename)}"`,
       },
     });
   } catch (err) {

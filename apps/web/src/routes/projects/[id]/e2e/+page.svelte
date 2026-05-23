@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface E2eResult {
     status?: string;

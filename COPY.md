@@ -42,6 +42,42 @@ One sentence naming the next workflow action.
 [ Primary button: do the action ]   Press <key> to do it via keyboard.
 ```
 
+### Canonical HTML shape
+
+```
+<H2>{What's missing}</H2>
+<P>{Why it's empty}. {What to do next}.</P>
+<button>{Primary action}</button>
+<button>{Secondary action}</button>
+```
+
+### Worked examples per stage list (matches empty-states.html pattern)
+
+- **capture-drafts**:
+  - H2: `No drafts yet.`
+  - P: `Drafts collect half-formed ideas. Press c to capture, or hand off from intake.`
+  - Buttons: `New draft`, `Open inbox`
+- **plan-prototypes**:
+  - H2: `No prototypes yet.`
+  - P: `Prototypes appear when a planning session ships a draft. Start one to seed this list.`
+  - Buttons: `Start planning`, `Open templates`
+- **build-list**:
+  - H2: `No tasks yet.`
+  - P: `Materialize an approved plan, or press c to create a task directly.`
+  - Buttons: `Materialize plan`, `New task`
+- **review-queue**:
+  - H2: `No reviews waiting.`
+  - P: `Items appear here when a task moves to in-review. Push something forward.`
+  - Buttons: `Open board`, `View completed`
+- **ship-archive**:
+  - H2: `No releases shipped.`
+  - P: `Approved reviews send artifacts here. Cut a release once review is green.`
+  - Buttons: `Open Ship`, `View artifacts`
+- **operate-alerts**:
+  - H2: `No alerts firing.`
+  - P: `Doctor is quiet. Re-probe to refresh, or open telemetry for trends.`
+  - Buttons: `Re-probe`, `Open telemetry`
+
 ### Per-surface copy
 
 **Capture (no docs yet):**
@@ -54,10 +90,31 @@ One sentence naming the next workflow action.
 >
 > [ Start planning ]   Press `n` or hand off from a doc in Capture.
 
+**AI Assist (no saved sessions yet):**
+> No saved sessions yet.
+>
+> Create a new session to Begin.
+>
+> [ Create Session ]
+
 **Build / board (no tasks yet):**
 > No tasks in this cycle.
 >
 > [ Add task ]   Press `c`, or materialize an approved plan from Plan.
+
+**Build / task quick create:**
+> Title is required. Scope, sprint, module, cycle, and recurrence stay intact.
+>
+> Duplicate task blocked. Open the existing task or change the title.
+>
+> Create failed. Draft preserved; retry when the connection recovers.
+
+**Docs / version review:**
+> Restore requires confirmation. A new version will record the restore event.
+>
+> Comment save failed. Draft preserved for retry.
+>
+> Permission denied. Ask an editor to grant comment access.
 
 **Build / runs feed (no runs yet):**
 > No runs yet in this project.
@@ -162,6 +219,18 @@ One sentence naming the next workflow action.
 >
 > [ I understand. Delete project ]   [ Cancel ]
 
+**Document trash impact:**
+> Move `Release readiness` to trash?
+>
+> Review affected child pages, backlinks, attachments, ContextBundles, and artifacts before moving it. Restore returns the Document to its original parent when possible.
+>
+> [ Move to trash ]   [ Cancel ]
+
+**Permanent document delete blocked:**
+> Permanent delete blocked.
+>
+> Requires Knowledge admin permission and typed document title confirmation.
+
 ### Hard bans on error copy
 
 - "Something went wrong" → banned.
@@ -192,9 +261,24 @@ One sentence naming the next workflow action.
 
 - Modal (see error template above). Type the name. Type-exact match enabled, no `--force` analog visible.
 
+### Skill conflict resolution
+
+- Title: `Resolve skill conflict`.
+- Lead sentence names both sides: `<installed skill> <version> conflicts with <requested skill> <version>`.
+- Reason sentence is specific: incompatible tool/API requirements, missing capability, or version mismatch.
+- Option copy stays consequence-first: `Use alt version`, `Skip`, `Upgrade installed first`, `Force`.
+- `Force` is hidden or disabled unless safety is proven, and always paired with explicit warning acknowledgement.
+- Persisted one-time choices say `Session choice saved`; do not imply future installs inherit it.
+
 ---
 
 ## 5. Mode affordance copy
+
+### Three forms (per-step row)
+
+- **Long** (per-card / per-row primary): `✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist` (full labels — keep verbatim).
+- **Compact** (dense lists, board cards, timeline lanes): glyph-only with `title="<long-name>"`. Examples: `title="✋ Manual"`, `title="▶ Play (handoff to AI)"`, `title="💬 Discuss"`, `title="⊞ AI Assist"`.
+- **Tight** (settings rows, doc surfaces): `▶ Suggest / 💬 Discuss` only. Drop Manual/Assist where they would be noise.
 
 ### ▶ Play picker popover
 
@@ -274,6 +358,8 @@ Lock these strings. No synonyms.
 | `unknown` | Unknown | Was unknown |
 
 Never `In Flight`, `WIP`, `Doing`, `Stuck`, `Done!`. Never localize the verb inflection inconsistently.
+
+> Lowercase, hyphenated. Any non-canonical synonym is a copy bug. Secondary descriptors live in `<span class="desc">` after the canonical pill. Canonical 8-state vocab: `queued / running / waiting-input / passing / failing / completed / cancelled / blocked`.
 
 ---
 
@@ -363,6 +449,21 @@ Risk: destructive
 - Inline in transcript, not modal (unless action is irreversible).
 - Persists `Allow always` decisions per-(agent, tool-pattern, project).
 
+### AI Assist abort reason copy
+
+Use these exact reason labels in Web, CLI, and TUI:
+
+| Value | Label |
+|---|---|
+| `user-cancel` | User cancel |
+| `dangerous-output` | Dangerous output |
+| `wrong-context` | Wrong context |
+| `cost-cap` | Cost cap |
+
+- Required note placeholder: "Why this AI Assist session is being stopped".
+- Confirmation title: "Abort active work?"
+- Never say "ACP" in the dialog; use "AI Assist".
+
 ---
 
 ## 11. Notification copy
@@ -384,6 +485,14 @@ No emoji. No `🎉`. No `❗`. Recovery action in `[ ]` brackets when one fits.
 ## 12. Settings labels
 
 Each setting has: name, current value, inline status chip (✓ inherited / ✏️ overridden / 🔒 locked), help text 11 px fg-muted.
+
+Project label settings:
+
+- Usage count: `<n> uses`
+- Archive parent with active children: `Archived <label>; <n> child label(s) moved to root.`
+- Empty archive: `No archived labels.`
+- Bulk cleanup action: `Delete selected`
+- Usage guard: `Cannot delete <label>; archive keeps <n> linked uses.`
 
 ### Inheritance chip copy
 
@@ -422,20 +531,22 @@ Set later via `fulcrum config telemetry on|anon|off` or
 - [CLI-TUI-UX.md](CLI-TUI-UX.md) §5 — CLI error code namespace `FUL_<DOMAIN>_<SPECIFIC>` (this file's error samples cite those codes).
 - [OD-PROMPT.md](OD-PROMPT.md).
 
-### 14.2 Research dossiers (`.scratch/design-research/`)
+### 14.2 Research dossiers (local research dossier)
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) §9 — empty-state template (one sentence + one action, no illustration).
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) §10–13 — permission prompt copy (inline transcript, never modal for non-destructive).
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) §10/§14/§16 — error template, telemetry first-run prompt, doctor row shape.
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) §4.1 — Plannotator `Mod+Enter` overload copy semantics.
+- [01-workflow-nav-ia.md](#) §9 — empty-state template (one sentence + one action, no illustration).
+- [02-agent-supervision.md](#) §10–13 — permission prompt copy (inline transcript, never modal for non-destructive).
+- [04-observability-trace.md](#) §10/§14/§16 — error template, telemetry first-run prompt, doctor row shape.
+- [07-copy-first-parity.md](#) §4.1 — Plannotator `Mod+Enter` overload copy semantics.
 
 ### 14.3 PRD glossary + impeccable
 
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 94 `error copy` mentions, 113 `empty state` mentions, 119 `error recovery` mentions in critique_focus.
-- [.claude/skills/impeccable/reference/ux-writing.md](.claude/skills/impeccable/reference/ux-writing.md).
-- [.claude/skills/impeccable/reference/clarify.md](.claude/skills/impeccable/reference/clarify.md).
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register copy rules.
+- local PRD glossary — 94 `error copy` mentions, 113 `empty state` mentions, 119 `error recovery` mentions in critique_focus.
+- [~/.claude/skills/impeccable/reference/ux-writing.md](~/.claude/skills/impeccable/reference/ux-writing.md).
+- [~/.claude/skills/impeccable/reference/clarify.md](~/.claude/skills/impeccable/reference/clarify.md).
+- [~/.claude/skills/impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md) — product register copy rules.
 
 ### 14.4 Transformation note
 
 The copy templates above are **additive**: every existing user-facing string in the codebase (`apps/web/src/lib/**`, `apps/cli/src/**`, `apps/tui/src/**`) is reviewed against these templates and replaced if it violates them. Strings that match are kept. No feature is removed; the words around the features are sharpened.
+
+> 2026-05-18 OD pass: status vocab enforced across all 35 OD frames; empty-state template applied across 15 stage lists; mode affordance copy promoted to 3 forms.

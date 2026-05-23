@@ -68,14 +68,18 @@ describe("ContextAssembler", () => {
     expect(Object.keys(bundle.slices)).toHaveLength(5);
     expect(new Set(Object.keys(bundle.slices))).toEqual(new Set(SLICE_KEYS));
     for (const key of SLICE_KEYS) {
-      expect(bundle.slices[key]).toEqual({
-        content: expect.any(String),
-        tokenCount: expect.any(Number),
-      });
+      expect(typeof bundle.slices[key].content).toBe("string");
+      expect(typeof bundle.slices[key].tokenCount).toBe("number");
+      expect(Array.isArray(bundle.slices[key].sourceRefs)).toBe(true);
     }
-    expect(bundle.slices.memories.content).toContain("existing retriever");
-    expect(bundle.slices.linkedDocs.content).toContain("Doc first paragraph.");
-    expect(bundle.slices.linkedDocs.content).not.toContain("Doc second paragraph");
+    expect(bundle.sourceRefs).toEqual([
+      { kind: "task", id: TASK_ID, reason: "selected-task", scope: "project" },
+      { kind: "memory", id: "memory", reason: "retrieved-memory", scope: "global" },
+      { kind: "doc", id: "design-doc-id", reason: "wikilink-doc", scope: "project" },
+    ]);
+    expect(String(bundle.slices.memories.content)).toContain("existing retriever");
+    expect(String(bundle.slices.linkedDocs.content)).toContain("Doc first paragraph.");
+    expect(String(bundle.slices.linkedDocs.content)).not.toContain("Doc second paragraph");
     expect(snapshotRepo.records).toHaveLength(1);
     expect(JSON.stringify(snapshotRepo.records[0]!.bundleBlob)).toBe(
       JSON.stringify(bundle),
@@ -194,8 +198,8 @@ describe("ContextAssembler", () => {
     expect(full.bundle.slices.repoState.content).toContain("services/knowledge-workspace/src/application/context");
     expect(full.bundle.slices.skillPrompts.content).toContain("Use when assembling context.");
     expect(full.bundle.slices.skillPrompts.content).toContain("context bundle");
-    expect(empty.bundle.slices.repoState).toEqual({ content: "", tokenCount: 0 });
-    expect(empty.bundle.slices.skillPrompts).toEqual({ content: "", tokenCount: 0 });
+    expect(empty.bundle.slices.repoState).toEqual({ content: "", tokenCount: 0, sourceRefs: [] });
+    expect(empty.bundle.slices.skillPrompts).toEqual({ content: "", tokenCount: 0, sourceRefs: [] });
   });
 
   test("persists a real ContextSnapshot and replays bundleBlob without repository calls", async () => {
@@ -211,10 +215,8 @@ describe("ContextAssembler", () => {
         ContextSnapshot,
         { id: snapshotId },
       );
-      expect(JSON.stringify(snapshot.bundleBlob)).toBe(JSON.stringify(bundle));
-      expect(JSON.stringify(replayContextSnapshot(snapshot.bundleBlob))).toBe(
-        JSON.stringify(bundle),
-      );
+      expect(snapshot.bundleBlob).toEqual(bundle as unknown as Record<string, unknown>);
+      expect(replayContextSnapshot(snapshot.bundleBlob)).toEqual(bundle);
       expect(snapshot.tokenCount).toBe(bundle.tokenCount);
       expect(snapshot.sliceSizes).toEqual(sliceSizes(bundle));
     } finally {

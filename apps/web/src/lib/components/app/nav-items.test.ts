@@ -1,89 +1,144 @@
 import { describe, expect, test } from "bun:test";
 
-import { LUCIDE_ICONS, NAV_GROUPS, NAV_ITEMS, type NavItem } from "./nav-items.ts";
+import {
+	LUCIDE_ICONS,
+	NAV_GROUPS,
+	NAV_ITEMS,
+	STAGE_NAV_ITEMS,
+	subnavForStageScope,
+	SYSTEM_NAV_ITEMS,
+	WORKSPACE_NAV_ITEMS,
+	stageForPath,
+} from "./nav-items.ts";
 
-describe("NAV_ITEMS surface", () => {
-  test("declares grouped primary surface", () => {
-    expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Current Scope", "Portfolio", "System"]);
-    expect(NAV_GROUPS.map((group) => group.items.map((item) => item.href))).toEqual([
-      ["/", "/boards", "/docs", "/planning", "/runs", "/artifacts"],
-      ["/projects", "/search", "/memory", "/context/preview"],
-      ["/agents", "/orchestration", "/audit", "/doctor", "/settings/inference"],
-    ]);
-  });
+describe("StageRail nav data", () => {
+	test("declares the six WorkflowStages in canonical Capture→Operate order", () => {
+		expect(STAGE_NAV_ITEMS.map((s) => s.stage)).toEqual([
+			"capture",
+			"plan",
+			"build",
+			"review",
+			"ship",
+			"operate",
+		]);
+	});
 
-  test("exposes hrefs in declared order", () => {
-    expect(NAV_ITEMS.map((i) => i.href)).toEqual([
-      "/",
-      "/boards",
-      "/docs",
-      "/planning",
-      "/runs",
-      "/artifacts",
-      "/projects",
-      "/search",
-      "/memory",
-      "/context/preview",
-      "/agents",
-      "/orchestration",
-      "/audit",
-      "/doctor",
-      "/settings/inference",
-    ]);
-  });
+	test("maps each WorkflowStage to a production route", () => {
+		expect(STAGE_NAV_ITEMS.map((s) => s.href)).toEqual([
+			"/mkh/projects/fulcrum/capture",
+			"/mkh/projects/fulcrum/plan",
+			"/mkh/projects/fulcrum/build",
+			"/mkh/projects/fulcrum/review",
+			"/mkh/projects/fulcrum/ship",
+			"/mkh/projects/fulcrum/operate",
+		]);
+	});
 
-  test("exposes labels in declared order", () => {
-    expect(NAV_ITEMS.map((i) => i.label)).toEqual([
-      "Dashboard",
-      "Board",
-      "Docs",
-      "Planning",
-      "Runs",
-      "Artifacts",
-      "All projects",
-      "Search",
-      "Memory",
-      "Context",
-      "Agents",
-      "Orchestration",
-      "Audit",
-      "Doctor",
-      "Settings",
-    ]);
-  });
+	test("declares the persistent Workspace and System groups in locked order", () => {
+		expect(NAV_GROUPS.map((group) => group.label)).toEqual(["Workspace", "System"]);
+	});
 
-  test("does not expose project-scoped repos as a primary nav item", () => {
-    expect(NAV_ITEMS.find((i) => i.href === "/repos")).toBeUndefined();
-  });
+	test("preserves the former Portfolio destinations verbatim in the Workspace group", () => {
+		expect(WORKSPACE_NAV_ITEMS.map((i) => i.href)).toEqual([
+			"/projects",
+			"/search",
+			"/memory",
+			"/context/preview",
+		]);
+		expect(WORKSPACE_NAV_ITEMS.map((i) => i.label)).toEqual([
+			"All projects",
+			"Search",
+			"Memory",
+			"Context",
+		]);
+	});
 
-  test("each entry uses an icon resolvable through LUCIDE_ICONS", () => {
-    for (const item of NAV_ITEMS) {
-      expect(LUCIDE_ICONS).toHaveProperty(item.iconName);
-      expect(typeof LUCIDE_ICONS[item.iconName]).toBe("function");
-    }
-  });
+	test("re-points the System group to Settings · Knowledge · MCP · Plugins", () => {
+		expect(SYSTEM_NAV_ITEMS.map((i) => i.label)).toEqual([
+			"Settings",
+			"Knowledge",
+			"MCP",
+			"Plugins",
+		]);
+		expect(SYSTEM_NAV_ITEMS.map((i) => i.id)).toEqual([
+			"settings",
+			"knowledge",
+			"mcp",
+			"plugins",
+		]);
+	});
 
-  test("locks the icon assignment per entry", () => {
-    const pairs: Array<[string, NavItem["iconName"]]> = [
-      ["/", "LayoutDashboard"],
-      ["/boards", "Kanban"],
-      ["/docs", "FileText"],
-      ["/planning", "FileText"],
-      ["/runs", "Activity"],
-      ["/artifacts", "FileText"],
-      ["/projects", "Folder"],
-      ["/search", "Search"],
-      ["/memory", "FileText"],
-      ["/context/preview", "FileText"],
-      ["/agents", "Activity"],
-      ["/orchestration", "Kanban"],
-      ["/audit", "FileText"],
-      ["/doctor", "Activity"],
-      ["/settings/inference", "Settings"],
-    ];
-    for (const [href, iconName] of pairs) {
-      const entry = NAV_ITEMS.find((i) => i.href === href);
-      expect(entry?.iconName).toBe(iconName);
-    }
-  });
+	test("each Workspace/System entry uses an icon resolvable through LUCIDE_ICONS", () => {
+		for (const item of NAV_ITEMS) {
+			expect(LUCIDE_ICONS).toHaveProperty(item.iconName);
+			expect(typeof LUCIDE_ICONS[item.iconName]).toBe("function");
+		}
+	});
+
+	test("every entry carries a stable, unique id used as the StageRail item key", () => {
+		const ids = NAV_ITEMS.map((i) => i.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		for (const id of ids) expect(id.length).toBeGreaterThan(0);
+	});
+
+	test("scoped stage subnav preserves explicit canonical hrefs instead of deriving from ids", () => {
+		expect(subnavForStageScope("plan", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Reviews",
+			"/acme/projects/alpha/plan/review",
+		]);
+		expect(subnavForStageScope("operate", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Audit",
+			"/acme/projects/alpha/operate/audit",
+		]);
+		expect(subnavForStageScope("operate", "acme", "alpha").map((item) => [item.label, item.href])).toContainEqual([
+			"Telemetry",
+			"/acme/projects/alpha/operate/telemetry",
+		]);
+	});
+});
+
+describe("stageForPath route mapping", () => {
+	test("resolves the workspace root to the Capture stage", () => {
+		expect(stageForPath("/")).toBe("capture");
+	});
+
+	test("maps each stage workbench route to its WorkflowStage", () => {
+		expect(stageForPath("/planning")).toBe("plan");
+		expect(stageForPath("/build-runs")).toBe("build");
+		expect(stageForPath("/review-search")).toBe("review");
+		expect(stageForPath("/ship-archive")).toBe("ship");
+		expect(stageForPath("/operate-mcp")).toBe("operate");
+	});
+
+	test("maps canonical project-scoped stage routes to their WorkflowStage", () => {
+		expect(stageForPath("/acme/projects/fulcrum/capture")).toBe("capture");
+		expect(stageForPath("/acme/projects/fulcrum/plan")).toBe("plan");
+		expect(stageForPath("/acme/projects/fulcrum/build/board")).toBe("build");
+		expect(stageForPath("/acme/projects/fulcrum/review")).toBe("review");
+		expect(stageForPath("/acme/projects/fulcrum/ship")).toBe("ship");
+		expect(stageForPath("/acme/projects/fulcrum/operate/doctor")).toBe("operate");
+	});
+
+	test("maps old feature-bucket routes to their owning stage: no destination dropped", () => {
+		expect(stageForPath("/docs")).toBe("capture");
+		expect(stageForPath("/boards")).toBe("build");
+		expect(stageForPath("/runs")).toBe("build");
+		expect(stageForPath("/artifacts")).toBe("ship");
+	});
+
+	test("maps former System routes onto a workflow stage", () => {
+		expect(stageForPath("/agents")).toBe("operate");
+		expect(stageForPath("/orchestration")).toBe("build");
+		expect(stageForPath("/audit")).toBe("operate");
+		expect(stageForPath("/doctor")).toBe("operate");
+	});
+
+	test("matches nested paths under a stage prefix", () => {
+		expect(stageForPath("/build-runs/abc123")).toBe("build");
+		expect(stageForPath("/planning/sprint-2")).toBe("plan");
+	});
+
+	test("falls back to Capture for an unmapped path", () => {
+		expect(stageForPath("/totally-unknown")).toBe("capture");
+	});
 });

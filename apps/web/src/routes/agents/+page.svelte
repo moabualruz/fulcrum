@@ -3,8 +3,8 @@
   import type { PageData } from "./$types";
   import AgentSessionWorkbench from "$lib/components/agents/AgentSessionWorkbench.svelte";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn, Select } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -30,7 +30,7 @@
   }
 </script>
 
-<header class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}>
+<header data-agents-header class={cn("flex items-baseline justify-between gap-4 border-b border-border pb-4 mb-4")}>
   <h1 class={cn("text-2xl font-semibold tracking-tight")}>Agents</h1>
 </header>
 
@@ -38,10 +38,10 @@
   <RouteSkeleton kind="list" />
 {:then payload}
   <div class={cn("mb-4")}>
-    <AgentSessionWorkbench model={payload.sessionWorkbench} />
+    <AgentSessionWorkbench model={payload.sessionWorkbench} availableAgents={payload.profiles} />
   </div>
 
-  <!-- W2: ACP bridge → persisted planning session -->
+  <!-- Guided planning bridge to a persisted planning session. -->
   <details data-acp-planning-bridge class={cn("mb-4 rounded-lg border border-border")}>
     <summary class={cn("cursor-pointer px-4 py-2 text-sm font-medium")}>Start Guided Planning Session</summary>
     <form method="POST" action="?/startGuidedPlanning" use:enhance class={cn("grid gap-3 p-4 pt-2")}>
@@ -59,7 +59,7 @@
           <input name="modeId" value="planning" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
         </label>
         <label class={cn("grid gap-1 text-sm")}>
-          <span class={cn("text-muted-foreground")}>Model</span>
+          <span class={cn("text-muted-foreground")}>Agent route</span>
           <input name="modelId" value="" placeholder="(default)" class={cn("h-9 rounded-md border border-input bg-background px-3 text-sm")} />
         </label>
         <label class={cn("grid gap-1 text-sm")}>
@@ -132,7 +132,7 @@
                 <button
                   type="submit"
                   data-test-button={profile.name}
-                  class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                 >Test</button>
               </form>
 
@@ -140,7 +140,7 @@
                 type="button"
                 data-dispatch-button={profile.name}
                 onclick={() => openDispatch(profile.name)}
-                class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+                class={cn(buttonVariants({ variant: "primary", size: "sm" }))}
               >Dispatch</button>
             </div>
           </div>
@@ -156,7 +156,7 @@
       class={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50")}
     >
       <div class={cn("rounded-lg border border-border bg-background p-6 shadow-lg w-full max-w-md")}>
-        <h2 class={cn("text-lg font-semibold mb-4")}>Dispatch run — {dispatchAgent}</h2>
+        <h2 class={cn("text-lg font-semibold mb-4")}>Dispatch run: {dispatchAgent}</h2>
 
         <form method="POST" action="?/dispatch" use:enhance>
           <input type="hidden" name="agent" value={dispatchAgent} />
@@ -170,7 +170,7 @@
               required
               class={cn("w-full rounded-md border border-input bg-background px-3 py-2 text-sm")}
             >
-              <option value="">— select a task —</option>
+              <option value="">- select a task -</option>
               {#each payload.tasks as task (task.id)}
                 <option value={task.id}>{task.title}</option>
               {/each}
@@ -185,7 +185,7 @@
               bind:value={dispatchProjectId}
               class={cn("w-full rounded-md border border-input bg-background px-3 py-2 text-sm")}
             >
-              <option value="">— any project —</option>
+              <option value="">- any project -</option>
               {#each payload.projects as project (project.id)}
                 <option value={project.id}>{project.name}</option>
               {/each}
@@ -197,13 +197,13 @@
               type="button"
               data-dispatch-cancel
               onclick={closeDispatch}
-              class={cn(buttonVariants({ variant: "outline" }))}
+              class={cn(buttonVariants({ variant: "secondary" }))}
             >Cancel</button>
             <button
               type="submit"
               data-dispatch-submit
               disabled={!dispatchTaskId}
-              class={cn(buttonVariants({ variant: "default" }))}
+              class={cn(buttonVariants({ variant: "primary" }))}
             >Dispatch</button>
           </div>
         </form>

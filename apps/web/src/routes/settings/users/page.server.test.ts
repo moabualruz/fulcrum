@@ -29,11 +29,22 @@ describe("/settings/users load", () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
 
     const result = await mod.load({
-      locals: { session: { userId: "user-owner" }, orgId: "org-1", userId: "user-owner" },
+      locals: { session: { id: "session-1", userId: "user-owner" }, orgId: "org-1", userId: "user-owner" },
       fetch: async (url: string | URL | Request, init?: RequestInit) => {
         const target = String(url);
         if (target.includes(forbiddenTransportPath)) throw new Error("unexpected transport call");
         calls.push({ url: target, init: init ?? {} });
+        if (target.includes("/api/v1/auth/sessions")) {
+          return Response.json([{
+            id: "session-remote",
+            deviceType: "desktop",
+            browser: "Firefox",
+            ipAddress: "203.0.113.0",
+            lastActiveAt: "2026-05-18T12:00:00.000Z",
+            expiresAt: "2026-05-19T12:00:00.000Z",
+            isCurrent: false,
+          }]);
+        }
         return Response.json([
           {
             id: "m1",
@@ -55,11 +66,26 @@ describe("/settings/users load", () => {
         orgId: "org-1",
         role: "owner",
         joinedAt: "2024-01-01T00:00:00.000Z",
+        email: null,
+        emailVerified: false,
       },
     ]);
+    expect(result.sessions).toEqual([expect.objectContaining({ id: "session-remote", ipAddress: "203.0.113.0" })]);
     expect(calls).toEqual([
       {
         url: "http://localhost/api/v1/organizations/members?orgId=org-1&userId=user-owner",
+        init: {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            cookie: "sid=session-1",
+          },
+          body: undefined,
+        },
+      },
+      {
+        url: "http://localhost/api/v1/auth/sessions?orgId=org-1&userId=user-owner&currentSessionId=session-1",
         init: {
           method: "GET",
           credentials: "include",

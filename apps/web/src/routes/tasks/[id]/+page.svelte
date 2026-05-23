@@ -1,10 +1,9 @@
 <script lang="ts">
   import type { TaskDetailPayload, SubtaskRow, EdgeRow, EventRow } from "$lib/server/task-detail";
   import type { TaskStatus } from "$lib/server/tasks";
-  import { TASK_STATUSES, describeStatus } from "$lib/components/board/board-helpers";
+  import { describeStatus, TASK_STATUSES } from "$lib/components/board/board-helpers";
   import { matchTaskShortcut } from "$lib/components/task-detail/task-detail-helpers";
-  import { buttonVariants } from "$lib/components/ui/button/index.js";
-  import { cn } from "$lib/utils.js";
+  import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props {
@@ -66,11 +65,26 @@
   };
   type TaskRunForm = {
     ok?: boolean;
-    mode?: "runPreview" | "run" | "runFeedback";
+    mode?: "runPreview" | "run" | "runFeedback" | "startAiAssistSession";
     message?: string;
     preview?: DependencyRunPreview;
     dispatch?: DependencyRunDispatch;
     feedback?: DependencyRunFeedback;
+    session?: {
+      sessionId: string;
+      taskId: string;
+      taskTitle: string;
+      taskDescription: string;
+      agent: string;
+      route: "plan" | "build" | "review";
+      workspacePath: string;
+      contextBundle: {
+        docs: readonly string[];
+        memory: readonly string[];
+        repoState: readonly string[];
+        summary: string;
+      };
+    };
   };
   const { data, form }: Props = $props();
 
@@ -83,7 +97,18 @@
   let autosaveStatus = $state<"idle" | "saving" | "saved" | "error">("idle");
   let liveRunFeedback = $state<DependencyRunFeedback | null>(null);
   let liveRunFeedbackSource: EventSource | null = null;
+  let aiAssistOpen = $state(false);
+  let aiAssistAgent = $state("codex");
+  let aiAssistRoute = $state<"plan" | "build" | "review">("plan");
+  let aiAssistWorkspacePath = $state(".");
   let displayedRunFeedback = $derived(liveRunFeedback ?? (form?.mode === "runFeedback" && form.ok ? form.feedback ?? null : null));
+  let aiAssistSession = $derived(form?.mode === "startAiAssistSession" && form.ok ? form.session ?? null : null);
+  let contextBundle = $derived(aiAssistSession?.contextBundle ?? {
+    docs: payload ? [`Task brief: ${payload.task.title}`, payload.task.project_id ? `Project scope: ${payload.task.project_id}` : "Project scope: active workspace"] : [],
+    memory: ["Memory snapshot: task history, prior decisions, and linked notes included when available."],
+    repoState: payload ? [`Workspace path: ${aiAssistWorkspacePath}`, `Task updated: ${payload.task.updated_at}`] : [],
+    summary: payload ? "2 docs, 1 memory notes, 2 repo signals" : "Context pending",
+  });
   const normalizePayload = (p: TaskDetailPayload): TaskDetailPayload => ({
     ...p,
     subtasks: p.subtasks ?? [],
@@ -227,13 +252,16 @@
             class="text-2xl font-bold w-full border-b border-border bg-transparent outline-none"
           />
         {:else}
-          <h1
-            data-task-title
-            class="text-2xl font-bold cursor-pointer hover:text-muted-foreground"
-            onclick={() => (editingTitle = true)}
-            role="button"
-            tabindex="0"
-          >{payload.task.title}</h1>
+          <h1 class="text-2xl font-bold">
+            <button
+              type="button"
+              data-task-title
+              class="cursor-pointer text-left hover:text-muted-foreground"
+              onclick={() => (editingTitle = true)}
+            >
+              {payload.task.title}
+            </button>
+          </h1>
         {/if}
         <div class="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
           <span data-task-status>{describeStatus(payload.task.status)}</span>
@@ -316,7 +344,7 @@
                 Model
                 <input name="model" value="" class={cn(fieldCls, "text-xs")} />
               </label>
-              <button type="submit" data-task-run-submit class={cn(buttonVariants({ variant: "default" }))}>Run</button>
+              <button type="submit" data-task-run-submit class={cn(buttonVariants({ variant: "primary" }))}>Run</button>
             </div>
             <input name="prompt" value={`Run dependency tree for ${payload.task.id}`} class={cn(fieldCls, "text-xs")} />
           </form>
@@ -327,6 +355,14 @@
             </label>
             <button type="submit" data-task-run-feedback-submit class={cn(buttonVariants({ variant: "secondary" }))}>Feedback</button>
           </form>
+          <button
+            type="button"
+            data-task-ai-assist-open
+            class={cn(buttonVariants({ variant: "primary" }), "md:col-span-2 justify-center")}
+            onclick={() => (aiAssistOpen = true)}
+          >
+            Start AI Assist
+          </button>
         </div>
 
         {#if form?.ok === false}
@@ -480,9 +516,132 @@
 
       <!-- Actions -->
       <footer class="flex items-center gap-2 border-t border-border pt-4">
-        <button type="button" data-task-save onclick={onSave} class={cn(buttonVariants({ variant: "default" }))}>Save</button>
-        <button type="button" data-task-delete onclick={onDelete} class={cn(buttonVariants({ variant: "destructive" }))}>Delete</button>
+        <button type="button" data-task-save onclick={onSave} class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
+        <button type="button" data-task-delete onclick={onDelete} class={cn(buttonVariants({ variant: "danger" }))}>Delete</button>
       </footer>
+
+      {#if aiAssistOpen}
+        <div data-ai-assist-underlay class="fixed inset-0 z-40 bg-black/25" onclick={() => (aiAssistOpen = false)} role="presentation"></div>
+        <aside
+          data-ai-assist-drawer
+          class="fixed inset-y-0 right-0 z-50 flex w-[min(420px,92vw)] flex-col border-l border-border bg-background shadow-2xl"
+          aria-label="AI Assist drawer"
+        >
+          <header class="border-b border-border p-4">
+            <div class="mb-3 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="truncate text-base font-semibold">AI Assist</h2>
+                <p class="mt-1 truncate text-xs text-muted-foreground" data-ai-assist-task-title>{payload.task.title}</p>
+              </div>
+              <button
+                type="button"
+                class={cn(buttonVariants({ variant: "ghost" }), "h-8 px-2")}
+                aria-label="Close AI Assist"
+                onclick={() => (aiAssistOpen = false)}
+              >
+                ×
+              </button>
+            </div>
+            <div class="grid gap-3">
+              <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+                Agent
+                <select
+                  name="agent"
+                  bind:value={aiAssistAgent}
+                  data-ai-assist-agent-picker
+                  class="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                >
+                  <option value="codex">codex</option>
+                  <option value="claude-code">claude-code</option>
+                  <option value="gemini-cli">gemini-cli</option>
+                  <option value="opencode">opencode</option>
+                  <option value="pi-cli">pi-cli</option>
+                </select>
+              </label>
+              <div data-ai-assist-route-selector class="grid gap-1 text-xs font-medium text-muted-foreground">
+                Route
+                <div class="grid grid-cols-3 rounded-md border border-input p-1">
+                  {#each ["plan", "build", "review"] as route (route)}
+                    <button
+                      type="button"
+                      data-route={route}
+                      data-selected={aiAssistRoute === route}
+                      class={cn("h-8 rounded text-xs font-medium", aiAssistRoute === route ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                      onclick={() => (aiAssistRoute = route as "plan" | "build" | "review")}
+                    >
+                      {route}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+              <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+                Workspace path
+                <div class="flex gap-2">
+                  <input
+                    bind:value={aiAssistWorkspacePath}
+                    data-ai-assist-workspace-path
+                    readonly
+                    class="h-9 min-w-0 flex-1 rounded-md border border-input bg-muted px-2 font-mono text-xs text-foreground"
+                  />
+                  <button type="button" data-ai-assist-workspace-edit class={cn(buttonVariants({ variant: "secondary" }), "h-9 px-3")}>Edit</button>
+                </div>
+              </label>
+            </div>
+          </header>
+
+          <section class="grid gap-3 border-b border-border p-4" data-ai-assist-task-context>
+            <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+              Task title
+              <input value={payload.task.title} readonly class="h-9 rounded-md border border-input bg-muted px-2 text-sm text-foreground" />
+            </label>
+            <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+              Description
+              <textarea readonly class="min-h-20 rounded-md border border-input bg-muted p-2 text-sm text-foreground">{payload.task.description ?? ""}</textarea>
+            </label>
+          </section>
+
+          <section class="min-h-0 flex-1 overflow-auto p-4">
+            <details data-ai-assist-context-bundle open class="rounded-md border border-border p-3">
+              <summary class="cursor-pointer text-sm font-semibold">Context bundle · {contextBundle.summary}</summary>
+              <div class="mt-3 grid gap-3 text-sm">
+                <div>
+                  <h3 class="text-xs font-semibold uppercase text-muted-foreground">Docs</h3>
+                  {#each contextBundle.docs as item}
+                    <p data-context-doc class="mt-1 rounded border border-border px-2 py-1">{item}</p>
+                  {/each}
+                </div>
+                <div>
+                  <h3 class="text-xs font-semibold uppercase text-muted-foreground">Memory</h3>
+                  {#each contextBundle.memory as item}
+                    <p data-context-memory class="mt-1 rounded border border-border px-2 py-1">{item}</p>
+                  {/each}
+                </div>
+                <div>
+                  <h3 class="text-xs font-semibold uppercase text-muted-foreground">Repo state</h3>
+                  {#each contextBundle.repoState as item}
+                    <p data-context-repo class="mt-1 rounded border border-border px-2 py-1">{item}</p>
+                  {/each}
+                </div>
+              </div>
+            </details>
+
+            {#if aiAssistSession}
+              <p data-ai-assist-session-created class="mt-4 rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
+                session {aiAssistSession.sessionId}
+              </p>
+            {/if}
+          </section>
+
+          <form method="POST" action="?/startAiAssistSession" class="border-t border-border p-4" data-ai-assist-start-form>
+            <input type="hidden" name="agent" value={aiAssistAgent} />
+            <input type="hidden" name="route" value={aiAssistRoute} />
+            <input type="hidden" name="workspacePath" value={aiAssistWorkspacePath} />
+            <button type="submit" data-ai-assist-start-session class={cn(buttonVariants({ variant: "primary" }), "w-full")}>
+              Start session
+            </button>
+          </form>
+        </aside>
+      {/if}
     </article>
   {/if}
 {/await}

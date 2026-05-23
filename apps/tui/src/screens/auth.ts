@@ -1,5 +1,5 @@
 /**
- * TUI Auth screen — Settings → Auth
+ * TUI Auth screen: Settings → Auth
  *
  * Renders:
  *   - Current user email, org name, role
@@ -31,6 +31,14 @@ export interface AuthInfo {
   orgName?: string;
   saasAuthEnabled?: boolean;
   authProviders?: string[];
+  sessions?: Array<{
+    id: string;
+    deviceType: string;
+    browser: string;
+    ipAddress: string | null;
+    lastActiveAt: string;
+    isCurrent: boolean;
+  }>;
 }
 
 export interface AuthScreenOptions {
@@ -83,6 +91,17 @@ export class AuthScreen {
       r.writeln();
     }
 
+    if (info.sessions && info.sessions.length > 0) {
+      r.writeln(c.bold("  Login Sessions"));
+      r.separator("·");
+      for (const session of info.sessions) {
+        const marker = session.isCurrent ? " current" : "";
+        r.writeln(`    ${session.deviceType} ${session.browser}${marker}  ${session.ipAddress ?? "private"}  ${session.lastActiveAt}`);
+      }
+      r.writeln(c.dim("  Use CLI: fulcrum auth revoke-session <id> or revoke-other-sessions"));
+      r.writeln();
+    }
+
     r.writeln(c.dim("  Press [q] to go back"));
   }
 
@@ -93,7 +112,7 @@ export class AuthScreen {
       return true;
     }
     if (key === "e") {
-      // enroll passkey — stub: emit hint (real passkey URL from slice 13)
+      // enroll passkey: stub: emit hint (real passkey URL from slice 13)
       this.renderer.writeln(c.cyan("  Opening browser for passkey enrollment..."));
       return true;
     }

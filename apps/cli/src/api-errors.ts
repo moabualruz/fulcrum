@@ -1,11 +1,15 @@
 type CodedError = {
   code: string;
   message: string;
+  recovery?: string;
+  traceId?: string;
 };
 
 type AppKindError = {
   kind: string;
   message: string;
+  recovery?: string;
+  traceId?: string;
 };
 
 const APP_KIND_TO_CODE: Record<string, string> = {
@@ -18,9 +22,12 @@ const APP_KIND_TO_CODE: Record<string, string> = {
   external_dependency: "INTERNAL_SERVER_ERROR",
 };
 
+const PUBLIC_API_NOT_CONFIGURED_MESSAGE = "Public API caller is not configured";
+const PUBLIC_API_NOT_CONFIGURED_CODE = "FUL_PUBLIC_API_NOT_CONFIGURED";
+
 export function formatApiError(error: unknown): string {
-  if (isCodedError(error)) return `${error.code}: ${error.message}`;
-  if (isAppKindError(error)) return `${appKindCode(error.kind)}: ${error.message}`;
+  if (isCodedError(error)) return appendDiagnostics(`${error.code}: ${error.message}`, error);
+  if (isAppKindError(error)) return appendDiagnostics(`${appKindCode(error.kind)}: ${error.message}`, error);
   if (error instanceof Error) return error.message;
   return String(error);
 }
@@ -37,6 +44,7 @@ export function formatUnknownError(error: unknown): string {
 export function apiErrorCode(error: unknown): string | undefined {
   if (isCodedError(error)) return error.code;
   if (isAppKindError(error)) return appKindCode(error.kind);
+  if (isMissingPublicApiConfiguration(error)) return PUBLIC_API_NOT_CONFIGURED_CODE;
   return undefined;
 }
 
@@ -56,6 +64,18 @@ function isAppKindError(error: unknown): error is AppKindError {
   return typeof record["kind"] === "string" && typeof record["message"] === "string";
 }
 
+function isMissingPublicApiConfiguration(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(PUBLIC_API_NOT_CONFIGURED_MESSAGE);
+}
+
 function appKindCode(kind: string): string {
   return APP_KIND_TO_CODE[kind] ?? kind.toUpperCase();
+}
+
+function appendDiagnostics(message: string, error: CodedError | AppKindError): string {
+  const suffix = [
+    error.recovery ? `Recovery: ${error.recovery}` : null,
+    error.traceId ? `Trace: ${error.traceId}` : null,
+  ].filter(Boolean);
+  return suffix.length > 0 ? `${message} ${suffix.join(" ")}` : message;
 }

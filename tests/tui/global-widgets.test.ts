@@ -1,5 +1,5 @@
 /**
- * Global widgets TDD tests — P15#02.
+ * Global widgets TDD tests: P15#02.
  *
  * RED phase: all tests written against not-yet-existing widget implementations.
  * Covers: Palette, VirtualList, StatusBar, HelpOverlay, FilterChips, AsciiChart, wcwidth truncate.
@@ -86,62 +86,133 @@ describe("VirtualList", () => {
   });
 });
 
-// ─── StatusBar ──────────────────────────────────────────────────────────────
+// ─── StatusFooter (StatusBarWidget) ─────────────────────────────────────────
+//
+// prd-tui-status-footer-od-parity: the TUI StatusFooter mirrors the web
+// `@fulcrum/ui-kit` StatusFooter segment-for-segment (CLI-TUI-UX.md §8,
+// DESIGN.md §3.1). These tests assert the OD segment contract and explicitly
+// no longer assert the legacy org/user/screen StatusBar shape.
 
-import { StatusBarWidget } from "@fulcrum/tui/widgets/StatusBar.ts";
+import { StatusBarWidget, FOOTER_SEGMENT_ORDER } from "@fulcrum/tui/widgets/StatusBar.ts";
 
-describe("StatusBar", () => {
-  it("renders org name, user email, and current screen", () => {
+/**
+ * Shared web↔TUI footer parity matrix. The web StatusFooter consumer
+ * (apps/web TraceFooter.svelte) maps mode·profile·branch·run·agent·mcp into
+ * the left cluster and trace·time·help·palette·ai-assist into the right
+ * cluster; the TUI `FOOTER_SEGMENT_ORDER` is checked against this exact list
+ * so the two surfaces can never drift out of segment order.
+ */
+const WEB_TUI_FOOTER_SEGMENT_MATRIX = [
+  "mode",
+  "profile",
+  "branch",
+  "run",
+  "agent",
+  "mcp",
+  "trace",
+  "time",
+  "help",
+  "palette",
+  "ai-assist",
+] as const;
+
+describe("StatusFooter (StatusBarWidget)", () => {
+  it("renders the eleven OD footer segments in stable web-mirrored order", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Build",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      run: "01HXYZ 12/47",
+      agent: "claude-opus-4-7",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      time: "14:02",
+      width: 120,
     });
-    const line = stripAnsi(sb.render());
-    expect(line).toContain("Acme");
-    expect(line).toContain("admin@acme.com");
-    expect(line).toContain("Dashboard");
+    expect(sb.segments().map((s) => s.id)).toEqual([...WEB_TUI_FOOTER_SEGMENT_MATRIX]);
   });
 
-  it("shows bell count badge when > 0", () => {
-    const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 3,
-      width: 80,
-    });
-    const line = stripAnsi(sb.render());
-    expect(line).toContain("3");
+  it("FOOTER_SEGMENT_ORDER is the single shared web↔TUI parity matrix", () => {
+    expect([...FOOTER_SEGMENT_ORDER]).toEqual([...WEB_TUI_FOOTER_SEGMENT_MATRIX]);
   });
 
-  it("increments bell count on notification event", () => {
+  it("renders mode pill, profile, branch, agent, mcp, trace, time, and AI Assist", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "admin@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Capture",
+      orgName: "dev",
+      branch: "auth/rewrite",
+      agent: "claude-opus-4-7",
+      mcpHealth: "7/7",
+      traceId: "4f3a1c9e8b2d4a6f",
+      time: "14:02",
+      // Wide enough that no segment is ellipsized: this test exercises the
+      // full segment set; the width-starved ellipsis path has its own test.
+      width: 160,
     });
-    sb.setBellCount(5);
     const line = stripAnsi(sb.render());
-    expect(line).toContain("5");
+    expect(line).toContain("CAPTURE");
+    expect(line).toContain("profile: dev");
+    expect(line).toContain("auth/rewrite");
+    expect(line).toContain("agent: claude-opus-4-7");
+    expect(line).toContain("mcp 7/7");
+    expect(line).toContain("trace:4f3a1c9e");
+    expect(line).toContain("14:02");
+    expect(line).toContain(":ai");
   });
 
-  it("updates email on session change", () => {
+  it("renders trace/run/span as mono, copy-keybind-addressable segments", () => {
     const sb = new StatusBarWidget({
-      orgName: "Acme",
-      userEmail: "old@acme.com",
-      currentScreen: "Dashboard",
-      bellCount: 0,
-      width: 80,
+      currentScreen: "Runs",
+      orgName: "dev",
+      traceId: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      runId: "01HXYZ",
+      spanId: "8b2d4a6f",
+      width: 120,
     });
-    sb.setUserEmail("new@acme.com");
+    const segs = new Map(sb.segments().map((s) => [s.id, s]));
+    expect(segs.get("trace")?.mono).toBe(true);
+    expect(segs.get("trace")?.copyKeybind).toBe("y t");
+    expect(segs.get("run")?.mono).toBe(true);
+    expect(segs.get("run")?.copyKeybind).toBe("y r");
+    expect(sb.copyKeybinds()).toEqual({
+      "y t": "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      "y r": "01HXYZ",
+      "y s": "8b2d4a6f",
+    });
+  });
+
+  it("shows the bell count in the help hint when > 0", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Build",
+      orgName: "dev",
+      width: 120,
+    });
+    sb.setBellCount(3);
     const line = stripAnsi(sb.render());
-    expect(line).toContain("new@acme.com");
-    expect(line).not.toContain("old@acme.com");
+    expect(line).toContain("🔔3");
+  });
+
+  it("flips the mode pill on screen change", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Capture",
+      orgName: "dev",
+      width: 120,
+    });
+    sb.setCurrentScreen("Runs");
+    expect(stripAnsi(sb.render())).toContain("RUNS");
+  });
+
+  it("no longer renders the legacy user-email StatusBar segment", () => {
+    const sb = new StatusBarWidget({
+      currentScreen: "Build",
+      orgName: "dev",
+      userEmail: "admin@acme.com",
+      width: 120,
+    });
+    // The OD footer carries `profile`, never a user identity (DESIGN.md §3.1).
+    expect(stripAnsi(sb.render())).not.toContain("admin@acme.com");
   });
 });
 
@@ -334,5 +405,183 @@ describe("ASCII Charts", () => {
     const data = [3, 7, 2, 5, 1];
     const out = stripAnsi(renderHistogram(data, { width: 30 }));
     expect(out.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── TraceYank (y t / y r / y s / y p clipboard) ────────────────────────────
+//
+// prd-tui-trace-yank: the `y` family of clipboard chords copies the
+// cross-surface identity rendered in the StatusFooter (CLI-TUI-UX.md §7.6,
+// DESIGN.md §4.10). `apps/tui/src/keybindings.ts` owns the actual `y _` key
+// handler; these FakeTTY tests assert each yank payload is the bare identity
+// the StatusFooter renders and that the `y` family does not collide with the
+// §7.2/§7.3 stage-chord / list-navigation keys.
+
+import {
+  TRACE_YANK_CHORDS,
+  traceYankCollides,
+  createTraceYankHandler,
+  osc52Clipboard,
+  type TraceYankClipboard,
+} from "@fulcrum/tui/keybindings.ts";
+
+/**
+ * In-memory clipboard recorder: a real `TraceYankClipboard` sink (dependency
+ * injection, not a production mock) so a FakeTTY test can assert the exact
+ * payload the yank wrote.
+ */
+function recordingClipboard(): TraceYankClipboard & { last: string | null; history: string[] } {
+  const history: string[] = [];
+  return {
+    history,
+    get last() {
+      return history.at(-1) ?? null;
+    },
+    write(text: string) {
+      history.push(text);
+    },
+  };
+}
+
+const FOOTER_TRACE = {
+  currentScreen: "Runs",
+  orgName: "dev",
+  traceId: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+  runId: "01HXYZ",
+  spanId: "8b2d4a6f",
+  width: 120,
+} as const;
+
+describe("TraceYank (y t / y r / y s / y p clipboard)", () => {
+  it("y t / y r / y s / y p each yank the matching identity", () => {
+    const footer = new StatusBarWidget(FOOTER_TRACE);
+    const clip = recordingClipboard();
+    const yank = createTraceYankHandler(
+      { copyKeybinds: () => footer.copyKeybinds(), projectPath: "/work/fulcrum" },
+      clip,
+    );
+
+    expect(yank.yank("t")).toEqual({ target: "trace", value: FOOTER_TRACE.traceId });
+    expect(clip.last).toBe(FOOTER_TRACE.traceId);
+
+    expect(yank.yank("r")).toEqual({ target: "run", value: FOOTER_TRACE.runId });
+    expect(clip.last).toBe(FOOTER_TRACE.runId);
+
+    expect(yank.yank("s")).toEqual({ target: "span", value: FOOTER_TRACE.spanId });
+    expect(clip.last).toBe(FOOTER_TRACE.spanId);
+
+    expect(yank.yank("p")).toEqual({ target: "project", value: "/work/fulcrum" });
+    expect(clip.last).toBe("/work/fulcrum");
+  });
+
+  it("yank payloads equal the StatusFooter segment identity for the same screen", () => {
+    const footer = new StatusBarWidget(FOOTER_TRACE);
+    const clip = recordingClipboard();
+    const yank = createTraceYankHandler(
+      { copyKeybinds: () => footer.copyKeybinds(), projectPath: "/work/fulcrum" },
+      clip,
+    );
+    // The yank reads straight from the same `copyKeybinds()` the footer
+    // renders: trace/run/span can never drift from the footer segments.
+    const footerKeybinds = footer.copyKeybinds();
+    expect(yank.yank("t")?.value).toBe(footerKeybinds["y t"]);
+    expect(yank.yank("r")?.value).toBe(footerKeybinds["y r"]);
+    expect(yank.yank("s")?.value).toBe(footerKeybinds["y s"]);
+  });
+
+  it("yanked identity matches the fulcrum.cli.v1 envelope trace/span/run ids", () => {
+    // The CLI `--json` envelope (CLI-TUI-UX.md §3) carries trace_id/span_id/
+    // run_id for the same invocation; the TUI yank must copy those exact ids.
+    const envelope = {
+      schema: "fulcrum.cli.v1",
+      trace_id: "4f3a1c9e8b2d4a6f9c1e3a5b7d9f1c3e",
+      span_id: "8b2d4a6f",
+      run_id: "01HXYZ",
+    } as const;
+    const footer = new StatusBarWidget({
+      currentScreen: "Runs",
+      orgName: "dev",
+      traceId: envelope.trace_id,
+      runId: envelope.run_id,
+      spanId: envelope.span_id,
+      width: 120,
+    });
+    const clip = recordingClipboard();
+    const yank = createTraceYankHandler({ copyKeybinds: () => footer.copyKeybinds() }, clip);
+
+    expect(yank.yank("t")?.value).toBe(envelope.trace_id);
+    expect(yank.yank("r")?.value).toBe(envelope.run_id);
+    expect(yank.yank("s")?.value).toBe(envelope.span_id);
+  });
+
+  it("yanked values are bare ids with no decoration", () => {
+    const footer = new StatusBarWidget(FOOTER_TRACE);
+    const clip = recordingClipboard();
+    const yank = createTraceYankHandler(
+      { copyKeybinds: () => footer.copyKeybinds(), projectPath: "/work/fulcrum" },
+      clip,
+    );
+    // No `trace:` / `run:` prefix, no `…` ellipsis, no surrounding whitespace.
+    for (const key of ["t", "r", "s", "p"] as const) {
+      const result = yank.yank(key);
+      expect(result).not.toBeNull();
+      const value = result!.value;
+      expect(value).not.toMatch(/^(trace|run|span):/);
+      expect(value).not.toContain("…");
+      expect(value).toBe(value.trim());
+    }
+  });
+
+  it("renders the OSC 52 clipboard escape into a FakeTTY for the production sink", () => {
+    const tty = new FakeTTY({ columns: 120, rows: 32 });
+    const footer = new StatusBarWidget(FOOTER_TRACE);
+    const yank = createTraceYankHandler(
+      { copyKeybinds: () => footer.copyKeybinds() },
+      osc52Clipboard(tty),
+    );
+
+    yank.yank("t");
+    // OSC 52 terminal-clipboard sequence: ESC ] 52 ; c ; <base64> BEL.
+    const expectedB64 = Buffer.from(FOOTER_TRACE.traceId, "utf8").toString("base64");
+    expect(tty.raw()).toContain(`\x1b]52;c;${expectedB64}\x07`);
+    // The visible (ANSI-stripped) terminal carries no raw OSC payload leak.
+    expect(tty.plainText()).not.toContain("52;c;");
+  });
+
+  it("yank keys do not collide with list-navigation or stage-chord keys", () => {
+    // CLI-TUI-UX.md §7.2 stage chords (`g _`) + §7.3 list navigation
+    // (`j`/`k`/`o`/`c`/`e`/`x`/`V`). The `y` prefix and `t`/`r`/`s`/`p`
+    // second-keys must be free of those reservations.
+    expect(traceYankCollides("y")).toBe(false);
+    for (const key of Object.keys(TRACE_YANK_CHORDS)) {
+      expect(traceYankCollides(key)).toBe(false);
+    }
+    // The reserved keys themselves still register as collisions: proves the
+    // guard is load-bearing, not vacuously true.
+    for (const reserved of ["j", "k", "o", "c", "e", "x", "V", "g"]) {
+      expect(traceYankCollides(reserved)).toBe(true);
+    }
+  });
+
+  it("returns null for a non-yank key or an absent identity", () => {
+    const footer = new StatusBarWidget({
+      currentScreen: "Runs",
+      orgName: "dev",
+      traceId: FOOTER_TRACE.traceId,
+      width: 120,
+    });
+    const clip = recordingClipboard();
+    const yank = createTraceYankHandler({ copyKeybinds: () => footer.copyKeybinds() }, clip);
+
+    // Not a yank second-key.
+    expect(yank.isYankKey("z")).toBe(false);
+    expect(yank.yank("z")).toBeNull();
+    // No active span / run / project: nothing to copy, clipboard untouched.
+    expect(yank.yank("s")).toBeNull();
+    expect(yank.yank("r")).toBeNull();
+    expect(yank.yank("p")).toBeNull();
+    expect(clip.history).toEqual([]);
+    // The available trace id still yanks.
+    expect(yank.yank("t")?.value).toBe(FOOTER_TRACE.traceId);
   });
 });

@@ -32,12 +32,12 @@ mock.module("$app/environment", () => ({
 }));
 
 const MEMBERS: MemberRow[] = [
-  { id: "m1", userId: "user-alice", orgId: "org-001", role: "owner", joinedAt: "2024-01-01T00:00:00.000Z" },
-  { id: "m2", userId: "user-bob",   orgId: "org-001", role: "member", joinedAt: "2024-02-15T00:00:00.000Z" },
+  { id: "m1", userId: "user-alice", orgId: "org-001", role: "owner", joinedAt: "2024-01-01T00:00:00.000Z", email: "alice@example.com", emailVerified: true },
+  { id: "m2", userId: "user-bob", orgId: "org-001", role: "member", joinedAt: "2024-02-15T00:00:00.000Z", email: "bob@example.com", emailVerified: false },
 ];
 
 type PageProps = {
-  data: { members: MemberRow[] };
+  data: { members: MemberRow[]; sessions?: Array<Record<string, unknown>> };
   form?: Record<string, unknown>;
 };
 
@@ -143,5 +143,34 @@ describe("/settings/users +page.svelte", () => {
   test("invite form action points to ?/invite", () => {
     const { body } = render(Page, { props: { data: { members: [] } } });
     expect(body).toContain("action=\"?/invite\"");
+  });
+
+  test("renders active login sessions and blocks current-session revoke", () => {
+    const { body } = render(Page, {
+      props: {
+        data: {
+          members: MEMBERS,
+          sessions: [{
+            id: "session-current",
+            deviceType: "desktop",
+            browser: "Firefox",
+            ipAddress: "198.51.100.0",
+            lastActiveAt: "2026-05-18T12:00:00.000Z",
+            isCurrent: true,
+          }, {
+            id: "session-remote",
+            deviceType: "mobile",
+            browser: "Chrome",
+            ipAddress: "203.0.113.0",
+            lastActiveAt: "2026-05-18T13:00:00.000Z",
+            isCurrent: false,
+          }],
+        },
+      },
+    });
+    expect(body).toContain("data-auth-sessions-table");
+    expect(body).toContain("data-revoke-current-blocked=\"session-current\"");
+    expect(body).toContain("data-revoke-session=\"session-remote\"");
+    expect(body).toContain("data-revoke-other-sessions");
   });
 });

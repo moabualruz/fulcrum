@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * TaskComments — threaded comments with TipTap editor.
+   * TaskComments: threaded comments with TipTap editor.
    * D-01: threaded replies (24px indent, border-left)
    * D-02: reply button → inline sub-editor with parentCommentId
    * D-03: resolved comments collapse
    * D-04: reaction emoji bar (6 emoji)
    * D-100/D-101: TipTap mention extension with dual source (users + teams)
-   * Security T-05-16: TipTap renders from JSON schema — no raw HTML injection.
+   * Security T-05-16: TipTap renders from JSON schema: no raw HTML injection.
    */
 
   import { onMount, onDestroy } from "svelte";
@@ -135,7 +135,7 @@
       suggestion: {
         items: async ({ query }: { query: string }) => fetchMentionItems(query),
         render: () => {
-          // Minimal inline suggestion — full MentionSuggestion.svelte used via tippyjs in production
+          // Minimal inline suggestion: full MentionSuggestion.svelte used via tippyjs in production
           let container: HTMLElement | null = null;
           return {
             onStart: () => {
@@ -351,7 +351,7 @@
               type="button"
               aria-expanded="false"
             >
-              Resolved by {comment.resolvedByName ?? "someone"} — click to expand
+              Resolved by {comment.resolvedByName ?? "someone"}: click to expand
             </button>
           {:else}
             <div class="task-comments__comment-inner">

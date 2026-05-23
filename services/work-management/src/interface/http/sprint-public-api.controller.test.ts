@@ -9,6 +9,7 @@ import { validateSync } from "class-validator";
 import { AppModule } from "@fulcrum/server/app.module.ts";
 import {
   SprintCreateBodyDto,
+  SprintCloseBodyDto,
   SprintIdParamsDto,
   SprintListQueryDto,
   SprintPatchBodyDto,
@@ -44,6 +45,14 @@ describe("sprint public Nest API", () => {
     );
     expect(Reflect.getMetadata(METHOD_METADATA, SprintPublicApiController.prototype.deleteSprint)).toBe(
       RequestMethod.DELETE,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, SprintPublicApiController.prototype.startSprint)).toBe(":id/start");
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintPublicApiController.prototype.startSprint)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, SprintPublicApiController.prototype.closeSprint)).toBe(":id/close");
+    expect(Reflect.getMetadata(METHOD_METADATA, SprintPublicApiController.prototype.closeSprint)).toBe(
+      RequestMethod.POST,
     );
     expect(Reflect.getMetadata(PATH_METADATA, SprintPublicApiController.prototype.addTask)).toBe(":id/tasks");
     expect(Reflect.getMetadata(METHOD_METADATA, SprintPublicApiController.prototype.addTask)).toBe(
@@ -105,6 +114,8 @@ describe("sprint public Nest API", () => {
     const getSprint = mock(async () => ({ id: "sprint-1", name: "Sprint 1", status: "planning" }));
     const patchSprint = mock(async () => ({ id: "sprint-1", name: "Sprint 1 revised", status: "active" }));
     const deleteSprint = mock(async () => undefined);
+    const startSprint = mock(async () => ({ id: "sprint-1", status: "active" }));
+    const closeSprint = mock(async () => ({ closed: true, sprint: { id: "sprint-1", status: "completed" } }));
     const addTask = mock(async () => ({ id: "assignment-1", sprintId: "sprint-1", taskId: "task-1" }));
     const removeTask = mock(async () => ({ id: "assignment-1", sprintId: "sprint-1", taskId: "task-1" }));
     const controller = new SprintPublicApiController(
@@ -116,6 +127,8 @@ describe("sprint public Nest API", () => {
           getSprint,
           patchSprint,
           deleteSprint,
+          startSprint,
+          closeSprint,
           addTask,
           removeTask,
         },
@@ -136,6 +149,14 @@ describe("sprint public Nest API", () => {
       { orgId: "org-1", name: "Sprint 1 revised", status: "active" },
     )).resolves.toEqual(expect.objectContaining({ status: "active" }));
     await expect(controller.deleteSprint({ id: "sprint-1" }, { orgId: "org-1" })).resolves.toBeUndefined();
+    await expect(controller.startSprint(
+      { id: "sprint-1" },
+      { orgId: "org-1" },
+    )).resolves.toEqual(expect.objectContaining({ status: "active" }));
+    await expect(controller.closeSprint(
+      { id: "sprint-1" },
+      { orgId: "org-1", unfinishedDisposition: "backlog" },
+    )).resolves.toEqual(expect.objectContaining({ closed: true }));
     await expect(controller.addTask(
       { id: "sprint-1" },
       { orgId: "org-1", taskId: "task-1" },
@@ -159,6 +180,8 @@ describe("sprint public Nest API", () => {
       status: "active",
     });
     expect(deleteSprint).toHaveBeenCalledWith({ orgId: "org-1", id: "sprint-1" });
+    expect(startSprint).toHaveBeenCalledWith({ orgId: "org-1", id: "sprint-1" });
+    expect(closeSprint).toHaveBeenCalledWith({ orgId: "org-1", id: "sprint-1", unfinishedDisposition: "backlog" });
     expect(addTask).toHaveBeenCalledWith({ orgId: "org-1", id: "sprint-1", taskId: "task-1" });
     expect(removeTask).toHaveBeenCalledWith({ orgId: "org-1", id: "sprint-1", taskId: "task-1" });
   });
@@ -190,6 +213,8 @@ describe("sprint public Nest API", () => {
     const invalidBody = Object.assign(new SprintCreateBodyDto(), { orgId: "", name: "", status: "unknown" });
     const patch = Object.assign(new SprintPatchBodyDto(), { orgId: "org-1", status: "active" });
     const invalidPatch = Object.assign(new SprintPatchBodyDto(), { orgId: "", status: "unknown" });
+    const close = Object.assign(new SprintCloseBodyDto(), { orgId: "org-1", unfinishedDisposition: "backlog" });
+    const invalidClose = Object.assign(new SprintCloseBodyDto(), { orgId: "", unfinishedDisposition: "archive" });
     const taskParams = Object.assign(new SprintTaskParamsDto(), { id: "sprint-1", taskId: "task-1" });
     const invalidTaskParams = Object.assign(new SprintTaskParamsDto(), { id: "", taskId: "" });
     const taskBody = Object.assign(new SprintTaskBodyDto(), { orgId: "org-1", taskId: "task-1" });
@@ -203,6 +228,8 @@ describe("sprint public Nest API", () => {
     expect(validateSync(invalidBody).map((error) => error.property)).toEqual(["orgId", "name", "status"]);
     expect(validateSync(patch)).toHaveLength(0);
     expect(validateSync(invalidPatch).map((error) => error.property)).toEqual(["orgId", "status"]);
+    expect(validateSync(close)).toHaveLength(0);
+    expect(validateSync(invalidClose).map((error) => error.property)).toEqual(["orgId", "unfinishedDisposition"]);
     expect(validateSync(taskParams)).toHaveLength(0);
     expect(validateSync(invalidTaskParams).map((error) => error.property)).toEqual(["id", "taskId"]);
     expect(validateSync(taskBody)).toHaveLength(0);

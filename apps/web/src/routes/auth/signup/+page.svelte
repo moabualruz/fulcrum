@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ActionData } from "./$types";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     form?: ActionData;
@@ -21,6 +22,18 @@
     <p data-auth-error class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
       {form.error}
     </p>
+  {/if}
+
+  {#if form?.created}
+    <div data-auth-verification-sent class="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+      <p>{form.verificationNotice ?? "Verification email sent."}</p>
+      {#if form.verificationUrl}
+        <p class="mt-1 text-xs">
+          Development link:
+          <a class="underline" href={form.verificationUrl}>Verify email</a>
+        </p>
+      {/if}
+    </div>
   {/if}
 
   <form method="POST" class="flex flex-col gap-4">
@@ -52,13 +65,11 @@
 
     <div class="flex flex-col gap-1.5">
       <label for="signup-password" class="text-sm font-medium">Password</label>
-      <input
+      <CredentialInput
         id="signup-password"
         name="password"
-        type="password"
         autocomplete="new-password"
         required
-        class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
       />
     </div>
 

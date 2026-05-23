@@ -1,9 +1,9 @@
 /**
- * fulcrum skills — CLI subcommands backed by the skill-supply public API.
+ * fulcrum skills: CLI subcommands backed by the skill-supply public API.
  *
  * Commands:
  *   fulcrum skills list [--json]
- *   fulcrum skills install <path> [--json]
+ *   fulcrum skills install <path> [--force-conflict] [--resolve-conflict=alt-version|skip|upgrade-installed] [--json]
  *   fulcrum skills upgrade <slug|all> [--json]
  *   fulcrum skills uninstall <slug> [--json]
  *   fulcrum skills sync [--fetch-upstream] [--install-cron] [--daily] [--json]
@@ -51,7 +51,7 @@ interface SkillConflictOutput {
 
 export interface SkillsCaller {
   list: () => Promise<SkillOutput[]>;
-  install: (input: { path: string }) => Promise<SkillOutput>;
+  install: (input: { path: string; forceConflict?: boolean; conflictResolution?: ConflictInstallResolution }) => Promise<SkillOutput>;
   upgrade: (input: { slug: string }) => Promise<SkillOutput[]>;
   uninstall: (input: { slug: string }) => Promise<void>;
   sync: (input: { fetchUpstream: boolean }) => Promise<SyncResult>;
@@ -80,7 +80,7 @@ function isFeatureEnabled(feature: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// run — entry-point
+// run: entry-point
 // ---------------------------------------------------------------------------
 
 export async function run(
@@ -121,7 +121,7 @@ Skill management commands.
 
 Usage:
   fulcrum skills list [--json]
-  fulcrum skills install <path> [--json]
+  fulcrum skills install <path> [--force-conflict] [--resolve-conflict=alt-version|skip|upgrade-installed] [--json]
   fulcrum skills upgrade <slug|all> [--json]
   fulcrum skills uninstall <slug> [--json]
   fulcrum skills sync [--fetch-upstream] [--install-cron] [--json]
@@ -130,6 +130,9 @@ Usage:
 
 Options:
   --json            Output as machine-readable JSON.
+  --force-conflict  Force a conflict when the lock marks the resolution safe.
+  --resolve-conflict=<mode>
+                    One-time install conflict choice: alt-version, skip, upgrade-installed.
   --fetch-upstream  Fetch upstream skill updates during sync.
   --install-cron    Install daily sync cron entry (requires FULCRUM_FEATURES=skills-daily-sync).
   -h, --help        Show this help.
@@ -178,6 +181,8 @@ async function runInstall(
 ): Promise<void> {
   const { print, printErr, exit } = opts;
   const jsonMode = argv.includes("--json");
+  const forceConflict = argv.includes("--force-conflict");
+  const conflictResolution = parseConflictInstallResolution(argv);
   const positional = argv.filter((a) => !a.startsWith("-"));
   const path = positional[0];
 
@@ -187,10 +192,19 @@ async function runInstall(
     exit(1);
     return;
   }
+  if (conflictResolution === "invalid") {
+    printErr("fulcrum skills install: --resolve-conflict must be alt-version, skip, or upgrade-installed");
+    exit(1);
+    return;
+  }
 
   try {
     const caller = await resolveCaller(opts);
-    const skill = await caller.install({ path });
+    const skill = await caller.install({
+      path,
+      forceConflict: forceConflict || undefined,
+      conflictResolution: conflictResolution ?? undefined,
+    });
     if (jsonMode) {
       print(JSON.stringify(skill));
     } else {
@@ -199,6 +213,18 @@ async function runInstall(
   } catch (err) {
     handleError("fulcrum skills install", err, printErr, exit);
   }
+}
+
+type ConflictInstallResolution = "alt-version" | "skip" | "upgrade-installed";
+
+function parseConflictInstallResolution(argv: readonly string[]): ConflictInstallResolution | "invalid" | null {
+  const equal = argv.find((arg) => arg.startsWith("--resolve-conflict="));
+  const separateIndex = argv.indexOf("--resolve-conflict");
+  if (!equal && separateIndex < 0) return null;
+  const value = equal ? equal.slice("--resolve-conflict=".length) : argv[separateIndex + 1];
+  if (!value || value.startsWith("-")) return equal || argv.includes("--resolve-conflict") ? "invalid" : null;
+  if (value === "alt-version" || value === "skip" || value === "upgrade-installed") return value;
+  return "invalid";
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +477,7 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
     try {
       const existing = await readFile(plistPath, "utf8");
       if (existing.includes(PLIST_LABEL)) return;
-    } catch { /* not present — write it */ }
+    } catch { /* not present: write it */ }
 
     await mkdir(plistDir, { recursive: true });
     await writeFile(plistPath, PLIST_TEMPLATE, "utf8");
@@ -464,7 +490,7 @@ async function writeCronEntry(opts: SkillsRunOptions): Promise<void> {
     try {
       const existing = await readFile(cronPath, "utf8");
       if (existing.includes("fulcrum skills sync")) return;
-    } catch { /* not present — write it */ }
+    } catch { /* not present: write it */ }
 
     await mkdir(cronDir, { recursive: true });
     await writeFile(cronPath, `${CRON_LINE}\n`, "utf8");

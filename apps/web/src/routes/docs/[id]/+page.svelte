@@ -3,8 +3,8 @@
 	import type { PageData } from "./$types";
 	import MarkdownPreview from "$lib/components/markdown/MarkdownPreview.svelte";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -57,12 +57,12 @@
 			<a
 				data-doc-plan
 				href="/planning?docId={doc.id}"
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Plan from this doc</a>
 			<a
 				data-doc-edit
 				href="/docs/{doc.id}/edit"
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Edit</a>
 		</div>
 	</header>
@@ -211,4 +211,20 @@
 			</form>
 		</div>
 	</div>
+{:catch err}
+	<section
+		data-doc-detail-error
+		role="alert"
+		class={cn("rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm")}
+	>
+		<h1 class={cn("text-lg font-semibold text-destructive")}>Document could not load</h1>
+		<p class={cn("mt-1 text-muted-foreground")}>{err instanceof Error ? err.message : "Document not found"}</p>
+		<p class={cn("mt-2 text-muted-foreground")}>Recovery: return to Documents, refresh the list, then reopen the document.</p>
+		<p class={cn("mt-1 font-mono text-xs text-muted-foreground")}>trace: docs-detail</p>
+		<a
+			href="/docs"
+			data-doc-detail-error-back
+			class={cn(buttonVariants({ variant: "secondary" }), "mt-3 gap-2")}
+		>Back to documents</a>
+	</section>
 {/await}

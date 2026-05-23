@@ -74,7 +74,7 @@ describe("/settings/importers", () => {
     });
   });
 
-  describe("actions.preflight() — CSV", () => {
+  describe("actions.preflight(): CSV", () => {
     test("returns rowCount and columns for valid CSV", async () => {
       process.env["FULCRUM_FEATURES"] = "import-csv";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);
@@ -162,7 +162,7 @@ describe("/settings/importers", () => {
     });
   });
 
-  describe("actions.preflight() — Linear", () => {
+  describe("actions.preflight(): Linear", () => {
     test("returns 501 when importer application service is not configured", async () => {
       process.env["FULCRUM_FEATURES"] = "import-linear";
       const mod = await import(`./+page.server.ts?t=${Date.now()}`);

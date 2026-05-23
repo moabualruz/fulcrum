@@ -1,11 +1,7 @@
 import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 import { createProjectApiForEvent } from "$lib/server/project-api";
-import {
-  addProjectRepo,
-  linkProjectRepoToProject,
-  listProjectRepoCards,
-} from "@integration-hub/interface/project-repositories.ts";
+import { createRepositoryApiForEvent } from "$lib/server/repository-api";
 
 interface ProjectHeader {
   id: string;
@@ -13,59 +9,58 @@ interface ProjectHeader {
 }
 
 export const load: PageServerLoad = async (event) => {
-  const { params, locals } = event;
+  const { params } = event;
   const project = await loadProject(event, params.id);
-  const { em, ctx } = await requestScopedApp(locals, params.id);
-  const repos = await listProjectRepoCards(em, ctx);
+  const repos = await createRepositoryApiForEvent(event).repos.projectCards({ projectId: params.id });
   return { project, repos };
 };
 
 export const actions: Actions = {
-  add: async ({ params, request, locals }) => {
-    const form = await request.formData();
+  add: async (event) => {
+    const form = await event.request.formData();
     try {
-      const { em, ctx } = await requestScopedApp(locals, params.id);
-      await addProjectRepo(em, ctx, {
+      await createRepositoryApiForEvent(event).repos.addToProject({
+        projectId: event.params.id,
         kind: form.get("kind") === "remote" ? "remote" : "local",
         path: String(form.get("path") ?? ""),
         url: String(form.get("url") ?? ""),
         name: String(form.get("name") ?? ""),
       });
-      return { ok: true };
+      return { ok: true, mode: "addRepo" };
     } catch (e) {
       return fail(400, {
         ok: false,
+        mode: "addRepo",
         message: e instanceof Error ? e.message : "invalid repo",
       });
     }
   },
-  link: async ({ params, request, locals }) => {
-    const form = await request.formData();
+  link: async (event) => {
+    const form = await event.request.formData();
     const repoId = String(form.get("repoId") ?? "").trim();
-    if (!repoId) return fail(400, { ok: false, message: "repoId required" });
-    const { em, ctx } = await requestScopedApp(locals, params.id);
-    await linkProjectRepoToProject(em, ctx, repoId);
-    return { ok: true };
+    if (!repoId) return fail(400, { ok: false, mode: "linkRepo", message: "repoId required" });
+    try {
+      await createRepositoryApiForEvent(event).repos.linkToProject({
+        projectId: event.params.id,
+        repoId,
+      });
+      return { ok: true, mode: "linkRepo" };
+    } catch (e) {
+      return fail(400, {
+        ok: false,
+        mode: "linkRepo",
+        message: e instanceof Error ? e.message : "invalid repo",
+      });
+    }
   },
 };
 
 async function loadProject(event: Parameters<PageServerLoad>[0], projectId: string): Promise<ProjectHeader> {
-  try {
-    const project = await createProjectApiForEvent(event).projects.get({ id: projectId }) as ProjectHeader;
-    return {
-      id: project.id,
-      name: project.name,
-    };
-  } catch (cause) {
-    if (typeof cause === "object" && cause !== null && "status" in cause && (cause as { status?: unknown }).status === 404) {
-      throw error(404, "Project not found");
-    }
-    const message = cause instanceof Error ? cause.message : String(cause);
-    throw error(502, message);
-  }
-}
-
-async function requestScopedApp(locals: App.Locals, projectId?: string) {
-  const { requestServiceScope } = await import("$lib/server/request-service-scope");
-  return requestServiceScope(locals, projectId);
+  const payload = await createProjectApiForEvent(event).projects.get({ id: projectId });
+  const record = (payload as { project?: ProjectHeader }).project ?? (payload as Partial<ProjectHeader>);
+  if (!record.id || !record.name) throw error(404, "Project not found");
+  return {
+    id: record.id,
+    name: record.name,
+  };
 }

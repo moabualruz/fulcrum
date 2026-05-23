@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 	import DocTree from "$lib/components/docs/DocTree.svelte";
 	import InContextSearchBar from "$lib/components/search/InContextSearchBar.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -22,7 +22,7 @@
 	}
 
 	function projectLabel(id: string | null): string {
-		return id ? id : "—";
+		return id ? id : "-";
 	}
 
 	function autoSubmit(event: Event): void {
@@ -50,7 +50,7 @@
 			href="/docs/new"
 			data-new-doc
 			data-slot="button"
-			class={cn(buttonVariants({ variant: "default" }), "gap-2")}
+			class={cn(buttonVariants({ variant: "primary" }), "gap-2")}
 		>New document</a>
 	</header>
 
@@ -84,6 +84,7 @@
 		<select
 			data-kind-filter
 			name="kind"
+			aria-label="Filter documents by kind"
 			onchange={autoSubmit}
 			class={cn(
 				"border-input bg-background flex h-9 rounded-md border px-3 py-1 text-sm shadow-xs",
@@ -107,15 +108,30 @@
 		/>
 		<button
 			type="submit"
-			class={cn(buttonVariants({ variant: "outline" }))}
+			class={cn(buttonVariants({ variant: "secondary" }))}
 		>Apply</button>
 	</form>
 
-	{#if payload.documents.length === 0 && data.kind === "" && data.q === ""}
+	{#if payload.error}
+		<div
+			data-docs-error
+			role="alert"
+			class={cn("rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-sm")}
+		>
+			<p class={cn("font-medium")}>{payload.error.message}</p>
+			<p class={cn("mt-1 text-muted-foreground")}>Recovery: {payload.error.recovery}</p>
+			<p class={cn("mt-1 font-mono text-xs text-muted-foreground")}>trace: {payload.error.traceId}</p>
+			<a
+				href="/docs"
+				data-docs-error-retry
+				class={cn(buttonVariants({ variant: "secondary" }), "mt-3 gap-2")}
+			>Retry</a>
+		</div>
+	{:else if payload.documents.length === 0 && data.kind === "" && data.q === ""}
 		<div
 			data-empty-docs
 			class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-		>No documents yet — create one.</div>
+		>No documents yet: create one.</div>
 	{:else if payload.documents.length === 0}
 		<div
 			data-empty-filter

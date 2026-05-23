@@ -30,6 +30,7 @@ import {
 } from "@platform-core/interface/http/credential-public-api.controller.ts";
 import {
   FULCRUM_CREDENTIAL_ENTITIES,
+  FulcrumCredentialEntity,
 } from "@platform-core/infrastructure/database/credential.entities.ts";
 import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
 import { CredentialStore } from "@platform-core/infrastructure/database/credential-store.ts";
@@ -94,53 +95,66 @@ async function assertCredentialRoundTrip(source: FulcrumTypeOrmConnectionSource,
   try {
     await dataSource.runMigrations();
     await seedCredentialOrganization(dataSource, source);
-    const controller = new CredentialPublicApiController(
-      new CredentialPublicApiService(
-        { featuresEnv: "public-api", keyring: { stateDir: keyringDir, native: null } },
-        new CredentialStore(dataSource),
-      ),
+    const service = new CredentialPublicApiService(
+      { featuresEnv: "public-api", keyring: { stateDir: keyringDir, native: null } },
+      new CredentialStore(dataSource),
     );
+    const controller = new CredentialPublicApiController(service);
 
     const created = await controller.setCredential({
       orgId: `workspace-credential-${source}`,
       userId: `owner-credential-${source}`,
       name: "LINEAR_API_KEY",
-      value: "secret-value",
+      value: "fixture-value",
     });
     expect(created).toMatchObject({ name: "LINEAR_API_KEY" });
     await expect(controller.listCredentials({
       orgId: `workspace-credential-${source}`,
       userId: `owner-credential-${source}`,
     })).resolves.toEqual([expect.objectContaining({ name: "LINEAR_API_KEY", archived: false })]);
-    await expect(controller.getCredential(
+    const publicCredential = await controller.getCredential(
       { name: "LINEAR_API_KEY" },
       {
         orgId: `workspace-credential-${source}`,
         userId: `owner-credential-${source}`,
       },
-    )).resolves.toEqual({ name: "LINEAR_API_KEY", value: "secret-value" });
+    );
+    expect(publicCredential).toMatchObject({ name: "LINEAR_API_KEY", provider: "local" });
+    expect(JSON.stringify(publicCredential)).not.toContain("fixture-value");
+    expect(await service.getCredentialReference(
+      { name: "LINEAR_API_KEY" },
+      {
+        orgId: `workspace-credential-${source}`,
+        userId: `owner-credential-${source}`,
+      },
+    )).toEqual({
+      credentialId: publicCredential.id,
+      name: "LINEAR_API_KEY",
+      provider: "local",
+    });
+    expect(JSON.stringify(await dataSource.getRepository(FulcrumCredentialEntity).find())).not.toContain("fixture-value");
     await expect(controller.rotateCredential(
       { name: "LINEAR_API_KEY" },
       {
         orgId: `workspace-credential-${source}`,
         userId: `owner-credential-${source}`,
-        newValue: "new-secret",
+        newValue: "rotated-fixture-value",
       },
-    )).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true, trace_id: "trace-credential-rotate-LINEAR_API_KEY" });
     await expect(controller.getCredential(
       { name: "LINEAR_API_KEY" },
       {
         orgId: `workspace-credential-${source}`,
         userId: `owner-credential-${source}`,
       },
-    )).resolves.toEqual({ name: "LINEAR_API_KEY", value: "new-secret" });
+    )).resolves.toEqual(expect.objectContaining({ name: "LINEAR_API_KEY", provider: "local" }));
     await expect(controller.archiveCredential(
       { name: "LINEAR_API_KEY" },
       {
         orgId: `workspace-credential-${source}`,
         userId: `owner-credential-${source}`,
       },
-    )).resolves.toEqual({ ok: true });
+    )).resolves.toEqual({ ok: true, trace_id: "trace-credential-archive-LINEAR_API_KEY" });
     await expect(controller.listCredentials({
       orgId: `workspace-credential-${source}`,
       userId: `owner-credential-${source}`,
@@ -157,7 +171,7 @@ async function assertCredentialRoundTrip(source: FulcrumTypeOrmConnectionSource,
       orgId: `workspace-credential-${source}`,
       userId: `outsider-credential-${source}`,
       name: "BLOCKED",
-      value: "secret-value",
+      value: "fixture-value",
     })).rejects.toBeInstanceOf(ForbiddenException);
   } finally {
     await dataSource.destroy();
@@ -176,6 +190,10 @@ describe("credential public Nest API", () => {
       .toBe(RequestMethod.POST);
     expect(Reflect.getMetadata(METHOD_METADATA, CredentialPublicApiController.prototype.removeCredential))
       .toBe(RequestMethod.DELETE);
+    expect(Reflect.getMetadata(PATH_METADATA, CredentialPublicApiController.prototype.archiveCredential))
+      .toBe(":name/archive");
+    expect(Reflect.getMetadata(PATH_METADATA, CredentialPublicApiController.prototype.rotateCredential))
+      .toBe(":name/rotate");
   });
 
   test("hides the default unconfigured route when the public API feature is off", async () => {

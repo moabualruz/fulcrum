@@ -27,6 +27,7 @@ describe("/inbox +page.server.ts load()", () => {
         if (target.includes("/api/trpc")) throw new Error("unexpected local bridge call");
         calls.push(target);
         if (target.includes("/unread-count")) return Response.json({ count: 0 });
+        if (target.includes("/notifications/rules")) return Response.json([]);
         return Response.json({ data: [], total: 0 });
       },
     }) as never);
@@ -37,6 +38,7 @@ describe("/inbox +page.server.ts load()", () => {
     expect(calls.sort()).toEqual([
       "http://localhost/api/v1/audit?orgId=org-1&userId=user-1&limit=20&offset=0",
       "http://localhost/api/v1/notifications/unread-count?orgId=org-1&userId=user-1",
+      "http://localhost/api/v1/notifications/rules?orgId=org-1&userId=user-1",
       "http://localhost/api/v1/notifications?orgId=org-1&userId=user-1",
     ].sort());
   });
@@ -47,6 +49,9 @@ describe("/inbox +page.server.ts load()", () => {
         const target = String(url);
         if (target.includes("/unread-count")) return Response.json({ count: 1 });
         if (target.includes("/api/v1/audit")) return Response.json({ data: [], total: 0 });
+        if (target.includes("/notifications/rules")) return Response.json([
+          { id: "rule-1", name: "Review blockers", enabled: true, channels: ["in-app", "email"] },
+        ]);
         return Response.json({
           data: [
             {
@@ -91,7 +96,12 @@ describe("/inbox +page.server.ts load()", () => {
       entityKind: "task",
       entityId: "task-1",
       readAt: null,
+      evidenceHref: "/search?q=task%3Atask-1",
+      evidenceLabel: "task:task-1",
     });
+    expect(result.notificationRules).toEqual([
+      { id: "rule-1", name: "Review blockers", enabled: true, channels: ["in-app", "email"] },
+    ]);
   });
 
   test("loads activity through the public audit API with pagination", async () => {
@@ -101,6 +111,7 @@ describe("/inbox +page.server.ts load()", () => {
         const target = String(url);
         if (target.includes("/unread-count")) return Response.json({ count: 0 });
         if (target.includes("/api/v1/notifications?")) return Response.json({ data: [] });
+        if (target.includes("/notifications/rules")) return Response.json([]);
         expect(target).toBe("http://localhost/api/v1/audit?orgId=org-1&userId=user-1&limit=20&offset=20");
         return Response.json({
           data: [
@@ -153,6 +164,38 @@ describe("/inbox +page.server.ts actions.markAllRead()", () => {
     expect(calls).toEqual([
       {
         url: "http://localhost/api/v1/notifications/mark-all-read?orgId=org-1&userId=user-1",
+        init: {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "content-type": "application/json",
+            cookie: "sid=session-1",
+          },
+        },
+      },
+    ]);
+  });
+
+  test("marks one notification read through the public API", async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const event = makeEvent({
+      fetchImpl: async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return Response.json({ ok: true });
+      },
+    }) as ReturnType<typeof makeEvent> & { request: Request };
+    event.request = new Request("http://localhost/inbox", {
+      method: "POST",
+      headers: { cookie: "sid=session-1" },
+      body: new URLSearchParams({ id: "notification-1" }),
+    });
+
+    const result = await actions.markRead(event as never);
+
+    expect(result).toEqual({ markedRead: true, id: "notification-1" });
+    expect(calls).toEqual([
+      {
+        url: "http://localhost/api/v1/notifications/notification-1/mark-read?orgId=org-1&userId=user-1",
         init: {
           method: "PATCH",
           credentials: "include",

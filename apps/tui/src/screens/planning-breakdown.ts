@@ -266,6 +266,21 @@ export interface PlanningBreakdownScreenOptions {
   };
 }
 
+function displayStatus(value: string | undefined): string {
+  if (!value) return "(unknown)";
+  if (value === "ready_for_acp_prompt") return "Ready for AI Assist prompt";
+  return value
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function displaySession(agentName?: string, sessionId?: string): string {
+  if (agentName) return `${agentName} active`;
+  return sessionId ? "Active" : "(new)";
+}
+
 export class PlanningBreakdownScreen {
   private breakdown: PlanningBreakdownResult | null = null;
   private materialized: PlanningBreakdownMaterializationResult | null = null;
@@ -392,12 +407,12 @@ export class PlanningBreakdownScreen {
 
     if (this.guidedAcpStart) {
       renderer.writeln();
-      renderer.writeln(c.bold("  Guided ACP session"));
-      renderer.infoRow("Status", this.guidedAcpStart.status);
+      renderer.writeln(c.bold("  AI Assist session"));
+      renderer.infoRow("Status", displayStatus(this.guidedAcpStart.status));
       if (this.guidedAcpStart.session) {
         renderer.infoRow(
           "Session",
-          `${this.guidedAcpStart.session.acpSessionId ?? "(new)"} ${this.guidedAcpStart.session.agentName ?? ""}`.trim(),
+          displaySession(this.guidedAcpStart.session.agentName, this.guidedAcpStart.session.acpSessionId),
         );
         renderer.infoRow("Mode", this.guidedAcpStart.session.modeId ?? "(none)");
         renderer.infoRow("Model", this.guidedAcpStart.session.modelId ?? "(none)");
@@ -417,11 +432,14 @@ export class PlanningBreakdownScreen {
 
     if (this.guidedAcpSessionAction) {
       renderer.writeln();
-      renderer.writeln(c.bold("  Guided ACP action"));
-      renderer.infoRow("Status", this.guidedAcpSessionAction.status);
-      renderer.infoRow("Session", this.guidedAcpSessionAction.session?.acpSessionId ?? "(none)");
+      renderer.writeln(c.bold("  Planning session action"));
+      renderer.infoRow("Status", displayStatus(this.guidedAcpSessionAction.status));
+      renderer.infoRow(
+        "Session",
+        displaySession(this.guidedAcpSessionAction.session?.agentName, this.guidedAcpSessionAction.session?.acpSessionId),
+      );
       renderer.infoRow("Action", this.guidedAcpSessionAction.action?.method ?? "(none)");
-      renderer.infoRow("State", this.guidedAcpSessionAction.session?.sessionStatus ?? "(unknown)");
+      renderer.infoRow("State", displayStatus(this.guidedAcpSessionAction.session?.sessionStatus));
       for (const entry of this.guidedAcpSessionAction.traffic?.entries ?? []) {
         renderer.writeln(`  ${entry.method ?? "(traffic)"}`);
       }
@@ -430,9 +448,9 @@ export class PlanningBreakdownScreen {
     if (this.continuousUpdate) {
       renderer.writeln();
       renderer.writeln(c.bold("  Continuous update"));
-      renderer.infoRow("Status", this.continuousUpdate.status);
+      renderer.infoRow("Status", displayStatus(this.continuousUpdate.status));
       renderer.infoRow("Trace", this.continuousUpdate.traceId ?? this.continuousUpdate.context?.traceId ?? "(none)");
-      renderer.infoRow("ACP", this.continuousUpdate.acpSessionId ?? "(none)");
+      renderer.infoRow("AI Assist session", this.continuousUpdate.acpSessionId ? "Active" : "(none)");
       for (const doc of this.continuousUpdate.changedDocs ?? []) {
         renderer.writeln(`  doc ${doc.title ?? doc.id}`);
       }
@@ -515,7 +533,7 @@ export class PlanningBreakdownScreen {
     }
 
     renderer.writeln();
-    renderer.writeln(c.dim("  r refresh  a acp  p acp action  n new freeform  u update  g generate  e execute artifact  x run cycle  m materialize  c context  q back"));
+    renderer.writeln(c.dim("  r refresh  a assist  p session action  n new freeform  u update  g generate  e execute artifact  x run cycle  m materialize  c context  q back"));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -619,11 +637,11 @@ export class PlanningBreakdownScreen {
   private async startGuidedAcpPlanning(): Promise<void> {
     const start = this.opts.caller.planning.startGuidedAcpPlanningSession;
     if (!start) {
-      this.error = "Planning guided ACP caller unavailable.";
+      this.error = "Planning AI Assist session caller unavailable.";
       return;
     }
     if (!this.opts.guidedAcpInput) {
-      this.error = "Planning guided ACP input unavailable.";
+      this.error = "Planning AI Assist session input unavailable.";
       return;
     }
     try {
@@ -638,12 +656,12 @@ export class PlanningBreakdownScreen {
   private async recordGuidedAcpSessionAction(): Promise<void> {
     const record = this.opts.caller.planning.recordGuidedAcpSessionAction;
     if (!record) {
-      this.error = "Planning guided ACP session action caller unavailable.";
+      this.error = "Planning session action caller unavailable.";
       return;
     }
     const input = this.guidedAcpSessionActionInput();
     if (!input) {
-      this.error = "Planning guided ACP session action input unavailable.";
+      this.error = "Planning session action input unavailable.";
       return;
     }
     try {

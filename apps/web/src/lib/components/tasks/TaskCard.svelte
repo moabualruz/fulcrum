@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { Badge, Card } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
 
   export interface TaskCardTask {
     id: string;
@@ -42,7 +43,7 @@
     3: { label: "High", color: "text-orange-500", icon: "↑" },
     2: { label: "Medium", color: "text-yellow-500", icon: "→" },
     1: { label: "Low", color: "text-blue-500", icon: "↓" },
-    0: { label: "None", color: "text-muted-foreground", icon: "—" },
+    0: { label: "None", color: "text-muted-foreground", icon: "-" },
   };
 
   const pMeta = $derived(
@@ -79,7 +80,7 @@
 </script>
 
 <!-- min-h-11 = 44px (touch compliance) -->
-<div
+<Card
   data-task-card
   data-testid="task-card"
   data-task-id={task.id}
@@ -87,7 +88,7 @@
   role="button"
   tabindex="0"
   class={cn(
-    "group relative flex flex-col gap-1 rounded-md border border-border bg-card px-3 py-2 shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer min-h-11",
+    "group relative gap-1 rounded-md px-3 py-2 transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer min-h-11",
     density === "comfortable" && "gap-2"
   )}
   onclick={handleClick}
@@ -118,13 +119,15 @@
 
     <!-- Blocked badge (D-20) -->
     {#if isBlocked}
-      <span
+      <Badge
         data-blocked-badge
-        class="shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold bg-destructive/10 text-destructive"
+        variant="destructive"
+        size="sm"
+        class="shrink-0 text-[10px] font-semibold"
         title={task.blockerTitles?.join(", ") ?? "Blocked"}
       >
         Blocked
-      </span>
+      </Badge>
     {/if}
   </div>
 
@@ -170,14 +173,14 @@
     {#if task.labels && task.labels.length > 0}
       <div data-labels class="flex flex-wrap gap-1">
         {#each task.labels as label (label)}
-          <span
+          <Badge
             class="rounded-full px-2 py-0.5 text-[10px] font-medium"
             style={task.labelColors?.[label]
               ? `background-color: ${task.labelColors[label]}22; color: ${task.labelColors[label]}`
               : "background-color: hsl(var(--muted)); color: hsl(var(--muted-foreground))"}
           >
             {label}
-          </span>
+          </Badge>
         {/each}
       </div>
     {/if}
@@ -209,4 +212,4 @@
       </span>
     </div>
   {/if}
-</div>
+</Card>

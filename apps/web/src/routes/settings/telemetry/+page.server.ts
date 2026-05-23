@@ -1,5 +1,10 @@
 import { fail, type Actions, type ServerLoad } from "@sveltejs/kit";
 import { createTelemetryApiCaller } from "@platform-core/interface/http/telemetry-api-client";
+import {
+  TELEMETRY_SCOPE,
+  TelemetryConsentStore,
+  type TelemetryConsent,
+} from "@platform-core/application/telemetry/consent-store.ts";
 
 interface TelemetryEvent {
   locals: App.Locals;
@@ -13,16 +18,28 @@ interface TelemetryStatus {
   rowCount: number;
 }
 
+export interface LocalConsentSnapshot {
+  consent: TelemetryConsent | null;
+  scope: readonly string[];
+  path: string;
+}
+
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const DEFAULT_USER_ID = "local-user";
 
 export const load: ServerLoad = (event) => {
   return {
+    local: readLocalConsent(),
     streamed: {
       data: loadTelemetry(event as TelemetryEvent),
     },
   };
 };
+
+function readLocalConsent(): LocalConsentSnapshot {
+  const store = new TelemetryConsentStore();
+  return { consent: store.read(), scope: TELEMETRY_SCOPE, path: store.filePath };
+}
 
 export const actions: Actions = {
   toggleOptIn: async (event) => {
@@ -34,7 +51,8 @@ export const actions: Actions = {
       } else {
         await caller.telemetry.optIn();
       }
-      return { success: true, optIn: !status.optIn };
+      const consent = new TelemetryConsentStore().write(!status.optIn);
+      return { success: true, optIn: !status.optIn, local: { consent, scope: TELEMETRY_SCOPE } };
     } catch (cause) {
       return fail(502, { error: errorMessage(cause) });
     }

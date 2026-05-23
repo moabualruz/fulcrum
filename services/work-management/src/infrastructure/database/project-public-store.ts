@@ -22,6 +22,9 @@ export interface ProjectPublicRow {
   kind: ProjectPublicKind;
   slug: string;
   name: string;
+  description: string | null;
+  status: string;
+  ownerId: string | null;
   repoPath: string | null;
   template: string | null;
   memoryConfig: Record<string, unknown> | null;
@@ -29,6 +32,15 @@ export interface ProjectPublicRow {
   traceId: string;
   createdAt: string | null;
   updatedAt: string | null;
+  updated_at: string | null;
+  taskCount: number;
+  task_count: number;
+  openTaskCount: number;
+  open_task_count: number;
+  docCount: number;
+  doc_count: number;
+  latestActivityAt: string | null;
+  latest_activity_at: string | null;
 }
 
 export interface ProjectPublicStats {
@@ -37,7 +49,14 @@ export interface ProjectPublicStats {
   taskCount: number;
   doneTaskCount: number;
   openTaskCount: number;
+  artifactCount: number;
   traceId: string;
+}
+
+/** Candidate parent project for the new-project parent picker: `{ id, name }`. */
+export interface ProjectPublicOption {
+  id: string;
+  name: string;
 }
 
 export class ProjectPublicStore {
@@ -48,7 +67,11 @@ export class ProjectPublicStore {
       where: { workspaceId: input.orgId },
       order: { createdAt: "ASC", id: "ASC" },
     });
-    return { data: projects.map((project) => toPublicRow(input.orgId, project)) };
+    return {
+      data: await Promise.all(
+        projects.map(async (project) => toPublicRow(input.orgId, project, {}, await this.projectListStats(project))),
+      ),
+    };
   }
 
   async createProject(input: {
@@ -56,6 +79,10 @@ export class ProjectPublicStore {
     kind?: ProjectPublicKind;
     name: string;
     slug?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
+    traceId?: string;
     repoPath?: string;
     template?: string;
   }): Promise<ProjectPublicRow> {
@@ -73,6 +100,9 @@ export class ProjectPublicStore {
         kind,
         slug: workspace.slug,
         name: workspace.name,
+        description: input.description ?? null,
+        status: input.status ?? "active",
+        ownerId: input.ownerId ?? null,
         repoPath: input.repoPath ?? null,
         template: input.template ?? null,
         memoryConfig: null,
@@ -80,6 +110,15 @@ export class ProjectPublicStore {
         traceId: `trace-workspace-${workspace.id}`,
         createdAt: workspace.createdAt?.toISOString() ?? null,
         updatedAt: workspace.updatedAt?.toISOString() ?? null,
+        updated_at: workspace.updatedAt?.toISOString() ?? null,
+        taskCount: 0,
+        task_count: 0,
+        openTaskCount: 0,
+        open_task_count: 0,
+        docCount: 0,
+        doc_count: 0,
+        latestActivityAt: workspace.updatedAt?.toISOString() ?? null,
+        latest_activity_at: workspace.updatedAt?.toISOString() ?? null,
       };
     }
 
@@ -89,7 +128,10 @@ export class ProjectPublicStore {
       workspaceId: input.orgId,
       slug: input.slug ?? slugify(input.name),
       name: input.name,
-      traceId: `trace-project-${id}`,
+      description: input.description ?? null,
+      status: input.status ?? "active",
+      ownerId: input.ownerId ?? null,
+      traceId: input.traceId ?? `trace-project-${id}`,
     });
     return toPublicRow(input.orgId, project, {
       kind,
@@ -107,12 +149,18 @@ export class ProjectPublicStore {
     orgId: string;
     id: string;
     name?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
     memoryConfig?: Record<string, unknown>;
   }): Promise<ProjectPublicRow | null> {
     const project = await this.findScopedProject(input);
     if (!project) return null;
 
     if (input.name !== undefined) project.name = input.name;
+    if (input.description !== undefined) project.description = input.description;
+    if (input.status !== undefined) project.status = input.status;
+    if (input.ownerId !== undefined) project.ownerId = input.ownerId;
     if (input.memoryConfig !== undefined) {
       project.workflowConfig = {
         ...(project.workflowConfig ?? {}),
@@ -142,18 +190,142 @@ export class ProjectPublicStore {
 
     const tasks = await this.taskRepository().findBy({ projectId: project.id, deletedAt: IsNull() });
     const doneTaskCount = tasks.filter((task) => task.status === "done").length;
+    const artifactCount = await this.countProjectArtifacts(project.id);
     return {
       orgId: input.orgId,
       projectId: project.id,
       taskCount: tasks.length,
       doneTaskCount,
       openTaskCount: tasks.length - doneTaskCount,
+      artifactCount,
       traceId: project.traceId,
     };
   }
 
+  /**
+   * The full project-detail read-model (`{ project, summary }`): the same
+   * `loadProjectOverview` query the in-process detail route used, exposed over
+   * the public API so the web detail route stays a pure invocation layer.
+   * `projectStats` is a counts-only projection and cannot carry `inProgress` /
+   * `sprintDaysRemaining`, so the detail route needs this richer endpoint.
+   */
+  async projectOverview(input: { orgId: string; id: string }): Promise<unknown> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+    // `findScopedProject` accepts a slug OR uuid; downstream
+    // `loadProjectOverview` queries the projects table by uuid only — pass the
+    // resolved uuid so a slug-keyed URL still returns the overview.
+    const { loadProjectOverview } = await import("@work-management/application/projects/queries.ts");
+    return await loadProjectOverview(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: project.id },
+      project.id,
+    );
+  }
+
+  /**
+   * Candidate parent projects for the new-project parent picker. Delegates to
+   * the same `listProjectOptions` query the in-process route used so the picker
+   * stays consistent with project hierarchy rules.
+   */
+  async listProjectOptions(input: { orgId: string }): Promise<ProjectPublicOption[]> {
+    const { listProjectOptions } = await import("@work-management/application/projects/queries.ts");
+    return await listProjectOptions(this.dataSource.manager, {
+      orgId: input.orgId,
+      userId: null,
+    });
+  }
+
+  /**
+   * The richer project-creation path: template normalization, repo linking, and
+   * workflow setup via `createProjectFromSetup`. The plain `createProject` store
+   * method cannot carry `parentId`/`template`/`repoPath` semantics, so the
+   * new-project route's setup branch needs this endpoint.
+   */
+  async createProjectFromSetup(input: {
+    orgId: string;
+    userId?: string | null;
+    name: string;
+    slug?: string;
+    description?: string | null;
+    kind?: ProjectPublicKind;
+    parentId?: string | null;
+    repoPath?: string | null;
+    template?: string | null;
+  }): Promise<unknown> {
+    const { createProjectFromSetup } = await import("@work-management/application/projects/commands.ts");
+    return await createProjectFromSetup(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: input.userId ?? null },
+      {
+        name: input.name,
+        slug: input.slug,
+        description: input.description ?? null,
+        kind: input.kind,
+        parentId: input.parentId ?? null,
+        repoPath: input.repoPath ?? null,
+        template: input.template ?? null,
+      },
+    );
+  }
+
+  /**
+   * The project backlog read-model (`{ project, sprints, backlogTasks }`):
+   * unassigned, open tasks plus the project's sprints. Sprint↔task assignment
+   * here mutates `tasks.sprint_id` (the column `loadProjectBacklog` reads), so
+   * it is distinct from the `WorkManagementCycleTask` join-table assignment the
+   * sprint public API exposes.
+   */
+  async loadProjectBacklog(input: { orgId: string; id: string }): Promise<unknown> {
+    const project = await this.findScopedProject(input);
+    if (!project) return null;
+    const { loadProjectBacklog } = await import("@work-management/application/work-cycle-queries.ts");
+    return await loadProjectBacklog(this.dataSource.manager, {
+      orgId: input.orgId,
+      userId: null,
+      projectId: input.id,
+    });
+  }
+
+  async addBacklogTaskToSprint(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<{ moved: true }> {
+    const { addTaskToSprint } = await import("@work-management/application/work-cycle-commands.ts");
+    return await addTaskToSprint(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.id },
+      input.sprintId,
+      input.taskId,
+    );
+  }
+
+  async removeBacklogTaskFromSprint(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<{ moved: true }> {
+    const { removeTaskFromSprint } = await import("@work-management/application/work-cycle-commands.ts");
+    return await removeTaskFromSprint(
+      this.dataSource.manager,
+      { orgId: input.orgId, userId: null, projectId: input.id },
+      input.sprintId,
+      input.taskId,
+    );
+  }
+
   private async findScopedProject(input: { orgId: string; id: string }): Promise<FulcrumProject | null> {
-    return await this.projectRepository().findOneBy({ id: input.id, workspaceId: input.orgId });
+    // `id` may arrive as a uuid OR a project slug (web routes pass the slug
+    // straight through from the URL). Try the uuid first, fall back to slug,
+    // both scoped to the workspace.
+    const repo = this.projectRepository();
+    return (
+      (await repo.findOneBy({ id: input.id, workspaceId: input.orgId })) ??
+      (await repo.findOneBy({ slug: input.id, workspaceId: input.orgId }))
+    );
   }
 
   private workspaceRepository() {
@@ -167,15 +339,54 @@ export class ProjectPublicStore {
   private taskRepository() {
     return this.dataSource.getRepository(FulcrumTaskEntity);
   }
+
+  private documentRepository() {
+    return this.dataSource.getRepository(FulcrumDocumentEntity);
+  }
+
+  private async projectListStats(project: FulcrumProject): Promise<ProjectPublicListStats> {
+    const [tasks, docs] = await Promise.all([
+      this.taskRepository().findBy({ projectId: project.id, deletedAt: IsNull() }),
+      this.documentRepository().findBy({ projectId: project.id }),
+    ]);
+    const closed = new Set(["completed", "done", "canceled", "cancelled"]);
+    const dates = [
+      project.updatedAt,
+      ...tasks.map((task) => task.updatedAt),
+      ...docs.map((doc) => doc.updatedAt),
+    ].filter((value): value is Date => value instanceof Date);
+    const latest = dates.length > 0 ? new Date(Math.max(...dates.map((value) => value.getTime()))).toISOString() : null;
+    return {
+      taskCount: tasks.length,
+      openTaskCount: tasks.filter((task) => !closed.has(task.status ?? "")).length,
+      docCount: docs.length,
+      latestActivityAt: latest,
+    };
+  }
+
+  private async countProjectArtifacts(projectId: string): Promise<number> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    const exists = await queryRunner.hasTable("fulcrum_artifacts");
+    await queryRunner.release();
+    if (!exists) return 0;
+    const rows = await this.dataSource.query<Array<{ count: string }>>(
+      "SELECT COUNT(*)::text AS count FROM fulcrum_artifacts WHERE project_id = $1 AND deleted_at IS NULL",
+      [projectId],
+    );
+    return Number(rows[0]?.count ?? 0);
+  }
 }
 
 function toPublicRow(
   orgId: string,
   project: FulcrumProject,
   overrides: Partial<Pick<ProjectPublicRow, "kind" | "repoPath" | "template">> = {},
+  stats: ProjectPublicListStats = EMPTY_PROJECT_LIST_STATS,
 ): ProjectPublicRow {
   const memoryConfig = project.workflowConfig?.["memory_config"];
   const publicMemoryConfig = isRecord(memoryConfig) ? memoryConfig : null;
+  const updatedAt = project.updatedAt?.toISOString() ?? null;
+  const latestActivityAt = stats.latestActivityAt ?? updatedAt;
   return {
     id: project.id,
     orgId,
@@ -183,15 +394,41 @@ function toPublicRow(
     kind: overrides.kind ?? "project",
     slug: project.slug,
     name: project.name,
+    description: project.description ?? null,
+    status: project.status ?? "active",
+    ownerId: project.ownerId ?? null,
     repoPath: overrides.repoPath ?? null,
     template: overrides.template ?? null,
     memoryConfig: publicMemoryConfig,
     memory_config: publicMemoryConfig,
     traceId: project.traceId,
     createdAt: project.createdAt?.toISOString() ?? null,
-    updatedAt: project.updatedAt?.toISOString() ?? null,
+    updatedAt,
+    updated_at: updatedAt,
+    taskCount: stats.taskCount,
+    task_count: stats.taskCount,
+    openTaskCount: stats.openTaskCount,
+    open_task_count: stats.openTaskCount,
+    docCount: stats.docCount,
+    doc_count: stats.docCount,
+    latestActivityAt,
+    latest_activity_at: latestActivityAt,
   };
 }
+
+interface ProjectPublicListStats {
+  taskCount: number;
+  openTaskCount: number;
+  docCount: number;
+  latestActivityAt: string | null;
+}
+
+const EMPTY_PROJECT_LIST_STATS: ProjectPublicListStats = {
+  taskCount: 0,
+  openTaskCount: 0,
+  docCount: 0,
+  latestActivityAt: null,
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);

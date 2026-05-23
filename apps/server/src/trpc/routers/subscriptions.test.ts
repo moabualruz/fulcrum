@@ -18,6 +18,9 @@ import {
   type RunUpdatePayload,
   type NotificationPayload,
   type OrchestrationStatePayload,
+  type RunUpdateEvent,
+  type NotificationEvent,
+  type OrchestrationStateEvent,
 } from "./subscriptions.ts";
 
 afterEach(() => resetEventBus());
@@ -35,10 +38,34 @@ function makeCtx(orgId: string) {
 }
 
 describe("runsSubscriptionRouter.onRunUpdate", () => {
+  test("reports connection status and polling recovery metadata", async () => {
+    const original = process.env["FULCRUM_FEATURES"];
+    process.env["FULCRUM_FEATURES"] = "ws-polling-fallback";
+
+    const status = await runsSubscriptionRouter
+      .createCaller(makeCtx("org1"))
+      .status({ runId: "run-abc" });
+
+    expect(status).toEqual({
+      connected: true,
+      topic: "agent_run.run-abc",
+      transport: "event-bus",
+      fallback: {
+        mode: "polling",
+        enabled: true,
+        intervalMs: 5_000,
+        recovery: "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
+      },
+    });
+
+    if (original === undefined) delete process.env["FULCRUM_FEATURES"];
+    else process.env["FULCRUM_FEATURES"] = original;
+  });
+
   test("receives events published to agent_run.<runId>", async () => {
     const bus = getEventBus();
     const runId = "run-abc";
-    const received: RunUpdatePayload[] = [];
+    const received: RunUpdateEvent[] = [];
 
     const obs = await runsSubscriptionRouter
       .createCaller(makeCtx("org1"))
@@ -46,7 +73,7 @@ describe("runsSubscriptionRouter.onRunUpdate", () => {
 
     // tRPC v11 createCaller returns a Promise<Observable>
     const sub = obs.subscribe({
-      next(event: RunUpdatePayload) {
+      next(event: RunUpdateEvent) {
         received.push(event);
       },
     });
@@ -69,23 +96,42 @@ describe("runsSubscriptionRouter.onRunUpdate", () => {
     sub.unsubscribe();
 
     expect(received).toHaveLength(2);
-    expect(received[0]!.status).toBe("running");
-    expect(received[1]!.status).toBe("completed");
+    expect(received[0]!).toMatchObject({
+      topic: `agent_run.${runId}`,
+      type: `agent_run.${runId}`,
+      traceId: null,
+      payload: { status: "running" },
+    });
+    expect(received[1]!.payload.status).toBe("completed");
+    expect(new Date(received[0]!.timestamp).toString()).not.toBe("Invalid Date");
   });
 });
 
 describe("notifySubscriptionRouter.onNewNotification", () => {
+  test("reports notification stream status for current org", async () => {
+    const status = await notifySubscriptionRouter
+      .createCaller(makeCtx("org-xyz"))
+      .status();
+
+    expect(status).toMatchObject({
+      connected: true,
+      topic: "org.org-xyz.notifications",
+      transport: "event-bus",
+      fallback: { mode: "polling", intervalMs: 5_000 },
+    });
+  });
+
   test("receives events published to org.<orgId>.notifications", async () => {
     const bus = getEventBus();
     const orgId = "org-xyz";
-    const received: NotificationPayload[] = [];
+    const received: NotificationEvent[] = [];
 
     const obs = await notifySubscriptionRouter
       .createCaller(makeCtx(orgId))
       .onNewNotification();
 
     const sub = obs.subscribe({
-      next(event: NotificationPayload) {
+      next(event: NotificationEvent) {
         received.push(event);
       },
     });
@@ -102,7 +148,8 @@ describe("notifySubscriptionRouter.onNewNotification", () => {
     sub.unsubscribe();
 
     expect(received).toHaveLength(1);
-    expect(received[0]!.title).toBe("New task assigned");
+    expect(received[0]!.payload.title).toBe("New task assigned");
+    expect(received[0]!.topic).toBe(`org.${orgId}.notifications`);
   });
 });
 
@@ -110,14 +157,14 @@ describe("orchestrationSubscriptionRouter.onStateChange", () => {
   test("receives events published to orchestration.<orgId>", async () => {
     const bus = getEventBus();
     const orgId = "org-orch";
-    const received: OrchestrationStatePayload[] = [];
+    const received: OrchestrationStateEvent[] = [];
 
     const obs = await orchestrationSubscriptionRouter
       .createCaller(makeCtx(orgId))
       .onStateChange();
 
     const sub = obs.subscribe({
-      next(event: OrchestrationStatePayload) {
+      next(event: OrchestrationStateEvent) {
         received.push(event);
       },
     });
@@ -135,7 +182,8 @@ describe("orchestrationSubscriptionRouter.onStateChange", () => {
     sub.unsubscribe();
 
     expect(received).toHaveLength(1);
-    expect(received[0]!.state).toBe("running");
+    expect(received[0]!.payload.state).toBe("running");
+    expect(received[0]!.topic).toBe(`orchestration.${orgId}`);
   });
 });
 

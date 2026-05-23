@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
+import { REQUIRED_RESILIENCE_STATES } from "@platform-core/application/interface-parity/resilience-state-matrix.ts";
 import { apiErrorCode, formatApiError, formatCommandError, hasApiErrorCode } from "./api-errors.ts";
 
 describe("CLI API error handling", () => {
@@ -24,11 +25,42 @@ describe("CLI API error handling", () => {
     expect(hasApiErrorCode(error, "UNAUTHORIZED")).toBe(true);
   });
 
+  test("formats permission and missing feature flag failures as actionable stderr-safe strings", () => {
+    expect(formatCommandError({
+      kind: "forbidden",
+      message: "permission denied",
+      recovery: "Request access.",
+      traceId: "trace-cli-denied",
+    })).toBe("FORBIDDEN: permission denied Recovery: Request access. Trace: trace-cli-denied");
+    expect(formatCommandError({
+      code: "FUL_MISSING_FEATURE_FLAG",
+      message: "Enable public-api.",
+      recovery: "Run fulcrum doctor.",
+    })).toBe(
+      "FUL_MISSING_FEATURE_FLAG: Enable public-api. Recovery: Run fulcrum doctor.",
+    );
+    expect(REQUIRED_RESILIENCE_STATES.filter((state) => state.surface === "cli").map((state) => state.state)).toEqual([
+      "missing-api",
+      "permission-denied",
+      "missing-feature-flag",
+      "empty-list",
+    ]);
+  });
+
   test("formats plain errors and unknown thrown values", () => {
     expect(formatApiError(new Error("bad input"))).toBe("bad input");
     expect(formatCommandError(new Error("bad input"))).toBe("Error: bad input");
     expect(formatApiError("bad input")).toBe("bad input");
     expect(apiErrorCode("bad input")).toBeUndefined();
+  });
+
+  test("maps missing public API configuration to a stable CLI error code", () => {
+    const error = new Error(
+      "Public API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL for runs, run, cycle, module, context, notifications, audit, webhooks, or connectors commands.",
+    );
+
+    expect(apiErrorCode(error)).toBe("FUL_PUBLIC_API_NOT_CONFIGURED");
+    expect(hasApiErrorCode(error, "FUL_PUBLIC_API_NOT_CONFIGURED")).toBe(true);
   });
 
   test("CLI source files do not import @trpc/server", async () => {

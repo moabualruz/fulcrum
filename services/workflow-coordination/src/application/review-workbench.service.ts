@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { Inject, Injectable } from "@nestjs/common";
@@ -11,6 +11,7 @@ import {
   type ReviewWorkbenchInput,
   type ReviewWorkbenchModel,
 } from "@planning-review/application/reviews/review-workbench.ts";
+import { buildManualSimulationChecklist } from "@planning-review/application/manual-simulation-checklist.ts";
 import type {
   AppendReviewWorkbenchAnnotationInput,
   LoadReviewWorkbenchSessionInput,
@@ -27,9 +28,12 @@ import type {
   FinalQaReportOutput,
   FinalQaTaskResult,
   GeneratedE2eCoverageCase,
+  GeneratedE2eMockPolicy,
   GeneratedE2eRegressionRunOutput,
   GeneratedE2eRegressionRunner,
   GeneratedE2eRegressionTest,
+  GeneratedE2eScenarioData,
+  ManualSimulationChecklist,
   RecordUatCodeReviewDecisionInput,
   RunGeneratedE2eRegressionTestsInput,
   UatCodeReviewAutoDecisionConfig,
@@ -65,6 +69,10 @@ import {
   DependencyRunService,
   type AutomatedFeedbackLoopOutput,
 } from "@workflow-coordination/application/dependency-execution.service.ts";
+import {
+  listGeneratedE2eRunHistory,
+  type GeneratedE2eRunHistoryEntry,
+} from "@planning-review/application/reports/generated-e2e-run-actions.ts";
 
 export type ReviewWorkbenchPreview = ReviewWorkbenchModel;
 export type ReviewWorkbenchSession = ReviewWorkbenchSessionOutput;
@@ -84,6 +92,7 @@ export type UatCodeReviewHandoff = UatCodeReviewHandoffOutput;
 export type UatCodeReviewDecision = UatCodeReviewDecisionOutput;
 export type ConfiguredUatCodeReviewDecision = ConfiguredUatCodeReviewDecisionOutput;
 export type GeneratedE2eRegressionRun = GeneratedE2eRegressionRunOutput;
+export type GeneratedE2eRunHistory = GeneratedE2eRunHistoryEntry[];
 
 const UAT_CODE_REVIEW_AUTO_DECISION_SETTING_KEY = "reports.uatCodeReviewAutoDecision";
 
@@ -121,6 +130,10 @@ export interface ConfiguredUatCodeReviewDecisionInput
 export interface GeneratedE2eRegressionRunInput
   extends UatCodeReviewHandoffInput,
     RunGeneratedE2eRegressionTestsInput {}
+
+export interface GeneratedE2eRunHistoryInput extends UatCodeReviewHandoffInput {
+  limit?: number;
+}
 
 export interface ReviewWorkbenchSessionSaveInput
   extends SaveReviewWorkbenchSessionInput {
@@ -765,7 +778,8 @@ export class ReviewWorkbenchService {
       if (rows.length === 0) {
         throw new Error("No accepted generated UAT E2E regression tests were found.");
       }
-      const testFiles = await materializeTypeOrmGeneratedE2eTests(input.projectId, traceId, rows);
+      const runId = reviewWorkflowId("run", traceId, "generated-e2e", runner);
+      const testFiles = await materializeTypeOrmGeneratedE2eTests(input.projectId, traceId, runId, rows);
       const plan = buildTypeOrmGeneratedE2eRunnerPlan(runner, testFiles);
       let stdout = "";
       let stderr = "";
@@ -781,7 +795,6 @@ export class ReviewWorkbenchService {
         status = exitCode === 0 ? "passed" : "failed";
       }
 
-      const runId = reviewWorkflowId("run", traceId, "generated-e2e", runner);
       await manager.getRepository(FulcrumAgentRunEntity).save({
         id: runId,
         projectId: input.projectId,
@@ -790,6 +803,15 @@ export class ReviewWorkbenchService {
         status,
         dependencyTree: rows.map((row) => row.id),
       });
+      const specArtifacts = await persistTypeOrmGeneratedE2eSpecArtifacts(
+        manager,
+        input.projectId,
+        traceId,
+        runId,
+        runner,
+        rows,
+        testFiles,
+      );
       const eventId = reviewWorkflowId("event", traceId, "generated-e2e-regression-run-completed", runner);
       await manager.getRepository(FulcrumRunEventEntity).save({
         id: eventId,
@@ -815,16 +837,19 @@ export class ReviewWorkbenchService {
           exitCode,
           ciCommand: plan.ciCommand,
           ciEnv: plan.ciEnv,
+          generatedSpecArtifactIds: specArtifacts.map((artifact) => artifact.id),
         },
       });
 
       return {
         projectId: input.projectId,...(input.traceId ? { traceId } : {}),
+        runId,
         runner,
         status,
         command: plan.command,...(plan.cwd ? { cwd: plan.cwd } : {}),
         testFiles,
         artifactIds: rows.map((row) => row.id),
+        generatedSpecArtifactIds: specArtifacts.map((artifact) => artifact.id),
         stdout,
         stderr,
         exitCode,
@@ -833,6 +858,21 @@ export class ReviewWorkbenchService {
         eventId,
       };
     });
+  }
+
+  async listGeneratedE2eRuns(input: GeneratedE2eRunHistoryInput): Promise<GeneratedE2eRunHistory> {
+    if (!this.dataSource) {
+      throw new Error("ReviewWorkbenchService requires a TypeORM DataSource to list generated E2E runs.");
+    }
+    if (!input.projectId.trim()) throw new Error("Generated E2E projectId is required.");
+
+    const traceId = input.traceId ?? reviewWorkflowId("trace", input.projectId, "generated-e2e-history");
+    await ensureReviewWorkspaceProject(this.dataSource.manager, input, traceId);
+    return await listGeneratedE2eRunHistory(
+      this.dataSource.manager,
+      { orgId: input.workspaceId, userId: null, projectId: input.projectId },
+      { projectId: input.projectId, limit: input.limit },
+    );
   }
 }
 
@@ -950,8 +990,9 @@ async function loadTypeOrmGeneratedE2eTests(
 async function materializeTypeOrmGeneratedE2eTests(
   projectId: string,
   traceId: string,
+  runId: string,
   rows: FulcrumGeneratedE2ETest[],): Promise<string[]> {
-  const directory = join(tmpdir(), "fulcrum-generated-e2e", slug(projectId), slug(traceId));
+  const directory = join(tmpdir(), "fulcrum-generated-e2e", slug(projectId), slug(traceId), slug(runId));
   await mkdir(directory, { recursive: true });
   const testFiles: string[] = [];
   for (const row of rows) {
@@ -960,6 +1001,51 @@ async function materializeTypeOrmGeneratedE2eTests(
     testFiles.push(filePath);
   }
   return testFiles;
+}
+
+async function persistTypeOrmGeneratedE2eSpecArtifacts(
+  manager: EntityManager,
+  projectId: string,
+  traceId: string,
+  runId: string,
+  runner: GeneratedE2eRegressionRunner,
+  rows: FulcrumGeneratedE2ETest[],
+  testFiles: string[],
+): Promise<Array<{ id: string }>> {
+  const artifacts: Array<{ id: string }> = [];
+  for (const [index, filePath] of testFiles.entries()) {
+    const row = rows[index];
+    if (!row) continue;
+    const fileStat = await stat(filePath);
+    const artifact = {
+      id: reviewWorkflowId("artifact", traceId, runId, "generated-e2e-spec", String(index + 1)),
+      projectId,
+      traceId,
+      runId,
+      taskId: null,
+      docId: null,
+      kind: "generated-e2e-spec",
+      title: `Generated E2E spec ${index + 1}`,
+      filename: basename(filePath),
+      bodyPath: filePath,
+      checksumSha256: null,
+      mime: "text/typescript",
+      sizeBytes: String(fileStat.size),
+      lifecycleState: "created",
+      metadataJson: {
+        previewKind: "playwright-spec",
+        runner,
+        sourceGeneratedE2eTestId: row.id,
+        sourceArtifactIds: rows.map((source) => source.id),
+      },
+      archived: false,
+      archivedAt: null,
+      deletedAt: null,
+    };
+    await manager.getRepository(FulcrumArtifactEntity).save(artifact);
+    artifacts.push({ id: artifact.id });
+  }
+  return artifacts;
 }
 
 function safeGeneratedE2eFilename(value: string): string {
@@ -1474,6 +1560,18 @@ async function generateTypeOrmE2eRegressionTests(
 
   for (const task of sourceTasks) {
     const coverageCases = buildCoverageCases(task);
+    const scenarioData = buildTypeOrmScenarioData(input, traceId, task);
+    const mockPolicy: GeneratedE2eMockPolicy = {
+      usesMocks: false,
+      impossibilityReason: null,
+    };
+    const manualSimulationChecklist = buildManualSimulationChecklist({
+      projectId: input.projectId,
+      traceId,
+      tasks: [task],
+      approvedForE2e: true,
+    });
+    const generationTaskId = reviewWorkflowId("task", traceId, "generated-e2e", task.taskId);
     const filename = `uat-${slug(traceId)}-${slug(task.title)}.spec.ts`;
     const filePath = `generated/e2e/${filename}`;
     const body = buildTypeOrmRegressionTestBody({
@@ -1481,7 +1579,32 @@ async function generateTypeOrmE2eRegressionTests(
       projectId: input.projectId,
       task,
       coverageCases,
+      manualSimulationChecklist,
+      scenarioData,
+      mockPolicy,
       runner,
+    });
+    const generationTaskDescription = buildTypeOrmGenerationTaskDescription({ traceId, task, scenarioData, mockPolicy });
+    await manager.getRepository(FulcrumTaskEntity).save({
+      id: generationTaskId,
+      projectId: input.projectId,
+      externalId: null,
+      title: `Generate E2E regression: ${task.title}`,
+      description: generationTaskDescription,
+      descriptionText: generationTaskDescription,
+      tiptapContent: {},
+      status: "todo",
+      priority: null,
+      points: null,
+      assigneeId: null,
+      parentTaskId: null,
+      successCriteria: [`Generated E2E regression covers ${task.title}.`],
+      customFields: {
+        generatedBy: "uat_code_review_approval",
+        sourceTaskId: task.taskId,
+      },
+      traceId,
+      deletedAt: null,
     });
     const id = reviewWorkflowId("e2e", traceId, task.taskId);
     await manager.getRepository(FulcrumGeneratedE2ETestEntity).save({
@@ -1496,6 +1619,7 @@ async function generateTypeOrmE2eRegressionTests(
     });
     generated.push({
       artifactId: id,
+      generationTaskId,
       filename,
       path: filePath,
       runner,
@@ -1506,6 +1630,9 @@ async function generateTypeOrmE2eRegressionTests(
       sourceTaskIds: [task.taskId],
       sourceCriteria: task.successCriteria,
       coverageCases,
+      manualSimulationChecklist,
+      scenarioData,
+      mockPolicy,
       ciCommand: runner === "playwright"
         ? ["bun", "run", "web:e2e:generated"]
         : ["bun", "test", filePath],
@@ -1567,6 +1694,9 @@ function buildTypeOrmRegressionTestBody(input: {
   projectId: string;
   task: FinalQaTaskResult;
   coverageCases: GeneratedE2eCoverageCase[];
+  manualSimulationChecklist: ManualSimulationChecklist;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
   runner: GeneratedE2eRegressionRunner;
 }): string {
   const assertion = {
@@ -1580,6 +1710,9 @@ function buildTypeOrmRegressionTestBody(input: {
       runIds: input.task.runIds,
     },
     coverageCases: input.coverageCases,
+    manualSimulationChecklist: input.manualSimulationChecklist,
+    scenarioData: input.scenarioData,
+    mockPolicy: input.mockPolicy,
   };
   const importLine = input.runner === "playwright"
     ? 'import { expect, test } from "@playwright/test";'
@@ -1592,6 +1725,10 @@ function buildTypeOrmRegressionTestBody(input: {
       "",
       `test("preserves approved UAT evidence for ${input.task.title}", async () => {`,
       "  expect(acceptedTrace.coverageCases.map((coverage) => coverage.criterion)).toEqual(acceptedTrace.task.successCriteria);",
+      '  expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
+      "  expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
+      "  expect(acceptedTrace.scenarioData.evidenceArtifactIds).toEqual(acceptedTrace.task.artifactIds);",
+      "  expect(acceptedTrace.mockPolicy).toEqual({ usesMocks: false, impossibilityReason: null });",
       "  expect(acceptedTrace.task.artifactIds.length).toBeGreaterThan(0);",
       "  expect(acceptedTrace.task.runIds.length).toBeGreaterThan(0);",
       "});",
@@ -1606,11 +1743,61 @@ function buildTypeOrmRegressionTestBody(input: {
     `describe("Generated UAT regression: ${input.traceId}", () => {`,
     `  test("preserves approved UAT evidence for ${input.task.title}", () => {`,
     "    expect(acceptedTrace.coverageCases.map((coverage) => coverage.criterion)).toEqual(acceptedTrace.task.successCriteria);",
+    '    expect(acceptedTrace.manualSimulationChecklist.status).toBe("approved");',
+    "    expect(acceptedTrace.manualSimulationChecklist.steps.map((step) => step.expectedObservation)).toEqual(acceptedTrace.coverageCases.map((coverage) => coverage.criterion));",
+    "    expect(acceptedTrace.scenarioData.evidenceArtifactIds).toEqual(acceptedTrace.task.artifactIds);",
+    "    expect(acceptedTrace.mockPolicy).toEqual({ usesMocks: false, impossibilityReason: null });",
     "    expect(acceptedTrace.task.artifactIds.length).toBeGreaterThan(0);",
     "    expect(acceptedTrace.task.runIds.length).toBeGreaterThan(0);",
     "  });",
     "});",
     "",
+  ].join("\n");
+}
+
+function buildTypeOrmScenarioData(
+  input: UatCodeReviewDecisionInput,
+  traceId: string,
+  task: FinalQaTaskResult,
+): GeneratedE2eScenarioData {
+  return {
+    traceId,
+    projectId: input.projectId,
+    taskId: task.taskId,
+    taskTitle: task.title,
+    taskStatus: task.status,
+    latestReviewEventId: task.latestReviewEventId,
+    evidenceArtifactIds: task.artifactIds,
+    evidenceRunIds: task.runIds,
+  };
+}
+
+function buildTypeOrmGenerationTaskDescription(input: {
+  traceId: string;
+  task: FinalQaTaskResult;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
+}): string {
+  return [
+    "## Scenario",
+    `Trace: ${input.traceId}`,
+    `Source task: ${input.task.taskId}`,
+    `User path: ${input.task.title}`,
+    "",
+    "## Fixture data",
+    `Task status: ${input.scenarioData.taskStatus ?? "unset"}`,
+    `Review event: ${input.scenarioData.latestReviewEventId ?? "none"}`,
+    "",
+    "## Evidence artifacts",
+    ...input.scenarioData.evidenceArtifactIds.map((id) => `- ${id}`),
+    "",
+    "## Evidence runs",
+    ...input.scenarioData.evidenceRunIds.map((id) => `- ${id}`),
+    "",
+    "## Mock policy",
+    input.mockPolicy.usesMocks
+      ? `Mocks require documented impossibility reason: ${input.mockPolicy.impossibilityReason ?? "missing"}`
+      : "Mocks are not used.",
   ].join("\n");
 }
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants, Select } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -46,7 +46,7 @@
 				data-project-select
 				class={cn("border-input bg-background flex h-9 w-48 rounded-md border px-3 py-1 text-sm shadow-xs")}
 			>
-				<option value="">— select —</option>
+				<option value="">- select -</option>
 				{#each opts.projects as p (p.id)}
 					<option value={p.id} selected={data.selectedProjectId === p.id}>{p.name}</option>
 				{/each}
@@ -60,7 +60,7 @@
 				data-task-select
 				class={cn("border-input bg-background flex h-9 w-64 rounded-md border px-3 py-1 text-sm shadow-xs")}
 			>
-				<option value="">— select —</option>
+				<option value="">- select -</option>
 				{#each opts.tasks as t (t.id)}
 					<option value={t.id} selected={data.selectedTaskId === t.id}>{t.title} ({t.status})</option>
 				{/each}
@@ -69,7 +69,7 @@
 		<div class={cn("self-end")}>
 			<button
 				type="submit"
-				class={cn(buttonVariants({ variant: "default" }))}
+				class={cn(buttonVariants({ variant: "primary" }))}
 			>Preview</button>
 		</div>
 	</form>
@@ -105,7 +105,7 @@
 							{#each bundle.memories as mem (mem.id)}
 								<li>
 									<span class={cn("font-medium")}>{mem.key}</span>
-									<span class={cn("text-muted-foreground")}> — {mem.body.slice(0, 80)}{mem.body.length > 80 ? "..." : ""}</span>
+									<span class={cn("text-muted-foreground")}>: {mem.body.slice(0, 80)}{mem.body.length > 80 ? "..." : ""}</span>
 								</li>
 							{/each}
 						</ul>
@@ -122,7 +122,7 @@
 							{#each bundle.documents as doc (doc.id)}
 								<li>
 									<a href="/docs/{doc.id}" class={cn("font-medium hover:underline")}>{doc.title}</a>
-									<span class={cn("text-muted-foreground")}> — {doc.body_excerpt.slice(0, 80)}{doc.body_excerpt.length > 80 ? "..." : ""}</span>
+									<span class={cn("text-muted-foreground")}>: {doc.body_excerpt.slice(0, 80)}{doc.body_excerpt.length > 80 ? "..." : ""}</span>
 								</li>
 							{/each}
 						</ul>

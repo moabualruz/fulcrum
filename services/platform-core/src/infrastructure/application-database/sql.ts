@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import pg from "pg";
+import { assertPgliteLockRecoverable } from "@platform-core/application/db/pglite-lock-recovery.ts";
 
 export type SqlValue = string | number | boolean | null | Uint8Array;
 
@@ -12,9 +13,28 @@ export interface SqlExecutor {
 
 export async function openLocalSqlStore(dataDir: string): Promise<SqlExecutor> {
   await mkdir(dataDir, { recursive: true });
+  await assertPgliteLockRecoverable(dataDir);
   const { PGlite } = await import("@electric-sql/pglite");
-  const { vector } = await import("@electric-sql/pglite/vector");
-  const db = new PGlite(dataDir, { extensions: { vector } });
+  // String-keyed dynamic import keeps `bun build --compile` from statically
+  // resolving + bundling vector.tar.gz (which a compiled $bunfs cannot read).
+  // Skip the extension entirely inside a compiled binary; non-vector queries
+  // keep working.
+  const url = (import.meta?.url ?? "").replace(/\\/g, "/");
+  const isCompiled = url.includes("/$bunfs/")
+    || (process.argv[0] ?? "").replace(/\\/g, "/").includes("/$bunfs/");
+  let vectorExtension: unknown = null;
+  if (!isCompiled) {
+    try {
+      const vectorModule = "@electric-sql/pglite/vector";
+      const mod = await import(vectorModule);
+      vectorExtension = (mod as { vector?: unknown }).vector ?? null;
+    } catch {
+      vectorExtension = null;
+    }
+  }
+  const db = vectorExtension
+    ? new PGlite(dataDir, { extensions: { vector: vectorExtension as never } })
+    : new PGlite(dataDir);
   await db.waitReady;
   return {
     engine: "pglite",

@@ -43,21 +43,26 @@ const ApplyAutoDecisionInputSchema = z.object({
 const FinalQaInputSchema = z.object({
   projectId: z.string().trim().min(1),
   traceId: z.string().trim().min(1).optional(),
+  taskIds: z.array(z.string().trim().min(1)).max(500).optional(),
 }).strict();
 
 const FinalQaFeedbackGateInputSchema = z.object({
   projectId: z.string().trim().min(1),
   traceId: z.string().trim().min(1).optional(),
+  taskIds: z.array(z.string().trim().min(1)).max(500).optional(),
   workerId: z.string().trim().min(1).optional(),
+  reviewerAgent: z.string().trim().min(1).optional(),
   feedbackAgent: z.string().trim().min(1).optional(),
   feedbackModel: z.string().trim().min(1).optional(),
   maxIterations: z.number().int().min(1).max(20).optional(),
   cwd: z.string().trim().min(1).optional(),
+  copyToWorktree: z.array(z.string().trim().min(1)).max(500).optional(),
 }).strict();
 
 const RunGeneratedE2eInputSchema = z.object({
   projectId: z.string().trim().min(1),
   traceId: z.string().trim().min(1).optional(),
+  taskIds: z.array(z.string().trim().min(1)).max(500).optional(),
   runner: z.enum(["bun", "playwright"]).optional(),
   planOnly: z.boolean().optional(),
 }).strict();

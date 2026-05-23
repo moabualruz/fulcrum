@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
   /**
-   * MentionSuggestion — dual-source mention popup (users + teams).
+   * MentionSuggestion: dual-source mention popup (users + teams).
    */
 
   interface Props {

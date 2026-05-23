@@ -11,6 +11,8 @@ export interface TrafficEntry {
   requestId?: number | string;
   payload: unknown;
   error?: boolean;
+  truncated?: boolean;
+  droppedCount?: number;
 }
 
 export type TrafficEntryInput = Omit<TrafficEntry, "id" | "timestamp">;
@@ -37,6 +39,23 @@ export interface InMemoryTrafficRecorderOptions {
 
 const DEFAULT_MAX_ENTRIES = 500;
 
+export function limitTrafficEntries(entries: TrafficEntry[], maxEntries = DEFAULT_MAX_ENTRIES): TrafficEntry[] {
+  if (maxEntries <= 0) return [];
+  if (entries.length <= maxEntries) return entries;
+
+  const previousDroppedCount = entries.reduce((count, entry) => Math.max(count, entry.droppedCount ?? 0), 0);
+  const droppedCount = previousDroppedCount + entries.length - maxEntries;
+  const retained = entries.slice(-maxEntries);
+  if (retained[0]) {
+    retained[0] = {
+      ...retained[0],
+      truncated: true,
+      droppedCount,
+    };
+  }
+  return retained;
+}
+
 export function createInMemoryTrafficRecorder(options: InMemoryTrafficRecorderOptions = {}): AcpTrafficRecorder {
   const maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
   const now = options.now ?? Date.now;
@@ -46,6 +65,7 @@ export function createInMemoryTrafficRecorder(options: InMemoryTrafficRecorderOp
     isPaused: false,
     filter: "all" as TrafficFilter,
     searchQuery: "",
+    droppedCount: 0,
   };
 
   return {
@@ -85,17 +105,30 @@ export function createInMemoryTrafficRecorder(options: InMemoryTrafficRecorderOp
     },
     addEntry(entry) {
       if (state.isPaused) return;
+      if (maxEntries <= 0) {
+        state.droppedCount += 1;
+        return;
+      }
       state.entries.push({
         ...entry,
         id: createId(),
         timestamp: now(),
       });
       if (state.entries.length > maxEntries) {
+        state.droppedCount += state.entries.length - maxEntries;
         state.entries = state.entries.slice(-maxEntries);
+        if (state.entries[0]) {
+          state.entries[0] = {
+            ...state.entries[0],
+            truncated: true,
+            droppedCount: state.droppedCount,
+          };
+        }
       }
     },
     clear() {
       state.entries = [];
+      state.droppedCount = 0;
     },
     togglePause() {
       state.isPaused = !state.isPaused;

@@ -1,16 +1,16 @@
 <script lang="ts">
   /**
-   * FilterBuilder — chip-based filter UI (Linear-style).
+   * FilterBuilder: chip-based filter UI (Linear-style).
    */
   import { createEventDispatcher } from "svelte";
   import type { SavedViewQuery, FilterClause, FilterOp } from "@work-management/interface/saved-view-filters.ts";
   import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
 
-  import * as Popover from "$lib/components/ui/popover/index.js";
-  import { Button } from "$lib/components/ui/button/index.js";
-  import { Badge } from "$lib/components/ui/badge/index.js";
-  import * as Select from "$lib/components/ui/select/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
+  import { Popover, PopoverTrigger, PopoverContent } from "@fulcrum/ui-kit";
+  import { Button } from "@fulcrum/ui-kit";
+  import { Badge } from "@fulcrum/ui-kit";
+  import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@fulcrum/ui-kit";
+  import { Input } from "@fulcrum/ui-kit";
 
   // ── Props ──────────────────────────────────────────────────────────
   interface Props {
@@ -251,52 +251,52 @@
   {/if}
 
   <!-- Add filter popover -->
-  <Popover.Root bind:open={addFilterOpen}>
-    <Popover.Trigger asChild let:builder>
-      <Button builders={[builder]} variant="outline" size="sm" class="h-7 gap-1 text-xs">
+  <Popover bind:open={addFilterOpen}>
+    <PopoverTrigger asChild let:builder>
+      <Button builders={[builder]} variant="secondary" size="sm" class="h-7 gap-1 text-xs">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
         </svg>
         Add filter
       </Button>
-    </Popover.Trigger>
-    <Popover.Content class="w-80 p-4 space-y-3">
+    </PopoverTrigger>
+    <PopoverContent class="w-80 p-4 space-y-3">
       <!-- Field picker -->
       <div class="space-y-1">
         <label class="text-xs font-medium text-muted-foreground">Field</label>
-        <Select.Root
+        <Select
           onSelectedChange={(v) => {
             newFieldKey = v?.value ?? "";
             newOp = getOperators(allFields.find((f) => f.key === newFieldKey)?.type ?? "text")[0]?.value ?? "eq";
           }}
         >
-          <Select.Trigger class="w-full h-8 text-xs">
-            <Select.Value placeholder="Select field..." />
-          </Select.Trigger>
-          <Select.Content>
+          <SelectTrigger class="w-full h-8 text-xs">
+            <SelectValue placeholder="Select field..." />
+          </SelectTrigger>
+          <SelectContent>
             {#each allFields as field}
-              <Select.Item value={field.key} label={field.label}>{field.label}</Select.Item>
+              <SelectItem value={field.key} label={field.label}>{field.label}</SelectItem>
             {/each}
-          </Select.Content>
-        </Select.Root>
+          </SelectContent>
+        </Select>
       </div>
 
       <!-- Operator picker -->
       {#if selectedFieldDef}
         <div class="space-y-1">
           <label class="text-xs font-medium text-muted-foreground">Operator</label>
-          <Select.Root
+          <Select
             onSelectedChange={(v) => { newOp = (v?.value ?? "eq") as FilterOp; }}
           >
-            <Select.Trigger class="w-full h-8 text-xs">
-              <Select.Value placeholder="Select operator..." />
-            </Select.Trigger>
-            <Select.Content>
+            <SelectTrigger class="w-full h-8 text-xs">
+              <SelectValue placeholder="Select operator..." />
+            </SelectTrigger>
+            <SelectContent>
               {#each availableOps as op}
-                <Select.Item value={op.value} label={op.label}>{op.label}</Select.Item>
+                <SelectItem value={op.value} label={op.label}>{op.label}</SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
         </div>
 
         <!-- Value input (type-aware) -->
@@ -306,16 +306,16 @@
             {#if selectedFieldDef.type === "date"}
               <Input type="date" bind:value={newValue} class="h-8 text-xs" />
             {:else if selectedFieldDef.options}
-              <Select.Root onSelectedChange={(v) => { newValue = v?.value ?? ""; }}>
-                <Select.Trigger class="w-full h-8 text-xs">
-                  <Select.Value placeholder="Select value..." />
-                </Select.Trigger>
-                <Select.Content>
+              <Select onSelectedChange={(v) => { newValue = v?.value ?? ""; }}>
+                <SelectTrigger class="w-full h-8 text-xs">
+                  <SelectValue placeholder="Select value..." />
+                </SelectTrigger>
+                <SelectContent>
                   {#each selectedFieldDef.options as opt}
-                    <Select.Item value={opt.value} label={opt.label}>{opt.label}</Select.Item>
+                    <SelectItem value={opt.value} label={opt.label}>{opt.label}</SelectItem>
                   {/each}
-                </Select.Content>
-              </Select.Root>
+                </SelectContent>
+              </Select>
             {:else if selectedFieldDef.type === "number"}
               <Input type="number" bind:value={newValue} class="h-8 text-xs" placeholder="Enter number..." />
             {:else}
@@ -328,8 +328,8 @@
       <Button size="sm" class="w-full" on:click={addFilter} disabled={!newFieldKey}>
         Apply filter
       </Button>
-    </Popover.Content>
-  </Popover.Root>
+    </PopoverContent>
+  </Popover>
 
   <!-- Spacer -->
   <div class="flex-1" />
@@ -346,7 +346,7 @@
   </label>
 
   <!-- Export button -->
-  <Button variant="outline" size="sm" class="h-7 text-xs" on:click={handleExport}>
+  <Button variant="secondary" size="sm" class="h-7 text-xs" on:click={handleExport}>
     Export
   </Button>
 </div>

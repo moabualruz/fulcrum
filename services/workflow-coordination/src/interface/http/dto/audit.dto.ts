@@ -5,6 +5,7 @@ export class AuditListQueryDto {
   kind?: string;
   subjectId?: string;
   verb?: string;
+  traceId?: string;
   since?: string;
   until?: string;
   limit?: number | string;

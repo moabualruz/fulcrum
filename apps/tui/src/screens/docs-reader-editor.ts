@@ -1,5 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { QuitConfirmation } from "../quit-confirmation.ts";
 import type { TuiDocScope, TuiDocType } from "./docs-types.ts";
 
 export interface DocsReaderEditorDoc {
@@ -78,6 +79,7 @@ export class DocsReaderEditorScreen {
   private collaborationStates: DocsReaderCollaborationState[] = [];
   private mode: Mode = "reader";
   private bodyBuffer = "";
+  private readonly quitConfirmation = new QuitConfirmation();
 
   constructor(private readonly opts: DocsReaderEditorScreenOptions) {}
 
@@ -127,7 +129,20 @@ export class DocsReaderEditorScreen {
       return true;
     }
 
+    const quitAnswer = this.quitConfirmation.answer(key);
+    if (quitAnswer === "stay" || quitAnswer === "confirm") return true;
+    if (quitAnswer === "quit") {
+      this.mode = "reader";
+      this.bodyBuffer = this.doc.body;
+      return true;
+    }
+
     if (this.mode === "editor" && (key === "q" || key === "\x1b")) {
+      const decision = this.quitConfirmation.request(
+        this.hasUnsavedEdits,
+        "Discard document draft changes.",
+      );
+      if (decision === "confirm") return true;
       this.mode = "reader";
       return true;
     }
@@ -144,6 +159,7 @@ export class DocsReaderEditorScreen {
       });
       this.doc = { ...this.doc, body: this.bodyBuffer };
       this.mode = "reader";
+      this.quitConfirmation.clear();
       return true;
     }
 
@@ -158,6 +174,14 @@ export class DocsReaderEditorScreen {
     return this.bodyBuffer;
   }
 
+  get hasUnsavedEdits(): boolean {
+    return this.mode === "editor" && this.doc !== null && this.bodyBuffer !== this.doc.body;
+  }
+
+  get quitConfirmationMessage(): string | null {
+    return this.quitConfirmation.message;
+  }
+
   private renderEditor(renderer: Renderer, doc: DocsReaderEditorDoc): void {
     renderer.writeln(`  title: ${doc.title}`);
     renderer.writeln(`  docType: ${doc.docType}`);
@@ -167,6 +191,11 @@ export class DocsReaderEditorScreen {
     renderer.writeln("  ---");
     for (const line of this.bodyBuffer.split("\n")) renderer.writeln(`  ${line}`);
     renderer.writeln();
+    if (this.quitConfirmation.message) {
+      renderer.writeln(c.yellow(`  ${this.quitConfirmation.message}`));
+      renderer.writeln(c.dim(`  ${this.quitConfirmation.hint ?? ""}`));
+      renderer.writeln();
+    }
     renderer.writeln(c.dim("  Ctrl+S save  q cancel"));
   }
 

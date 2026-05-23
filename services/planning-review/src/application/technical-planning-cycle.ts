@@ -42,6 +42,23 @@ export interface TechnicalPlanningTaskSeed {
   success?: string;
 }
 
+export interface TechnicalPlanningResearchQuestion {
+  id?: string;
+  question: string;
+  limit: string;
+  conclusion?: string;
+  sourceIds?: string[];
+}
+
+export interface TechnicalPlanningResearchArtifact {
+  id: string;
+  question: string;
+  limit: string;
+  conclusion: string;
+  sourceIds: string[];
+  status: "recorded" | "assumption_recorded";
+}
+
 export interface BuildTechnicalPlanningCycleDraftInput {
   source: TechnicalPlanningCycleSource;
   userPrompt: string;
@@ -54,6 +71,7 @@ export interface BuildTechnicalPlanningCycleDraftInput {
   boilerplatePaths?: string[];
   successCriteria?: string[];
   taskSeeds?: TechnicalPlanningTaskSeed[];
+  researchQuestions?: TechnicalPlanningResearchQuestion[];
 }
 
 export interface GenerateTechnicalPlanningCycleInput
@@ -72,6 +90,7 @@ export interface TechnicalPlanningCyclePlan {
   prototypePaths: string[];
   boilerplatePaths: string[];
   sourceDocRefs: Array<{ kind: "doc"; id: string }>;
+  researchArtifactIds?: string[];
 }
 
 export interface TechnicalPlanningCycleDraft {
@@ -80,6 +99,7 @@ export interface TechnicalPlanningCycleDraft {
   prompt: string;
   reviewPrompt: string;
   plan: TechnicalPlanningCyclePlan;
+  researchArtifacts?: TechnicalPlanningResearchArtifact[];
   artifactPreviews: PlanningArtifactPreview[];
   breakdown: ApprovedPlanBreakdown;
 }
@@ -128,6 +148,7 @@ export function buildTechnicalPlanningCycleDraft(
   const boilerplatePaths = normalizePaths(input.boilerplatePaths, DEFAULT_BOILERPLATE_PATHS);
   const successCriteria = normalizeTextList(input.successCriteria, DEFAULT_SUCCESS_CRITERIA);
   const taskSeeds = normalizeTaskSeeds(input.taskSeeds);
+  const researchArtifacts = buildResearchArtifacts(input.researchQuestions);
   const markdown = buildPlanMarkdown({
     title,
     input,
@@ -136,6 +157,7 @@ export function buildTechnicalPlanningCycleDraft(
     boilerplatePaths,
     successCriteria,
     taskSeeds,
+    researchArtifacts,
   });
   const breakdown = buildApprovedPlanBreakdown({
     planId,
@@ -162,7 +184,9 @@ export function buildTechnicalPlanningCycleDraft(
       prototypePaths,
       boilerplatePaths,
       sourceDocRefs: [...input.context.sourceRefs],
+      researchArtifactIds: researchArtifacts.map((artifact) => artifact.id),
     },
+    researchArtifacts,
     artifactPreviews,
     breakdown,
   };
@@ -201,6 +225,7 @@ export async function generateTechnicalPlanningCycle(
       prototypePaths: draft.plan.prototypePaths,
       boilerplatePaths: draft.plan.boilerplatePaths,
       artifactPreviewIds: draft.artifactPreviews.map((preview) => preview.id),
+      researchArtifactIds: (draft.researchArtifacts ?? []).map((artifact) => artifact.id),
       taskClientKeys: draft.breakdown.taskDrafts.map((task) => task.clientKey),
     },
   });
@@ -220,6 +245,7 @@ function buildPlanMarkdown(input: {
   boilerplatePaths: string[];
   successCriteria: string[];
   taskSeeds: TechnicalPlanningTaskSeed[];
+  researchArtifacts: TechnicalPlanningResearchArtifact[];
 }): string {
   const lines = [
     `# ${input.title}`,
@@ -230,6 +256,14 @@ function buildPlanMarkdown(input: {
     ...input.input.context.sourceRefs.map((ref) => `- Source doc: ${ref.id}`),
     "",
     input.input.context.contextMarkdown,
+    "",
+    "## Bounded Research",
+    ...researchArtifactLines(input.researchArtifacts),
+    "",
+    "## Decision Inputs",
+    input.researchArtifacts.length > 0
+      ? `- Cite research artifacts before plan decisions: ${input.researchArtifacts.map((artifact) => artifact.id).join(", ")}`
+      : "- No research artifacts requested. Record assumptions before approval if decisions need external facts.",
     "",
     "## Prototype / Boilerplate",
     ...artifactLines("prototype", input.prototypePaths),
@@ -249,6 +283,18 @@ function artifactLines(kind: ApprovedPlanArtifactKind, paths: string[]): string[
   return paths.map((path) => `- [${kind}] ${path}`);
 }
 
+function researchArtifactLines(artifacts: TechnicalPlanningResearchArtifact[]): string[] {
+  if (artifacts.length === 0) return ["- No bounded research requested."];
+  return artifacts.flatMap((artifact) => [
+    `- [research] ${artifact.id}`,
+    `  Question: ${artifact.question}`,
+    `  Limit: ${artifact.limit}`,
+    `  Status: ${artifact.status}`,
+    `  Conclusion: ${artifact.conclusion}`,
+    `  Sources: ${artifact.sourceIds.length ? artifact.sourceIds.join(", ") : "assumption"}`,
+  ]);
+}
+
 function taskLines(seed: TechnicalPlanningTaskSeed): string[] {
   return [
     `- [${seed.clientKey}] ${seed.title}`,
@@ -258,11 +304,18 @@ function taskLines(seed: TechnicalPlanningTaskSeed): string[] {
 }
 
 function buildGenerationPrompt(input: BuildTechnicalPlanningCycleDraftInput, traceId?: string): string {
+  const researchLines = buildResearchArtifacts(input.researchQuestions).flatMap((artifact) => [
+    `Research artifact ${artifact.id}: ${artifact.question}`,
+    `Limit: ${artifact.limit}`,
+    `Conclusion: ${artifact.conclusion}`,
+  ]);
   return [
     input.userPrompt.trim(),
     "",
     "Generate a technical plan with prototype and boilerplate artifacts before task execution.",
+    "Persist bounded research conclusions as artifact ids before making implementation decisions.",
     traceId ? `Trace ID: ${traceId}` : null,
+    ...researchLines,
     input.context.contextMarkdown,
   ].filter((line): line is string => line !== null).join("\n");
 }
@@ -282,6 +335,35 @@ function buildReviewPrompt(input: {
     "",
     input.markdown,
   ].filter((line): line is string => line !== null).join("\n");
+}
+
+function buildResearchArtifacts(questions?: TechnicalPlanningResearchQuestion[]): TechnicalPlanningResearchArtifact[] {
+  return normalizeResearchQuestions(questions).map((item, index) => {
+    const id = item.id ?? stableId(`research-${index + 1}`, item.question, item.limit);
+    const sourceIds = normalizeTextList(item.sourceIds, []);
+    const conclusion = item.conclusion?.trim() ||
+      `Assumption recorded because no research provider is configured for: ${item.question}`;
+    return {
+      id,
+      question: item.question,
+      limit: item.limit,
+      conclusion,
+      sourceIds,
+      status: item.conclusion?.trim() ? "recorded" : "assumption_recorded",
+    };
+  });
+}
+
+function normalizeResearchQuestions(questions?: TechnicalPlanningResearchQuestion[]): TechnicalPlanningResearchQuestion[] {
+  return (questions ?? [])
+    .map((question) => ({
+      id: question.id?.trim() || undefined,
+      question: question.question.trim(),
+      limit: question.limit.trim(),
+      conclusion: question.conclusion?.trim() || undefined,
+      sourceIds: normalizeTextList(question.sourceIds, []),
+    }))
+    .filter((question) => question.question.length > 0 && question.limit.length > 0);
 }
 
 function normalizeTaskSeeds(seeds?: TechnicalPlanningTaskSeed[]): TechnicalPlanningTaskSeed[] {

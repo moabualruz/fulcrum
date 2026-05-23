@@ -4,7 +4,7 @@ import {
   WORKFLOW_UAT_FIXTURE,
   assertWorkflowContractFixtureIntegrity,
   workflowFixtureIds,
-} from "./workflow-fixture.ts";
+} from "@fulcrum/test-fixtures";
 
 describe("client workflow UAT fixture", () => {
   test("declares one shared Agent OS work cycle spine for every client", () => {

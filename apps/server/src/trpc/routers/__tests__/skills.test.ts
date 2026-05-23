@@ -118,7 +118,7 @@ describe("skills tRPC router", () => {
     const stored = await em.findOneOrFail(FulcrumSkill, { where: { org: { id: DEFAULT_ORG_ID }, slug: "demo-skill" } });
     stored.source = SkillSource.Upstream;
     stored.upstreamRepo = upstreamDir;
-    /* flushed */
+    await em.save(stored);
 
     const upgraded = await caller.fulcrum_skills.upgrade({ slug: "demo-skill" });
     expect(upgraded.map((skill) => skill.slug)).toEqual(["demo-skill"]);
@@ -126,6 +126,8 @@ describe("skills tRPC router", () => {
 
     await writeFile(join(home, ".claude", "skills", "demo-skill", "SKILL.md"), SKILL_V1, "utf8");
     const syncResult = await caller.fulcrum_skills.sync({ fetchUpstream: true });
+    expect(syncResult.ok).toBe(true);
+    expect(typeof syncResult.trace_id).toBe("string");
     expect(syncResult.conflicts).toEqual(["demo-skill"]);
     // upstream_conflict may be undefined (replaced by SkillConflict entity in 04-05)
     if ((await readSkillsLockFile())["demo-skill"]?.upstream_conflict) {

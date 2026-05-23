@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * ShortcutHelpOverlay — task workflow (D-68).
+   * ShortcutHelpOverlay: task workflow (D-68).
    *
    * Opened with the `?` key. Shows all keyboard shortcuts in a
    * two-column grouped layout. Closes on Esc or backdrop click.
    */
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     open: boolean;
@@ -75,6 +75,7 @@
     role="dialog"
     aria-modal="true"
     aria-label="Keyboard shortcuts"
+    tabindex="-1"
     data-testid="keyboard-help-overlay"
     class={cn("fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4")}
     onclick={handleBackdrop}

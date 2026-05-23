@@ -20,17 +20,29 @@ interface PublicDocument {
 }
 
 export const load: PageServerLoad = async (event) => {
-  const rows = (await createDocumentApiForEvent(event).docs.list() as PublicDocument[])
-    .filter((doc) => (doc.projectId ?? doc.project_id ?? null) === null);
-  const flat: FlatDoc[] = rows.map((doc) => ({
-    id: doc.id,
-    title: doc.title,
-    kind: typeof doc.frontmatter?.kind === "string" ? doc.frontmatter.kind : doc.docType ?? doc.type ?? "note",
-    parent_id: doc.parentId ?? doc.parent_id ?? null,
-    sort_order: doc.sortOrder ?? doc.sort_order ?? 0,
-    updated_at: doc.updatedAt ?? doc.updated_at ?? "",
-  }));
-  return { tree: buildDocTree(flat) };
+  try {
+    const rows = (await createDocumentApiForEvent(event).docs.list() as PublicDocument[])
+      .filter((doc) => (doc.projectId ?? doc.project_id ?? null) === null);
+    const flat: FlatDoc[] = rows.map((doc) => ({
+      id: doc.id,
+      title: doc.title,
+      kind: typeof doc.frontmatter?.kind === "string" ? doc.frontmatter.kind : doc.docType ?? doc.type ?? "note",
+      parent_id: doc.parentId ?? doc.parent_id ?? null,
+      sort_order: doc.sortOrder ?? doc.sort_order ?? 0,
+      updated_at: doc.updatedAt ?? doc.updated_at ?? "",
+    }));
+    return { tree: buildDocTree(flat), error: null as null };
+  } catch (err) {
+    console.error("docs:global list failed", err);
+    return {
+      tree: [] as ReturnType<typeof buildDocTree>,
+      error: {
+        message: "Global documents could not load.",
+        recovery: "Retry after the local API is reachable.",
+        traceId: "docs-global",
+      },
+    };
+  }
 };
 
 export const actions: Actions = {

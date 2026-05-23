@@ -104,8 +104,8 @@ describe("mirror-policy: lockfile subpath_sha256 integrity", () => {
     }
   });
 
-  test("entry with malformed hash (not 64 hex chars) is rejected at load time: subpath_sha256 is just a field — the loader stores it without validating format", async () => {
-    // The loader does NOT validate sha256 format (by design — it's checked against
+  test("entry with malformed hash (not 64 hex chars) is rejected at load time: subpath_sha256 is just a field: the loader stores it without validating format", async () => {
+    // The loader does NOT validate sha256 format (by design: it's checked against
     // the live computed hash during sync). This test documents that behavior.
     const lockPath = await writeLock(
       LOCK_HEADER +
@@ -229,7 +229,7 @@ describe("mirror-policy: syncUpstreamSkills copies to all agent paths", () => {
       logSpy.mockRestore();
     }
 
-    // Third-party skills land at the vendor's own placement convention —
+    // Third-party skills land at the vendor's own placement convention -
     // <agent>/skills/<name>/ for everyone (Gemini included; vendor's per-
     // platform installer also writes to ~/.gemini/skills/<name>/). Fulcrum
     // does not own a namespace for skills it didn't author.

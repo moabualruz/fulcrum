@@ -15,10 +15,22 @@ const ROWS: RunRow[] = [
     model: "opus",
     status: "succeeded",
     project_id: "p1",
+    task_id: "task-1",
+    task_title: "Ship run feed",
     started_at: "2026-04-30T10:00:00Z",
     ended_at: "2026-04-30T10:30:00Z",
     sandbox_mode: null,
     iteration_count: null,
+    last_event_at: "2026-04-30T10:20:00Z",
+    recent_events: [
+      {
+        id: "event-1",
+        verb: "run.succeeded",
+        actor: "system",
+        created_at: "2026-04-30T10:20:00Z",
+        payload: { summary: "Run completed" },
+      },
+    ],
   },
   {
     id: "r2",
@@ -26,10 +38,14 @@ const ROWS: RunRow[] = [
     model: null,
     status: "running",
     project_id: null,
+    task_id: "task-2",
+    task_title: "Review blockers",
     started_at: "2026-04-30T11:00:00Z",
     ended_at: null,
     sandbox_mode: "strict",
     iteration_count: 3,
+    last_event_at: null,
+    recent_events: [],
   },
   {
     id: "r3",
@@ -37,10 +53,22 @@ const ROWS: RunRow[] = [
     model: "sonnet",
     status: "failed",
     project_id: "p2",
+    task_id: null,
+    task_title: null,
     started_at: "2026-04-30T09:00:00Z",
     ended_at: "2026-04-30T09:05:00Z",
     sandbox_mode: null,
     iteration_count: null,
+    last_event_at: "2026-04-30T09:05:00Z",
+    recent_events: [
+      {
+        id: "event-2",
+        verb: "run.failed",
+        actor: "codex",
+        created_at: "2026-04-30T09:05:00Z",
+        payload: { reason: "lint failed" },
+      },
+    ],
   },
 ];
 
@@ -58,9 +86,11 @@ describe("RunsTable component (SSR)", () => {
 
   test("renders header buttons with data-runs-sort for each column", () => {
     const { body } = render(RunsTable, { props: { rows: ROWS } });
-    for (const col of ["agent", "model", "status", "sandbox_mode", "iteration_count", "started_at", "duration"]) {
+    for (const col of ["task_title", "model", "status", "agent", "last_event_at", "started_at", "duration"]) {
       expect(body).toContain(`data-runs-sort="${col}"`);
     }
+    expect(body).toContain("Run");
+    expect(body).toContain("Events");
   });
 
   test("renders three rows in passed order when no sort applied", () => {
@@ -106,5 +136,17 @@ describe("RunsTable component (SSR)", () => {
       const re = new RegExp(`data-runs-row-link[^>]*href="/runs/${row.id}"`);
       expect(body).toMatch(re);
     }
+  });
+
+  test("renders task labels, last event timestamps, and inline event timelines", () => {
+    const { body } = render(RunsTable, { props: { rows: ROWS } });
+    expect(body).toContain("data-run-task-cell");
+    expect(body).toContain("Ship run feed");
+    expect(body).toContain("data-run-last-event-at");
+    expect(body).toContain("2026-04-30 10:20");
+    expect(body).toContain('data-run-event-timeline="r1"');
+    expect(body).toContain("run.succeeded");
+    expect(body).toContain("Run completed");
+    expect(body).toContain("No events recorded.");
   });
 });

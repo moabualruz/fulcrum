@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     current: number;
@@ -23,7 +23,7 @@
   data-current={current}
   data-limit={limit}
   class={cn("text-xs tabular-nums", color)}
-  title={`WIP limit: ${current} / ${limit}`}
+  title={`Active work limit: ${current} / ${limit}`}
 >
   {current}/{limit}
 </span>

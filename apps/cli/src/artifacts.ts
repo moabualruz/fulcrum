@@ -1,5 +1,5 @@
 /**
- * CLI: `fulcrum artifacts <verb>` — thin wrappers over the artifact caller.
+ * CLI: `fulcrum artifacts <verb>`: thin wrappers over the artifact caller.
  * All verbs support --json for machine-parseable output.
  */
 
@@ -112,7 +112,7 @@ export function parseArtifactsArgs(argv: readonly string[]): ParsedArtifactsArgs
 
 // --- Help ---
 
-export const ARTIFACTS_HELP = `fulcrum artifacts — manage artifacts
+export const ARTIFACTS_HELP = `fulcrum artifacts: manage artifacts
 
 Usage:
   fulcrum artifacts list [--project-id <id>] [--run-id <id>] [--task-id <id>]
@@ -352,7 +352,7 @@ export async function run(argv: readonly string[], client: ArtifactsClient): Pro
             console.log(`${c.id}\t${c.filename}\t${c.sizeBytes}B`);
           }
           console.log(`total: ${result.totalCount} files, ${result.totalBytes} bytes`);
-          if (dryRun) console.log("(dry run — no files pruned)");
+          if (dryRun) console.log("(dry run: no files pruned)");
         }
       });
       return;

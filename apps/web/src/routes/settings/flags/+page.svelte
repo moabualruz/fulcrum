@@ -26,6 +26,12 @@
     </p>
   {/if}
 
+  {#if data.loadError}
+    <p data-flags-route-error class="rounded-md border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900">
+      {data.loadError}
+    </p>
+  {/if}
+
   <section aria-label="Registered feature flags" class="overflow-x-auto rounded-md border border-border">
     <table data-flags-table class="w-full min-w-[680px] text-sm">
       <thead class="border-b border-border bg-muted/50">

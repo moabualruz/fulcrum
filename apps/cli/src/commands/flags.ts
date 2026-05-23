@@ -2,10 +2,10 @@ import { formatCommandError } from "../api-errors.ts";
 import {
   createFeatureExperimentApiCallerFromEnv,
   type FeatureExperimentApiEnvironment,
-} from "@platform-core/interface/http/feature-experiment-api-client.ts";
+} from "@feature-flags/interface/http/feature-experiment-api-client.ts";
 
 /**
- * fulcrum flags — feature-flag CLI subcommands.
+ * fulcrum flags: feature-flag CLI subcommands.
  *
  * Commands:
  *   fulcrum flags list [--json]
@@ -74,7 +74,7 @@ Options:
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// run — entry-point for `fulcrum flags <subcommand> [args]`
+// run: entry-point for `fulcrum flags <subcommand> [args]`
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function run(
@@ -189,7 +189,7 @@ async function runSet(
   }
 
   if (valueStr && valueStr !== "on" && valueStr !== "off") {
-    printErr(`fulcrum flags set: invalid value '${valueStr}' — must be 'on' or 'off'`);
+    printErr(`fulcrum flags set: invalid value '${valueStr}': must be 'on' or 'off'`);
     exit(1);
     return;
   }

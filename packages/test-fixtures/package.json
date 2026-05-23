@@ -1,0 +1,21 @@
+{
+	"name": "@fulcrum/test-fixtures",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"build": "bun run --bun tsc -p tsconfig.json --noEmit",
+		"test": "bun test src"
+	},
+	"dependencies": {
+		"@faker-js/faker": "10.4.0",
+		"fishery": "2.4.0",
+		"zod": "4.4.2"
+	},
+	"devDependencies": {
+		"typescript": "^5.6.0"
+	}
+}

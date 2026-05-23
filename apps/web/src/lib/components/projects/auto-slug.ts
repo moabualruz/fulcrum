@@ -8,7 +8,7 @@ import { slugify } from "$lib/util/slugify";
  * `slugify`. If they have, leave whatever value they typed alone.
  *
  * Pulled out of `ProjectForm.svelte` so it can be unit-tested without an
- * SSR/DOM harness — the component delegates to this on every name keystroke.
+ * SSR/DOM harness: the component delegates to this on every name keystroke.
  */
 export function deriveAutoSlug(
   name: string,

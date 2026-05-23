@@ -24,8 +24,8 @@ type ProductCaller = {
   };
   sprints?: {
     list(input?: Record<string, unknown>): Promise<unknown[]>;
-    start?(input: { id: string }): Promise<unknown>;
-    close?(input: Record<string, unknown>): Promise<unknown>;
+    start(input: { id: string }): Promise<unknown>;
+    close(input: Record<string, unknown>): Promise<unknown>;
   };
   search?: { query(input: Record<string, unknown>): Promise<unknown[]> };
   context?: { assemble?(input: Record<string, unknown>): Promise<unknown> };
@@ -78,7 +78,7 @@ Usage:
   fulcrum product init [--json]
   fulcrum product projects list [--json] [--limit <N>]
   fulcrum product tasks create --title <T> --project <P> [--json]
-  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--json]
+  fulcrum product tasks list [--status <S>] [--assignee <A>] [--project <P>] [--limit <N>] [--offset <N>] [--json]
   fulcrum product tasks workbench [--project <P>] [--trace <T>] [--view <board|list|table>] [--status <S>] [--state-group <G>] [--labels <L1,L2>] [--assignee <A>] [--cycle <C>] [--module <M>] [--task-type <T>] [--priority <N>] [--search <text>] [--json]
   fulcrum product tasks update <id> --status <S> [--json]
   fulcrum product tasks bulk <id,id,...> --status <S> [--json]
@@ -93,7 +93,7 @@ Usage:
   fulcrum product sprints list --project <P> [--json]
   fulcrum product sprints activate <id> [--json]
   fulcrum product sprints complete <id> [--json]
-  fulcrum product search <query> [--org-slug <slug>] [--kind <kind>] [--limit <N>] [--json]
+  fulcrum product search <query> [--org-slug <slug>] [--kind <kind>] [--limit <N>] [--offset <N>] [--json]
   fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
   fulcrum product reports final-qa --project <id> [--trace <id>] [--json]
   fulcrum product reports final-qa-gate --project <id> [--trace <id>] [--worker <id>] [--reviewer-agent <A>] [--feedback-agent <A>] [--feedback-model <M>] [--max-iterations <N>] [--cwd <path>] [--copy-to-worktree <path,path,...>] [--json]
@@ -105,10 +105,11 @@ Usage:
   fulcrum product reports review-session save --project <id> --diff-file <path> [--annotations-file <path>] [--trace <id>] [--review <id>] [--type <plan|uat|code_review>] [--title <text>] [--search <query>] [--json]
   fulcrum product reports review-session load --project <id> [--review <id>|--trace <id>] [--search <query>] [--selected-file <path>] [--viewed-files <path,path,...>] [--hide-viewed] [--json]
   fulcrum product reports review-session annotate --project <id> --file <path> --line-start <N> --line-end <N> [--review <id>|--trace <id>] [--annotation <id>] [--type <comment|suggestion|concern>] [--scope <line|file>] [--side <old|new>] [--text <text>] [--suggested-code <code>] [--original-code <code>] [--severity <important|nit|pre_existing>] [--decorations <blocking,non-blocking,if-minor>] [--search <query>] [--json]
-  fulcrum product planning freeform-start --title <text> --body <markdown> --prompt <text> [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--json]
-  fulcrum product planning guided-acp-start --agent <A> --cwd <path> --prompt <text> [--template <id>] [--source-docs <ids>] [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--permission <review_each_tool|allow_workspace|read_only>] [--json]
-  fulcrum product planning continuous-update --trigger <manual_doc_edit|acp_session_update> --prompt <text> [--doc <id>] [--title <text>] [--body <markdown>] [--source-docs <ids>] [--tasks <ids>] [--project <id>] [--trace <id>] [--acp-session <id>] [--mode <id>] [--model <id>] [--json]
-  fulcrum product planning generate --source <freeform_docs|guided_acp|continuous_update> --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--plan <id>] [--review <id>] [--prototype-paths <paths>] [--boilerplate-paths <paths>] [--criteria <text,...>] [--json]
+  AI Assist planning:
+  fulcrum product planning freeform-start --title <text> --body <markdown> --prompt <text> [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--json]
+  fulcrum product planning guided-ai-assist-start --agent <A> --cwd <path> --prompt <text> [--template <id>] [--source-docs <ids>] [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--permission <review_each_tool|allow_workspace|read_only>] [--json]
+  fulcrum product planning continuous-update --trigger <manual_doc_edit|ai_assist_session_update> --prompt <text> [--doc <id>] [--title <text>] [--body <markdown>] [--source-docs <ids>] [--tasks <ids>] [--project <id>] [--trace <id>] [--ai-assist-session <id>] [--mode <id>] [--model <id>] [--json]
+  fulcrum product planning generate --source <freeform_docs|guided_ai_assist|continuous_update> --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--plan <id>] [--review <id>] [--prototype-paths <paths>] [--boilerplate-paths <paths>] [--criteria <text,...>] [--json]
   fulcrum product planning freeform-prompt --prompt <text> [--source-docs <ids>] [--project <id>] [--trace <id>] [--json]
   fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
   fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
@@ -124,8 +125,9 @@ const VALUE_FLAGS = new Set<string>([
   "--assignee",
   "--agent",
   "--annotation",
-  "--annotations-file",
-  "--acp-session",
+	"--annotations-file",
+	"--acp-session",
+	"--ai-assist-session",
   "--author",
   "--baseline",
   "--body",
@@ -157,6 +159,7 @@ const VALUE_FLAGS = new Set<string>([
   "--module",
   "--org-slug",
   "--original-code",
+  "--offset",
   "--plan",
   "--prompt",
   "--prototype-paths",
@@ -307,7 +310,7 @@ async function runInit(argv: readonly string[], io: Io): Promise<void> {
 async function runProjects(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
   const [sub, ...rest] = argv;
   if (sub !== "list") return usage(io, `fulcrum product projects: unknown verb '${sub ?? ""}'`);
-  printValue(await caller.projects?.list({ limit: numberFlag(rest, "--limit") }) ?? [], rest, io.print);
+  printValue(await requireProjects(caller).list({ limit: numberFlag(rest, "--limit") }), rest, io.print);
 }
 
 async function runTasks(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
@@ -323,6 +326,8 @@ async function runTasks(caller: ProductCaller, argv: readonly string[], io: Io):
         projectId: flagValue(rest, "--project"),
         status: flagValue(rest, "--status"),
         assigneeId: flagValue(rest, "--assignee"),
+        limit: numberFlag(rest, "--limit"),
+        offset: numberFlag(rest, "--offset"),
       });
       return printValue(Array.isArray(result) ? result : result.data ?? [], rest, io.print);
     }
@@ -389,16 +394,16 @@ async function runSprints(caller: ProductCaller, argv: readonly string[], io: Io
   const [sub, ...rest] = argv;
   switch (sub) {
     case "list":
-      return printValue(await caller.sprints?.list({ projectId: flagValue(rest, "--project") }) ?? [], rest, io.print);
+      return printValue(await requireSprints(caller).list({ projectId: requiredFlag(rest, "--project") }), rest, io.print);
     case "activate": {
       const id = firstArg(rest);
       if (!id) return usage(io, "usage: fulcrum product sprints activate <id>");
-      return printValue(await caller.sprints?.start?.({ id }) ?? { id, status: "active" }, rest, io.print);
+      return printValue(await requireSprints(caller).start({ id }), rest, io.print);
     }
     case "complete": {
       const id = firstArg(rest);
       if (!id) return usage(io, "usage: fulcrum product sprints complete <id>");
-      return printValue(await caller.sprints?.close?.({ id, unfinishedDisposition: "backlog" }) ?? { id, status: "completed" }, rest, io.print);
+      return printValue(await requireSprints(caller).close({ id, unfinishedDisposition: "backlog" }), rest, io.print);
     }
     default:
       return usage(io, `fulcrum product sprints: unknown verb '${sub ?? ""}'`);
@@ -412,6 +417,7 @@ async function runSearch(caller: ProductCaller, argv: readonly string[], io: Io)
     query,
     kind: flagValue(argv, "--kind"),
     limit: numberFlag(argv, "--limit") ?? 25,
+    offset: numberFlag(argv, "--offset"),
   }) ?? [], argv, io.print);
 }
 
@@ -517,6 +523,14 @@ async function runReview(caller: ProductCaller, argv: readonly string[], io: Io)
   }
 }
 
+/**
+ * `fulcrum product planning …`: the Plan-stage commands' documented aliases.
+ *
+ * The canonical Plan-stage grammar is `fulcrum plan|mission|prototype <verb>`
+ * (`CLI-TUI-UX.md` §1.2, `apps/cli/src/commands/plan-stage.ts`). These
+ * `product planning …` verbs are kept working unchanged as compatibility
+ * aliases per migration-strategy.md: no Plan command name is removed.
+ */
 async function runPlanning(caller: ProductCaller, argv: readonly string[], io: Io): Promise<void> {
   const [sub, ...rest] = argv;
   switch (sub) {
@@ -525,9 +539,10 @@ async function runPlanning(caller: ProductCaller, argv: readonly string[], io: I
       if (!start) throw new Error("planning freeform start caller is not configured");
       return printValue(await start(freeformStartInput(rest)), rest, io.print);
     }
-    case "guided-acp-start": {
+		case "guided-ai-assist-start":
+		case "guided-acp-start": {
       const start = requirePlanning(caller).startGuidedAcpPlanningSession;
-      if (!start) throw new Error("planning guided ACP start caller is not configured");
+      if (!start) throw new Error("planning AI Assist session start caller is not configured");
       return printValue(await start(guidedAcpStartInput(rest)), rest, io.print);
     }
     case "freeform-prompt": {
@@ -563,7 +578,7 @@ async function resolveCaller(opts: ProductRunOptions): Promise<{ caller: Product
   if (opts.caller) return { caller: opts.caller, cleanup: async () => {} };
   const publicCaller = createProductPublicApiCaller(opts.env, opts.fetch);
   if (publicCaller) return { caller: publicCaller, cleanup: async () => {} };
-  throw new Error("Product API caller is not configured");
+  throw new Error(productApiConfigError(opts.env));
 }
 
 function createProductPublicApiCaller(
@@ -607,9 +622,9 @@ function createProductPublicApiCaller(
   if (sprintApi) {
     caller.sprints = {
       list: async (input?: Record<string, unknown>) => await sprintApi.sprints.list(input) as unknown[],
-      start: async (input: { id: string }) => await sprintApi.sprints.update({ id: input.id, status: "active" }),
+      start: async (input: { id: string }) => await sprintApi.sprints.start({ id: input.id }),
       close: async (input: Record<string, unknown>) =>
-        await sprintApi.sprints.update({ ...input, id: String(input["id"]), status: "completed" }),
+        await sprintApi.sprints.close({ ...input, id: String(input["id"]) }),
     };
   }
 
@@ -643,9 +658,21 @@ function createProductPublicApiCaller(
   return Object.keys(caller).length > 0 ? caller : null;
 }
 
+function requireProjects(caller: ProductCaller): NonNullable<ProductCaller["projects"]> {
+  if (!caller.projects) {
+    throw new Error("projects caller is not configured; missing FULCRUM_ORG_ID for project API commands");
+  }
+  return caller.projects;
+}
+
 function requireTasks(caller: ProductCaller): NonNullable<ProductCaller["tasks"]> {
   if (!caller.tasks) throw new Error("tasks caller is not configured");
   return caller.tasks;
+}
+
+function requireSprints(caller: ProductCaller): NonNullable<ProductCaller["sprints"]> {
+  if (!caller.sprints) throw new Error("sprints caller is not configured");
+  return caller.sprints;
 }
 
 function requirePlanning(caller: ProductCaller): NonNullable<ProductCaller["planning"]> {
@@ -696,7 +723,7 @@ function freeformStartInput(argv: readonly string[]): Record<string, unknown> {
     projectId: flagValue(argv, "--project"),
     parentId: flagValue(argv, "--parent-doc"),
     traceId: flagValue(argv, "--trace"),
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     modeId: flagValue(argv, "--mode"),
     modelId: flagValue(argv, "--model"),
     maxDocChars: numberFlag(argv, "--max-doc-chars"),
@@ -714,7 +741,7 @@ function guidedAcpStartInput(argv: readonly string[]): Record<string, unknown> {
     throw new Error("--permission must be review_each_tool, allow_workspace, or read_only");
   }
   return compact({
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     agentName: requiredFlag(argv, "--agent"),
     cwd: requiredFlag(argv, "--cwd"),
     userPrompt: requiredFlag(argv, "--prompt"),
@@ -740,9 +767,9 @@ function freeformPlanningInput(argv: readonly string[]): Record<string, unknown>
 }
 
 function continuousUpdateInput(argv: readonly string[]): Record<string, unknown> {
-  const trigger = requiredFlag(argv, "--trigger");
-  if (trigger !== "manual_doc_edit" && trigger !== "acp_session_update") {
-    throw new Error("--trigger must be manual_doc_edit or acp_session_update");
+  const trigger = planningUpdateTrigger(argv);
+  if (!trigger) {
+    throw new Error("--trigger must be manual_doc_edit or ai_assist_session_update");
   }
   const changedDoc = compact({
     id: flagValue(argv, "--doc"),
@@ -758,7 +785,7 @@ function continuousUpdateInput(argv: readonly string[]): Record<string, unknown>
     changedDocs,
     projectId: flagValue(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
-    acpSessionId: flagValue(argv, "--acp-session"),
+    acpSessionId: aiAssistSessionFlag(argv),
     modeId: flagValue(argv, "--mode"),
     modelId: flagValue(argv, "--model"),
     maxDocChars: numberFlag(argv, "--max-doc-chars"),
@@ -766,9 +793,9 @@ function continuousUpdateInput(argv: readonly string[]): Record<string, unknown>
 }
 
 function technicalPlanningInput(argv: readonly string[]): Record<string, unknown> {
-  const source = requiredFlag(argv, "--source");
-  if (source !== "freeform_docs" && source !== "guided_acp" && source !== "continuous_update") {
-    throw new Error("--source must be freeform_docs, guided_acp, or continuous_update");
+  const source = technicalPlanningSource(argv);
+  if (!source) {
+    throw new Error("--source must be freeform_docs, guided_ai_assist, or continuous_update");
   }
   return compact({
     source,
@@ -892,25 +919,33 @@ function finalQaFeedbackGateInput(argv: readonly string[]): Record<string, unkno
 }
 
 function uatDecisionInput(argv: readonly string[]): Record<string, unknown> {
+  const decision = requiredFlag(argv, "--decision");
+  const reviewType = requiredFlag(argv, "--type");
+  const runner = flagValue(argv, "--runner");
+  assertOneOf("--decision", decision, ["start_uat", "start_code_review", "request_changes", "approve_without_manual_review"]);
+  assertOneOf("--type", reviewType, ["uat", "code_review"]);
+  if (runner) assertOneOf("--runner", runner, ["bun", "playwright"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
-    decision: requiredFlag(argv, "--decision"),
-    reviewType: requiredFlag(argv, "--type"),
+    decision,
+    reviewType,
     feedbackText: flagValue(argv, "--feedback"),
     feedbackAgent: flagValue(argv, "--feedback-agent"),
     feedbackModel: flagValue(argv, "--feedback-model"),
     taskIds: csvFlag(flagValue(argv, "--tasks")),
-    e2eRunner: flagValue(argv, "--runner"),
+    e2eRunner: runner,
   });
 }
 
 function e2eRunInput(argv: readonly string[]): Record<string, unknown> {
+  const runner = flagValue(argv, "--runner");
+  if (runner) assertOneOf("--runner", runner, ["bun", "playwright"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     traceId: flagValue(argv, "--trace"),
     taskIds: csvFlag(flagValue(argv, "--tasks")),
-    runner: flagValue(argv, "--runner"),
+    runner,
     planOnly: argv.includes("--plan-only") ? true : undefined,
   });
 }
@@ -932,10 +967,12 @@ async function reviewWorkbenchInput(argv: readonly string[]): Promise<Record<str
 }
 
 async function reviewWorkbenchSessionSaveInput(argv: readonly string[]): Promise<Record<string, unknown>> {
+  const reviewType = flagValue(argv, "--type");
+  if (reviewType) assertOneOf("--type", reviewType, ["plan", "uat", "code_review"]);
   return compact({
     ...(await reviewWorkbenchInput(argv)),
     projectId: requiredFlag(argv, "--project"),
-    reviewType: flagValue(argv, "--type"),
+    reviewType,
     title: flagValue(argv, "--title"),
   });
 }
@@ -959,21 +996,29 @@ function reviewWorkbenchSessionAnnotateInput(argv: readonly string[]): Record<st
   const reviewId = flagValue(argv, "--review");
   const traceId = flagValue(argv, "--trace");
   if (!reviewId && !traceId) throw new Error("missing required flag --review or --trace");
+  const type = flagValue(argv, "--type");
+  const scope = flagValue(argv, "--scope");
+  const side = flagValue(argv, "--side");
+  const severity = flagValue(argv, "--severity");
+  if (type) assertOneOf("--type", type, ["comment", "suggestion", "concern"]);
+  if (scope) assertOneOf("--scope", scope, ["line", "file"]);
+  if (side) assertOneOf("--side", side, ["old", "new"]);
+  if (severity) assertOneOf("--severity", severity, ["important", "nit", "pre_existing"]);
   return compact({
     projectId: requiredFlag(argv, "--project"),
     reviewId,
     traceId,
     annotationId: flagValue(argv, "--annotation"),
-    type: flagValue(argv, "--type"),
-    scope: flagValue(argv, "--scope"),
+    type,
+    scope,
     filePath: requiredFlag(argv, "--file"),
     lineStart: requiredNumberFlag(argv, "--line-start"),
     lineEnd: requiredNumberFlag(argv, "--line-end"),
-    side: flagValue(argv, "--side"),
+    side,
     text: flagValue(argv, "--text"),
     suggestedCode: flagValue(argv, "--suggested-code"),
     originalCode: flagValue(argv, "--original-code"),
-    severity: flagValue(argv, "--severity"),
+    severity,
     conventionalLabel: flagValue(argv, "--conventional-label"),
     decorations: csvFlag(flagValue(argv, "--decorations")),
     author: flagValue(argv, "--author"),
@@ -1066,6 +1111,24 @@ function flagValue(argv: readonly string[], flag: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function aiAssistSessionFlag(argv: readonly string[]): string | undefined {
+  return flagValue(argv, "--ai-assist-session") ?? flagValue(argv, "--acp-session");
+}
+
+function planningUpdateTrigger(argv: readonly string[]): "manual_doc_edit" | "acp_session_update" | null {
+  const trigger = requiredFlag(argv, "--trigger");
+  if (trigger === "manual_doc_edit") return trigger;
+  if (trigger === "ai_assist_session_update" || trigger === "acp_session_update") return "acp_session_update";
+  return null;
+}
+
+function technicalPlanningSource(argv: readonly string[]): "freeform_docs" | "guided_acp" | "continuous_update" | null {
+  const source = requiredFlag(argv, "--source");
+  if (source === "freeform_docs" || source === "continuous_update") return source;
+  if (source === "guided_ai_assist" || source === "guided_acp") return "guided_acp";
+  return null;
+}
+
 function flagEnabled(argv: readonly string[], flag: string): boolean {
   return parseProductArgs(argv).flags[flag] === true;
 }
@@ -1100,6 +1163,7 @@ async function printSubscriptionEvents(
     try {
       subscription = stream.subscribe({
         next(value) {
+          if (done) return;
           print(JSON.stringify(value));
           if (isInactiveFeedback(value)) finish();
         },
@@ -1137,6 +1201,12 @@ function validateFlags(argv: readonly string[], allowed: ReadonlySet<string>): v
   }
 }
 
+function assertOneOf(flag: string, value: string, allowed: readonly string[]): void {
+  if (!allowed.includes(value)) {
+    throw new Error(`${flag} must be one of: ${allowed.join(", ")}`);
+  }
+}
+
 function compact(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
@@ -1156,5 +1226,19 @@ function isUsageError(error: unknown): boolean {
   return message.startsWith("unknown flag:") ||
     message.startsWith("missing value for flag:") ||
     message.startsWith("flag does not take a value:") ||
-    message.startsWith("missing required flag");
+    message.startsWith("missing required flag") ||
+    message.includes(" must be ");
+}
+
+function productApiConfigError(env: Record<string, string | undefined> | undefined): string {
+  const effective = env ?? process.env;
+  const missing = [];
+  if (!effective["FULCRUM_SERVER_URL"] && !effective["FULCRUM_PUBLIC_API_URL"]) {
+    missing.push("FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL");
+  }
+  return [
+    "Product API caller is not configured",
+    missing.length ? `missing ${missing.join(", ")}` : "no public API clients were created",
+    "run `fulcrum product init --json` for local readiness, then export FULCRUM_SERVER_URL and FULCRUM_ORG_ID",
+  ].join("; ");
 }

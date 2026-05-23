@@ -1,6 +1,6 @@
 # IA-MAP.md — Fulcrum Information Architecture
 
-> Concrete route tree, screen-by-screen scope, keyboard map, ACP drawer behavior. Grounded in `.scratch/design-research/01..07`, `.scratch/prd.jsonl`, [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md).
+> Concrete route tree, screen-by-screen scope, keyboard map, ACP drawer behavior. Grounded in local research dossier, local PRD glossary, [PRODUCT.md](PRODUCT.md), [DESIGN.md](DESIGN.md).
 
 ---
 
@@ -91,6 +91,18 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 /<ws>/global-docs                                         workspace-level docs
 /<ws>/projects                                            project list (Linear-style)
 
+# Docs hub (app surface; lists project + global documents)
+/docs                                                     docs hub: project tree, global tree, kind + text filters, link to /docs/new
+/docs/new                                                 new document form
+/docs/global                                              global docs tree
+/docs/<docId>                                             document viewer
+/docs/<docId>/edit                                        document editor
+/docs/<docId>/history                                     document version history
+/docs/<docId>/planning                                    planning view tied to document
+/ai-assist                                                OD reference route for AI Assist drawer with document planning context
+/plan-session                                             internal design-e2e preview for persistent AI Assist planning sessions, traffic stream inspection, source/session/trace links, reload resume, and missing-ID recovery
+/settings/ai-assist                                      AI Assist checkpoint mode, retention, event transport, and resolution precedence
+
 # System (workspace scope)
 /<ws>/doctor                                              workspace doctor
 /<ws>/settings                                            workspace settings
@@ -117,6 +129,7 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 # Auth
 /auth/login
 /auth/signup
+/onboarding                                           signup verification + workspace setup
 /auth/invite/<token>
 /auth/logout
 
@@ -127,8 +140,27 @@ Pattern: `/<workspaceSlug>/<stage>[/<sub>]?...`
 
 # Marketing (prerendered, separate /app shell)
 /                                                         landing
-/docs                                                     public docs
+/marketing/docs                                           public marketing docs (separate from app /docs hub)
 /changelog
+
+# System surfaces (internal previews + platform shells)
+/desktop                                                  desktop-shell preview (Tauri window chrome, gated by FULCRUM_FEATURES=desktop-app)
+/os-widgets                                               gallery of macOS-style OS-level surfaces (tray menu, native notification, dock badge); internal preview only; not part of web shell production routes
+/build-graph                                              internal design-e2e preview for doc search, scoped filters, snippets, graph counts, and planning-context actions
+/build-runs                                               internal design-e2e preview for local diff code review, line-anchored annotations, feedback export, feedback-run job logs, QA feedback exhaustion gate, and approval identity
+/build-timeline                                           internal design-e2e preview for document version timeline, inline diff, restore confirmation, comments, backlinks, and planning conversion
+/task-filters                                             internal design-e2e preview for persistent task filters, AND/OR logic, and saved filtered views
+/palette                                                  internal design-e2e preview for permission-aware CommandPalette actions and SavedView access
+/comments                                                 internal design-e2e preview for task detail side panel with inline edit, properties, comments, activity, related tasks, and runs
+/comments-block-thread                                    internal design-e2e preview for inline comment marks, margin pins, hover previews, thread sidebar, resolved state, and mark deletion
+/auth-flows                                               internal design-e2e preview for login form, OAuth provider POST payloads, passkey support detection, and recovery guidance
+/cross-cutting-offline                                    internal design-e2e preview for offline banner, last-sync timestamp, sync-now action, and queued mutation replay state
+/cross-cutting-mobile                                     internal design-e2e preview for Android status-bar/gesture-zone, iOS notch/home-indicator/bottom-nav/landscape safe-area reserves, and Tailwind sm/md/lg/xl responsive breakpoint reflow
+/cross-cutting-motion                                     internal design-e2e preview for prefers-reduced-motion, parallax disablement, decorative autoplay pause, and animationSpeed settings override
+/cross-cutting-perf                                       internal design-e2e preview for TanStack Virtual lists over 100 rows, overscan 10, stable 48px rows, jump-to-row, and selection persistence
+/mobile-capture                                           internal design-e2e preview for mobile capture Core Web Vitals budgets, layout stability, opt-in metric delivery, and task quick-create tray behavior
+/view-controls                                            internal design-e2e preview for view sort controls (header sort, asc/desc indicator, mobile sort menu, clear sort)
+/                                                         public landing page surfaced via marketing build; linked from docs + downloads only; not part of authenticated web shell
 ```
 
 URL invariants:
@@ -150,7 +182,7 @@ URL invariants:
 | Intake queue | `/.../capture/inbox` | Single column, snooze/accept/decline | Plane intake (modified) |
 | Templates | inline | Note, Doc, Decision, Bug, Question, Intake | n/a |
 
-Editor: TipTap-based, slash menu, mentions (`@user`, `@page`, `@TASK-123`, `@RUN-456`, `@Oct 1`), block types per DESIGN.md §3, page history, comments side rail.
+Editor: TipTap-based, slash menu, mentions (`@user`, `@page`, `@TASK-123`, `@RUN-456`, `@Oct 1`), block types per DESIGN.md §3, page history, comments side rail. Real-time collaboration shows connected users, cursor overlays, connection health, last saved state, offline retry, and contributor-attributed revision history; flag-off state keeps single-user save controls without dead collaboration UI.
 
 Exit handoff: "Hand off to Plan" button on doc header → creates planning session pre-seeded with this doc as context. Trace ID allocated here.
 
@@ -358,6 +390,11 @@ Per DESIGN.md §3.1 + research-01 §11. Slides over content as an overlay with a
 - **Agent picker header opens a full panel** listing every configured CLI agent (claude-code · codex · gemini-cli · opencode · pi-cli · custom), with status dot · client kind · latency · MCP count · plugin count · ring badge. Includes a filter input and `+ Add CLI agent (claude-code, codex, gemini-cli, opencode, pi-cli …)` shortcut. Footer link: `Manage agents, MCP & plugins in Settings →`.
 - Entry point: the **right-most segment of the status footer** on web (`✨ AI Assist  ⌘/`), the **right-most tab** of the bottom tab bar on mobile (accent-tinted), or the **right-most segment of the terminal footer** in TUI. Never decorative; always accent-tinted left-border.
 - Mobile: bottom sheet 92vw × full-height-minus-tabs.
+- Session actions inside the AI Assist workbench:
+  - Pause / Resume are direct form actions on the active session.
+  - Abort opens reason + required-note confirmation before `?/abortWithReason`.
+  - Checkpoint timeline actions post to `?/restoreCheckpoint` for newest checkpoint or `?/forkFromCheckpoint` after older-checkpoint confirmation.
+  - Paused sessions show a pause-queue count so queued prompts remain visible before resume.
 
 ---
 
@@ -406,6 +443,8 @@ Segments left → right:
 
 Never collapses. Never scrolls. Only mode segment changes color.
 
+**Modes pill (trailing).** When focus enters a step that supports mode affordances, the status footer surfaces a trailing pill `[ Modes ]` containing the long-form mode-row. On TUI, the same pill renders in the footer as `[ ✋ ▶ 💬 :ai ]`.
+
 ---
 
 ## 8. CLI subcommand tree (mirrors stage nav)
@@ -414,7 +453,7 @@ Per research-05 §3.1. Two-level noun-verb hub-and-spoke (gh/wrangler shape).
 
 ```
 # Capture
-fulcrum doc      <list|new|view|edit|attach|history|restore|link|search>
+fulcrum doc      <list|new|view|edit|attach|history|trash|restore|delete|link|search>
 fulcrum note     <new|view|search|tag>
 fulcrum capture  <text|url|file>          # generic intake
 
@@ -448,8 +487,12 @@ fulcrum memory   <list|promote|view>
 # Operate
 fulcrum doctor   [--json] [--subsystem <name>] [--probe]
 fulcrum mcp      <list|register|unregister|enable|disable|test|reload>
+                 [--agent <id>]               # scope MCP ops to a CLI agent
+fulcrum plugin   <list|install|enable|disable|update|remove>
+                 [--agent <id>] [--all-agents]
 fulcrum hooks    <list|enable|disable|test>
-fulcrum skills   <list|sync|lint|upstream>
+fulcrum skills   <list|install|sync|lint|upstream>
+                 install <path> [--force-conflict] [--resolve-conflict=alt-version|skip|upgrade-installed]
 fulcrum install  [--profile minimal|rules-only|full] [--dry-run]
 fulcrum compress [--check]
 fulcrum config   <get|set|edit|path>
@@ -458,6 +501,25 @@ fulcrum trace    <show <id>>
 fulcrum ai       [--step <id>] [--agent <id>]   # opens inline AI Assist session;
                                                 # --agent overrides the default route
                                                 # for the step's action kind
+                 start --task <id> --title <title> [--agent <id>] [--route plan|build|review]
+                                                # starts task-scoped AI Assist with assembled context
+
+# Multi-CLI agent management (no cap on configured agents)
+fulcrum agent    <list|view|add|edit|remove|enable|disable|set-default|reload>
+                 [--client claude-code|codex|gemini-cli|opencode|pi-cli|...]
+                 [--ring preferred|stable|experimental]
+fulcrum agent invoke <id> [--step <step-id>]    # run any agent against a step
+fulcrum route    <list|show|set|reset>           # default agent per action kind
+                 <action-kind> <agent-id> [--fallback <agent-id>]
+                 # action kinds: plan.draft, plan.refine, plan.prototype,
+                 # capture.discuss, build.run.step, build.run.long,
+                 # review.suggest, review.summary, ship.changelog,
+                 # operate.probe, operate.diagnose, ai.freeform
+
+# Settings
+fulcrum settings              # opens :settings (TUI) or settings.html (web)
+fulcrum profile  <list|show|switch|new|delete>
+fulcrum workspace <list|switch|new>
 
 # Cross-cutting
 fulcrum web                                 # opens web shell
@@ -467,38 +529,73 @@ fulcrum help [topic]
 fulcrum completion <bash|zsh|fish|powershell>
 ```
 
-Default: `fulcrum` alone = `fulcrum tui`. `-h/--help` always works.
+Default: `fulcrum` alone = `fulcrum tui`. `-h/--help` always works. Every command accepts `--profile <name>` and emits `trace=<id>` in stderr envelope for cross-surface linking.
+
+### 8.1 CLI envelope format
+
+Every command writes a one-line trailer to stderr (so `--json` stdout stays parseable):
+
+```
+fulcrum: ok | err [exit=N] trace=<id> agent=<id> profile=<name> took=<ms>
+```
+
+Errors follow the COPY.md template: `[what failed]. [why]. [next step]. trace=<id>`. Use `fulcrum trace show <id>` to jump to the trace explorer (web auto-opens if `$FULCRUM_OPEN=1`).
 
 ---
 
-## 9. TUI screen list (mirrors stage nav)
+## 9. TUI screen list (mirrors stage nav · full parity with web)
 
-Per research-05 §3.5. OpenTUI host shell, screens implemented as components.
+Per research-05 §3.5. OpenTUI host shell, screens implemented as components. The TUI is **feature-complete parity** with the web shell: every web destination has a TUI screen. AI is **TUI-native** (inline `:ai` pane), never a web drawer overlay.
 
-| Stage | Screen | Default key |
-|---|---|---|
-| Capture | `:inbox` | `j/k` items, `Enter`, `c` capture |
-| Capture | `:docs` | tree nav, `Enter`, `n` new |
-| Capture | `:doc/<id>` | doc reader/editor |
-| Plan | `:plans` | sessions list |
-| Plan | `:plan/<id>` | live planning session |
-| Plan | `:missions` | mission tree |
-| Build | `:runs` | runs feed, auto-tail |
-| Build | `:run/<id>` | live session |
-| Build | `:board` | task board (j/k/h/l) |
-| Build | `:tasks` | list view |
-| Build | `:graph` | dependency graph |
-| Build | `:agents` | agent panel |
-| Review | `:review` | review queue |
-| Review | `:review/<id>` | diff viewer |
-| Ship | `:artifacts` | artifacts list |
-| Ship | `:repos` | repo status |
-| Operate | `:doctor` | subsystems |
-| Operate | `:audit` | audit log |
-| Operate | `:ai` | AI Assist pane |
-| Operate | `:logs` | live log tail |
+| Stage | Screen | Default key | Notes |
+|---|---|---|---|
+| Capture | `:capture` (alias `:inbox`) | `j/k` items, `Enter`, `c` capture | filters / drafts / promoted in side pane |
+| Capture | `:docs` | tree nav, `Enter`, `n` new | doc reader/editor |
+| Capture | `:doc/<id>` | mode keys `p / d / m / :ai` | per-block mode row |
+| Plan | `:plan` | sessions list | `Enter` enters live session |
+| Plan | `:plan/<id>` | live planning session | 3-pane: sessions · transcript · workspace |
+| Plan | `:missions` | mission tree | activate slice with `a` |
+| Plan | `:prototype` | prototype gallery | live + archived |
+| Plan | `:templates` | plan template library | 12 templates |
+| Plan | `:prompts` | prompt library | tag filter |
+| Build | `:runs` | runs feed, auto-tail | `Enter` opens `:run/<id>` |
+| Build | `:run` / `:run/<id>` | live agent session | 4 panes: steps · current tool · cost/tokens · permission |
+| Build | `:board` | task board (j/k/h/l) | five-layout switcher mirrors web |
+| Build | `:list` | task list view | dense table |
+| Build | `:timeline` | gantt | 14-day window |
+| Build | `:graph` | dependency graph | status-coloured nodes |
+| Review | `:review` | review queue | tabs: awaiting / changes / approved / merged |
+| Review | `:review/<id>` | diff viewer | inline comments anchored to lines |
+| Ship | `:ship` | releases list | cycle/channel filters |
+| Ship | `:ship/<id>` | release detail | overlay panel (top-anchored sheet) |
+| Ship | `:archive` | release archive | major/minor/patch pills |
+| Operate | `:doctor` | subsystems | probe per row |
+| Operate | `:telemetry` | charts | p50/p99 · runs-by-step · resources |
+| Operate | `:alerts` | firing alerts | severity tabs |
+| Operate | `:mcp` | per-agent MCP scope | scope chip switches CLI agent |
+| Operate | `:plugins` | per-agent plugin scope | toggle / update / install-across |
+| Operate | `:audit` | audit log | trace-linked |
+| Operate | `:logs` | live log tail | follow + filter |
+| System | `:ai` | inline AI Assist pane (TUI-native, inline screen swap, NOT a web drawer overlay) | TUI-native; no web drawer; auto-injected `[ :ai ]` foot seg on every screen; explicitly listed per OD pass-5 |
+| System | `:agents` | CLI agent registry | unlimited entries · `a` add · `d` set default |
+| System | `:routes` | default agent per action | `e` edit · `o` override · `r` reset |
+| System | `:settings` | settings | 8 sections: General · Appearance · Keyboard · Privacy · Integrations · AI agents · Account · Danger |
+| System | `:K` | command palette | parity with web ⌘K |
+| System | `?` | keyboard cheatsheet | full key map |
 
-Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g / G` first/last, `H/L` prev/next screen, `q` pop view, `Ctrl-C` graceful quit.
+Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g / G` first/last, `H/L` prev/next screen, `q` pop view, `Ctrl-C` graceful quit. Stage chord: `g {c|p|b|B|r|s|o}` (`g b` runs feed, `g B` board). Run control: `:run`, `:pause`, `:cancel`, `:replay`. Profile: `:profile`, `:workspace`. Settings: `:set theme dark/light`, `:set density compact/cozy/comfortable`, `:set mode simple/pro`.
+
+### 9.1 TUI footer (status spine)
+
+Mirrors web `.foot` exactly. Left-to-right: `mode pill · profile · repo:branch · run id + step · agent · mcp health · spacer · trace · time · ? · :`. Right-most segment is `[ :ai ]` (accent-bordered), invokes `:ai` inline screen. No drawer.
+
+### 9.2 TUI ≠ web invariants
+
+- **No web chat drawer in TUI.** AI is the inline `:ai` screen.
+- **No mouse-only affordances.** Every action has a keystroke; click is a convenience.
+- **No animation.** Status changes flash one frame; no slide / fade / pulse beyond the cursor blink.
+- **Status badge vocabulary identical.** `pending · running · complete · blocked · awaiting · failed · cancelled · degraded · unknown` — color + glyph + text, never color alone.
+- **Trace ID on every footer.** Click (or `y` yank) copies; `:trace <id>` jumps.
 
 ---
 
@@ -521,6 +618,7 @@ Universal keys: `:` palette, `/` filter, `?` help, `Space` modeless menu, `g g /
 - AI Assist drawer = bottom sheet 60vh draggable.
 - Modals = bottom sheets.
 - Tap targets ≥44×44 px under `(pointer: coarse)` (research-06 §1, WCAG 2.5.5).
+- Mobile shell reserve: Android status-bar top inset ≥24 px, Android bottom gesture inset ≥48 px, Android landscape inline gesture insets ≥48 px; iOS notched-device top inset ≥47 px, iOS home-indicator bottom inset ≥34 px, and iOS landscape notch insets ≥47 px. Bottom tab bar and mobile sheets sit above those reserves. Responsive web shell uses the Tailwind v4 `xs/sm/md/lg/xl/2xl` ladder from DESIGN.md §1.5; mobile/desktop branching uses the same `md - 1` threshold as `MOBILE_QUERY`.
 - Heavy authoring (multi-pane doc edit, complex board drag) gracefully degrades to "open desktop for full edit" banner; read + approve + comment + status-update remain fully mobile.
 
 ---
@@ -536,6 +634,8 @@ Same trace ID surfaces in 4 places (research-04 §15):
 
 Click any of them → same trace explorer view (span tree + linked artifacts + audit slice + linked runs).
 
+**Mode-row × trace.** Every of the 24 stage-list surfaces (post-pass-2) now carries the mode-row at step-level; the trace ID echoes into each mode-button's `aria-describedby` so screen readers announce `[mode], trace tr_8f29a4c`.
+
 ---
 
 ## 12. Sources
@@ -548,22 +648,24 @@ Click any of them → same trace explorer view (span tree + linked artifacts + a
 - [CLI-TUI-UX.md](CLI-TUI-UX.md) — extends §8 (CLI tree) and §9 (TUI screen list) with JSON envelope, flag standards, completion install, error codes, keyboard map, parity table.
 - [OD-PROMPT.md](OD-PROMPT.md) — paste block for Open Design with all required reads.
 
-### 12.2 Research dossiers (`.scratch/design-research/`)
+### 12.2 Research dossiers (local research dossier)
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §3 (sidebar IA), §5 (right drawer), §6 (palette), §7 (status footer). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §2.3 (Build runs feed), §5 (ACP drawer), live session shape inside Plan/Build. Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
-- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — drives §2.1 (Capture editor + tree), Plan doc surface, memory promotion in §2.5 (Ship). Notion / Docmost / Outline / Anytype / Logseq / Obsidian / Tana / Linear docs / Slack Canvas.
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §2.6 (Operate doctor/audit/error logs/telemetry), §11 (trace-spine link grammar). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — drives §8 (CLI tree) and §9 (TUI screens), expanded in CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / clig.dev / 12-factor / k9s / lazygit / tig / btop / fzf / Helix / Charm / OpenTUI / gh-dash.
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §10 (mobile IA), breakpoint inheritance from DESIGN.md §1.5. Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / WCAG 2.2 AA / Bits UI / Radix.
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §2.3 (Plane five-layout views verbatim), §2.4 (Plannotator review-editor 40-component suite verbatim), §2.6 (Plane settings two-level split), trace-spine cross-cuts. Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table.
+- [01-workflow-nav-ia.md](#) — drives §3 (sidebar IA), §5 (right drawer), §6 (palette), §7 (status footer). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
+- [02-agent-supervision.md](#) — drives §2.3 (Build runs feed), §5 (ACP drawer), live session shape inside Plan/Build. Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
+- [03-knowledge-docs-memory.md](#) — drives §2.1 (Capture editor + tree), Plan doc surface, memory promotion in §2.5 (Ship). Notion / Docmost / Outline / Anytype / Logseq / Obsidian / Tana / Linear docs / Slack Canvas.
+- [04-observability-trace.md](#) — drives §2.6 (Operate doctor/audit/error logs/telemetry), §11 (trace-spine link grammar). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
+- [05-cli-tui-design.md](#) — drives §8 (CLI tree) and §9 (TUI screens), expanded in CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / clig.dev / 12-factor / k9s / lazygit / tig / btop / fzf / Helix / Charm / OpenTUI / gh-dash.
+- [06-mobile-a11y-perf-tokens.md](#) — drives §10 (mobile IA), breakpoint inheritance from DESIGN.md §1.5. Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / WCAG 2.2 AA / Bits UI / Radix.
+- [07-copy-first-parity.md](#) — drives §2.3 (Plane five-layout views verbatim), §2.4 (Plannotator review-editor 40-component suite verbatim), §2.6 (Plane settings two-level split), trace-spine cross-cuts. Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table.
 
 ### 12.3 PRD glossary + impeccable + goal
 
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 PRD entries; 142 CLI + 149 TUI items inform §8 + §9, 178 `workflow parity` mentions force workflow-stage IA, 148 `traceability` force §11.
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md).
-- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md).
+- local PRD glossary — 1281 PRD entries; 142 CLI + 149 TUI items inform §8 + §9, 178 `workflow parity` mentions force workflow-stage IA, 148 `traceability` force §11.
+- [~/.claude/skills/impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md).
+- local UX remediation goal.
 
 ### 12.4 Transformation note
 
 Every web route, CLI command, and TUI screen currently shipped in `apps/web/src/routes/**`, `apps/cli/src/commands/**`, `apps/tui/src/screens/**` is preserved under the new IA. See [PRODUCT.md § Transformation Discipline](PRODUCT.md) for the per-cluster carry-over table. Renames are 301-redirected for one minor version with deprecation banner.
+
+> 2026-05-18 OD pass: route tree gains `/desktop`, `/os-widgets`, `/` (landing).

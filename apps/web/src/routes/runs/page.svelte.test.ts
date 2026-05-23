@@ -19,6 +19,10 @@ mock.module("$app/navigation", () => ({
   invalidateAll: async () => {},
 }));
 
+mock.module("$app/forms", () => ({
+  enhance: () => {},
+}));
+
 mock.module("$app/environment", () => ({ browser: false, dev: false, building: false, version: "" }));
 
 interface RunRow {
@@ -27,8 +31,18 @@ interface RunRow {
   model: string | null;
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   project_id: string | null;
+  task_id?: string | null;
+  task_title?: string | null;
   started_at: string;
   ended_at: string | null;
+  last_event_at?: string | null;
+  recent_events?: Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    created_at: string;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 type PageProps = {
@@ -39,9 +53,11 @@ type PageProps = {
       status: string;
       range: string;
       project: string;
+      dateFrom?: string;
+      dateTo?: string;
     };
     streamed: {
-      data: Promise<{ runs: RunRow[] }> | { runs: RunRow[] };
+      data: Promise<{ runs: RunRow[]; projects?: unknown[]; tasks?: unknown[] }> | { runs: RunRow[]; projects?: unknown[]; tasks?: unknown[] };
     };
   };
 };
@@ -53,8 +69,12 @@ const SAMPLE: RunRow[] = [
     model: "opus",
     status: "succeeded",
     project_id: null,
+    task_id: "task-alpha",
+    task_title: "Design run feed",
     started_at: "2026-04-30T10:00:00.000Z",
     ended_at: "2026-04-30T10:30:00.000Z",
+    last_event_at: "2026-04-30T10:29:00.000Z",
+    recent_events: [{ id: "event-alpha", verb: "run.succeeded", actor: "system", created_at: "2026-04-30T10:29:00.000Z", payload: { summary: "Run complete" } }],
   },
   {
     id: "01J0RUN0000000000000000002",
@@ -62,8 +82,12 @@ const SAMPLE: RunRow[] = [
     model: "gpt-5",
     status: "running",
     project_id: null,
+    task_id: "task-beta",
+    task_title: "Wire filters",
     started_at: "2026-04-30T11:00:00.000Z",
     ended_at: null,
+    last_event_at: "2026-04-30T11:05:00.000Z",
+    recent_events: [{ id: "event-beta", verb: "run.running", actor: "codex", created_at: "2026-04-30T11:05:00.000Z", payload: { status: "running" } }],
   },
   {
     id: "01J0RUN0000000000000000003",
@@ -71,8 +95,12 @@ const SAMPLE: RunRow[] = [
     model: "pro",
     status: "failed",
     project_id: null,
+    task_id: "task-gamma",
+    task_title: "Fix event history",
     started_at: "2026-04-30T09:00:00.000Z",
     ended_at: "2026-04-30T09:05:00.000Z",
+    last_event_at: "2026-04-30T09:05:00.000Z",
+    recent_events: [{ id: "event-gamma", verb: "run.failed", actor: "gemini", created_at: "2026-04-30T09:05:00.000Z", payload: { reason: "failed" } }],
   },
 ];
 
@@ -105,7 +133,7 @@ describe("/runs +page.svelte", () => {
       props: {
         data: {
           activeProjectId: null,
-          filter: { agent: "", status: "", range: "all", project: "__any__" },
+          filter: { agent: "", status: "", range: "all", project: "__any__", dateFrom: "", dateTo: "" },
           streamed: { data: pending },
         },
       },
@@ -122,7 +150,7 @@ describe("/runs +page.svelte", () => {
     expect(rowMatches).toHaveLength(3);
   });
 
-  test("filter form has agent, status, and range selects", () => {
+  test("filter pane has live agent, status, range, project, and date controls", () => {
     const { body } = render(Page, {
       props: { data: pageData(SAMPLE) },
     });
@@ -130,6 +158,18 @@ describe("/runs +page.svelte", () => {
     expect(body).toContain("data-runs-status-filter");
     expect(body).toContain("data-runs-range-filter");
     expect(body).toContain("data-runs-project-filter");
+    expect(body).toContain("data-runs-date-from-filter");
+    expect(body).toContain("data-runs-date-to-filter");
+    expect(body).not.toContain(">Apply</button>");
+  });
+
+  test("renders task and event history from the run feed rows", () => {
+    const { body } = render(Page, {
+      props: { data: pageData(SAMPLE) },
+    });
+    expect(body).toContain("Design run feed");
+    expect(body).toContain("data-run-event-timeline");
+    expect(body).toContain("run.succeeded");
   });
 
   test("renders empty state when there are zero runs", () => {

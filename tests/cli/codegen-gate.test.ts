@@ -24,7 +24,7 @@ describe("ci:codegen snapshot gate", () => {
 
       expect(result.ok).toBe(true);
       expect(result.changedFiles).toEqual([]);
-      expect(result.message).toBe("ci:codegen OK — generated snapshot matches fresh codegen");
+      expect(result.message).toBe("ci:codegen OK: generated snapshot matches fresh codegen");
     } finally {
       await rm(committedDir, { recursive: true, force: true });
       await rm(freshDir, { recursive: true, force: true });

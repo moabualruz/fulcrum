@@ -1,6 +1,7 @@
 import { DataSource, EntitySchema, type DataSourceOptions } from "typeorm";
 import { PGliteDriver } from "typeorm-pglite";
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
+import { assertPgliteLockRecoverable } from "@platform-core/application/db/pglite-lock-recovery.ts";
 import { FULCRUM_TYPEORM_MIGRATIONS_TABLE } from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { CoreAndAuth1715788800000 } from "./migrations/1715788800000-CoreAndAuth.ts";
 import { WorkManagement1715788800001 } from "./migrations/1715788800001-WorkManagement.ts";
@@ -10,8 +11,10 @@ import { Integration1715788800004 } from "./migrations/1715788800004-Integration
 import { Notifications1715788800005 } from "./migrations/1715788800005-Notifications.ts";
 import { Platform1715788800006 } from "./migrations/1715788800006-Platform.ts";
 import { Migration20260516AcpSessionColumns1778623200002 } from "./migrations/Migration20260516_acp_sessions.ts";
+import { Migration20260519AcpSessionPauseResumeCheckpoints1778841600000 } from "./migrations/Migration20260519_acp_session_checkpoints.ts";
 import { Migration20260517NotificationTraceColumn1778760600001 } from "./migrations/Migration20260517_notification_trace_column.ts";
-import { PlatformFeatureFlags1778753400000 } from "@platform-core/infrastructure/database/feature-flag.migration.ts";
+import { ProjectStatuses20260523001778932800000 } from "./migrations/Migration20260523_project_statuses.ts";
+import { PlatformFeatureFlags1778753400000 } from "../../../../feature-flags/src/infrastructure/database/migrations/feature-flag.migration.ts";
 import { Credential1778623200010 } from "@platform-core/infrastructure/database/credential.migration.ts";
 import { ErrorLog1778758800000 } from "@platform-core/infrastructure/database/error-log.migration.ts";
 import { Telemetry1778755200000 } from "@platform-core/infrastructure/database/telemetry.migration.ts";
@@ -133,6 +136,7 @@ import { WebhookRuleConfig } from "@notification-center/infrastructure/database/
 
 // agent-client-protocol owned entities
 import { AcpSession } from "@agent-client-protocol/infrastructure/database/entities/AcpSession.ts";
+import { AcpSessionCheckpoint } from "@agent-client-protocol/infrastructure/database/entities/AcpSessionCheckpoint.ts";
 
 // workflow-coordination owned entities
 import { ArtifactRetentionPolicy } from "@workflow-coordination/infrastructure/database/entities/artifacts/ArtifactRetentionPolicy.ts";
@@ -146,7 +150,7 @@ import { FulcrumTelemetrySettingEntity, FulcrumTelemetryEventEntity } from "@pla
 import { FulcrumThemeSettingEntity } from "@platform-core/infrastructure/database/theme-settings.entities.ts";
 import { FulcrumCredentialEntity } from "@platform-core/infrastructure/database/credential.entities.ts";
 import { FulcrumTenantSettingEntity } from "@platform-core/infrastructure/database/tenant-setting.entities.ts";
-import { PlatformFeatureFlagEntity } from "@platform-core/infrastructure/database/feature-flag.entities.ts";
+import { PlatformFeatureFlagEntity } from "../../../../feature-flags/src/infrastructure/database/entities/feature-flag.entities.ts";
 
 // EntitySchema entities — identity-access
 import { FulcrumInvitationEntity } from "@identity-access/infrastructure/database/invitation.entities.ts";
@@ -267,6 +271,7 @@ export const applicationMigrations = [
   WorkflowAudit1778623200008,
   IdentityAccess1778623200009,
   Migration20260516AcpSessionColumns1778623200002,
+  Migration20260519AcpSessionPauseResumeCheckpoints1778841600000,
   Migration20260517NotificationTraceColumn1778760600001,
   IntegrationWebhooks1778750700000,
   IntegrationConnectors1778751600000,
@@ -279,6 +284,7 @@ export const applicationMigrations = [
   ErrorLog1778758800000,
   NotificationReadState1778750400000,
   NotificationSettings1778750500000,
+  ProjectStatuses20260523001778932800000,
 ];
 
 export function createDataSourceOptions(
@@ -297,6 +303,28 @@ export function createDataSourceOptions(
     migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
     synchronize: false,
     logging: env["TYPEORM_LOGGING"] === "true",
+  };
+}
+
+export function resolveApplicationDatabaseRuntime(
+  env: Record<string, string | undefined> = process.env,
+): {
+  backend: "pglite" | "postgres";
+  source: "fulcrum-home" | "database-url";
+  target: string;
+  migrationsTableName: string;
+  migrationCount: number;
+  entityCount: number;
+} {
+  const database = resolveDatabaseConfig({ env });
+  const entities = getCoreEntities();
+  return {
+    backend: database.backend,
+    source: database.backend === "postgres" ? "database-url" : "fulcrum-home",
+    target: database.backend === "postgres" ? database.url : database.dataDir,
+    migrationsTableName: FULCRUM_TYPEORM_MIGRATIONS_TABLE,
+    migrationCount: applicationMigrations.length,
+    entityCount: entities.length,
   };
 }
 
@@ -371,6 +399,7 @@ export function getCoreEntities(): (Function | EntitySchema)[] {
     RoutingRule,
     // agent-client-protocol
     AcpSession,
+    AcpSessionCheckpoint,
     // integration-hub
     BitbucketIssue,
     BitbucketPullRequest,
@@ -493,6 +522,7 @@ export async function initDataSource(
   if (config.backend === "pglite") {
     const { mkdir } = await import("node:fs/promises");
     await mkdir(config.dataDir, { recursive: true });
+    await assertPgliteLockRecoverable(config.dataDir);
   }
   defaultDataSource = new DataSource({
     ...createDataSourceOptions(),

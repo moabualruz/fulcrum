@@ -31,8 +31,11 @@ describe("BoardCard component", () => {
 
   test("renders a button with data hooks + aria-label derived from task", () => {
     const { body } = render(BoardCard, { props: { task: baseTask } });
+    // BoardCard composes the ui-kit Card primitive, so the clickable element
+    // is a div with role="button" rather than a raw <button>; the board data
+    // hooks + aria-label are unchanged.
     expect(body).toMatch(
-      /<button\b[^>]*data-board-card\b[^>]*data-task-id="01J"[^>]*data-status="in_progress"[^>]*data-priority="5"[^>]*aria-label="Edit task: Wire UI"/,
+      /role="button"[^>]*data-board-card="true"[^>]*data-task-id="01J"[^>]*data-status="in_progress"[^>]*data-priority="5"[^>]*aria-label="Edit task: Wire UI"/,
     );
   });
 
@@ -43,7 +46,9 @@ describe("BoardCard component", () => {
 
   test("renders priority marker as P<priority>", () => {
     const { body } = render(BoardCard, { props: { task: baseTask } });
-    expect(body).toMatch(/data-board-card-priority[^>]*>P5</);
+    // Priority renders inside a ui-kit Badge, whose slotted content is wrapped
+    // in Svelte SSR comment markers (<!---->P5<!---->).
+    expect(body).toMatch(/data-board-card-priority[^>]*>(?:<!--[^>]*-->)*P5</);
   });
 
   test("renders project marker only when project_id is set", () => {

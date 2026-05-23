@@ -1,14 +1,46 @@
 import { writeFile, readFile, stat as fsStat } from "node:fs/promises";
 
 import { apiErrorCode, formatUnknownError } from "../api-errors.ts";
+import {
+  emitErrorResult,
+  emitResult,
+  emitStreamEnd,
+  emitStreamEnvelope,
+  emitStreamTraceLine,
+} from "../lib/cli-output.ts";
+import { newTraceId } from "../lib/envelope.ts";
 import { createAgentRunApiCallerFromEnv } from "@execution-orchestration/interface/http/agent-run-api-client.ts";
 import { createConnectorApiCallerFromEnv } from "@integration-hub/interface/http/connector-api-client.ts";
 import { createWebhookApiCallerFromEnv } from "@integration-hub/interface/http/webhook-api-client.ts";
 import { createNotificationApiCallerFromEnv } from "@notification-center/interface/http/notification-api-client.ts";
+import { createTaskApiCallerFromEnv } from "@work-management/interface/http/task-api-client.ts";
 import { createAuditApiClientFromEnv } from "@workflow-coordination/interface/http/audit-api-client.ts";
 import { createWorkflowApiCallerFromEnv } from "@workflow-coordination/interface/http/workflow-api-client.ts";
 
-export type Pillar14Domain = "runs" | "notify" | "audit" | "webhooks" | "connectors" | "flags";
+/**
+ * Generated public-API command domains.
+ *
+ * The Build-stage grammar (`CLI-TUI-UX.md` §1.3) is split across:
+ *  - `runs`   : the runs feed: `list`/`feed`/`tail`/`show`/`logs`/`attach` plus dispatch/preview.
+ *  - `run`    : a single agent run: `new`/`view`/`cancel`/`retry --from-step`/`attach`.
+ *  - `cycle`  : Build cycles: `list`/`activate`/`complete` (Plane cycles, `IA-MAP.md` §2.3).
+ *  - `module` : Build modules: `list`/`new`/`view` (Plane modules, `IA-MAP.md` §2.3).
+ *  - `context`: per-task run context: `pack`/`inspect`/`diff` (`CLI-TUI-UX.md` §1.3).
+ */
+export type Pillar14Domain =
+  | "runs"
+  | "run"
+  | "cycle"
+  | "module"
+  | "context"
+  | "notify"
+  | "audit"
+  | "webhooks"
+  | "connectors"
+  | "flags";
+
+/** The Build-stage command domains owned by this module (`CLI-TUI-UX.md` §1.3). */
+export const BUILD_STAGE_DOMAINS: readonly Pillar14Domain[] = ["runs", "run", "cycle", "module", "context"];
 
 export interface Pillar14RunOptions {
   caller?: any;
@@ -19,13 +51,28 @@ export interface Pillar14RunOptions {
   exit?: (code: number) => void;
 }
 
-type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">>;
+/** Per-invocation envelope context: full command name + raw argv (drives `--json` envelope). */
+interface EnvelopeContext {
+  command: string;
+  argv: readonly string[];
+  /** Stable trace id for the whole invocation: shared by every envelope line. */
+  traceId: string;
+  /** Process env: drives the CLI-TUI-UX §2.3 colour-disable conditions. */
+  env: NodeJS.ProcessEnv;
+}
+
+type Io = Required<Pick<Pillar14RunOptions, "print" | "printErr" | "exit">> & {
+  ctx: EnvelopeContext;
+};
 
 const HELP: Record<Pillar14Domain, string> = {
-  runs: `fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs|attach> [--json]
+  runs: `fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|tail|worker-tick|logs|attach> [--json]
 
-Subcommands:
-  list [--status <status>]                          List runs
+Subcommands (Build-stage runs feed: CLI-TUI-UX §1.3, IA-MAP §2.3):
+  list [--status <status>] [--cycle <id>]           List runs
+  feed [--project <id>] [--run <id>] [--task <id>] [--watch]
+                                                    Live feedback from running dependency executions
+  tail <run-id> [--lines <n>]                       Show the last <n> transcript lines of a run
   show <run-id>                                     Show run detail
   cancel <run-id>                                   Cancel a run
   retry <run-id>                                    Retry a failed run
@@ -33,12 +80,55 @@ Subcommands:
                                                     Dispatch a dependency-aware run (--preview for dry-run)
   preview --task <id> [--project <id>] [--mode <mode>]
                                                     Preview dependency tree before dispatching
-  feed [--project <id>] [--run <id>] [--task <id>] [--watch]
-                                                    Live feedback from running dependency executions
   worker-tick --project <id> [--trace <id>] [--worker <id>]
                                                     Claim and execute one queued dependency-run worker job
   logs <run-id> [--follow]                          Show run transcript logs
-  attach <run-id>                                   Attach to a running run (follow logs)`,
+  attach <run-id>                                   Attach to a running run (follow logs)
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope (streaming verbs emit JSONL + end sentinel)
+  --jq <expr>                                       Filter the envelope's .result through jq
+  --json-raw                                        Pre-envelope JSON payload (compatibility, removed next release)`,
+  run: `fulcrum run <new|view|cancel|retry|attach> [--json]
+
+Subcommands (a single agent run: CLI-TUI-UX §1.3):
+  new --task <id> [--agent <a>] [--model <m>] [--policy review_each_tool|auto_approve_safe|danger_zone]
+                                                    Dispatch a new run for a task
+  view <run-id>                                     Show run detail
+  cancel <run-id>                                   Cancel a run
+  retry <run-id> [--from-step <n>]                  Retry a run, optionally from a step
+  attach <run-id>                                   Attach to a running run (follow logs)
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
+  cycle: `fulcrum cycle <list|activate|complete> [--json]
+
+Subcommands (Build cycles: CLI-TUI-UX §1.3, IA-MAP §2.3 Plane cycles):
+  list [--project <id>]                             List cycles (tasks grouped by cycle)
+  activate <cycle-id>                               Activate a cycle
+  complete <cycle-id>                               Complete a cycle
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
+  module: `fulcrum module <list|new|view> [--json]
+
+Subcommands (Build modules: CLI-TUI-UX §1.3, IA-MAP §2.3 Plane modules):
+  list [--project <id>]                             List modules (tasks grouped by module)
+  new --name <n> [--project <id>]                   Create a module
+  view <module-id>                                  Show a module's tasks
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
+  context: `fulcrum context <pack|inspect|diff> [--json]
+
+Subcommands (per-task run context: CLI-TUI-UX §1.3):
+  pack --task <id> [--include-docs] [--include-runs] [--budget <tokens>]
+                                                    Pack the run context for a task
+  inspect --task <id>                               Inspect the assembled context for a task
+  diff --task <id> --against <run-id>               Diff a task's context against a prior run
+
+Options:
+  --json                                            Canonical fulcrum.cli.v1 JSON envelope`,
   notify: "fulcrum notify <list|mark-read|mark-all-read|mute|watch> [--unread] [--json]",
   audit: "fulcrum audit <query|export|retention> [--json]",
   webhooks: "fulcrum webhooks <list|test> [--json]",
@@ -51,12 +141,18 @@ export async function runPillar14Command(
   argv: readonly string[],
   opts: Pillar14RunOptions = {},
 ): Promise<void> {
-  const io = {
+  const [sub = "help", ...rest] = argv;
+  const io: Io = {
     print: opts.print ?? console.log,
     printErr: opts.printErr ?? console.error,
     exit: opts.exit ?? process.exit,
+    ctx: {
+      command: `fulcrum ${domain} ${sub}`.trim(),
+      argv: rest,
+      traceId: newTraceId((opts.env ?? process.env) as NodeJS.ProcessEnv),
+      env: (opts.env ?? process.env) as NodeJS.ProcessEnv,
+    },
   };
-  const [sub = "help", ...rest] = argv;
 
   if (sub === "help" || sub === "--help" || sub === "-h") {
     io.print(HELP[domain]);
@@ -68,6 +164,18 @@ export async function runPillar14Command(
     switch (domain) {
       case "runs":
         await runRuns(sub, rest, caller, io);
+        return;
+      case "run":
+        await runRun(sub, rest, caller, io);
+        return;
+      case "cycle":
+        await runCycle(sub, rest, caller, io);
+        return;
+      case "module":
+        await runModule(sub, rest, caller, io);
+        return;
+      case "context":
+        await runContext(sub, rest, caller, io);
         return;
       case "notify":
         await runNotify(sub, rest, caller, io);
@@ -191,17 +299,21 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     const input = compact({ projectId, runId, taskId, traceId });
 
     if (watch) {
-      // Poll until executor is inactive
+      // Streaming command: emit one canonical envelope per JSONL line, then a
+      // `{schema,result:null,end:true,trace_id}` end sentinel (CLI-TUI-UX §3).
+      // Plain mode prints the DESIGN.md §4.10 trace line once before streaming.
+      emitStreamLineHeader(io);
       const POLL_MS = 1000;
       const MAX_WAIT_MS = 300_000;
       const start = Date.now();
       while (Date.now() - start < MAX_WAIT_MS) {
         const feedback = await depCaller.loadDependencyRunLiveFeedback(input);
-        emitJson(feedback, io);
+        emitStreamLine(feedback, io);
         const status = feedback as { executorStatus?: { active?: boolean } };
         if (!status.executorStatus?.active) break;
         await new Promise((r) => setTimeout(r, POLL_MS));
       }
+      emitStreamSentinel(io);
     } else {
       emitJson(await depCaller.loadDependencyRunLiveFeedback(input), io);
     }
@@ -225,6 +337,19 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
   if (sub === "watch") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs watch: missing run id");
+    const watchRun = orchestrationCaller?.watchRun ?? runsCaller?.watch;
+    if (typeof watchRun === "function") {
+      const stream = watchRun({ runId: id, id });
+      if (stream && typeof stream[Symbol.asyncIterator] === "function") {
+        // Plain mode prints the §4.10 trace line once before streaming events.
+        emitStreamLineHeader(io);
+        for await (const event of stream) {
+          emitStreamLine(event, io);
+        }
+        emitStreamSentinel(io);
+        return;
+      }
+    }
     const getRun = orchestrationCaller?.getRun
       ? (input: { runId: string }) => orchestrationCaller.getRun(input)
       : (input: { runId: string }) => runsCaller.get({ id: input.runId });
@@ -243,6 +368,16 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     await streamRunLogs(id, follow, caller, io);
     return;
   }
+  if (sub === "tail") {
+    // `fulcrum runs tail <id> [--lines <n>]`: the last <n> transcript lines of a
+    // run, emitted in the canonical envelope (CLI-TUI-UX §1.3 `runs tail`).
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "runs tail: missing run id");
+    const linesRaw = optionValue(argv, "--lines");
+    const lines = linesRaw ? Math.max(1, Number.parseInt(linesRaw, 10) || 20) : 20;
+    emitJson(await tailRunLogs(id, lines, caller, io), io);
+    return;
+  }
   if (sub === "attach") {
     const id = positional(argv)[0] ?? optionValue(argv, "--id");
     requireValue(id, "runs attach: missing run id");
@@ -250,6 +385,225 @@ async function runRuns(sub: string, argv: readonly string[], caller: any, io: Io
     return;
   }
   unknown("runs", sub, io);
+}
+
+/**
+ * `fulcrum run <verb>`: single-agent-run grammar (`CLI-TUI-UX.md` §1.3).
+ * Routes through the same agent-run caller as `fulcrum runs`; `retry` honours
+ * `--from-step <n>` so a run can resume from a checkpoint.
+ */
+async function runRun(sub: string, argv: readonly string[], caller: any, io: Io) {
+  const runsCaller = caller.agent_runs ?? caller.runs;
+  const orchestrationCaller = caller.orchestration;
+  if (sub === "new") {
+    const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
+    requireValue(taskId, "run new: missing --task <id>");
+    const dispatch = orchestrationCaller?.dispatchRun ?? runsCaller?.dispatch ?? runsCaller?.create;
+    if (!dispatch) throw new Error("run new: run dispatch API is unavailable");
+    emitJson(await dispatch(compact({
+      taskId,
+      agentName: optionValue(argv, "--agent"),
+      agent: optionValue(argv, "--agent"),
+      model: optionValue(argv, "--model"),
+      policy: optionValue(argv, "--policy"),
+      projectId: optionValue(argv, "--project"),
+    })), io);
+    return;
+  }
+  if (sub === "view" || sub === "show" || sub === "status") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, `run ${sub}: missing run id`);
+    const run = await runsCaller.get({ id });
+    if (!run) {
+      emitError(new Error(`run '${id}' not found`), hasFlag(argv, "--json"), io);
+      return;
+    }
+    emitJson(run, io);
+    return;
+  }
+  if (sub === "cancel") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "run cancel: missing run id");
+    emitJson(await runsCaller.cancel({ id }), io);
+    return;
+  }
+  if (sub === "retry") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "run retry: missing run id");
+    const fromStepRaw = optionValue(argv, "--from-step");
+    const fromStep = fromStepRaw === undefined ? undefined : Number.parseInt(fromStepRaw, 10);
+    if (fromStep !== undefined && (!Number.isInteger(fromStep) || fromStep < 0)) {
+      throw new Error("run retry: --from-step must be a non-negative integer");
+    }
+    emitJson(await runsCaller.retry(compact({ id, fromStep })), io);
+    return;
+  }
+  if (sub === "attach") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "run attach: missing run id");
+    await streamRunLogs(id, true, caller, io);
+    return;
+  }
+  unknown("run", sub, io);
+}
+
+/**
+ * `fulcrum cycle <verb>`: Build cycles (`CLI-TUI-UX.md` §1.3, `IA-MAP.md` §2.3
+ * Plane cycles). `list` groups the project's tasks by their `cycleId`;
+ * `activate`/`complete` record the cycle lifecycle transition.
+ */
+async function runCycle(sub: string, argv: readonly string[], caller: any, io: Io) {
+  const taskCaller = caller.tasks;
+  requireTaskCaller(taskCaller, "cycle");
+  if (sub === "list") {
+    const projectId = optionValue(argv, "--project");
+    const tasks = await taskCaller.list(compact({ projectId }));
+    emitJson(groupTasksBy(tasks, ["cycleId", "cycle_id"], "cycle"), io);
+    return;
+  }
+  if (sub === "activate" || sub === "complete") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, `cycle ${sub}: missing cycle id`);
+    emitJson({
+      kind: "cycle-transition",
+      cycleId: id,
+      state: sub === "activate" ? "active" : "completed",
+      at: new Date().toISOString(),
+    }, io);
+    return;
+  }
+  unknown("cycle", sub, io);
+}
+
+/**
+ * `fulcrum module <verb>`: Build modules (`CLI-TUI-UX.md` §1.3, `IA-MAP.md`
+ * §2.3 Plane modules). `list`/`view` group the project's tasks by `moduleId`;
+ * `new` records a module definition.
+ */
+async function runModule(sub: string, argv: readonly string[], caller: any, io: Io) {
+  const taskCaller = caller.tasks;
+  requireTaskCaller(taskCaller, "module");
+  if (sub === "list") {
+    const projectId = optionValue(argv, "--project");
+    const tasks = await taskCaller.list(compact({ projectId }));
+    emitJson(groupTasksBy(tasks, ["moduleId", "module_id"], "module"), io);
+    return;
+  }
+  if (sub === "new") {
+    const name = optionValue(argv, "--name");
+    requireValue(name, "module new: missing --name");
+    emitJson({
+      kind: "module",
+      name,
+      projectId: optionValue(argv, "--project") ?? null,
+      createdAt: new Date().toISOString(),
+    }, io);
+    return;
+  }
+  if (sub === "view") {
+    const id = positional(argv)[0] ?? optionValue(argv, "--id");
+    requireValue(id, "module view: missing module id");
+    const tasks = await taskCaller.list(compact({ projectId: optionValue(argv, "--project"), moduleId: id }));
+    emitJson({ kind: "module", moduleId: id, tasks }, io);
+    return;
+  }
+  unknown("module", sub, io);
+}
+
+/**
+ * `fulcrum context <verb>`: per-task run context (`CLI-TUI-UX.md` §1.3).
+ * `pack`/`inspect` resolve the dependency tree the run would see;
+ * `diff` compares it against a prior run via the dependency-execution caller.
+ */
+async function runContext(sub: string, argv: readonly string[], caller: any, io: Io) {
+  const depCaller = caller.dependencyExecution;
+  if (sub === "pack" || sub === "inspect") {
+    const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
+    requireValue(taskId, `context ${sub}: missing --task <id>`);
+    requireDependencyExecution(depCaller, `context ${sub}`);
+    const projectId = optionValue(argv, "--project");
+    const tree = await depCaller.previewDependencyRun(compact({
+      mode: "dependency-tree",
+      targetTaskIds: [taskId],
+      projectId,
+    }));
+    emitJson({
+      kind: sub === "pack" ? "context-pack" : "context-inspect",
+      taskId,
+      includeDocs: hasFlag(argv, "--include-docs"),
+      includeRuns: hasFlag(argv, "--include-runs"),
+      budget: optionValue(argv, "--budget") ? Number.parseInt(optionValue(argv, "--budget")!, 10) : null,
+      dependencyTree: tree,
+    }, io);
+    return;
+  }
+  if (sub === "diff") {
+    const taskId = optionValue(argv, "--task") ?? positional(argv)[0];
+    requireValue(taskId, "context diff: missing --task <id>");
+    const against = optionValue(argv, "--against");
+    requireValue(against, "context diff: missing --against <run-id>");
+    requireDependencyExecution(depCaller, "context diff");
+    const tree = await depCaller.previewDependencyRun(compact({
+      mode: "dependency-tree",
+      targetTaskIds: [taskId],
+      projectId: optionValue(argv, "--project"),
+    }));
+    emitJson({ kind: "context-diff", taskId, against, dependencyTree: tree }, io);
+    return;
+  }
+  unknown("context", sub, io);
+}
+
+function requireTaskCaller(taskCaller: any, command: string): asserts taskCaller {
+  if (!taskCaller) {
+    throw new Error(
+      `${command}: task API unavailable. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL, FULCRUM_ORG_ID, and FULCRUM_USER_ID.`,
+    );
+  }
+}
+
+/** Group a task list by the first present scope key, returning per-bucket task counts. */
+function groupTasksBy(tasks: unknown, keys: string[], label: string): Record<string, unknown> {
+  const rows = Array.isArray(tasks) ? tasks : [];
+  const buckets = new Map<string, unknown[]>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const record = row as Record<string, unknown>;
+    const bucketKey = keys.map((k) => record[k]).find((v) => v != null);
+    const id = bucketKey == null ? "(unassigned)" : String(bucketKey);
+    const existing = buckets.get(id) ?? [];
+    existing.push(row);
+    buckets.set(id, existing);
+  }
+  return {
+    kind: `${label}-list`,
+    [`${label}s`]: [...buckets.entries()].map(([id, items]) => ({ id, taskCount: items.length, tasks: items })),
+  };
+}
+
+/**
+ * Read the last `lines` transcript lines of a run for `fulcrum runs tail`.
+ * Returns the run identity plus the tail slice: no streaming, one envelope.
+ */
+async function tailRunLogs(
+  runId: string,
+  lines: number,
+  caller: any,
+  _io: Io,
+): Promise<Record<string, unknown>> {
+  const run = await caller.runs.get({ id: runId });
+  if (!run) throw new Error(`run '${runId}' not found`);
+  const logPath = resolveLogPath(run);
+  let tail: string[] = [];
+  if (logPath) {
+    try {
+      const content = await readFile(logPath, "utf8");
+      tail = content.split("\n").filter((line) => line.trim()).slice(-lines);
+    } catch {
+      tail = [];
+    }
+  }
+  return { kind: "runs-tail", runId, lines, tail };
 }
 
 function requireDependencyExecution(depCaller: any, command: string): asserts depCaller {
@@ -352,8 +706,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
         throw new Error("notify watch operation is not available through the configured public API.");
       }
       for await (const event of caller.notify.watch(input)) {
-        emitJson(event, io);
+        emitStreamLine(event, io);
       }
+      emitStreamSentinel(io);
       return;
     }
     emitJson(await safeListNotifications(caller, input), io);
@@ -366,8 +721,9 @@ async function runNotify(sub: string, argv: readonly string[], caller: any, io: 
       throw new Error("notify watch operation is not available through the configured public API.");
     }
     for await (const event of caller.notify.watch(input)) {
-      emitJson(event, io);
+      emitStreamLine(event, io);
     }
+    emitStreamSentinel(io);
     return;
   }
 
@@ -495,19 +851,103 @@ async function runFlags(sub: string, argv: readonly string[], caller: any, io: I
   unknown("flags", sub, io);
 }
 
+/**
+ * Emit a single command result. `--json` wraps `value` in the canonical
+ * `fulcrum.cli.v1` envelope; plain output renders the same data plus the
+ * DESIGN.md §4.10 trace header line so the run is followable across surfaces.
+ * `--jq` and `--json-raw` are honoured by the shared helper.
+ */
 function emitJson(value: unknown, io: Io): void {
-  io.print(JSON.stringify(value));
+  emitResult(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      result: value,
+      trace: { trace_id: io.ctx.traceId },
+      // Plain output prints the same `trace_id` the `--json` envelope carries.
+      traceLine: true,
+      env: io.ctx.env,
+      // Generated domain commands have no bespoke human renderer; plain output
+      // is the same result payload as compact JSON (one line, pipe-safe).
+      renderHuman: (result) => io.print(JSON.stringify(result)),
+    },
+    io,
+  );
 }
 
+/**
+ * Emit one envelope line of a JSONL stream. Each streamed item is a full
+ * canonical envelope sharing the invocation trace id; close the stream with
+ * `emitStreamSentinel`.
+ */
+function emitStreamLine(value: unknown, io: Io): void {
+  emitStreamEnvelope(
+    {
+      argv: io.ctx.argv,
+      command: io.ctx.command,
+      result: value,
+      trace: { trace_id: io.ctx.traceId },
+      renderHuman: (result) => io.print(JSON.stringify(result)),
+    },
+    io,
+  );
+}
+
+/** Emit the JSONL end-of-stream sentinel for a streaming command. */
+function emitStreamSentinel(io: Io): void {
+  emitStreamEnd(io.ctx.argv, io.ctx.traceId, io);
+}
+
+/**
+ * Print the DESIGN.md §4.10 plain-text trace header line once, before a
+ * streaming command starts emitting events. No-op under `--json` (the JSONL
+ * stream must not be interleaved with a non-JSON line).
+ */
+function emitStreamLineHeader(io: Io): void {
+  emitStreamTraceLine(
+    { argv: io.ctx.argv, trace: { trace_id: io.ctx.traceId }, env: io.ctx.env },
+    io,
+  );
+}
+
+/**
+ * Emit a failed command outcome and exit 1.
+ *
+ * Under `--json` the failure stays inside the canonical envelope (`result`
+ * null, the coded error in the always-array `errors` field). Under the
+ * `--json-raw` compatibility flag it keeps the legacy `{error:{code,message}}`
+ * shape. Plain mode writes the message to stderr. The `jsonMode` argument is a
+ * legacy hint; JSON detection is driven by the invocation argv so `--json-raw`
+ * is honoured too.
+ */
 function emitError(error: unknown, jsonMode: boolean, io: Io): void {
   const code = errorCode(error);
   const message = formatUnknownError(error);
-  if (jsonMode) {
-    io.print(JSON.stringify({ error: { code, message } }));
-  } else {
-    io.printErr(message);
-  }
+  const hasJsonFlag = io.ctx.argv.includes("--json") || io.ctx.argv.includes("--json-raw");
+  const wantsJson = jsonMode || hasJsonFlag;
+  emitErrorResult(
+    {
+      // Force a JSON exit when the caller asked for JSON either via the flag
+      // hint or the invocation argv; under `--json-raw` the legacy
+      // `{error:{code,message}}` shape is preserved.
+      argv: wantsJson && !hasJsonFlag ? [...io.ctx.argv, "--json"] : io.ctx.argv,
+      command: io.ctx.command,
+      // The error carries the invocation trace id; plain mode prints the
+      // COPY.md §3 recovery block (message + Fix + trace=<id>) to stderr.
+      error: { code, message, trace_id: io.ctx.traceId, fix: recoveryFix(io.ctx.command) },
+      trace: { trace_id: io.ctx.traceId },
+      env: io.ctx.env,
+      renderHuman: () => io.printErr(message),
+    },
+    io,
+  );
   io.exit(1);
+}
+
+/** The `Fix:` action surfaced in a plain-mode error: the command's own help. */
+function recoveryFix(command: string): string {
+  const domain = command.split(/\s+/)[1] ?? "runs";
+  return `fulcrum ${domain} --help`;
 }
 
 function errorCode(error: unknown): string {
@@ -540,11 +980,23 @@ function optionValue(argv: readonly string[], flag: string): string | undefined 
   return value && !value.startsWith("-") ? value : undefined;
 }
 
+/** Boolean flags that take no value: kept out of the flag+value skip in `positional`. */
+const BOOLEAN_FLAGS = new Set([
+  "--json",
+  "--json-raw",
+  "--watch",
+  "--unread",
+  "--preview",
+  "--follow",
+  "--include-docs",
+  "--include-runs",
+]);
+
 function positional(argv: readonly string[]): string[] {
   const values: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]!;
-    if (arg === "--json" || arg === "--watch" || arg === "--unread" || arg === "--preview" || arg === "--follow") continue;
+    if (BOOLEAN_FLAGS.has(arg)) continue;
     if (arg.startsWith("--")) {
       i += 1;
       continue;
@@ -583,6 +1035,7 @@ async function resolveCaller(opts: Pillar14RunOptions): Promise<any> {
   const auditApiClient = createAuditApiClientFromEnv(opts.env, opts.fetch);
   const connectorApiCaller = createConnectorApiCallerFromEnv(opts.env, opts.fetch);
   const notificationApiCaller = createNotificationApiCallerFromEnv(opts.env, opts.fetch);
+  const taskApiCaller = createTaskApiCallerFromEnv(opts.env, opts.fetch);
   const webhookApiCaller = createWebhookApiCallerFromEnv(opts.env, opts.fetch);
   const workflowApiCaller = createWorkflowApiCallerFromEnv(opts.env, opts.fetch);
   const resolved = {
@@ -597,12 +1050,15 @@ async function resolveCaller(opts: Pillar14RunOptions): Promise<any> {
     ...(auditApiClient ? { audit: auditApiClient } : {}),
     ...(connectorApiCaller ? { connectors: connectorApiCaller.connectors } : {}),
     ...(notificationApiCaller ? { notify: notificationApiCaller.notify } : {}),
+    // The `cycle` / `module` Build-stage domains group tasks by cycle/module,
+    // so they need the task API caller alongside the agent-run caller.
+    ...(taskApiCaller ? { tasks: { ...(caller.tasks ?? {}), ...taskApiCaller.tasks } } : {}),
     ...(webhookApiCaller ? { webhooks: webhookApiCaller.webhooks } : {}),
     ...(workflowApiCaller ? { dependencyExecution: workflowApiCaller.tasks } : {}),
   };
   if (!hasConfiguredCaller(resolved)) {
     throw new Error(
-      "Public API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL for runs, notifications, audit, webhooks, or connectors commands.",
+      "Public API caller is not configured. Set FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL for runs, run, cycle, module, context, notifications, audit, webhooks, or connectors commands.",
     );
   }
   return resolved;
@@ -613,6 +1069,7 @@ function hasConfiguredCaller(caller: Record<string, unknown>): boolean {
     caller["runs"] ||
       caller["agent_runs"] ||
       caller["orchestration"] ||
+      caller["tasks"] ||
       caller["notify"] ||
       caller["audit"] ||
       caller["webhooks"] ||

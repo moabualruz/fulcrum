@@ -5,7 +5,7 @@
  * the install banner after a configurable delay (default: 30 000 ms).
  */
 
-// BeforeInstallPromptEvent is not in the standard TS lib — declare it.
+// BeforeInstallPromptEvent is not in the standard TS lib: declare it.
 declare global {
   interface BeforeInstallPromptEvent extends Event {
     prompt(): Promise<void>;

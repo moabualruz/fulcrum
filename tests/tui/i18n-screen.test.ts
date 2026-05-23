@@ -1,5 +1,5 @@
 /**
- * TDD — i18n screen gating.
+ * TDD: i18n screen gating.
  * RED written first; GREEN by apps/tui/src/screens/i18n-screen.ts.
  *
  * Acceptance criteria covered:
@@ -18,7 +18,7 @@ import {
   i18nTabVisible,
   SETTINGS_KEY_LOCALE,
 } from "@fulcrum/tui/screens/i18n-screen.ts";
-import { resetFeaturesCache } from "@platform-core/application/feature-flags/index.ts";
+import { resetFeaturesCache } from "@feature-flags/application/index.ts";
 
 // Minimal in-memory SettingsService for tests.
 function makeSettings(initial: Record<string, string> = {}): {
@@ -42,7 +42,7 @@ beforeEach(() => {
   resetFeaturesCache();
 });
 
-describe("i18n screen — flag OFF", () => {
+describe("i18n screen: flag OFF", () => {
   const env = { FULCRUM_FEATURES: "" };
 
   test("renderI18nScreen returns visible=false", async () => {
@@ -75,7 +75,7 @@ describe("i18n screen — flag OFF", () => {
   });
 });
 
-describe("i18n screen — flag ON", () => {
+describe("i18n screen: flag ON", () => {
   const env = { FULCRUM_FEATURES: "i18n" };
 
   test("renderI18nScreen returns visible=true", async () => {
@@ -157,12 +157,12 @@ describe("i18n flag via CLI env simulation", () => {
     expect(i18nTabVisible(env)).toBe(true);
   });
 
-  test("multiple flags — i18n on, embeddings on → i18n tab visible", () => {
+  test("multiple flags: i18n on, embeddings on → i18n tab visible", () => {
     const env = { FULCRUM_FEATURES: "i18n,embeddings" };
     expect(i18nTabVisible(env)).toBe(true);
   });
 
-  test("multiple flags — only embeddings on → i18n tab hidden", () => {
+  test("multiple flags: only embeddings on → i18n tab hidden", () => {
     const env = { FULCRUM_FEATURES: "embeddings" };
     expect(i18nTabVisible(env)).toBe(false);
   });

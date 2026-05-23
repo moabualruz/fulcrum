@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cn } from "$lib/utils";
+import { cn } from "@fulcrum/ui-kit";
 
 describe("cn", () => {
   it("filters out falsy class values", () => {

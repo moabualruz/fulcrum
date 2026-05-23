@@ -134,7 +134,7 @@ describe("task public Nest API", () => {
       filtersApplied: 2,
       listRows: [{ id: TASK_ID, title: "Workbench task" }],
     }));
-    const createTask = mock(async () => task({ id: "created-task" }));
+    const createTask = mock(async () => task({ id: "created-task", traceId: "trace-created-task" }));
     const getTask = mock(async () => task({ title: "Fetched task" }));
     const listTaskChildren = mock(async () => [task({ id: "child-task", parentId: TASK_ID })]);
     const patchTask = mock(async () => task({ title: "Updated task", status: "done" }));
@@ -191,7 +191,8 @@ describe("task public Nest API", () => {
       points: 5,
       assigneeId: USER_ID,
       project_id: PROJECT_ID,
-    })).resolves.toEqual({ id: "created-task" });
+      traceId: "trace-created-task",
+    })).resolves.toEqual({ id: "created-task", traceId: "trace-created-task" });
     await expect(controller.getTask({ id: TASK_ID }, { orgId: ORG_ID, userId: USER_ID })).resolves.toEqual(
       expect.objectContaining({ title: "Fetched task" }),
     );
@@ -260,6 +261,7 @@ describe("task public Nest API", () => {
       priority: undefined,
       points: 5,
       assigneeId: USER_ID,
+      traceId: "trace-created-task",
     });
     expect(getTask).toHaveBeenCalledWith({ orgId: ORG_ID, userId: USER_ID, projectId: null, id: TASK_ID });
     expect(listTaskChildren).toHaveBeenCalledWith({
@@ -374,7 +376,12 @@ describe("task public Nest API", () => {
     });
     const params = Object.assign(new TaskIdParamsDto(), { id: TASK_ID });
     const invalidParams = Object.assign(new TaskIdParamsDto(), { id: "" });
-    const body = Object.assign(new TaskCreateBodyDto(), { orgId: ORG_ID, userId: USER_ID, title: "Task" });
+    const body = Object.assign(new TaskCreateBodyDto(), {
+      orgId: ORG_ID,
+      userId: USER_ID,
+      title: "Task",
+      traceId: "trace-task",
+    });
     const invalidBody = Object.assign(new TaskCreateBodyDto(), { orgId: "", userId: "", title: "" });
     const patch = Object.assign(new TaskPatchBodyDto(), { orgId: ORG_ID, userId: USER_ID, status: "done" });
     const invalidPatch = Object.assign(new TaskPatchBodyDto(), { orgId: "", userId: "", status: "unknown" });

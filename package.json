@@ -5,7 +5,9 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*",
+    "services/*"
   ],
   "overrides": {
     "cookie": "^0.7.2",
@@ -20,9 +22,17 @@
     "build": "bun build --compile --minify --target=bun-darwin-arm64 --external=@nestjs/platform-socket.io --external=@grpc/grpc-js --external=@grpc/proto-loader --external=kafkajs --external=nats --external=amqplib --external=amqp-connection-manager --external=ioredis --external=mqtt apps/cli/src/main.ts --outfile=dist/fulcrum-darwin-arm64",
     "build:all": "bun run scripts/build-all.ts",
     "test": "bun test",
+    "typecheck": "bun run --bun tsc --noEmit",
     "lint": "bun run --bun tsc --noEmit",
+    "format": "biome format --write biome.json",
     "lint:boundaries": "bun run scripts/check-module-boundaries.ts",
     "ci": "bun run scripts/ci.ts",
+    "ci-fast": "bun run scripts/ci.ts --tier=tier2 --changed",
+    "ci:tier1": "bun run scripts/ci.ts --tier=tier1",
+    "ci:tier2": "bun run scripts/ci.ts --tier=tier2",
+    "ci:tier3": "bun run scripts/ci.ts --tier=tier3",
+    "ci:tier4": "bun run scripts/ci.ts --tier=tier4",
+    "ci:tier5": "bun run scripts/ci.ts --tier=tier5",
     "changelog": "git-cliff -o CHANGELOG.md",
     "compress": "bun run apps/cli/src/main.ts compress",
     "release": "bun run scripts/release.ts"
@@ -32,6 +42,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.11.3",
+    "@biomejs/biome": "2.4.15",
     "@nestjs/microservices": "11.1.21",
     "@nestjs/websockets": "11.1.21",
     "@playwright/test": "1.59.1",
@@ -39,10 +50,12 @@
     "@types/bun": "latest",
     "@types/pg": "8.20.0",
     "@types/ws": "8.18.1",
+    "@vitest/browser-playwright": "4.1.5",
     "svelte": "^5.55.2",
     "tinyglobby": "0.2.16",
     "ts-morph": "28.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "@ai-hero/sandcastle": "0.5.6",
@@ -54,6 +67,7 @@
     "@nestjs/common": "11.1.20",
     "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.1.20",
+    "@nestjs/event-emitter": "3.0.1",
     "@nestjs/platform-express": "11.1.20",
     "@nestjs/swagger": "11.4.2",
     "@nestjs/typeorm": "11.0.1",

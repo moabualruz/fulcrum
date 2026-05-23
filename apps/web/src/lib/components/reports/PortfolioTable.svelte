@@ -68,7 +68,7 @@
               </div>
             </td>
             <td class="px-4 py-3 text-muted-foreground">
-              {row.activeSprint ?? '—'}
+              {row.activeSprint ?? '-'}
             </td>
             <td class="px-4 py-3">
               {#if row.overdueCount > 0}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { cn } from "$lib/utils.js";
+  import { Badge, Card, Stat } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
   import { fetchSprintReport, type SprintReportData } from "./sprint-report-api.js";
 
   interface VelocityEntry {
@@ -38,12 +39,12 @@
   }
 
   function fmt(val: number | undefined | null, suffix = ""): string {
-    if (val == null) return "—";
+    if (val == null) return "-";
     return `${val}${suffix}`;
   }
 
   function fmtDate(d: string | null | undefined): string {
-    if (!d) return "—";
+    if (!d) return "-";
     return new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -86,18 +87,14 @@
           {fmtDate(sprint.startDate)} – {fmtDate(sprint.endDate)}
         </p>
       </div>
-      <span class={cn(
-        "text-xs px-2 py-0.5 rounded-full font-medium",
-        sprint.status === "completed" ? "bg-green-100 text-green-700" :
-        sprint.status === "active" ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
-      )}>
+      <Badge variant={sprint.status === "completed" ? "success" : sprint.status === "active" ? "accent" : "default"}>
         {sprint.status === "completed" ? "Closed" : sprint.status === "active" ? "In Progress" : "Planned"}
-      </span>
+      </Badge>
     </div>
 
     {#if sprint.status !== "completed"}
       <div class={cn("bg-blue-50 text-blue-700 text-sm px-3 py-2 rounded-md")}>
-        Sprint in progress — stats are live and not yet frozen.
+        Sprint in progress: stats are live and not yet frozen.
       </div>
     {/if}
 
@@ -113,10 +110,7 @@
           { label: "Removed", value: fmt(summary.removed) },
           { label: "Scope change", value: fmt(summary.scopeChangePct, "%") },
         ] as stat}
-          <div class={cn("flex flex-col gap-0.5 p-3 rounded-lg border border-border bg-card")}>
-            <div class={cn("text-xs text-muted-foreground")}>{stat.label}</div>
-            <div class={cn("text-2xl font-bold tabular-nums")}>{stat.value}</div>
-          </div>
+          <Stat label={stat.label} value={stat.value} />
         {/each}
       </div>
     {:else}
@@ -124,7 +118,7 @@
     {/if}
 
     {#if sprint.velocityHistory && sprint.velocityHistory.length > 0}
-      <div class={cn("border border-border rounded-lg p-4")}>
+      <Card class={cn("p-4")}>
         <h3 class={cn("text-sm font-semibold mb-3")}>Velocity</h3>
         <div class={cn("flex flex-col gap-1.5")}>
           {#each sprint.velocityHistory as entry}
@@ -143,16 +137,16 @@
             Rolling avg: <span class={cn("font-medium")}>{velocityAvg(sprint.velocityHistory)} pts</span>
           </div>
         </div>
-      </div>
+      </Card>
     {/if}
 
     {#if sprint.retrospectiveNotes}
       {@const retroText = notesText(sprint.retrospectiveNotes)}
       {#if retroText}
-        <div class={cn("border border-border rounded-lg p-4")}>
+        <Card class={cn("p-4")}>
           <h3 class={cn("text-sm font-semibold mb-2")}>Retrospective Notes</h3>
           <p class={cn("text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed")}>{retroText}</p>
-        </div>
+        </Card>
       {/if}
     {/if}
 
@@ -174,14 +168,14 @@
               <tr class={cn("border-t border-border hover:bg-muted/30")}>
                 <td class={cn("px-3 py-2 truncate max-w-xs")}>{task.title}</td>
                 <td class={cn("px-3 py-2")}>
-                  <span class={cn("text-xs px-1.5 py-0.5 rounded bg-muted")}>{task.status}</span>
+                  <Badge variant="default" size="sm">{task.status}</Badge>
                 </td>
-                <td class={cn("px-3 py-2 text-right tabular-nums")}>{task.storyPoints ?? "—"}</td>
+                <td class={cn("px-3 py-2 text-right tabular-nums")}>{task.storyPoints ?? "-"}</td>
                 <td class={cn("px-3 py-2 text-xs text-muted-foreground")}>
                   {#if task.statusHistory && task.statusHistory.length > 0}
                     {task.statusHistory.map((h) => `${h.status} ${new Date(h.enteredAt).toLocaleDateString()}`).join(" → ")}
                   {:else}
-                    —
+                    -
                   {/if}
                 </td>
               </tr>

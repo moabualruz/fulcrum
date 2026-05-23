@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
+import { TrpcRouter } from "@fulcrum/server/trpc/trpc.router.ts";
+import { TrpcService } from "@fulcrum/server/trpc/trpc.service.ts";
 
 const REQUIRED_NAMESPACES = [
   "tasks",
@@ -22,6 +25,7 @@ const REQUIRED_NAMESPACES = [
   "routing",
   "skills",
   "inference",
+  "timeEntries",
 ];
 
 const ROOT_ALIASES: Record<string, string> = {
@@ -88,10 +92,11 @@ const ALLOWLIST: Record<string, string> = {
 };
 
 function procedureNamespaces(): string[] {
-  return [...new Set(
-    Object.keys((appRouter as never as { _def: { procedures: Record<string, unknown> } })._def.procedures)
-      .map((path) => path.split(".")[0]!),
-  )].sort();
+  return [...new Set(procedurePaths(appRouter).map((path) => path.split(".")[0]!))].sort();
+}
+
+function procedurePaths(router: unknown): string[] {
+  return Object.keys((router as { _def: { procedures: Record<string, unknown> } })._def.procedures).sort();
 }
 
 function testFiles(): string[] {
@@ -126,5 +131,24 @@ describe("all tRPC router contract gate", () => {
     for (const [namespace, reason] of Object.entries(ALLOWLIST)) {
       expect(reason.trim().length, namespace).toBeGreaterThan(20);
     }
+  });
+
+  test("CLI/TUI local caller appRouter includes every Nest-mounted tRPC namespace", async () => {
+    const nestRouterSource = await readFile(new URL("../trpc.router.ts", import.meta.url), "utf-8");
+    const nestNamespaces = [...nestRouterSource.matchAll(/^      ([a-zA-Z_][a-zA-Z0-9_]*): /gm)]
+      .map((match) => match[1]!)
+      .filter((namespace) => !namespace.endsWith("Subscriptions"))
+      .filter((namespace) => namespace !== "ping")
+      .sort();
+    const localCallerNamespaces = procedureNamespaces();
+
+    expect(localCallerNamespaces).toEqual(expect.arrayContaining(nestNamespaces));
+  });
+
+  test("Nest tRPC middleware and CLI/TUI local caller expose the same procedure contract", () => {
+    const nestRouter = new TrpcRouter(new TrpcService());
+    nestRouter.onModuleInit();
+
+    expect(procedurePaths(nestRouter.appRouter)).toEqual(procedurePaths(appRouter));
   });
 });

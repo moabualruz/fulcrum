@@ -1,5 +1,5 @@
 /**
- * Tests for generateNarration — gated behind FULCRUM_FEATURES=report-llm-narration.
+ * Tests for generateNarration: gated behind FULCRUM_FEATURES=report-llm-narration.
  * Uses mocked inference sidecar (no real HTTP calls).
  */
 

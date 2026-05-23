@@ -1,20 +1,33 @@
 /**
- * PlanningScreen — TUI ACP planning surface (W2).
+ * Plan stage workbench: the TUI `:plan` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `plan` screen).
  *
- * Shows current planning state, starts guided ACP or freeform planning
+ * The Plan stage's planning-sessions surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :plan · …` header,
+ * StatusFooter strip, and empty/error contract as every other stage workbench.
+ * Shows current planning state, starts guided AI Assist or freeform planning
  * sessions, and displays session status with traffic info.
  *
  * Keybindings:
- *   G       — start guided ACP session
- *   F       — start freeform planning
- *   R       — refresh state
- *   j/k     — navigate sessions
- *   Enter   — open session detail
- *   q       — go back
+ *   G      : start guided AI Assist session
+ *   F      : start freeform planning
+ *   R      : refresh state
+ *   j/k    : navigate sessions
+ *   Enter  : open session detail
+ *   q      : go back
  */
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderStatusBadge,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -51,6 +64,12 @@ export interface TuiPlanningState {
 
 export interface PlanningScreenOptions {
   projectId?: string;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
   caller: {
     planning: {
       getState: (input?: { projectId?: string }) => Promise<TuiPlanningState>;
@@ -78,8 +97,29 @@ export class PlanningScreen {
   private cursor = 0;
   private scrollTop = 0;
   private error: string | null = null;
+  private readonly modePicker = new ModePicker({
+    stepId: "planning",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: PlanningScreenOptions) {}
+
+  /** The OD stage-scope chrome for the Plan workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Plan",
+      route: ":plan",
+      purpose: "live planning",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.allSessions.length} sessions`,
+      agent: this.allSessions[this.cursor]?.agentName ?? null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? this.allSessions[this.cursor]?.traceId ?? null,
+    };
+  }
 
   async load(): Promise<void> {
     try {
@@ -95,20 +135,34 @@ export class PlanningScreen {
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Planning"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
     if (this.error) {
-      renderer.writeln(c.red(`  ${this.error}`));
-      renderer.writeln();
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Planning state failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
     }
 
     if (!this.state) {
-      renderer.writeln(c.dim("  Loading planning state..."));
       renderer.writeln();
-      renderer.writeln(c.dim("  G=guided start  F=freeform start  q=back"));
+      renderer.writeln(c.dim("  Loading planning state..."));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.allSessions.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No planning sessions in this stage yet.",
+        "Press G for a guided session or F for freeform.",
+      );
+      renderer.writeln();
+      renderer.writeln(c.dim("  G=guided start  F=freeform start  R=refresh  q=back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
       return;
     }
 
@@ -119,7 +173,7 @@ export class PlanningScreen {
       renderer.writeln(c.dim("  No active planning sessions."));
     } else {
       for (const session of active) {
-        const badge = planningStatusBadge(session.status);
+        const badge = renderStatusBadge(session.status);
         const mode = session.mode === "guided" ? c.cyan("[guided]") : c.magenta("[freeform]");
         const agent = session.agentName ? c.dim(` @${session.agentName}`) : "";
         const traffic = session.traffic?.length
@@ -141,7 +195,7 @@ export class PlanningScreen {
       for (const session of visible) {
         const index = allSessions.indexOf(session);
         const pointer = index === this.cursor ? c.bold(">") : " ";
-        const badge = planningStatusBadge(session.status);
+        const badge = renderStatusBadge(session.status);
         const mode = session.mode === "guided" ? c.cyan("[G]") : c.magenta("[F]");
         const date = session.createdAt ? c.dim(` ${session.createdAt}`) : "";
         renderer.writeln(`${pointer} ${badge} ${mode} ${session.title}${date}  ${c.dim(session.id)}`);
@@ -160,10 +214,17 @@ export class PlanningScreen {
     }
 
     renderer.writeln();
+    renderer.writeln(`  ${c.dim("step modes")}  ${this.modePicker.render()}`);
+    renderer.writeln();
     renderer.writeln(c.dim("  G=guided start  F=freeform start  R=refresh  j/k=navigate  Enter=open  q=back"));
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.modePicker.handleChordKey(key)) {
+      return true;
+    }
+
     if (key === "j" || key === "\x1b[B") {
       const max = Math.max(0, this.allSessions.length - 1);
       this.cursor = Math.min(this.cursor + 1, max);
@@ -260,18 +321,4 @@ export class PlanningScreen {
     if (this.cursor < this.scrollTop) this.scrollTop = this.cursor;
     if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-function planningStatusBadge(status: string): string {
-  if (status === "idle") return c.dim("[idle]");
-  if (status === "planning") return c.yellow("[planning]");
-  if (status === "awaiting_review") return c.cyan("[review]");
-  if (status === "approved") return c.green("[approved]");
-  if (status === "rejected") return c.red("[rejected]");
-  if (status === "executing") return c.yellow("[executing]");
-  return `[${status}]`;
 }

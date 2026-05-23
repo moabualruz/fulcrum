@@ -1,84 +1,88 @@
 #!/usr/bin/env bun
-// fulcrum — multi-agent foundation CLI.
+// fulcrum: local-first CLI Agent OS. Binary entry-point.
 
-const HELP = `fulcrum — multi-agent foundation CLI
+import { installCliLogRedaction } from "./log.ts";
+import {
+  ROOT_HELP,
+  STAGE_HELP_TOPICS,
+  commandPathFromArgv,
+  renderCommandHelp,
+  renderCommandSchema,
+  renderStageHelp,
+} from "./help.ts";
+import { serializeEnvelope, wrapEnvelope } from "./lib/envelope.ts";
 
-Usage:
-  fulcrum init [DIR]                 Bootstrap a project (AGENTS.md, .claude/CLAUDE.md, .gitignore).
-  fulcrum hook <name> [args...]      Run a hook recipe (reads JSON envelope on stdin).
-                                     Recipes: format, lint-gate, pm-policy, test-on-edit,
-                                              audit-log, index-check, index-rebuild, router
-  fulcrum hooks list                 List available hook recipes.
-  fulcrum hooks enable <name>        Register a hook in each detected agent config.
-  fulcrum skills sync                Mirror authored skills; Codex global scope is opt-in.
-  fulcrum skills upstream [--update-pins]
-                                     Mirror curated third-party skills to agents; --update-pins
-                                     computes and writes subpath_sha256 for unpinned entries.
-  fulcrum skills lint <path>         Validate a SKILL.md (frontmatter + required body sections).
-  fulcrum skills list [--installed]  Enumerate authored skills, or installed skill budgets.
-  fulcrum install [--profile minimal|rules-only|full] [--with-project DIR]
-                  [--no-skills] [--no-upstream-skills]
-                  [--no-default-mcps] [--enable-all-mcps]
-                                     Splice rules, vendor hooks, sync skills, install caveman.
-                                     Default profile is minimal; full keeps historical bootstrap.
-                                     --enable-all-mcps: enable every builtin MCP across all agents.
-  fulcrum uninstall [--dry-run] [--purge] [--include-caveman]
-                                     Remove Fulcrum-managed install artifacts.
-  fulcrum compress [--check] [FILES...]
-                                     Compress markdown with caveman; default targets shown in help.
-  fulcrum mcp list [--json]          List registered MCP servers.
-  fulcrum mcp register <name> [--http URL | --stdio CMD] [--vendor V] ...
-                                     Register an MCP server in the registry.
-  fulcrum mcp unregister <name>      Unregister and remove from all agents.
-  fulcrum mcp enable <name> [--agent <id> ...] [--all-agents]
-                                     Enable server and push to agents.
-  fulcrum mcp disable <name> [--agent <id> ...] [--all-agents]
-                                     Disable server and remove from agents.
-  fulcrum component list [--json]    List Fulcrum components.
-  fulcrum components status [--json] Show component lifecycle status.
-  fulcrum component info <id> [--json]
-                                     Show component details and surfaces.
-  fulcrum component plan <install|remove|enable|disable> <component> [--agent <id>] [--all-agents] [--json]
-                                     Plan component changes without applying them.
-  fulcrum auth <whoami|invite|login|logout>
-  fulcrum flags <list|set> [options]
-  fulcrum routing rules <list|add|edit|delete> [options]
-  fulcrum db <migrate|status|history> [options]
-  fulcrum web
-  fulcrum tui
-  fulcrum inference <start|status|embed|generate|stop> [--json]
-  fulcrum projects|tasks|sprints|memory|search|artifacts|credentials|webhooks|repos|docs|runs|notify|audit|connectors
-  fulcrum settings <list|get|set> [--json]
-  fulcrum completion --shell <bash|zsh|fish|powershell>
-  fulcrum product init [--json]      Initialise the local product kernel (PGlite + migrations).
-  fulcrum product projects list [--json]
-                                     List product-kernel projects.
-  fulcrum product search <query> [--org-slug <slug>] [--limit <N>] [--json]
-                                     Run an FTS query over the product kernel search index.
-  fulcrum product context assemble --task <id> [--org-slug <slug>] [--json]
-                                     Render the assembled Markdown context for a task.
-  fulcrum product planning preview --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
-                                     Preview approved-plan docs/tasks/dependencies through shared planning API.
-  fulcrum product planning materialize --plan <id> --file <path> [--project <id>] [--trace <id>] [--json]
-                                     Persist approved-plan docs/tasks/dependencies through shared planning API.
-  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
-                                     Report bun, agent dirs, tool presence, policy health.
-                                     --subsystem runs only named subsystem checks via orchestrator.
-                                     --checks includes modular orchestrator checks in legacy report.
-  fulcrum version                    Print version.
-  fulcrum help                       This message.
-
-Environment:
-  FULCRUM_HOME           override ~/.fulcrum
-  FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
-  FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
-`;
+installCliLogRedaction();
 
 const VERSION = "0.1.0";
+const BUILD_DATE = process.env["FULCRUM_BUILD_DATE"] ?? "dev";
+const COMMIT = process.env["FULCRUM_COMMIT"] ?? "dev";
+
+const INDEX_DISPATCH_ROOTS = new Set([
+  "agent",
+  "branch",
+  "config",
+  "context",
+  "cycle",
+  "doc",
+  "e2e",
+  "mission",
+  "module",
+  "note",
+  "operate",
+  "plan",
+  "plugin",
+  "pr",
+  "profile",
+  "prototype",
+  "qa",
+  "release",
+  "repo",
+  "review",
+  "run",
+  "ship",
+  "trace",
+  "uat",
+  "workspace",
+]);
+
+function printVersion(argv: readonly string[]): void {
+  const result = {
+    version: VERSION,
+    commit: COMMIT,
+    build_date: BUILD_DATE,
+  };
+  if (argv.includes("--json")) {
+    console.log(
+      serializeEnvelope(wrapEnvelope({
+        command: "fulcrum version",
+        args: {},
+        result,
+        trace: { trace_id: process.env["FULCRUM_TRACE_ID"] },
+        startedAt: Date.now(),
+      })),
+    );
+    return;
+  }
+  console.log(VERSION);
+}
 
 async function main() {
   const argv = Bun.argv.slice(2);
   const [cmd = "help", ...rest] = argv;
+
+  if (argv.includes("--json-schema")) {
+    console.log(JSON.stringify(renderCommandSchema(commandPathFromArgv(argv))));
+    return;
+  }
+
+  // `--help` / `-h` on any command short-circuits dispatch. If we have a
+  // command-specific help entry we print that; otherwise we fall back to the
+  // root help so every subcommand has *some* help and never errors out.
+  if (cmd !== "help" && (argv.includes("--help") || argv.includes("-h"))) {
+    console.log(renderCommandHelp(argv) ?? ROOT_HELP);
+    return;
+  }
 
   switch (cmd) {
     case "hook": {
@@ -101,7 +105,7 @@ async function main() {
       return;
     }
     case "init": {
-      const { run: runInit } = await import("./commands/init.ts");
+      const { run: runInit } = await import("./init.ts");
       await runInit(rest);
       return;
     }
@@ -155,50 +159,103 @@ async function main() {
       await run([cmd, ...rest]);
       return;
     }
+    case "completion": {
+      const { run: runCompletion } = await import("./completion.ts");
+      await runCompletion(rest);
+      return;
+    }
+    case "version":
+    case "--version":
+    case "-V": {
+      printVersion(rest);
+      return;
+    }
+    case "--json": {
+      if (rest.includes("--version") || rest.includes("-V")) {
+        printVersion([cmd, ...rest]);
+        return;
+      }
+      const { run } = await import("./index.ts");
+      await run([cmd, ...rest]);
+      return;
+    }
+    case "parity":
     case "auth":
     case "flags":
     case "routing":
+    case "route":
     case "db":
     case "web":
     case "tui":
     case "inference":
     case "agents":
     case "projects":
+    case "capture":
+    case "task":
     case "tasks":
     case "sprints":
     case "memory":
     case "search":
+    case "ship":
     case "artifacts":
+    case "artifact":
     case "repos":
+    case "repo":
     case "docs":
+    case "report":
     case "symphony":
     case "runs":
+    case "session":
+    case "ai":
+    case "mode":
+    case "context":
     case "notify":
     case "audit":
     case "webhooks":
     case "connectors":
     case "components":
-    case "completion": {
+    case "relationships":
+    case "comments":
+    case "templates":
+    case "automations":
+    case "recurrence":
+    case "saved_views":
+    case "taskCustomFields":
+    case "customFieldDefs": {
       const { run } = await import("./index.ts");
       await run([cmd, ...rest]);
       return;
     }
-    case "version":
-    case "--version":
-    case "-v":
-      console.log(VERSION);
-      return;
     case "help":
     case "--help":
-    case "-h":
-      console.log(HELP);
+    case "-h": {
+      const path = commandPathFromArgv(argv);
+      const topic = path[0];
+      if (topic) {
+        const stageHelp = path.length === 1 ? renderStageHelp(topic) : null;
+        const commandHelp = renderCommandHelp(path);
+        if (stageHelp || commandHelp) {
+          console.log(stageHelp ?? commandHelp);
+          return;
+        }
+        console.error(`fulcrum help: unknown stage '${topic}'`);
+        console.error(`Known stages: ${STAGE_HELP_TOPICS.join(", ")}`);
+        process.exit(2);
+      }
+      console.log(ROOT_HELP);
       return;
+    }
     default:
+      if (INDEX_DISPATCH_ROOTS.has(cmd)) {
+        const { run } = await import("./index.ts");
+        await run([cmd, ...rest]);
+        return;
+      }
       console.error(`fulcrum: unknown command '${cmd}'`);
       if (cmd === "projcts") {
         console.error("Did you mean 'projects'?");
       }
-      console.error(HELP);
+      console.error(ROOT_HELP);
       process.exit(1);
   }
 }

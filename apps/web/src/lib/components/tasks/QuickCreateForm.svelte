@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * QuickCreateForm — task workflow (D-113).
+   * QuickCreateForm: task workflow (D-113).
    *
    * Compact floating form for rapid task creation.
    * Triggered by the `c` keyboard shortcut or a + button.
    * Enter submits, Esc closes. Stays open after submit for multi-create.
    *
    */
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
   import { page } from "$app/state";
   import {
     createQuickTask,
@@ -90,7 +90,7 @@
           title: title.trim(),
         });
       } catch {
-        // silently ignore — duplicate detection is best-effort
+        // silently ignore: duplicate detection is best-effort
       }
     }, 500);
   }

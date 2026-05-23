@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+interface UpstreamConflict {
+  local_content: string;
+  upstream_content: string;
+  installed_skill: string;
+  requested_skill: string;
+  recommended_resolution: string;
+}
+
 interface SkillsPayload {
   skills: Array<{
     id: string;
@@ -8,7 +16,7 @@ interface SkillsPayload {
     source: string;
     content_hash: string | null;
     enabled_agents: string[];
-    upstream_conflict: null;
+    upstream_conflict: UpstreamConflict | null;
   }>;
 }
 
@@ -36,39 +44,55 @@ function loadEvent(fetch: typeof globalThis.fetch) {
   };
 }
 
+const SKILL_ROWS = [
+  {
+    id: "bat",
+    name: "bat",
+    slug: "bat",
+    source: "local",
+    version: "1.0.0",
+    hash: "sha-bat",
+    upstreamRepo: null,
+    upstreamRef: null,
+    enabledAgents: ["codex"],
+  },
+  {
+    id: "jq",
+    name: "jq",
+    slug: "jq",
+    source: "local",
+    version: "1.1.0",
+    hash: "sha-jq",
+    upstreamRepo: null,
+    upstreamRef: null,
+    enabledAgents: ["codex", "claude"],
+  },
+];
+
+// The skills route load now fans out to two public-API endpoints in parallel:
+// `GET /api/v1/skills` for the installed list and `GET /api/v1/skills/conflicts`
+// for upstream version conflicts. This dispatcher routes a mocked `fetch` to
+// the right payload by path so each test controls both endpoints independently.
+function skillsFetch(
+  skillRows: unknown[],
+  conflictRows: unknown[],
+  calls: Array<{ url: string; init?: RequestInit }>,
+): typeof globalThis.fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ url, init });
+    const body = url.includes("/api/v1/skills/conflicts") ? conflictRows : skillRows;
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof globalThis.fetch;
+}
+
 describe("/settings/skills +page.server.ts load()", () => {
   test("loads installed skills through the public skill API", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
-    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      calls.push({ url: String(input), init });
-      return new Response(
-        JSON.stringify([
-          {
-            id: "bat",
-            name: "bat",
-            slug: "bat",
-            source: "local",
-            version: "1.0.0",
-            hash: "sha-bat",
-            upstreamRepo: null,
-            upstreamRef: null,
-            enabledAgents: ["codex"],
-          },
-          {
-            id: "jq",
-            name: "jq",
-            slug: "jq",
-            source: "local",
-            version: "1.1.0",
-            hash: "sha-jq",
-            upstreamRepo: null,
-            upstreamRef: null,
-            enabledAgents: ["codex", "claude"],
-          },
-        ]),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }) as typeof globalThis.fetch;
+    const fetch = skillsFetch(SKILL_ROWS, [], calls);
     const mod = await import(`./+page.server.ts?skills-public-list=${Date.now()}`);
 
     const result = mod.load(loadEvent(fetch) as never);
@@ -89,21 +113,43 @@ describe("/settings/skills +page.server.ts load()", () => {
         upstream_conflict: null,
       }),
     ]);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.url).toBe("http://localhost/api/v1/skills?orgId=org-1");
-    expect(calls[0]?.init).toMatchObject({
-      method: "GET",
-      credentials: "include",
-      headers: expect.objectContaining({ cookie: "sid=session-1" }),
+    // The load fans out to the installed-skills list and the conflicts list.
+    expect(calls).toHaveLength(2);
+    const urls = calls.map((call) => call.url).sort();
+    expect(urls).toContain("http://localhost/api/v1/skills?orgId=org-1");
+    expect(urls).toContain("http://localhost/api/v1/skills/conflicts");
+    for (const call of calls) {
+      expect(call.init).toMatchObject({
+        method: "GET",
+        credentials: "include",
+        headers: expect.objectContaining({ cookie: "sid=session-1" }),
+      });
+    }
+  });
+
+  test("maps an upstream conflict onto the matching installed skill", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const conflicts = [{ slug: "jq", localHash: "sha-jq", upstreamHash: "sha-jq-next" }];
+    const fetch = skillsFetch(SKILL_ROWS, conflicts, calls);
+    const mod = await import(`./+page.server.ts?skills-conflict=${Date.now()}`);
+
+    const result = mod.load(loadEvent(fetch) as never);
+    const payload = await streamedData<SkillsPayload>(result);
+
+    const bat = payload.skills.find((skill) => skill.slug === "bat");
+    const jq = payload.skills.find((skill) => skill.slug === "jq");
+    // Only `jq` has a conflict row: `bat` stays conflict-free.
+    expect(bat?.upstream_conflict).toBeNull();
+    expect(jq?.upstream_conflict).toMatchObject({
+      local_content: "sha-jq",
+      upstream_content: "sha-jq-next",
+      installed_skill: "jq",
     });
   });
 
   test("returns empty array when no skills are installed", async () => {
-    const fetch = (async () =>
-      new Response(JSON.stringify([]), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      })) as typeof globalThis.fetch;
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetch = skillsFetch([], [], calls);
     const mod = await import(`./+page.server.ts?skills-empty=${Date.now()}`);
 
     const result = mod.load(loadEvent(fetch) as never);

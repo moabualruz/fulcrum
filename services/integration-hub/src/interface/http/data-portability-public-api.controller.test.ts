@@ -147,6 +147,7 @@ async function assertDataPortabilityRoundTrip(source: FulcrumTypeOrmConnectionSo
     const backup = await controller.createBackup(scope);
     expect(backup).toMatchObject({
       format: "fulcrum.db-dump.v1",
+      schemaVersion: 1,
       entityCounts: expect.objectContaining({ fulcrum_portable_items: 1 }),
     });
     expect(typeof backup.dump).toBe("string");
@@ -189,12 +190,56 @@ async function assertDataPortabilityRoundTrip(source: FulcrumTypeOrmConnectionSo
     await dataSource.query("update fulcrum_portable_items set title = $1 where id = $2", ["Broken", "item-1"]);
     await expect(controller.restoreBackup({ ...scope, dump: backup.dump })).resolves.toMatchObject({
       format: "fulcrum.db-dump.v1",
+      schemaVersion: 1,
       entityCounts: expect.objectContaining({ fulcrum_portable_items: 1 }),
     });
     await expect(dataSource.query<{ title: string; api_token: string }[]>(
       "select title, api_token from fulcrum_portable_items where id = $1",
       ["item-1"],
     )).resolves.toEqual([{ title: "Original", api_token: "secret-token" }]);
+
+    // Partial failure reporting: stage an export manifest where one row violates
+    // a NOT NULL constraint. Other rows must still import; failure list captures
+    // the offending row with its db error message.
+    await dataSource.query("delete from fulcrum_portable_items");
+    const partialFailureExportPath = join(scratch, `${source}-partial.json`);
+    const failingManifest = {
+      format: "fulcrum.json-export.v1",
+      manifest: {
+        schema_version: 1,
+        fulcrum_version: "0.1.0",
+        exported_at: new Date().toISOString(),
+        counts: { fulcrum_portable_items: 2 },
+        column_types: {
+          fulcrum_portable_items: {
+            id: "character varying",
+            org_id: "character varying",
+            title: "character varying",
+            api_token: "text",
+            details: "jsonb",
+          },
+        },
+      },
+      fulcrum_portable_items: [
+        { id: "item-ok", org_id: scope.orgId, title: "OK", api_token: null, details: { status: "ready" } },
+        { id: "item-bad", org_id: scope.orgId, title: null, api_token: null, details: { status: "ready" } },
+      ],
+    };
+    await writeFile(partialFailureExportPath, JSON.stringify(failingManifest), "utf8");
+    const partial = await controller.runImport({ ...scope, importId: partialFailureExportPath, onConflict: "update" });
+    expect(partial.imported).toBeGreaterThanOrEqual(1);
+    expect(partial.errors).toBe(1);
+    expect(partial.failures).toEqual([
+      expect.objectContaining({ kind: "fulcrum_portable_items", id: "item-bad" }),
+    ]);
+    await expect(dataSource.query<{ id: string }[]>(
+      "select id from fulcrum_portable_items where id = $1",
+      ["item-ok"],
+    )).resolves.toEqual([{ id: "item-ok" }]);
+    await expect(dataSource.query<{ id: string }[]>(
+      "select id from fulcrum_portable_items where id = $1",
+      ["item-bad"],
+    )).resolves.toEqual([]);
 
     await writeFile(exportPath, JSON.stringify({ bad: true }), "utf8");
     await expect(controller.preflightImport({ ...scope, path: exportPath })).rejects.toBeInstanceOf(BadRequestException);

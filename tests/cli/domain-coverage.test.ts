@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { GENERATED_DOMAIN_COMMANDS } from "@fulcrum/cli/generated-domains.ts";
+import { ROOT_HELP } from "@fulcrum/cli/help.ts";
 
 const BASE_DOMAINS = [
   "projects",
@@ -124,8 +125,7 @@ describe("architecture all-domain CLI coverage gate", () => {
   });
 
   test("architecture domains are exposed in top-level CLI help", async () => {
-    const index = await read("../../apps/cli/src/index.ts");
-    const missing = ARCHITECTURE_DOMAIN_COMMANDS.filter((domain) => !index.includes(`fulcrum ${domain} `));
+    const missing = ARCHITECTURE_DOMAIN_COMMANDS.filter((domain) => !ROOT_HELP.includes(`fulcrum ${domain} `));
 
     expect(missing).toEqual([]);
   });

@@ -1,6 +1,6 @@
 import { resolveDefaultOrgId } from "@identity-access/application/auth/default-org.ts";
 import { User } from "@identity-access/infrastructure/database/entities/auth/User.ts";
-import type { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import type { FlagRegistry } from "@feature-flags/application/registry.ts";
 import type { ApplicationPersistence, ApplicationOrm } from "@platform-core/application/runtime/local-database.ts";
 import { initDatabase } from "@platform-core/application/runtime/local-database.ts";
 import { DEFAULT_ADMIN_EMAIL } from "@platform-core/infrastructure/application-database/seed.ts";
@@ -41,7 +41,7 @@ export async function createDefaultWebRuntime(): Promise<WebRuntime> {
   // Build FlagRegistry from DataSource directly (standalone, no NestJS DI).
   let flagRegistry: FlagRegistry | undefined;
   try {
-    const { FlagRegistry } = await import("@platform-core/application/feature-flags/registry.ts");
+    const { FlagRegistry } = await import("@feature-flags/application/registry.ts");
     const flagRepo = new FeatureFlagRepository(orm.getRepository(FeatureFlag) as never);
     flagRegistry = new FlagRegistry(flagRepo as never);
   } catch {

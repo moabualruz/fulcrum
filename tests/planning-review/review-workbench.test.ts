@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { classifyPlanningTriage } from "@planning-review/application/features/planning-triage.ts";
 import { buildReviewWorkbenchModel, type ReviewWorkbenchDiffFile } from "@planning-review/application/reviews/review-workbench.ts";
 import type { CodeReviewAnnotation } from "@planning-review/application/reviews/shared/review-feedback.ts";
 
@@ -110,6 +111,11 @@ describe("review planning behavior behavior", () => {
         title: "workflow review",
         repo: "acme/fulcrum",
       },
+      planningTriage: classifyPlanningTriage({
+        title: "Auth plan",
+        markdown: "Update auth permission policy and UAT path.",
+        changedPaths: ["services/identity-access/src/application/auth/passkeys.ts"],
+      }),
       editorAnnotations: [
         {
           filePath: "src/app/main.ts",
@@ -134,6 +140,11 @@ describe("review planning behavior behavior", () => {
     expect(model.projectId).toBe("project-review");
     expect(model.traceId).toBe("trace-review-workbench");
     expect(model.reviewId).toBe("review-uat-1");
+    expect(model.planningTriage).toMatchObject({
+      risk: "high",
+      requiredReviewTypes: ["security_review", "code_review", "uat"],
+    });
+    expect(model.planningTriage?.reason).toContain("security-sensitive");
     expect(model.selectedFile?.path).toBe("src/app/main.ts");
     expect(model.visibleFiles.map((file) => file.path)).toEqual(["src/app/main.ts", "docs/plan.md"]);
 

@@ -33,7 +33,7 @@ describe("DangerZone component (SSR)", () => {
     expect(triggerMatch).not.toBeNull();
     const confirmMatch = body.match(/<div\b[^>]*data-danger-confirm[^>]*>/);
     expect(confirmMatch).not.toBeNull();
-    // The confirm panel must be hidden in the default SSR render — a closed
+    // The confirm panel must be hidden in the default SSR render: a closed
     // dialog state by default.
     expect(confirmMatch?.[0]).toContain("hidden");
   });

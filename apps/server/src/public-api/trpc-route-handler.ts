@@ -5,6 +5,7 @@ import type { Session } from "better-auth";
 
 import { createContext } from "../trpc/context.ts";
 import { appRouter } from "../trpc/router.ts";
+import { WEB_TRPC_BRIDGE_PREFIX } from "./route-taxonomy.ts";
 
 export interface TrpcRouteHandlerInput {
   request: Request;
@@ -17,7 +18,7 @@ export interface TrpcRouteHandlerInput {
 
 export function handleTrpcRoute(input: TrpcRouteHandlerInput): Promise<Response> {
   return fetchRequestHandler({
-    endpoint: "/api/trpc",
+    endpoint: WEB_TRPC_BRIDGE_PREFIX,
     req: input.request,
     router: appRouter,
     createContext: ({ resHeaders }) =>

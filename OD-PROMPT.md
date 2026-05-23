@@ -36,14 +36,14 @@ REQUIRED READS (verbatim sources of truth — do not invent, do not skip):
        — Voice rules, empty-state copy, error template, mode affordance copy, doctor copy, permission prompts, status labels.
   4b. /Users/mkh/workspace/fulcrum/CLI-TUI-UX.md
        — Full CLI subcommand tree (six workflow stages), JSON envelope, flag standards, completion, error codes, TUI screen list, keyboard map, status footer (mirror of web), command palette, ACP chat pane, CLI↔TUI parity table.
-  5. /Users/mkh/workspace/fulcrum/.scratch/design-research/01-workflow-nav-ia.md
-  6. /Users/mkh/workspace/fulcrum/.scratch/design-research/02-agent-supervision.md
-  7. /Users/mkh/workspace/fulcrum/.scratch/design-research/03-knowledge-docs-memory.md
-  8. /Users/mkh/workspace/fulcrum/.scratch/design-research/04-observability-trace.md
-  9. /Users/mkh/workspace/fulcrum/.scratch/design-research/05-cli-tui-design.md
- 10. /Users/mkh/workspace/fulcrum/.scratch/design-research/06-mobile-a11y-perf-tokens.md
- 11. /Users/mkh/workspace/fulcrum/.scratch/design-research/07-copy-first-parity.md
- 12. /Users/mkh/workspace/fulcrum/.scratch/prd.jsonl
+  5. local research dossier (01-workflow-nav-ia)
+  6. local research dossier (02-agent-supervision)
+  7. local research dossier (03-knowledge-docs-memory)
+  8. local research dossier (04-observability-trace)
+  9. local research dossier (05-cli-tui-design)
+ 10. local research dossier (06-mobile-a11y-perf-tokens)
+ 11. local research dossier (07-copy-first-parity)
+ 12. local PRD glossary
        — 1281-entry NDJSON PRD glossary. Treat as canonical user-value requirements. Sample 30+ entries to verify your design honors them.
 
 CORE PRINCIPLES (lifted verbatim from PRODUCT.md; do not soften):
@@ -217,7 +217,7 @@ After Open Design lands the first hi-fi, this conversation iterates via:
 /impeccable clarify copy
 ```
 
-Each cycle pulls the OD artifact via `mcp__open-design__get_artifact`, runs the named impeccable command, writes back proposed edits as a patch file in `.scratch/od-iterations/<ts>/`, and asks you to apply via Open Design's "apply changes" affordance.
+Each cycle pulls the OD artifact via `mcp__open-design__get_artifact`, runs the named impeccable command, writes back proposed edits as a patch file in `local OD iterations dir`, and asks you to apply via Open Design's "apply changes" affordance.
 
 Lock decisions into DESIGN.md / IA-MAP.md / COPY.md as they stabilize so future iterations stay grounded.
 
@@ -232,11 +232,11 @@ Lock decisions into DESIGN.md / IA-MAP.md / COPY.md as they stabilize so future 
 | `/Users/mkh/workspace/fulcrum/IA-MAP.md` | Routes, IA, keyboard, drawer |
 | `/Users/mkh/workspace/fulcrum/COPY.md` | Voice + copy templates |
 | `/Users/mkh/workspace/fulcrum/CLI-TUI-UX.md` | CLI subcommand tree, JSON envelope, flags, completion, TUI screens, keymap, status footer, palette, ACP chat pane, parity table |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/01-workflow-nav-ia.md` | Workflow-stage IA research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/02-agent-supervision.md` | Live session pane research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/03-knowledge-docs-memory.md` | Editor / memory research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/04-observability-trace.md` | Doctor / audit / trace research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/05-cli-tui-design.md` | CLI / TUI research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/06-mobile-a11y-perf-tokens.md` | Mobile / a11y / tokens research |
-| `/Users/mkh/workspace/fulcrum/.scratch/design-research/07-copy-first-parity.md` | Plane/Docmost/Fusion/Plannotator/ACP-UI parity audit |
-| `/Users/mkh/workspace/fulcrum/.scratch/prd.jsonl` | 1281-entry PRD glossary (sample 30+ entries) |
+| `local research dossier (01-workflow-nav-ia)` | Workflow-stage IA research |
+| `local research dossier (02-agent-supervision)` | Live session pane research |
+| `local research dossier (03-knowledge-docs-memory)` | Editor / memory research |
+| `local research dossier (04-observability-trace)` | Doctor / audit / trace research |
+| `local research dossier (05-cli-tui-design)` | CLI / TUI research |
+| `local research dossier (06-mobile-a11y-perf-tokens)` | Mobile / a11y / tokens research |
+| `local research dossier (07-copy-first-parity)` | Plane/Docmost/Fusion/Plannotator/ACP-UI parity audit |
+| `local PRD glossary` | 1281-entry PRD glossary (sample 30+ entries) |

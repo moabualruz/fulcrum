@@ -184,7 +184,10 @@ describe("ReportsScreen", () => {
     await screen.handleKey("4");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Throughput");
     await screen.handleKey("5");
-    expect(renderPlain((renderer) => screen.render(renderer))).toContain("inProgress: 2");
+    const activeWork = renderPlain((renderer) => screen.render(renderer));
+    expect(activeWork).toContain("Active work");
+    expect(activeWork).toContain("inProgress: 2");
+    expect(activeWork).not.toContain("WIP");
     await screen.handleKey("6");
     expect(renderPlain((renderer) => screen.render(renderer))).toContain("Mon | TTTTT IIDD");
   });

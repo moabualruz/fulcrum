@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
-  import * as Sheet from "$lib/components/ui/sheet";
-  import * as ScrollArea from "$lib/components/ui/scroll-area";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { Sheet, SheetContent, SheetHeader, SheetTitle, ScrollArea } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import HistoryIcon from "@lucide/svelte/icons/history";
   import UserIcon from "@lucide/svelte/icons/user";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
@@ -90,17 +89,16 @@
   }
 </script>
 
-<Sheet.Root bind:open>
-  <Sheet.Content side="right" class={cn("w-[360px] p-0")}>
-    <Sheet.Header class={cn("border-b border-border px-4 py-3")}>
-      <Sheet.Title class={cn("flex items-center gap-2 text-base")}>
+<Sheet bind:open>
+  <SheetContent side="right" class={cn("w-[360px] p-0")}>
+    <SheetHeader class={cn("border-b border-border px-4 py-3")}>
+      <SheetTitle class={cn("flex items-center gap-2 text-base")}>
         <HistoryIcon class={cn("size-4")} />
         Version history
-      </Sheet.Title>
-    </Sheet.Header>
+      </SheetTitle>
+    </SheetHeader>
 
-    <ScrollArea.Root class={cn("h-[calc(100vh-60px)]")}>
-      <ScrollArea.Viewport class={cn("px-0 py-2")}>
+    <ScrollArea class={cn("h-[calc(100vh-60px)]")} viewportClasses={cn("px-0 py-2")}>
         {#if versions.length === 0}
           <p class={cn("px-4 py-8 text-sm text-muted-foreground text-center")}>No versions yet.</p>
         {:else}
@@ -158,7 +156,7 @@
                   <!-- Show diff toggle -->
                   <button
                     data-show-diff={version.id}
-                    class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-7 shrink-0")}
+                    class={cn(buttonVariants({ variant: "ghost", size: "md" }), "size-7 shrink-0 px-0")}
                     onclick={() => toggleDiff(version.id)}
                     title={showDiff[version.id] ? "Hide diff" : "Show diff"}
                     aria-expanded={showDiff[version.id] ?? false}
@@ -174,7 +172,7 @@
                   {#if !isCurrent}
                     <button
                       data-restore-version={version.id}
-                      class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-7 shrink-0")}
+                      class={cn(buttonVariants({ variant: "ghost", size: "md" }), "size-7 shrink-0 px-0")}
                       onclick={() => { confirmRestore = version.id; }}
                       title="Restore this version"
                     >
@@ -208,7 +206,7 @@
                     <span class={cn("flex-1 text-muted-foreground")}>Restore to v{version.versionNum}?</span>
                     <button
                       data-confirm-restore
-                      class={cn(buttonVariants({ variant: "default", size: "sm" }), "h-7 px-3 text-xs")}
+                      class={cn(buttonVariants({ variant: "primary", size: "sm" }), "h-7 px-3 text-xs")}
                       disabled={restoreLoading}
                       onclick={() => handleRestore(version.id)}
                     >
@@ -227,8 +225,6 @@
             {/each}
           </ol>
         {/if}
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="vertical" />
-    </ScrollArea.Root>
-  </Sheet.Content>
-</Sheet.Root>
+    </ScrollArea>
+  </SheetContent>
+</Sheet>

@@ -9,7 +9,9 @@ const USER_ID = "00000000-0000-0000-0000-000000000010";
 const resolveApplicationSessionContext = mock(async () => ({
   userId: USER_ID,
   orgId: ORG_ID,
+  activeOrgId: ORG_ID,
   sessionId: "session",
+  sessionExpiresAt: "2026-05-18T00:00:00.000Z",
   email: "user@example.test",
   role: "owner",
   orgName: "Acme",

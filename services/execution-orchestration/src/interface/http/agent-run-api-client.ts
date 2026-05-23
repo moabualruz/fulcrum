@@ -2,11 +2,13 @@ export interface AgentRunApiEnvironment {
   FULCRUM_SERVER_URL?: string;
   FULCRUM_PUBLIC_API_URL?: string;
   FULCRUM_ORG_ID?: string;
+  FULCRUM_USER_ID?: string;
 }
 
 export interface AgentRunApiClientOptions {
   baseUrl: string;
   orgId: string;
+  userId?: string | null;
   fetch?: typeof fetch;
   headers?: Record<string, string>;
 }
@@ -48,6 +50,74 @@ export function createAgentRunApiCaller(options: AgentRunApiClientOptions) {
       await request<{ ok: true }>(`/api/v1/runs/${encodeURIComponent(input.id)}/cancel`, { method: "POST" }),
     retry: async (input: { id: string }) =>
       await request(`/api/v1/runs/${encodeURIComponent(input.id)}/retry`, { method: "POST" }),
+    pageData: async (input: Record<string, unknown> = {}) =>
+      await request("/api/v1/runs/page-data", {
+        query: compact({
+          contextProjectId: input.contextProjectId,
+          filterProjectId: input.filterProjectId ?? input.projectId,
+          hasProjectFilter: input.hasProjectFilter,
+          range: input.range,
+          agent: input.agent,
+          status: input.status,
+          dateFrom: input.dateFrom,
+          dateTo: input.dateTo,
+        }),
+      }),
+    projectRuns: async (input: { projectId: string }) =>
+      await request("/api/v1/runs/project", { query: { projectId: input.projectId } }),
+    pageDetail: async (input: { id: string; projectId?: string | null }) =>
+      await request(`/api/v1/runs/${encodeURIComponent(input.id)}/page-data`, {
+        query: compact({ projectId: input.projectId }),
+      }),
+    dispatchPrompt: async (input: { projectId?: string | null; agentName: string; prompt: string }) =>
+      await request("/api/v1/runs/prompt-dispatch", {
+        method: "POST",
+        body: {
+          orgId: options.orgId,
+          userId: options.userId ?? null,
+          projectId: input.projectId ?? null,
+          agentName: input.agentName,
+          prompt: input.prompt,
+        },
+      }),
+    recordApprovalDecision: async (input: {
+      id: string;
+      projectId?: string | null;
+      approvalId: string;
+      decision: "approve" | "deny" | "request_info";
+      note?: string | null;
+    }) =>
+      await request(`/api/v1/runs/${encodeURIComponent(input.id)}/approval-decision`, {
+        method: "POST",
+        body: {
+          orgId: options.orgId,
+          userId: options.userId ?? null,
+          projectId: input.projectId ?? null,
+          approvalId: input.approvalId,
+          decision: input.decision,
+          note: input.note ?? null,
+        },
+      }),
+    archiveArtifact: async (input: { id: string; artifactId: string; projectId?: string | null }) =>
+      await request(`/api/v1/runs/${encodeURIComponent(input.id)}/artifacts/${encodeURIComponent(input.artifactId)}/archive`, {
+        method: "POST",
+        body: { orgId: options.orgId, userId: options.userId ?? null, projectId: input.projectId ?? null },
+      }),
+    linkArtifactToDoc: async (input: { id: string; artifactId: string; docId: string; projectId?: string | null }) =>
+      await request(`/api/v1/runs/${encodeURIComponent(input.id)}/artifacts/${encodeURIComponent(input.artifactId)}/link-doc`, {
+        method: "POST",
+        body: {
+          orgId: options.orgId,
+          userId: options.userId ?? null,
+          projectId: input.projectId ?? null,
+          docId: input.docId,
+        },
+      }),
+    promoteArtifactToMemory: async (input: { id: string; artifactId: string; projectId?: string | null }) =>
+      await request(`/api/v1/runs/${encodeURIComponent(input.id)}/artifacts/${encodeURIComponent(input.artifactId)}/promote-memory`, {
+        method: "POST",
+        body: { orgId: options.orgId, userId: options.userId ?? null, projectId: input.projectId ?? null },
+      }),
     status: async () =>
       await request("/api/v1/symphony/state"),
     refresh: async () =>
@@ -85,7 +155,7 @@ export function createAgentRunApiCallerFromEnv(
   const baseUrl = env.FULCRUM_SERVER_URL ?? env.FULCRUM_PUBLIC_API_URL;
   const orgId = env.FULCRUM_ORG_ID;
   if (!baseUrl || !orgId) return null;
-  return createAgentRunApiCaller({ baseUrl, orgId, fetch: fetchFn });
+  return createAgentRunApiCaller({ baseUrl, orgId, userId: env.FULCRUM_USER_ID ?? null, fetch: fetchFn });
 }
 
 function agentRunRequest(options: AgentRunApiClientOptions) {
@@ -98,6 +168,7 @@ function agentRunRequest(options: AgentRunApiClientOptions) {
   ): Promise<T> {
     const url = new URL(path, baseUrl);
     url.searchParams.set("orgId", options.orgId);
+    if (options.userId) url.searchParams.set("userId", options.userId);
     for (const [key, value] of Object.entries(init.query ?? {})) {
       if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
     }

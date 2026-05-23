@@ -1,5 +1,5 @@
 /**
- * P3#20 — TUI Orchestration Pane: live runs table, state filter tabs,
+ * P3#20: TUI Orchestration Pane: live runs table, state filter tabs,
  * detail overlay, keyboard actions (retry/cancel).
  *
  * Designed for 2s poll refresh via `listRuns` tRPC; columns: task title,
@@ -211,9 +211,9 @@ export class OrchestratorPane {
     renderer.writeln(`  State:           ${stateBadge(run.symphonyState)}`);
     renderer.writeln(`  Attempts:        ${run.attemptCount}`);
     renderer.writeln(`  Started:         ${run.startedAt.toISOString()}`);
-    renderer.writeln(`  Workspace:       ${run.workspacePath ?? "—"}`);
-    renderer.writeln(`  last_error_kind: ${run.lastErrorKind ?? "—"}`);
-    renderer.writeln(`  next_retry_at:   ${run.nextRetryAt?.toISOString() ?? "—"}`);
+    renderer.writeln(`  Workspace:       ${run.workspacePath ?? "-"}`);
+    renderer.writeln(`  last_error_kind: ${run.lastErrorKind ?? "-"}`);
+    renderer.writeln(`  next_retry_at:   ${run.nextRetryAt?.toISOString() ?? "-"}`);
     renderer.writeln();
     renderer.writeln(c.dim("  r retry  x cancel  Esc close"));
   }
@@ -253,7 +253,7 @@ function elapsedStr(startedAt: Date): string {
 }
 
 function truncatePath(path: string | null, maxLen: number): string {
-  if (!path) return "—";
+  if (!path) return "-";
   if (path.length <= maxLen) return path;
   return "…" + path.slice(-(maxLen - 1));
 }

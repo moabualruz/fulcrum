@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { describe, expect, mock, test } from "bun:test";
 
-import { InternalServerErrorException, NotFoundException, RequestMethod } from "@nestjs/common";
+import { BadRequestException, InternalServerErrorException, NotFoundException, RequestMethod } from "@nestjs/common";
 import { METHOD_METADATA, MODULE_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { validateSync } from "class-validator";
 
@@ -13,12 +13,14 @@ import {
   RepositoryCreateBodyDto,
   RepositoryIdParamsDto,
   RepositoryListQueryDto,
+  RepositoryFileQueryDto,
   RepositoryPublicApiController,
   RepositoryPublicApiModule,
   RepositoryPublicApiService,
   RepositoryReadModelIdParamsDto,
   RepositoryReadModelListQueryDto,
   RepositoryRequestContextDto,
+  RepositoryTreeQueryDto,
 } from "@integration-hub/interface/http/repository-public-api.controller.ts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -79,6 +81,18 @@ describe("repository public Nest API", () => {
       ":id/status",
     );
     expect(Reflect.getMetadata(METHOD_METADATA, RepositoryPublicApiController.prototype.getRepositoryStatus)).toBe(
+      RequestMethod.GET,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, RepositoryPublicApiController.prototype.getRepositoryTree)).toBe(
+      ":id/tree",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, RepositoryPublicApiController.prototype.getRepositoryTree)).toBe(
+      RequestMethod.GET,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, RepositoryPublicApiController.prototype.getRepositoryFile)).toBe(
+      ":id/file",
+    );
+    expect(Reflect.getMetadata(METHOD_METADATA, RepositoryPublicApiController.prototype.getRepositoryFile)).toBe(
       RequestMethod.GET,
     );
     expect(Reflect.getMetadata(METHOD_METADATA, RepositoryPublicApiController.prototype.unregisterRepository)).toBe(
@@ -142,6 +156,20 @@ describe("repository public Nest API", () => {
       lastSyncAt: null,
       lastTouchedAt: null,
     }));
+    const getFileTree = mock(async () => ({
+      repoId: REPO_ID,
+      branch: "main",
+      dir: "docs",
+      entries: [{ path: "docs/guide.txt", kind: "file", sizeBytes: 42 }],
+    }));
+    const getFileContent = mock(async () => ({
+      repoId: REPO_ID,
+      branch: "main",
+      path: "docs/guide.txt",
+      mimeType: "text/plain",
+      encoding: "utf8",
+      content: "guide\n",
+    }));
     const unregister = mock(async () => undefined);
     const listBranches = mock(async () => [
       {
@@ -184,6 +212,8 @@ describe("repository public Nest API", () => {
           sync,
           syncRepo,
           statusRepo,
+          getFileTree,
+          getFileContent,
           unregister,
           listBranches,
           getBranch,
@@ -202,6 +232,8 @@ describe("repository public Nest API", () => {
         sync,
         syncRepo,
         statusRepo,
+        getFileTree,
+        getFileContent,
         unregister,
         listBranches,
         getBranch,
@@ -242,6 +274,28 @@ describe("repository public Nest API", () => {
     await expect(controller.getRepositoryStatus({ id: REPO_ID }, { orgId: ORG_ID })).resolves.toEqual(
       expect.objectContaining({ repoId: REPO_ID, status: "synced" }),
     );
+    await expect(controller.getRepositoryTree({ id: REPO_ID }, {
+      orgId: ORG_ID,
+      branch: "main",
+      dir: "docs",
+    })).resolves.toEqual({
+      repoId: REPO_ID,
+      branch: "main",
+      dir: "docs",
+      entries: [{ path: "docs/guide.txt", kind: "file", sizeBytes: 42 }],
+    });
+    await expect(controller.getRepositoryFile({ id: REPO_ID }, {
+      orgId: ORG_ID,
+      branch: "main",
+      path: "docs/guide.txt",
+    })).resolves.toEqual({
+      repoId: REPO_ID,
+      branch: "main",
+      path: "docs/guide.txt",
+      mimeType: "text/plain",
+      encoding: "utf8",
+      content: "guide\n",
+    });
     await expect(controller.unregisterRepository({ id: REPO_ID }, { orgId: ORG_ID })).resolves.toBeUndefined();
     await expect(branchController.listBranches({ orgId: ORG_ID, repoId: REPO_ID, limit: "20" })).resolves.toEqual([
       expect.objectContaining({
@@ -278,11 +332,41 @@ describe("repository public Nest API", () => {
     expect(sync).toHaveBeenCalledWith({ orgId: ORG_ID });
     expect(syncRepo).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID });
     expect(statusRepo).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID });
+    expect(getFileTree).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID, branch: "main", dir: "docs" });
+    expect(getFileContent).toHaveBeenCalledWith({
+      orgId: ORG_ID,
+      repoId: REPO_ID,
+      branch: "main",
+      path: "docs/guide.txt",
+    });
     expect(unregister).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID });
     expect(listBranches).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID, limit: 20 });
     expect(getBranch).toHaveBeenCalledWith({ orgId: ORG_ID, id: "branch-1" });
     expect(listCommits).toHaveBeenCalledWith({ orgId: ORG_ID, repoId: REPO_ID, branch: "main", limit: 20 });
     expect(getCommit).toHaveBeenCalledWith({ orgId: ORG_ID, id: "commit-1" });
+  });
+
+  test("rejects repository file browse paths that escape the repo", async () => {
+    const controller = new RepositoryPublicApiController(
+      new RepositoryPublicApiService({
+        featuresEnv: "public-api",
+        orgId: ORG_ID,
+        application: {
+          list: async () => [],
+          syncRepo: async () => null,
+          statusRepo: async () => null,
+          getFileTree: async () => ({ entries: [] }),
+          getFileContent: async () => ({ content: "" }),
+        },
+      }),
+    );
+
+    await expect(controller.getRepositoryTree({ id: REPO_ID }, { orgId: ORG_ID, dir: "../secrets" }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.getRepositoryFile({ id: REPO_ID }, { orgId: ORG_ID, path: "/etc/passwd" }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.getRepositoryFile({ id: REPO_ID }, { orgId: ORG_ID, path: "docs\\secret.txt" }))
+      .rejects.toBeInstanceOf(BadRequestException);
   });
 
   test("returns Nest 404 when repository sync or status cannot find the repository", async () => {
@@ -330,6 +414,20 @@ describe("repository public Nest API", () => {
       branch: "main",
       limit: "20",
     });
+    const treeQuery = Object.assign(new RepositoryTreeQueryDto(), {
+      orgId: ORG_ID,
+      branch: "main",
+      dir: "docs",
+    });
+    const fileQuery = Object.assign(new RepositoryFileQueryDto(), {
+      orgId: ORG_ID,
+      branch: "main",
+      path: "docs/guide.txt",
+    });
+    const invalidFileQuery = Object.assign(new RepositoryFileQueryDto(), {
+      orgId: ORG_ID,
+      path: "",
+    });
     const body = Object.assign(new RepositoryCreateBodyDto(), {
       orgId: ORG_ID,
       name: "Repo",
@@ -350,6 +448,9 @@ describe("repository public Nest API", () => {
     expect(validateSync(readModelParams)).toHaveLength(0);
     expect(validateSync(invalidReadModelParams).map((error) => error.property)).toEqual(["id"]);
     expect(validateSync(readModelQuery)).toHaveLength(0);
+    expect(validateSync(treeQuery)).toHaveLength(0);
+    expect(validateSync(fileQuery)).toHaveLength(0);
+    expect(validateSync(invalidFileQuery).map((error) => error.property)).toEqual(["path"]);
     expect(validateSync(body)).toHaveLength(0);
     expect(validateSync(invalidBody).map((error) => error.property)).toEqual(["orgId", "name", "kind"]);
   });

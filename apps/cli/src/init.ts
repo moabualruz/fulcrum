@@ -1,4 +1,4 @@
-// fulcrum init [DIR]          — bootstrap a project with cross-agent rules + skills paths.
+// fulcrum init [DIR]         : bootstrap a project with cross-agent rules + skills paths.
 //
 // Idempotent: skips files that already exist.
 
@@ -38,7 +38,17 @@ const GITIGNORE_LINES = [
   ".claude/.cache/",
 ];
 
-/** Dry-run state — set by tests or --dry-run flag. */
+const HELP = `fulcrum init [DIR]
+
+Bootstrap a project with AGENTS.md, .claude/CLAUDE.md, and .gitignore entries.
+
+Usage:
+  fulcrum init [DIR]
+  fulcrum init --dry-run [DIR]
+  fulcrum init reindex [DIR]
+`;
+
+/** Dry-run state: set by tests or --dry-run flag. */
 let DRY_RUN = false;
 
 /** Toggle dry-run mode (used by tests). */
@@ -74,6 +84,11 @@ async function af(path: string, data: string): Promise<void> {
 
 
 export async function run(args: string[]): Promise<void> {
+  if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
+    console.log(HELP);
+    return;
+  }
+
   // Handle `fulcrum init reindex [DIR]` subcommand.
   if (args[0] === "reindex") {
     DRY_RUN = false;
@@ -102,7 +117,7 @@ export async function run(args: string[]): Promise<void> {
     if (a === "--dry-run") { DRY_RUN = true; }
     else { filteredArgs.push(a); }
   }
-  if (DRY_RUN) console.log("(dry-run mode — no files will be written)\n");
+  if (DRY_RUN) console.log("(dry-run mode: no files will be written)\n");
 
   const dir = resolve(filteredArgs[0] ?? process.cwd());
   if (!(await exists(dir))) {
@@ -161,11 +176,11 @@ export async function run(args: string[]): Promise<void> {
   }
   if (!added) console.log("  · .gitignore  (kept)");
 
-  // Vendor integrations — per-agent skill/plugin/extension/hook installers.
+  // Vendor integrations: per-agent skill/plugin/extension/hook installers.
   const { runVendorIntegrations } = await import("./vendor-installs.ts");
   await runVendorIntegrations(dir, home, { dryRun: DRY_RUN });
 
-  // Project indices — vendor-default index builds for tools that produce a
+  // Project indices: vendor-default index builds for tools that produce a
   // matchers (rg, fd, ast-grep, …) need no index, so they are NOT here.
   const { runProjectIndex } = await import("./project-index.ts");
   await runProjectIndex(dir, { dryRun: DRY_RUN });

@@ -10,11 +10,14 @@ export interface RepoListItem {
   lastSyncAt?: string | Date | null;
   openTaskCount?: number;
   health?: string;
+  syncStatus?: string | null;
+  lastSyncError?: string | null;
   recentCommit?: string | null;
   path?: string | null;
   supervisionMode?: string | null;
   lastSyncedAt?: string | Date | null;
   branchCount?: number | null;
+  syncLogs?: RepoSyncLogItem[];
 }
 
 export interface RepoSyncResult {
@@ -175,6 +178,13 @@ export interface RepoCommitItem {
   date: string;
 }
 
+export interface RepoSyncLogItem {
+  id: string;
+  status: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface RepoDetailScreenOptions {
   repoId: string;
   caller: {
@@ -222,9 +232,11 @@ export class RepoDetailScreen {
     renderer.writeln(c.bold(`  Repo › ${this.repo?.name ?? this.opts.repoId}`));
     renderer.separator();
     renderer.writeln();
-    renderer.writeln(
-      `  ${this.repo?.supervisionMode ?? "manual"}  ${formatSynced(this.repo?.lastSyncedAt)}  branches ${this.repo?.branchCount ?? 0}`,
-    );
+    const syncAt = this.repo?.lastSyncedAt ?? this.repo?.lastSyncAt;
+    const status = this.repo?.syncStatus ?? this.repo?.health ?? this.repo?.supervisionMode ?? "manual";
+    renderer.writeln(`  status ${status}  ${formatSynced(syncAt)}  branches ${this.repo?.branchCount ?? 0}`);
+    if (this.repo?.lastSyncError) renderer.writeln(c.red(`  sync error ${this.repo.lastSyncError}`));
+    this.renderSyncLogs(renderer);
     renderer.writeln();
 
     if (this.focus === "commits" || this.focus === "diff") {
@@ -349,6 +361,15 @@ export class RepoDetailScreen {
         if (!line) continue;
         renderer.writeln(`  ${line}`);
       }
+    }
+  }
+
+  private renderSyncLogs(renderer: Renderer): void {
+    const logs = this.repo?.syncLogs ?? [];
+    if (logs.length === 0) return;
+    renderer.writeln(c.bold("  Sync log"));
+    for (const log of logs.slice(0, 5)) {
+      renderer.writeln(`  ${log.createdAt}  ${log.status}  ${log.message}`);
     }
   }
 

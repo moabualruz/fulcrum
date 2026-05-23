@@ -23,6 +23,9 @@ export interface RunnerOptions {
   tag?: string;
   dump?: string;
   entityCounts?: Record<string, number>;
+  artifacts?: Record<string, string>;
+  config?: Record<string, unknown>;
+  localState?: Record<string, unknown>;
 }
 
 export interface RunnerResult {
@@ -32,21 +35,50 @@ export interface RunnerResult {
 
 export interface BackupArchive {
   format: "fulcrum.backup.v1";
+  schemaVersion: 1;
   createdAt: string;
   entityCounts: Record<string, number>;
   dump: string;
+  components: {
+    database: BackupArchiveComponent;
+    artifacts: BackupArchiveComponent;
+    config: BackupArchiveComponent;
+    localState: BackupArchiveComponent;
+  };
+  checksumSha256: string;
+}
+
+export interface BackupArchiveComponent {
+  included: boolean;
+  itemCount: number;
   checksumSha256: string;
 }
 
 export interface BackupArchiveVerification {
   ok: boolean;
   format?: string;
+  schemaVersion?: number;
   entityCounts?: Record<string, number>;
+  components?: BackupArchive["components"];
   checksumSha256?: string;
+  reason?: string;
 }
 
 function checksumDump(dump: string): string {
   return createHash("sha256").update(Buffer.from(dump, "base64")).digest("hex");
+}
+
+function checksumJson(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function component(value: Record<string, unknown> | Record<string, string> | undefined): BackupArchiveComponent {
+  const data = value ?? {};
+  return {
+    included: Object.keys(data).length > 0,
+    itemCount: Object.keys(data).length,
+    checksumSha256: checksumJson(data),
+  };
 }
 
 /**
@@ -67,9 +99,16 @@ export async function createLocalBackup(opts: RunnerOptions = {}): Promise<Runne
   }), "utf8").toString("base64");
   const archive: BackupArchive = {
     format: "fulcrum.backup.v1",
+    schemaVersion: 1,
     createdAt: new Date().toISOString(),
     entityCounts: opts.entityCounts ?? {},
     dump,
+    components: {
+      database: { included: true, itemCount: Object.keys(opts.entityCounts ?? {}).length, checksumSha256: checksumDump(dump) },
+      artifacts: component(opts.artifacts),
+      config: component(opts.config),
+      localState: component(opts.localState),
+    },
     checksumSha256: checksumDump(dump),
   };
   const source = Readable.from([JSON.stringify(archive)]);
@@ -84,11 +123,16 @@ export async function verifyBackupArchive(path: string): Promise<BackupArchiveVe
   try {
     const archive = JSON.parse(gunzipSync(await readFile(path)).toString("utf8")) as BackupArchive;
     const checksumSha256 = checksumDump(archive.dump);
+    if (archive.format !== "fulcrum.backup.v1") return { ok: false, format: archive.format, reason: "format-mismatch" };
+    if (archive.schemaVersion !== 1) return { ok: false, format: archive.format, schemaVersion: archive.schemaVersion, reason: "schema-version-mismatch" };
     return {
-      ok: archive.format === "fulcrum.backup.v1" && checksumSha256 === archive.checksumSha256,
+      ok: checksumSha256 === archive.checksumSha256,
       format: archive.format,
+      schemaVersion: archive.schemaVersion,
       entityCounts: archive.entityCounts,
+      components: archive.components,
       checksumSha256: archive.checksumSha256,
+      reason: checksumSha256 === archive.checksumSha256 ? undefined : "checksum-mismatch",
     };
   } catch {
     return { ok: false };

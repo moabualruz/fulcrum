@@ -89,7 +89,13 @@ describe("continuous update planning application action", () => {
       blocksTaskIds: [],
     })]);
     expect(result.missingTargetTaskIds).toEqual(["task-missing"]);
-    expect(result.context.sourceRefs).toEqual([{ kind: "doc", id: sourceDoc.id }]);
+    expect(result.context.sourceRefs).toEqual([
+      expect.objectContaining({
+        kind: "doc",
+        id: sourceDoc.id,
+        sourceId: expect.stringContaining(`doc:${sourceDoc.id}@v`),
+      }),
+    ]);
     expect(result.prompt).toContain("Continue the Fulcrum workflow cycle");
     expect(result.prompt).toContain("Replan after the user changed the workflow brief.");
     expect(result.prompt).toContain("New context: keep ACP edits");
@@ -130,7 +136,13 @@ describe("continuous update planning application action", () => {
           blockedByTaskIds: [prerequisite.id],
         })],
         missingTargetTaskIds: ["task-missing"],
-        sourceRefs: [{ kind: "doc", id: sourceDoc.id }],
+        sourceRefs: [
+          expect.objectContaining({
+            kind: "doc",
+            id: sourceDoc.id,
+            sourceId: expect.stringContaining(`doc:${sourceDoc.id}@v`),
+          }),
+        ],
       }),
     }]);
   });

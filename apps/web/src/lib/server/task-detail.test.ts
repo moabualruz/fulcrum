@@ -49,10 +49,11 @@ describe("getTaskDetail", () => {
       const child1 = await createTask(db, { orgId, title: "Child 1", parentId: parent.id });
       const child2 = await createTask(db, { orgId, title: "Child 2", parentId: parent.id });
 
-      // Add an edge (blocked-by)
+      // Add an edge (blocked-by). The canonical relationship column is `kind`;
+      // getTaskDetail selects it as `rel`.
       const edgeId = makeId();
       await db.query(
-        `INSERT INTO edges (id, org_id, from_kind, from_id, to_kind, to_id, rel)
+        `INSERT INTO edges (id, org_id, from_kind, from_id, to_kind, to_id, kind)
            VALUES ($1, $2, 'task', $3, 'task', $4, 'blocked_by')`,
         [edgeId, orgId, parent.id, "01BLOCKER00000000000000000"],
       );

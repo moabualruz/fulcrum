@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants, Select } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -47,7 +47,7 @@
 			<button
 				data-delete-memory
 				type="submit"
-				class={cn(buttonVariants({ variant: "destructive" }))}
+				class={cn(buttonVariants({ variant: "danger" }))}
 			>Delete</button>
 		</form>
 	</header>
@@ -110,13 +110,13 @@
 				<button
 					type="submit"
 					data-save-memory
-					class={cn(buttonVariants({ variant: "default" }), "w-full")}
+					class={cn(buttonVariants({ variant: "primary" }), "w-full")}
 				>Save changes</button>
 			</form>
 
 			<div class={cn("rounded-lg border border-border p-4 text-xs text-muted-foreground space-y-1")}>
 				<div>ID: <code>{mem.id}</code></div>
-				<div data-memory-source-ref>Source: {mem.source ?? "—"}</div>
+				<div data-memory-source-ref>Source: {mem.source ?? "-"}</div>
 				<div data-memory-links hidden></div>
 				<div>Created: {mem.created_at}</div>
 				<div>Updated: {mem.updated_at}</div>

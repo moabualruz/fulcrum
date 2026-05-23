@@ -1,8 +1,14 @@
 import { extractRouterMetadata, type DomainMetadata } from "../../../scripts/cli/codegen.ts";
 
+import { emitErrorResult, emitResult, type OutputIo } from "./lib/cli-output.ts";
+import { wantsHelp } from "./lib/flag-conventions.ts";
+
 export type CompletionShell = "bash" | "zsh" | "fish" | "powershell";
 
 export type CompletionScripts = Record<CompletionShell, string>;
+
+/** The four shells `fulcrum completion` supports: `CLI-TUI-UX.md` §4. */
+export const COMPLETION_SHELLS: readonly CompletionShell[] = ["bash", "zsh", "fish", "powershell"];
 
 export type GenerateCompletionScriptsOptions = {
   routerPath: string;
@@ -35,21 +41,177 @@ export function emitCompletionScripts(domains: DomainMetadata[]): CompletionScri
   };
 }
 
+/**
+ * The `CLI-TUI-UX.md` §4 install-guidance lines for one shell.
+ *
+ * Per §4 the completion command must *tell the user exactly* how to install the
+ * script it just printed. These lines are rendered as comments at the head of
+ * the printed script (so `> _fulcrum` keeps a valid file) and are also surfaced
+ * structured in the `--json` envelope `result.install`.
+ */
+export function completionInstallGuidance(shell: CompletionShell): readonly string[] {
+  switch (shell) {
+    case "bash":
+      return [
+        "Add to ~/.bashrc:",
+        "  source <(fulcrum completion bash)",
+        "Or install to bash-completion.d:",
+        "  fulcrum completion bash > /usr/local/etc/bash_completion.d/fulcrum",
+      ];
+    case "zsh":
+      return [
+        "Add to ~/.zshrc:",
+        "  source <(fulcrum completion zsh)",
+        "Or install to fpath:",
+        "  fulcrum completion zsh > /usr/local/share/zsh/site-functions/_fulcrum",
+      ];
+    case "fish":
+      return [
+        "Install to fish completions:",
+        "  fulcrum completion fish > ~/.config/fish/completions/fulcrum.fish",
+      ];
+    case "powershell":
+      return [
+        "Add to your PowerShell profile:",
+        "  fulcrum completion powershell | Out-String | Invoke-Expression",
+        "Or persist it:",
+        "  fulcrum completion powershell >> $PROFILE",
+      ];
+  }
+}
+
+/**
+ * Render the `CLI-TUI-UX.md` §4 completion script for one shell, prefixed with
+ * the install-guidance comment header.
+ *
+ * The bare script bodies emitted by {@link emitCompletionScripts} stay byte-for
+ * byte identical to the committed `scripts/cli/completions.*` codegen output -
+ * the header is added only here, on the command path, so a user who runs
+ * `fulcrum completion zsh` sees how to install it.
+ */
+export function renderCompletionScript(shell: CompletionShell, bareScript: string): string {
+  const guidance = completionInstallGuidance(shell);
+  const header = [`# Fulcrum ${shell} completion`, ...guidance.map((line) => `# ${line}`), ""];
+  return `${header.join("\n")}\n${bareScript}`;
+}
+
 export async function printCompletionScript(
   shell: CompletionShell,
   options: GenerateCompletionScriptsOptions,
 ): Promise<void> {
   const scripts = await generateCompletionScripts(options);
-  process.stdout.write(scripts[shell]);
+  process.stdout.write(renderCompletionScript(shell, scripts[shell]));
 }
 
+const HELP = [
+  "fulcrum completion <bash|zsh|fish|powershell>",
+  "",
+  "Print a shell completion script for the fulcrum CLI.",
+  "",
+  "Usage:",
+  "  fulcrum completion <shell> [--json]",
+  "  fulcrum completion --shell <shell>      (compatibility alias)",
+  "",
+  "Shells: bash, zsh, fish, powershell",
+  "",
+  "Install examples (CLI-TUI-UX.md §4):",
+  "  # zsh: add to ~/.zshrc:",
+  "  source <(fulcrum completion zsh)",
+  "  # zsh: or install to fpath:",
+  "  fulcrum completion zsh > /usr/local/share/zsh/site-functions/_fulcrum",
+  "  # bash: add to ~/.bashrc:",
+  "  source <(fulcrum completion bash)",
+  "  # fish: install to fish completions:",
+  "  fulcrum completion fish > ~/.config/fish/completions/fulcrum.fish",
+  "  # powershell: add to your profile:",
+  "  fulcrum completion powershell | Out-String | Invoke-Expression",
+  "",
+  "Options:",
+  "  --json        Output the fulcrum.cli.v1 envelope (script + install guidance).",
+  "  -h, --help    Show this help.",
+].join("\n");
+
+/** Resolve a completion shell from a positional arg or the `--shell` alias. */
+export function resolveCompletionShell(argv: readonly string[]): {
+  shell: CompletionShell | null;
+  raw: string | undefined;
+} {
+  // Compatibility alias: `--shell <shell>` / `-s <shell>` is still accepted.
+  const flagValue = valueAfter(argv, "--shell") ?? valueAfter(argv, "-s");
+  // Spec form (`CLI-TUI-UX.md` §4): `fulcrum completion zsh`: first positional.
+  const positional = argv.find((token) => !token.startsWith("-"));
+  const raw = positional ?? flagValue;
+  if (isCompletionShell(raw)) return { shell: raw, raw };
+  return { shell: null, raw };
+}
+
+function isCompletionShell(value: unknown): value is CompletionShell {
+  return COMPLETION_SHELLS.includes(value as CompletionShell);
+}
+
+/**
+ * `fulcrum completion <shell>`: print a shell completion script.
+ *
+ * Output paths (`CLI-TUI-UX.md` §3 / §4):
+ *  - plain: the install-guidance comment header followed by the completion script.
+ *  - `--json`: the canonical `fulcrum.cli.v1` envelope, `result` carrying the
+ *    shell, script, and structured install guidance.
+ *  - unsupported / missing shell: the canonical envelope error
+ *    (`FUL_CLI_UNSUPPORTED_SHELL`) under `--json`, and the `COPY.md` §3 plain
+ *    recovery block (`message` + `Fix:` + `trace=<id>`) on stderr otherwise.
+ */
 export async function run(argv: readonly string[]): Promise<void> {
-  const shell = shellFromArgs(argv);
-  if (!shell) {
-    console.error("usage: fulcrum completion --shell bash|zsh|fish|powershell");
-    process.exit(2);
+  const io: OutputIo = {
+    print: (line) => process.stdout.write(`${line}\n`),
+    printErr: (line) => process.stderr.write(`${line}\n`),
+  };
+
+  // `CLI-TUI-UX.md` §2: `--help` always works, even after other flags.
+  if (wantsHelp(argv)) {
+    io.print(HELP);
+    return;
   }
-  await printCompletionScript(shell, { routerPath: "apps/server/src/trpc/router.ts" });
+
+  const { shell, raw } = resolveCompletionShell(argv);
+  if (!shell) {
+    const supported = COMPLETION_SHELLS.join(", ");
+    emitErrorResult(
+      {
+        argv,
+        command: "fulcrum completion",
+        args: { shell: raw ?? null },
+        error: {
+          code: "FUL_CLI_UNSUPPORTED_SHELL",
+          message: raw
+            ? `Unsupported shell "${raw}". fulcrum completion supports: ${supported}.`
+            : `No shell given. fulcrum completion supports: ${supported}.`,
+          fix: "fulcrum completion zsh",
+          doc: "https://fulcrum.dev/docs/cli/completion",
+        },
+        renderHuman: () => {},
+      },
+      io,
+    );
+    process.exitCode = 2;
+    return;
+  }
+
+  const scripts = await generateCompletionScripts({ routerPath: "apps/server/src/trpc/router.ts" });
+  const script = renderCompletionScript(shell, scripts[shell]);
+  emitResult(
+    {
+      argv,
+      command: "fulcrum completion",
+      args: { shell },
+      result: {
+        shell,
+        script,
+        install: completionInstallGuidance(shell),
+      },
+      renderHuman: () => process.stdout.write(script),
+    },
+    io,
+  );
 }
 
 function domainCompletion(domain: DomainMetadata): CompletionCommand {
@@ -211,12 +373,6 @@ function emitPowerShell(commands: CompletionCommand[]): string {
     "}",
     "",
   ].join("\n");
-}
-
-function shellFromArgs(argv: readonly string[]): CompletionShell | null {
-  const raw = valueAfter(argv, "--shell") ?? valueAfter(argv, "-s");
-  if (raw === "bash" || raw === "zsh" || raw === "fish" || raw === "powershell") return raw;
-  return null;
 }
 
 function valueAfter(argv: readonly string[], flag: string): string | undefined {

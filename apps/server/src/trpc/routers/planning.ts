@@ -141,6 +141,7 @@ const FreeformPlanningContextSchema = z.object({
 }).strict();
 
 const FreeformPlanningPromptOutputSchema = z.object({
+  traceId: z.string().optional(),
   context: FreeformPlanningContextSchema,
   prompt: z.string(),
 }).strict();
@@ -302,6 +303,7 @@ const ApprovedPlanDependencyUpdateSchema = z.object({
 }).strict();
 
 const ApprovedPlanBreakdownSchema = z.object({
+  traceId: z.string().optional(),
   title: z.string(),
   docs: z.array(ApprovedPlanDocDraftSchema),
   artifacts: z.array(ApprovedPlanArtifactSchema),
@@ -345,6 +347,7 @@ const ApprovedPlanMaterializationSchema = z.object({
 }).strict();
 
 const ApprovedPlanMaterializeResultSchema = z.object({
+  traceId: z.string().optional(),
   breakdown: ApprovedPlanBreakdownSchema,
   materialization: ApprovedPlanMaterializationSchema,
 }).strict();
@@ -406,13 +409,14 @@ export const planningRouter = t.router({
     .input(StartGuidedAcpPlanningInputSchema)
     .output(StartGuidedAcpPlanningOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.startGuidedAcpPlanningSession(
+      mapAppError(async () => {
+        const result = await planningApplication.startGuidedAcpPlanningSession(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return { ...result, traceId: result.session.traceId ?? input.traceId };
+      })
     ),
 
   startFreeformWorkFromDocs: permissionedProcedure({
@@ -422,13 +426,14 @@ export const planningRouter = t.router({
     .input(StartFreeformWorkInputSchema)
     .output(StartFreeformWorkOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.startFreeformWorkFromDocs(
+      mapAppError(async () => {
+        const result = await planningApplication.startFreeformWorkFromDocs(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return { ...result, traceId: result.context.traceId ?? input.traceId };
+      })
     ),
 
   buildFreeformDocsPlanningPrompt: permissionedProcedure({
@@ -438,13 +443,14 @@ export const planningRouter = t.router({
     .input(FreeformPlanningPromptInputSchema)
     .output(FreeformPlanningPromptOutputSchema)
     .query(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.buildFreeformPlanningPromptFromDocs(
+      mapAppError(async () => {
+        const result = await planningApplication.buildFreeformPlanningPromptFromDocs(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return { ...result, traceId: result.context.traceId ?? input.traceId };
+      })
     ),
 
   restartPlanningCycleFromUpdates: permissionedProcedure({
@@ -454,13 +460,14 @@ export const planningRouter = t.router({
     .input(RestartPlanningCycleFromUpdatesInputSchema)
     .output(RestartPlanningCycleFromUpdatesOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.restartPlanningCycleFromUpdates(
+      mapAppError(async () => {
+        const result = await planningApplication.restartPlanningCycleFromUpdates(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return { ...result, traceId: result.traceId ?? input.traceId };
+      })
     ),
 
   generateTechnicalPlanningCycle: permissionedProcedure({
@@ -470,19 +477,25 @@ export const planningRouter = t.router({
     .input(GenerateTechnicalPlanningCycleInputSchema)
     .output(GenerateTechnicalPlanningCycleOutputSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.generateTechnicalPlanningCycle(
+      mapAppError(async () => {
+        const result = await planningApplication.generateTechnicalPlanningCycle(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return { ...result, traceId: result.plan.traceId ?? result.context.traceId ?? input.traceId };
+      })
     ),
 
   previewApprovedPlanBreakdown: permissionedProcedure({ resource: "planning", action: "previewApprovedPlanBreakdown" })
     .input(ApprovedPlanInputSchema)
     .output(ApprovedPlanBreakdownSchema)
-    .query(({ input }) => mapAppError(() => planningApplication.previewApprovedPlanBreakdown(input))),
+    .query(({ input }) =>
+      mapAppError(async () => {
+        const breakdown = await planningApplication.previewApprovedPlanBreakdown(input);
+        return { ...breakdown, traceId: input.traceId };
+      })
+    ),
 
   materializeApprovedPlanBreakdown: permissionedProcedure({
     resource: "planning",
@@ -491,13 +504,23 @@ export const planningRouter = t.router({
     .input(ApprovedPlanInputSchema)
     .output(ApprovedPlanMaterializeResultSchema)
     .mutation(({ ctx, input }) =>
-      mapAppError(() =>
-        planningApplication.materializeApprovedPlanBreakdown(
+      mapAppError(async () => {
+        const result = await planningApplication.materializeApprovedPlanBreakdown(
           requireTrpcEntityManager(ctx),
           appContext(ctx, input.projectId),
           input,
-        )
-      )
+        );
+        return {
+          ...result,
+          traceId: input.traceId,
+          breakdown: {
+            ...result.breakdown,
+            traceId: "traceId" in result.breakdown && typeof result.breakdown.traceId === "string"
+              ? result.breakdown.traceId
+              : input.traceId,
+          },
+        };
+      })
     ),
 });
 

@@ -22,6 +22,17 @@ export interface WorkflowAuditRetentionPolicy {
   updatedAt?: Date;
 }
 
+export interface WorkflowAuditExportJob {
+  id: string;
+  orgId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  format: "json" | "csv";
+  content: string | null;
+  error: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export const WorkflowAuditEventEntity = new EntitySchema<WorkflowAuditEvent>({
   name: "WorkflowAuditEvent",
   tableName: "fulcrum_audit_events",
@@ -80,7 +91,34 @@ export const WorkflowAuditRetentionPolicyEntity = new EntitySchema<WorkflowAudit
   ],
 });
 
+export const WorkflowAuditExportJobEntity = new EntitySchema<WorkflowAuditExportJob>({
+  name: "WorkflowAuditExportJob",
+  tableName: "fulcrum_audit_export_jobs",
+  columns: {
+    id: { type: "varchar", length: 128, primary: true },
+    orgId: { name: "org_id", type: "varchar", length: 128 },
+    status: { type: "varchar", length: 80 },
+    format: { type: "varchar", length: 20 },
+    content: { type: "text", nullable: true },
+    error: { type: "text", nullable: true },
+    createdAt: {
+      name: "created_at",
+      type: "timestamptz",
+      createDate: true,
+    },
+    updatedAt: {
+      name: "updated_at",
+      type: "timestamptz",
+      updateDate: true,
+    },
+  },
+  indices: [
+    { name: "fulcrum_audit_export_jobs_org_created_idx", columns: ["orgId", "createdAt"] },
+  ],
+});
+
 export const WORKFLOW_AUDIT_ENTITIES = [
   WorkflowAuditEventEntity,
   WorkflowAuditRetentionPolicyEntity,
+  WorkflowAuditExportJobEntity,
 ];

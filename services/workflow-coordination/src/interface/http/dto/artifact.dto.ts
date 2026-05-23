@@ -64,6 +64,10 @@ export class ArtifactDownloadResponseDto {
   artifact!: ArtifactPublicResponseDto;
   bodyPath!: string | null;
   checksumSha256!: string | null;
+  contentBase64!: string | null;
+  filename!: string;
+  mime!: string;
+  sizeBytes!: string;
 }
 
 export class ArtifactDeleteResponseDto {

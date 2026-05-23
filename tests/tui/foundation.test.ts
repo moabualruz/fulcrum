@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, describe, expect, it } from "bun:test";
 import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,17 +9,30 @@ import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { buildCaller, TuiApp, type TuiCaller } from "@fulcrum/tui/index.ts";
 import { TuiRouter } from "@fulcrum/tui/router.ts";
+import { Renderer } from "@fulcrum/tui/renderer.ts";
 import { SubscriptionBridge } from "@fulcrum/tui/subscriptions.ts";
 import { JsonlCrashLog } from "@fulcrum/tui/crashlog.ts";
 import { DbTelemetrySink, MemoryTelemetrySink } from "@fulcrum/tui/telemetry.ts";
 import { FakeTTY } from "@fulcrum/tui/testing/fake-tty.ts";
+import {
+  BOOT_SPLASH_SUBTITLE,
+  BOOT_SPLASH_TITLE,
+  FOUNDATION_KEY_BINDINGS,
+  SELECTED_ROW_FOCUS_MARKER,
+  formatFocusedRowLabel,
+  renderBootSplash,
+} from "@fulcrum/tui/screens/tui-foundation.ts";
 import { Org, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
 import { Account } from "@identity-access/infrastructure/database/entities/auth/Account.ts";
 import { TelemetryEvent } from "@platform-core/infrastructure/application-database/entities/platform/TelemetryEvent.ts";
-import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { createTestOrm, destroyTestOrm, type TestOrm } from "@test-support/application-database.ts";
 import { createTestContainer } from "@test-support/application-container.ts";
 
 const createCaller = t.createCallerFactory(appRouter);
+
+afterAll(async () => {
+  await destroyTestOrm();
+});
 
 function mockSession() {
   return {
@@ -132,6 +145,93 @@ describe("TuiApp foundation behavior", () => {
     expect(app.isRunning).toBe(false);
   });
 
+  it("renders boot splash before launcher nav", async () => {
+    const tty = new FakeTTY({ columns: 24, rows: 8 });
+    const app = new TuiApp({
+      output: tty,
+      caller: fakeCaller(),
+    });
+
+    await app.mount();
+
+    const text = tty.plainText();
+    expect(text).toContain(BOOT_SPLASH_TITLE);
+    expect(text).toContain(BOOT_SPLASH_SUBTITLE);
+    expect(text.indexOf(BOOT_SPLASH_SUBTITLE)).toBeLessThan(text.indexOf("Domain nav"));
+    app.stop();
+  });
+
+  it("keeps boot splash title visible on narrow terminals", () => {
+    const tty = new FakeTTY({ columns: 8, rows: 6 });
+    renderBootSplash(new Renderer(tty));
+
+    expect(tty.plainText()).toContain(BOOT_SPLASH_TITLE);
+  });
+
+  it("publishes foundation vim keybinding help", () => {
+    expect(FOUNDATION_KEY_BINDINGS.map((binding) => binding.key)).toEqual([
+      "j/k",
+      "Enter/Space",
+      "?",
+      "Esc",
+      "q",
+      "t",
+    ]);
+  });
+
+  it("handles help, open/select, escape, and q as foundation keys", async () => {
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: {
+        ...fakeCaller(),
+        projects: { list: async () => [{ id: "proj-1", name: "Roadmap" }] },
+      },
+    });
+
+    await app.mount();
+    tty.inject("?");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Launcher");
+    expect(tty.plainText()).toContain("Enter/Space");
+
+    tty.inject("\x1b");
+    await Bun.sleep(0);
+    tty.inject(" ");
+    await Bun.sleep(0);
+    expect(tty.plainText()).toContain("Projects");
+
+    tty.inject("q");
+    await Bun.sleep(0);
+    expect(app.screen).toBe("nav");
+    expect(tty.plainText()).toContain("Domain nav");
+    app.stop();
+  });
+
+  it("renders selected nav row with durable focus marker", async () => {
+    const tty = new FakeTTY({ columns: 80, rows: 24 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: fakeCaller(),
+    });
+
+    await app.mount();
+    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Projects`);
+
+    tty.inject("j");
+    await Bun.sleep(0);
+    // Domain nav order: Projects → Build Board → Tasks. One 'j' moves to Build Board.
+    expect(tty.plainText()).toContain(`${SELECTED_ROW_FOCUS_MARKER} Build Board`);
+    app.stop();
+  });
+
+  it("formats focused rows with marker independent of ANSI color", () => {
+    expect(formatFocusedRowLabel("Projects", true)).toContain(`${SELECTED_ROW_FOCUS_MARKER} `);
+    expect(formatFocusedRowLabel("Projects", false)).not.toContain(SELECTED_ROW_FOCUS_MARKER);
+  });
+
   it("writes telemetry per screen render", async () => {
     const telemetry = new MemoryTelemetrySink();
     const app = new TuiApp({
@@ -176,7 +276,7 @@ describe("TuiApp foundation behavior", () => {
     }
   });
 
-  it("status bar and auth screen render local org name from production caller", async () => {
+  it("status footer and auth screen render local org name from production caller", async () => {
     const db = await createTestOrm();
     try {
       const tty = new FakeTTY();
@@ -186,8 +286,11 @@ describe("TuiApp foundation behavior", () => {
       });
 
       await app.mount();
-      expect(tty.plainText()).toContain("Local");
-      expect(tty.plainText()).toContain("admin@local");
+      await app.waitForStartupData();
+      // OD StatusFooter renders the org name as the `profile:` segment; it
+      // drops the legacy user email: prd-tui-status-footer-od-parity.
+      expect(tty.plainText()).toContain("profile: Local");
+      expect(tty.plainText()).not.toContain("admin@local");
 
       tty.clear();
       await app.navigateTo("auth");
@@ -262,12 +365,16 @@ describe("SubscriptionBridge", () => {
     const bus = new EventEmitter();
     const bridge = new SubscriptionBridge(bus);
     const received: number[] = [];
+    const receivedAt: number[] = [];
 
     const sub = bridge.subscribe<number>("runs.onRunUpdate", (value) => {
       received.push(value);
+      receivedAt.push(Date.now());
     });
+    const sentAt = Date.now();
     bus.emit("runs.onRunUpdate", 1);
     expect(received).toEqual([1]);
+    expect(receivedAt[0]! - sentAt).toBeLessThan(200);
 
     sub.unsubscribe();
     bus.emit("runs.onRunUpdate", 2);

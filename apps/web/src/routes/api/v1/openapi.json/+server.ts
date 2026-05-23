@@ -1,5 +1,5 @@
 /**
- * /api/v1/openapi.json — serves OpenAPI 3.1 spec when public-api flag ON.
+ * /api/v1/openapi.json: serves OpenAPI 3.1 spec when public-api flag ON.
  */
 
 import { json } from "@sveltejs/kit";

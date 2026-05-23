@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -27,13 +28,21 @@ import {
 } from "@nestjs/swagger";
 import { IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import { z } from "zod";
 
 import { INTEGRATION_HUB_REPOSITORY_ENTITIES } from "@integration-hub/infrastructure/database/repository.entities.ts";
 import { RepositoryPublicStore } from "@integration-hub/infrastructure/database/repository-public-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { getFileContent, getFileTree } from "@integration-hub/application/repos/git.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import {
+  addProjectRepo,
+  linkProjectRepoToProject,
+  listProjectRepoCards,
+  type ProjectRepoCard,
+} from "@integration-hub/interface/project-repositories.ts";
 
-import { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto } from "./dto/repository.dto.ts";
-export { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto };
+import { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryTreeQueryDto, RepositoryFileQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto } from "./dto/repository.dto.ts";
+export { RepositoryListQueryDto, RepositoryRequestContextDto, RepositoryReadModelListQueryDto, RepositoryTreeQueryDto, RepositoryFileQueryDto, RepositoryIdParamsDto, RepositoryReadModelIdParamsDto, RepositoryCreateBodyDto };
 
 export const REPOSITORY_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.repositoryPublicApi.options");
 
@@ -56,6 +65,8 @@ export interface RepositoryPublicApplication {
   sync?(input: { orgId: string }): Promise<unknown>;
   syncRepo(input: { orgId: string; repoId: string }): Promise<unknown>;
   statusRepo(input: { orgId: string; repoId: string }): Promise<unknown>;
+  getFileTree?(input: { orgId: string; repoId: string; branch?: string; dir?: string }): Promise<unknown>;
+  getFileContent?(input: { orgId: string; repoId: string; branch?: string; path: string }): Promise<unknown>;
   unregister?(input: { orgId: string; repoId: string }): Promise<void>;
   listBranches?(input: { orgId: string; repoId?: string; limit?: number }): Promise<unknown>;
   getBranch?(input: { orgId: string; id: string }): Promise<unknown>;
@@ -130,6 +141,26 @@ export class RepositoryPublicApiService {
     return status;
   }
 
+  async getRepositoryTree(params: RepositoryIdParamsDto, query: RepositoryTreeQueryDto): Promise<unknown> {
+    const application = this.requireMethod("getFileTree");
+    return toJsonDates(await application({
+      orgId: this.resolveOrgId(query.orgId),
+      repoId: params.id,
+      branch: query.branch,
+      dir: safeRepoPath(query.dir, "dir", true),
+    }));
+  }
+
+  async getRepositoryFile(params: RepositoryIdParamsDto, query: RepositoryFileQueryDto): Promise<unknown> {
+    const application = this.requireMethod("getFileContent");
+    return toJsonDates(await application({
+      orgId: this.resolveOrgId(query.orgId),
+      repoId: params.id,
+      branch: query.branch,
+      path: requiredRepoPath(query.path, "path"),
+    }));
+  }
+
   async unregisterRepository(params: RepositoryIdParamsDto, query: RepositoryRequestContextDto): Promise<void> {
     const application = this.requireMethod("unregister");
     await application({ orgId: this.resolveOrgId(query.orgId), repoId: params.id });
@@ -185,6 +216,8 @@ export class RepositoryPublicApiService {
         sync: (input) => this.store!.sync(input),
         syncRepo: (input) => this.store!.syncRepo(input),
         statusRepo: (input) => this.store!.statusRepo(input),
+        getFileTree: (input) => this.getStoreFileTree(input),
+        getFileContent: (input) => this.getStoreFileContent(input),
         unregister: (input) => this.store!.unregister(input),
         listBranches: (input) => this.store!.listBranches(input),
         getBranch: (input) => this.store!.getBranch(input),
@@ -209,6 +242,42 @@ export class RepositoryPublicApiService {
     const resolved = orgId ?? this.options?.orgId;
     if (!resolved) throw new InternalServerErrorException("Repository public API org scope is not configured.");
     return resolved;
+  }
+
+  private async getStoreFileTree(input: {
+    orgId: string;
+    repoId: string;
+    branch?: string;
+    dir?: string;
+  }): Promise<unknown> {
+    if (!this.store) throw new InternalServerErrorException("Repository public API store is not configured.");
+    const repo = await this.store.get({ orgId: input.orgId, repoId: input.repoId });
+    if (!repo?.localPath) throw new NotFoundException({ error: "repo checkout not found" });
+    const branch = input.branch ?? repo.currentBranch ?? repo.defaultBranch ?? "HEAD";
+    const entries = await getFileTree(repo.localPath, { branch, dir: input.dir });
+    return { repoId: input.repoId, branch, dir: input.dir ?? "", entries };
+  }
+
+  private async getStoreFileContent(input: {
+    orgId: string;
+    repoId: string;
+    branch?: string;
+    path: string;
+  }): Promise<unknown> {
+    if (!this.store) throw new InternalServerErrorException("Repository public API store is not configured.");
+    const repo = await this.store.get({ orgId: input.orgId, repoId: input.repoId });
+    if (!repo?.localPath) throw new NotFoundException({ error: "repo checkout not found" });
+    const branch = input.branch ?? repo.currentBranch ?? repo.defaultBranch ?? "HEAD";
+    const file = await getFileContent(repo.localPath, input.path, branch);
+    const isBinary = Buffer.isBuffer(file.content);
+    return {
+      repoId: input.repoId,
+      branch,
+      path: input.path,
+      mimeType: file.mimeType,
+      encoding: isBinary ? "base64" : "utf8",
+      content: isBinary ? file.content.toString("base64") : file.content,
+    };
   }
 }
 
@@ -237,6 +306,14 @@ export class RepositoryPublicApiController {
 
   async getRepositoryStatus(params: RepositoryIdParamsDto, query: RepositoryRequestContextDto): Promise<unknown> {
     return await this.repositories.getRepositoryStatus(params, query);
+  }
+
+  async getRepositoryTree(params: RepositoryIdParamsDto, query: RepositoryTreeQueryDto): Promise<unknown> {
+    return await this.repositories.getRepositoryTree(params, query);
+  }
+
+  async getRepositoryFile(params: RepositoryIdParamsDto, query: RepositoryFileQueryDto): Promise<unknown> {
+    return await this.repositories.getRepositoryFile(params, query);
   }
 
   async unregisterRepository(params: RepositoryIdParamsDto, query: RepositoryRequestContextDto): Promise<void> {
@@ -268,6 +345,80 @@ export class RepositoryCommitPublicApiController {
   }
 }
 
+const ProjectRepositoryParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+const ProjectRepositoryLinkParamsSchema = ProjectRepositoryParamsSchema.extend({
+  repoId: z.string().min(1),
+});
+
+const ProjectRepositoryQuerySchema = z.object({
+  orgId: z.string().min(1),
+});
+
+const ProjectRepositoryCreateBodySchema = ProjectRepositoryQuerySchema.extend({
+  kind: z.enum(["local", "remote"]).optional(),
+  path: z.string().optional().nullable(),
+  url: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+});
+
+export class ProjectRepositoryPublicApiService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectRepoCard[]> {
+    const parsedParams = ProjectRepositoryParamsSchema.parse(params);
+    const parsedQuery = ProjectRepositoryQuerySchema.parse(query);
+    return await listProjectRepoCards(this.dataSource.manager, {
+      orgId: parsedQuery.orgId,
+      userId: null,
+      projectId: parsedParams.id,
+    });
+  }
+
+  async add(params: unknown, body: unknown): Promise<{ id: string }> {
+    const parsedParams = ProjectRepositoryParamsSchema.parse(params);
+    const parsedBody = ProjectRepositoryCreateBodySchema.parse(body);
+    return await addProjectRepo(
+      this.dataSource.manager,
+      { orgId: parsedBody.orgId, userId: null, projectId: parsedParams.id },
+      {
+        kind: parsedBody.kind === "remote" ? "remote" : "local",
+        path: parsedBody.path,
+        url: parsedBody.url,
+        name: parsedBody.name,
+      },
+    );
+  }
+
+  async link(params: unknown, body: unknown): Promise<{ ok: true }> {
+    const parsedParams = ProjectRepositoryLinkParamsSchema.parse(params);
+    const parsedBody = ProjectRepositoryQuerySchema.parse(body);
+    return await linkProjectRepoToProject(
+      this.dataSource.manager,
+      { orgId: parsedBody.orgId, userId: null, projectId: parsedParams.id },
+      parsedParams.repoId,
+    );
+  }
+}
+
+export class ProjectRepositoryPublicApiController {
+  constructor(private readonly projectRepositories: ProjectRepositoryPublicApiService) {}
+
+  async list(params: unknown, query: unknown): Promise<ProjectRepoCard[]> {
+    return await this.projectRepositories.list(params, query);
+  }
+
+  async add(params: unknown, body: unknown): Promise<{ id: string }> {
+    return await this.projectRepositories.add(params, body);
+  }
+
+  async link(params: unknown, body: unknown): Promise<{ ok: true }> {
+    return await this.projectRepositories.link(params, body);
+  }
+}
+
 export class RepositoryPublicApiModule {
   static register(options: RepositoryPublicApiOptions): NestDynamicModule {
     return {
@@ -277,11 +428,13 @@ export class RepositoryPublicApiModule {
         RepositoryPublicApiController,
         RepositoryBranchPublicApiController,
         RepositoryCommitPublicApiController,
+        ProjectRepositoryPublicApiController,
       ],
       providers: [
         { provide: REPOSITORY_PUBLIC_API_OPTIONS, useValue: options },
         RepositoryPublicStore,
         RepositoryPublicApiService,
+        ProjectRepositoryPublicApiService,
       ],
       exports: [RepositoryPublicApiService],
     };
@@ -303,6 +456,23 @@ function parseOptionalInteger(value: string | number | undefined): number | unde
   return parsed;
 }
 
+function safeRepoPath(value: string | undefined, field: string, allowEmpty: boolean): string | undefined {
+  if (value === undefined || value === "") {
+    if (allowEmpty) return undefined;
+    throw new BadRequestException({ error: `${field} is required` });
+  }
+  if (value.includes("\0") || value.startsWith("/") || value.includes("\\") || value.split("/").includes("..")) {
+    throw new BadRequestException({ error: `${field} must stay inside repo` });
+  }
+  return value.replace(/\/+$/, "");
+}
+
+function requiredRepoPath(value: string | undefined, field: string): string {
+  const safe = safeRepoPath(value, field, false);
+  if (!safe) throw new BadRequestException({ error: `${field} is required` });
+  return safe;
+}
+
 function toJsonDates(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
 }
@@ -310,14 +480,18 @@ function toJsonDates(value: unknown): unknown {
 Inject(REPOSITORY_PUBLIC_API_OPTIONS)(RepositoryPublicApiService, undefined, 0);
 Inject(RepositoryPublicStore)(RepositoryPublicApiService, undefined, 1);
 Inject(DataSource)(RepositoryPublicStore, undefined, 0);
+Inject(DataSource)(ProjectRepositoryPublicApiService, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryPublicApiController, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryBranchPublicApiController, undefined, 0);
 Inject(RepositoryPublicApiService)(RepositoryCommitPublicApiController, undefined, 0);
+Inject(ProjectRepositoryPublicApiService)(ProjectRepositoryPublicApiController, undefined, 0);
 
 for (const dto of [
   RepositoryListQueryDto,
   RepositoryRequestContextDto,
   RepositoryReadModelListQueryDto,
+  RepositoryTreeQueryDto,
+  RepositoryFileQueryDto,
   RepositoryCreateBodyDto,
 ] as const) {
   IsString()(dto.prototype, "orgId");
@@ -335,6 +509,19 @@ for (const property of ["repoId", "branch", "limit"] as const) {
   IsString()(RepositoryReadModelListQueryDto.prototype, property);
   MinLength(1)(RepositoryReadModelListQueryDto.prototype, property);
 }
+
+for (const dto of [RepositoryTreeQueryDto, RepositoryFileQueryDto] as const) {
+  IsOptional()(dto.prototype, "branch");
+  IsString()(dto.prototype, "branch");
+  MinLength(1)(dto.prototype, "branch");
+}
+
+IsOptional()(RepositoryTreeQueryDto.prototype, "dir");
+IsString()(RepositoryTreeQueryDto.prototype, "dir");
+MinLength(1)(RepositoryTreeQueryDto.prototype, "dir");
+
+IsString()(RepositoryFileQueryDto.prototype, "path");
+MinLength(1)(RepositoryFileQueryDto.prototype, "path");
 
 IsString()(RepositoryCreateBodyDto.prototype, "name");
 MinLength(1)(RepositoryCreateBodyDto.prototype, "name");
@@ -372,6 +559,14 @@ const getRepositoryStatusDescriptor = Object.getOwnPropertyDescriptor(
   RepositoryPublicApiController.prototype,
   "getRepositoryStatus",
 );
+const getRepositoryTreeDescriptor = Object.getOwnPropertyDescriptor(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryTree",
+);
+const getRepositoryFileDescriptor = Object.getOwnPropertyDescriptor(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryFile",
+);
 const unregisterRepositoryDescriptor = Object.getOwnPropertyDescriptor(
   RepositoryPublicApiController.prototype,
   "unregisterRepository",
@@ -392,6 +587,18 @@ const getCommitDescriptor = Object.getOwnPropertyDescriptor(
   RepositoryCommitPublicApiController.prototype,
   "getCommit",
 );
+const listProjectRepositoriesDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+);
+const addProjectRepositoryDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+);
+const linkProjectRepositoryDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+);
 
 if (
   !listRepositoriesDescriptor ||
@@ -400,11 +607,16 @@ if (
   !syncRepositoriesDescriptor ||
   !syncRepositoryDescriptor ||
   !getRepositoryStatusDescriptor ||
+  !getRepositoryTreeDescriptor ||
+  !getRepositoryFileDescriptor ||
   !unregisterRepositoryDescriptor ||
   !listBranchesDescriptor ||
   !getBranchDescriptor ||
   !listCommitsDescriptor ||
-  !getCommitDescriptor
+  !getCommitDescriptor ||
+  !listProjectRepositoriesDescriptor ||
+  !addProjectRepositoryDescriptor ||
+  !linkProjectRepositoryDescriptor
 ) {
   throw new Error("RepositoryPublicApiController route descriptors are missing");
 }
@@ -510,6 +722,44 @@ ApiOkResponse({ description: "Repository status" })(
   getRepositoryStatusDescriptor,
 );
 
+Get(":id/tree")(RepositoryPublicApiController.prototype, "getRepositoryTree", getRepositoryTreeDescriptor);
+Param()(RepositoryPublicApiController.prototype, "getRepositoryTree", 0);
+Query()(RepositoryPublicApiController.prototype, "getRepositoryTree", 1);
+ApiOperation({ summary: "List repository file tree" })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryTree",
+  getRepositoryTreeDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryTree",
+  getRepositoryTreeDescriptor,
+);
+ApiOkResponse({ description: "Repository file tree" })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryTree",
+  getRepositoryTreeDescriptor,
+);
+
+Get(":id/file")(RepositoryPublicApiController.prototype, "getRepositoryFile", getRepositoryFileDescriptor);
+Param()(RepositoryPublicApiController.prototype, "getRepositoryFile", 0);
+Query()(RepositoryPublicApiController.prototype, "getRepositoryFile", 1);
+ApiOperation({ summary: "Read repository file content" })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryFile",
+  getRepositoryFileDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryFile",
+  getRepositoryFileDescriptor,
+);
+ApiOkResponse({ description: "Repository file content" })(
+  RepositoryPublicApiController.prototype,
+  "getRepositoryFile",
+  getRepositoryFileDescriptor,
+);
+
 Delete(":id")(RepositoryPublicApiController.prototype, "unregisterRepository", unregisterRepositoryDescriptor);
 HttpCode(204)(RepositoryPublicApiController.prototype, "unregisterRepository", unregisterRepositoryDescriptor);
 Param()(RepositoryPublicApiController.prototype, "unregisterRepository", 0);
@@ -600,17 +850,84 @@ ApiOkResponse({ description: "Repository commit" })(
   getCommitDescriptor,
 );
 
+Controller("api/v1/projects/:id/repos")(ProjectRepositoryPublicApiController);
+ApiTags("project-repositories")(ProjectRepositoryPublicApiController);
+
+Get()(ProjectRepositoryPublicApiController.prototype, "list", listProjectRepositoriesDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "list", 0);
+Query()(ProjectRepositoryPublicApiController.prototype, "list", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+ApiOperation({ summary: "List project repository cards" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+ApiOkResponse({ description: "Project repository cards" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "list",
+  listProjectRepositoriesDescriptor,
+);
+
+Post()(ProjectRepositoryPublicApiController.prototype, "add", addProjectRepositoryDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "add", 0);
+Body()(ProjectRepositoryPublicApiController.prototype, "add", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+ApiOperation({ summary: "Add a repository to a project" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+ApiCreatedResponse({ description: "Project repository created" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "add",
+  addProjectRepositoryDescriptor,
+);
+
+Post(":repoId/link")(ProjectRepositoryPublicApiController.prototype, "link", linkProjectRepositoryDescriptor);
+Param()(ProjectRepositoryPublicApiController.prototype, "link", 0);
+Body()(ProjectRepositoryPublicApiController.prototype, "link", 1);
+ApiParam({ name: "id", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiParam({ name: "repoId", required: true })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiOperation({ summary: "Link an existing repository to a project" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+ApiOkResponse({ description: "Project repository linked" })(
+  ProjectRepositoryPublicApiController.prototype,
+  "link",
+  linkProjectRepositoryDescriptor,
+);
+
 Module({
   imports: [TypeOrmModule.forFeature(INTEGRATION_HUB_REPOSITORY_ENTITIES)],
   controllers: [
     RepositoryPublicApiController,
     RepositoryBranchPublicApiController,
     RepositoryCommitPublicApiController,
+    ProjectRepositoryPublicApiController,
   ],
   providers: [
     { provide: REPOSITORY_PUBLIC_API_OPTIONS, useValue: null },
     RepositoryPublicStore,
     RepositoryPublicApiService,
+    ProjectRepositoryPublicApiService,
   ],
   exports: [RepositoryPublicApiService],
 })(RepositoryPublicApiModule);

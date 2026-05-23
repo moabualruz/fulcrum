@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DataSource } from "typeorm";
@@ -12,8 +12,19 @@ const originalStdoutIsTTY = process.stdout.isTTY;
 const originalStdinIsTTY = process.stdin.isTTY;
 const originalConsoleLog = console.log;
 const originalConsoleError = console.error;
+const originalHome = process.env.HOME;
+const originalPath = process.env.PATH;
 let previousFulcrumHome: string | undefined;
 const originalCwd = process.cwd();
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function captureRun(args: readonly string[]): Promise<{
   stdout: string;
@@ -78,6 +89,10 @@ afterEach(() => {
   console.error = originalConsoleError;
   if (previousFulcrumHome === undefined) delete process.env.FULCRUM_HOME;
   else process.env.FULCRUM_HOME = previousFulcrumHome;
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
+  if (originalPath === undefined) delete process.env.PATH;
+  else process.env.PATH = originalPath;
   process.chdir(originalCwd);
 });
 
@@ -104,19 +119,30 @@ describe("root CLI source dispatch", () => {
     expect(result.stdout).toContain("inference <start|status|embed|generate|stop>");
   });
 
-  test("init command bootstraps a real local database through the source router", async () => {
+  test("init command bootstraps project scaffolding through the source router", async () => {
     previousFulcrumHome = process.env.FULCRUM_HOME;
-    process.env.FULCRUM_HOME = await mkdtemp(join(tmpdir(), "fulcrum-cli-init-source-"));
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-cli-init-source-"));
+    process.env.FULCRUM_HOME = join(scratch, "fulcrum-home");
+    process.env.HOME = join(scratch, "home");
+    process.env.PATH = `${join(scratch, "bin")}:/bin:/usr/bin`;
+    await mkdir(process.env.HOME, { recursive: true });
+    await mkdir(process.env.PATH, { recursive: true });
+    const project = join(scratch, "project");
+    await mkdir(project, { recursive: true });
 
-    const first = await captureRun(["init"]);
-    const second = await captureRun(["init"]);
+    const first = await captureRun(["init", project]);
+    const second = await captureRun(["init", project]);
 
     expect(first.exitCode).toBeNull();
     expect(first.stderr).toBe("");
-    expect(first.stdout).toContain("Local org bootstrapped");
+    expect(first.stdout).toContain("fulcrum init");
+    expect(await readFile(join(project, "AGENTS.md"), "utf8")).toContain("# AGENTS.md");
+    expect(await readFile(join(project, ".claude", "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(await exists(join(project, ".claude", "skills", ".gitkeep"))).toBe(true);
     expect(second.exitCode).toBeNull();
     expect(second.stderr).toBe("");
-    expect(second.stdout).toContain("Already initialized");
+    expect(second.stdout).toContain("AGENTS.md  (kept)");
+    expect(second.stdout).toContain(".claude/CLAUDE.md  (kept)");
   });
 
   test("i18n command routes without DB and returns real normalized locale payloads", async () => {
@@ -192,7 +218,7 @@ describe("root CLI source dispatch", () => {
     process.chdir(scratch);
 
     // buildLocalApplicationContainer auto-runs migrations, so pending state
-    // is never reached. The next gate — missing build artifacts — fires instead.
+    // is never reached. The next gate: missing build artifacts: fires instead.
     await expect(run(["web"])).rejects.toThrow(
       "web build missing",
     );
@@ -264,7 +290,8 @@ describe("root CLI source dispatch", () => {
   });
 
   test.each([
-    ["agents", ["agents", "--help"], "fulcrum agents"],
+    ["agents", ["agents", "--help"], "fulcrum agent"],
+    ["init", ["init", "--help"], "fulcrum init [DIR]"],
     ["projects", ["projects", "--help"], "fulcrum projects"],
     ["tasks", ["tasks", "--help"], "fulcrum tasks"],
     ["work", ["work", "--help"], "fulcrum work"],

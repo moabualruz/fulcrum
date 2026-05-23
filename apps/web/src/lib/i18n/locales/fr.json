@@ -6,7 +6,7 @@
   "common.create": "Créer",
   "common.search": "Rechercher",
   "common.loading": "Chargement…",
-  "common.error": "Une erreur est survenue",
+  "common.error": "L’action n’a pas abouti. Réessayez.",
   "common.confirm": "Confirmer",
   "common.close": "Fermer",
   "nav.dashboard": "Tableau de bord",

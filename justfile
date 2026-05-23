@@ -1,8 +1,23 @@
 ci:
-    bun run scripts/ci.ts
+    bun run ci
 
 ci-fast:
-    bun run scripts/ci.ts --changed
+    bun run ci-fast
+
+ci-tier1:
+    bun run ci:tier1
+
+ci-tier2:
+    bun run ci:tier2
+
+ci-tier3:
+    bun run ci:tier3
+
+ci-tier4:
+    bun run ci:tier4
+
+ci-tier5:
+    bun run ci:tier5
 
 sync-symphony:
     #!/usr/bin/env bash

@@ -24,7 +24,7 @@ import { OrgMember } from "@identity-access/infrastructure/database/entities/aut
 import { Invitation } from "@identity-access/infrastructure/database/entities/auth/Invitation.ts";
 import { OrgMemberRepository } from "@identity-access/infrastructure/database/repositories/auth/OrgMemberRepository.ts";
 import { InvitationRepository } from "@identity-access/infrastructure/database/repositories/auth/InvitationRepository.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { appRouter } from "@fulcrum/server/trpc/router.ts";
 import { createContext } from "@fulcrum/server/trpc/context.ts";
 import { t } from "@fulcrum/server/trpc/trpc.ts";
@@ -227,6 +227,9 @@ describe("auth.whoami", () => {
     const result = await caller.auth.whoami();
     expect(result.userId).toBe(TEST_OWNER_ID);
     expect(result.orgId).toBe(TEST_ORG_ID);
+    expect(result.activeOrgId).toBe(TEST_ORG_ID);
+    expect(result.sessionId).toBe(`sess-${TEST_OWNER_ID.slice(-8)}`);
+    expect(typeof result.sessionExpiresAt).toBe("string");
     expect(result.email).toBe("owner@test.local");
     expect(result.role).toBe("owner");
   });

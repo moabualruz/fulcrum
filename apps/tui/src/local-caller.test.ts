@@ -156,6 +156,7 @@ describe("TUI audit API caller", () => {
 
     await expect(caller.audit.query({
       subjectKind: "task",
+      traceId: "trace-1",
       dateRange: { from: new Date("2026-05-14T00:00:00.000Z") },
     })).resolves.toEqual([{ id: "audit-1", subjectKind: "task" }]);
     await expect(caller.audit.export({ format: "json", subjectKind: "task" })).resolves.toEqual({
@@ -164,7 +165,7 @@ describe("TUI audit API caller", () => {
     });
     expect(calls).toEqual([
       {
-        url: "http://127.0.0.1:4321/api/v1/audit?orgId=org-1&kind=task&since=2026-05-14T00%3A00%3A00.000Z",
+        url: "http://127.0.0.1:4321/api/v1/audit?orgId=org-1&kind=task&traceId=trace-1&since=2026-05-14T00%3A00%3A00.000Z",
         init: {
           method: "GET",
           credentials: "include",

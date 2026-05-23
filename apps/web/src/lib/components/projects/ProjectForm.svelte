@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Select } from "@fulcrum/ui-kit";
 	import { untrack } from "svelte";
 	import { enhance } from "$app/forms";
 	import type { SuperValidated } from "sveltekit-superforms";
@@ -13,7 +14,7 @@
 	let { form, parentProjects = [] }: Props = $props();
 
 	// Local reactive copies seeded from the server-validated form. Plain Svelte
-	// runes are sufficient here — the heavy `superForm` client wiring is not
+	// runes are sufficient here: the heavy `superForm` client wiring is not
 	// needed for this single-action POST flow, and avoiding it keeps SSR clean
 	// (no `$app/stores`, `$app/navigation`, `$app/environment` imports leaking
 	// into server-render harnesses). `untrack` so the initial seed does not
@@ -92,7 +93,7 @@
 			bind:value={slugValue}
 			oninput={onSlugInput}
 			aria-invalid={slugError ? "true" : undefined}
-			pattern="[a-z0-9][a-z0-9-]{0,63}"
+			pattern={"[a-z0-9][a-z0-9-]{0,63}"}
 			required
 			class="border-input bg-background h-9 rounded-md border px-3 py-1 text-sm font-mono shadow-xs"
 		/>

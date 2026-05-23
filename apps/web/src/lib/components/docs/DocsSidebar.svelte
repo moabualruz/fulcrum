@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import { dndzone, type DndEvent } from "svelte-dnd-action";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
@@ -99,7 +99,7 @@
     <h2 class={cn("text-sm font-semibold truncate")}>{title}</h2>
     <button
       data-new-doc
-      class={cn(buttonVariants({ variant: "ghost", size: "icon" }), "size-6 shrink-0")}
+      class={cn(buttonVariants({ variant: "ghost", size: "sm" }), "size-6 shrink-0 px-0")}
       onclick={() => { showNewDocInput = !showNewDocInput; }}
       title="New document"
       aria-label="New document"

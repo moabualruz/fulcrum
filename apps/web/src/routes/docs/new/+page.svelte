@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { untrack } from "svelte";
-	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import MarkdownEditor from "$lib/components/markdown/MarkdownEditor.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { untrack } from "svelte";
+	import { enhance } from "$app/forms";
 	import {
 		applyTemplateSelectionChange,
 		buildDocTypeOptions,
@@ -12,7 +11,7 @@
 		type TemplatePickerState,
 	} from "$lib/docs/template-picker";
 	import { DOC_TYPE_DESCRIPTIONS, DOC_TYPE_LABELS } from "$lib/docs/doc-templates";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -29,7 +28,7 @@
 		templates,
 	}));
 
-	// Local mirrors seeded once — keystrokes don't recompute against re-rendered
+	// Local mirrors seeded once: keystrokes don't recompute against re-rendered
 	// `data.form.data` on every input event.
 	let titleValue = $state(untrack(() => data.form.data.title ?? ""));
 	let kindValue = $state(initialTemplateState.kind);
@@ -93,7 +92,7 @@
 	</div>
 </header>
 
-<section data-doc-new-wizard class={cn("mb-4 flex max-w-5xl flex-col gap-4")}>
+<section data-doc-new-wizard class={cn("mb-4 flex min-w-0 max-w-5xl flex-col gap-4")}>
 	{#if wizardStep === "type"}
 		<div class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
 			{#each KINDS as kind (kind)}
@@ -110,7 +109,8 @@
 				</button>
 			{/each}
 		</div>
-	{:else if wizardStep === "template"}
+	{/if}
+	{#if wizardStep === "type" || wizardStep === "template"}
 		<div data-template-picker class={cn("border-border flex flex-col gap-3 rounded-md border p-4")}>
 			<div class={cn("flex items-center justify-between gap-3")}>
 				<div>
@@ -119,7 +119,7 @@
 				</div>
 				<button
 					type="button"
-					class={cn(buttonVariants({ variant: "default", size: "sm" }))}
+					class={cn(buttonVariants({ variant: "primary", size: "sm" }))}
 					onclick={useSelectedTemplate}
 				>Use template</button>
 			</div>
@@ -132,8 +132,13 @@
 	method="POST"
 	data-doc-new-form
 	use:enhance
-	class={cn("flex flex-col gap-4 max-w-3xl")}
+	class={cn("flex min-w-0 max-w-3xl flex-col gap-4")}
 >
+	<!-- Owning project: seeded from `?project=` so a Capture-stage doc binds
+	     to that project. resolveProjectId (action) accepts a slug or uuid. -->
+	{#if data.form.data.projectId}
+		<input type="hidden" name="projectId" value={data.form.data.projectId} />
+	{/if}
 	<div class={cn("flex flex-col gap-1.5")}>
 		<label for="doc-title" class={cn("text-sm font-medium")}>Title</label>
 		<input
@@ -185,9 +190,11 @@
 		/>
 	</div>
 
-	<div class={cn("flex flex-col gap-1.5")}>
+	<div class={cn("flex min-w-0 flex-col gap-1.5")}>
 		<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
-		<MarkdownEditor bind:value={bodyValue} onChange={handleBodyChange} ariaLabel="Document body" />
+		<div class={cn("min-w-0 overflow-x-auto")}>
+			<MarkdownEditor bind:value={bodyValue} onChange={handleBodyChange} ariaLabel="Document body" />
+		</div>
 		<input type="hidden" name="body" value={bodyValue} />
 		{#if bodyError}
 			<p data-error-body class={cn("text-destructive text-xs")}>{bodyError}</p>
@@ -197,8 +204,9 @@
 	<div class={cn("flex items-center gap-2 pt-2")}>
 		<button
 			type="submit"
+			data-doc-save
 			data-doc-submit
-			class={cn(buttonVariants({ variant: "default" }))}
+			class={cn(buttonVariants({ variant: "primary" }))}
 		>Create document</button>
 	</div>
 </form>

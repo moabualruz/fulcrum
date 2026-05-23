@@ -1,7 +1,9 @@
 import "reflect-metadata";
 
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -21,6 +23,7 @@ import {
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
 import {
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -32,7 +35,16 @@ import { IsArray, IsIn, IsOptional, IsString, IsUUID, MinLength } from "class-va
 import { DataSource } from "typeorm";
 
 import { CsvValidationError } from "@work-management/application/tasks/csv.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { AppError } from "@platform-core/domain/errors.ts";
+import {
+  bulkDelete,
+  bulkUpdate,
+  createTask as createBoardWorkItem,
+  deleteTask as deleteBoardWorkItem,
+  updateTask as updateBoardWorkItem,
+} from "@work-management/application/tasks/commands.ts";
+import { listBoardTaskRows } from "@work-management/application/tasks/queries.ts";
 import { TaskPublicStore } from "@work-management/infrastructure/database/task-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
@@ -84,6 +96,7 @@ export interface TaskPublicApplication {
     priority?: number;
     points?: number;
     assigneeId?: string;
+    traceId?: string;
   }): Promise<unknown>;
   getTask(input: {
     orgId: string;
@@ -153,6 +166,7 @@ export class TaskPublicApiService {
   constructor(
     private readonly options: TaskPublicApiOptions | null = null,
     private readonly store: TaskPublicStore | null = null,
+    private readonly dataSource: DataSource | null = null,
   ) {}
 
   async listTasks(query: TaskListQueryDto): Promise<unknown[]> {
@@ -195,7 +209,7 @@ export class TaskPublicApiService {
     }));
   }
 
-  async createTask(body: TaskCreateBodyDto): Promise<{ id: string }> {
+  async createTask(body: TaskCreateBodyDto): Promise<{ id: string; traceId?: string }> {
     const task = await this.requireApplication().createTask({
       orgId: body.orgId,
       userId: body.userId,
@@ -208,12 +222,68 @@ export class TaskPublicApiService {
       priority: body.priority,
       points: body.points,
       assigneeId: body.assigneeId,
+      traceId: body.traceId,
     });
     const id = extractId(task);
     if (!id) {
       throw new InternalServerErrorException("Task public API create facade returned no task ID.");
     }
-    return { id };
+    return { id, traceId: extractTraceId(task) ?? undefined };
+  }
+
+  // NOTE: listBoardWorkItems / createBoardWorkItem / bulk-status / bulk-delete
+  // are declared here, BEFORE `getTask`, so NestJS RouterExplorer maps the
+  // literal `tasks/board` and `tasks/board/bulk-*` GET/POST routes before the
+  // parametric `tasks/:id` route. Reordering matters: the scanner walks
+  // class methods in source order and Express picks the first matching route.
+  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
+    this.requirePublicApiFeature();
+    // Board list reads from the canonical `fulcrum_tasks` table via
+    // TaskPublicStore so it returns the same rows the plain `/api/v1/tasks`
+    // endpoint does. Without this, the legacy `tasks` table view returned 0
+    // rows for any task created through the public API.
+    const store = this.requireStore();
+    const tasks = await this.mapAppErrors(() =>
+      store.listTasks({
+        orgId: query.orgId,
+        userId: query.userId ?? "local",
+        projectId: resolveProjectId(query),
+        includeDeleted: false,
+      })
+    );
+    return tasks.map((task) => toJsonDates({
+      id: task.id,
+      title: task.title,
+      status: task.status ?? "todo",
+      priority: task.priority ?? 0,
+      project_id: task.projectId,
+      updated_at: task.updatedAt,
+    }));
+  }
+
+  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
+    this.requirePublicApiFeature();
+    return toJsonDates(await this.mapAppErrors(() =>
+      createBoardWorkItem(this.requireDataSource().manager, boardContext(body), {
+        title: body.title,
+        status: body.status,
+        projectId: resolveProjectId(body),
+      })
+    ));
+  }
+
+  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
+    this.requirePublicApiFeature();
+    return await this.mapAppErrors(() =>
+      bulkUpdate(this.requireDataSource().manager, boardContext(body), body.ids, { status: body.status })
+    );
+  }
+
+  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
+    this.requirePublicApiFeature();
+    return await this.mapAppErrors(() =>
+      bulkDelete(this.requireDataSource().manager, boardContext(body), body.ids)
+    );
   }
 
   async getTask(params: TaskIdParamsDto, query: TaskRequestContextDto): Promise<unknown> {
@@ -346,6 +416,34 @@ export class TaskPublicApiService {
     }
   }
 
+  // /tasks/board/:id updates + move stay below the parametric /tasks/:id
+  // declarations because their literal prefix (`tasks/board/...`) does NOT
+  // collide with `tasks/:id`: Express matches segment-by-segment and
+  // `tasks/board/...` cannot be served by a `tasks/:id` route.
+  async updateBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardPatchBodyDto): Promise<unknown> {
+    this.requirePublicApiFeature();
+    return toJsonDates(await this.mapAppErrors(() =>
+      updateBoardWorkItem(this.requireDataSource().manager, boardContext(body), params.id, boardPatch(body))
+    ));
+  }
+
+  async deleteBoardWorkItem(params: TaskIdParamsDto, query: TaskBoardScopeDto): Promise<unknown> {
+    this.requirePublicApiFeature();
+    return toJsonDates(await this.mapAppErrors(() =>
+      deleteBoardWorkItem(this.requireDataSource().manager, boardContext(query), params.id)
+    ));
+  }
+
+  async moveBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardMoveBodyDto): Promise<unknown> {
+    this.requirePublicApiFeature();
+    return toJsonDates(await this.mapAppErrors(() =>
+      updateBoardWorkItem(this.requireDataSource().manager, boardContext(body), params.id, {
+        expectedStatus: body.expectedStatus,
+        status: body.status,
+      })
+    ));
+  }
+
   private requireApplication(): TaskPublicApplication {
     this.requirePublicApiFeature();
     const application = this.options?.application;
@@ -393,6 +491,63 @@ export class TaskPublicApiService {
       throw new ForbiddenException({ error: "Feature disabled", code: "FEATURE_DISABLED" });
     }
   }
+
+  private async mapAppErrors<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof AppError) throw appHttpError(error);
+      throw error;
+    }
+  }
+
+  private requireDataSource(): DataSource {
+    if (!this.dataSource) {
+      throw new InternalServerErrorException("Task board public API data source is not configured.");
+    }
+    return this.dataSource;
+  }
+
+  private requireStore(): TaskPublicStore {
+    if (!this.store) {
+      throw new InternalServerErrorException("Task public store is not configured.");
+    }
+    return this.store;
+  }
+}
+
+export class TaskBoardScopeDto {
+  orgId!: string;
+  userId!: string;
+  projectId?: string | null;
+  project_id?: string | null;
+}
+
+export class TaskBoardCreateBodyDto extends TaskBoardScopeDto {
+  title!: string;
+  status?: string | null;
+}
+
+export class TaskBoardPatchBodyDto extends TaskBoardScopeDto {
+  title?: string;
+  description?: string | null;
+  status?: string | null;
+  expectedStatus?: string | null;
+  priority?: number | null;
+}
+
+export class TaskBoardMoveBodyDto extends TaskBoardScopeDto {
+  expectedStatus?: string | null;
+  status!: string;
+}
+
+export class TaskBoardBulkStatusBodyDto extends TaskBoardScopeDto {
+  ids!: string[];
+  status!: string;
+}
+
+export class TaskBoardBulkDeleteBodyDto extends TaskBoardScopeDto {
+  ids!: string[];
 }
 
 export class TaskPublicApiController {
@@ -406,8 +561,28 @@ export class TaskPublicApiController {
     return await this.tasks.manualTaskWorkbench(query);
   }
 
-  async createTask(body: TaskCreateBodyDto): Promise<{ id: string }> {
+  async createTask(body: TaskCreateBodyDto): Promise<{ id: string; traceId?: string }> {
     return await this.tasks.createTask(body);
+  }
+
+  // Board literal routes declared BEFORE `getTask`/`patchTask` (the parametric
+  // `tasks/:id` routes) so NestJS RouterExplorer maps the literal `tasks/board`
+  // first — otherwise Express matches `tasks/:id` with `id="board"` and the
+  // board GET 404s.
+  async listBoardWorkItems(query: TaskBoardScopeDto): Promise<unknown[]> {
+    return await this.tasks.listBoardWorkItems(query);
+  }
+
+  async createBoardWorkItem(body: TaskBoardCreateBodyDto): Promise<unknown> {
+    return await this.tasks.createBoardWorkItem(body);
+  }
+
+  async bulkUpdateBoardWorkItems(body: TaskBoardBulkStatusBodyDto): Promise<{ updated: number }> {
+    return await this.tasks.bulkUpdateBoardWorkItems(body);
+  }
+
+  async bulkDeleteBoardWorkItems(body: TaskBoardBulkDeleteBodyDto): Promise<{ deleted: number }> {
+    return await this.tasks.bulkDeleteBoardWorkItems(body);
   }
 
   async getTask(params: TaskIdParamsDto, query: TaskRequestContextDto): Promise<unknown> {
@@ -447,6 +622,21 @@ export class TaskPublicApiController {
   async importTasksCsv(body: TaskCsvImportBodyDto): Promise<unknown> {
     return await this.tasks.importTasksCsv(body);
   }
+
+  async updateBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardPatchBodyDto): Promise<unknown> {
+    return await this.tasks.updateBoardWorkItem(params, body);
+  }
+
+  async deleteBoardWorkItem(params: TaskIdParamsDto, query: TaskBoardScopeDto): Promise<unknown> {
+    return await this.tasks.deleteBoardWorkItem(params, query);
+  }
+
+  async moveBoardWorkItem(params: TaskIdParamsDto, body: TaskBoardMoveBodyDto): Promise<unknown> {
+    return await this.tasks.moveBoardWorkItem(params, body);
+  }
+  // Bulk endpoints (`bulkUpdateBoardWorkItems`/`bulkDeleteBoardWorkItems`) are
+  // declared earlier in the class so RouterExplorer maps their literal paths
+  // before the parametric `tasks/:id` patches.
 }
 
 export class TaskPublicApiModule {
@@ -498,6 +688,12 @@ function extractId(value: unknown): string | null {
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
+function extractTraceId(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const traceId = (value as Record<string, unknown>)["traceId"];
+  return typeof traceId === "string" && traceId.length > 0 ? traceId : null;
+}
+
 function toJsonDates(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
 }
@@ -518,7 +714,38 @@ function taskPatch(body: TaskPatchBodyDto): Partial<TaskPatchBodyDto> {
       patch[key] = body[key] as never;
     }
   }
+  // `sprintId` was historically assigned through `/backlog/sprint-tasks`;
+  // accept it here too (camel or snake) so the standard tasks PATCH can move
+  // a task into / out of a sprint without a separate endpoint.
+  const sprintId = body.sprintId ?? body.sprint_id;
+  if (sprintId !== undefined) patch.sprintId = sprintId;
   return patch;
+}
+
+function boardPatch(body: TaskBoardPatchBodyDto): Partial<TaskBoardPatchBodyDto> {
+  const patch: Partial<TaskBoardPatchBodyDto> = {};
+  for (const key of ["title", "description", "status", "expectedStatus", "priority"] as const) {
+    if (body[key] !== undefined) {
+      patch[key] = body[key] as never;
+    }
+  }
+  return patch;
+}
+
+function boardContext(input: TaskBoardScopeDto) {
+  return {
+    orgId: input.orgId,
+    userId: input.userId ?? null,
+    projectId: resolveProjectId(input),
+  };
+}
+
+function appHttpError(error: AppError) {
+  if (error.kind === "validation") return new BadRequestException(error.message);
+  if (error.kind === "forbidden") return new ForbiddenException(error.message);
+  if (error.kind === "not_found") return new NotFoundException(error.message);
+  if (error.kind === "conflict") return new ConflictException(error.message);
+  return new InternalServerErrorException(error.message);
 }
 
 function normalizeStringList(value: unknown): string[] {
@@ -535,6 +762,7 @@ function normalizeStringList(value: unknown): string[] {
 
 Inject(TASK_PUBLIC_API_OPTIONS)(TaskPublicApiService, undefined, 0);
 Inject(TaskPublicStore)(TaskPublicApiService, undefined, 1);
+Inject(DataSource)(TaskPublicApiService, undefined, 2);
 Inject(DataSource)(TaskPublicStore, undefined, 0);
 Inject(TaskPublicApiService)(TaskPublicApiController, undefined, 0);
 
@@ -600,6 +828,9 @@ IsIn(TASK_STATUSES)(TaskCreateBodyDto.prototype, "status");
 IsOptional()(TaskCreateBodyDto.prototype, "assigneeId");
 IsString()(TaskCreateBodyDto.prototype, "assigneeId");
 MinLength(1)(TaskCreateBodyDto.prototype, "assigneeId");
+IsOptional()(TaskCreateBodyDto.prototype, "traceId");
+IsString()(TaskCreateBodyDto.prototype, "traceId");
+MinLength(1)(TaskCreateBodyDto.prototype, "traceId");
 
 for (const property of ["title", "descriptionText", "assigneeId"] as const) {
   IsOptional()(TaskPatchBodyDto.prototype, property);
@@ -630,6 +861,43 @@ IsString()(TaskCsvImportBodyDto.prototype, "csv");
 MinLength(1)(TaskCsvImportBodyDto.prototype, "csv");
 IsOptional()(TaskCsvImportBodyDto.prototype, "columnMap");
 
+for (const dto of [
+  TaskBoardScopeDto,
+  TaskBoardCreateBodyDto,
+  TaskBoardPatchBodyDto,
+  TaskBoardMoveBodyDto,
+  TaskBoardBulkStatusBodyDto,
+  TaskBoardBulkDeleteBodyDto,
+] as const) {
+  IsString()(dto.prototype, "orgId");
+  MinLength(1)(dto.prototype, "orgId");
+  IsString()(dto.prototype, "userId");
+  MinLength(1)(dto.prototype, "userId");
+  for (const property of ["project_id", "projectId"] as const) {
+    IsOptional()(dto.prototype, property);
+    IsString()(dto.prototype, property);
+  }
+}
+IsString()(TaskBoardCreateBodyDto.prototype, "title");
+MinLength(1)(TaskBoardCreateBodyDto.prototype, "title");
+for (const dto of [TaskBoardCreateBodyDto, TaskBoardPatchBodyDto, TaskBoardMoveBodyDto, TaskBoardBulkStatusBodyDto] as const) {
+  IsOptional()(dto.prototype, "status");
+  IsString()(dto.prototype, "status");
+}
+IsOptional()(TaskBoardPatchBodyDto.prototype, "title");
+IsString()(TaskBoardPatchBodyDto.prototype, "title");
+IsOptional()(TaskBoardPatchBodyDto.prototype, "description");
+IsString()(TaskBoardPatchBodyDto.prototype, "description");
+IsOptional()(TaskBoardPatchBodyDto.prototype, "expectedStatus");
+IsString()(TaskBoardPatchBodyDto.prototype, "expectedStatus");
+IsOptional()(TaskBoardMoveBodyDto.prototype, "expectedStatus");
+IsString()(TaskBoardMoveBodyDto.prototype, "expectedStatus");
+for (const dto of [TaskBoardBulkStatusBodyDto, TaskBoardBulkDeleteBodyDto] as const) {
+  IsArray()(dto.prototype, "ids");
+  IsString({ each: true })(dto.prototype, "ids");
+  MinLength(1, { each: true })(dto.prototype, "ids");
+}
+
 const listTasksDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "listTasks");
 const manualTaskWorkbenchDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "manualTaskWorkbench");
 const createTaskDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "createTask");
@@ -641,6 +909,13 @@ const setTaskDependenciesDescriptor = Object.getOwnPropertyDescriptor(TaskPublic
 const setTaskParentDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "setTaskParent");
 const exportTasksCsvDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "exportTasksCsv");
 const importTasksCsvDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "importTasksCsv");
+const listBoardWorkItemsDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "listBoardWorkItems");
+const createBoardWorkItemDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "createBoardWorkItem");
+const updateBoardWorkItemDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "updateBoardWorkItem");
+const deleteBoardWorkItemDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "deleteBoardWorkItem");
+const moveBoardWorkItemDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "moveBoardWorkItem");
+const bulkUpdateBoardWorkItemsDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "bulkUpdateBoardWorkItems");
+const bulkDeleteBoardWorkItemsDescriptor = Object.getOwnPropertyDescriptor(TaskPublicApiController.prototype, "bulkDeleteBoardWorkItems");
 
 if (
   !listTasksDescriptor ||
@@ -653,13 +928,21 @@ if (
   !setTaskDependenciesDescriptor ||
   !setTaskParentDescriptor ||
   !exportTasksCsvDescriptor ||
-  !importTasksCsvDescriptor
+  !importTasksCsvDescriptor ||
+  !listBoardWorkItemsDescriptor ||
+  !createBoardWorkItemDescriptor ||
+  !updateBoardWorkItemDescriptor ||
+  !deleteBoardWorkItemDescriptor ||
+  !moveBoardWorkItemDescriptor ||
+  !bulkUpdateBoardWorkItemsDescriptor ||
+  !bulkDeleteBoardWorkItemsDescriptor
 ) {
   throw new Error("TaskPublicApiController route descriptors are missing");
 }
 
 Controller("api/v1")(TaskPublicApiController);
 ApiTags("tasks")(TaskPublicApiController);
+ApiForbiddenResponse({ description: "Task public API feature is disabled or caller lacks permission" })(TaskPublicApiController);
 
 Get("tasks")(TaskPublicApiController.prototype, "listTasks", listTasksDescriptor);
 Query()(TaskPublicApiController.prototype, "listTasks", 0);
@@ -682,6 +965,67 @@ ApiOkResponse({ description: "Manual task workbench" })(
   "manualTaskWorkbench",
   manualTaskWorkbenchDescriptor,
 );
+
+Get("tasks/board")(TaskPublicApiController.prototype, "listBoardWorkItems", listBoardWorkItemsDescriptor);
+Query()(TaskPublicApiController.prototype, "listBoardWorkItems", 0);
+ApiOperation({ summary: "List board work items" })(TaskPublicApiController.prototype, "listBoardWorkItems", listBoardWorkItemsDescriptor);
+ApiOkResponse({ description: "Board work items" })(TaskPublicApiController.prototype, "listBoardWorkItems", listBoardWorkItemsDescriptor);
+
+Post("tasks/board")(TaskPublicApiController.prototype, "createBoardWorkItem", createBoardWorkItemDescriptor);
+Body()(TaskPublicApiController.prototype, "createBoardWorkItem", 0);
+ApiOperation({ summary: "Create board work item" })(TaskPublicApiController.prototype, "createBoardWorkItem", createBoardWorkItemDescriptor);
+ApiCreatedResponse({ description: "Created board work item" })(
+  TaskPublicApiController.prototype,
+  "createBoardWorkItem",
+  createBoardWorkItemDescriptor,
+);
+
+Patch("tasks/board/bulk-status")(TaskPublicApiController.prototype, "bulkUpdateBoardWorkItems", bulkUpdateBoardWorkItemsDescriptor);
+Body()(TaskPublicApiController.prototype, "bulkUpdateBoardWorkItems", 0);
+ApiOperation({ summary: "Bulk update board work item status" })(
+  TaskPublicApiController.prototype,
+  "bulkUpdateBoardWorkItems",
+  bulkUpdateBoardWorkItemsDescriptor,
+);
+ApiOkResponse({ description: "Bulk status result" })(
+  TaskPublicApiController.prototype,
+  "bulkUpdateBoardWorkItems",
+  bulkUpdateBoardWorkItemsDescriptor,
+);
+
+Post("tasks/board/bulk-delete")(TaskPublicApiController.prototype, "bulkDeleteBoardWorkItems", bulkDeleteBoardWorkItemsDescriptor);
+Body()(TaskPublicApiController.prototype, "bulkDeleteBoardWorkItems", 0);
+ApiOperation({ summary: "Bulk delete board work items" })(
+  TaskPublicApiController.prototype,
+  "bulkDeleteBoardWorkItems",
+  bulkDeleteBoardWorkItemsDescriptor,
+);
+ApiOkResponse({ description: "Bulk delete result" })(
+  TaskPublicApiController.prototype,
+  "bulkDeleteBoardWorkItems",
+  bulkDeleteBoardWorkItemsDescriptor,
+);
+
+Patch("tasks/board/:id")(TaskPublicApiController.prototype, "updateBoardWorkItem", updateBoardWorkItemDescriptor);
+Param()(TaskPublicApiController.prototype, "updateBoardWorkItem", 0);
+Body()(TaskPublicApiController.prototype, "updateBoardWorkItem", 1);
+ApiOperation({ summary: "Update board work item" })(TaskPublicApiController.prototype, "updateBoardWorkItem", updateBoardWorkItemDescriptor);
+ApiParam({ name: "id", required: true })(TaskPublicApiController.prototype, "updateBoardWorkItem", updateBoardWorkItemDescriptor);
+ApiOkResponse({ description: "Updated board work item" })(TaskPublicApiController.prototype, "updateBoardWorkItem", updateBoardWorkItemDescriptor);
+
+Delete("tasks/board/:id")(TaskPublicApiController.prototype, "deleteBoardWorkItem", deleteBoardWorkItemDescriptor);
+Param()(TaskPublicApiController.prototype, "deleteBoardWorkItem", 0);
+Query()(TaskPublicApiController.prototype, "deleteBoardWorkItem", 1);
+ApiOperation({ summary: "Delete board work item" })(TaskPublicApiController.prototype, "deleteBoardWorkItem", deleteBoardWorkItemDescriptor);
+ApiParam({ name: "id", required: true })(TaskPublicApiController.prototype, "deleteBoardWorkItem", deleteBoardWorkItemDescriptor);
+ApiOkResponse({ description: "Deleted board work item" })(TaskPublicApiController.prototype, "deleteBoardWorkItem", deleteBoardWorkItemDescriptor);
+
+Patch("tasks/board/:id/move")(TaskPublicApiController.prototype, "moveBoardWorkItem", moveBoardWorkItemDescriptor);
+Param()(TaskPublicApiController.prototype, "moveBoardWorkItem", 0);
+Body()(TaskPublicApiController.prototype, "moveBoardWorkItem", 1);
+ApiOperation({ summary: "Move board work item" })(TaskPublicApiController.prototype, "moveBoardWorkItem", moveBoardWorkItemDescriptor);
+ApiParam({ name: "id", required: true })(TaskPublicApiController.prototype, "moveBoardWorkItem", moveBoardWorkItemDescriptor);
+ApiOkResponse({ description: "Moved board work item" })(TaskPublicApiController.prototype, "moveBoardWorkItem", moveBoardWorkItemDescriptor);
 
 Post("tasks")(TaskPublicApiController.prototype, "createTask", createTaskDescriptor);
 Body()(TaskPublicApiController.prototype, "createTask", 0);

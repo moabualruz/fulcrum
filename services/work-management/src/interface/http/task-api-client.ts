@@ -66,6 +66,41 @@ export function createTaskApiCaller(options: TaskApiClientOptions) {
           body: taskBody(options, body),
         });
       },
+      board: {
+        list: async (input: JsonRecord = {}) =>
+          await request("/api/v1/tasks/board", { method: "GET", query: taskQuery(input) }),
+        create: async (input: JsonRecord) =>
+          await request("/api/v1/tasks/board", { method: "POST", body: taskBody(options, input) }),
+        update: async (input: JsonRecord & { id: string }) => {
+          const { id, ...body } = input;
+          return await request(`/api/v1/tasks/board/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: taskBody(options, body),
+          });
+        },
+        delete: async (input: JsonRecord & { id: string }) =>
+          await request(`/api/v1/tasks/board/${encodeURIComponent(input.id)}`, {
+            method: "DELETE",
+            query: taskQuery(input),
+          }),
+        move: async (input: JsonRecord & { id: string }) => {
+          const { id, ...body } = input;
+          return await request(`/api/v1/tasks/board/${encodeURIComponent(id)}/move`, {
+            method: "PATCH",
+            body: taskBody(options, body),
+          });
+        },
+        bulkStatus: async (input: JsonRecord) =>
+          await request("/api/v1/tasks/board/bulk-status", {
+            method: "PATCH",
+            body: taskBody(options, input),
+          }),
+        bulkDelete: async (input: JsonRecord) =>
+          await request("/api/v1/tasks/board/bulk-delete", {
+            method: "POST",
+            body: taskBody(options, input),
+          }),
+      },
     },
   };
 }
@@ -117,6 +152,8 @@ function taskQuery(input: JsonRecord): JsonRecord {
     projectId: input.projectId,
     project_id: input.project_id,
     include_deleted: input.includeDeleted ?? input.include_deleted,
+    sortField: input.sortField,
+    sortDirection: input.sortDirection,
   });
 }
 

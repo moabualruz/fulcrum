@@ -93,12 +93,13 @@ function bundleFixture(): ContextBundle {
     projectId: null,
     tokenBudget: 8192,
     tokenCount: 5,
+    sourceRefs: [{ kind: "task", id: TASK_ID, reason: "selected-task", scope: "project" }],
     slices: {
-      memories: { content: "memory", tokenCount: 1 },
-      linkedDocs: { content: "doc", tokenCount: 1 },
-      recentRuns: { content: "run", tokenCount: 1 },
-      repoState: { content: "repo", tokenCount: 1 },
-      skillPrompts: { content: "skill", tokenCount: 1 },
+      memories: { content: "memory", tokenCount: 1, sourceRefs: [] },
+      linkedDocs: { content: "doc", tokenCount: 1, sourceRefs: [] },
+      recentRuns: { content: "run", tokenCount: 1, sourceRefs: [] },
+      repoState: { content: "repo", tokenCount: 1, sourceRefs: [] },
+      skillPrompts: { content: "skill", tokenCount: 1, sourceRefs: [] },
     },
   };
 }

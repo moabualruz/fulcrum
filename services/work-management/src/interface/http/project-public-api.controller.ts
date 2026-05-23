@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -25,18 +26,53 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import type { z } from "zod";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { loadDashboard } from "@work-management/application/dashboard/queries.ts";
 import {
   ProjectPublicStore,
   type ProjectPublicKind,
 } from "@work-management/infrastructure/database/project-public-store.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
-import { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto } from "./dto/project.dto.ts";
-export { ProjectListQueryDto, ProjectRequestContextDto, ProjectIdParamsDto, ProjectCreateBodyDto, ProjectPatchBodyDto };
+import {
+  ProjectBacklogSprintTaskBodyDto,
+  ProjectBacklogSprintTaskBodySchema,
+  ProjectBacklogSprintTaskParamsDto,
+  ProjectBacklogSprintTaskParamsSchema,
+  ProjectCreateBodyDto,
+  ProjectCreateBodySchema,
+  ProjectIdParamsDto,
+  ProjectIdParamsSchema,
+  ProjectListQueryDto,
+  ProjectListQuerySchema,
+  ProjectPatchBodyDto,
+  ProjectPatchBodySchema,
+  ProjectRequestContextDto,
+  ProjectRequestContextSchema,
+  ProjectSetupBodyDto,
+  ProjectSetupBodySchema,
+} from "./dto/project.dto.ts";
+export {
+  ProjectBacklogSprintTaskBodyDto,
+  ProjectBacklogSprintTaskBodySchema,
+  ProjectBacklogSprintTaskParamsDto,
+  ProjectBacklogSprintTaskParamsSchema,
+  ProjectCreateBodyDto,
+  ProjectCreateBodySchema,
+  ProjectIdParamsDto,
+  ProjectIdParamsSchema,
+  ProjectListQueryDto,
+  ProjectListQuerySchema,
+  ProjectPatchBodyDto,
+  ProjectPatchBodySchema,
+  ProjectRequestContextDto,
+  ProjectRequestContextSchema,
+  ProjectSetupBodyDto,
+  ProjectSetupBodySchema,
+};
 
 export const PROJECT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.projectPublicApi.options");
 
@@ -47,6 +83,10 @@ export interface ProjectPublicApplication {
     kind?: ProjectPublicKind;
     name: string;
     slug?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
+    traceId?: string;
     repoPath?: string;
     template?: string;
   }): Promise<unknown>;
@@ -55,10 +95,39 @@ export interface ProjectPublicApplication {
     orgId: string;
     id: string;
     name?: string;
+    description?: string | null;
+    status?: string;
+    ownerId?: string | null;
     memoryConfig?: Record<string, unknown>;
   }): Promise<unknown>;
   deleteProject?(input: { orgId: string; id: string }): Promise<void>;
   projectStats?(input: { orgId: string; id: string }): Promise<unknown>;
+  projectOverview?(input: { orgId: string; id: string }): Promise<unknown>;
+  listProjectOptions?(input: { orgId: string }): Promise<unknown>;
+  createProjectFromSetup?(input: {
+    orgId: string;
+    userId?: string | null;
+    name: string;
+    slug?: string;
+    description?: string | null;
+    kind?: ProjectPublicKind;
+    parentId?: string | null;
+    repoPath?: string | null;
+    template?: string | null;
+  }): Promise<unknown>;
+  loadProjectBacklog?(input: { orgId: string; id: string }): Promise<unknown>;
+  addBacklogTaskToSprint?(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<unknown>;
+  removeBacklogTaskFromSprint?(input: {
+    orgId: string;
+    id: string;
+    sprintId: string;
+    taskId: string;
+  }): Promise<unknown>;
 }
 
 export interface ProjectPublicApiOptions {
@@ -70,53 +139,143 @@ export class ProjectPublicApiService {
   constructor(
     private readonly options: ProjectPublicApiOptions | null = null,
     private readonly store: ProjectPublicStore | null = null,
+    private readonly dataSource: DataSource | null = null,
   ) {}
 
   async listProjects(query: ProjectListQueryDto): Promise<{ data: unknown[] }> {
-    return await this.requireApplication().listProjects({ orgId: query.orgId });
+    const parsed = parseProjectInput(ProjectListQuerySchema, query);
+    return await this.requireApplication().listProjects({ orgId: parsed.orgId });
   }
 
   async createProject(body: ProjectCreateBodyDto): Promise<unknown> {
+    const parsed = parseProjectInput(ProjectCreateBodySchema, body);
     const application = this.requireMethod("createProject");
     return await application({
-      orgId: body.orgId,
-      kind: body.kind,
-      name: body.name,
-      slug: body.slug,
-      repoPath: body.repoPath,
-      template: body.template,
+      orgId: parsed.orgId,
+      kind: parsed.kind,
+      name: parsed.name,
+      slug: parsed.slug,
+      description: parsed.description,
+      status: parsed.status,
+      ownerId: parsed.ownerId,
+      traceId: parsed.traceId,
+      repoPath: parsed.repoPath,
+      template: parsed.template,
     });
   }
 
   async getProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("getProject");
-    const result = await application({ orgId: query.orgId, id: params.id });
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
   }
 
   async patchProject(params: ProjectIdParamsDto, body: ProjectPatchBodyDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedBody = parseProjectInput(ProjectPatchBodySchema, body);
     const application = this.requireMethod("patchProject");
     const result = await application({
-      orgId: body.orgId,
-      id: params.id,
-      name: body.name,
-      memoryConfig: body.memory_config,
+      orgId: parsedBody.orgId,
+      id: parsedParams.id,
+      name: parsedBody.name,
+      description: parsedBody.description,
+      status: parsedBody.status,
+      ownerId: parsedBody.ownerId,
+      memoryConfig: parsedBody.memory_config,
     });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
   }
 
   async deleteProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<void> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("deleteProject");
-    await application({ orgId: query.orgId, id: params.id });
+    await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
   }
 
   async projectStats(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
     const application = this.requireMethod("projectStats");
-    const result = await application({ orgId: query.orgId, id: params.id });
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
     if (!result) throw new NotFoundException({ error: "Project not found." });
     return result;
+  }
+
+  async projectOverview(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
+    const application = this.requireMethod("projectOverview");
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
+    if (!result) throw new NotFoundException({ error: "Project not found." });
+    return result;
+  }
+
+  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
+    this.requireApplication();
+    const dataSource = this.requireDataSource();
+    return await loadDashboard(dataSource.manager, query.orgId, query.projectId ?? query.project_id ?? null);
+  }
+
+  async listProjectOptions(query: ProjectListQueryDto): Promise<unknown> {
+    const parsed = parseProjectInput(ProjectListQuerySchema, query);
+    const application = this.requireMethod("listProjectOptions");
+    return await application({ orgId: parsed.orgId });
+  }
+
+  async createProjectFromSetup(body: ProjectSetupBodyDto): Promise<unknown> {
+    const parsed = parseProjectInput(ProjectSetupBodySchema, body);
+    const application = this.requireMethod("createProjectFromSetup");
+    return await application({
+      orgId: parsed.orgId,
+      name: parsed.name,
+      slug: parsed.slug,
+      description: parsed.description,
+      kind: parsed.kind,
+      parentId: parsed.parentId,
+      repoPath: parsed.repoPath,
+      template: parsed.template,
+    });
+  }
+
+  async loadProjectBacklog(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
+    const application = this.requireMethod("loadProjectBacklog");
+    const result = await application({ orgId: parsedQuery.orgId, id: parsedParams.id });
+    if (!result) throw new NotFoundException({ error: "Project not found." });
+    return result;
+  }
+
+  async addBacklogTaskToSprint(params: ProjectIdParamsDto, body: ProjectBacklogSprintTaskBodyDto): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectIdParamsSchema, params);
+    const parsedBody = parseProjectInput(ProjectBacklogSprintTaskBodySchema, body);
+    const application = this.requireMethod("addBacklogTaskToSprint");
+    return await application({
+      orgId: parsedBody.orgId,
+      id: parsedParams.id,
+      sprintId: parsedBody.sprintId,
+      taskId: parsedBody.taskId,
+    });
+  }
+
+  async removeBacklogTaskFromSprint(
+    params: ProjectBacklogSprintTaskParamsDto,
+    query: ProjectRequestContextDto,
+  ): Promise<unknown> {
+    const parsedParams = parseProjectInput(ProjectBacklogSprintTaskParamsSchema, params);
+    const parsedQuery = parseProjectInput(ProjectRequestContextSchema, query);
+    const application = this.requireMethod("removeBacklogTaskFromSprint");
+    return await application({
+      orgId: parsedQuery.orgId,
+      id: parsedParams.id,
+      sprintId: parsedParams.sprintId,
+      taskId: parsedParams.taskId,
+    });
   }
 
   private requireApplication(): ProjectPublicApplication {
@@ -134,6 +293,12 @@ export class ProjectPublicApiService {
         patchProject: (input) => this.store!.patchProject(input),
         deleteProject: (input) => this.store!.deleteProject(input),
         projectStats: (input) => this.store!.projectStats(input),
+        projectOverview: (input) => this.store!.projectOverview(input),
+        listProjectOptions: (input) => this.store!.listProjectOptions(input),
+        createProjectFromSetup: (input) => this.store!.createProjectFromSetup(input),
+        loadProjectBacklog: (input) => this.store!.loadProjectBacklog(input),
+        addBacklogTaskToSprint: (input) => this.store!.addBacklogTaskToSprint(input),
+        removeBacklogTaskFromSprint: (input) => this.store!.removeBacklogTaskFromSprint(input),
       };
     }
     throw new InternalServerErrorException("Project public API application facade is not configured.");
@@ -148,6 +313,18 @@ export class ProjectPublicApiService {
     }
     return method as NonNullable<ProjectPublicApplication[Name]>;
   }
+
+  private requireDataSource(): DataSource {
+    if (!this.dataSource) {
+      throw new InternalServerErrorException("Project public API data source is not configured.");
+    }
+    return this.dataSource;
+  }
+}
+
+export class ProjectDashboardQueryDto extends ProjectRequestContextDto {
+  projectId?: string | null;
+  project_id?: string | null;
 }
 
 export class ProjectPublicApiController {
@@ -159,6 +336,23 @@ export class ProjectPublicApiController {
 
   async createProject(body: ProjectCreateBodyDto): Promise<unknown> {
     return await this.projects.createProject(body);
+  }
+
+  // Literal-segment routes (`dashboard`, `options`, `setup`) MUST be declared
+  // before the `:id` parametric routes — NestJS's RouterExplorer registers
+  // routes in method-definition order, and Express matches in registration
+  // order, so a parametric `:id` registered first would swallow GET /dashboard
+  // etc. as `getProject({ id: "dashboard" })` → 404 "Project not found".
+  async dashboard(query: ProjectDashboardQueryDto): Promise<unknown> {
+    return await this.projects.dashboard(query);
+  }
+
+  async listProjectOptions(query: ProjectListQueryDto): Promise<unknown> {
+    return await this.projects.listProjectOptions(query);
+  }
+
+  async createProjectFromSetup(body: ProjectSetupBodyDto): Promise<unknown> {
+    return await this.projects.createProjectFromSetup(body);
   }
 
   async getProject(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
@@ -175,6 +369,25 @@ export class ProjectPublicApiController {
 
   async projectStats(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
     return await this.projects.projectStats(params, query);
+  }
+
+  async projectOverview(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    return await this.projects.projectOverview(params, query);
+  }
+
+  async loadProjectBacklog(params: ProjectIdParamsDto, query: ProjectRequestContextDto): Promise<unknown> {
+    return await this.projects.loadProjectBacklog(params, query);
+  }
+
+  async addBacklogTaskToSprint(params: ProjectIdParamsDto, body: ProjectBacklogSprintTaskBodyDto): Promise<unknown> {
+    return await this.projects.addBacklogTaskToSprint(params, body);
+  }
+
+  async removeBacklogTaskFromSprint(
+    params: ProjectBacklogSprintTaskParamsDto,
+    query: ProjectRequestContextDto,
+  ): Promise<unknown> {
+    return await this.projects.removeBacklogTaskFromSprint(params, query);
   }
 }
 
@@ -196,39 +409,24 @@ export class ProjectPublicApiModule {
 
 Inject(PROJECT_PUBLIC_API_OPTIONS)(ProjectPublicApiService, undefined, 0);
 Inject(ProjectPublicStore)(ProjectPublicApiService, undefined, 1);
+Inject(DataSource)(ProjectPublicApiService, undefined, 2);
 Inject(DataSource)(ProjectPublicStore, undefined, 0);
 Inject(ProjectPublicApiService)(ProjectPublicApiController, undefined, 0);
 
-for (const property of ["orgId"] as const) {
-  IsString()(ProjectListQueryDto.prototype, property);
-  MinLength(1)(ProjectListQueryDto.prototype, property);
-  IsString()(ProjectRequestContextDto.prototype, property);
-  MinLength(1)(ProjectRequestContextDto.prototype, property);
-  IsString()(ProjectCreateBodyDto.prototype, property);
-  MinLength(1)(ProjectCreateBodyDto.prototype, property);
-  IsString()(ProjectPatchBodyDto.prototype, property);
-  MinLength(1)(ProjectPatchBodyDto.prototype, property);
+function parseProjectInput<Schema extends z.ZodType>(
+  schema: Schema,
+  value: unknown,
+): z.infer<Schema> {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  throw new BadRequestException({
+    error: "Invalid project request.",
+    issues: result.error.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+    })),
+  });
 }
-
-IsString()(ProjectIdParamsDto.prototype, "id");
-MinLength(1)(ProjectIdParamsDto.prototype, "id");
-
-IsOptional()(ProjectCreateBodyDto.prototype, "kind");
-IsIn(["workspace", "project", "subproject"])(ProjectCreateBodyDto.prototype, "kind");
-IsString()(ProjectCreateBodyDto.prototype, "name");
-MinLength(1)(ProjectCreateBodyDto.prototype, "name");
-
-for (const property of ["slug", "repoPath", "template"] as const) {
-  IsOptional()(ProjectCreateBodyDto.prototype, property);
-  IsString()(ProjectCreateBodyDto.prototype, property);
-  MinLength(1)(ProjectCreateBodyDto.prototype, property);
-}
-
-IsOptional()(ProjectPatchBodyDto.prototype, "name");
-IsString()(ProjectPatchBodyDto.prototype, "name");
-MinLength(1)(ProjectPatchBodyDto.prototype, "name");
-IsOptional()(ProjectPatchBodyDto.prototype, "memory_config");
-IsObject()(ProjectPatchBodyDto.prototype, "memory_config");
 
 const listProjectsDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "listProjects");
 const createProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "createProject");
@@ -236,6 +434,28 @@ const getProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiCon
 const patchProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "patchProject");
 const deleteProjectDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "deleteProject");
 const projectStatsDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "projectStats");
+const projectOverviewDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "projectOverview");
+const dashboardDescriptor = Object.getOwnPropertyDescriptor(ProjectPublicApiController.prototype, "dashboard");
+const listProjectOptionsDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectPublicApiController.prototype,
+  "listProjectOptions",
+);
+const createProjectFromSetupDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectPublicApiController.prototype,
+  "createProjectFromSetup",
+);
+const loadProjectBacklogDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectPublicApiController.prototype,
+  "loadProjectBacklog",
+);
+const addBacklogTaskToSprintDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectPublicApiController.prototype,
+  "addBacklogTaskToSprint",
+);
+const removeBacklogTaskFromSprintDescriptor = Object.getOwnPropertyDescriptor(
+  ProjectPublicApiController.prototype,
+  "removeBacklogTaskFromSprint",
+);
 
 if (
   !listProjectsDescriptor ||
@@ -243,7 +463,14 @@ if (
   !getProjectDescriptor ||
   !patchProjectDescriptor ||
   !deleteProjectDescriptor ||
-  !projectStatsDescriptor
+  !projectStatsDescriptor ||
+  !projectOverviewDescriptor ||
+  !dashboardDescriptor ||
+  !listProjectOptionsDescriptor ||
+  !createProjectFromSetupDescriptor ||
+  !loadProjectBacklogDescriptor ||
+  !addBacklogTaskToSprintDescriptor ||
+  !removeBacklogTaskFromSprintDescriptor
 ) {
   throw new Error("ProjectPublicApiController route descriptors are missing");
 }
@@ -263,6 +490,35 @@ ApiOkResponse({ description: "Project list" })(
   "listProjects",
   listProjectsDescriptor,
 );
+
+Get("dashboard")(ProjectPublicApiController.prototype, "dashboard", dashboardDescriptor);
+Query()(ProjectPublicApiController.prototype, "dashboard", 0);
+ApiOperation({ summary: "Load workspace dashboard" })(
+  ProjectPublicApiController.prototype,
+  "dashboard",
+  dashboardDescriptor,
+);
+ApiOkResponse({ description: "Workspace dashboard" })(
+  ProjectPublicApiController.prototype,
+  "dashboard",
+  dashboardDescriptor,
+);
+
+// Static `options` segment registered before `:id` so the parent-project
+// picker is not shadowed by the get-by-id route.
+Get("options")(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
+Query()(ProjectPublicApiController.prototype, "listProjectOptions", 0);
+ApiOperation({ summary: "List candidate parent projects" })(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
+ApiOkResponse({ description: "Candidate parent projects" })(ProjectPublicApiController.prototype, "listProjectOptions", listProjectOptionsDescriptor);
+
+Post("setup")(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
+Body()(ProjectPublicApiController.prototype, "createProjectFromSetup", 0);
+ApiOperation({ summary: "Create a project with template, repo, and workflow setup" })(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
+ApiCreatedResponse({ description: "Created project with setup links" })(ProjectPublicApiController.prototype, "createProjectFromSetup", createProjectFromSetupDescriptor);
+
+
+
+
 
 Post()(ProjectPublicApiController.prototype, "createProject", createProjectDescriptor);
 Body()(ProjectPublicApiController.prototype, "createProject", 0);
@@ -353,6 +609,36 @@ ApiOkResponse({ description: "Project stats" })(
   "projectStats",
   projectStatsDescriptor,
 );
+
+Get(":id/overview")(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+Param()(ProjectPublicApiController.prototype, "projectOverview", 0);
+Query()(ProjectPublicApiController.prototype, "projectOverview", 1);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+ApiOperation({ summary: "Get the project detail read-model" })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+ApiOkResponse({ description: "Project overview" })(ProjectPublicApiController.prototype, "projectOverview", projectOverviewDescriptor);
+
+Get(":id/backlog")(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+Param()(ProjectPublicApiController.prototype, "loadProjectBacklog", 0);
+Query()(ProjectPublicApiController.prototype, "loadProjectBacklog", 1);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+ApiOperation({ summary: "Get the project backlog read-model" })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+ApiOkResponse({ description: "Project backlog" })(ProjectPublicApiController.prototype, "loadProjectBacklog", loadProjectBacklogDescriptor);
+
+Post(":id/backlog/sprint-tasks")(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+Param()(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", 0);
+Body()(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", 1);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+ApiOperation({ summary: "Assign a backlog task to a sprint" })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+ApiCreatedResponse({ description: "Sprint task assignment" })(ProjectPublicApiController.prototype, "addBacklogTaskToSprint", addBacklogTaskToSprintDescriptor);
+
+Delete(":id/backlog/sprints/:sprintId/tasks/:taskId")(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+Param()(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", 0);
+Query()(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", 1);
+ApiParam({ name: "id", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiParam({ name: "sprintId", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiParam({ name: "taskId", required: true })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiOperation({ summary: "Unassign a backlog task from a sprint" })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
+ApiOkResponse({ description: "Removed sprint task assignment" })(ProjectPublicApiController.prototype, "removeBacklogTaskFromSprint", removeBacklogTaskFromSprintDescriptor);
 
 Module({
   imports: [TypeOrmModule.forFeature(FULCRUM_WORKFLOW_SPINE_ENTITIES)],

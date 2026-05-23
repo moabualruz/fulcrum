@@ -28,13 +28,13 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { SprintPublicStore } from "@work-management/infrastructure/database/sprint-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 
-import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto } from "./dto/sprint.dto.ts";
+import { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintCloseBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, ProjectSprintBoardQueryDto, ProjectSprintCreateBodyDto, ProjectSprintDetailQueryDto, ProjectSprintGoalBodyDto, ProjectSprintTaskCreateBodyDto, ProjectSprintTaskPatchBodyDto, ProjectSprintTaskParamsDto } from "./dto/sprint.dto.ts";
 import type { SprintStatus } from "./dto/sprint.dto.ts";
-export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto };
+export { SprintListQueryDto, SprintRequestContextDto, SprintIdParamsDto, SprintCreateBodyDto, SprintPatchBodyDto, SprintCloseBodyDto, SprintTaskParamsDto, SprintTaskBodyDto, SprintListResponseDto, ProjectSprintBoardQueryDto, ProjectSprintCreateBodyDto, ProjectSprintDetailQueryDto, ProjectSprintGoalBodyDto, ProjectSprintTaskCreateBodyDto, ProjectSprintTaskPatchBodyDto, ProjectSprintTaskParamsDto };
 export type { SprintStatus };
 
 export const SPRINT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.sprintPublicApi.options");
@@ -56,8 +56,45 @@ export interface SprintPublicApplication {
     status?: SprintStatus;
   }): Promise<unknown>;
   deleteSprint?(input: { orgId: string; id: string }): Promise<void>;
+  startSprint?(input: { orgId: string; id: string }): Promise<unknown>;
+  closeSprint?(input: { orgId: string; id: string; unfinishedDisposition?: "backlog" }): Promise<unknown>;
   addTask?(input: { orgId: string; id: string; taskId: string }): Promise<unknown>;
   removeTask?(input: { orgId: string; id: string; taskId: string }): Promise<unknown>;
+  // Project-scoped sprint board (the `sprints` table). Distinct from the cycle
+  // methods above; see SprintPublicStore for why both live on one store.
+  loadProjectSprints?(input: { orgId: string; projectId: string }): Promise<unknown>;
+  createProjectSprint?(input: {
+    orgId: string;
+    projectId: string;
+    name: string;
+    goal?: string | null;
+    capacity?: number | null;
+  }): Promise<unknown>;
+  loadProjectSprintDetail?(input: {
+    orgId: string;
+    projectId: string;
+    sprintId: string;
+  }): Promise<unknown>;
+  startProjectSprint?(input: { orgId: string; sprintId: string }): Promise<unknown>;
+  completeProjectSprint?(input: { orgId: string; sprintId: string }): Promise<unknown>;
+  updateProjectSprintGoal?(input: {
+    orgId: string;
+    sprintId: string;
+    goal: string;
+  }): Promise<unknown>;
+  createProjectSprintTask?(input: {
+    orgId: string;
+    projectId: string;
+    sprintId: string;
+    title: string;
+    status?: string | null;
+  }): Promise<unknown>;
+  updateProjectSprintTask?(input: {
+    orgId: string;
+    projectId: string;
+    taskId: string;
+    status?: string | null;
+  }): Promise<unknown>;
 }
 
 export interface SprintPublicApiOptions {
@@ -113,6 +150,24 @@ export class SprintPublicApiService {
     await application({ orgId: query.orgId, id: params.id });
   }
 
+  async startSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    const application = this.requireMethod("startSprint");
+    const result = await application({ orgId: body.orgId, id: params.id });
+    if (!result) throw new NotFoundException({ error: "Sprint not found." });
+    return result;
+  }
+
+  async closeSprint(params: SprintIdParamsDto, body: SprintCloseBodyDto): Promise<unknown> {
+    const application = this.requireMethod("closeSprint");
+    const result = await application({
+      orgId: body.orgId,
+      id: params.id,
+      unfinishedDisposition: body.unfinishedDisposition ?? "backlog",
+    });
+    if (!result) throw new NotFoundException({ error: "Sprint not found." });
+    return result;
+  }
+
   async addTask(params: SprintIdParamsDto, body: SprintTaskBodyDto): Promise<unknown> {
     const application = this.requireMethod("addTask");
     const result = await application({ orgId: body.orgId, id: params.id, taskId: body.taskId });
@@ -125,6 +180,78 @@ export class SprintPublicApiService {
     const result = await application({ orgId: query.orgId, id: params.id, taskId: params.taskId });
     if (!result) throw new NotFoundException({ error: "Sprint task assignment not found." });
     return result;
+  }
+
+  async loadProjectSprints(query: ProjectSprintBoardQueryDto): Promise<unknown> {
+    const application = this.requireMethod("loadProjectSprints");
+    return await application({ orgId: query.orgId, projectId: query.projectId });
+  }
+
+  async createProjectSprint(body: ProjectSprintCreateBodyDto): Promise<unknown> {
+    const application = this.requireMethod("createProjectSprint");
+    return await application({
+      orgId: body.orgId,
+      projectId: body.projectId,
+      name: body.name,
+      goal: body.goal,
+      capacity: body.capacity,
+    });
+  }
+
+  async loadProjectSprintDetail(
+    params: SprintIdParamsDto,
+    query: ProjectSprintDetailQueryDto,
+  ): Promise<unknown> {
+    const application = this.requireMethod("loadProjectSprintDetail");
+    const result = await application({
+      orgId: query.orgId,
+      projectId: query.projectId,
+      sprintId: params.id,
+    });
+    if (!result) throw new NotFoundException({ error: "Sprint not found." });
+    return result;
+  }
+
+  async startProjectSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    const application = this.requireMethod("startProjectSprint");
+    return await application({ orgId: body.orgId, sprintId: params.id });
+  }
+
+  async completeProjectSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    const application = this.requireMethod("completeProjectSprint");
+    return await application({ orgId: body.orgId, sprintId: params.id });
+  }
+
+  async updateProjectSprintGoal(params: SprintIdParamsDto, body: ProjectSprintGoalBodyDto): Promise<unknown> {
+    const application = this.requireMethod("updateProjectSprintGoal");
+    return await application({ orgId: body.orgId, sprintId: params.id, goal: body.goal });
+  }
+
+  async createProjectSprintTask(
+    params: SprintIdParamsDto,
+    body: ProjectSprintTaskCreateBodyDto,
+  ): Promise<unknown> {
+    const application = this.requireMethod("createProjectSprintTask");
+    return await application({
+      orgId: body.orgId,
+      projectId: body.projectId,
+      sprintId: params.id,
+      title: body.title,
+      status: body.status,
+    });
+  }
+
+  async updateProjectSprintTask(
+    params: ProjectSprintTaskParamsDto,
+    body: ProjectSprintTaskPatchBodyDto,
+  ): Promise<unknown> {
+    const application = this.requireMethod("updateProjectSprintTask");
+    return await application({
+      orgId: body.orgId,
+      projectId: body.projectId,
+      taskId: params.taskId,
+      status: body.status,
+    });
   }
 
   private requireApplication(): SprintPublicApplication {
@@ -141,8 +268,18 @@ export class SprintPublicApiService {
         getSprint: (input) => this.store!.getSprint(input),
         patchSprint: (input) => this.store!.patchSprint(input),
         deleteSprint: (input) => this.store!.deleteSprint(input),
+        startSprint: (input) => this.store!.startSprint(input),
+        closeSprint: (input) => this.store!.closeSprint(input),
         addTask: (input) => this.store!.addTask(input),
         removeTask: (input) => this.store!.removeTask(input),
+        loadProjectSprints: (input) => this.store!.loadProjectSprints(input),
+        createProjectSprint: (input) => this.store!.createProjectSprint(input),
+        loadProjectSprintDetail: (input) => this.store!.loadProjectSprintDetail(input),
+        startProjectSprint: (input) => this.store!.startProjectSprint(input),
+        completeProjectSprint: (input) => this.store!.completeProjectSprint(input),
+        updateProjectSprintGoal: (input) => this.store!.updateProjectSprintGoal(input),
+        createProjectSprintTask: (input) => this.store!.createProjectSprintTask(input),
+        updateProjectSprintTask: (input) => this.store!.updateProjectSprintTask(input),
       };
     }
     throw new InternalServerErrorException("Sprint public API application facade is not configured.");
@@ -170,6 +307,18 @@ export class SprintPublicApiController {
     return await this.sprints.createSprint(body);
   }
 
+  // Literal-segment routes (`project-board`) MUST be declared before the
+  // `:id` parametric route — NestJS mounts in method-definition order +
+  // Express matches in registration order, so a parametric `:id` declared
+  // first would capture `/project-board` as `{id:"project-board"}` and 404.
+  async loadProjectSprints(query: ProjectSprintBoardQueryDto): Promise<unknown> {
+    return await this.sprints.loadProjectSprints(query);
+  }
+
+  async createProjectSprint(body: ProjectSprintCreateBodyDto): Promise<unknown> {
+    return await this.sprints.createProjectSprint(body);
+  }
+
   async getSprint(params: SprintIdParamsDto, query: SprintRequestContextDto): Promise<unknown> {
     return await this.sprints.getSprint(params, query);
   }
@@ -182,12 +331,53 @@ export class SprintPublicApiController {
     await this.sprints.deleteSprint(params, query);
   }
 
+  async startSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    return await this.sprints.startSprint(params, body);
+  }
+
+  async closeSprint(params: SprintIdParamsDto, body: SprintCloseBodyDto): Promise<unknown> {
+    return await this.sprints.closeSprint(params, body);
+  }
+
   async addTask(params: SprintIdParamsDto, body: SprintTaskBodyDto): Promise<unknown> {
     return await this.sprints.addTask(params, body);
   }
 
   async removeTask(params: SprintTaskParamsDto, query: SprintRequestContextDto): Promise<unknown> {
     return await this.sprints.removeTask(params, query);
+  }
+
+  async loadProjectSprintDetail(
+    params: SprintIdParamsDto,
+    query: ProjectSprintDetailQueryDto,
+  ): Promise<unknown> {
+    return await this.sprints.loadProjectSprintDetail(params, query);
+  }
+
+  async startProjectSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    return await this.sprints.startProjectSprint(params, body);
+  }
+
+  async completeProjectSprint(params: SprintIdParamsDto, body: SprintRequestContextDto): Promise<unknown> {
+    return await this.sprints.completeProjectSprint(params, body);
+  }
+
+  async updateProjectSprintGoal(params: SprintIdParamsDto, body: ProjectSprintGoalBodyDto): Promise<unknown> {
+    return await this.sprints.updateProjectSprintGoal(params, body);
+  }
+
+  async createProjectSprintTask(
+    params: SprintIdParamsDto,
+    body: ProjectSprintTaskCreateBodyDto,
+  ): Promise<unknown> {
+    return await this.sprints.createProjectSprintTask(params, body);
+  }
+
+  async updateProjectSprintTask(
+    params: ProjectSprintTaskParamsDto,
+    body: ProjectSprintTaskPatchBodyDto,
+  ): Promise<unknown> {
+    return await this.sprints.updateProjectSprintTask(params, body);
   }
 }
 
@@ -225,6 +415,8 @@ for (const property of ["orgId"] as const) {
   MinLength(1)(SprintCreateBodyDto.prototype, property);
   IsString()(SprintPatchBodyDto.prototype, property);
   MinLength(1)(SprintPatchBodyDto.prototype, property);
+  IsString()(SprintCloseBodyDto.prototype, property);
+  MinLength(1)(SprintCloseBodyDto.prototype, property);
   IsString()(SprintTaskBodyDto.prototype, property);
   MinLength(1)(SprintTaskBodyDto.prototype, property);
 }
@@ -255,16 +447,64 @@ IsString()(SprintPatchBodyDto.prototype, "name");
 MinLength(1)(SprintPatchBodyDto.prototype, "name");
 IsOptional()(SprintPatchBodyDto.prototype, "status");
 IsIn(["planning", "active", "completed", "cancelled"])(SprintPatchBodyDto.prototype, "status");
+IsOptional()(SprintCloseBodyDto.prototype, "unfinishedDisposition");
+IsIn(["backlog"])(SprintCloseBodyDto.prototype, "unfinishedDisposition");
 IsString()(SprintTaskBodyDto.prototype, "taskId");
 MinLength(1)(SprintTaskBodyDto.prototype, "taskId");
+
+// Project-scoped sprint board DTO validation. `orgId` + `projectId` are
+// required identity on every board request; goal/capacity/status are optional.
+for (const property of ["orgId", "projectId"] as const) {
+  IsString()(ProjectSprintBoardQueryDto.prototype, property);
+  MinLength(1)(ProjectSprintBoardQueryDto.prototype, property);
+  IsString()(ProjectSprintCreateBodyDto.prototype, property);
+  MinLength(1)(ProjectSprintCreateBodyDto.prototype, property);
+  IsString()(ProjectSprintDetailQueryDto.prototype, property);
+  MinLength(1)(ProjectSprintDetailQueryDto.prototype, property);
+  IsString()(ProjectSprintTaskCreateBodyDto.prototype, property);
+  MinLength(1)(ProjectSprintTaskCreateBodyDto.prototype, property);
+  IsString()(ProjectSprintTaskPatchBodyDto.prototype, property);
+  MinLength(1)(ProjectSprintTaskPatchBodyDto.prototype, property);
+}
+
+IsString()(ProjectSprintCreateBodyDto.prototype, "name");
+MinLength(1)(ProjectSprintCreateBodyDto.prototype, "name");
+IsOptional()(ProjectSprintCreateBodyDto.prototype, "goal");
+IsString()(ProjectSprintCreateBodyDto.prototype, "goal");
+IsOptional()(ProjectSprintCreateBodyDto.prototype, "capacity");
+
+IsString()(ProjectSprintGoalBodyDto.prototype, "orgId");
+MinLength(1)(ProjectSprintGoalBodyDto.prototype, "orgId");
+IsString()(ProjectSprintGoalBodyDto.prototype, "goal");
+
+IsString()(ProjectSprintTaskCreateBodyDto.prototype, "title");
+MinLength(1)(ProjectSprintTaskCreateBodyDto.prototype, "title");
+IsOptional()(ProjectSprintTaskCreateBodyDto.prototype, "status");
+IsString()(ProjectSprintTaskCreateBodyDto.prototype, "status");
+
+IsOptional()(ProjectSprintTaskPatchBodyDto.prototype, "status");
+IsString()(ProjectSprintTaskPatchBodyDto.prototype, "status");
+
+IsString()(ProjectSprintTaskParamsDto.prototype, "taskId");
+MinLength(1)(ProjectSprintTaskParamsDto.prototype, "taskId");
 
 const listSprintsDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "listSprints");
 const createSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "createSprint");
 const getSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "getSprint");
 const patchSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "patchSprint");
 const deleteSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "deleteSprint");
+const startSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "startSprint");
+const closeSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "closeSprint");
 const addTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "addTask");
 const removeTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "removeTask");
+const loadProjectSprintsDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "loadProjectSprints");
+const createProjectSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "createProjectSprint");
+const loadProjectSprintDetailDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "loadProjectSprintDetail");
+const startProjectSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "startProjectSprint");
+const completeProjectSprintDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "completeProjectSprint");
+const updateProjectSprintGoalDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "updateProjectSprintGoal");
+const createProjectSprintTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "createProjectSprintTask");
+const updateProjectSprintTaskDescriptor = Object.getOwnPropertyDescriptor(SprintPublicApiController.prototype, "updateProjectSprintTask");
 
 if (
   !listSprintsDescriptor ||
@@ -272,8 +512,18 @@ if (
   !getSprintDescriptor ||
   !patchSprintDescriptor ||
   !deleteSprintDescriptor ||
+  !startSprintDescriptor ||
+  !closeSprintDescriptor ||
   !addTaskDescriptor ||
-  !removeTaskDescriptor
+  !removeTaskDescriptor ||
+  !loadProjectSprintsDescriptor ||
+  !createProjectSprintDescriptor ||
+  !loadProjectSprintDetailDescriptor ||
+  !startProjectSprintDescriptor ||
+  !completeProjectSprintDescriptor ||
+  !updateProjectSprintGoalDescriptor ||
+  !createProjectSprintTaskDescriptor ||
+  !updateProjectSprintTaskDescriptor
 ) {
   throw new Error("SprintPublicApiController route descriptors are missing");
 }
@@ -306,6 +556,29 @@ ApiCreatedResponse({ description: "Created sprint" })(
   "createSprint",
   createSprintDescriptor,
 );
+
+// Project-scoped sprint board routes. Literal `project-board` /
+// `project-tasks` segments are registered before `:id` so Express matches the
+// literal path rather than treating the segment as a sprint id.
+Get("project-board")(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
+Query()(SprintPublicApiController.prototype, "loadProjectSprints", 0);
+ApiOperation({ summary: "List project sprints with velocity" })(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
+ApiOkResponse({ description: "Project sprint board" })(SprintPublicApiController.prototype, "loadProjectSprints", loadProjectSprintsDescriptor);
+
+Post("project-board")(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
+Body()(SprintPublicApiController.prototype, "createProjectSprint", 0);
+ApiOperation({ summary: "Create a project sprint" })(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
+ApiCreatedResponse({ description: "Created project sprint" })(SprintPublicApiController.prototype, "createProjectSprint", createProjectSprintDescriptor);
+
+Patch("project-tasks/:taskId")(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+Param()(SprintPublicApiController.prototype, "updateProjectSprintTask", 0);
+Body()(SprintPublicApiController.prototype, "updateProjectSprintTask", 1);
+ApiParam({ name: "taskId", required: true })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+ApiOperation({ summary: "Update a project sprint task" })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+ApiOkResponse({ description: "Updated project sprint task" })(SprintPublicApiController.prototype, "updateProjectSprintTask", updateProjectSprintTaskDescriptor);
+
+
+
 
 Get(":id")(SprintPublicApiController.prototype, "getSprint", getSprintDescriptor);
 Param()(SprintPublicApiController.prototype, "getSprint", 0);
@@ -361,6 +634,44 @@ ApiNoContentResponse({ description: "Deleted" })(
   deleteSprintDescriptor,
 );
 
+Post(":id/start")(SprintPublicApiController.prototype, "startSprint", startSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "startSprint", 0);
+Body()(SprintPublicApiController.prototype, "startSprint", 1);
+ApiOperation({ summary: "Start a sprint" })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+ApiOkResponse({ description: "Started sprint" })(
+  SprintPublicApiController.prototype,
+  "startSprint",
+  startSprintDescriptor,
+);
+
+Post(":id/close")(SprintPublicApiController.prototype, "closeSprint", closeSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "closeSprint", 0);
+Body()(SprintPublicApiController.prototype, "closeSprint", 1);
+ApiOperation({ summary: "Close a sprint" })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
+);
+ApiParam({ name: "id", required: true })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
+);
+ApiOkResponse({ description: "Closed sprint" })(
+  SprintPublicApiController.prototype,
+  "closeSprint",
+  closeSprintDescriptor,
+);
+
 Post(":id/tasks")(SprintPublicApiController.prototype, "addTask", addTaskDescriptor);
 Param()(SprintPublicApiController.prototype, "addTask", 0);
 Body()(SprintPublicApiController.prototype, "addTask", 1);
@@ -403,6 +714,41 @@ ApiOkResponse({ description: "Removed sprint task assignment" })(
   "removeTask",
   removeTaskDescriptor,
 );
+
+Get(":id/detail")(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+Param()(SprintPublicApiController.prototype, "loadProjectSprintDetail", 0);
+Query()(SprintPublicApiController.prototype, "loadProjectSprintDetail", 1);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+ApiOperation({ summary: "Get the project sprint detail read-model" })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+ApiOkResponse({ description: "Project sprint detail" })(SprintPublicApiController.prototype, "loadProjectSprintDetail", loadProjectSprintDetailDescriptor);
+
+Post(":id/start-board")(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "startProjectSprint", 0);
+Body()(SprintPublicApiController.prototype, "startProjectSprint", 1);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+ApiOperation({ summary: "Start a project sprint" })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+ApiOkResponse({ description: "Started project sprint" })(SprintPublicApiController.prototype, "startProjectSprint", startProjectSprintDescriptor);
+
+Post(":id/complete-board")(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+Param()(SprintPublicApiController.prototype, "completeProjectSprint", 0);
+Body()(SprintPublicApiController.prototype, "completeProjectSprint", 1);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+ApiOperation({ summary: "Complete a project sprint" })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+ApiOkResponse({ description: "Completed project sprint" })(SprintPublicApiController.prototype, "completeProjectSprint", completeProjectSprintDescriptor);
+
+Patch(":id/goal")(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+Param()(SprintPublicApiController.prototype, "updateProjectSprintGoal", 0);
+Body()(SprintPublicApiController.prototype, "updateProjectSprintGoal", 1);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+ApiOperation({ summary: "Update a project sprint goal" })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+ApiOkResponse({ description: "Updated project sprint goal" })(SprintPublicApiController.prototype, "updateProjectSprintGoal", updateProjectSprintGoalDescriptor);
+
+Post(":id/board-tasks")(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
+Param()(SprintPublicApiController.prototype, "createProjectSprintTask", 0);
+Body()(SprintPublicApiController.prototype, "createProjectSprintTask", 1);
+ApiParam({ name: "id", required: true })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
+ApiOperation({ summary: "Create a task within a project sprint" })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
+ApiCreatedResponse({ description: "Created project sprint task" })(SprintPublicApiController.prototype, "createProjectSprintTask", createProjectSprintTaskDescriptor);
 
 Module({
   imports: [TypeOrmModule.forFeature(WORK_MANAGEMENT_ENTITIES)],

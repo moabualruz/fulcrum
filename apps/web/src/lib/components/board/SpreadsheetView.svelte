@@ -2,7 +2,8 @@
   import type { BoardTask } from "$lib/product-queries";
   import type { TaskStatus } from "$lib/server/tasks";
   import { TASK_STATUSES, describeStatus } from "./board-helpers";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@fulcrum/ui-kit";
 
   interface Props {
     tasks: BoardTask[];
@@ -85,17 +86,26 @@
             {task.title}
           </td>
           <td class={cn("px-3 py-2")}>
-            <select
-              data-status-select
-              class={cn("h-7 rounded border border-input bg-background px-2 text-xs")}
+            <Select
               value={task.status}
-              onchange={(e) => onStatusChange?.(task.id, (e.target as HTMLSelectElement).value as TaskStatus)}
-              onclick={(e) => e.stopPropagation()}
+              type="single"
+              onValueChange={(value) => onStatusChange?.(task.id, value as TaskStatus)}
             >
-              {#each TASK_STATUSES as s}
-                <option value={s}>{describeStatus(s)}</option>
-              {/each}
-            </select>
+              <SelectTrigger
+                data-status-select
+                aria-label={`Status for ${task.title}`}
+                size="sm"
+                class="h-7 w-32 text-xs"
+                onclick={(e) => e.stopPropagation()}
+              >
+                <SelectValue placeholder={describeStatus(task.status)} />
+              </SelectTrigger>
+              <SelectContent>
+                {#each TASK_STATUSES as s}
+                  <SelectItem value={s} label={describeStatus(s)} />
+                {/each}
+              </SelectContent>
+            </Select>
           </td>
           <td class={cn("px-3 py-2 text-center")}>
             <span class={cn("text-xs font-medium", {
@@ -106,7 +116,7 @@
             })}>P{task.priority ?? 4}</span>
           </td>
           <td class={cn("px-3 py-2 text-xs text-muted-foreground")}>
-            {task.created_at ? new Date(task.created_at).toLocaleDateString() : "—"}
+            {task.created_at ? new Date(task.created_at).toLocaleDateString() : "-"}
           </td>
         </tr>
       {/each}

@@ -1,5 +1,5 @@
 /**
- * HelpOverlay — renders keybinding map for current screen context.
+ * HelpOverlay: renders keybinding map for current screen context.
  * Triggered by `?` key.
  */
 
@@ -29,22 +29,28 @@ export class HelpOverlay {
 
   render(): string[] {
     const lines: string[] = [];
-    const inner = this.width - 4;
+    const inner = Math.max(8, this.width - 4);
 
     lines.push("┌" + "─".repeat(inner + 2) + "┐");
-    lines.push("│ " + pc.bold(`${this.screenName} — Keybindings`).padEnd(inner) + " │");
+    lines.push("│ " + pc.bold(fit(`${this.screenName}: Keybindings`, inner)).padEnd(inner) + " │");
     lines.push("│" + "─".repeat(inner + 2) + "│");
 
     for (const b of this.bindings) {
-      const keyStr = pc.cyan(b.key.padEnd(8));
-      const text = `  ${keyStr}  ${b.action}`;
+      const keyStr = b.key.padEnd(8);
+      const text = fit(`  ${keyStr}  ${b.action}`, inner);
       lines.push("│ " + text.padEnd(inner) + " │");
     }
 
     lines.push("│" + " ".repeat(inner + 2) + "│");
-    lines.push("│ " + pc.dim("Press ? or Esc to close").padEnd(inner) + " │");
+    lines.push("│ " + pc.dim(fit("Press ? or Esc to close", inner)).padEnd(inner) + " │");
     lines.push("└" + "─".repeat(inner + 2) + "┘");
 
     return lines;
   }
+}
+
+function fit(value: string, width: number): string {
+  if (value.length <= width) return value;
+  if (width <= 1) return value.slice(0, width);
+  return value.slice(0, width - 1) + "…";
 }

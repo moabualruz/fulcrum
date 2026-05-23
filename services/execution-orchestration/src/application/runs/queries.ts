@@ -202,6 +202,9 @@ export interface AgentRunDetailRow extends ProjectRunRow {
   prompt: string | null;
   parent_run_id: string | null;
   transcript_path: string | null;
+  workspace_diff_path: string | null;
+  token_used: number | null;
+  cost_usd: string | number | null;
 }
 
 export interface RunEventRow {
@@ -216,16 +219,36 @@ export interface RunEventRow {
   created_at: string | Date;
 }
 
+export interface ApprovalQueueItem {
+  id: string;
+  toolName: string;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  argumentsSummary: string;
+  context: string;
+  timeoutAt: string | null;
+  requestedAt: string;
+}
+
 export interface RunRow {
   id: string;
   agent: string;
   model: string | null;
   status: string;
   project_id: string | null;
+  task_id: string | null;
+  task_title: string | null;
   started_at: string;
   ended_at: string | null;
   sandbox_mode: string | null;
   iteration_count: number | null;
+  last_event_at: string | null;
+  recent_events: Array<{
+    id: string;
+    verb: string;
+    actor: string;
+    created_at: string;
+    payload: Record<string, unknown>;
+  }>;
 }
 
 export interface RunRowsFilter {
@@ -233,6 +256,8 @@ export interface RunRowsFilter {
   agent?: string | null;
   status?: string | null;
   range?: "24h" | "7d" | "30d" | "all";
+  dateFrom?: string | null;
+  dateTo?: string | null;
 }
 
 export interface RunsPageData {
@@ -265,11 +290,13 @@ export async function listRunRows(
   const agentExpr = columns.has("agent") ? "ar.agent" : "ar.agent_name";
   const modelExpr = columns.has("model") ? "ar.model" : "ar.agent_version";
   const statusExpr = columns.has("status") ? "ar.status" : "NULL::text";
-  const projectExpr = hasProjectId ? "ar.project_id" : "t.project_id";
+  const hasTaskId = columns.has("task_id");
+  const projectExpr = hasProjectId ? "ar.project_id" : hasTaskId ? "t.project_id" : "NULL::text";
+  const taskExpr = hasTaskId ? "ar.task_id" : "NULL::text";
   const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
   const sandboxExpr = columns.has("sandbox_mode") ? "ar.sandbox_mode" : "NULL::text";
   const iterationExpr = columns.has("iteration_count") ? "ar.iteration_count" : "NULL::int";
-  const joins = hasProjectId ? "" : "LEFT JOIN tasks t ON t.id = ar.task_id";
+  const joins = hasTaskId ? "LEFT JOIN tasks t ON t.id = ar.task_id" : "";
   const params: unknown[] = [];
   const bind = (value: unknown): string => {
     params.push(value);
@@ -295,6 +322,12 @@ export async function listRunRows(
     const hours = filter.range === "24h" ? 24 : filter.range === "7d" ? 24 * 7 : 24 * 30;
     conditions.push(`ar.started_at >= ${bind(new Date(Date.now() - hours * 60 * 60 * 1000))}`);
   }
+  if (filter.dateFrom) {
+    conditions.push(`ar.started_at >= ${bind(`${filter.dateFrom}T00:00:00.000Z`)}`);
+  }
+  if (filter.dateTo) {
+    conditions.push(`ar.started_at <= ${bind(`${filter.dateTo}T23:59:59.999Z`)}`);
+  }
 
   const rows = await ormSqlConnection(em).execute<Array<{
     id: string;
@@ -302,6 +335,8 @@ export async function listRunRows(
     model: string | null;
     status: string | null;
     project_id: string | null;
+    task_id: string | null;
+    task_title: string | null;
     started_at: string | Date;
     ended_at: string | Date | null;
     sandbox_mode: string | null;
@@ -312,6 +347,8 @@ export async function listRunRows(
             ${modelExpr} AS model,
             ${statusExpr} AS status,
             ${projectExpr} AS project_id,
+            ${taskExpr} AS task_id,
+            ${hasTaskId ? "t.title" : "NULL::text"} AS task_title,
             ar.started_at,
             ${endedExpr} AS ended_at,
             ${sandboxExpr} AS sandbox_mode,
@@ -322,17 +359,58 @@ export async function listRunRows(
       ORDER BY ar.started_at DESC, ar.id ASC`,
     params,
   );
-  return rows.map((row) => ({
-    id: row.id,
-    agent: row.agent ?? "",
-    model: row.model ?? null,
-    status: row.status ?? "queued",
-    project_id: row.project_id ?? null,
-    started_at: isoStamp(row.started_at),
-    ended_at: nullableIsoStamp(row.ended_at),
-    sandbox_mode: row.sandbox_mode ?? null,
-    iteration_count: row.iteration_count === null ? null : Number(row.iteration_count),
-  }));
+  const runIds = rows.map((row) => row.id);
+  const events = runIds.length > 0
+    ? await optionalRows<{
+        id: string;
+        subject_id: string;
+        verb: string;
+        actor: string;
+        payload: Record<string, unknown> | null;
+        created_at: string | Date;
+      }>(
+        ormSqlConnection(em),
+        `SELECT id, subject_id, verb, actor, payload, created_at
+           FROM events
+          WHERE org_id = $1
+            AND subject_kind = 'agent_run'
+            AND subject_id IN (${runIds.map((_, index) => `$${index + 2}`).join(", ")})
+          ORDER BY created_at DESC, id DESC`,
+        [ctx.orgId, ...runIds],
+      )
+    : [];
+  const eventsByRun = new Map<string, RunRow["recent_events"]>();
+  for (const event of events) {
+    const bucket = eventsByRun.get(event.subject_id) ?? [];
+    if (bucket.length < 5) {
+      bucket.push({
+        id: event.id,
+        verb: event.verb,
+        actor: event.actor,
+        payload: event.payload ?? {},
+        created_at: isoStamp(event.created_at),
+      });
+    }
+    eventsByRun.set(event.subject_id, bucket);
+  }
+  return rows.map((row) => {
+    const recentEvents = eventsByRun.get(row.id) ?? [];
+    return {
+      id: row.id,
+      agent: row.agent ?? "",
+      model: row.model ?? null,
+      status: row.status ?? "queued",
+      project_id: row.project_id ?? null,
+      task_id: row.task_id ?? null,
+      task_title: row.task_title ?? null,
+      started_at: isoStamp(row.started_at),
+      ended_at: nullableIsoStamp(row.ended_at),
+      sandbox_mode: row.sandbox_mode ?? null,
+      iteration_count: row.iteration_count === null ? null : Number(row.iteration_count),
+      last_event_at: recentEvents[0]?.created_at ?? null,
+      recent_events: recentEvents,
+    };
+  });
 }
 
 export async function listProjectRuns(em: EntityManager, ctx: AppContext): Promise<ProjectRunRow[]> {
@@ -383,6 +461,7 @@ export async function getProjectRunPageData(
 ): Promise<{
   run: AgentRunDetailRow;
   transcript: string | null;
+  diff: string | null;
   artifacts: Array<{
     id: string;
     org_id: string;
@@ -396,10 +475,17 @@ export async function getProjectRunPageData(
     size: number | null;
     mime: string | null;
     archived: boolean;
+    lifecycle_state: string;
+    retention_until: string | null;
+    preview_kind: string;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string;
     downloadHref: string;
   }>;
   events: Array<RunEventRow & { created_at: string }>;
+  approvalQueue: ApprovalQueueItem[];
 }> {
   const conn = ormSqlConnection(em);
   const columns = await agentRunColumns(em);
@@ -417,6 +503,9 @@ export async function getProjectRunPageData(
   const parentExpr = columns.has("parent_run_id") ? "ar.parent_run_id" : "NULL::text";
   const endedExpr = columns.has("ended_at") ? "ar.ended_at" : "NULL::timestamptz";
   const transcriptExpr = columns.has("transcript_path") ? "ar.transcript_path" : "NULL::text";
+  const diffExpr = columns.has("workspace_diff_path") ? "ar.workspace_diff_path" : "NULL::text";
+  const tokenExpr = columns.has("token_used") ? "ar.token_used" : columns.has("total_tokens") ? "ar.total_tokens" : "NULL::int";
+  const costExpr = columns.has("cost_usd") ? "ar.cost_usd" : "NULL::numeric";
   const errorExpr = columns.has("last_error_kind") ? "ar.last_error_kind" : "NULL::text";
   const retryExpr = columns.has("retry_count") ? "ar.retry_count" : columns.has("attempt_count") ? "ar.attempt_count" : "0";
   const workspaceExpr = columns.has("workspace_path") ? "ar.workspace_path" : "NULL::text";
@@ -435,6 +524,9 @@ export async function getProjectRunPageData(
             ar.started_at,
             ${endedExpr} AS ended_at,
             ${transcriptExpr} AS transcript_path,
+            ${diffExpr} AS workspace_diff_path,
+            ${tokenExpr} AS token_used,
+            ${costExpr} AS cost_usd,
             ${errorExpr} AS last_error_kind,
             ${retryExpr} AS retry_count,
             ${workspaceExpr} AS workspace_path
@@ -462,6 +554,16 @@ export async function getProjectRunPageData(
     }
   }
 
+  let diff: string | null = null;
+  if (run.workspace_diff_path) {
+    try {
+      diff = await readFile(run.workspace_diff_path, "utf8");
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+    }
+  }
+
   const artifactProjectExpr = artifactCols.has("project_id") ? "a.project_id" : artifactCols.has("task_id") ? "at.project_id" : "NULL::text";
   const artifactTaskExpr = artifactCols.has("task_id") ? "a.task_id" : "NULL::text";
   const artifactKindExpr = artifactCols.has("kind") ? "a.kind" : "'artifact'::text";
@@ -470,6 +572,19 @@ export async function getProjectRunPageData(
   const artifactShaExpr = artifactCols.has("sha256") ? "a.sha256" : artifactCols.has("checksum_sha256") ? "a.checksum_sha256" : "NULL::text";
   const artifactSizeExpr = artifactCols.has("size") ? "a.size" : artifactCols.has("size_bytes") ? "a.size_bytes" : "NULL::bigint";
   const artifactArchivedExpr = artifactCols.has("archived") ? "a.archived" : "false";
+  const artifactMetadataExpr = artifactCols.has("metadata_json") ? "a.metadata_json" : "'{}'::jsonb";
+  const artifactLifecycleExpr = artifactCols.has("lifecycle_state")
+    ? "a.lifecycle_state"
+    : artifactCols.has("metadata_json")
+      ? "COALESCE(a.metadata_json ->> 'lifecycleState', 'created')"
+      : "'created'::text";
+  const artifactRetentionExpr = artifactCols.has("retention_until") ? "a.retention_until" : "NULL::timestamptz";
+  const artifactDocExpr = artifactCols.has("doc_id") ? "a.doc_id" : "NULL::text";
+  const artifactLinkedDocExpr = artifactCols.has("metadata_json") ? "COALESCE(a.metadata_json ->> 'linkedDocId', NULL)" : "NULL::text";
+  const artifactPreviewExpr = artifactCols.has("metadata_json") ? "COALESCE(a.metadata_json ->> 'previewKind', a.metadata_json ->> 'preview_kind', 'file')" : "'file'::text";
+  const artifactPromotedExpr = artifactCols.has("metadata_json")
+    ? "CASE WHEN lower(COALESCE(a.metadata_json ->> 'promotedToMemory', 'false')) IN ('true', '1', 'yes') THEN true ELSE false END"
+    : "false";
   const artifactCreatedExpr = artifactCols.has("created_at") ? "a.created_at" : "now()";
   const artifactJoins = artifactCols.has("project_id") || !artifactCols.has("task_id") ? "" : "LEFT JOIN tasks at ON at.id = a.task_id";
   const artifacts = (await conn.execute<Array<{
@@ -485,6 +600,13 @@ export async function getProjectRunPageData(
     size: number | null;
     mime: string | null;
     archived: boolean;
+    metadata_json: Record<string, unknown>;
+    lifecycle_state: string | null;
+    retention_until: string | Date | null;
+    preview_kind: string | null;
+    doc_id: string | null;
+    linked_doc_id: string | null;
+    promoted_to_memory: boolean;
     created_at: string | Date;
   }>>(
     `SELECT a.id,
@@ -499,6 +621,13 @@ export async function getProjectRunPageData(
             ${artifactSizeExpr} AS size,
             a.mime,
             ${artifactArchivedExpr} AS archived,
+            ${artifactMetadataExpr} AS metadata_json,
+            ${artifactLifecycleExpr} AS lifecycle_state,
+            ${artifactRetentionExpr} AS retention_until,
+            ${artifactPreviewExpr} AS preview_kind,
+            ${artifactDocExpr} AS doc_id,
+            ${artifactLinkedDocExpr} AS linked_doc_id,
+            ${artifactPromotedExpr} AS promoted_to_memory,
             ${artifactCreatedExpr} AS created_at
        FROM artifacts a
        ${artifactJoins}
@@ -509,6 +638,11 @@ export async function getProjectRunPageData(
     ...artifact,
     archived: Boolean(artifact.archived),
     size: artifact.size === null ? null : Number(artifact.size),
+    lifecycle_state: artifact.lifecycle_state ?? "created",
+    retention_until: nullableIsoStamp(artifact.retention_until),
+    preview_kind: artifact.preview_kind ?? "file",
+    linked_doc_id: artifact.linked_doc_id ?? artifact.doc_id,
+    promoted_to_memory: Boolean(artifact.promoted_to_memory),
     created_at: isoStamp(artifact.created_at),
     downloadHref: `/artifacts/${artifact.id}/download`,
   }));
@@ -524,7 +658,47 @@ export async function getProjectRunPageData(
     ...event,
     created_at: isoStamp(event.created_at),
   }));
-  return { run, transcript, artifacts, events };
+  return { run, transcript, diff, artifacts, events, approvalQueue: buildApprovalQueue(events) };
+}
+
+function buildApprovalQueue(events: Array<RunEventRow & { created_at: string }>): ApprovalQueueItem[] {
+  const decisions = new Set(
+    events
+      .filter((event) => event.verb === "approval.decision")
+      .map((event) => stringValue(event.payload, "approvalId"))
+      .filter((value): value is string => value !== null),
+  );
+  return events
+    .filter((event) => event.verb === "approval.requested" || event.verb === "approval.required")
+    .map((event) => {
+      const approvalId = stringValue(event.payload, "approvalId") ?? event.id;
+      return {
+        id: approvalId,
+        toolName: stringValue(event.payload, "toolName") ?? stringValue(event.payload, "tool") ?? "Tool call",
+        riskLevel: riskLevelValue(event.payload["riskLevel"] ?? event.payload["risk_level"]),
+        argumentsSummary: jsonSummary(event.payload["arguments"] ?? event.payload["args"] ?? event.payload["input"]),
+        context: stringValue(event.payload, "context") ?? stringValue(event.payload, "summary") ?? "No context supplied.",
+        timeoutAt: stringValue(event.payload, "timeoutAt") ?? stringValue(event.payload, "timeout_at"),
+        requestedAt: event.created_at,
+      } satisfies ApprovalQueueItem;
+    })
+    .filter((item) => !decisions.has(item.id));
+}
+
+function stringValue(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key];
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+function jsonSummary(value: unknown): string {
+  if (value === null || value === undefined) return "{}";
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function riskLevelValue(value: unknown): ApprovalQueueItem["riskLevel"] {
+  return value === "low" || value === "medium" || value === "high" || value === "critical" ? value : "medium";
 }
 
 function isoStamp(value: string | Date): string {

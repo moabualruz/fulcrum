@@ -36,7 +36,16 @@ interface DocRow {
 }
 
 function isSqlExecutor(db: DocumentDb): db is SqlExecutor {
-  return "query" in db && typeof (db as { query: unknown }).query === "function";
+  // A TypeORM EntityManager also exposes `.query`, so `query` alone is not a
+  // safe discriminator — it would misclassify an EntityManager as a raw SQL
+  // store and pick the wrong id generator (ULID vs UUID). The raw SqlExecutor
+  // is the one with `.exec` and without the EntityManager's `.getRepository`.
+  return (
+    "query" in db &&
+    typeof (db as { query: unknown }).query === "function" &&
+    typeof (db as { exec?: unknown }).exec === "function" &&
+    !("getRepository" in db)
+  );
 }
 
 function sqlForManager(sql: string, params: readonly unknown[]): { sql: string; params: unknown[] } {

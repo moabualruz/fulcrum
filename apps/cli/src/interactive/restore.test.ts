@@ -15,7 +15,7 @@ async function freshDb(): Promise<{ db: TestStore; dir: string }> {
   return { db, dir };
 }
 
-describe("restore — round-trip backup → restore", () => {
+describe("restore: round-trip backup → restore", () => {
   let db: TestStore;
   let dir: string;
 

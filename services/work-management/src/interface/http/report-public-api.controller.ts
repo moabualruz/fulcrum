@@ -7,6 +7,7 @@ import {
   InternalServerErrorException,
   Module,
   NotFoundException,
+  Param,
   Query,
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
@@ -14,11 +15,14 @@ import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
+import { z } from "zod";
 
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
+import { AppNotFoundError } from "@platform-core/domain/errors.ts";
 import { ReportPublicStore } from "@work-management/infrastructure/database/report-public-store.ts";
 import { WORK_MANAGEMENT_ENTITIES } from "@work-management/infrastructure/database/work-structure.entities.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+import type { ProjectReportsPage } from "@work-management/interface/project-reports.ts";
 
 import { ReportBurndownQueryDto, ReportVelocityQueryDto, ReportResponseDto } from "./dto/report.dto.ts";
 export { ReportBurndownQueryDto, ReportVelocityQueryDto, ReportResponseDto };
@@ -26,6 +30,7 @@ export { ReportBurndownQueryDto, ReportVelocityQueryDto, ReportResponseDto };
 export const REPORT_PUBLIC_API_OPTIONS = Symbol.for("fulcrum.reportPublicApi.options");
 
 export interface ReportPublicApplication {
+  projectPage?(input: { orgId: string; projectId: string; sprintId?: string }): Promise<ProjectReportsPage>;
   burndown(input: { orgId: string; projectId: string; sprintId?: string }): Promise<ReportResponseDto>;
   velocity(input: { orgId: string; projectId: string }): Promise<ReportResponseDto>;
 }
@@ -40,6 +45,25 @@ export class ReportPublicApiService {
     private readonly options: ReportPublicApiOptions | null = null,
     private readonly store: ReportPublicStore | null = null,
   ) {}
+
+  async projectPage(params: unknown, query: unknown): Promise<ProjectReportsPage> {
+    const parsedParams = ReportProjectParamsSchema.parse(params);
+    const parsedQuery = ReportProjectPageQuerySchema.parse(query);
+    const application = this.requireApplication();
+    if (!application.projectPage) {
+      throw new InternalServerErrorException("Report project page public API application facade is not configured.");
+    }
+    try {
+      return await application.projectPage({
+        orgId: parsedQuery.orgId,
+        projectId: parsedParams.projectId,
+        sprintId: parsedQuery.sprintId ?? parsedQuery.sprint_id,
+      });
+    } catch (err) {
+      if (err instanceof AppNotFoundError) throw new NotFoundException({ error: err.message });
+      throw err;
+    }
+  }
 
   async burndown(query: ReportBurndownQueryDto): Promise<ReportResponseDto> {
     return await this.requireApplication().burndown({
@@ -65,6 +89,7 @@ export class ReportPublicApiService {
     if (application) return application;
     if (this.store) {
       return {
+        projectPage: (input) => this.store!.projectPage(input),
         burndown: (input) => this.store!.burndown(input),
         velocity: (input) => this.store!.velocity(input),
       };
@@ -76,6 +101,10 @@ export class ReportPublicApiService {
 export class ReportPublicApiController {
   constructor(private readonly reports: ReportPublicApiService) {}
 
+  async projectPage(params: unknown, query: unknown): Promise<ProjectReportsPage> {
+    return await this.reports.projectPage(params, query);
+  }
+
   async burndown(query: ReportBurndownQueryDto): Promise<ReportResponseDto> {
     return await this.reports.burndown(query);
   }
@@ -84,6 +113,16 @@ export class ReportPublicApiController {
     return await this.reports.velocity(query);
   }
 }
+
+const ReportProjectParamsSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+const ReportProjectPageQuerySchema = z.object({
+  orgId: z.string().min(1),
+  sprint_id: z.string().min(1).optional(),
+  sprintId: z.string().min(1).optional(),
+});
 
 export class ReportPublicApiModule {
   static register(options: ReportPublicApiOptions): NestDynamicModule {
@@ -126,15 +165,30 @@ for (const property of ["sprint_id", "sprintId"] as const) {
   MinLength(1)(ReportBurndownQueryDto.prototype, property);
 }
 
+const projectPageDescriptor = Object.getOwnPropertyDescriptor(ReportPublicApiController.prototype, "projectPage");
 const burndownDescriptor = Object.getOwnPropertyDescriptor(ReportPublicApiController.prototype, "burndown");
 const velocityDescriptor = Object.getOwnPropertyDescriptor(ReportPublicApiController.prototype, "velocity");
 
-if (!burndownDescriptor || !velocityDescriptor) {
+if (!projectPageDescriptor || !burndownDescriptor || !velocityDescriptor) {
   throw new Error("ReportPublicApiController route descriptors are missing");
 }
 
 Controller("api/v1/reports")(ReportPublicApiController);
 ApiTags("reports")(ReportPublicApiController);
+
+Get("projects/:projectId")(ReportPublicApiController.prototype, "projectPage", projectPageDescriptor);
+Param()(ReportPublicApiController.prototype, "projectPage", 0);
+Query()(ReportPublicApiController.prototype, "projectPage", 1);
+ApiOperation({ summary: "Project reports page data" })(
+  ReportPublicApiController.prototype,
+  "projectPage",
+  projectPageDescriptor,
+);
+ApiOkResponse({ description: "Project reports page data" })(
+  ReportPublicApiController.prototype,
+  "projectPage",
+  projectPageDescriptor,
+);
 
 Get("burndown")(ReportPublicApiController.prototype, "burndown", burndownDescriptor);
 Query()(ReportPublicApiController.prototype, "burndown", 0);

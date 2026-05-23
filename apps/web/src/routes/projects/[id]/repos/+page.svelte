@@ -1,24 +1,30 @@
 <script lang="ts">
 	import { enhance } from "$app/forms";
 	import type { PageData } from "./$types";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
+		form?: {
+			ok: boolean;
+			mode?: "addRepo" | "linkRepo";
+			message?: string;
+		};
 	}
 
-	let { data }: Props = $props();
+	let { data, form }: Props = $props();
 	let addOpen = $state(false);
 	let linkOpen = $state(false);
 	let mode = $state<"local" | "remote">("local");
 </script>
 
-<header data-project-repos-header class={cn("mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4")}>
-	<div class={cn("flex items-baseline gap-3")}>
-		<a href="/projects/{data.project.id}" data-back-project class={cn("text-sm text-muted-foreground hover:underline")}>← {data.project.name}</a>
+<div data-testid="project-repos-page" class={cn("min-w-0 overflow-x-hidden px-4 py-4 sm:px-6")}>
+<header data-project-repos-header class={cn("mb-4 flex min-w-0 flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-end lg:justify-between")}>
+	<div class={cn("flex min-w-0 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3")}>
+		<a href="/projects/{data.project.id}" data-back-project class={cn("min-w-0 break-words text-sm text-muted-foreground hover:underline")}>← {data.project.name}</a>
 		<h1 class={cn("text-2xl font-semibold tracking-tight")}>Repos</h1>
 	</div>
-	<div class={cn("flex gap-2")}>
+	<div class={cn("flex min-w-0 flex-col gap-2 sm:flex-row")}>
 		<button type="button" data-link-repo-trigger onclick={() => (linkOpen = !linkOpen)} class={cn("rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted")}>Link existing</button>
 		<button type="button" data-add-repo-trigger onclick={() => (addOpen = !addOpen)} class={cn("bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-3 py-1.5 text-sm font-medium shadow-xs")}>Add repo</button>
 	</div>
@@ -37,13 +43,23 @@
 			<button type="submit" class={cn("bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-1.5 text-sm font-medium shadow-xs")}>Save</button>
 		</div>
 	</form>
+	{#if form?.mode === "addRepo"}
+		<p data-add-repo-feedback class={cn("mt-3 text-sm", form.ok ? "text-muted-foreground" : "text-destructive")}>
+			{form.ok ? "Repo saved." : form.message}
+		</p>
+	{/if}
 </section>
 
 <section data-link-repo-modal hidden={!linkOpen} class={cn("mb-4 rounded-md border border-border bg-background p-4")}>
-	<form data-link-repo-form method="POST" action="?/link" use:enhance class={cn("flex gap-3 items-end")}>
+	<form data-link-repo-form method="POST" action="?/link" use:enhance class={cn("flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end")}>
 		<label class={cn("grid gap-1 text-sm flex-1")}>Repo ID<input name="repoId" class={cn("h-9 rounded-md border border-input bg-background px-3")} /></label>
 		<button type="submit" class={cn("bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-1.5 text-sm font-medium shadow-xs")}>Link</button>
 	</form>
+	{#if form?.mode === "linkRepo"}
+		<p data-link-repo-feedback class={cn("mt-3 text-sm", form.ok ? "text-muted-foreground" : "text-destructive")}>
+			{form.ok ? "Repo linked." : form.message}
+		</p>
+	{/if}
 </section>
 
 {#if data.repos.length === 0}
@@ -51,9 +67,9 @@
 {:else}
 	<div data-repo-cards class={cn("grid gap-3 sm:grid-cols-2 lg:grid-cols-3")}>
 		{#each data.repos as repo (repo.id)}
-			<div data-repo-card data-repo-id={repo.id} class={cn("rounded-md border border-border bg-card p-4")}>
-				<div class={cn("flex items-center justify-between mb-2")}>
-					<a href="/repos/{repo.id}" class={cn("font-medium hover:underline")}>{repo.name}</a>
+			<div data-repo-card data-repo-id={repo.id} class={cn("min-w-0 rounded-md border border-border bg-card p-4")}>
+				<div class={cn("mb-2 flex min-w-0 items-center justify-between gap-2")}>
+					<a href="/repos/{repo.id}" class={cn("min-w-0 break-words font-medium hover:underline")}>{repo.name}</a>
 					<span data-repo-kind class={cn("rounded border border-border px-2 py-0.5 text-xs")}>{repo.kind}</span>
 				</div>
 				{#if repo.currentBranch}
@@ -74,3 +90,4 @@
 		{/each}
 	</div>
 {/if}
+</div>

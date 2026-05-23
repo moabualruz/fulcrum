@@ -5,7 +5,10 @@ import { Injectable } from "@nestjs/common";
 import {
   buildDocumentPageTree,
   findDocumentBreadcrumbPath,
+  previewDocumentTreeOperations,
   type DocumentTreeNode,
+  type DocumentTreeOperationsPreviewInput,
+  type DocumentTreeOperationsPreviewOutput,
   type FulcrumDocTreePage,
 } from "@knowledge-workspace/domain/document-page-tree.ts";
 import {
@@ -47,6 +50,7 @@ export interface DocumentWorkspacePageOperationsInput {
   pages: DocumentPageWithParent[];
   rootPageId: string;
   accessibleTreePageIds: string[];
+  operations?: Omit<DocumentTreeOperationsPreviewInput, "tree">;
   sidebar: {
     result: DocumentCursorResult<DocumentWorkspaceSidebarOperationItem>;
     spaceId: string;
@@ -64,6 +68,7 @@ export interface DocumentWorkspacePageOperationsInput {
 
 export interface DocumentWorkspacePageOperationsOutput {
   accessibleTree: DocumentPageWithParent[];
+  operationsPreview: DocumentTreeOperationsPreviewOutput;
   sidebar: DocumentCursorResult<DocumentWorkspaceSidebarOperationItem & { canEdit?: boolean }>;
   recent: DocumentCursorResult<DocumentWorkspaceRecentOperationItem>;
 }
@@ -84,6 +89,10 @@ export class DocumentWorkspaceService {
       pages: input.pages,
       rootPageId: input.rootPageId,
       accessiblePageIds: input.accessibleTreePageIds,
+    });
+    const operationsPreview = previewDocumentTreeOperations({
+      tree: buildDocumentPageTree(input.pages.map((page) => toPreviewTreePage(page, input.sidebar.spaceId))),
+      ...input.operations,
     });
 
     const sidebar = await applyDocumentSidebarPermissions({
@@ -106,8 +115,25 @@ export class DocumentWorkspaceService {
       },
     });
 
-    return { accessibleTree, sidebar, recent };
+    return { accessibleTree, operationsPreview, sidebar, recent };
   }
+}
+
+function toPreviewTreePage(
+  page: DocumentPageWithParent,
+  fallbackSpaceId: string,
+): FulcrumDocTreePage {
+  const record = page as DocumentPageWithParent & Record<string, unknown>;
+  const position = typeof record["position"] === "string" || typeof record["position"] === "number"
+    ? record["position"]
+    : "0";
+  return {
+    id: page.id,
+    parentPageId: page.parentPageId,
+    title: typeof record["title"] === "string" ? record["title"] : page.id,
+    position,
+    spaceId: typeof record["projectId"] === "string" ? record["projectId"] : fallbackSpaceId,
+  };
 }
 
 function pageOperationPermissions(

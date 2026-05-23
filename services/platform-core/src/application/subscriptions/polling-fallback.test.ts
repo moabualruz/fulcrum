@@ -13,6 +13,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { EventBus, resetEventBus } from "./event-bus.ts";
 import {
   isPollingFallbackEnabled,
+  pollingFallbackState,
   startPollingFallback,
   type PollingSource,
 } from "./polling-fallback.ts";
@@ -35,6 +36,15 @@ describe("isPollingFallbackEnabled", () => {
     if (original !== undefined) process.env["FULCRUM_FEATURES"] = original;
     else delete process.env["FULCRUM_FEATURES"];
   });
+
+  test("reports UI-safe recovery state", () => {
+    expect(pollingFallbackState("public-api,ws-polling-fallback", 2_500)).toEqual({
+      mode: "polling",
+      enabled: true,
+      intervalMs: 2_500,
+      recovery: "If the stream disconnects, reconnect with the last event id and poll the matching list endpoint until the stream is connected.",
+    });
+  });
 });
 
 describe("startPollingFallback", () => {
@@ -49,7 +59,12 @@ describe("startPollingFallback", () => {
         callCount++;
         if (callCount === 1) {
           return [
-            { id: "1", topic: "agent_run.poll1", data: { status: "running" } },
+            {
+              id: "1",
+              topic: "agent_run.poll1",
+              data: { status: "running" },
+              timestamp: "2026-05-18T02:00:00.000Z",
+            },
           ];
         }
         return [];
@@ -67,6 +82,7 @@ describe("startPollingFallback", () => {
 
     expect(received.length).toBeGreaterThanOrEqual(1);
     expect(received[0]!.payload).toEqual({ status: "running" });
+    expect(received[0]!.timestamp.toISOString()).toBe("2026-05-18T02:00:00.000Z");
 
     stop();
   });

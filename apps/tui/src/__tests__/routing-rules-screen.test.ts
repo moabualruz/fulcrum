@@ -1,5 +1,5 @@
 /**
- * TUI routing-rules screen — parity and state label tests.
+ * TUI routing-rules screen: parity and state label tests.
  *
  * Verifies all required labels appear:
  *   Rules (tab), Drafts (tab), Test (tab), Backends (tab)

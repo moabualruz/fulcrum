@@ -1,4 +1,3 @@
-// @ts-nocheck — new file, type fixes deferred to gate review
 /**
  * Remote backup storage adapters.
  * Gated by FULCRUM_FEATURES=scheduled-backups.
@@ -18,6 +17,7 @@
 import { createReadStream } from "node:fs";
 import { readdir, unlink } from "node:fs/promises";
 import { join, basename } from "node:path";
+import type { Readable } from "node:stream";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +27,7 @@ export interface UploadResult {
   success: boolean;
   provider: string;
   key: string;
+  credentialRef?: string;
   error?: string;
   attempts: number;
 }
@@ -36,6 +37,7 @@ export interface BackupEvent {
   payload: {
     provider: string;
     key: string;
+    credentialRef?: string;
     error?: string;
     attempts: number;
   };
@@ -43,7 +45,7 @@ export interface BackupEvent {
 
 /** Minimal S3 PutObject command interface — injected for testability. */
 export interface S3PutFn {
-  (params: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }): Promise<void>;
+  (params: { Bucket: string; Key: string; Body: Readable }): Promise<void>;
 }
 
 /** Minimal GCS file interface — injected for testability. */
@@ -52,6 +54,8 @@ export interface GCSFileSaveFn {
 }
 
 export interface RemoteAdapterOptions {
+  /** Credential record id/reference; adapters never receive raw secrets in DSNs. */
+  credentialRef?: string;
   /** Injected S3 put function (real or mock). */
   s3Put?: S3PutFn;
   /** Injected GCS file.save function (real or mock). */
@@ -77,6 +81,8 @@ export function parseDSN(dsn: string): ParsedDSN {
   if (!match) throw new Error(`Invalid backup DSN: ${dsn}`);
   const provider = match[1] as ParsedDSN["provider"];
   const bucket = match[2];
+  if (!bucket) throw new Error(`Invalid backup DSN: ${dsn}`);
+  if (bucket.includes("@")) throw new Error("Remote backup DSN must not contain inline credentials; use credentialRef");
   const prefix = match[3] ?? "";
   return { provider, bucket, prefix };
 }
@@ -129,10 +135,10 @@ export async function uploadBackup(
       3,
       baseMs,
     );
-    return { success: true, provider: parsed.provider, key, attempts };
+    return { success: true, provider: parsed.provider, key, credentialRef: opts.credentialRef, attempts };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    return { success: false, provider: parsed.provider, key, error, attempts: 3 };
+    return { success: false, provider: parsed.provider, key, credentialRef: opts.credentialRef, error, attempts: 3 };
   }
 }
 
@@ -238,6 +244,7 @@ export function makeBackupEvent(result: UploadResult): BackupEvent {
     payload: {
       provider: result.provider,
       key: result.key,
+      ...(result.credentialRef ? { credentialRef: result.credentialRef } : {}),
       ...(result.error ? { error: result.error } : {}),
       attempts: result.attempts,
     },

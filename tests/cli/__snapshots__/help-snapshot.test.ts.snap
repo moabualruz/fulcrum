@@ -1,0 +1,169 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`fulcrum --help workflow-stage command tree root help snapshot is stable 1`] = `
+"fulcrum: local-first CLI Agent OS
+
+Commands are grouped by workflow stage so the CLI shares one mental model with
+the web and TUI surfaces (Capture · Plan · Build · Review · Ship · Operate).
+
+Usage:
+  fulcrum <command> [subcommand] [options]
+  fulcrum help <stage>             Show commands and examples for one stage.
+
+CAPTURE
+  Intake: docs, notes, captures, and search before planning.
+  fulcrum capture <text|url|file|inbox|review|status|action>
+                                               Capture intake items and triage mobile/inbox captures.
+  fulcrum note <new|list>                      Create and browse short-form capture notes.
+  fulcrum doc <list|new|view|edit|attach|history|restore|comment|link|search|delete|template>
+                                               Browse and edit capture documents.
+  fulcrum search query <query>                 Full-text search across captured content.
+
+PLAN
+  Turn captured intent into approved plans, sprints, and prototypes.
+  fulcrum plan <start|list|view|edit|approve|reject|materialize|preview>
+                                               Manage approved-plan docs/tasks/dependencies.
+  fulcrum mission <create|list|show|activate|delete>
+                                               Shape mission hierarchy and active waves.
+  fulcrum prototype <new|view|attach>          Create and attach plan prototypes.
+  fulcrum sprints <list|get|create|update|delete|add-task|remove-task>
+                                               Manage sprints and sprint membership.
+
+BUILD
+  Execute the plan: tasks, agent runs, work items, and routing.
+  fulcrum task|tasks <list|get|new|create|update|delete>
+                                               Create and manage build tasks.
+  fulcrum work <create|inspect|move|link|report>
+                                               Manage durable units of work.
+  fulcrum run <new|view|cancel|retry|attach>   Manage one agent run.
+  fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs>
+                                               Inspect and control the runs feed.
+  fulcrum cycle <list|activate|complete>       Manage build cycles.
+  fulcrum module <list|new|view>               Manage build modules.
+  fulcrum context <pack|inspect|diff>          Inspect task run context.
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
+                                               Manage the multi-CLI agent registry.
+  fulcrum route <rules|assign|simulate>        Route action kinds to agents.
+  fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
+
+REVIEW
+  Quality gates: UAT, code review, and final-handoff decisions.
+  fulcrum review <list|view|approve|request-changes>
+                                               Review queue and approval decisions.
+  fulcrum qa <run|report>                      Run QA checks and report artifacts.
+  fulcrum uat <run|handoff|decision>           Hand tasks to UAT and record decisions.
+  fulcrum e2e <run|report>                     Run or inspect end-to-end review suites.
+
+SHIP
+  Release outputs: artifacts, repositories, and promoted memory.
+  fulcrum ship <list|view>                     Inspect release list and detail surfaces.
+  fulcrum release <cut|roll-back|pause|promote>
+                                               Operate release rollout actions.
+  fulcrum artifact <list|view|diff|export|download>
+                                               Manage run artifacts and releases.
+  fulcrum repo <list|status|sync>              Manage tracked repositories.
+  fulcrum branch <list|switch|finish>          Inspect and move branch state.
+  fulcrum pr <list|view|create>                Inspect and create pull requests.
+  fulcrum memory <list|get|add|delete|search|promote>
+                                               Manage and promote persistent memory.
+
+OPERATE
+  Run the system: health, installs, MCP, hooks, config, and audit.
+  fulcrum doctor [--json] [--subsystem <name>] [--checks] [--probe]
+                                               Report environment and policy health.
+  fulcrum install [--profile minimal|rules-only|full] [--dry-run]
+                                               Splice rules, vendor hooks, sync skills.
+  fulcrum uninstall [--dry-run] [--purge]      Remove Fulcrum-managed install artifacts.
+  fulcrum mcp <list|register|unregister|enable|disable|test|reload>
+                                               Manage the MCP server registry.
+  fulcrum plugin <list|install|enable|disable|update|remove>
+                                               List plugin markers; mutation verbs are deferred until plugins.cross_agent.
+  fulcrum hooks <list|enable|disable|test>     Manage agent hook recipes.
+  fulcrum skills <sync|upstream|lint|list>     Mirror and validate authored skills.
+  fulcrum component|components <list|info|plan|status>
+                                               Inspect the component lifecycle.
+  fulcrum settings <list|get|set>              Read and write workspace settings.
+  fulcrum flags <list|set>                     Read and write feature flags.
+  fulcrum audit <query|export>                 Query the audit log.
+  fulcrum db <migrate|status|history>          Manage the local database.
+  fulcrum compress [--check] [FILES...]        Caveman-compress markdown.
+  fulcrum inference <start|status|embed|generate|stop>
+                                               Manage the local inference runtime.
+  fulcrum telemetry <status|opt-in|opt-out|purge>
+                                               Manage telemetry consent.
+  fulcrum notify list [--unread]               List notifications.
+  fulcrum offline <status|sync-now>            Inspect offline/sync state.
+  fulcrum backup <create|restore|verify>       Manage local backups.
+  fulcrum data <export|import>                 Export or import workspace data.
+  fulcrum secrets <set|get|rotate|init-keyring>
+                                               Manage local secrets.
+  fulcrum errors <list|get|purge>              Inspect the error log.
+  fulcrum webhooks <list|test>                 Manage webhooks.
+  fulcrum connectors <enable|sync> <id>        Manage external connectors.
+  fulcrum i18n <list|set>                      Manage locale.
+  fulcrum theme <list|set>                     Manage theme.
+
+AI ASSIST
+  Step-scoped agent sessions: the CLI side of the AI Assist drawer.
+  fulcrum mode <manual|play|discuss|ai> <step> Apply a per-step mode affordance.
+  fulcrum ai <start|send|attach|pause|resume|abort|checkpoint|restore|preview|rerun>
+                                               Operate step-scoped AI Assist threads.
+  fulcrum session <list|pause|resume|abort|checkpoint|restore|checkpoints|watch>
+                                               Control persisted AI Assist sessions.
+
+CROSS-CUTTING / GLOBAL
+  Surface launchers and global commands available from any stage.
+  fulcrum init [DIR]                           Bootstrap a project (AGENTS.md, .gitignore).
+  fulcrum projects <list|stats>                Manage project / workspace scope.
+  fulcrum auth <whoami|invite|login|logout>    Manage CLI authentication.
+  fulcrum web                                  Open the web shell in a browser.
+  fulcrum tui                                  Open the keyboard-first TUI workbench.
+  fulcrum completion <bash|zsh|fish|powershell>
+                                               Print a shell completion script with install guidance.
+  fulcrum version                              Print the CLI version.
+  fulcrum help [stage]                         This message, or per-stage detail.
+
+Every command accepts --json for the machine-readable fulcrum.cli.v1 envelope
+(CLI-TUI-UX.md §3). Add --jq <expr> to filter, --no-color to disable color.
+
+Environment:
+  FULCRUM_HOME           override ~/.fulcrum
+  FULCRUM_POLICY         override ~/.fulcrum/tool-output-policy.toml
+  FULCRUM_HEAD_LINES     head lines for summary tiers (default 20)
+
+Run \`fulcrum help <stage>\` (e.g. \`fulcrum help build\`) for stage detail.
+"
+`;
+
+exports[`fulcrum help <stage> per-stage detail build stage help snapshot is stable 1`] = `
+"fulcrum: Build stage
+
+Execute the plan: tasks, agent runs, work items, and routing.
+
+Commands:
+  fulcrum task|tasks <list|get|new|create|update|delete>
+                                               Create and manage build tasks.
+  fulcrum work <create|inspect|move|link|report>
+                                               Manage durable units of work.
+  fulcrum run <new|view|cancel|retry|attach>   Manage one agent run.
+  fulcrum runs <list|show|cancel|retry|dispatch|preview|feed|worker-tick|logs>
+                                               Inspect and control the runs feed.
+  fulcrum cycle <list|activate|complete>       Manage build cycles.
+  fulcrum module <list|new|view>               Manage build modules.
+  fulcrum context <pack|inspect|diff>          Inspect task run context.
+  fulcrum agent <list|view|add|edit|remove|enable|disable|set-default|reload|invoke|test|status|defaults>
+                                               Manage the multi-CLI agent registry.
+  fulcrum route <rules|assign|simulate>        Route action kinds to agents.
+  fulcrum symphony runs list --state ready     Inspect orchestrated run queues.
+
+Examples:
+  fulcrum task list --status open --json
+  fulcrum run view run-1 --json
+  fulcrum cycle list --json
+  fulcrum runs feed --watch --json
+  fulcrum route simulate --action build.run.step --json
+
+Every command accepts --json for the machine-readable fulcrum.cli.v1 envelope
+(CLI-TUI-UX.md §3). Add --jq <expr> to filter, --no-color to disable color.
+"
+`;

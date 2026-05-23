@@ -1,40 +1,32 @@
 import { redirect } from "@sveltejs/kit";
+import { existsSync, statSync } from "node:fs";
 import type { Actions, PageServerLoad } from "./$types";
-import { listAgentProfilesPageData, testProfile } from "@execution-orchestration/interface/agent-profile-pages.ts";
-import { dispatchTaskRun } from "@execution-orchestration/interface/run-actions.ts";
-import { createIdleSessionWorkbenchModel } from "@agent-client-protocol/interface/session-workbench.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
+import { createAgentsApiForEvent } from "$lib/server/agents-api";
 
-export const load: PageServerLoad = ({ locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { locals } = event;
   return {
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
-      data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals);
-        return {
-          ...(await listAgentProfilesPageData(em, ctx)),
-          sessionWorkbench: createIdleSessionWorkbenchModel(),
-        };
-      })(),
+      data: createAgentsApiForEvent(event).agents.list(),
     },
   };
 };
 
 export const actions: Actions = {
-  test: async ({ request, locals }) => {
-    const form = await request.formData();
+  test: async (event) => {
+    const form = await event.request.formData();
     const name = form.get("name") as string;
     if (!name) return { success: false, message: "Missing profile name" };
-    const { em, ctx } = await requestServiceScope(locals);
-    const result = await testProfile(em, ctx.orgId, name);
+    const result = await createAgentsApiForEvent(event).agents.test({ name }) as { test_passed: boolean };
     return actionOk(
       result.test_passed ? `${name}: test passed` : `${name}: test failed`,
     );
   },
 
-  startGuidedPlanning: async ({ request, locals }) => {
-    const form = await request.formData();
+  startGuidedPlanning: async (event) => {
+    const form = await event.request.formData();
     const agentName = (form.get("agentName") as string) ?? "";
     const userPrompt = (form.get("userPrompt") as string) ?? "";
     const modeId = (form.get("modeId") as string) || undefined;
@@ -43,101 +35,132 @@ export const actions: Actions = {
     const cwd = (form.get("cwd") as string) || process.cwd();
     if (!agentName || !userPrompt)
       return { success: false, message: "agent and prompt are required" };
-    const { em, ctx } = await requestServiceScope(locals);
-    const { startGuidedAcpPlanningSession } = await import(
-      "@planning-review/application/acp-guided-planning-actions.ts"
-    );
-    const result = await startGuidedAcpPlanningSession(em, {
-      orgId: ctx.orgId,
-      userId: ctx.userId,
+    const result = await createAgentsApiForEvent(event).agents.startGuidedPlanning({
       acpSessionId: `acp-${Date.now()}`,
       agentName,
       cwd,
       userPrompt,
       modeId,
       modelId,
-      permissionMode: permissionMode as "review_each_tool" | "allow_workspace" | "read_only",
-    });
+      permissionMode,
+    }) as { traceId?: string | null };
     return actionOk(`Planning session started (trace: ${result.traceId ?? "none"})`);
   },
 
-  dispatch: async ({ request, locals }) => {
-    const form = await request.formData();
+  dispatch: async (event) => {
+    const form = await event.request.formData();
     const agent = (form.get("agent") as string | null) ?? "";
     const taskId = (form.get("task_id") as string | null) ?? "";
     const projectId = (form.get("project_id") as string | null) || null;
     if (!agent || !taskId)
       return { success: false, message: "agent and task_id are required" };
-    const { em, ctx } = await requestServiceScope(locals, projectId);
-    const run = await dispatchTaskRun(em, ctx, { taskId, agent });
+    const run = await createAgentsApiForEvent(event).agents.dispatchTask({ projectId, taskId, agent }) as { id: string };
     throw redirect(303, `/runs/${run.id}`);
   },
 
-  resolvePermission: async ({ request, locals }) => {
-    const form = await request.formData();
+  resolvePermission: async (event) => {
+    const form = await event.request.formData();
     const sessionId = form.get("sessionId") as string;
     const optionId = form.get("optionId") as string;
     if (!sessionId || !optionId)
       return { success: false, message: "sessionId and optionId required" };
-    const { em, ctx } = await requestServiceScope(locals);
-    const { resolveSessionPermission } = await import(
-      "@agent-client-protocol/application/session-manager.ts"
-    );
-    await resolveSessionPermission(em, { sessionId, optionId });
+    await createAgentsApiForEvent(event).sessions.resolvePermission({ sessionId, optionId });
     return actionOk("Permission resolved");
   },
 
-  trafficControl: async ({ request, locals }) => {
-    const form = await request.formData();
+  trafficControl: async (event) => {
+    const form = await event.request.formData();
     const action = form.get("trafficAction") as string;
     const value = form.get("value") as string;
     if (!action)
       return { success: false, message: "trafficAction required" };
-    const { em, ctx } = await requestServiceScope(locals);
-    const { updateTrafficControl } = await import(
-      "@agent-client-protocol/application/session-manager.ts"
-    );
-    await updateTrafficControl(em, { action, value });
+    await createAgentsApiForEvent(event).sessions.updateTraffic({ action, value });
     return actionOk(`Traffic ${action} updated`);
   },
 
-  connectBridge: async ({ request, locals }) => {
-    const form = await request.formData();
+  reconnectSession: async (event) => {
+    await createAgentsApiForEvent(event).sessions.reconnect();
+    return actionOk("AI Assist reconnected");
+  },
+
+  abortWithReason: async (event) => {
+    const form = await event.request.formData();
+    const reason = (form.get("reason") as string | null) ?? "";
+    const note = ((form.get("note") as string | null) ?? "").trim();
+    if (!["user-cancel", "dangerous-output", "wrong-context", "cost-cap"].includes(reason)) {
+      return { success: false, message: "valid abort reason required" };
+    }
+    if (!note) return { success: false, message: "abort note required" };
+    await createAgentsApiForEvent(event).sessions.abort({ reason, note });
+    return actionOk("AI Assist session aborted");
+  },
+
+  pauseSession: async (event) => {
+    await createAgentsApiForEvent(event).sessions.pause();
+    return actionOk("AI Assist paused");
+  },
+
+  resumeSession: async (event) => {
+    await createAgentsApiForEvent(event).sessions.resume();
+    return actionOk("AI Assist resumed");
+  },
+
+  restoreCheckpoint: async (event) => {
+    const form = await event.request.formData();
+    const checkpointId = (form.get("checkpointId") as string | null) ?? "";
+    if (!checkpointId) return { success: false, message: "checkpointId required" };
+    await createAgentsApiForEvent(event).sessions.restoreCheckpoint({ checkpointId });
+    return actionOk("AI Assist restored from checkpoint");
+  },
+
+  forkFromCheckpoint: async (event) => {
+    const form = await event.request.formData();
+    const checkpointId = (form.get("checkpointId") as string | null) ?? "";
+    if (!checkpointId) return { success: false, message: "checkpointId required" };
+    await createAgentsApiForEvent(event).sessions.forkFromCheckpoint({ checkpointId });
+    return actionOk("AI Assist session forked from checkpoint");
+  },
+
+  resumeSavedSession: async (event) => {
+    const form = await event.request.formData();
+    const savedSessionId = form.get("savedSessionId") as string;
+    if (!savedSessionId) return { success: false, message: "savedSessionId required" };
+    await createAgentsApiForEvent(event).sessions.resumeSaved({ savedSessionId });
+    return actionOk("AI Assist session resumed");
+  },
+
+  deleteSavedSession: async (event) => {
+    const form = await event.request.formData();
+    const savedSessionId = form.get("savedSessionId") as string;
+    if (!savedSessionId) return { success: false, message: "savedSessionId required" };
+    await createAgentsApiForEvent(event).sessions.deleteSaved({ savedSessionId });
+    return actionOk("AI Assist session deleted");
+  },
+
+  connectBridge: async (event) => {
+    const form = await event.request.formData();
     const agentName = form.get("agentName") as string;
     const transportType = form.get("transportType") as string;
     const command = form.get("command") as string;
     const url = form.get("url") as string;
-    const cwd = (form.get("cwd") as string) || process.cwd();
+    const modeId = ((form.get("modeId") as string) ?? "").trim();
+    const modelId = ((form.get("modelId") as string) ?? "").trim();
+    const cwd = ((form.get("cwd") as string) ?? "").trim();
     if (!agentName) return { success: false, message: "agentName required" };
     if (!transportType) return { success: false, message: "transportType required" };
-    const { AcpSessionManager, setActiveSessionManager } = await import(
-      "@agent-client-protocol/interface/session-workbench.ts"
-    );
-    const { createAcpClientBridge } = await import(
-      "@agent-client-protocol/application/client-bridge-factory.ts"
-    );
-    const { createAcpSessionState } = await import(
-      "@agent-client-protocol/application/session-store.ts"
-    );
-    const { createAcpConfigState } = await import(
-      "@agent-client-protocol/application/config-store.ts"
-    );
-    let agentConfig: Record<string, unknown>;
-    if (transportType === "stdio" && command) {
-      agentConfig = { type: "stdio", command, args: [], env: {} };
-    } else if (transportType === "websocket" && url) {
-      agentConfig = { type: "remote", transport: "websocket", url, headers: {} };
-    } else {
-      return { success: false, message: "invalid transport config" };
+    if (!cwd) return { success: false, message: "working directory required" };
+    if (!existsSync(cwd) || !statSync(cwd).isDirectory()) {
+      return { success: false, message: "working directory must be an existing folder" };
     }
-    const config = createAcpConfigState({ config: { agents: { [agentName]: agentConfig } } });
-    const manager = new AcpSessionManager({
-      state: createAcpSessionState(),
-      config,
-      createBridge: async (input) => createAcpClientBridge({ config: config.getAgent(input.name)!, cwd }),
-    });
-    setActiveSessionManager(manager);
-    const session = await manager.createSession(agentName, cwd);
+    const session = await createAgentsApiForEvent(event).sessions.connectBridge({
+      agentName,
+      transportType,
+      command,
+      url,
+      modeId,
+      modelId,
+      cwd,
+    }) as { sessionId: string };
     return actionOk(`Connected to ${agentName} (session: ${session.sessionId})`);
   },
 };

@@ -50,9 +50,25 @@ export class WorkflowAudit1778623200008 implements MigrationInterface {
       CREATE UNIQUE INDEX IF NOT EXISTS uq_event_retention_policy_org_project
         ON event_retention_policy (org_id, project_id) NULLS NOT DISTINCT
     `);
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS fulcrum_audit_export_jobs (
+        id varchar(128) PRIMARY KEY,
+        org_id varchar(128) NOT NULL,
+        status varchar(80) NOT NULL,
+        format varchar(20) NOT NULL,
+        content text,
+        error text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await queryRunner.query(
+      "CREATE INDEX IF NOT EXISTS fulcrum_audit_export_jobs_org_created_idx ON fulcrum_audit_export_jobs (org_id, created_at)",
+    );
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query("DROP TABLE IF EXISTS fulcrum_audit_export_jobs");
     await queryRunner.query("DROP TABLE IF EXISTS event_retention_policy");
     await queryRunner.query("DROP TABLE IF EXISTS fulcrum_audit_events");
   }

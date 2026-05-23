@@ -23,6 +23,9 @@ export interface AcpSessionState {
   isLoading: boolean;
   isConnecting: boolean;
   isReconnecting: boolean;
+  isPaused: boolean;
+  reconnectAttempts: number;
+  reconnectMaxAttempts: number;
   error: string | null;
   pendingPermission: PermissionRequest | null;
   availableModes: SessionMode[];
@@ -33,6 +36,9 @@ export interface AcpSessionState {
   startupPhase: string;
   startupLogs: string[];
   startupElapsed: number;
+  checkpoints: AcpSessionCheckpointState[];
+  currentCheckpointId: string | null;
+  queuedPromptCount: number;
   readonly hasActiveSession: boolean;
   readonly messageList: ChatMessage[];
   readonly toolCallList: ToolCallInfo[];
@@ -41,6 +47,17 @@ export interface AcpSessionState {
   now(): number;
   disconnectState(): void;
   clearError(): void;
+}
+
+export interface AcpSessionCheckpointState {
+  id: string;
+  sessionId: string;
+  kind: "git" | "file" | "message";
+  ref: string;
+  turnIndex: number;
+  messageUuid: string;
+  label: string | null;
+  createdAt: number;
 }
 
 class MutableAcpSessionState implements AcpSessionState {
@@ -52,6 +69,9 @@ class MutableAcpSessionState implements AcpSessionState {
   isLoading = false;
   isConnecting = false;
   isReconnecting = false;
+  isPaused = false;
+  reconnectAttempts = 0;
+  reconnectMaxAttempts = 3;
   error: string | null = null;
   pendingPermission: PermissionRequest | null = null;
   availableModes: SessionMode[] = [];
@@ -62,6 +82,9 @@ class MutableAcpSessionState implements AcpSessionState {
   startupPhase = "starting";
   startupLogs: string[] = [];
   startupElapsed = 0;
+  checkpoints: AcpSessionCheckpointState[] = [];
+  currentCheckpointId: string | null = null;
+  queuedPromptCount = 0;
   private readonly createIdFn: () => string;
   private readonly nowFn: () => number;
 
@@ -97,6 +120,7 @@ class MutableAcpSessionState implements AcpSessionState {
   disconnectState(): void {
     this.currentSession = null;
     this.isConnected = false;
+    this.isPaused = false;
     this.messages = [];
     this.toolCalls.clear();
     this.availableModes = [];
@@ -105,6 +129,9 @@ class MutableAcpSessionState implements AcpSessionState {
     this.availableModels = [];
     this.currentModelId = "";
     this.pendingPermission = null;
+    this.checkpoints = [];
+    this.currentCheckpointId = null;
+    this.queuedPromptCount = 0;
   }
 
   clearError(): void {
@@ -206,6 +233,9 @@ function applyToolCall(state: AcpSessionState, update: Record<string, unknown>):
     title: stringValue(update.title),
     kind: stringValue(update.kind) || "other",
     status: toolStatus(update.status),
+    args: update.args ?? update.input,
+    result: update.result,
+    errorMessage: optionalString(update.errorMessage) ?? optionalString(update.error),
     locations: locationsFromUnknown(update.locations),
   };
   const last = state.messages.at(-1);
@@ -223,12 +253,20 @@ function applyToolCallUpdate(state: AcpSessionState, update: Record<string, unkn
   if (existing) {
     if (typeof update.status === "string") existing.status = toolStatus(update.status);
     if (typeof update.title === "string") existing.title = update.title;
+    if ("args" in update || "input" in update) existing.args = update.args ?? update.input;
+    if ("result" in update) existing.result = update.result;
+    if (typeof update.errorMessage === "string") existing.errorMessage = update.errorMessage;
+    if (typeof update.error === "string") existing.errorMessage = update.error;
   }
   for (const message of state.messages) {
     for (const toolCall of message.toolCalls ?? []) {
       if (toolCall.toolCallId !== toolCallId) continue;
       if (typeof update.status === "string") toolCall.status = toolStatus(update.status);
       if (typeof update.title === "string") toolCall.title = update.title;
+      if ("args" in update || "input" in update) toolCall.args = update.args ?? update.input;
+      if ("result" in update) toolCall.result = update.result;
+      if (typeof update.errorMessage === "string") toolCall.errorMessage = update.errorMessage;
+      if (typeof update.error === "string") toolCall.errorMessage = update.error;
     }
   }
 }
@@ -266,6 +304,10 @@ function toolStatus(value: unknown): ToolCallInfo["status"] {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function toRecord(value: unknown): Record<string, unknown> {

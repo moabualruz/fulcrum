@@ -4,15 +4,49 @@ import { Controller, Get, Inject, Module } from "@nestjs/common";
 import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 
 import { buildDoctorReport, discoverChecks } from "@platform-core/application/health-checks/index.ts";
+import {
+  runPlatformDoctorChecks,
+  type PlatformDoctorStatus,
+} from "@platform-core/application/platform-operations/readiness-checks.ts";
+
+type DoctorSeverity = "info" | "warning" | "critical";
+
+function severityForPlatformStatus(status: PlatformDoctorStatus): DoctorSeverity {
+  if (status === "fail") return "critical";
+  if (status === "warn") return "warning";
+  return "info";
+}
+
+export interface DoctorPublicApiOptions {
+  buildReport?: typeof buildDoctorReport;
+  discover?: typeof discoverChecks;
+  platformChecks?: typeof runPlatformDoctorChecks;
+}
 
 export class DoctorPublicApiService {
+  constructor(private readonly options: DoctorPublicApiOptions = {}) {}
+
   async run() {
-    return await buildDoctorReport();
+    const [report, platformChecks] = await Promise.all([
+      (this.options.buildReport ?? buildDoctorReport)(),
+      (this.options.platformChecks ?? runPlatformDoctorChecks)(),
+    ]);
+
+    return {
+      ...report,
+      platformChecks: platformChecks.map((check) => ({
+        ...check,
+        severity: severityForPlatformStatus(check.status),
+      })),
+    };
   }
 
   async subsystems() {
-    const checks = await discoverChecks();
-    return [...new Set(checks.map((check) => check.subsystem))].sort();
+    const checks = await (this.options.discover ?? discoverChecks)();
+    return [...new Set([
+      ...checks.map((check) => check.subsystem),
+      "platform",
+    ])].sort();
   }
 }
 

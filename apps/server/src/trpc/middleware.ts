@@ -35,7 +35,7 @@ import {
   permission,
   type TrpcProcedureMeta,
 } from "./permissions.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { appErrorToTrpcError } from "@fulcrum/server/trpc/error-mapping.ts";
 import { AppError } from "@platform-core/domain/errors.ts";
 

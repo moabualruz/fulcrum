@@ -1,190 +1,160 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
-interface StatusRow {
+// `/projects/[id]/settings/statuses/+page.server.ts` is a pure invocation
+// layer: `load` calls `ensureProjectExists` + `createProjectStatusApiForEvent`,
+// the actions call the project-status public API. This suite drives the route
+// through a fake `event.fetch` (no `mock.module`, so sibling settings suites
+// that import the real `$lib/server/project-api` are never hijacked).
+
+interface PublicStatusRow {
   id: string;
-  org_id: string;
-  project_id: string;
   name: string;
   color: string;
-  sort_order: number;
-  is_final: boolean;
-  created_at: string;
-  updated_at: string;
+  isFinal: boolean;
+  sortOrder: number;
 }
 
-const statuses: StatusRow[] = [];
-const appScope = { em: { kind: "mock-em" }, ctx: { orgId: "org-1", userId: "user-1" } };
-
-function eventFor(
-  projectId: string,
-  fetchImpl: typeof fetch = fetchProject(),
-): Parameters<typeof import("./+page.server.ts").load>[0] {
+function statusEvent(projectId: string, fetchImpl: typeof fetch) {
   const url = new URL(`http://localhost/projects/${projectId}/settings/statuses`);
   return {
     params: { id: projectId },
     url,
     locals: { orgId: "org-1", userId: "user-1" },
     fetch: fetchImpl,
-    request: new Request(url, { headers: { cookie: "sid=test-session" } }),
+    request: new Request(url, { method: "POST", headers: { cookie: "sid=test-session" } }),
   } as unknown as Parameters<typeof import("./+page.server.ts").load>[0];
 }
 
-function fetchProject(calls: string[] = []): typeof fetch {
+function actionEvent(projectId: string, fetchImpl: typeof fetch, data: Record<string, string>) {
+  const url = new URL(`http://localhost/projects/${projectId}/settings/statuses`);
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(data)) fd.set(key, value);
+  return {
+    params: { id: projectId },
+    url,
+    locals: { orgId: "org-1", userId: "user-1" },
+    fetch: fetchImpl,
+    request: new Request(url, { method: "POST", body: fd, headers: { cookie: "sid=test-session" } }),
+  } as unknown as Parameters<typeof import("./+page.server.ts").actions.create>[0];
+}
+
+// A fake project-status public API: `GET /api/v1/projects/:id` (project
+// existence), `GET/POST /api/v1/projects/:id/statuses`, `PATCH/DELETE
+// /api/v1/projects/:id/statuses/:statusId`. Records every call for assertions.
+function fetchStatuses(calls: string[] = [], seed: PublicStatusRow[] = []): typeof fetch {
+  const statuses = seed.map((status) => ({ ...status }));
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
-    const headers = new Headers(init?.headers);
-    calls.push(`${method} ${url.pathname}${url.search} ${headers.get("cookie") ?? ""}`);
-    if (url.pathname.startsWith("/api/v1/projects/") && method === "GET") {
-      return Response.json({ id: decodeURIComponent(url.pathname.split("/").at(-1) ?? ""), name: "Alpha" });
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push(`${method} ${url.pathname}`);
+    const parts = url.pathname.split("/").filter(Boolean); // api v1 projects :id statuses :statusId?
+
+    if (parts.length === 4 && parts[2] === "projects" && method === "GET") {
+      return Response.json({ id: decodeURIComponent(parts[3]!), name: "Project 1" });
     }
-    return Response.json({ message: `unexpected ${method} ${url.pathname}${url.search}` }, { status: 500 });
+    if (parts.length === 5 && parts[4] === "statuses" && method === "GET") {
+      return Response.json(statuses);
+    }
+    if (parts.length === 5 && parts[4] === "statuses" && method === "POST") {
+      const row = {
+        id: "status-new",
+        name: body.name,
+        color: body.color,
+        isFinal: body.isFinal ?? false,
+        sortOrder: statuses.length + 1,
+      };
+      statuses.push(row);
+      return Response.json(row, { status: 201 });
+    }
+    if (parts.length === 6 && parts[4] === "statuses" && method === "PATCH") {
+      return Response.json({ ok: true });
+    }
+    if (parts.length === 6 && parts[4] === "statuses" && method === "DELETE") {
+      return new Response(null, { status: 204 });
+    }
+    return Response.json({ message: `unexpected ${method} ${url.pathname}` }, { status: 500 });
   }) as typeof fetch;
 }
 
-mock.module("$lib/server/application-scope", () => ({
-  requestAppScope: async () => appScope,
-}));
-
-mock.module("$lib/server/project-statuses", () => ({
-  listProjectStatuses: async (_em: unknown, projectId: string) =>
-    statuses.filter((status) => status.project_id === projectId),
-  createProjectStatus: async (_em: unknown, input: { orgId: string; projectId: string; name: string; color?: string; isFinal?: boolean }) => {
-    const row: StatusRow = {
-      id: `status-${statuses.length + 1}`,
-      org_id: input.orgId,
-      project_id: input.projectId,
-      name: input.name,
-      color: input.color ?? "#6b7280",
-      sort_order: statuses.length,
-      is_final: input.isFinal ?? false,
-      created_at: "2026-05-15T00:00:00.000Z",
-      updated_at: "2026-05-15T00:00:00.000Z",
-    };
-    statuses.push(row);
-    return { id: row.id };
-  },
-  updateProjectStatus: async (_em: unknown, input: { id: string; name?: string; color?: string; sortOrder?: number; isFinal?: boolean }) => {
-    const row = statuses.find((status) => status.id === input.id);
-    if (!row) throw new Error(`missing status ${input.id}`);
-    if (input.name !== undefined) row.name = input.name;
-    if (input.color !== undefined) row.color = input.color;
-    if (input.sortOrder !== undefined) row.sort_order = input.sortOrder;
-    if (input.isFinal !== undefined) row.is_final = input.isFinal;
-    return { ok: true };
-  },
-  deleteProjectStatus: async (_em: unknown, id: string) => {
-    const index = statuses.findIndex((status) => status.id === id);
-    if (index !== -1) statuses.splice(index, 1);
-    return { ok: true };
-  },
-}));
-
-beforeEach(() => {
-  statuses.splice(0, statuses.length);
-});
-
 describe("/projects/[id]/settings/statuses +page.server.ts", () => {
-  test("server route uses project/status helpers instead of direct application imports", () => {
+  test("server route uses project status public API instead of application scope", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
+    expect(source).toContain("createProjectStatusApiForEvent");
     expect(source).toContain("ensureProjectExists");
-    expect(source).toContain("$lib/server/project-statuses");
-    expect(source).not.toContain("@work-management/application/project-statuses");
-    expect(source).not.toContain("@work-management/application/projects");
-    expect(source).not.toContain("getProjectOrNull");
+    expect(source).not.toContain("requestAppScope");
+    expect(source).not.toContain("requestServiceScope");
+    expect(source).not.toContain("@work-management/application/");
   });
 
-  test("load returns empty statuses list", async () => {
-    const id = "project-1";
+  test("load ensures project and returns statuses", async () => {
     const calls: string[] = [];
+    const fetchImpl = fetchStatuses(calls, [
+      { id: "status-1", name: "Ready", color: "#22c55e", isFinal: false, sortOrder: 1 },
+    ]);
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
-    const result = await mod.load(eventFor(id, fetchProject(calls)));
-    expect(result.statuses).toEqual([]);
-    expect(result.projectId).toBe(id);
-    expect(calls).toEqual(["GET /api/v1/projects/project-1?orgId=org-1 sid=test-session"]);
-  });
+    const result = await mod.load(statusEvent("project-1", fetchImpl));
 
-  test("create + delete status cycle", async () => {
-    const id = "project-1";
-    const fetchImpl = fetchProject();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
-    const fd = new FormData();
-    fd.set("name", "In Review");
-    fd.set("color", "#3b82f6");
-    const request = new Request("http://localhost", { method: "POST", body: fd });
-    await mod.actions.create({
-      ...eventFor(id, fetchImpl),
-      request,
-    } as Parameters<typeof mod.actions.create>[0]);
-
-    const afterCreate = await mod.load(eventFor(id, fetchImpl));
-    expect(afterCreate.statuses).toHaveLength(1);
-    expect(afterCreate.statuses[0].name).toBe("In Review");
-    expect(afterCreate.statuses[0].color).toBe("#3b82f6");
-
-    const delFd = new FormData();
-    delFd.set("id", afterCreate.statuses[0].id);
-    await mod.actions.delete({
-      ...eventFor(id, fetchImpl),
-      request: new Request("http://localhost", { method: "POST", body: delFd }),
-    } as Parameters<typeof mod.actions.delete>[0]);
-
-    const afterDelete = await mod.load(eventFor(id, fetchImpl));
-    expect(afterDelete.statuses).toHaveLength(0);
-  });
-
-  test("create with isFinal flag", async () => {
-    const id = "project-1";
-    const fetchImpl = fetchProject();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
-    const fd = new FormData();
-    fd.set("name", "Done");
-    fd.set("isFinal", "on");
-    await mod.actions.create({
-      ...eventFor(id, fetchImpl),
-      request: new Request("http://localhost", { method: "POST", body: fd }),
-    } as Parameters<typeof mod.actions.create>[0]);
-
-    const result = await mod.load(eventFor(id, fetchImpl));
-    expect(result.statuses[0].is_final).toBe(true);
-  });
-
-  test("update maps status fields through helper action", async () => {
-    const id = "project-1";
-    const fetchImpl = fetchProject();
-    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
-    statuses.push({
-      id: "status-update",
-      org_id: "org-1",
-      project_id: id,
-      name: "Review",
-      color: "#6b7280",
-      sort_order: 0,
-      is_final: false,
-      created_at: "2026-05-15T00:00:00.000Z",
-      updated_at: "2026-05-15T00:00:00.000Z",
+    expect(result).toEqual({
+      projectId: "project-1",
+      statuses: [{ id: "status-1", name: "Ready", color: "#22c55e", isFinal: false, sortOrder: 1 }],
     });
+    expect(calls).toEqual(["GET /api/v1/projects/project-1", "GET /api/v1/projects/project-1/statuses"]);
+  });
 
-    const fd = new FormData();
-    fd.set("id", "status-update");
-    fd.set("name", "Accepted");
-    fd.set("color", "#22c55e");
-    fd.set("sortOrder", "4");
-    fd.set("isFinal", "on");
-    await mod.actions.update({
-      ...eventFor(id, fetchImpl),
-      request: new Request("http://localhost", { method: "POST", body: fd }),
-    } as Parameters<typeof mod.actions.update>[0]);
+  test("create action validates name and delegates defaults to project status public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 1}`);
+    const invalid = (await mod.actions.create(
+      actionEvent("project-1", fetchStatuses(), { name: "" }),
+    )) as { status: number; data: unknown };
+    expect(invalid.status).toBe(400);
+    expect(invalid.data).toEqual({ error: "Name is required" });
 
-    const result = await mod.load(eventFor(id, fetchImpl));
-    expect(result.statuses).toContainEqual(expect.objectContaining({
-      id: "status-update",
-      name: "Accepted",
-      color: "#22c55e",
-      sort_order: 4,
-      is_final: true,
-    }));
+    const calls: string[] = [];
+    const result = await mod.actions.create(
+      actionEvent("project-1", fetchStatuses(calls), { name: "Done", isFinal: "on" }),
+    );
+    expect(result).toEqual({ success: true });
+    expect(calls).toEqual(["POST /api/v1/projects/project-1/statuses"]);
+  });
+
+  test("update action maps optional fields before delegating", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 2}`);
+    const missing = (await mod.actions.update(
+      actionEvent("project-1", fetchStatuses(), { id: "" }),
+    )) as { status: number; data: unknown };
+    expect(missing.status).toBe(400);
+    expect(missing.data).toEqual({ error: "id required" });
+
+    const calls: string[] = [];
+    const result = await mod.actions.update(
+      actionEvent("project-1", fetchStatuses(calls), {
+        id: "status-1",
+        name: "Done",
+        color: "#16a34a",
+        isFinal: "on",
+        sortOrder: "7",
+      }),
+    );
+    expect(result).toEqual({ success: true });
+    expect(calls).toEqual(["PATCH /api/v1/projects/project-1/statuses/status-1"]);
+  });
+
+  test("delete action validates id and delegates to project status public API", async () => {
+    const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
+    const missing = (await mod.actions.delete(
+      actionEvent("project-1", fetchStatuses(), { id: "" }),
+    )) as { status: number; data: unknown };
+    expect(missing.status).toBe(400);
+    expect(missing.data).toEqual({ error: "id required" });
+
+    const calls: string[] = [];
+    const result = await mod.actions.delete(
+      actionEvent("project-1", fetchStatuses(calls), { id: "status-1" }),
+    );
+    expect(result).toEqual({ success: true });
+    expect(calls).toEqual(["DELETE /api/v1/projects/project-1/statuses/status-1"]);
   });
 });

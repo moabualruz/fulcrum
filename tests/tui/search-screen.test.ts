@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * TDD — semantic search toggle gating.
+ * TDD: semantic search toggle gating.
  * RED written first; GREEN by apps/tui/src/screens/search-screen.ts.
  *
  * Acceptance criteria covered:
@@ -19,7 +19,7 @@ import {
   executeSearch,
 } from "@fulcrum/tui/screens/search-screen.ts";
 import type { SearchOptions, SearchResult } from "@fulcrum/tui/types.ts";
-import { resetFeaturesCache } from "@platform-core/application/feature-flags/index.ts";
+import { resetFeaturesCache } from "@feature-flags/application/index.ts";
 
 beforeEach(() => {
   resetFeaturesCache();
@@ -48,7 +48,7 @@ function makeSearchService(): {
   };
 }
 
-describe("buildFilterChips — embeddings OFF", () => {
+describe("buildFilterChips: embeddings OFF", () => {
   const env = { FULCRUM_FEATURES: "" };
 
   test("semanticChipVisible is false", () => {
@@ -67,7 +67,7 @@ describe("buildFilterChips — embeddings OFF", () => {
   });
 });
 
-describe("buildFilterChips — embeddings ON", () => {
+describe("buildFilterChips: embeddings ON", () => {
   const env = { FULCRUM_FEATURES: "embeddings" };
 
   test("semanticChipVisible is true", () => {
@@ -81,7 +81,7 @@ describe("buildFilterChips — embeddings ON", () => {
   });
 });
 
-describe("toggleSemanticMode — embeddings OFF", () => {
+describe("toggleSemanticMode: embeddings OFF", () => {
   const env = { FULCRUM_FEATURES: "" };
 
   test("toggle returns mode='fts' (no-op guard)", () => {
@@ -97,7 +97,7 @@ describe("toggleSemanticMode — embeddings OFF", () => {
   });
 });
 
-describe("toggleSemanticMode — embeddings ON", () => {
+describe("toggleSemanticMode: embeddings ON", () => {
   const env = { FULCRUM_FEATURES: "embeddings" };
 
   test("fts → hybrid on first toggle", () => {
@@ -114,7 +114,7 @@ describe("toggleSemanticMode — embeddings ON", () => {
   });
 });
 
-describe("executeSearch — mode propagation", () => {
+describe("executeSearch: mode propagation", () => {
   const envOff = { FULCRUM_FEATURES: "" };
   const envOn = { FULCRUM_FEATURES: "embeddings" };
 

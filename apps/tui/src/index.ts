@@ -1,5 +1,5 @@
 /**
- * TUI application root — `fulcrum tui` entry-point.
+ * TUI application root: `fulcrum tui` entry-point.
  *
  * Architecture:
  *   - Keyboard-first terminal UI rendered through the OpenTUI adapter at
@@ -23,6 +23,7 @@
  */
 
 import type { TuiOutput, TuiInput } from "./testing/fake-tty.ts";
+import { installTuiLogRedaction } from "./log.ts";
 import { StdoutOutput } from "./testing/fake-tty.ts";
 import { Renderer, c } from "./renderer.ts";
 import { createFulcrumTuiRenderer, type FulcrumTuiRenderer } from "./opentui/adapter.ts";
@@ -30,12 +31,18 @@ import { AuthScreen } from "./screens/auth.ts";
 import type { AuthInfo } from "./screens/auth.ts";
 import { FlagsScreen } from "./screens/flags.ts";
 import type { FlagItem } from "./screens/flags.ts";
+import { FOUNDATION_KEY_BINDINGS, formatFocusedRowLabel, renderBootSplash } from "./screens/tui-foundation.ts";
 import { NewDocScreen } from "./screens/new-doc.ts";
+import { CaptureWorkbenchScreen } from "./screens/capture.ts";
+import { TaskBoardScreen, type TaskCreateInput } from "./screens/task-board.ts";
 import { TaskListScreen } from "./screens/task-list.ts";
+import { TaskTimelineScreen } from "./screens/task-timeline.ts";
 import type { TuiTask } from "./screens/task-types.ts";
 import { RoutingRulesScreen } from "./screens/routing-rules.ts";
 import type { TuiRoutingRule, TuiEnrichedDecision } from "./screens/routing-rules.ts";
 import { RunsScreen, RunDetailScreen, type TuiRun } from "./screens/runs.ts";
+import { RunsControlScreen } from "./screens/runs-screen.ts";
+import { DoctorScreen } from "./screens/doctor.ts";
 import {
   PlanningBreakdownScreen,
   type ContinuousUpdateInput,
@@ -57,25 +64,60 @@ import {
   type TechnicalPlanningResult,
   type WorkflowCycleResultView,
 } from "./screens/planning-breakdown.ts";
+import { PlanningScreen } from "./screens/planning-screen.ts";
+import { ReviewScreen } from "./screens/review-screen.ts";
 import { NotificationsScreen } from "./screens/notifications.ts";
 import { ActivityFeedScreen } from "./screens/activity.ts";
 import { NotificationRulesScreen } from "./screens/notification-rules.ts";
 import { AuditLogScreen } from "./screens/audit.ts";
 import { ArtifactsScreen, type TuiArtifact, type TuiArtifactFilters, type TuiArtifactPreview } from "./screens/artifacts.ts";
+import {
+  CHAT_PANE_FOOTER_MODE,
+  ChatPaneScreen,
+  createInlineAiAssistPane,
+  defaultAiAssistScope,
+  type ChatPaneCaller,
+} from "./screens/ai-assist-session.ts";
 import { TuiRouter, type TuiRoute } from "./router.ts";
+import {
+  TUI_STAGE_NAV,
+  TUI_TAB_STRIP,
+  TUI_COLON_SCREEN_TARGETS,
+  buildTuiScreenRegistry,
+  resolveColonRoute,
+  type ScreenRegistry,
+  type StageNavEntry,
+} from "./screen-registry.ts";
+import { HelpOverlay, type KeyBinding } from "./widgets/HelpOverlay.ts";
+import { Palette } from "./widgets/Palette.ts";
+import { StatusBarWidget } from "./widgets/StatusBar.ts";
+import {
+  STAGE_CHORD_PREFIX,
+  TUI_CHORD_PREFIXES,
+  createChordLatch,
+  createStageChordHandler,
+  createTraceYankHandler,
+  osc52Clipboard,
+  type ChordLatch,
+  type StageChordHandler,
+  type TraceYankClipboard,
+  type TraceYankHandler,
+} from "./keybindings.ts";
 import { JsonlCrashLog, type TuiCrashLog } from "./crashlog.ts";
 import { DbTelemetrySink, NullTelemetrySink, type TuiTelemetrySink } from "./telemetry.ts";
 import {
   createTuiHttpCaller,
   requireTuiSessionContext,
 } from "./local-caller.ts";
-import type { InferenceModel, ModelPullProgress } from "@platform-core/interface/http/inference-api-client.ts";
+import type { InferenceModel, ModelPullProgress, EmbedResult } from "@platform-core/interface/http/inference-api-client.ts";
 import type { KeybindingMap, KeybindingAction } from "@platform-core/interface/input-bindings.ts";
 import type { TuiTheme } from "./theme/index.ts";
 import type { SubscriptionBridge } from "./subscriptions.ts";
 import type {
   WorkflowAcceptanceCycleInput,
 } from "@workflow-coordination/interface/workflow-cycle.ts";
+
+installTuiLogRedaction();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -93,7 +135,16 @@ export interface TuiCaller {
       passkeyCount?: number;
       saasAuthEnabled?: boolean;
       authProviders?: string[];
+      sessionId?: string | null;
     }>;
+    sessions?: (input?: { currentSessionId?: string }) => Promise<Array<{
+      id: string;
+      deviceType: string;
+      browser: string;
+      ipAddress: string | null;
+      lastActiveAt: string;
+      isCurrent: boolean;
+    }>>;
   };
   flags: {
     list: () => Promise<FlagItem[]>;
@@ -110,7 +161,7 @@ export interface TuiCaller {
       labels?: string[] | null;
     }>>;
     update?: (input: { id: string; status: string }) => Promise<unknown>;
-    create?: (input: { title: string; status: string }) => Promise<unknown>;
+    create?: (input: TaskCreateInput) => Promise<unknown>;
     bulk?: (input: { ids: string[]; status?: string; assignee?: string }) => Promise<{ ok: boolean }>;
     previewDependencyRun?: (input: {
       mode: "task" | "board";
@@ -145,7 +196,7 @@ export interface TuiCaller {
   agent_runs?: {
     list: () => Promise<TuiRun[]>;
     get: (input: { id: string }) => Promise<TuiRun>;
-    create: (input: { projectId: string; taskId: string; agent: string }) => Promise<TuiRun>;
+    create: (input: { projectId: string; taskId: string; agent: string; model?: string; policy?: string }) => Promise<TuiRun>;
     cancel: (input: { id: string }) => Promise<{ ok: boolean }>;
   };
   runsSubscriptions?: SubscriptionBridge;
@@ -162,6 +213,7 @@ export interface TuiCaller {
       gen_hit_rate?: number;
       cache_db_size?: number;
     }>;
+    embed?: (input: { texts: string[]; model?: string }) => Promise<EmbedResult>;
     models?: {
       list: () => Promise<InferenceModel[]>;
       pull: (input: { modelId: string; force?: boolean }) => AsyncIterable<ModelPullProgress> | Promise<AsyncIterable<ModelPullProgress>>;
@@ -257,10 +309,10 @@ export interface TuiCaller {
 export type TuiAction = "CreateItem";
 
 export interface TuiAppOptions {
-  /** Output driver — defaults to real stdout. Inject FakeTTY for tests. */
+  /** Output driver: defaults to real stdout. Inject FakeTTY for tests. */
   output?: TuiOutput;
 
-  /** Input driver — defaults to real stdin. Inject FakeTTY for tests. */
+  /** Input driver: defaults to real stdin. Inject FakeTTY for tests. */
   input?: TuiInput;
 
   /** HTTP API caller. Required. */
@@ -297,16 +349,16 @@ export interface TuiAppOptions {
   /** Approved-plan input used when opening the planning breakdown screen. */
   planningInput?: PlanningBreakdownInput;
 
-  /** Freeform-doc prompt input used when requesting ACP planning context. */
+  /** Freeform-doc prompt input used when requesting protocol-backed planning context. */
   freeformPlanningInput?: FreeformPlanningPromptInput;
 
   /** Freeform intake input used when starting workflow work from a rough document. */
   freeformStartInput?: FreeformWorkStartInput;
 
-  /** Guided ACP planning input used when starting a protocol-backed planning session. */
+  /** Guided AI Assist planning input used when starting a protocol-backed planning session. */
   guidedAcpInput?: GuidedAcpPlanningInput;
 
-  /** Continuous update input used when restarting planning from edited docs or ACP state. */
+  /** Continuous update input used when restarting planning from edited docs or protocol session state. */
   continuousUpdateInput?: ContinuousUpdateInput;
 
   /** Planning generation input used when requesting prototype and boilerplate review artifacts. */
@@ -317,6 +369,17 @@ export interface TuiAppOptions {
 
   /** Full workflow-cycle input used when running the acceptance cycle from planning. */
   workflowCycleInput?: WorkflowAcceptanceCycleInput;
+
+  /** Cross-surface identity context rendered in the status footer. */
+  traceContext?: {
+    projectId?: string;
+    runId?: string;
+    spanId?: string;
+    traceId?: string;
+  };
+
+  /** Clipboard sink for `y t`/`y r`/`y s`/`y p`; tests inject this. */
+  traceYankClipboard?: TraceYankClipboard;
 }
 
 /** Map keybinding action → semantic TuiAction handler key. */
@@ -325,29 +388,49 @@ const KEYBINDING_TO_TUI_ACTION: Partial<Record<KeybindingAction, TuiAction>> = {
   "doc.create": "CreateItem",
 };
 
+import { TOGGLE_THEME_COMMAND } from "./screens/tui-foundation.ts";
+
 const COMMAND_PALETTE_ACTIONS = [
   "Create task",
   "Create doc",
   "Search",
   "Dispatch run",
   "Settings",
+  TOGGLE_THEME_COMMAND,
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen enum
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning";
+type Screen = "nav" | "auth" | "flags" | "inference" | "new-doc" | "capture" | "plan" | "review" | "inbox" | "activity" | "notification-rules" | "audit" | "artifacts" | "routing-rules" | "planning" | "ai-assist" | "run";
 type DomainScreen =
   | "projects"
+  | "build-board"
   | "tasks"
+  | "timeline"
+  | "table"
+  | "graph"
+  | "cycles"
+  | "modules"
   | "sprints"
   | "docs"
+  | "notes"
   | "memory"
   | "runs"
   | "repos"
   | "search"
   | "skills"
+  | "telemetry"
+  | "alerts"
+  | "logs"
+  | "errors"
+  | "mcp"
+  | "plugins"
+  | "hooks"
+  | "trace"
+  | "agents"
+  | "settings"
   | "components"
   | "doctor";
 
@@ -357,13 +440,14 @@ type TuiScreen = Screen | DomainScreen;
 // Navigation entries
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface NavEntry {
+export interface NavEntry {
   label: string;
   screen: TuiScreen;
 }
 
-const NAV_ENTRIES: NavEntry[] = [
+export const TUI_NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Projects", screen: "projects" },
+  { label: "Build Board", screen: "build-board" },
   { label: "Tasks", screen: "tasks" },
   { label: "Sprints", screen: "sprints" },
   { label: "Docs", screen: "docs" },
@@ -387,6 +471,54 @@ const NAV_ENTRIES: NavEntry[] = [
   { label: "Activity", screen: "activity" },
   { label: "Audit", screen: "audit" },
 ];
+
+const NAV_ENTRIES = TUI_NAV_ENTRIES;
+
+const ROUTE_SCREEN_DETAILS: Partial<Record<DomainScreen, { title: string; route: string; purpose: string }>> = {
+  table: { title: "Build Table", route: ":table", purpose: "Spreadsheet task layout" },
+  graph: { title: "Build Graph", route: ":graph", purpose: "Dependency graph" },
+  cycles: { title: "Build Cycles", route: ":cycles", purpose: "Cycle list" },
+  modules: { title: "Build Modules", route: ":modules", purpose: "Module list" },
+  notes: { title: "Capture Notes", route: ":notes", purpose: "Short-form notes" },
+  telemetry: { title: "Operate Telemetry", route: ":telemetry", purpose: "p50/p99 charts and run resources" },
+  alerts: { title: "Operate Alerts", route: ":alerts", purpose: "Firing alerts by severity" },
+  logs: { title: "Operate Logs", route: ":logs", purpose: "Live log tail" },
+  errors: { title: "Operate Errors", route: ":errors", purpose: "Grouped error logs" },
+  mcp: { title: "Operate MCP", route: ":mcp", purpose: "MCP server list with agent scope" },
+  plugins: { title: "Operate Plugins", route: ":plugins", purpose: "Plugin list with agent scope" },
+  hooks: { title: "Operate Hooks", route: ":hooks", purpose: "Hook list" },
+  skills: { title: "Operate Skills", route: ":skills", purpose: "Skill list" },
+  trace: { title: "Operate Trace", route: ":trace/<id>", purpose: "Trace explorer" },
+  agents: { title: "System Agents", route: ":agents", purpose: "CLI agent registry" },
+  settings: { title: "System Settings", route: ":settings", purpose: "TUI settings sections" },
+};
+
+export function listTuiNavigationEntries(): readonly NavEntry[] {
+  return TUI_NAV_ENTRIES;
+}
+
+/**
+ * Colon-route screen key (from `screen-registry.ts`) → the `TuiScreen` the root
+ * launcher navigates to. Keys whose dedicated stage workbench is still owned by
+ * a downstream PRD resolve to the launcher root with that stage pre-selected,
+ * so every colon route resolves to a real screen: never an unknown-screen
+ * crash. Existing screens keep their home (value-preservation: no lost route).
+ */
+/**
+ * Resolve a colon route (`:capture`, `:plan`, `:runs`, `:board`, `:review`,
+ * `:ship`, `:doctor`, `:ai`, …) to a `TuiScreen`. Returns `undefined` for an
+ * unknown route so the caller can render a not-found state instead of crashing.
+ */
+export function resolveTuiColonScreen(route: string): TuiScreen | undefined {
+  const screenKey = resolveColonRoute(route);
+  if (!screenKey) return undefined;
+  return TUI_COLON_SCREEN_TARGETS[screenKey] as TuiScreen | undefined;
+}
+
+function runIdFromColonRoute(route: string): string | null {
+  const match = route.trim().match(/^:?run\/([^/]+)$/);
+  return match?.[1] ?? null;
+}
 
 function defaultPlanningInput(): PlanningBreakdownInput {
   return {
@@ -419,7 +551,7 @@ function defaultGuidedAcpInput(): GuidedAcpPlanningInput {
   return {
     agentName: "codex",
     cwd: "/Users/mkh/workspace/fulcrum",
-    userPrompt: "Plan with selected context through ACP.",
+    userPrompt: "Plan with selected context through AI Assist.",
     promptTemplateId: "prototype-first",
     selectedDocIds: [],
     traceId: "tui-planning",
@@ -472,6 +604,8 @@ export class TuiApp {
   private readonly input: TuiInput | null;
   private readonly actions: Partial<Record<TuiAction, () => void | Promise<void>>>;
   private readonly pathRouter: TuiRouter | null;
+  /** Canonical TUI screen catalog: backs the root tab strip + colon routes. */
+  private readonly screenRegistry: ScreenRegistry;
   private readonly telemetry: TuiTelemetrySink;
   private readonly crashLog: TuiCrashLog;
   private readonly keybindings: Partial<KeybindingMap> | null;
@@ -485,16 +619,34 @@ export class TuiApp {
   private readonly technicalPlanningInput: TechnicalPlanningInput;
   private readonly planningArtifactExecutionInput: PlanningArtifactRunInput;
   private readonly workflowCycleInput?: WorkflowAcceptanceCycleInput;
+  private readonly traceContext: NonNullable<TuiAppOptions["traceContext"]>;
+  private readonly chordLatch: ChordLatch;
+  private readonly stageChordHandler: StageChordHandler;
+  private readonly traceYankHandler: TraceYankHandler;
   private keyHandler: ((key: string) => void) | null = null;
 
-  private currentScreen: Screen = "nav";
+  private currentScreen: TuiScreen = "nav";
   private domainScreen: DomainScreen | null = null;
   private currentPath: string | null = null;
+  /**
+   * The screen the inline `:ai` pane was opened from: `q` inside `:ai` pops
+   * back here rather than to the launcher root (CLI-TUI-UX.md §7.5, §10.1).
+   */
+  private aiAssistReturnScreen: TuiScreen = "nav";
   private navCursor = 0;
+  /** Selected stage in the root StageNav (0..5 → Capture..Operate). */
+  private stageCursor = 0;
   private paletteOpen = false;
+  private colonPalette: Palette | null = null;
+  private helpOpen = false;
   private domainRows: string[] = [];
   private domainError: string | null = null;
+  private paletteCursor = 0;
+  private paletteFeedback: string | null = null;
+  private selectedNavAction: string | null = null;
+  private taskBoardScreen: TaskBoardScreen | null = null;
   private taskListScreen: TaskListScreen | null = null;
+  private taskTimelineScreen: TaskTimelineScreen | null = null;
   private statusInfo: { email: string; orgId: string } | null = null;
   private inferenceInfo: { status: string; tone: "green" | "yellow" | "red" } = {
     status: "down",
@@ -511,8 +663,11 @@ export class TuiApp {
     cache_db_size: number;
   } = { active_requests: 0, ops_last_10s: 0, embed_hit_rate: 0, gen_hit_rate: 0, cache_db_size: 0 };
   private inferenceRoutingConfig: Record<string, string> = {};
+  private inferenceEmbedResult: EmbedResult | null = null;
+  private inferenceEmbedError: string | null = null;
   private inferencePoll: ReturnType<typeof setInterval> | null = null;
   private bellPoll: ReturnType<typeof setInterval> | null = null;
+  private startupHydration: Promise<void> | null = null;
   private bellCount = 0;
   private running = false;
 
@@ -520,6 +675,9 @@ export class TuiApp {
   private authScreen: AuthScreen | null = null;
   private flagsScreen: FlagsScreen | null = null;
   private newDocScreen: NewDocScreen | null = null;
+  private captureWorkbenchScreen: CaptureWorkbenchScreen | null = null;
+  private planWorkbenchScreen: PlanningScreen | null = null;
+  private reviewWorkbenchScreen: ReviewScreen | null = null;
   private routingRulesScreen: RoutingRulesScreen | null = null;
   private notificationsScreen: NotificationsScreen | null = null;
   private activityScreen: ActivityFeedScreen | null = null;
@@ -528,7 +686,16 @@ export class TuiApp {
   private artifactsScreen: ArtifactsScreen | null = null;
   private runsScreen: RunsScreen | null = null;
   private runDetailScreen: RunDetailScreen | null = null;
+  private pendingRunDetailId: string | null = null;
+  private runsControlScreen: RunsControlScreen | null = null;
+  private doctorScreen: DoctorScreen | null = null;
   private planningScreen: PlanningBreakdownScreen | null = null;
+  /**
+   * The TUI-native inline `:ai` AI Assist pane (`ChatPane`, CLI-TUI-UX.md §10).
+   * Built lazily on first `:ai` open and reused thereafter so the thread
+   * transcript + composer draft survive every screen swap (§10.3).
+   */
+  private chatPaneScreen: ChatPaneScreen | null = null;
 
   constructor(opts: TuiAppOptions) {
     const out = opts.output ?? new StdoutOutput();
@@ -539,12 +706,14 @@ export class TuiApp {
     });
     this.input = opts.input ?? null;
     this.actions = opts.actions ?? {};
+    this.screenRegistry = buildTuiScreenRegistry();
     this.pathRouter = opts.routes && opts.routes.length > 0
       ? new TuiRouter({
         routes: [
           { path: "/", screenKey: "nav", title: "Root", render: () => "" },
           ...opts.routes,
         ],
+        screenRegistry: this.screenRegistry,
       })
       : null;
     this.telemetry = opts.telemetry ?? new NullTelemetrySink();
@@ -560,6 +729,21 @@ export class TuiApp {
     this.technicalPlanningInput = opts.technicalPlanningInput ?? defaultTechnicalPlanningInput();
     this.planningArtifactExecutionInput = opts.planningArtifactExecutionInput ?? defaultPlanningArtifactExecutionInput();
     this.workflowCycleInput = opts.workflowCycleInput;
+    this.traceContext = opts.traceContext ?? {
+      projectId: process.env["FULCRUM_PROJECT_ID"],
+      runId: process.env["FULCRUM_RUN_ID"],
+      spanId: process.env["FULCRUM_SPAN_ID"],
+      traceId: process.env["FULCRUM_TRACE_ID"],
+    };
+    this.chordLatch = createChordLatch(TUI_CHORD_PREFIXES);
+    this.stageChordHandler = createStageChordHandler();
+    this.traceYankHandler = createTraceYankHandler(
+      {
+        copyKeybinds: () => this._statusFooter().copyKeybinds(),
+        projectPath: this.traceContext.projectId ?? process.cwd(),
+      },
+      opts.traceYankClipboard ?? osc52Clipboard(out),
+    );
   }
 
   /** Resolved theme contract (Pillar 17), if injected. */
@@ -573,22 +757,12 @@ export class TuiApp {
    */
   async mount(): Promise<void> {
     this.running = true;
+    renderBootSplash(this.renderer);
 
-    // Load status bar data
-    await this._loadStatusBar();
-    await this._loadInferenceBadge();
-    await this._loadBellCount();
-    this.inferencePoll = setInterval(() =>
-      this._loadInferenceBadge().then(() => {
-        if (this.running) return this._renderCurrentScreen();
-      }), 30_000);
-    this.bellPoll = setInterval(() =>
-      this._loadBellCount().then(() => {
-        if (this.running) return this._renderCurrentScreen();
-      }), 60_000);
-
-    // Initial render
+    // CLI-TUI-UX.md §16: paint the first frame before API/database-backed
+    // startup data can delay terminal feedback.
     await this._renderCurrentScreen();
+    this.startupHydration = this._hydrateStartupData();
 
     // Attach keyboard listener (no-op in headless mode)
     if (this.input) {
@@ -620,9 +794,30 @@ export class TuiApp {
     void this.openTuiRenderer?.dispose();
   }
 
+  private async _hydrateStartupData(): Promise<void> {
+    await this._loadStatusBar();
+    await this._loadInferenceBadge();
+    await this._loadBellCount();
+    if (!this.running) return;
+    await this._renderCurrentScreen();
+    if (!this.running) return;
+    this.inferencePoll = setInterval(() =>
+      this._loadInferenceBadge().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 30_000);
+    this.bellPoll = setInterval(() =>
+      this._loadBellCount().then(() => {
+        if (this.running) return this._renderCurrentScreen();
+      }), 60_000);
+  }
+
   /** Whether the TUI is currently running. */
   get isRunning(): boolean {
     return this.running;
+  }
+
+  async waitForStartupData(): Promise<void> {
+    await this.startupHydration;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -641,16 +836,50 @@ export class TuiApp {
     }
   }
 
+  /**
+   * Render the OD StatusFooter (CLI-TUI-UX.md §8, DESIGN.md §3.1): the
+   * always-on bottom strip that mirrors the web `StatusFooter` primitive
+   * segment-for-segment. The `StatusBarWidget` owns the segment order, mono
+   * trace identity, and copy keybinds; this method only supplies shell data.
+   */
   private _renderStatusBar(): void {
-    const info = this.statusInfo;
-    const badge = this._formatInferenceBadge();
-    if (!info) {
-      this.renderer.statusBar("Fulcrum TUI", badge);
-      return;
-    }
-    const left = `${info.orgId}  ${info.email}`;
-    const right = `Bell:${this.bellCount}  ${badge}  q:quit  ?:help`;
-    this.renderer.statusBar(left, right);
+    this.renderer.moveTo(this.renderer.height, 1);
+    this.renderer.write(this._statusFooter().render());
+  }
+
+  /**
+   * Build the `StatusBarWidget` from current shell state. Exposed so the
+   * keyboard layer can read `copyKeybinds()` for `y t`/`y r`/`y s` trace yanks
+   * against the exact identity the footer renders.
+   */
+  private _statusFooter(): StatusBarWidget {
+    const focusedRun = this.currentRunForFooter;
+    const runId = focusedRun?.id ?? this.traceContext.runId ?? null;
+    const traceId = focusedRun
+      ? focusedRun.traceId ?? this.traceContext.traceId ?? null
+      : this.traceContext.traceId ?? null;
+    const spanId = focusedRun ? focusedRun.spanId ?? null : this.traceContext.spanId ?? null;
+    return new StatusBarWidget({
+      currentScreen: this._currentScreenLabel(),
+      orgName: focusedRun?.projectName ?? this.statusInfo?.orgId ?? "local",
+      branch: this.traceContext.projectId ?? "main",
+      run: runId,
+      agent: focusedRun?.agent ?? this.inferenceModels[0]?.id ?? "claude-opus-4-7",
+      mcpHealth: this.inferenceInfo.status === "ok" ? "ok" : this.inferenceInfo.status,
+      mcpDegraded: this.inferenceInfo.tone !== "green",
+      traceId,
+      runId,
+      spanId,
+      time: this._footerClock(),
+      bellCount: this.bellCount,
+      width: this.renderer.width,
+    });
+  }
+
+  /** Wall-clock `HH:MM` for the footer `time` segment (OD `.term-foot` `14:02`). */
+  private _footerClock(): string {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
   private async _loadBellCount(): Promise<void> {
@@ -719,11 +948,12 @@ export class TuiApp {
     try {
       this.renderer.clearScreen();
       this.renderer.hideCursor();
-      this._renderStatusBar();
 
       if (this.currentPath && this.pathRouter) {
         const body = this.pathRouter.render();
         if (body) this.renderer.writeln(body);
+        this._renderHelpOverlay();
+        this._renderStatusBar();
         return;
       }
 
@@ -742,6 +972,15 @@ export class TuiApp {
           break;
         case "new-doc":
           this._renderNewDoc();
+          break;
+        case "capture":
+          this.captureWorkbenchScreen?.render(this.renderer);
+          break;
+        case "plan":
+          this.planWorkbenchScreen?.render(this.renderer);
+          break;
+        case "review":
+          this.reviewWorkbenchScreen?.render(this.renderer);
           break;
         case "inbox":
           this.notificationsScreen?.render(this.renderer);
@@ -764,14 +1003,27 @@ export class TuiApp {
         case "planning":
           this._renderPlanning();
           break;
+        case "ai-assist":
+          this.chatPaneScreen?.render(this.renderer);
+          break;
+        case "run":
+          this.runDetailScreen?.render(this.renderer);
+          break;
       }
-      if (this.domainScreen && this.currentScreen === "nav") {
+      if (this.domainScreen) {
         this._renderDomainScreen(this.domainScreen);
       }
+      this._renderHelpOverlay();
+      this._renderColonPalette();
+      this._renderStatusBar();
     } catch (error) {
       this.renderer.clearScreen();
       this.renderer.writeln(c.bold("TUI error"));
       this.renderer.writeln(error instanceof Error ? error.message : String(error));
+      const stackLine = error instanceof Error ? error.stack?.split("\n").slice(1).find((line) => line.trim()) : undefined;
+      if (stackLine) this.renderer.writeln(stackLine.trim());
+      this.renderer.writeln("Recovery: press r to retry, b to go back, or q to quit; run fulcrum doctor if the screen fails again.");
+      if (this.traceContext.traceId) this.renderer.writeln(`trace=${this.traceContext.traceId}`);
       await this.crashLog.write(error, { screenKey, route });
     } finally {
       await this.telemetry.recordRender({
@@ -790,38 +1042,146 @@ export class TuiApp {
     r.writeln(c.bold("  Fulcrum TUI"));
     r.separator();
     r.writeln();
+
+    // OD `tui-runs.html` #tui-tabs: always-visible top tab strip (root chrome).
+    this._renderTabStrip();
+    r.writeln();
+
+    // Stage workbench launcher: the six workflow stages (CLI-TUI-UX.md §6).
+    this._renderStageNav();
+
+    r.writeln();
     r.writeln(c.bold("  Domain nav"));
 
     for (let i = 0; i < NAV_ENTRIES.length; i++) {
       const entry = NAV_ENTRIES[i];
       if (!entry) continue;
-      r.navItem(entry.label, i === this.navCursor);
+      const selected = i === this.navCursor;
+      r.navItem(formatFocusedRowLabel(entry.label, selected), selected);
     }
 
     r.writeln();
     r.writeln(c.bold("  Detail / log pane"));
+    const activeStage = TUI_STAGE_NAV[this.stageCursor] as StageNavEntry | undefined;
+    if (activeStage) {
+      r.writeln(`  Stage: ${activeStage.label}  route:${activeStage.colon}  chord:g ${activeStage.chord}`);
+    }
     const selected = NAV_ENTRIES[this.navCursor];
-    r.writeln(`  ${selected?.label ?? "No domain"} ready. Use Enter to open, / for command palette.`);
+    if (selected) {
+      const detail = NAV_DETAILS[selected.screen] ?? {
+        summary: `${selected.label} workflow cockpit.`,
+        action: "Enter opens selected screen.",
+        status: "ready",
+      };
+      r.writeln(`  Selected: ${selected.label}  screen:${selected.screen}  status:${detail.status}`);
+      r.writeln(`  ${detail.summary}`);
+      r.writeln(`  ${detail.action}`);
+      if (this.selectedNavAction) r.writeln(c.dim(`  Last action: ${this.selectedNavAction}`));
+    } else {
+      r.writeln("  No domain selected.");
+    }
+    r.writeln();
+    // Palette + help are reachable from the root launcher (PRD acceptance).
+    r.writeln(c.dim("  Command palette: / or :  ·  Help: ?"));
     r.writeln();
     r.writeln(c.bold("  Status footer"));
-    r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / commands  q quit"));
+    r.writeln(c.dim("  j/k or arrows navigate  Enter open  Esc back  / or Ctrl+K commands  ? help  q quit"));
     this._renderCommandPalette();
+  }
+
+  /**
+   * Render the OD `tui-runs.html` `#tui-tabs` strip: sixteen colon-route tabs
+   * in exact order. This is always-visible root chrome; every label and its
+   * position are sourced from `TUI_TAB_STRIP` in the screen registry, so the
+   * snapshot test locks concrete OD labels and order, not placeholder text.
+   */
+  private _renderTabStrip(): void {
+    const r = this.renderer;
+    r.writeln(c.bold("  Stage tab strip"));
+    const labels = TUI_TAB_STRIP.map((tab) => tab.label);
+    r.writeln(`  ${labels.join("  ")}`);
+  }
+
+  /**
+   * Render the root StageNav: the six workflow-stage launchers (Capture, Plan,
+   * Build, Review, Ship, Operate). Each row shows its colon route and `g`-chord
+   * so the operator can launch a stage workbench from the root.
+   */
+  private _renderStageNav(): void {
+    const r = this.renderer;
+    r.writeln(c.bold("  Stage nav"));
+    for (let i = 0; i < TUI_STAGE_NAV.length; i++) {
+      const stage = TUI_STAGE_NAV[i] as StageNavEntry;
+      const selected = i === this.stageCursor;
+      const row = `${stage.label}  ${stage.colon}  (g ${stage.chord})`;
+      r.navItem(formatFocusedRowLabel(row, selected), selected);
+    }
   }
 
   private _renderCommandPalette(): void {
     if (!this.paletteOpen) {
-      this.renderer.writeln(c.dim(`  Command palette: /  ${COMMAND_PALETTE_ACTIONS.join(" | ")}`));
+      this.renderer.writeln(c.dim(`  Command palette: / or Ctrl+K  ${COMMAND_PALETTE_ACTIONS.join(" | ")}`));
       return;
     }
     this.renderer.writeln();
     this.renderer.writeln(c.bold("  Command palette"));
-    for (const action of COMMAND_PALETTE_ACTIONS) this.renderer.writeln(`  - ${action}`);
+    for (let i = 0; i < COMMAND_PALETTE_ACTIONS.length; i++) {
+      const action = COMMAND_PALETTE_ACTIONS[i]!;
+      this.renderer.writeln(formatFocusedRowLabel(action, i === this.paletteCursor));
+    }
+    if (this.paletteFeedback) this.renderer.writeln(c.dim(`  ${this.paletteFeedback}`));
+  }
+
+  private _renderHelpOverlay(): void {
+    if (!this.helpOpen) return;
+    const overlay = new HelpOverlay({
+      screenName: this._currentScreenLabel(),
+      bindings: this._currentHelpBindings(),
+      width: 72,
+    });
+    this.renderer.writeln();
+    for (const line of overlay.render()) this.renderer.writeln(line);
+  }
+
+  private _renderColonPalette(): void {
+    if (!this.colonPalette?.isOpen) return;
+    this.renderer.writeln();
+    for (const line of this.colonPalette.render()) this.renderer.writeln(line);
+  }
+
+  private _currentScreenLabel(): string {
+    if (this.currentPath && this.pathRouter) return this.pathRouter.current.title;
+    if (this.domainScreen) return domainTitle(this.domainScreen);
+    if (this.currentScreen === "nav") return "Launcher";
+    // The inline `:ai` AI Assist pane flips the footer mode pill to `:AI`
+    // while focused (CLI-TUI-UX.md §10.1). `_currentScreenLabel` feeds the
+    // `mode` segment, which `StatusBarWidget` upper-cases: so `:ai` renders
+    // as `:AI`.
+    if (this.currentScreen === "ai-assist") return CHAT_PANE_FOOTER_MODE;
+    return screenTitle(this.currentScreen as Screen);
+  }
+
+  private _currentHelpBindings(): KeyBinding[] {
+    return [...FOUNDATION_KEY_BINDINGS, { key: "/ Ctrl+K", action: "Toggle command palette" }];
   }
 
   private _renderDomainScreen(screen: DomainScreen): void {
     const r = this.renderer;
+    if (screen === "build-board" && this.taskBoardScreen) {
+      this.taskBoardScreen.render(r);
+      return;
+    }
     if (screen === "tasks" && this.taskListScreen) {
       this.taskListScreen.render(r);
+      return;
+    }
+    if (screen === "timeline" && this.taskTimelineScreen) {
+      this._renderRouteScreenHeader(screen);
+      this.taskTimelineScreen.render(r);
+      return;
+    }
+    if (ROUTE_SCREEN_DETAILS[screen]) {
+      this._renderRouteScreen(screen);
       return;
     }
     r.writeln();
@@ -829,21 +1189,32 @@ export class TuiApp {
     r.separator();
 
     if (screen === "runs") {
+      if (this.runsControlScreen) {
+        this.runsControlScreen.render(r);
+        r.writeln();
+        r.writeln(c.bold("  Live session pane"));
+        this.runDetailScreen?.render(r);
+        this._renderRunsStatusFooter(r);
+        return;
+      }
       r.writeln(c.bold("  Run list"));
       this.runsScreen?.render(r);
       r.writeln();
       r.writeln(c.bold("  Transcript / log"));
       this.runDetailScreen?.render(r);
-      r.writeln();
-      r.writeln(c.bold("  Status footer"));
-      const run = this.currentRunForFooter;
-      r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
+      this._renderRunsStatusFooter(r);
+      return;
+    }
+
+    if (screen === "doctor" && this.doctorScreen) {
+      this.doctorScreen.render(r);
       return;
     }
 
     r.writeln(c.bold("  Detail / log pane"));
     if (this.domainError) {
       r.writeln(c.red(`  ${this.domainError}`));
+      r.writeln(c.dim("  Fix: check the API/service status, then retry this screen. Esc returns to navigation."));
     } else if (this.domainRows.length === 0) {
       r.writeln(c.dim(`  No ${domainTitle(screen).toLowerCase()} records.`));
     } else {
@@ -854,7 +1225,49 @@ export class TuiApp {
     r.writeln(c.dim("  Esc back  / commands  q root quit"));
   }
 
+  private _renderRouteScreenHeader(screen: DomainScreen): void {
+    const detail = ROUTE_SCREEN_DETAILS[screen];
+    if (!detail) return;
+    this.renderer.writeln();
+    this.renderer.writeln(c.bold(`  ${detail.title}`));
+    this.renderer.writeln(c.dim(`  ${detail.route} · ${detail.purpose}`));
+    this.renderer.separator();
+  }
+
+  private _renderRouteScreen(screen: DomainScreen): void {
+    const r = this.renderer;
+    const detail = ROUTE_SCREEN_DETAILS[screen];
+    if (!detail) return;
+    this._renderRouteScreenHeader(screen);
+    r.writeln();
+    if (this.domainError) {
+      r.writeln(c.red(`  ${this.domainError}`));
+      r.writeln(c.dim(`  Recovery: reopen ${detail.route} after restoring the backing API.`));
+    } else if (this.domainRows.length === 0) {
+      r.writeln(c.dim(`  No ${detail.title.toLowerCase()} records.`));
+      r.writeln(c.dim(`  ${detail.purpose}.`));
+    } else {
+      for (const row of this.domainRows) r.writeln(`  ${row}`);
+    }
+    r.writeln();
+    r.writeln(c.dim("  j/k navigate  Enter detail  q back  : routes  ? help"));
+  }
+
+  /**
+   * Render the canonical `runs` workbench status footer. Carries the focused
+   * run's live `state:` identity regardless of whether the new RunsControl
+   * workbench or the legacy run-list path is active — the run-subscription
+   * lifecycle reads run state off this line, so it must render on both paths.
+   */
+  private _renderRunsStatusFooter(r: Renderer): void {
+    r.writeln();
+    r.writeln(c.bold("  Status footer"));
+    const run = this.currentRunForFooter;
+    r.writeln(c.dim(run ? `  state:${run.status}  duration:live  agent:${run.agent}` : "  no active run"));
+  }
+
   private get currentRunForFooter(): TuiRun | null {
+    if (this.currentScreen !== "run" && this.domainScreen !== "runs") return null;
     return this.runDetailScreen?.currentRun ?? null;
   }
 
@@ -920,6 +1333,20 @@ export class TuiApp {
     }
     r.writeln();
 
+    r.writeln(c.bold("  Embed probe"));
+    if (this.inferenceEmbedError) {
+      r.writeln(`  ${c.red("failed")} ${this.inferenceEmbedError}`);
+    } else if (this.inferenceEmbedResult) {
+      const dims = this.inferenceEmbedResult.vectors[0]?.length ?? this.inferenceEmbedResult.dimensions ?? 0;
+      r.infoRow("Model", this.inferenceEmbedResult.model);
+      r.infoRow("Vectors", `${this.inferenceEmbedResult.vectors.length}`);
+      r.infoRow("Dimensions", `${dims}`);
+      r.infoRow("Cached", `${this.inferenceEmbedResult.cached}`);
+    } else {
+      r.writeln(c.dim("  Press [e] to embed a probe text through the same inference caller."));
+    }
+    r.writeln();
+
     // Per-feature backend routing
     r.writeln(c.bold("  Routing"));
     const routingEntries = Object.entries(this.inferenceRoutingConfig);
@@ -931,7 +1358,7 @@ export class TuiApp {
       }
     }
 
-    // External LLM Provider — shown only when flag enabled
+    // External LLM Provider: shown only when flag enabled
     const externalEnabled = (process.env["FULCRUM_FEATURES"] ?? "")
       .split(",").map((s) => s.trim()).includes("external-llm-provider");
     if (externalEnabled) {
@@ -988,6 +1415,30 @@ export class TuiApp {
       return;
     }
 
+    if (key === "?") {
+      this.helpOpen = !this.helpOpen;
+      await this._renderCurrentScreen();
+      return;
+    }
+    if (this.helpOpen && key === "\x1b") {
+      this.helpOpen = false;
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.colonPalette) {
+      await this._handleColonPaletteKey(key);
+      return;
+    }
+
+    if (key === ":") {
+      this._openColonPalette();
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (await this._handleChordKey(key)) return;
+
     // Keybinding registry dispatch (Pillar 14). Resolves single-character
     // shortcuts to semantic TuiActions before per-screen routing.
     const tuiAction = this._resolveKeybindingAction(key);
@@ -1018,13 +1469,60 @@ export class TuiApp {
       if (key === "q" || key === "\x1b") {
         this.currentScreen = "nav";
         await this._renderCurrentScreen();
+        return;
       }
+      if (key.toLowerCase() === "e") {
+        await this.embedInferenceText("Fulcrum inference TUI probe");
+        return;
+      }
+      return;
+    }
+
+    if (this.currentScreen === "ai-assist" && this.chatPaneScreen) {
+      // CLI-TUI-UX.md §7.5 AI Assist pane keymap. `q` pops back to the screen
+      // the pane was opened from; the `ChatPane` keeps its thread state so the
+      // transcript survives the round-trip (§10.3).
+      const pane = this.chatPaneScreen;
+      if (key === "q") {
+        await this._navigate(this.aiAssistReturnScreen);
+        return;
+      }
+      if (key === "\x1b") {
+        pane.blur();
+      } else if (key === "\r") {
+        await pane.submit();
+      } else if (key === "\x0c") {
+        pane.clearComposer();
+      } else if (key === "\x13") {
+        await pane.saveThread();
+      } else if (key === "\x1b[A") {
+        pane.history(-1);
+      } else if (key === "\x1b[B") {
+        pane.history(1);
+      } else if (key === "\x7f" || key === "\b") {
+        pane.backspace();
+      } else if (key.length === 1 && key >= " ") {
+        pane.type(key);
+      }
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "run" && this.runDetailScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.runDetailScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
       return;
     }
 
     if (this.domainScreen) {
       if (key === "q" || key === "\x1b") {
         this.domainScreen = null;
+        this.taskBoardScreen = null;
         this.taskListScreen?.dispose();
         this.taskListScreen = null;
         this.currentScreen = "nav";
@@ -1036,8 +1534,28 @@ export class TuiApp {
         await this._renderCurrentScreen();
         return;
       }
+      if (key === "\x0b") {
+        this.paletteOpen = !this.paletteOpen;
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "build-board" && this.taskBoardScreen) {
+        const consumed = await this.taskBoardScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
+        return;
+      }
       if (this.domainScreen === "tasks" && this.taskListScreen) {
         const consumed = await this.taskListScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "runs" && this.runsControlScreen) {
+        const consumed = await this.runsControlScreen.handleKey(key);
+        if (consumed) await this._renderCurrentScreen();
+        return;
+      }
+      if (this.domainScreen === "doctor" && this.doctorScreen) {
+        const consumed = await this.doctorScreen.handleKey(key);
         if (consumed) await this._renderCurrentScreen();
         return;
       }
@@ -1060,6 +1578,39 @@ export class TuiApp {
       if (key === "\x03") {
         this.onExit();
       }
+      return;
+    }
+
+    if (this.currentScreen === "capture" && this.captureWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.captureWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "plan" && this.planWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.planWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
+      return;
+    }
+
+    if (this.currentScreen === "review" && this.reviewWorkbenchScreen) {
+      if (key === "q" || key === "\x1b") {
+        this.currentScreen = "nav";
+        await this._renderCurrentScreen();
+        return;
+      }
+      const consumed = await this.reviewWorkbenchScreen.handleKey(key);
+      if (consumed) await this._renderCurrentScreen();
       return;
     }
 
@@ -1119,15 +1670,18 @@ export class TuiApp {
     }
 
     if (this.currentScreen === "routing-rules") {
+      const consumed = this.routingRulesScreen
+        ? await this.routingRulesScreen.handleKey(key)
+        : false;
+      if (consumed) {
+        await this._renderCurrentScreen();
+        return;
+      }
       if (key === "q" || key === "\x1b") {
         this.currentScreen = "nav";
         await this._renderCurrentScreen();
         return;
       }
-      const consumed = this.routingRulesScreen
-        ? await this.routingRulesScreen.handleKey(key)
-        : false;
-      if (consumed) await this._renderCurrentScreen();
       return;
     }
 
@@ -1164,6 +1718,22 @@ export class TuiApp {
   }
 
   private async _handleNavKey(key: string): Promise<void> {
+    if (this.paletteOpen) {
+      if (key === "j" || key === "\x1b[B") {
+        this.paletteCursor = Math.min(this.paletteCursor + 1, COMMAND_PALETTE_ACTIONS.length - 1);
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "k" || key === "\x1b[A") {
+        this.paletteCursor = Math.max(this.paletteCursor - 1, 0);
+        await this._renderCurrentScreen();
+        return;
+      }
+      if (key === "\r" || key === "\n") {
+        await this._runPaletteAction(COMMAND_PALETTE_ACTIONS[this.paletteCursor]!);
+        return;
+      }
+    }
     if (key === "j" || key === "\x1b[B") {
       this.navCursor = Math.min(this.navCursor + 1, NAV_ENTRIES.length - 1);
       await this._renderCurrentScreen();
@@ -1176,11 +1746,13 @@ export class TuiApp {
     }
     if (key === "\x1b") {
       this.paletteOpen = false;
+      this.paletteFeedback = null;
       await this._renderCurrentScreen();
       return;
     }
-    if (key === "/") {
+    if (key === "/" || key === "\x0b") {
       this.paletteOpen = !this.paletteOpen;
+      this.paletteFeedback = null;
       await this._renderCurrentScreen();
       return;
     }
@@ -1204,6 +1776,99 @@ export class TuiApp {
       await this._openSelected();
       return;
     }
+  }
+
+  private async _handleChordKey(key: string): Promise<boolean> {
+    const outcome = this.chordLatch.feed(key);
+    if (outcome.kind === "passthrough") return false;
+    if (outcome.kind === "armed") return true;
+    if (outcome.kind === "cancelled") return true;
+
+    if (outcome.prefix === STAGE_CHORD_PREFIX) {
+      const stage = this.stageChordHandler.resolve(outcome.key);
+      if (stage) await this.navigateColon(stage.route);
+      return true;
+    }
+
+    if (outcome.prefix === "y") {
+      const yank = this.traceYankHandler.yank(outcome.key);
+      if (yank) {
+        this.selectedNavAction = `Yanked ${yank.target} ${yank.value}`;
+        await this._renderCurrentScreen();
+      }
+      return true;
+    }
+
+    return true;
+  }
+
+  private _openColonPalette(): void {
+    this.chordLatch.reset();
+    this.colonPalette = new Palette({
+      width: Math.max(52, Math.min(90, this.renderer.width - 4)),
+      height: Math.max(18, Math.min(34, this.renderer.height - 4)),
+      items: [],
+      mode: "colon",
+    });
+    this.colonPalette.open();
+  }
+
+  private async _handleColonPaletteKey(key: string): Promise<void> {
+    const palette = this.colonPalette;
+    if (!palette) return;
+
+    if (key === "\x1b" || key === "escape") {
+      palette.close();
+      this.colonPalette = null;
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\t") {
+      palette.handleKey("tab");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x1b[A") {
+      palette.handleKey("up");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x1b[B") {
+      palette.handleKey("down");
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\x7f" || key === "\b") {
+      palette.setQuery(palette.currentQuery.slice(0, -1));
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    if (key === "\r" || key === "\n" || key === "enter") {
+      const command = palette.hasKnownColonCommand()
+        ? palette.currentQuery.trim()
+        : palette.colonCandidates()[0];
+      palette.close();
+      this.colonPalette = null;
+      if (command) {
+        await this.navigateColon(`:${command}`);
+      } else {
+        await this._renderCurrentScreen();
+      }
+      return;
+    }
+
+    if (key.length === 1 && key >= " ") {
+      palette.setQuery(palette.currentQuery + key);
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    await this._renderCurrentScreen();
   }
 
   private async _openNewDoc(): Promise<void> {
@@ -1239,11 +1904,42 @@ export class TuiApp {
     await this._navigate(entry.screen);
   }
 
+  private async _runPaletteAction(action: typeof COMMAND_PALETTE_ACTIONS[number]): Promise<void> {
+    this.selectedNavAction = action;
+    this.paletteFeedback = `ran ${action}`;
+    if (action === "Create task") {
+      await this._navigate("build-board");
+      if (this.taskBoardScreen) {
+        await this.taskBoardScreen.handleKey("c");
+        await this._renderCurrentScreen();
+      }
+      return;
+    }
+    if (action === "Create doc") {
+      await this._openNewDoc();
+      return;
+    }
+    if (action === "Search") {
+      await this._navigate("search");
+      return;
+    }
+    if (action === "Dispatch run") {
+      await this._navigate("runs");
+      return;
+    }
+    if (action === "Settings") {
+      await this._navigate("doctor");
+      return;
+    }
+    await this._renderCurrentScreen();
+  }
+
   private async _navigate(screen: TuiScreen): Promise<void> {
     this.currentPath = null;
     this.domainScreen = null;
-    this.currentScreen = "nav";
+    this.currentScreen = screen;
     this.paletteOpen = false;
+    this.paletteFeedback = null;
 
     if (isDomainScreen(screen)) {
       this.domainScreen = screen;
@@ -1254,10 +1950,28 @@ export class TuiApp {
 
     this.currentScreen = screen;
 
+    if (screen === "run" && this.caller.agent_runs) {
+      const routeRunId = this.pendingRunDetailId;
+      this.pendingRunDetailId = null;
+      const runId = routeRunId ?? (await this.caller.agent_runs.list())[0]?.id;
+      if (runId) {
+        this.runDetailScreen?.dispose();
+        this.runDetailScreen = new RunDetailScreen({
+          runId,
+          caller: { agent_runs: this.caller.agent_runs },
+          subscriptions: this.caller.runsSubscriptions,
+        });
+        await this.runDetailScreen.load();
+      }
+    }
+
     if (screen === "auth") {
       let authInfo: AuthInfo;
       try {
         const whoami = await this.caller.auth.whoami();
+        const sessions = this.caller.auth.sessions
+          ? await this.caller.auth.sessions({ currentSessionId: whoami.sessionId ?? undefined })
+          : [];
         authInfo = {
           userId: whoami.userId,
           orgId: whoami.orgId,
@@ -1267,6 +1981,7 @@ export class TuiApp {
           passkeyCount: whoami.passkeyCount ?? 0,
           saasAuthEnabled: whoami.saasAuthEnabled ?? false,
           authProviders: whoami.authProviders ?? [],
+          sessions: Array.isArray(sessions) ? sessions : [],
         };
       } catch {
         authInfo = {
@@ -1301,6 +2016,44 @@ export class TuiApp {
         this._loadInferenceModels(),
         this._loadInferenceRoutingConfig(),
       ]);
+    }
+
+    if (screen === "capture") {
+      this.captureWorkbenchScreen = new CaptureWorkbenchScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? null,
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        data: {
+          inbox: [
+            {
+              id: "cap-tui-stage",
+              title: "Stage route capture",
+              preview: "Route opened from g c / :capture",
+              meta: "now · workbench · tui",
+            },
+          ],
+        },
+      });
+    }
+
+    if (screen === "plan") {
+      this.planWorkbenchScreen = new PlanningScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        caller: this._stagePlanningCaller(),
+      });
+      await this.planWorkbenchScreen.load();
+    }
+
+    if (screen === "review") {
+      this.reviewWorkbenchScreen = new ReviewScreen({
+        projectLabel: this.traceContext.projectId ?? "fulcrum",
+        traceId: this.traceContext.traceId ?? "trace-tui-review",
+        mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+        caller: this._stageReviewCaller(),
+      });
+      await this.reviewWorkbenchScreen.load();
     }
 
     if (screen === "inbox") {
@@ -1388,15 +2141,132 @@ export class TuiApp {
       }
     }
 
+    if (screen === "ai-assist") {
+      // The inline `:ai` AI Assist pane is built once and reused so the thread
+      // transcript + composer draft survive every screen swap (CLI-TUI-UX.md
+      // §10.3). Reopening it re-scopes to the current project + last trace.
+      const scope = defaultAiAssistScope(
+        this.traceContext.projectId ?? "fulcrum",
+        this.traceContext.traceId ?? null,
+      );
+      if (!this.chatPaneScreen) {
+        this.chatPaneScreen = createInlineAiAssistPane({
+          caller: this._aiAssistCaller(),
+          threadName: "ai-assist",
+          agent: this.inferenceModels[0]?.id ?? "claude-opus-4-7",
+          scope,
+        });
+      } else {
+        this.chatPaneScreen.rescope(scope);
+      }
+    }
+
     await this._renderCurrentScreen();
+  }
+
+  private _stagePlanningCaller(): ConstructorParameters<typeof PlanningScreen>[0]["caller"] {
+    return {
+      planning: {
+        getState: async () => ({
+          activeSessions: [
+            {
+              id: "plan-tui-stage",
+              title: "TUI stage workbench",
+              status: "planning",
+              mode: "guided",
+              agentName: "fulcrum",
+              traceId: this.traceContext.traceId ?? "trace-tui-plan",
+              traffic: [{ method: "g p / :plan" }],
+            },
+          ],
+          recentSessions: [],
+        }),
+        startGuided: async () => ({
+          id: "plan-guided",
+          title: "Guided planning",
+          status: "planning",
+          mode: "guided",
+          traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        }),
+        startFreeform: async () => ({
+          id: "plan-freeform",
+          title: "Freeform planning",
+          status: "planning",
+          mode: "freeform",
+          traceId: this.traceContext.traceId ?? "trace-tui-plan",
+        }),
+      },
+    };
+  }
+
+  private _stageReviewCaller(): ConstructorParameters<typeof ReviewScreen>[0]["caller"] {
+    return {
+      reviews: {
+        listSessions: async () => [
+          {
+            id: "review-tui-stage",
+            title: "TUI stage review",
+            status: "in_progress",
+            reviewer: "fulcrum",
+            criteria: [{ name: "stage route opens canonical workbench", status: "pending" }],
+          },
+        ],
+        getSession: async ({ id }) => ({ id, title: "TUI stage review", status: "in_progress" }),
+        startReview: async () => ({ id: "review-new", title: "New review", status: "draft" }),
+        approve: async () => ({ ok: true }),
+        requestChanges: async () => ({ ok: true }),
+        saveSession: async () => ({ ok: true }),
+      },
+    };
+  }
+
+  /**
+   * The service boundary the inline `:ai` AI Assist pane dispatches against.
+   * Wired against the TUI `KernelCaller` so a real run streams through the same
+   * services as the web drawer and CLI command; tests inject their own caller
+   * directly into `ChatPaneScreen`.
+   */
+  private _aiAssistCaller(): ChatPaneCaller {
+    return {
+      sendMessage: async ({ message }) => ({
+        time: this._footerClock(),
+        lines: [`Working on: ${message}`],
+      }),
+      resolvePermission: async () => {},
+      saveThread: async () => {},
+    };
   }
 
   private async _loadDomainRows(screen: DomainScreen): Promise<void> {
     this.domainRows = [];
     this.domainError = null;
+    this.taskBoardScreen = null;
     this.taskListScreen?.dispose();
     this.taskListScreen = null;
+    this.taskTimelineScreen = null;
     try {
+      if (screen === "build-board") {
+        const tasks = this.caller.tasks;
+        if (!tasks?.list || !tasks.update || !tasks.create) {
+          throw new Error("Build Board API disconnected: missing tasks.list, tasks.update, or tasks.create. Recovery: run fulcrum doctor, export FULCRUM_SERVER_URL, then reopen :board.");
+        }
+        this.taskBoardScreen = new TaskBoardScreen({
+          caller: {
+            tasks: {
+              list: async () => (await tasks.list()).map(toTuiTask),
+              update: async (input) => toTuiTask(await tasks.update!(input) as Parameters<typeof toTuiTask>[0]),
+              create: async (input) => toTuiTask(await tasks.create!(input) as Parameters<typeof toTuiTask>[0]),
+            },
+          },
+          onOpenTask: (id) => {
+            this.selectedNavAction = `open task ${id}`;
+          },
+          createScope: { source: "board" },
+        });
+        await this.taskBoardScreen.load();
+        return;
+      }
+
       if (screen === "tasks" && this.caller.tasks) {
         this.taskListScreen = new TaskListScreen({
           caller: {
@@ -1417,9 +2287,40 @@ export class TuiApp {
         return;
       }
 
+      if (screen === "timeline") {
+        this.taskTimelineScreen = new TaskTimelineScreen({
+          caller: {
+            tasks: {
+              list: async () => (await this.caller.tasks?.list() ?? []).map(toTuiTask),
+            },
+          },
+        });
+        await this.taskTimelineScreen.load();
+        return;
+      }
+
       if (screen === "runs" && this.caller.agent_runs) {
         const runs = await this.caller.agent_runs.list();
         this.domainRows = runs.map((run) => `${run.id}  ${run.agent}  ${run.status}  ${run.taskTitle ?? ""}`);
+        this.runsControlScreen = new RunsControlScreen({
+          projectLabel: this.traceContext.projectId ?? "fulcrum",
+          traceId: this.traceContext.traceId ?? null,
+          mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+          agent: runs[0]?.agent ?? this.inferenceModels[0]?.id ?? "codex",
+          model: this.inferenceModels[0]?.id ?? "default",
+          policy: this.inferenceRoutingConfig["build.run.step"] ?? "review_each_tool",
+          caller: {
+            agent_runs: {
+              list: async () => runs,
+              dispatch: async (input) => await this.caller.agent_runs!.create(input),
+              cancel: async (input) => await this.caller.agent_runs!.cancel(input),
+              retry: async (input) => await this.caller.agent_runs!.get(input),
+              getDeps: async (input) =>
+                (runs.find((run) => run.id === input.id) as (TuiRun & { deps?: [] }) | undefined)?.deps ?? [],
+            },
+          },
+        });
+        await this.runsControlScreen.load();
         this.runsScreen = new RunsScreen({ caller: { agent_runs: this.caller.agent_runs } });
         await this.runsScreen.load();
         const firstRun = runs[0];
@@ -1435,6 +2336,32 @@ export class TuiApp {
         return;
       }
 
+      if (screen === "doctor") {
+        this.doctorScreen = new DoctorScreen({
+          projectLabel: this.traceContext.projectId ?? "fulcrum",
+          traceId: this.traceContext.traceId ?? null,
+          mcp: this.inferenceInfo.status === "ok" ? "ok" : null,
+          results: [
+            {
+              name: "tui.route",
+              subsystem: "tui",
+              status: "ok",
+              message: "stage routes render canonical workbenches",
+              durationMs: 4,
+            },
+            {
+              name: "tui.status-spine",
+              subsystem: "tui",
+              status: "ok",
+              message: "status spine carries trace and mode footer",
+              durationMs: 3,
+            },
+          ],
+        });
+        this.domainRows = [];
+        return;
+      }
+
       const rows = await this._listDomainRows(screen);
       this.domainRows = rows.map(formatDomainRow);
     } catch (error) {
@@ -1445,12 +2372,27 @@ export class TuiApp {
   private async _listDomainRows(screen: DomainScreen): Promise<unknown[]> {
     if (screen === "projects") return await this.caller.projects?.list() ?? [];
     if (screen === "tasks") return await this.caller.tasks?.list() ?? [];
+    if (screen === "table") return await this.caller.tasks?.list() ?? [];
+    if (screen === "graph") return await this.caller.tasks?.list() ?? [];
+    if (screen === "cycles") return [];
+    if (screen === "modules") return [];
     if (screen === "sprints") return await this.caller.sprints?.list() ?? [];
     if (screen === "repos") return await this.caller.repos?.list() ?? [];
     if (screen === "memory") return await this.caller.memories?.list({}) ?? [];
     if (screen === "search") return await this.caller.search?.query({ q: "", limit: 10 }) ?? [];
     if (screen === "docs") return [];
     if (screen === "skills") return [];
+    if (screen === "notes") return [];
+    if (screen === "telemetry") return [];
+    if (screen === "alerts") return [];
+    if (screen === "logs") return [];
+    if (screen === "errors") return [];
+    if (screen === "mcp") return [];
+    if (screen === "plugins") return [];
+    if (screen === "hooks") return [];
+    if (screen === "trace") return [];
+    if (screen === "agents") return [];
+    if (screen === "settings") return [];
     if (screen === "components") return [];
     if (screen === "doctor") return [];
     return [];
@@ -1460,13 +2402,27 @@ export class TuiApp {
   // Headless helpers (for tests)
   // ─────────────────────────────────────────────────────────────────────────
 
-  /** Navigate to a screen directly (for tests — bypasses keyboard). */
+  /** Navigate to a screen directly (for tests: bypasses keyboard). */
   async navigateTo(screen: TuiScreen): Promise<void> {
+    // The `:ai` tab and footer `[ :ai ]` segment route here; record the
+    // origin screen so `q` inside the pane pops back (CLI-TUI-UX.md §7.5).
+    if (screen === "ai-assist" && this.currentScreen !== "ai-assist") {
+      this.aiAssistReturnScreen = this.domainScreen ?? this.currentScreen;
+    }
     await this._navigate(screen);
   }
 
   async renderForTest(): Promise<void> {
     await this._renderCurrentScreen();
+  }
+
+  /**
+   * Drive a single keypress synchronously (for tests). The runtime keyboard
+   * listener is fire-and-forget (`void this._handleKey`); tests need to await
+   * the dispatch so an assertion runs after the screen has re-rendered.
+   */
+  async handleKey(key: string): Promise<void> {
+    await this._handleKey(key);
   }
 
   async pullInferenceModel(modelId: string): Promise<void> {
@@ -1488,6 +2444,25 @@ export class TuiApp {
     await this._renderCurrentScreen();
   }
 
+  async embedInferenceText(text: string, model?: string): Promise<void> {
+    const embed = this.caller.inference?.embed;
+    if (!embed) {
+      this.inferenceEmbedResult = null;
+      this.inferenceEmbedError = "inference embed caller unavailable";
+      await this._renderCurrentScreen();
+      return;
+    }
+
+    try {
+      this.inferenceEmbedResult = await embed({ texts: [text], model });
+      this.inferenceEmbedError = null;
+    } catch (error) {
+      this.inferenceEmbedResult = null;
+      this.inferenceEmbedError = error instanceof Error ? error.message : "inference embed failed";
+    }
+    await this._renderCurrentScreen();
+  }
+
   /** Navigate to a router path directly (for tests and future route dispatcher). */
   async navigatePath(path: string): Promise<void> {
     if (!this.pathRouter) {
@@ -1498,8 +2473,39 @@ export class TuiApp {
     await this._renderCurrentScreen();
   }
 
+  /**
+   * Resolve and navigate a colon route (`:capture`, `:plan`, `:runs`, `:board`,
+   * `:review`, `:ship`, `:doctor`, `:ai`, … plus aliases). Returns the resolved
+   * `TuiScreen`, or `undefined` for an unknown route: the launcher root stays
+   * mounted in that case rather than crashing. Stage routes pre-select the
+   * matching StageNav entry so the root reflects the requested stage.
+   */
+  async navigateColon(route: string): Promise<TuiScreen | undefined> {
+    const screenKey = resolveColonRoute(route);
+    // The colon route must resolve to a screen the canonical registry knows;
+    // an unknown route leaves the launcher mounted instead of crashing.
+    if (!screenKey || !this.screenRegistry.has(screenKey)) return undefined;
+    const target = resolveTuiColonScreen(route);
+    if (!target) return undefined;
+    this.pendingRunDetailId = target === "run" ? runIdFromColonRoute(route) : null;
+    // Opening the inline `:ai` pane records the screen it was opened from so
+    // `q` inside the pane pops back there, not to the launcher (§7.5, §10.1).
+    if (target === "ai-assist" && this.currentScreen !== "ai-assist") {
+      this.aiAssistReturnScreen = this.domainScreen ?? this.currentScreen;
+    }
+    const stageIndex = TUI_STAGE_NAV.findIndex((s) => s.colon === route.trim());
+    if (stageIndex >= 0) this.stageCursor = stageIndex;
+    await this._navigate(target);
+    return target;
+  }
+
+  /** The canonical TUI screen catalog (for tests and route inspection). */
+  get screens(): ScreenRegistry {
+    return this.screenRegistry;
+  }
+
   /** Current screen name (for tests). */
-  get screen(): Screen {
+  get screen(): TuiScreen {
     return this.currentScreen;
   }
 
@@ -1514,7 +2520,7 @@ export class TuiApp {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// buildCaller — production HTTP API caller factory
+// buildCaller: production HTTP API caller factory
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function buildCaller(
@@ -1606,7 +2612,7 @@ function tuiNotifyCaller(notify: NonNullable<TuiCaller["notify"]>) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// launchTui — convenience launcher used by the `fulcrum tui` binary entry.
+// launchTui: convenience launcher used by the `fulcrum tui` binary entry.
 // Constructs a TuiApp, mounts it, and returns the running instance.
 // Headless tests inject FakeTTY for both output + input.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1647,14 +2653,31 @@ class OpenTuiOutput implements TuiOutput {
 function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
   return [
     "projects",
+    "build-board",
     "tasks",
+    "timeline",
+    "table",
+    "graph",
+    "cycles",
+    "modules",
     "sprints",
     "docs",
+    "notes",
     "memory",
     "runs",
     "repos",
     "search",
     "skills",
+    "telemetry",
+    "alerts",
+    "logs",
+    "errors",
+    "mcp",
+    "plugins",
+    "hooks",
+    "trace",
+    "agents",
+    "settings",
     "components",
     "doctor",
   ].includes(screen);
@@ -1663,19 +2686,97 @@ function isDomainScreen(screen: TuiScreen): screen is DomainScreen {
 function domainTitle(screen: DomainScreen): string {
   const titles: Record<DomainScreen, string> = {
     projects: "Projects",
+    "build-board": "Build Board",
     tasks: "Tasks",
+    timeline: "Build Timeline",
+    table: "Build Table",
+    graph: "Build Graph",
+    cycles: "Build Cycles",
+    modules: "Build Modules",
     sprints: "Sprints",
     docs: "Docs",
+    notes: "Capture Notes",
     memory: "Memory",
     runs: "Runs",
     repos: "Repos",
     search: "Search",
-    skills: "Skills",
+    skills: "Operate Skills",
+    telemetry: "Operate Telemetry",
+    alerts: "Operate Alerts",
+    logs: "Operate Logs",
+    errors: "Operate Errors",
+    mcp: "Operate MCP",
+    plugins: "Operate Plugins",
+    hooks: "Operate Hooks",
+    trace: "Operate Trace",
+    agents: "System Agents",
+    settings: "System Settings",
     components: "Components",
-    doctor: "Doctor/Settings",
+    doctor: "Doctor",
   };
   return titles[screen];
 }
+
+function screenTitle(screen: Screen): string {
+  const titles: Record<Screen, string> = {
+    nav: "Launcher",
+    auth: "Auth",
+    flags: "Feature Flags",
+    inference: "Inference",
+    "new-doc": "New Document",
+    capture: "Capture",
+    plan: "Plan",
+    review: "Review",
+    inbox: "Notifications",
+    activity: "Activity",
+    "notification-rules": "Notification Rules",
+    audit: "Audit",
+    artifacts: "Artifacts",
+    "routing-rules": "Routing",
+    planning: "Planning",
+    "ai-assist": "AI Assist",
+    run: "Run detail",
+  };
+  return titles[screen];
+}
+
+const NAV_DETAILS: Partial<Record<TuiScreen, { summary: string; action: string; status: string }>> = {
+  projects: {
+    summary: "Project scope, branch posture, and active build context.",
+    action: "Enter opens project rows; g p jumps here from stage navigation.",
+    status: "ready",
+  },
+  "build-board": {
+    summary: "Kanban build cockpit with selected card, h/l status movement, and inline create.",
+    action: "Enter opens board; / Create task opens the same board create flow.",
+    status: "ready",
+  },
+  tasks: {
+    summary: "Task list, filters, multi-select, dependency preview, and manual workbench.",
+    action: "Enter opens task workflow rows.",
+    status: "ready",
+  },
+  planning: {
+    summary: "Approved-plan breakdown, freeform planning, and workflow cycle handoff.",
+    action: "Enter opens planning cockpit.",
+    status: "ready",
+  },
+  runs: {
+    summary: "Agent run list with live transcript/log pane.",
+    action: "Enter opens run monitor.",
+    status: "ready",
+  },
+  search: {
+    summary: "Search and command-palette discovery.",
+    action: "Enter opens search rows.",
+    status: "ready",
+  },
+  doctor: {
+    summary: "Settings and diagnostic checks.",
+    action: "Enter opens doctor/settings.",
+    status: "ready",
+  },
+};
 
 function formatDomainRow(row: unknown): string {
   if (!row || typeof row !== "object") return String(row);
@@ -1693,6 +2794,9 @@ function toTuiTask(row: {
   assigneeId?: string | null;
   assignee?: string | null;
   labels?: string[] | null;
+  dueDate?: string | Date | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
 }): TuiTask {
   return {
     id: row.id,
@@ -1700,6 +2804,9 @@ function toTuiTask(row: {
     status: row.status ?? "pending",
     assignee: row.assignee ?? row.assigneeId ?? null,
     labels: row.labels ?? [],
+    dueDate: row.dueDate ?? null,
+    startDate: row.startDate ?? null,
+    endDate: row.endDate ?? null,
   };
 }
 

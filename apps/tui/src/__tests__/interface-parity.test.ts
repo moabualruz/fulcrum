@@ -1,10 +1,11 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 
 import { setTenantSetting } from "@platform-core/application/settings/commands.ts";
 import { createTask } from "@work-management/application/tasks/commands.ts";
 import { Session } from "@identity-access/infrastructure/database/entities/auth/Session.ts";
 import { createTestContainer, createTestOrm } from "@test-support/index.ts";
+import { destroyTestOrm } from "@test-support/application-database.ts";
 import { buildCaller } from "../index.ts";
 
 const RUNTIME_FILES = [
@@ -27,7 +28,7 @@ async function source(path: string): Promise<string> {
 
 async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Promise<void> {
   const em = db.em;
-  em.persist(em.create(Session, {
+  await em.save(em.create(Session, {
     id: `parity-${crypto.randomUUID()}`,
     userId: db.seed.userId,
     orgId: db.seed.orgId,
@@ -37,10 +38,13 @@ async function ensureSession(db: Awaited<ReturnType<typeof createTestOrm>>): Pro
     ipAddress: null,
     userAgent: "test",
   }));
-  /* flushed */
 }
 
 describe("interface TUI interface encapsulation", () => {
+  afterAll(async () => {
+    await destroyTestOrm();
+  });
+
   const persistenceImportPattern = new RegExp([
     `@mikro-${"orm"}/postgresql`,
     "db/db.module",

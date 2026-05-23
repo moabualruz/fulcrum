@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -70,8 +70,8 @@
                 <a href="/artifacts/{artifact.id}" class={cn("text-primary underline-offset-4 hover:underline")}>{artifact.title}</a>
               </td>
               <td class={cn("py-2")}>{artifact.kind}</td>
-              <td class={cn("py-2")}>{artifact.mime ?? "—"}</td>
-              <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "—"}</td>
+              <td class={cn("py-2")}>{artifact.mime ?? "-"}</td>
+              <td class={cn("py-2 text-right")}>{artifact.size != null ? artifact.size.toLocaleString() : "-"}</td>
               <td class={cn("py-2")}>{artifact.created_at.slice(0, 10)}</td>
             </tr>
           {/each}

@@ -17,6 +17,7 @@
  */
 
 import type { EntityManager } from "typeorm";
+import { randomUUID } from "node:crypto";
 import { Engine } from "json-rules-engine";
 
 import { ProjectAutomation } from "@work-management/infrastructure/database/entities/tasks/ProjectAutomation.ts";
@@ -183,6 +184,7 @@ export class WorkItemAutomationService {
     const config = automation.actionConfig as Record<string, unknown> | null ?? {};
 
     try {
+      let executed = false;
       switch (automation.actionType) {
         case "set_status": {
           const status = config["status"] as string | undefined;
@@ -191,6 +193,7 @@ export class WorkItemAutomationService {
               `update tasks set status = ?, updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [status, orgId, event.taskId],
             );
+            executed = true;
             // Re-evaluate in case chained automations trigger (depth + 1)
             await this.evaluate(
               { ...event, verb: "task.status_changed", payload: { ...event.payload, toStatus: status } },
@@ -216,6 +219,7 @@ export class WorkItemAutomationService {
                 [orgId, event.taskId],
               );
             }
+            executed = true;
           }
           break;
         }
@@ -227,6 +231,7 @@ export class WorkItemAutomationService {
               `update tasks set custom_fields = jsonb_set(coalesce(custom_fields, '{}'), '{label}', to_jsonb(?::text), true), updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [label, orgId, event.taskId],
             );
+            executed = true;
           }
           break;
         }
@@ -237,6 +242,7 @@ export class WorkItemAutomationService {
               `update tasks set custom_fields = custom_fields - 'label', updated_at = now() where org_id = ? and id = ? and deleted_at is null`,
               [orgId, event.taskId],
             );
+            executed = true;
           }
           break;
         }
@@ -248,6 +254,7 @@ export class WorkItemAutomationService {
           if (body && authorId && event.taskId) {
             const commentService = new WorkItemCommentService(this.em);
             await commentService.createComment(orgId, event.taskId, authorId, body);
+            executed = true;
           }
           break;
         }
@@ -257,6 +264,7 @@ export class WorkItemAutomationService {
           if (userId && event.taskId) {
             const commentService = new WorkItemCommentService(this.em);
             await commentService.subscribe(orgId, event.taskId, userId, "automation");
+            executed = true;
           }
           break;
         }
@@ -275,6 +283,7 @@ export class WorkItemAutomationService {
                 [orgId, event.taskId],
               );
             }
+            executed = true;
           }
           break;
         }
@@ -284,12 +293,48 @@ export class WorkItemAutomationService {
           return; // Don't increment executionCount for unknown actions
       }
 
+      if (executed) {
+        await this.recordExecutionAudit(automation, event, orgId, config);
+      }
+
       // Increment execution count
       automation.executionCount = (automation.executionCount ?? 0) + 1;
       automation.updatedAt = new Date();
       await this.em.save(automation);
     } catch (err) {
       console.error(`[WorkItemAutomationService] Action '${automation.actionType}' failed for automation '${automation.id}':`, err);
+    }
+  }
+
+  private async recordExecutionAudit(
+    automation: ProjectAutomation,
+    event: AutomationEvent,
+    orgId: string,
+    actionConfig: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.em.query(
+        `insert into audit_events (id, org_id, project_id, actor_id, action, subject_kind, subject_id, payload, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, now())`,
+        [
+          randomUUID(),
+          orgId,
+          event.projectId,
+          `automation:${automation.id}`,
+          "automation.executed",
+          "task",
+          event.taskId,
+          JSON.stringify({
+            automationId: automation.id,
+            triggerType: automation.triggerType,
+            actionType: automation.actionType,
+            actionConfig,
+            eventVerb: event.verb,
+          }),
+        ],
+      );
+    } catch (err) {
+      console.warn(`[WorkItemAutomationService] Audit write failed for automation '${automation.id}':`, err);
     }
   }
 

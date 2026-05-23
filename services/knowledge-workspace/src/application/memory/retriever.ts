@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Memory } from "@knowledge-workspace/infrastructure/database/entities/memory/Memory.ts";
 import { MEMORY_KINDS } from "@knowledge-workspace/infrastructure/database/entities/memory/enums.ts";
 import { MemoryRepository } from "@knowledge-workspace/infrastructure/database/repositories/memory/MemoryRepository.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { embedQuerySafe } from "./retrieval/sidecar.ts";
 import { rankMemoryMatchesHybrid } from "./retrieval/scoring.ts";
 import {

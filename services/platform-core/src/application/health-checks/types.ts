@@ -8,10 +8,14 @@ import { z } from "zod";
 export const CheckStatusSchema = z.enum(["ok", "warn", "fail"]);
 export type CheckStatus = z.infer<typeof CheckStatusSchema>;
 
+export const CheckSeveritySchema = z.enum(["info", "warning", "critical"]);
+export type CheckSeverity = z.infer<typeof CheckSeveritySchema>;
+
 export const DoctorCheckResultSchema = z.object({
   name: z.string(),
   subsystem: z.string(),
   status: CheckStatusSchema,
+  severity: CheckSeveritySchema.optional(),
   message: z.string(),
   /** Recovery guidance shown to user on warn/fail. */
   recovery: z.string().optional(),

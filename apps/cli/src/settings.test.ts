@@ -50,6 +50,52 @@ describe("CLI settings command", () => {
     expect(JSON.parse(output[0]!)).toEqual({ key: "theme", value: "light" });
   });
 
+  test("settings ai-assist get resolves user over org", async () => {
+    const { run } = await import("./settings.ts");
+    const output: string[] = [];
+    const rows = new Map<string, unknown>([
+      ["ai-assist.org", { value: JSON.stringify({ checkpointMode: "file", retentionDays: 60 }) }],
+      ["ai-assist.user.user-1", { value: JSON.stringify({ checkpointMode: "git" }) }],
+    ]);
+
+    await run(["ai-assist", "get", "--user", "user-1", "--json"], {
+      caller: { settings: { get: async ({ key }: { key: string }) => rows.get(key) ?? null } },
+      print: (line: string) => output.push(line),
+      printErr: () => {},
+      exit: () => {},
+    } as never);
+
+    const parsed = JSON.parse(output[0]!);
+    expect(parsed.checkpointMode).toEqual({ value: "git", source: "user" });
+    expect(parsed.retentionDays).toEqual({ value: 60, source: "org" });
+  });
+
+  test("settings ai-assist set writes scoped preference", async () => {
+    const { run } = await import("./settings.ts");
+    const writes: unknown[] = [];
+    const output: string[] = [];
+
+    await run(["ai-assist", "set", "eventsTransport", "db-outbox", "--scope", "user", "--user", "user-1", "--json"], {
+      caller: {
+        settings: {
+          get: async () => null,
+          set: async (input: { key: string; value: string }) => {
+            writes.push(input);
+            return input;
+          },
+        },
+      },
+      print: (line: string) => output.push(line),
+      printErr: () => {},
+      exit: () => {},
+    } as never);
+
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ key: "ai-assist.user.user-1" });
+    expect(JSON.parse((writes[0] as { value: string }).value).eventsTransport).toBe("db-outbox");
+    expect(JSON.parse(output[0]!).eventsTransport).toBe("db-outbox");
+  });
+
   test("settings list/get/set route through the configured public API", async () => {
     const { run } = await import("./settings.ts");
     const calls: Array<{ url: string; init: RequestInit }> = [];
@@ -108,6 +154,83 @@ describe("CLI settings command", () => {
       printErr: () => {},
       exit: (code: number) => exits.push(code),
     } as never);
+    expect(exits).toEqual([2]);
+  });
+
+  test("settings ai-assist get resolves layered values with sources", async () => {
+    const { run } = await import("./settings.ts");
+    const output: string[] = [];
+    const store = new Map<string, string>([
+      ["ai-assist.org", JSON.stringify({ checkpointMode: "file", retentionCount: 50 })],
+      ["ai-assist.user.u1", JSON.stringify({ checkpointMode: "git" })],
+    ]);
+    await run(["ai-assist", "get", "--user", "u1", "--json"], {
+      caller: {
+        settings: {
+          get: async ({ key }: { key: string }) => store.has(key) ? { key, value: store.get(key) } : null,
+          set: async () => ({}),
+          list: async () => [],
+        },
+      },
+      print: (line: string) => output.push(line),
+      printErr: () => {},
+      exit: () => {},
+    } as never);
+    const parsed = JSON.parse(output[0]!);
+    expect(parsed.checkpointMode).toEqual({ value: "git", source: "user" });
+    expect(parsed.retentionCount).toEqual({ value: 50, source: "org" });
+    expect(parsed.eventsTransport).toEqual({ value: "memory", source: "default" });
+  });
+
+  test("settings ai-assist set --scope org writes a stringified payload", async () => {
+    const { run } = await import("./settings.ts");
+    const writes: Array<{ key: string; value: string }> = [];
+    const output: string[] = [];
+    await run(
+      ["ai-assist", "set", "checkpointMode", "git", "--scope", "org", "--json"],
+      {
+        caller: {
+          settings: {
+            get: async () => null,
+            set: async (input: { key: string; value: string }) => {
+              writes.push(input);
+              return input;
+            },
+            list: async () => [],
+          },
+        },
+        print: (line: string) => output.push(line),
+        printErr: () => {},
+        exit: () => {},
+      } as never,
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.key).toBe("ai-assist.org");
+    const parsed = JSON.parse(writes[0]!.value);
+    expect(parsed.checkpointMode).toBe("git");
+    const out = JSON.parse(output[0]!);
+    expect(out.checkpointMode).toBe("git");
+  });
+
+  test("settings ai-assist set --scope user requires --user", async () => {
+    const { run } = await import("./settings.ts");
+    const exits: number[] = [];
+    await run(
+      ["ai-assist", "set", "checkpointMode", "git", "--scope", "user"],
+      {
+        caller: {
+          settings: {
+            get: async () => null,
+            set: async () => ({}),
+            list: async () => [],
+          },
+        },
+        env: {},
+        print: () => {},
+        printErr: () => {},
+        exit: (code: number) => exits.push(code),
+      } as never,
+    );
     expect(exits).toEqual([2]);
   });
 });

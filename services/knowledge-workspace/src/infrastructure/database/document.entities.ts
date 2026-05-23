@@ -99,6 +99,18 @@ export interface KnowledgeWorkspaceSavedSearch {
   updatedAt?: Date;
 }
 
+export interface KnowledgeWorkspaceSearchClick {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  projectId: string | null;
+  query: string;
+  resultId: string;
+  resultKind: string;
+  position: number | null;
+  createdAt?: Date;
+}
+
 const timestampColumns = {
   createdAt: {
     name: "created_at",
@@ -291,6 +303,26 @@ export const KnowledgeWorkspaceSavedSearchEntity = new EntitySchema<KnowledgeWor
   ],
 });
 
+export const KnowledgeWorkspaceSearchClickEntity = new EntitySchema<KnowledgeWorkspaceSearchClick>({
+  name: "KnowledgeWorkspaceSearchClick",
+  tableName: "fulcrum_search_clicks",
+  columns: {
+    id: { type: "varchar", length: 128, primary: true },
+    workspaceId: { name: "workspace_id", type: "varchar", length: 128 },
+    userId: { name: "user_id", type: "varchar", length: 128 },
+    projectId: { name: "project_id", type: "varchar", length: 128, nullable: true },
+    query: { type: "text" },
+    resultId: { name: "result_id", type: "varchar", length: 128 },
+    resultKind: { name: "result_kind", type: "varchar", length: 80 },
+    position: { type: "integer", nullable: true },
+    ...createdAtColumn,
+  },
+  indices: [
+    { name: "fulcrum_search_clicks_workspace_user_idx", columns: ["workspaceId", "userId"] },
+    { name: "fulcrum_search_clicks_workspace_project_idx", columns: ["workspaceId", "projectId"] },
+  ],
+});
+
 export const KNOWLEDGE_WORKSPACE_ENTITIES = [
   KnowledgeWorkspacePageEntity,
   KnowledgeWorkspacePageHistoryEntity,
@@ -300,4 +332,5 @@ export const KNOWLEDGE_WORKSPACE_ENTITIES = [
   KnowledgeWorkspaceCollaborationStateEntity,
   KnowledgeWorkspaceSearchEntryEntity,
   KnowledgeWorkspaceSavedSearchEntity,
+  KnowledgeWorkspaceSearchClickEntity,
 ];

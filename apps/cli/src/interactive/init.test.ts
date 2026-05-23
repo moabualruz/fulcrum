@@ -1,4 +1,4 @@
-// Tests for `fulcrum init` interactive flow — org + admin@local user seeding.
+// Tests for `fulcrum init` interactive flow: org + admin@local user seeding.
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -15,7 +15,7 @@ async function freshDb(): Promise<{ db: TestStore; dir: string }> {
   return { db, dir };
 }
 
-describe("interactive init — seed org + admin@local", () => {
+describe("interactive init: seed org + admin@local", () => {
   let db: TestStore;
   let dir: string;
 
@@ -42,7 +42,7 @@ describe("interactive init — seed org + admin@local", () => {
     expect(users[0]!.handle).toBe("admin@local");
   });
 
-  test("idempotent — second run exits 0, single org + user row", async () => {
+  test("idempotent: second run exits 0, single org + user row", async () => {
     const { seedOrgAndAdmin } = await import("./init.ts");
     const r1 = await seedOrgAndAdmin(db);
     expect(r1.created).toBe(true);
@@ -59,7 +59,7 @@ describe("interactive init — seed org + admin@local", () => {
 
   test("--non-interactive exits with code 7 when prompt would appear", async () => {
     const { runInteractiveInit } = await import("./init.ts");
-    // nonInteractive mode with no existing org — should throw INTERACTIVE_REQUIRED
+    // nonInteractive mode with no existing org: should throw INTERACTIVE_REQUIRED
     try {
       await runInteractiveInit(db, { nonInteractive: true });
       // If no prompt needed (org exists), it should succeed silently.
@@ -75,7 +75,7 @@ describe("interactive init — seed org + admin@local", () => {
     const { seedOrgAndAdmin, runInteractiveInit } = await import("./init.ts");
     await seedOrgAndAdmin(db);
 
-    // No prompt needed — should succeed.
+    // No prompt needed: should succeed.
     await runInteractiveInit(db, { nonInteractive: true });
     // No throw = pass.
   });

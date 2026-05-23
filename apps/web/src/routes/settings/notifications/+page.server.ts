@@ -30,11 +30,15 @@ function retainDaysOf(policy: RetentionPolicyResponse | null | undefined, fallba
 }
 
 export const load: PageServerLoad = async (event) => {
-  const publicPolicy = await createRetentionPolicyApi(event as RetentionPolicyEvent).retentionPolicy.get();
-  return {
-    retainDays: retainDaysOf(publicPolicy),
-    saved: false,
-  };
+  try {
+    const publicPolicy = await createRetentionPolicyApi(event as RetentionPolicyEvent).retentionPolicy.get();
+    return {
+      retainDays: retainDaysOf(publicPolicy),
+      saved: false,
+    };
+  } catch {
+    return { retainDays: 0, saved: false };
+  }
 };
 
 export const actions: Actions = {

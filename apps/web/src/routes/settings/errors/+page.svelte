@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props { data: PageData }
@@ -32,7 +32,7 @@
         class={cn("ml-1 border-input bg-background h-8 rounded-md border px-2 text-xs")} />
     </label>
     <button type="submit" data-clear-before-btn disabled={!clearBefore}
-      class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}>Clear</button>
+      class={cn(buttonVariants({ variant: "danger", size: "sm" }))}>Clear</button>
   </form>
 </header>
 
@@ -78,8 +78,8 @@
                   </details>
                 {/if}
               </td>
-              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.os ?? "—"}</td>
-              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.version ?? "—"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.os ?? "-"}</td>
+              <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.version ?? "-"}</td>
               <td class={cn("p-2 align-top text-xs text-muted-foreground")}>{err.occurred_at.slice(0, 16)}</td>
             </tr>
           {/each}

@@ -20,7 +20,13 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 import { DEFAULT_ADMIN_PASSWORD } from "@platform-core/infrastructure/application-database/seed.ts";
 import { AuthService } from "@identity-access/application/auth/index.ts";
 import { TypeOrmBetterAuthAdapter } from "@identity-access/application/auth/adapter.ts";
+import { applicationMigrations, getCoreEntities } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
+import {
+  buildFulcrumTypeOrmOptions,
+  createFulcrumTypeOrmDataSource,
+} from "@platform-core/infrastructure/database/typeorm-data-source.ts";
 import { createTestOrm, type TestOrm } from "@test-support/application-database.ts";
+import { startTemporaryPostgres } from "@test-support/temporary-postgres.ts";
 
 let db: TestOrm;
 let authService: AuthService;
@@ -332,6 +338,108 @@ describe("TypeOrmBetterAuthAdapter", () => {
       model: "rateLimit",
       where: [{ field: "bucket", operator: "not_in", value: ["missing"], connector: "AND", mode: "sensitive" }],
     })).toBe(2);
+  });
+
+  it("uses TypeORM find operators for DB-backed Better Auth filters", async () => {
+    const adapter = new TypeOrmBetterAuthAdapter(db.em).createAdapter() as any;
+    const emailPrefix = `adapter-filter-${crypto.randomUUID()}`;
+    const user = await adapter.create({
+      model: "user",
+      data: { email: `${emailPrefix}@example.com`, name: "Filter User" },
+    });
+    const account = await adapter.create({
+      model: "account",
+      data: {
+        userId: user.id,
+        providerId: "github",
+        accountId: `gh-${crypto.randomUUID()}`,
+        scope: "repo,user",
+      },
+    });
+
+    expect(await adapter.findOne({
+      model: "account",
+      where: [
+        { field: "accountId", operator: "eq", value: account.accountId, connector: "AND", mode: "sensitive" },
+        { field: "providerId", operator: "ne", value: "google", connector: "AND", mode: "sensitive" },
+      ],
+    })).toMatchObject({ id: account.id });
+    expect(await adapter.findMany({
+      model: "user",
+      where: [{ field: "email", operator: "starts_with", value: emailPrefix, connector: "AND", mode: "sensitive" }],
+      limit: 10,
+    })).toContainEqual(expect.objectContaining({ id: user.id }));
+    expect(await adapter.count({
+      model: "account",
+      where: [{ field: "id", operator: "in", value: [account.id], connector: "AND", mode: "sensitive" }],
+    })).toBe(1);
+  });
+
+  it("round-trips auth tables through the same adapter on PostgreSQL", async () => {
+    const postgres = await startTemporaryPostgres();
+    const dataSource = createFulcrumTypeOrmDataSource(
+      buildFulcrumTypeOrmOptions({
+        source: "postgres",
+        url: postgres.url,
+        entities: getCoreEntities(),
+        migrations: applicationMigrations,
+      }),
+    );
+
+    try {
+      await dataSource.initialize();
+      await dataSource.runMigrations({ transaction: "none" });
+      const adapter = new TypeOrmBetterAuthAdapter(dataSource.manager).createAdapter() as any;
+      const user = await adapter.create({
+        model: "user",
+        data: {
+          email: `postgres-adapter-${crypto.randomUUID()}@example.com`,
+          name: "PostgreSQL Adapter",
+          role: "owner",
+        },
+      });
+      const session = await adapter.create({
+        model: "session",
+        data: {
+          token: `pg-session-${crypto.randomUUID()}`,
+          userId: user.id,
+          activeOrganizationId: user.orgId,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+      const account = await adapter.create({
+        model: "account",
+        data: {
+          userId: user.id,
+          providerId: "github",
+          accountId: `pg-gh-${crypto.randomUUID()}`,
+        },
+      });
+      const verification = await adapter.create({
+        model: "verification",
+        data: {
+          identifier: `pg-verification-${crypto.randomUUID()}`,
+          value: "code",
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+
+      expect(await adapter.findOne({
+        model: "session",
+        where: [{ field: "token", operator: "eq", value: session.token, connector: "AND", mode: "sensitive" }],
+      })).toMatchObject({ token: session.token, userId: user.id });
+      expect(await adapter.findOne({
+        model: "account",
+        where: [{ field: "id", operator: "eq", value: account.id, connector: "AND", mode: "sensitive" }],
+      })).toMatchObject({ providerId: "github" });
+      expect(await adapter.findOne({
+        model: "verification",
+        where: [{ field: "id", operator: "eq", value: verification.id, connector: "AND", mode: "sensitive" }],
+      })).toMatchObject({ value: "code" });
+    } finally {
+      if (dataSource.isInitialized) await dataSource.destroy();
+      await postgres.stop();
+    }
   });
 });
 

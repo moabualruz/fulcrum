@@ -45,6 +45,13 @@ describe("skill supply public Nest API", () => {
     expect(Reflect.getMetadata(METHOD_METADATA, SkillSupplyPublicApiController.prototype.list)).toBe(RequestMethod.GET);
     expect(Reflect.getMetadata(METHOD_METADATA, SkillSupplyPublicApiController.prototype.registryList)).toBe(RequestMethod.GET);
     expect(Reflect.getMetadata(METHOD_METADATA, SkillSupplyPublicApiController.prototype.install)).toBe(RequestMethod.POST);
+    expect(Reflect.getMetadata(METHOD_METADATA, SkillSupplyPublicApiController.prototype.sync)).toBe(RequestMethod.POST);
+    expect(Reflect.getMetadata("swagger/apiResponse", SkillSupplyPublicApiController.prototype.sync)).toMatchObject({
+      "400": { description: "Invalid request - Check request schema" },
+      "401": { description: "Unauthorized - Reauthenticate" },
+      "403": { description: "Forbidden - Check permissions" },
+      "404": { description: "Not found - Verify resource exists" },
+    });
     expect(Reflect.getMetadata(METHOD_METADATA, SkillSupplyPublicApiController.prototype.uninstall)).toBe(RequestMethod.DELETE);
   });
 
@@ -100,11 +107,15 @@ describe("skill supply public Nest API", () => {
       actualSha256: "manual-hash",
       auditNote: "approved",
     })).resolves.toEqual({ ok: true });
-    await expect(controller.sync({ fetchUpstream: true })).resolves.toEqual({
+    const syncResult = await controller.sync({ fetchUpstream: true });
+    expect(syncResult).toMatchObject({
+      ok: true,
       merged: [],
       conflicts: [],
       errors: ["Upstream skill fetch is pending the TypeORM skill-supply service migration."],
     });
+    expect(syncResult.trace_id).toStartWith("trace-skills-sync-");
+    await expect(controller.sync()).resolves.toMatchObject({ ok: true, errors: [] });
     await expect(controller.uninstall("reviewer")).resolves.toEqual({ ok: true, slug: "reviewer" });
     await expect(controller.uninstall("reviewer")).rejects.toBeInstanceOf(NotFoundException);
   });

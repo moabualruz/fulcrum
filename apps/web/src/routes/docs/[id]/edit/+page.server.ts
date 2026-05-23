@@ -4,14 +4,13 @@ import { valibot } from "sveltekit-superforms/adapters";
 import { DocumentFormSchema } from "../../../../lib/server/documents.schema.ts";
 import { parseLabels, serializeLabels } from "../../../../lib/markdown/labels.ts";
 import { createDocumentApiForEvent } from "$lib/server/document-api";
-import { requestAppScope } from "$lib/server/application-scope";
 
 interface LoadEvent {
   params: { id: string };
-  locals?: App.Locals;
-  fetch?: typeof fetch;
-  request?: Request;
-  url?: URL;
+  locals: App.Locals;
+  fetch: typeof fetch;
+  request: Request;
+  url: URL;
 }
 
 interface ActionEvent {
@@ -43,27 +42,7 @@ function extractLabels(fm: Record<string, unknown>): string[] {
 
 export const load = async (event: LoadEvent) => {
   const { params } = event;
-  const serverUrl = process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"];
-
-  let publicDoc: PublicDocument;
-  if (serverUrl && event.url && event.request) {
-    // HTTP path: delegate to document API (production mode).
-    publicDoc = await createDocumentApiForEvent(event as Required<LoadEvent>).docs.get({ id: params.id }).catch(mapNotFound) as PublicDocument;
-  } else {
-    // Local/in-process path: query DB directly via application scope.
-    const { em, ctx } = await requestAppScope(event.locals);
-    const { getDoc } = await import("@knowledge-workspace/application/docs/queries.ts");
-    const raw = await getDoc(em, ctx, params.id).catch(mapNotFound);
-    if (!raw) throw mapNotFound(new Error("Document not found"));
-    publicDoc = {
-      id: raw.id,
-      projectId: raw.projectId ?? null,
-      docType: raw.docType,
-      title: raw.title,
-      bodyMd: raw.bodyMd ?? "",
-      frontmatter: raw.frontmatter ?? {},
-    };
-  }
+  const publicDoc = await createDocumentApiForEvent(event).docs.get({ id: params.id }).catch(mapNotFound) as PublicDocument;
 
   const doc = toEditableDocument(publicDoc);
   const form = await superValidate(
@@ -101,7 +80,9 @@ export const actions = {
 
 function mapNotFound(errorValue: unknown): never {
   const message = errorValue instanceof Error ? errorValue.message : String(errorValue);
-  if (/not found/i.test(message)) throw error(404, "Document not found");
+  if (/not found|invalid input syntax for type uuid/i.test(message)) {
+    throw error(404, "Document not found");
+  }
   throw errorValue;
 }
 

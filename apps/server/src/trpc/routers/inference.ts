@@ -28,7 +28,7 @@ import {
   setRoutingConfig,
 } from "@platform-core/application/inference/routing-config.ts";
 import { INFERENCE_CLIENT_TOKEN } from "@platform-core/application/inference/tokens.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { t, publicProcedure } from "@fulcrum/server/trpc/trpc.ts";
 import { permissionedProcedure } from "@fulcrum/server/trpc/middleware.ts";
 import type { TRPCContext } from "@fulcrum/server/trpc/context.ts";
@@ -194,6 +194,16 @@ const SetProviderInputSchema = z.object({
   key: z.string().min(1),
 });
 
+const ProviderSetResultSchema = z.object({
+  ok: z.boolean(),
+  url: z.string().url(),
+  credentialRef: z.object({
+    kind: z.literal("env"),
+    name: z.literal("FULCRUM_INFERENCE_API_KEY"),
+    redacted: z.literal(true),
+  }),
+});
+
 const BackendProbeResultSchema = z.object({
   ok: z.boolean(),
   model: z.string().optional(),
@@ -337,12 +347,20 @@ export const inferenceRouter = t.router({
 
     set: permissionedProcedure({ resource: "inference", action: "set" })
       .input(SetProviderInputSchema)
-      .output(z.object({ ok: z.boolean() }))
+      .output(ProviderSetResultSchema)
       .mutation(async ({ ctx, input }) => {
         // Persist URL + key to config store (env var override path documented in issue)
         process.env["FULCRUM_INFERENCE_URL"] = input.url;
         process.env["FULCRUM_INFERENCE_API_KEY"] = input.key;
-        return { ok: true };
+        return {
+          ok: true,
+          url: input.url,
+          credentialRef: {
+            kind: "env",
+            name: "FULCRUM_INFERENCE_API_KEY",
+            redacted: true,
+          },
+        };
       }),
   }),
 });

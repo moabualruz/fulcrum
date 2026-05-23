@@ -1,8 +1,10 @@
 import { describe, test, expect, afterEach } from "bun:test";
 
-// Tests for public-api gate on settings/api page.
+// Tests for the public-api gate on the settings/api page. `isPublicApiEnabled`
+// was extracted to `@fulcrum/server/api/feature-flags.ts`; the route imports
+// it from there rather than re-exporting it, so the test imports it directly.
 
-describe("/settings/api — isPublicApiEnabled() and load()", () => {
+describe("/settings/api: isPublicApiEnabled() and load()", () => {
   const orig = process.env["FULCRUM_FEATURES"];
 
   afterEach(() => {
@@ -12,20 +14,20 @@ describe("/settings/api — isPublicApiEnabled() and load()", () => {
 
   test("isPublicApiEnabled OFF by default", async () => {
     delete process.env["FULCRUM_FEATURES"];
-    const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isPublicApiEnabled()).toBe(false);
+    const { isPublicApiEnabled } = await import(`@fulcrum/server/api/feature-flags.ts?t=${Date.now()}`);
+    expect(isPublicApiEnabled()).toBe(false);
   });
 
   test("isPublicApiEnabled ON when FULCRUM_FEATURES=public-api", async () => {
     process.env["FULCRUM_FEATURES"] = "public-api";
-    const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isPublicApiEnabled()).toBe(true);
+    const { isPublicApiEnabled } = await import(`@fulcrum/server/api/feature-flags.ts?t=${Date.now()}`);
+    expect(isPublicApiEnabled()).toBe(true);
   });
 
   test("isPublicApiEnabled ON when mixed with other flags", async () => {
     process.env["FULCRUM_FEATURES"] = "saas-auth,public-api,notify-webhook";
-    const mod = await import(`./+page.server.ts?t=${Date.now()}`);
-    expect(mod.isPublicApiEnabled()).toBe(true);
+    const { isPublicApiEnabled } = await import(`@fulcrum/server/api/feature-flags.ts?t=${Date.now()}`);
+    expect(isPublicApiEnabled()).toBe(true);
   });
 
   test("load throws 404 when public-api OFF (with session)", async () => {

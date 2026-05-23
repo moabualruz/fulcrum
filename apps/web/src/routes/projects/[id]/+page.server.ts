@@ -7,10 +7,10 @@ import { superValidate } from "sveltekit-superforms/server";
 import { valibot } from "sveltekit-superforms/adapters";
 import * as v from "valibot";
 import type { Actions, PageServerLoad } from "./$types";
-import { deleteProject, loadProjectOverview, updateProject } from "@work-management/interface/project-lifecycle.ts";
-import { requestProjectScope } from "../project-request-scope";
+import { createProjectApiForEvent } from "$lib/server/project-api";
+import { ProjectApiError } from "@work-management/interface/http/project-api-client";
 
-// Detail-page rename uses a narrower schema than `ProjectFormSchema` — slug
+// Detail-page rename uses a narrower schema than `ProjectFormSchema`: slug
 // is immutable post-create (it's the URL-stable identifier baked into events
 // + cookies); only `name` and `description` are editable here.
 const RenameSchema = v.object({
@@ -25,15 +25,18 @@ const RenameSchema = v.object({
   ),
 });
 
-// PGlite returns timestamp columns as JS `Date` values; the page expects an
-// ISO string so the `formatUpdated` helper can `slice()` it deterministically
-// across timezones — convert at the boundary.
+interface ProjectOverview {
+  project: { id: string; slug: string; name: string; description: string | null; updated_at: string };
+  summary: { openTasks: number; inProgress: number; done: number; sprintDaysRemaining: number };
+}
+
 // Note: this loader is intentionally NOT wrapped in SvelteKit's `streamed`
 // pattern even though the rest of the detail routes are. The rename `<form>`
 // is built via `superValidate` *from* the loaded row's defaults, so the
-// initial form state is downstream of the DB read — there's no useful
+// initial form state is downstream of the read: there's no useful
 // header-paints-before-data window to gain by streaming this one row.
-export const load: PageServerLoad = async ({ params, parent, locals }) => {
+export const load: PageServerLoad = async (event) => {
+  const { params, parent } = event;
   // Inherit `activeProjectId` from the root layout-data so the
   // `<SetActiveButton />` next to the heading can render its toggle state
   // without an extra round-trip. Tests for this loader don't supply
@@ -42,8 +45,12 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
     typeof parent === "function"
       ? await parent()
       : ({ activeProjectId: null } as { activeProjectId: string | null });
-  const { em, ctx } = await requestProjectScope(locals, params.id);
-  const data = await loadProjectOverview(em, ctx, params.id);
+  const data = (await createProjectApiForEvent(event)
+    .projects.overview({ id: params.id! })
+    .catch((cause: unknown) => {
+      if (cause instanceof ProjectApiError && cause.status === 404) throw error(404, "Project not found");
+      throw cause;
+    })) as ProjectOverview | null;
   if (!data) throw error(404, "Project not found");
   const form = await superValidate(
     { name: data.project.name, description: data.project.description ?? "" },
@@ -57,20 +64,18 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
 };
 
 export const actions: Actions = {
-  rename: async ({ params, request, locals }) => {
-    const form = await superValidate(request, valibot(RenameSchema));
+  rename: async (event) => {
+    const form = await superValidate(event.request, valibot(RenameSchema));
     if (!form.valid) return fail(400, { form });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await updateProject(em, ctx, {
-        id: params.id!,
-        name: form.data.name,
-        description: form.data.description ?? null,
-      });
+    await createProjectApiForEvent(event).projects.update({
+      id: event.params.id!,
+      name: form.data.name,
+      description: form.data.description ?? null,
+    });
     return { form };
   },
-  delete: async ({ params, locals }) => {
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await deleteProject(em, ctx, params.id!);
+  delete: async (event) => {
+    await createProjectApiForEvent(event).projects.delete({ id: event.params.id! });
     throw redirect(303, "/projects");
   },
 };

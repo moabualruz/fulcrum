@@ -114,6 +114,7 @@ export const DownloadArtifactOutputSchema = z.object({
 export const DeleteArtifactInputSchema = z.object({
   id: UuidSchema.describe("Artifact identifier."),
   hard: z.boolean().optional().default(false).describe("Hard-delete: remove from disk + DB row."),
+  confirm: z.string().optional().describe("Required confirmation token for hard delete; must match artifact identifier."),
 });
 
 export const DeleteArtifactOutputSchema = z.object({

@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PageData, ActionData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import { toast } from "svelte-sonner";
 
@@ -64,7 +64,7 @@
     };
   }}>
     <button type="submit" data-create-backup disabled={creating}
-      class={cn(buttonVariants({ variant: "default" }))}>
+      class={cn(buttonVariants({ variant: "primary" }))}>
       {creating ? "Creating…" : "Create backup"}
     </button>
   </form>
@@ -76,7 +76,7 @@
     {#if pollStatus === "pending"}
       <span>Creating backup…</span>
     {:else if pollStatus === "complete"}
-      <span data-backup-complete>Backup ready —</span>
+      <span data-backup-complete>Backup ready -</span>
       <a href="/api/backups/{createdId}/download" download data-download-link
         class={cn(buttonVariants({ variant: "link", size: "sm" }), "p-0 h-auto")}>Download</a>
     {:else}
@@ -95,7 +95,7 @@
         class={cn("text-sm")}
         onchange={(e) => { restoreFile = (e.currentTarget as HTMLInputElement).files?.[0] ?? null; }} />
       <button type="submit" data-restore-submit disabled={!restoreFile}
-        class={cn(buttonVariants({ variant: "default" }))}>Preflight check</button>
+        class={cn(buttonVariants({ variant: "primary" }))}>Preflight check</button>
       <button type="submit" data-backup-verify disabled={!restoreFile}
         class={cn(buttonVariants({ variant: "secondary" }))}>Verify backup</button>
     </div>
@@ -120,7 +120,7 @@
         <button onclick={() => { confirmOpen = false; }} class={cn(buttonVariants({ variant: "ghost" }))}>Cancel</button>
         <form method="POST" action="?/confirmRestore" use:enhance>
           <input type="hidden" name="entityCounts" value={JSON.stringify(preflightCounts)} />
-          <button type="submit" data-confirm-restore class={cn(buttonVariants({ variant: "default" }))}>Confirm restore</button>
+          <button type="submit" data-confirm-restore class={cn(buttonVariants({ variant: "primary" }))}>Confirm restore</button>
         </form>
       </div>
     </div>
@@ -153,7 +153,7 @@
               <td class={cn("p-2 align-middle font-mono text-xs")}>{backup.id.slice(0, 8)}</td>
               <td class={cn("p-2 align-middle")}>{backup.status}</td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>
-                {backup.size_bytes ? `${(backup.size_bytes / 1024).toFixed(1)} KB` : "—"}
+                {backup.size_bytes ? `${(backup.size_bytes / 1024).toFixed(1)} KB` : "-"}
               </td>
               <td class={cn("p-2 align-middle text-xs text-muted-foreground")}>{backup.created_at.slice(0, 16)}</td>
             </tr>

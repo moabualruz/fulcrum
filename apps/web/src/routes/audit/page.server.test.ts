@@ -99,6 +99,26 @@ describe("/audit +page.server.ts load()", () => {
     expect((thrown as { status?: number })?.status).toBe(502);
   });
 
+  test("uses FULCRUM_API_URL for the backend during real E2E", async () => {
+    const previous = process.env["FULCRUM_API_URL"];
+    process.env["FULCRUM_API_URL"] = "http://127.0.0.1:3100";
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return Response.json({ data: [], total: 0 });
+    }) as typeof globalThis.fetch;
+
+    try {
+      const mod = await import(`./+page.server.ts?audit-api-url=${Date.now()}`);
+      await mod.load(loadEvent(fetch) as never);
+    } finally {
+      if (previous === undefined) delete process.env["FULCRUM_API_URL"];
+      else process.env["FULCRUM_API_URL"] = previous;
+    }
+
+    expect(calls[0]?.url).toBe("http://127.0.0.1:3100/api/v1/audit?orgId=org-1&limit=25&offset=0");
+  });
+
   test("page exposes actor, subject kind, verb, date range, and project filters", async () => {
     const source = await Bun.file(new URL("./+page.svelte", import.meta.url)).text();
     for (const field of ["name=\"actor\"", "name=\"kind\"", "name=\"verb\"", "name=\"date_from\"", "name=\"date_to\"", "name=\"project\""]) {

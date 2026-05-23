@@ -1,13 +1,13 @@
 import { fail, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import {
-  restartPlanningCycleFromUpdates,
-  type ContinuousUpdateTrigger,
-} from "@planning-review/application/continuous-update-actions.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { ensureProjectExists } from "$lib/server/project-api";
+import { createWebWorkflowApiCaller, workflowApiProjectMetadata } from "$lib/server/workflow-api";
 
-export const load: PageServerLoad = async ({ params }) => {
-  return { projectId: params.id };
+type ContinuousUpdateTrigger = "manual_doc_edit" | "acp_session_update";
+
+export const load: PageServerLoad = async (event) => {
+  await ensureProjectExists(event, event.params.id);
+  return { projectId: event.params.id };
 };
 
 function fdToRecord(fd: FormData): Record<string, string | null> {
@@ -23,21 +23,21 @@ function parseTrigger(value: string | null | undefined): ContinuousUpdateTrigger
 }
 
 export const actions: Actions = {
-  triggerUpdate: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  triggerUpdate: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
       const trigger = parseTrigger(raw["trigger"]);
       const userPrompt = raw["userPrompt"]?.trim();
       if (!userPrompt) return fail(400, { ok: false, message: "User prompt is required." });
 
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      const result = await restartPlanningCycleFromUpdates(em, ctx, {
+      const result = await workflowApi(event).planning.restartPlanningCycleFromUpdates({
+        ...workflowApiProjectMetadata(event, event.params.id),
         trigger,
         userPrompt,
-        projectId: params.id,
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
-      });
+      }) as ContinuousUpdateResult;
 
       return {
         ok: true,
@@ -55,25 +55,40 @@ export const actions: Actions = {
     }
   },
 
-  triggerAndRedirect: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  triggerAndRedirect: async (event) => {
+    const fd = await event.request.formData();
     const raw = fdToRecord(fd);
     try {
       const trigger = parseTrigger(raw["trigger"]);
       const userPrompt = raw["userPrompt"]?.trim();
       if (!userPrompt) return fail(400, { ok: false, message: "User prompt is required." });
 
-      const { em, ctx } = await requestServiceScope(locals, params.id);
-      await restartPlanningCycleFromUpdates(em, ctx, {
+      await workflowApi(event).planning.restartPlanningCycleFromUpdates({
+        ...workflowApiProjectMetadata(event, event.params.id),
         trigger,
         userPrompt,
-        projectId: params.id,
+        projectId: event.params.id,
         traceId: raw["traceId"]?.trim() || undefined,
       });
     } catch (err) {
       return fail(400, { ok: false, message: (err as Error).message });
     }
 
-    throw redirect(303, `/projects/${params.id}`);
+    throw redirect(303, `/projects/${event.params.id}`);
   },
 };
+
+interface ContinuousUpdateResult {
+  status: string;
+  trigger: string;
+  traceId?: string;
+  eventId?: string;
+  changedDocs: unknown[];
+  targetTaskIds: unknown[];
+}
+
+function workflowApi(event: Parameters<Actions[keyof Actions]>[0]) {
+  const api = createWebWorkflowApiCaller(event);
+  if (!api) throw new Error("Workflow public API is not configured.");
+  return api;
+}

@@ -58,6 +58,28 @@ describe("/audit/export +server.ts", () => {
     await expect(response.json()).resolves.toEqual({ jobId: "job-1" });
   });
 
+  test("uses FULCRUM_API_URL for the backend during real E2E", async () => {
+    const previous = process.env["FULCRUM_API_URL"];
+    process.env["FULCRUM_API_URL"] = "http://127.0.0.1:3100";
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(input), init });
+      return Response.json([]);
+    }) as typeof globalThis.fetch;
+
+    try {
+      const mod = await import(`./+server.ts?audit-export-api-url=${Date.now()}`);
+      await mod.GET(exportEvent(fetch, "?format=json") as never);
+    } finally {
+      if (previous === undefined) delete process.env["FULCRUM_API_URL"];
+      else process.env["FULCRUM_API_URL"] = previous;
+    }
+
+    expect(calls[0]?.url).toBe(
+      "http://127.0.0.1:3100/api/v1/audit/export?orgId=org-1&limit=100000&offset=0&format=json",
+    );
+  });
+
   test("source does not use direct app scope or application export helpers", async () => {
     const source = await Bun.file(new URL("./+server.ts", import.meta.url)).text();
 

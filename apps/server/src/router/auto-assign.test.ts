@@ -9,7 +9,7 @@ import {
   type RoutingConditions,
 } from "@execution-orchestration/infrastructure/database/entities/router/RoutingRule.ts";
 import type { EventRepository } from "@platform-core/infrastructure/application-database/repositories/core/EventRepository.ts";
-import type { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
+import { RoutingRuleRepository } from "@execution-orchestration/infrastructure/database/repositories/router/RoutingRuleRepository.ts";
 import { DEFAULT_ORG_ID } from "@platform-core/infrastructure/application-database/seed.ts";
 import { createTestOrm } from "@test-support/application-database.ts";
 import { autoAssign, configureAutoAssign } from "./auto-assign.ts";
@@ -287,7 +287,7 @@ describe("autoAssign", () => {
     const db = await buildMigratedOrm();
     try {
       const em = db.em;
-      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+      const repo = new RoutingRuleRepository(em.getRepository(RoutingRule));
       const rule = await em.save(RoutingRule, {
         org: { id: DEFAULT_ORG_ID } as Org,
         name: "bugs",
@@ -327,7 +327,7 @@ describe("autoAssign", () => {
     const db = await buildMigratedOrm();
     try {
       const em = db.em;
-      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+      const repo = new RoutingRuleRepository(em.getRepository(RoutingRule));
       await em.save(RoutingRule, {
         org: { id: DEFAULT_ORG_ID } as Org,
         name: "bugs",
@@ -461,7 +461,7 @@ describe("autoAssign", () => {
     const db = await buildMigratedOrm();
     try {
       const em = db.em;
-      const repo = em.getRepository(RoutingRule) as unknown as RoutingRuleRepository;
+      const repo = new RoutingRuleRepository(em.getRepository(RoutingRule));
       configureNoMatchPrompt({ routingRuleRepository: repo });
 
       const rule = await learnRule(TASK_FACTS, "codex", DEFAULT_ORG_ID);

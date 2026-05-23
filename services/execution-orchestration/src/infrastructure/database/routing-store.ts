@@ -18,7 +18,17 @@ import {
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 type JsonRecord = Record<string, unknown>;
-type TaskFacts = { task: { title: string; kind: string; priority: string; tags: string[]; projectId?: string | null } };
+type TaskFacts = {
+  task: { title: string; kind: string; priority: string; tags: string[]; projectId?: string | null };
+  context?: { connector?: JsonRecord };
+};
+
+export interface RoutingRequestContextPublicRow {
+  orgId: string;
+  userId: string;
+  projectId: string | null;
+  connectorContext: JsonRecord | null;
+}
 
 export interface RoutingRulePublicRow {
   id: string;
@@ -36,6 +46,7 @@ export interface RoutingRulePublicRow {
 }
 
 interface RoutingDecisionBasePublicRow {
+  requestContext: RoutingRequestContextPublicRow;
   matchedRuleId: string | null;
   draftId: string | null;
   factsUsed: JsonRecord;
@@ -141,16 +152,16 @@ export class RoutingPublicStore {
     return { ok: true };
   }
 
-  async dryRun(input: RoutingScope & { taskJson: JsonRecord }): Promise<RoutingDecisionPublicRow> {
-    return await this.decide(input.orgId, taskFactsFromJson(input.taskJson));
+  async dryRun(input: RoutingScope & { userId?: string; taskJson: JsonRecord }): Promise<RoutingDecisionPublicRow> {
+    return await this.decide(input.orgId, userId(input), taskFactsFromJson(input.taskJson), false);
   }
 
-  async testTask(input: RoutingScope & { taskId: string }): Promise<RoutingDecisionPublicRow | null> {
+  async testTask(input: RoutingScope & { userId?: string; taskId: string }): Promise<RoutingDecisionPublicRow | null> {
     const task = await this.taskRepository().findOneBy({ id: input.taskId });
     if (!task) return null;
     const project = await this.projectRepository().findOneBy({ id: task.projectId, workspaceId: input.orgId });
     if (!project) return null;
-    return await this.decide(input.orgId, taskFactsFromTask(task, project));
+    return await this.decide(input.orgId, userId(input), taskFactsFromTask(task, project), true);
   }
 
   async listDrafts(input: RoutingScope & { status?: FulcrumRoutingDraftStatus | string }): Promise<RoutingDraftPublicRow[]> {
@@ -231,25 +242,39 @@ export class RoutingPublicStore {
     };
   }
 
-  private async decide(orgId: string, facts: TaskFacts): Promise<RoutingDecisionPublicRow> {
+  private async decide(
+    orgId: string,
+    userId: string,
+    facts: TaskFacts,
+    createLearningDraft: boolean,
+  ): Promise<RoutingDecisionPublicRow> {
+    const requestContext = routingRequestContext(orgId, userId, facts);
     const rules = await this.dispatchRules(orgId, facts.task.projectId);
     const matched = rules.find((rule) => matchesRule(rule, facts));
     if (!matched) {
+      const draftId = createLearningDraft ? await this.createNoMatchDraft(orgId, facts) : null;
       return {
-        status: "no_match",
+        requestContext,
+        status: draftId ? "draft_created" : "no_match",
         matchedRuleId: null,
-        draftId: null,
+        draftId,
         agent: "",
         factsUsed: facts as unknown as JsonRecord,
         confidence: 0,
         backend: null,
         model: null,
         whyUnmatched: `No routing rule matched task kind=${facts.task.kind}.`,
-        evidence: [`no-match: kind=${facts.task.kind} priority=${facts.task.priority}`],
+        evidence: [
+          `no-match: kind=${facts.task.kind} priority=${facts.task.priority}`,
+          "llm-fallback: disabled unless router-llm feature is enabled",
+          ...(draftId ? [`draft-created: ${draftId} disabled for review`] : []),
+          ...(facts.context?.connector ? ["connector-context: included in routing facts"] : []),
+        ],
       };
     }
 
     return {
+      requestContext,
       status: "matched",
       matchedRuleId: matched.id,
       draftId: null,
@@ -259,8 +284,33 @@ export class RoutingPublicStore {
       backend: null,
       model: null,
       whyUnmatched: null,
-      evidence: [`matched rule ${matched.id} with agent=${matched.actionAgent}`],
+      evidence: [
+        `matched rule ${matched.id} with agent=${matched.actionAgent}`,
+        ...(facts.context?.connector ? ["connector-context: included in routing facts"] : []),
+      ],
     };
+  }
+
+  private async createNoMatchDraft(orgId: string, facts: TaskFacts): Promise<string> {
+    const draft = await this.draftRepository().save({
+      id: randomUUID(),
+      orgId,
+      projectId: facts.task.projectId ?? null,
+      status: "review_needed",
+      enabled: false,
+      taskFactsJson: facts as unknown as JsonRecord,
+      noMatchReason: `No routing rule matched task kind=${facts.task.kind}.`,
+      proposedConditionsJson: {
+        all: [{ fact: "task", path: "$.kind", operator: "equal", value: facts.task.kind }],
+      },
+      proposedActionsJson: { actionAgent: "", actionSkillSet: [] },
+      source: "no_match",
+      confidence: 0,
+      backend: null,
+      model: null,
+      matchingActiveRuleIdsJson: [],
+    });
+    return draft.id;
   }
 
   private async dispatchRules(orgId: string, projectId?: string | null): Promise<FulcrumRoutingRule[]> {
@@ -309,6 +359,12 @@ function serializeRule(rule: FulcrumRoutingRule): RoutingRulePublicRow {
 
 function serializeDraft(draft: FulcrumRoutingDraft): RoutingDraftPublicRow {
   return {
+    requestContext: {
+      orgId: draft.orgId,
+      userId: "",
+      projectId: draft.projectId,
+      connectorContext: connectorContextFromFacts(objectValue(draft.taskFactsJson)),
+    },
     draftId: draft.id,
     orgId: draft.orgId,
     projectId: draft.projectId,
@@ -340,6 +396,7 @@ function taskFactsFromTask(task: FulcrumTask, project: FulcrumProject): TaskFact
 }
 
 function taskFactsFromJson(taskJson: JsonRecord): TaskFacts {
+  const connectorContext = objectValue(taskJson["connectorContext"]);
   return {
     task: {
       title: stringValue(taskJson["title"], "Untitled task"),
@@ -348,6 +405,7 @@ function taskFactsFromJson(taskJson: JsonRecord): TaskFacts {
       tags: stringArray(taskJson["tags"]),
       projectId: typeof taskJson["projectId"] === "string" ? taskJson["projectId"] : null,
     },
+    ...(Object.keys(connectorContext).length > 0 ? { context: { connector: connectorContext } } : {}),
   };
 }
 
@@ -417,4 +475,26 @@ function stringValue(value: unknown, fallback: string): string {
 
 function dateString(value: Date | undefined): string | null {
   return value instanceof Date ? value.toISOString() : null;
+}
+
+function userId(input: { userId?: string }): string {
+  return typeof input.userId === "string" ? input.userId : "";
+}
+
+function routingRequestContext(
+  orgId: string,
+  userIdValue: string,
+  facts: TaskFacts,
+): RoutingRequestContextPublicRow {
+  return {
+    orgId,
+    userId: userIdValue,
+    projectId: facts.task.projectId ?? null,
+    connectorContext: facts.context?.connector ?? null,
+  };
+}
+
+function connectorContextFromFacts(facts: JsonRecord): JsonRecord | null {
+  const connector = objectValue(objectValue(facts["context"])["connector"]);
+  return Object.keys(connector).length > 0 ? connector : null;
 }

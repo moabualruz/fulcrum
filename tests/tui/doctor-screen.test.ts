@@ -41,10 +41,10 @@ function makeResult(overrides: Partial<DoctorCheckResult> = {}): DoctorCheckResu
 }
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — empty state
+// DoctorScreen: empty state
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — empty state", () => {
+describe("DoctorScreen: empty state", () => {
   it("renders loading placeholder when no results", () => {
     const screen = new DoctorScreen();
     const text = renderPlain(screen);
@@ -59,10 +59,10 @@ describe("DoctorScreen — empty state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — with results
+// DoctorScreen: with results
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — with results", () => {
+describe("DoctorScreen: with results", () => {
   const results: DoctorCheckResult[] = [
     makeResult({ name: "tui.binary-tui-entrypoint", status: "ok",   message: "entrypoint ok",   durationMs: 2 }),
     makeResult({ name: "tui.opentui-version",       status: "warn", message: "no opentui pkg",   durationMs: 1, recovery: "install opentui" }),
@@ -117,17 +117,17 @@ describe("DoctorScreen — with results", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — keyboard navigation
+// DoctorScreen: keyboard navigation
 // ---------------------------------------------------------------------------
 
-describe("DoctorScreen — keyboard navigation", () => {
+describe("DoctorScreen: keyboard navigation", () => {
   it("j moves cursor down", async () => {
     const screen = new DoctorScreen({ results: [
       makeResult({ name: "tui.a" }),
       makeResult({ name: "tui.b" }),
     ]});
     await screen.handleKey("j");
-    // After j cursor is on second item — render should inverse tui.b row
+    // After j cursor is on second item: render should inverse tui.b row
     const tty = makeTTY();
     screen.render(new Renderer(tty));
     // Just check it doesn't throw and contains both names
@@ -180,7 +180,7 @@ describe("DoctorScreen — keyboard navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// TuiDoctorCheckSchema — Zod validation
+// TuiDoctorCheckSchema: Zod validation
 // ---------------------------------------------------------------------------
 
 describe("TuiDoctorCheckSchema", () => {
@@ -201,7 +201,7 @@ describe("TuiDoctorCheckSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — evaluateOpenTuiGate
+// OpenTUI gate: evaluateOpenTuiGate
 // ---------------------------------------------------------------------------
 
 describe("evaluateOpenTuiGate", () => {
@@ -244,7 +244,7 @@ describe("evaluateOpenTuiGate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — runOpenTuiSnapshotGate
+// OpenTUI gate: runOpenTuiSnapshotGate
 // ---------------------------------------------------------------------------
 
 describe("runOpenTuiSnapshotGate", () => {
@@ -300,5 +300,63 @@ describe("runOpenTuiSnapshotGate", () => {
     expect(result.gateFailed).toBe(true);
     expect(result.failedSnapshots).toBe(12);
     expect(result.message).toContain("HANDOVER.md");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prd-tui-stage-workbenches-set: Operate stage workbench OD parity.
+//
+// The Operate (`:doctor`) workbench renders the OD `tui-runs.html` stage
+// chrome: the `fulcrum · :doctor · subsystems` header carrying the exact
+// stage name, the StatusFooter strip, and the shared empty-state contract.
+// Snapshots are locked at 80x24 and 120x32.
+// ---------------------------------------------------------------------------
+
+describe("Operate stage workbench (:doctor): OD parity", () => {
+  function renderAt(cols: number, rows: number, screen: DoctorScreen): string {
+    const tty = new FakeTTY({ columns: cols, rows });
+    screen.render(new Renderer(tty));
+    return tty.plainText();
+  }
+
+  const checks: DoctorCheckResult[] = [
+    makeResult({ name: "tui.jwt-verification", status: "ok", message: "p95 4ms", durationMs: 4 }),
+    makeResult({ name: "tui.telemetry-contract", status: "fail", message: "schema mismatch", durationMs: 3, recovery: "rename schema or migrate field" }),
+  ];
+
+  it("renders the Operate workbench header + footer at 80x24 and 120x32", () => {
+    const screen = new DoctorScreen({
+      results: checks,
+      projectLabel: "auth/rewrite",
+      traceId: "tr_56e3d12",
+      mcp: "6/7",
+    });
+    for (const [cols, rows] of [[80, 24], [120, 32]] as const) {
+      const snap = renderAt(cols, rows, screen);
+      expect(snap).toContain("Operate");
+      expect(snap).toContain("fulcrum · :doctor · subsystems");
+      expect(snap).toContain("OPERATE");
+      expect(snap).toContain("run: -");
+      expect(snap).toContain("trace tr_56e3d1");
+      expect(snap).toContain("span -");
+      expect(snap).not.toContain("m mode");
+    }
+  });
+
+  it("bare p/d select ModePicker modes and bare m opens picker without selecting", async () => {
+    const screen = new DoctorScreen({ results: checks });
+    await screen.handleKey("p");
+    expect(screen.currentStepMode).toBe("play");
+    await screen.handleKey("d");
+    expect(screen.currentStepMode).toBe("discuss");
+    await screen.handleKey("m");
+    expect(screen.currentStepMode).toBe("discuss");
+  });
+
+  it("empty Operate workbench renders the shared one-sentence/one-action contract", () => {
+    const screen = new DoctorScreen({ subsystem: "tui" });
+    const snap = renderAt(80, 24, screen);
+    expect(snap).toContain("No tui subsystem checks have run yet.");
+    expect(snap).toContain("Running checks");
   });
 });

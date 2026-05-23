@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 
-import { toAppError } from "@platform-core/application/error-mapping.ts";
+import { publicAppErrorMessage, toAppError } from "@platform-core/application/error-mapping.ts";
 import type { AppErrorKind } from "@platform-core/domain/errors.ts";
 
 type TrpcCode = ConstructorParameters<typeof TRPCError>[0]["code"];
@@ -19,7 +19,7 @@ export function appErrorToTrpcError(error: unknown): TRPCError {
   const appError = toAppError(error);
   return new TRPCError({
     code: TRPC_CODES[appError.kind],
-    message: appError.message,
+    message: publicAppErrorMessage(appError),
     cause: appError,
   });
 }

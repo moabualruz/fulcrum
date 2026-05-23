@@ -9,7 +9,7 @@ describe("database configuration resolver", () => {
       config: {},
     })).toEqual({
       backend: "pglite",
-      dataDir: "/tmp/fulcrum-home/pglite.data",
+      dataDir: "/tmp/fulcrum-home/db/main",
     });
   });
 
@@ -22,7 +22,7 @@ describe("database configuration resolver", () => {
       config: {
         db: {
           backend: "pglite",
-          dataDir: "/tmp/fulcrum-home/pglite.data",
+          dataDir: "/tmp/fulcrum-home/db/main",
         },
       },
     })).toEqual({
@@ -38,6 +38,32 @@ describe("database configuration resolver", () => {
     })).toEqual({
       backend: "postgres",
       url: "postgres://fulcrum:fulcrum@db:5432/fulcrum",
+    });
+  });
+
+  test("prefers FULCRUM_DATABASE_URL over generic DATABASE_URL", () => {
+    expect(resolveDatabaseConfig({
+      env: {
+        FULCRUM_DATABASE_URL: "postgresql://fulcrum:primary@db:5432/fulcrum",
+        DATABASE_URL: "postgresql://fulcrum:secondary@db:5432/fulcrum",
+      },
+      config: {},
+    })).toEqual({
+      backend: "postgres",
+      url: "postgresql://fulcrum:primary@db:5432/fulcrum",
+    });
+  });
+
+  test("ignores socket-only TypeORM mode for product DB status and keeps local PGlite default", () => {
+    expect(resolveDatabaseConfig({
+      env: {
+        FULCRUM_HOME: "/tmp/fulcrum-home",
+        FULCRUM_TYPEORM_PGLITE_SOCKET_URL: "postgresql://postgres:postgres@127.0.0.1:6543/postgres",
+      },
+      config: {},
+    })).toEqual({
+      backend: "pglite",
+      dataDir: "/tmp/fulcrum-home/db/main",
     });
   });
 

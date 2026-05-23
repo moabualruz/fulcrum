@@ -362,10 +362,16 @@ describe("Dependency execution Nest controller", () => {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Fulcrum-Reconnect": "send-last-event-id",
     });
-    expect(chunks).toEqual([
-      `event: feedback\ndata: ${JSON.stringify(output)}\n\n`,
-    ]);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toContain("event: dependency-run.feedback");
+    const event = JSON.parse(chunks[0]!.match(/^data: (.*)$/m)?.[1] ?? "{}");
+    expect(event).toMatchObject({
+      type: "dependency-run.feedback",
+      traceId: "trace-execution-api",
+      payload: output,
+    });
     expect(response.ended).toBe(true);
   });
 

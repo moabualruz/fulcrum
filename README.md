@@ -1,209 +1,286 @@
+<div align="center">
+
+<img src="apps/web/src/lib/assets/fulcrum-logo.svg" width="72" alt="Fulcrum — lever pivot" />
+
 # Fulcrum
 
-> Local-first Agent OS — project management, agent orchestration, docs, memory, and developer tooling in one platform. Defaults to embedded PGlite and switches to PostgreSQL with `FULCRUM_DATABASE_URL` or `DATABASE_URL`. SaaS-ready schema from day one.
+**Your repo, your work board, your agents — one local-first Agent OS.**
 
-Fulcrum is a full-stack Agent OS that combines Jira-style task management, Confluence-style docs, agent orchestration (Symphony), inference sidecar, memory/context engine, search, notifications, and developer tooling (CLI + TUI + Web) into a single local-first platform.
+> *A fulcrum is the pivot point of a lever — the supporting structure that turns small effort into large output. Same idea here: small commits land big outcomes through the agents you supervise.*
 
-## What Ships in v0.2.0
+Project management + agent orchestration + docs + memory + a CLI/TUI/Web triad,
+all running on your machine. PGlite by default; swap in Postgres with one env
+var. SaaS-ready schema from day one. Online features ship but stay dark behind
+explicit feature flags until you opt in.
 
-| Pillar | What it does | Surfaces |
-|--------|-------------|----------|
-| **Foundation** (P1) | Auth, orgs, feature flags, schema, migrations | Web, CLI |
-| **Inference Sidecar** (P2) | Embedded ML models, Ollama/LM Studio backends, embeddings | CLI, Web |
-| **Symphony Orchestration** (P3) | Agent dispatch, run lifecycle, retry/stall recovery | Web, CLI, TUI |
-| **Sandcastle Runner** (P4) | Sandboxed agent execution, transcript capture, artifact harvest | CLI |
-| **Router & Skills** (P5) | Routing rules engine, skill marketplace, auto-assign | Web, CLI, TUI |
-| **Tasks & Scrum** (P6) | Kanban boards, sprints, burndown charts, custom fields | Web, CLI, TUI |
-| **Docs & Collab** (P7) | TipTap editor, versioning, comments, templates | Web, CLI, TUI |
-| **Memory & Context** (P8) | Heuristic extraction, BM25 retrieval, context assembly | CLI, Web |
-| **Repos & Git** (P9) | Repository supervision, file browser, commit log | Web, CLI, TUI |
-| **Artifacts** (P10) | Run artifact storage, dedup, lifecycle management | Web, CLI |
-| **Search** (P11) | Full-text search, facets, saved searches, click telemetry | Web, CLI, TUI |
-| **Notifications** (P12) | Rules engine, inbox, audit log, quiet hours, webhooks | Web, CLI, TUI |
-| **API & Webhooks** (P13) | REST API (Hono/OpenAPI), webhook dispatcher, connectors | API, Web |
-| **CLI Codegen** (P14) | Generated commands, completions, doctor orchestrator | CLI |
-| **TUI** (P15) | Full terminal UI with 44 screens, keyboard navigation | TUI |
-| **Web Shell** (P16) | SvelteKit app, dashboard, all settings pages, a11y | Web |
-| **Cross-Cutting** (P17) | Themes, backups, imports/exports, telemetry, secrets | Web, CLI, TUI |
+[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#status)
+[![Local-first](https://img.shields.io/badge/local--first-pglite-blue.svg)](#getting-started)
+[![Surfaces](https://img.shields.io/badge/surfaces-web%20%7C%20cli%20%7C%20tui-purple.svg)](#three-surfaces-one-brain)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Built with Bun](https://img.shields.io/badge/runtime-bun-black.svg)](https://bun.sh)
 
-All online features are **shipped but disabled by default** behind `FULCRUM_FEATURES` flags.
+[Quick Start](#quick-start) · [Three Surfaces](#three-surfaces-one-brain) · [How it Works](#how-it-works) · [User Manuals](docs/manuals/) · [Acknowledgements](#acknowledgements)
+
+</div>
+
+---
+
+## Why Fulcrum
+
+Coding agents are everywhere; the **work around them** is fragmented. Tickets in
+Jira, docs in Notion, runs in a sandbox no one watches, memory in a markdown
+file someone forgot to commit. Fulcrum collapses that into one process you
+control:
+
+- **Local-first by default** — your project, your DB, your machine. No telemetry leaves the box unless you flip a flag.
+- **Three surfaces, one model** — Web, CLI, TUI all hit the same NestJS public API. Whatever you do in one is real in the others, immediately.
+- **Sandbox-first agent runs** — agents run inside isolated worktrees + container images, not your dev shell. Powered by [Matt Pocock's Sandcastle](https://github.com/mattpocock/sandcastle).
+- **OpenAI Symphony-compatible** — `fulcrum doctor` validates conformance to the [openai/symphony](https://github.com/openai/symphony) orchestration spec; the work-board → run lifecycle implements its contract.
+- **No vendor lock-in** — PGlite for dev, Postgres for prod via `FULCRUM_DATABASE_URL`. Same schema both ways.
+
+---
 
 ## Quick Start
 
 ```bash
-# Install
+# 1. clone + install
 git clone https://github.com/moabualruz/fulcrum
 cd fulcrum
 bun install
 
-# Run the web app (local dev — no auth required)
-bun --cwd apps/web run dev
-# → http://localhost:5173
+# 2. spin the stack (3 processes)
+cd apps/server && bun run src/index.ts &                              # NestJS public API @ :3000
+cd apps/web    && FULCRUM_SERVER_URL=http://localhost:3000 bun run dev # SvelteKit web  @ :5173
+bun run apps/tui/src/index.ts                                          # OpenTUI terminal
 
-# Or use the CLI
-bun run apps/cli/src/main.ts doctor
-bun run apps/cli/src/main.ts projects list --json
-bun run apps/cli/src/main.ts work create --project <project-id> --title "My first task" --json
+# 3. install the CLI globally (one binary)
+bun run build && cp dist/fulcrum-darwin-arm64 ~/.local/bin/fulcrum
+fulcrum doctor   # confirms the stack is wired
 ```
 
-## Supported Agents
+Open <http://localhost:5173/>, pick your project, ship work.
 
-Fulcrum manages configuration for 5 CLI coding agents:
+---
 
-| Agent | Rules | Skills | Hooks | MCP |
-|---|---|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` | `fulcrum@fulcrum` plugin | `~/.claude/settings.json` | `claude mcp` |
-| Codex CLI | `~/.codex/AGENTS.md` | `.codex/skills/fulcrum/` | `~/.codex/hooks.json` | `~/.codex/config.toml` |
-| Gemini CLI | `~/AGENTS.md` | `fulcrum-skills` extension | `~/.gemini/settings.json` | `settings.json` |
-| OpenCode | `~/.config/opencode/AGENTS.md` | `~/.config/opencode/skills/` | TypeScript plugin | `opencode.json` |
-| Pi CLI | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/skills/` | TypeScript extension | `pi-mcp-adapter` |
+## Three Surfaces, One Brain
 
-## Architecture
+The same NestJS server backs every surface. The web is a **pure invocation
+layer** — it never opens a database — and the TUI / CLI hit the same `/api/v1/*`
+endpoints. Whatever a human can do, an agent can do.
 
-Runtime surfaces are first-class local apps:
+<table>
+  <tr>
+    <td width="33%" align="center"><b>Web</b><br/><sub>SvelteKit · :5173</sub></td>
+    <td width="33%" align="center"><b>CLI</b><br/><sub>Bun-compiled · one binary</sub></td>
+    <td width="33%" align="center"><b>TUI</b><br/><sub>OpenTUI · keyboard-first</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/manuals/screenshots/web/72-proj-backlog.png" alt="Web backlog with sprint planning"/></td>
+    <td><img src="docs/manuals/screenshots/cli/03-doctor.png" alt="fulcrum doctor"/></td>
+    <td><img src="docs/manuals/screenshots/tui/08-doctor-screen.png" alt="TUI Doctor screen"/></td>
+  </tr>
+</table>
 
-| Path | Role |
-|---|---|
-| `apps/web` | SvelteKit client and local web UI. `fulcrum web` serves its built output locally. |
-| `apps/cli` | Bun CLI app and `fulcrum` binary entrypoint. |
-| `apps/tui` | OpenTUI client. Runs in-process against local application callers. |
-| `apps/server` | Local server adapters: Hono REST API, tRPC router, routing engine, Yjs/runtime adapters. |
-| `services/*/src/application` | Bounded-service application workflows, DTOs, validation, command/query services. Interfaces call here. |
-| `services/*/src/domain` | Bounded-service domain models, value types, and pure rules. |
-| `services/*/src/infrastructure` | Bounded-service adapters for persistence, messaging, external tools, and runtime integrations. |
-| `services/*/src/interface` | Bounded-service API/presentation adapters when a service owns an interface contract. |
-| `src/db` | ORM entities, repositories, migrations, DB composition. |
-| `src/domain` | Domain enums/value types and pure domain helpers. |
-| `tests` | Cross-interface, e2e, integration, migration, and parity tests. |
+The Operate stage is identical across surfaces — same doctor, same MCP
+inventory, same plugin registry:
 
-Root `package.json` declares `apps/*` as the Bun workspace set. Clients stay local-first: CLI and TUI use in-process callers by default; web runs through local SvelteKit dev or `fulcrum web`; server code provides local REST/tRPC/Yjs adapters without requiring a remote service.
+![Operate stage in the web app](docs/manuals/screenshots/web/06-operate.png)
+
+Full per-surface guides + every screen captured against live data live in
+[`docs/manuals/`](docs/manuals/).
+
+---
+
+## Tasks, Boards, and the Build Graph
+
+The work spine — what your team is doing, who's doing it, and what's blocked.
+
+### Workspace kanban — `/boards`
+
+Five-column board over canonical statuses (`pending`, `in_progress`, `blocked`, `completed`, `cancelled`) with every task in the workspace. Tabs swap into List, Table, Gantt, or Calendar views without leaving the page. New tasks are created inline per column.
+
+![Workspace boards across 5 columns](docs/manuals/screenshots/web/02-boards.png)
+
+### Project board — `/projects/<slug>/board`
+
+Same kanban, scoped to one project. The "manual task workbench" header summarizes Backlog / Unstarted / Started / Completed / Canceled so a PM can read status at a glance before drilling into cards.
+
+![Per-project board with manual workbench summary](docs/manuals/screenshots/web/71-proj-board.png)
+
+### Build dependency graph — `/build-graph`
+
+Sugiyama-layered DAG of the running build. Nodes color-code by lifecycle (queued, running, awaiting, blocked, completed), edges curve along the running chain, and the selected node opens an info card with `Open run` + `Open task` actions.
+
+![Build dependency graph with selected node panel](docs/manuals/screenshots/web/03-build-graph.png)
+
+The same data drives the CLI (`fulcrum tasks list --json`, `fulcrum runs graph --json`) and the TUI (`Build · Graph` chord), so a human and an agent see identical state.
+
+---
+
+## Plan → Review → Ship
+
+Every stage shares the same vocabulary (status badges, ModeRow per step, trace badge in the topbar) so the UI tells the same story across the workflow:
+
+### Plan — `/planning`
+
+The Plan stage owns AI Assist sessions, traffic streams, and the persistent planning workspace. Sessions list left, planning workspace centre, source-doc + trace-summary on the right.
+
+![Plan stage with active AI Assist session and traffic stream](docs/manuals/screenshots/web/02-plan.png)
+
+### Review — `/review`
+
+Code, QA, E2E, and Final QA review queues with diff + comments tripane.
+
+![Review stage tripane](docs/manuals/screenshots/web/04-review.png)
+
+### Ship — `/ship`
+
+Release cuts, archive timeline, artifact bundle download — same data as `fulcrum ship list --json`.
+
+![Ship stage release list](docs/manuals/screenshots/web/05-ship.png)
+
+### Operate — `/operate`
+
+Doctor system health (subsystems, latency, error rate), MCP inventory, plugins, alerts, telemetry. Mirrors `fulcrum doctor`.
+
+![Operate stage doctor view](docs/manuals/screenshots/web/06-operate.png)
+
+---
+
+## How it Works
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Surfaces                          │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌────────┐│
-│  │   Web   │  │   CLI   │  │   TUI   │  │  API   ││
-│  │SvelteKit│  │  Bun    │  │ OpenTUI │  │  Hono  ││
-│  └────┬────┘  └────┬────┘  └────┬────┘  └───┬────┘│
-│       └────────────┼───────────┼─────────────┘      │
-│                    │           │                     │
-│              ┌─────┴───────────┴─────┐              │
-│              │     tRPC Router       │              │
-│              │  (shared procedures)  │              │
-│              └───────────┬───────────┘              │
-│                          │                          │
-│  ┌───────────────────────┼───────────────────────┐  │
-│  │              Product Kernel                    │  │
-│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │  │
-│  │  │ Tasks  │ │  Docs  │ │ Memory │ │ Search │ │  │
-│  │  │Sprints │ │TipTap  │ │Context │ │  FTS   │ │  │
-│  │  └────────┘ └────────┘ └────────┘ └────────┘ │  │
-│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ │  │
-│  │  │ Repos  │ │Artifact│ │ Events │ │ Notify │ │  │
-│  │  │  Git   │ │Storage │ │ Audit  │ │  Feed  │ │  │
-│  │  └────────┘ └────────┘ └────────┘ └────────┘ │  │
-│  └───────────────────────┬───────────────────────┘  │
-│                          │                          │
-│              ┌───────────┴───────────┐              │
-│              │   PGlite (embedded)   │              │
-│              │   Local-first DB      │              │
-│              └───────────────────────┘              │
-└─────────────────────────────────────────────────────┘
+            ┌─────────────────────────────────────────────────┐
+            │             NestJS public API @ :3000           │
+            │ /api/v1/*  +  tRPC  +  Swagger  +  agent runs   │
+            └─────────────┬───────────────┬───────────────────┘
+                          │               │
+        ┌─────────────────┴──┐         ┌──┴────────────────────┐
+        │ SvelteKit web :5173 │         │  CLI binary  +  TUI   │
+        │ (no in-proc DB)    │         │ (HTTP only, no DB)    │
+        └─────────────────────┘         └───────────────────────┘
+                          │               │
+                          ▼               ▼
+            ┌──────────────────────────────────────────────────┐
+            │   PGlite  ⟷  TypeORM  ⟷  fulcrum_* entity tables  │
+            │   (swap to Postgres with FULCRUM_DATABASE_URL)   │
+            └──────────────────────────────────────────────────┘
+                          │
+                          ▼
+            ┌──────────────────────────────────────────────────┐
+            │ Sandcastle runtime — isolated worktree + sandbox │
+            │   (Claude Code, Codex, Gemini, OpenCode, Pi …)   │
+            └──────────────────────────────────────────────────┘
 ```
 
-## Feature Flags
+### What you get out of the box
 
-Online features are gated behind `FULCRUM_FEATURES` (comma-separated):
+| Pillar | What it does | Surfaces |
+|---|---|---|
+| **Foundation** | Auth, orgs, feature flags, migrations | Web · CLI |
+| **Symphony orchestration** | Agent dispatch, run lifecycle, retry/stall recovery | Web · CLI · TUI |
+| **Sandcastle agent runs** | Sandboxed execution, transcript capture, artifact harvest | CLI · TUI |
+| **Inference sidecar** | Embedded models, Ollama / LM Studio backends, embeddings | CLI · Web |
+| **Routing & skills** | Rules engine, skill marketplace, auto-assign | Web · CLI · TUI |
+| **Tasks & sprints** | Kanban, sprints, burndown, custom fields | Web · CLI · TUI |
+| **Docs & collab** | TipTap editor, versioning, comments, templates | Web · TUI |
+| **Memory & context** | Heuristic extraction, BM25 retrieval, context assembly | CLI · Web |
+| **Repos & git** | Repository supervision, file browser, commit log | Web · CLI · TUI |
+| **Artifacts** | Run artifact storage, dedup, lifecycle | Web · CLI |
+| **Search** | Full-text search, facets, saved searches | Web · CLI · TUI |
+| **Notifications** | Rules engine, inbox, audit log, webhooks | Web · CLI · TUI |
+| **Public API** | REST `/api/v1/*` + tRPC, OpenAPI 3.1 schema | API |
+| **Cross-cutting** | Themes, backups, imports/exports, telemetry, secrets | Web · CLI · TUI |
+
+All "online" features ship but stay disabled until you opt in via
+`FULCRUM_FEATURES=feature-a,feature-b`. The web prod build defaults to off;
+local dev defaults `public-api` on so you can drive the stack without flags.
+
+---
+
+## CLI in 10 seconds
 
 ```bash
-# Enable specific features
-export FULCRUM_FEATURES=i18n,embeddings,experiments
-
-# All available flags
-i18n, embeddings, router-llm, casbin, desktop-app, saas-auth,
-experiments, pwa-offline, real-time-collab-server, public-api,
-export-csv, import-csv, import-linear, import-jira, import-plane,
-telemetry-remote, error-reporting-remote, vault-integration,
-scheduled-backups, skill-marketplace, keyring-macos, keyring-linux,
-keyring-windows, report-llm-narration, notify-webhook
+fulcrum init                          # bootstrap a project (AGENTS.md, CLAUDE.md, .gitignore)
+fulcrum install --profile minimal     # splice rules + hooks + skills into every detected agent
+fulcrum doctor --json | jq            # canonical envelope: pipe into CI
+fulcrum hooks list                    # see registered hook recipes
+fulcrum skills sync                   # mirror authored skills to every agent
+fulcrum compress --check              # CI gate: caveman compression up to date
 ```
 
-## CLI Commands
+Every subcommand has `--help`. The CLI emits a `fulcrum.cli.v1` JSON envelope
+under `--json` for machine consumers.
 
-```bash
-# Project management
-fulcrum projects list|create|delete --json
-fulcrum work create --project <project-id> --title <title> --json
-fulcrum tasks list|create|update|delete --json
-fulcrum sprints list|create|close --json
+![fulcrum --help](docs/manuals/screenshots/cli/01-help.png)
 
-# Docs
-fulcrum docs list|create|update --json
+---
 
-# Search
-fulcrum search "query" --json
-fulcrum search "query" --all-projects --json
-fulcrum search "query" --global --json
+## Status
 
-# Agent operations
-fulcrum agent list|test --json
-fulcrum runs list|logs|cancel --json
-fulcrum inference status|start|stop --json
+- **alpha** — wire-up complete across all 13 service domains; APIs settling.
+- 1,500+ tests pass on `dev/v1.0` (typecheck 0, architecture 208/0, ui-kit 90/0, web 1,525/0).
+- The web is a verified pure invocation layer — `tests/architecture/` enforces it.
+- Active areas: sprint↔task entity unification, TUI screen coverage, additional MCP servers.
 
-# System
-fulcrum doctor --json
-fulcrum backup --output <path>
-fulcrum restore --input <path>
-fulcrum flags list|set --json
+See [`docs/manuals/findings.md`](docs/manuals/findings.md) for the most recent
+manual-test pass and a transparent ledger of bugs found + fixed + open.
 
-# Data
-fulcrum export --format csv|json --entity tasks
-fulcrum import --format csv|linear|jira|plane --json
-```
+---
 
-## Web App
+## Acknowledgements
 
-The SvelteKit web app runs at `http://localhost:5173` in dev mode.
+Fulcrum stands on shoulders. Two projects in particular were so directly
+useful they're hard-coded into the stack:
 
-**No login required in local/dev mode.** Set `FULCRUM_REQUIRE_AUTH=1` for SaaS mode with Better-Auth.
+### 🏰 Sandcastle — by [@mattpocock](https://github.com/mattpocock)
 
-Key pages:
-- `/` — Current-scope dashboard with project/task/doc/run metrics
-- `/projects` — Project hierarchy, portfolio view, and creation
-- `/projects/<id>/board` — Kanban board
-- `/docs` — Document browser and TipTap editor
-- `/search` — Full-text search with facets
-- `/inbox` — Notifications and activity feed
-- `/runs` — Agent run history and logs
-- `/doctor` — Health dashboard (no auth required)
-- `/settings/*` — Theme, flags, secrets, backups, connectors, etc.
+[`@ai-hero/sandcastle`](https://github.com/mattpocock/sandcastle) powers every
+agent run in Fulcrum. It hands us:
 
-## TUI
+- Isolated worktree + sandbox per run (Docker / Podman / Vercel / custom).
+- Provider abstraction across Claude Code, Codex, Gemini, OpenCode, Pi.
+- Branch-strategy management so agents never touch your live tree.
 
-```bash
-fulcrum tui
-```
+You can see it live in `services/execution-orchestration/infrastructure/agent-runtime/sandbox-runner.ts` — `runAgent` + `resolveProvider` + `sandboxProviderDoctorChecks` are all Sandcastle bindings. The `fulcrum doctor` sandbox check returns Sandcastle's provider availability + trust-boundary warning verbatim. Pin: `@ai-hero/sandcastle@0.5.6` (`tests/execution-orchestration/agent-runtime/sandcastle-deps.test.ts` keeps it locked).
 
-Project-first workbench covering tasks, docs, runs, search, notifications, memory, and reports. Keyboard-driven: `j/k` navigate, `Enter` selects, `q` goes back, `Tab` switches panes. Global or all-project views are explicit modes, not silent defaults.
+### 📚 Skills — by [@mattpocock](https://github.com/mattpocock)
 
-## Development
+The [`mattpocock/skills`](https://github.com/mattpocock/skills) repository is
+the upstream pattern Fulcrum's `fulcrum skills upstream` mirrors. Authored
+skills follow the same `SKILL.md` frontmatter + body shape; the same lint
+rules apply. Without Matt's work on what a skill IS, this layer would not
+exist.
 
-```bash
-bun install                  # Install deps
-bun run --bun tsc --noEmit   # Typecheck
-bun run scripts/test-root.ts # Run root tests
-bun --cwd apps/web run dev    # Dev server
-bun --cwd apps/web run web:e2e # Playwright e2e tests
-```
+Thank you, Matt — both gifts are foundational.
 
-## Docs
+### 🎼 Symphony — by [OpenAI](https://github.com/openai/symphony)
 
-- [User Guide](docs/user-guide.md)
-- [Developer Guide](docs/developer-guide.md)
-- [Test Gaps](docs/TEST-GAPS.md) — documented integration/e2e test coverage gaps
-- [Roadmap](.planning/ROADMAP.md) — phase status and blockers
-- [AGENTS](AGENTS.md) — project rules for AI agents
+Fulcrum implements OpenAI's [Symphony](https://github.com/openai/symphony)
+orchestration spec — the work-board → autonomous-run lifecycle, evidence
+contracts, retry/stall recovery, PR-landing semantics. `fulcrum doctor
+--subsystem symphony` validates conformance.
+
+Thanks to the OpenAI contributors driving Symphony forward — including
+[@frantic-openai](https://github.com/frantic-openai),
+[@hintz-openai](https://github.com/hintz-openai),
+[@danial-openai](https://github.com/danial-openai),
+[@kevinw-openai](https://github.com/kevinw-openai), and
+[@mstrautmann-oai](https://github.com/mstrautmann-oai). Your spec made
+this build dramatically less ambiguous.
+
+### Stack credits
+
+NestJS · SvelteKit · OpenTUI · TypeORM · PGlite · Bun · ui-kit (shadcn-svelte vocabulary, OKLCH tokens) · TipTap · Better-Auth · Effect.
+
+---
 
 ## License
 
-See [LICENSE](LICENSE).
+[MIT](LICENSE). Use it. Fork it. Ship it.
+
+---
+
+<div align="center">
+<sub>Built local-first. Built honest. Built so the agents and the humans both ship.</sub>
+</div>

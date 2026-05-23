@@ -17,6 +17,14 @@ export function createReportApiCaller(options: ReportApiClientOptions) {
   const request = reportRequest(options);
   return {
     reports: {
+      projectPage: async (input: JsonRecord & { projectId: string }) =>
+        await request(`/api/v1/reports/projects/${encodeURIComponent(input.projectId)}`, {
+          method: "GET",
+          query: compact({
+            orgId: options.orgId,
+            sprintId: input.sprintId ?? input.sprint_id,
+          }),
+        }),
       burndown: async (input: JsonRecord = {}) =>
         await request("/api/v1/reports/burndown", {
           method: "GET",

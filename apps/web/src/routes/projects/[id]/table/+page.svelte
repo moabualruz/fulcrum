@@ -1,7 +1,7 @@
 <script lang="ts">
   import ProjectViewSwitcher from "$lib/components/board/ProjectViewSwitcher.svelte";
   import TaskTable from "$lib/components/tasks/TaskTable.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { PageData } from "./$types";
 
   interface Props {

@@ -146,7 +146,9 @@ describe("server actions: agents", () => {
       );
       const tested = events.find((e) => e.verb === "tested");
       expect(tested?.subject_kind).toBe("agent_profile");
-      expect(tested?.payload).toEqual({ test_passed: false });
+      // appendEventOrm stamps the emitting `actor` into every event payload
+      // alongside the caller-supplied fields.
+      expect(tested?.payload).toEqual({ actor: "system", test_passed: false });
     } finally {
       await db.close();
     }

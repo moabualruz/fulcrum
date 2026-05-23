@@ -1,13 +1,26 @@
 /**
- * TUI Doctor screen — renders TUI subsystem health checks.
- * Slice 15 of Pillar 15 (Issue 18: doctor integration + OpenTUI gate).
+ * Operate stage workbench: the TUI `:doctor` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `operate` screen).
  *
- * Pure presenter: no terminal I/O. Consumed by OpenTUI component tree and tests.
+ * The Operate stage's subsystem-health surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :doctor · …`
+ * header, StatusFooter strip, and empty/error contract as every other stage.
+ *
+ * Pure presenter: no terminal I/O beyond the injected `Renderer`. Consumed by
+ * the OpenTUI component tree and the doctor-screen tests.
  */
 
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 import type { DoctorCheckResult } from "@platform-core/interface/doctor-results.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderWorkbenchEmptyState,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 // ---------------------------------------------------------------------------
 // TuiDoctorCheck Zod shape (re-exported for CLI / web consumers)
@@ -39,7 +52,7 @@ function statusIcon(status: DoctorCheckResult["status"]): string {
 }
 
 // ---------------------------------------------------------------------------
-// DoctorScreen — loads and renders TUI subsystem checks
+// DoctorScreen: loads and renders TUI subsystem checks
 // ---------------------------------------------------------------------------
 
 export interface DoctorScreenOptions {
@@ -49,6 +62,12 @@ export interface DoctorScreenOptions {
   onExit?: () => void;
   /** Subsystem filter shown in header; defaults to "tui". */
   subsystem?: string;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
 }
 
 export class DoctorScreen {
@@ -56,10 +75,42 @@ export class DoctorScreen {
   private cursor = 0;
   private expanded = new Set<string>();
   private readonly subsystem: string;
+  /** The focused subsystem-row Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "subsystem",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: DoctorScreenOptions = {}) {
     this.results = opts.results ?? [];
     this.subsystem = opts.subsystem ?? "tui";
+  }
+
+  /** The Step mode currently selected on the focused subsystem row (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
+
+  /** The OD stage-scope chrome for the Operate workbench. */
+  private get scope(): StageWorkbenchScope {
+    const fail = this.results.filter((r) => r.status === "fail").length;
+    const warn = this.results.filter((r) => r.status === "warn").length;
+    return {
+      stage: "Operate",
+      route: ":doctor",
+      purpose: "subsystems",
+      project: this.opts.projectLabel ?? null,
+      detail: this.results.length
+        ? `${this.results.length} checks · ${fail} failing · ${warn} warn`
+        : "subsystems",
+      agent: null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? null,
+    };
   }
 
   /** Replace the check results (called after async doctor run completes). */
@@ -73,6 +124,7 @@ export class DoctorScreen {
       this.opts.onExit?.();
       return true;
     }
+    if (this.modePicker.handleKey(key)) return true;
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.results.length - 1));
       return true;
@@ -97,13 +149,15 @@ export class DoctorScreen {
   }
 
   render(renderer: Renderer): void {
-    renderer.header(`  Doctor — ${this.subsystem} subsystem`);
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
     if (this.results.length === 0) {
-      renderer.writeln(c.dim("  Running checks…"));
-      renderer.writeln();
-      renderer.statusBar("[q] Back", "");
+      renderWorkbenchEmptyState(
+        renderer,
+        `No ${this.subsystem} subsystem checks have run yet.`,
+        "Running checks…",
+      );
+      renderStageWorkbenchFooter(renderer, this.scope);
       return;
     }
 
@@ -135,13 +189,22 @@ export class DoctorScreen {
       }
     }
 
+    // ModePicker row for the focused subsystem-row Step (acceptance: Step-bearing rows).
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
+
     renderer.separator();
-    renderer.statusBar("[j/k] Navigate  [Enter] Expand  [q] Back", `${this.subsystem}`);
+    renderer.writeln(c.dim("  j/k navigate  Enter expand  m/m p/m d/m a modes  q back"));
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 }
 
 // ---------------------------------------------------------------------------
-// OpenTUI gate — FakeTTY snapshot suite failure counter
+// OpenTUI gate: FakeTTY snapshot suite failure counter
 // ---------------------------------------------------------------------------
 
 export interface OpenTuiGateResult {
@@ -191,7 +254,7 @@ export function runOpenTuiSnapshotGate(
 
   for (const screen of screens) {
     const expected = snapshots[screen.name];
-    if (expected === undefined) continue; // no baseline — skip
+    if (expected === undefined) continue; // no baseline: skip
     try {
       const actual = screen.render();
       if (actual !== expected) {

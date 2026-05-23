@@ -1,5 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c, truncate } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
 
 export interface TuiMemory {
   id: string;
@@ -49,6 +50,7 @@ export interface MemoryTrpcCaller {
 export interface MemoryBrowserScreenOptions {
   projectId?: string;
   searchDebounceMs?: number;
+  viewportRows?: number;
   caller: {
     memory?: MemoryCaller;
     memories?: MemoryCaller;
@@ -68,6 +70,7 @@ export interface MemoryEditInput {
 export class MemoryBrowserScreen {
   private memories: TuiMemory[] = [];
   private cursor = 0;
+  private scrollTop = 0;
   private facetCursor = 0;
   private focus: Focus = "list";
   private selectedFacet: Facet | null = null;
@@ -115,17 +118,18 @@ export class MemoryBrowserScreen {
 
     for (let i = 0; i < rows.length; i++) {
       const memory = rows[i]!;
-      const selected = i === this.cursor;
+      const selected = this.scrollTop + i === this.cursor;
       const badge = memory.global ? " [global]" : " [project]";
       const importance = memory.importance ? ` !${memory.importance}` : "";
       const kind = memory.kind ? ` <${memory.kind}>` : "";
       const line = `  ${memoryLabel(memory)}${badge}${kind}${importance}  ${truncate(memoryText(memory), Math.max(24, renderer.width - 58))}`;
-      renderer.writeln(selected ? c.inverse(line) : line);
+      const visibleLine = truncateWide(line, Math.max(20, renderer.width));
+      renderer.writeln(selected ? c.inverse(visibleLine) : visibleLine);
     }
 
     renderer.writeln();
     if (this.confirmDelete) renderer.writeln(c.bold(`  Delete ${memoryLabel(this.currentMemory!)}? [y/N]`));
-    renderer.writeln(c.dim("  j/k move  f facets  Tab focus  / search  Enter detail/apply  g promote  a archive  e edit  d delete  q close"));
+    renderer.writeln(c.dim(truncateWide("  j/k move  f facets  Tab focus  / search  Enter detail/apply  g promote  a archive  e edit  d delete  q close", Math.max(20, renderer.width))));
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -170,6 +174,7 @@ export class MemoryBrowserScreen {
     if (key === "G") {
       this.globalOnly = !this.globalOnly;
       this.cursor = 0;
+      this.scrollTop = 0;
       this.clampCursor();
       return true;
     }
@@ -179,12 +184,18 @@ export class MemoryBrowserScreen {
     }
     if (key === "j" || key === "\x1b[B") {
       if (this.focus === "facets") this.facetCursor = Math.min(this.facetCursor + 1, Math.max(0, this.facets.length - 1));
-      else this.cursor = Math.min(this.cursor + 1, Math.max(0, this.visibleMemories.length - 1));
+      else {
+        this.cursor = Math.min(this.cursor + 1, Math.max(0, this.filteredMemories.length - 1));
+        this.keepCursorVisible();
+      }
       return true;
     }
     if (key === "k" || key === "\x1b[A") {
       if (this.focus === "facets") this.facetCursor = Math.max(0, this.facetCursor - 1);
-      else this.cursor = Math.max(0, this.cursor - 1);
+      else {
+        this.cursor = Math.max(0, this.cursor - 1);
+        this.keepCursorVisible();
+      }
       return true;
     }
     if (key === "\r" || key === "\n") {
@@ -192,6 +203,7 @@ export class MemoryBrowserScreen {
         this.selectedFacet = this.facets[this.facetCursor] ?? null;
         this.focus = "list";
         this.cursor = 0;
+        this.scrollTop = 0;
         this.clampCursor();
         return true;
       }
@@ -220,6 +232,7 @@ export class MemoryBrowserScreen {
     this.searchOpen = true;
     this.searchQuery = query;
     this.cursor = 0;
+    this.scrollTop = 0;
     this.clampCursor();
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => void this.runSearch(), this.opts.searchDebounceMs ?? 200);
@@ -234,7 +247,7 @@ export class MemoryBrowserScreen {
     this.clampCursor();
   }
 
-  get visibleMemories(): TuiMemory[] {
+  get filteredMemories(): TuiMemory[] {
     const query = this.searchQuery.trim().toLowerCase();
     return this.memories
       .filter((memory) => !memory.archived)
@@ -246,6 +259,11 @@ export class MemoryBrowserScreen {
       });
   }
 
+  get visibleMemories(): TuiMemory[] {
+    const rows = this.opts.viewportRows ?? 20;
+    return this.filteredMemories.slice(this.scrollTop, this.scrollTop + rows);
+  }
+
   private get memoryCaller(): MemoryCaller {
     const caller = this.opts.caller.memory ?? this.opts.caller.memories;
     if (!caller) throw new Error("MemoryBrowserScreen requires caller.memory or caller.memories");
@@ -253,7 +271,7 @@ export class MemoryBrowserScreen {
   }
 
   private get currentMemory(): TuiMemory | undefined {
-    return this.visibleMemories[this.cursor];
+    return this.filteredMemories[this.cursor];
   }
 
   private get facets(): Facet[] {
@@ -353,6 +371,7 @@ export class MemoryBrowserScreen {
     if (!query || !this.memoryCaller.search) return;
     this.memories = await this.memoryCaller.search({ ...this.baseInput(), query });
     this.cursor = 0;
+    this.scrollTop = 0;
     this.clampCursor();
   }
 
@@ -376,7 +395,14 @@ export class MemoryBrowserScreen {
   }
 
   private clampCursor(): void {
-    this.cursor = Math.min(this.cursor, Math.max(0, this.visibleMemories.length - 1));
+    this.cursor = Math.min(this.cursor, Math.max(0, this.filteredMemories.length - 1));
+    this.keepCursorVisible();
+  }
+
+  private keepCursorVisible(): void {
+    const rows = this.opts.viewportRows ?? 20;
+    if (this.cursor < this.scrollTop) this.scrollTop = this.cursor;
+    if (this.cursor >= this.scrollTop + rows) this.scrollTop = this.cursor - rows + 1;
   }
 }
 

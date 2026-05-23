@@ -16,6 +16,18 @@ const isPlaywrightCli = process.argv.some((arg) => arg.includes("playwright"));
 if (isPlaywrightCli) {
   const { test, expect } = await import("./fixtures.ts");
 
+  function artifactLink(page: import("@playwright/test").Page, title: string) {
+    return page.getByRole("link", { name: title }).first();
+  }
+
+  async function expectArtifactVisible(page: import("@playwright/test").Page, title: string) {
+    await expect(artifactLink(page, title)).toBeVisible();
+  }
+
+  async function expectArtifactAbsent(page: import("@playwright/test").Page, title: string) {
+    await expect(page.getByRole("link", { name: title })).toHaveCount(0);
+  }
+
   // ── List page ─────────────────────────────────────────────────────────────
 
   test("artifacts list page renders seeded artifact", async ({ page, fulcrumHome }) => {
@@ -29,7 +41,7 @@ if (isPlaywrightCli) {
 
     await page.goto("/artifacts");
     await expect(page.locator("[data-artifacts-list]")).toBeVisible();
-    await expect(page.locator("text=report.csv")).toBeVisible();
+    await expectArtifactVisible(page, "report.csv");
   });
 
   // ── Empty state ───────────────────────────────────────────────────────────
@@ -112,12 +124,12 @@ if (isPlaywrightCli) {
 
     // Default view: archived hidden
     await page.goto("/artifacts");
-    await expect(page.locator("text=active-file.txt")).toBeVisible();
-    await expect(page.locator("text=archived-file.txt")).not.toBeVisible();
+    await expectArtifactVisible(page, "active-file.txt");
+    await expectArtifactAbsent(page, "archived-file.txt");
 
     // Show archived
     await page.goto("/artifacts?archived=true");
-    await expect(page.locator("text=archived-file.txt")).toBeVisible();
+    await expectArtifactVisible(page, "archived-file.txt");
   });
 
   // ── Dedup: same content, different filenames → two rows ───────────────────
@@ -145,8 +157,8 @@ if (isPlaywrightCli) {
     });
 
     await page.goto("/artifacts");
-    await expect(page.locator("text=copy-a.txt")).toBeVisible();
-    await expect(page.locator("text=copy-b.txt")).toBeVisible();
+    await expectArtifactVisible(page, "copy-a.txt");
+    await expectArtifactVisible(page, "copy-b.txt");
   });
 
   // ── Delete via detail page ────────────────────────────────────────────────
@@ -167,7 +179,7 @@ if (isPlaywrightCli) {
     await page.locator("[data-artifact-delete]").click();
     // Should redirect to /artifacts
     await page.waitForURL("**/artifacts");
-    await expect(page.locator("text=to-delete.txt")).not.toBeVisible();
+    await expectArtifactAbsent(page, "to-delete.txt");
   });
 
   // ── MIME filter ───────────────────────────────────────────────────────────
@@ -188,8 +200,8 @@ if (isPlaywrightCli) {
     });
 
     await page.goto("/artifacts?mime=application/json");
-    await expect(page.locator("text=data.json")).toBeVisible();
-    await expect(page.locator("text=photo.png")).not.toBeVisible();
+    await expectArtifactVisible(page, "data.json");
+    await expectArtifactAbsent(page, "photo.png");
   });
 
   // ── Task-scoped artifact ──────────────────────────────────────────────────
@@ -212,7 +224,7 @@ if (isPlaywrightCli) {
     });
 
     await page.goto("/artifacts");
-    await expect(page.locator("text=task-attachment.pdf")).toBeVisible();
+    await expectArtifactVisible(page, "task-attachment.pdf");
   });
 
   // ── Inline text preview ───────────────────────────────────────────────────

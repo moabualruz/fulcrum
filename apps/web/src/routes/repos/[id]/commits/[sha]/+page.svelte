@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { buttonVariants } from "$lib/components/ui/button";
-  import { cn } from "$lib/utils.js";
+  import { buttonVariants } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -21,8 +21,8 @@
       <div class={cn("mt-1 font-mono text-xs text-muted-foreground")}>{payload.commit.sha}</div>
     </div>
     <div class={cn("flex gap-2")}>
-      <a href="?view=unified" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Unified</a>
-      <a href="?view=split" class={cn(buttonVariants({ variant: "outline", size: "sm" }))}>Split</a>
+      <a href="?view=unified" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Unified</a>
+      <a href="?view=split" class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}>Split</a>
     </div>
   </header>
 

@@ -83,6 +83,24 @@ async function runDocs(args: readonly string[], caller = fakeCaller()) {
   };
 }
 
+/**
+ * The `doc` verb group emits the canonical `fulcrum.cli.v1` envelope under
+ * `--json` (`prd-cli-capture-stage-parity`). This helper unwraps `.result` so
+ * the behavioural assertions below stay focused on the payload, not the chrome.
+ */
+function envelopeResult(line: string): unknown {
+  const parsed = JSON.parse(line) as Record<string, unknown>;
+  expect(parsed["schema"]).toBe("fulcrum.cli.v1");
+  expect(typeof parsed["trace_id"]).toBe("string");
+  return parsed["result"];
+}
+
+function envelopeErrors(line: string): unknown[] {
+  const parsed = JSON.parse(line) as { schema: string; errors: unknown[] };
+  expect(parsed.schema).toBe("fulcrum.cli.v1");
+  return parsed.errors;
+}
+
 describe("docs CLI commands", () => {
   test("list/get/create/delete/search call docs command boundary and print JSON", async () => {
     const caller = fakeCaller();
@@ -111,11 +129,11 @@ describe("docs CLI commands", () => {
       ["delete", { id: DOC.id, hard: true }],
       ["search", { query: "ADR", docType: "adr" }],
     ]);
-    expect(JSON.parse(list.lines[0] as string)[0].slug).toBe("my-adr");
-    expect(JSON.parse(get.lines[0] as string).bodyMd).toContain("Original body");
-    expect(JSON.parse(create.lines[0] as string)).toMatchObject({ slug: "my-adr", docType: "adr" });
-    expect(JSON.parse(deleted.lines[0] as string)).toEqual({ deleted: true });
-    expect(JSON.parse(search.lines[0] as string)[0].slug).toBe("my-adr");
+    expect((envelopeResult(list.lines[0] as string) as Array<{ slug: string }>)[0]!.slug).toBe("my-adr");
+    expect((envelopeResult(get.lines[0] as string) as { bodyMd: string }).bodyMd).toContain("Original body");
+    expect(envelopeResult(create.lines[0] as string)).toMatchObject({ slug: "my-adr", docType: "adr" });
+    expect(envelopeResult(deleted.lines[0] as string)).toEqual({ deleted: true });
+    expect((envelopeResult(search.lines[0] as string) as Array<{ slug: string }>)[0]!.slug).toBe("my-adr");
     expect([list, get, create, deleted, search].every((result) => result.exitCode === undefined)).toBe(true);
   });
 
@@ -133,7 +151,7 @@ describe("docs CLI commands", () => {
         ["get", { slug: "my-adr" }],
         ["update", { id: DOC.id, bodyMd: "# My ADR\n\nEdited body" }],
       ]);
-      expect(JSON.parse(result.lines[0] as string).bodyMd).toBe("# My ADR\n\nEdited body");
+      expect((envelopeResult(result.lines[0] as string) as { bodyMd: string }).bodyMd).toBe("# My ADR\n\nEdited body");
     } finally {
       await rm(scratch, { recursive: true, force: true });
     }
@@ -156,7 +174,7 @@ describe("docs CLI commands", () => {
     expect(caller.calls).toEqual([
       ["create", { title: "Design Note", docType: "note", projectId: "00000000-0000-4000-8000-000000000099" }],
     ]);
-    expect(JSON.parse(result.lines[0] as string).docType).toBe("adr"); // from fake, but call shape is what matters
+    expect((envelopeResult(result.lines[0] as string) as { docType: string }).docType).toBe("adr"); // from fake, but call shape is what matters
   });
 
   test("list with --project P passes projectId filter", async () => {
@@ -187,7 +205,7 @@ describe("docs CLI commands", () => {
 
     expect(result.exitCode).toBeUndefined();
     expect(caller.calls).toEqual([["versionsList", { docId: DOC.id }]]);
-    expect(JSON.parse(result.lines[0] as string)).toHaveLength(2);
+    expect(envelopeResult(result.lines[0] as string)).toHaveLength(2);
   });
 
   test("delete hard requires explicit confirmation", async () => {
@@ -196,7 +214,7 @@ describe("docs CLI commands", () => {
 
     expect(result.exitCode).toBe(1);
     expect(caller.calls).toEqual([]);
-    expect(result.errors.join("\n")).toContain("--yes");
+    expect(JSON.stringify(envelopeErrors(result.lines[0] as string))).toContain("--yes");
   });
 
   test("routes through the document public API when no caller is injected", async () => {
@@ -236,11 +254,11 @@ describe("docs CLI commands", () => {
     const templates = await runDocsWithOptions(["template", "list", "--json"], options);
 
     expect([list, get, create, versions, templates].every((result) => result.exitCode === undefined)).toBe(true);
-    expect(JSON.parse(list.lines[0] as string)[0].slug).toBe("my-adr");
-    expect(JSON.parse(get.lines[0] as string).id).toBe(DOC.id);
-    expect(JSON.parse(create.lines[0] as string)).toMatchObject({ id: "created-doc", title: "New doc", bodyMd: "# New" });
-    expect(JSON.parse(versions.lines[0] as string)).toEqual([{ id: "version-1", docId: DOC.id, version: 1 }]);
-    expect(JSON.parse(templates.lines[0] as string)).toEqual([{ id: "template-1", title: "Default note" }]);
+    expect((envelopeResult(list.lines[0] as string) as Array<{ slug: string }>)[0]!.slug).toBe("my-adr");
+    expect((envelopeResult(get.lines[0] as string) as { id: string }).id).toBe(DOC.id);
+    expect(envelopeResult(create.lines[0] as string)).toMatchObject({ id: "created-doc", title: "New doc", bodyMd: "# New" });
+    expect(envelopeResult(versions.lines[0] as string)).toEqual([{ id: "version-1", docId: DOC.id, version: 1 }]);
+    expect(envelopeResult(templates.lines[0] as string)).toEqual([{ id: "template-1", title: "Default note" }]);
     expect(requests).toEqual([
       ["GET", "http://127.0.0.1:3210/api/v1/docs?orgId=org-1&type=adr", undefined],
       ["GET", "http://127.0.0.1:3210/api/v1/docs?orgId=org-1", undefined],
@@ -254,7 +272,7 @@ describe("docs CLI commands", () => {
     const result = await runDocsWithOptions(["list", "--json"]);
 
     expect(result.exitCode).toBe(1);
-    expect(result.lines).toEqual([]);
-    expect(result.errors.join("\n")).toContain("Document API caller is not configured");
+    expect(result.errors).toEqual([]);
+    expect(JSON.stringify(envelopeErrors(result.lines[0] as string))).toContain("Document API caller is not configured");
   });
 });

@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 const RAW_ENTITY_MANAGER_PATTERNS = [
-  /em\.(persist|flush|execute|getConnection)/,
+  /(?:^|[^\w$])em\.(persist|flush|execute|getConnection)/,
 ];
 
 const RUNTIME_ROOTS = [
@@ -69,7 +69,7 @@ async function collectSourceFiles(root: string): Promise<string[]> {
     const path = join(root, entry.name);
     if (entry.isDirectory()) return collectSourceFiles(path);
     if (!entry.isFile()) return [];
-    if (!path.endsWith(".ts")) return [];
+    if (!path.endsWith(".ts") && !path.endsWith(".svelte")) return [];
     if (ignored(path)) return [];
     return [path];
   }));
@@ -123,11 +123,14 @@ describe("interface raw EntityManager and SQL boundary", () => {
     expect(found).toEqual(EXPECTED_RAW_SQL_CALL_FILES);
   });
 
-  test("web CLI and TUI invocation layers do not reference ORM internals", async () => {
+  test("web CLI and TUI app surfaces do not reference ORM internals", async () => {
     const found = await pathViolations(
       ["apps/web/src/routes", "apps/web/src/lib", "apps/cli/src", "apps/tui/src"],
       INVOCATION_LAYER_ORM_PATTERN,
     );
-    expect(found).toEqual([]);
+    // Pre-existing app-surface ORM references; refactor pass tracked
+    // separately. New routes MUST NOT be added here.
+    const RESIDUAL_INVOCATION_LAYER_ORM_FILES: string[] = [];
+    expect(found).toEqual(RESIDUAL_INVOCATION_LAYER_ORM_FILES);
   });
 });

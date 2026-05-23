@@ -58,7 +58,11 @@ describe("tasks cross-interface parity", () => {
         throw new Error(`unexpected CLI exit ${code}`);
       },
     });
-    const cliTask = JSON.parse(cliLines.join("\n")) as TaskDto;
+    // `fulcrum task get --json` wraps output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the task is `.result` (prd-cli-build-stage-parity).
+    const cliEnvelope = JSON.parse(cliLines.join("\n")) as { schema: string; result: TaskDto };
+    expect(cliEnvelope.schema).toBe("fulcrum.cli.v1");
+    const cliTask = cliEnvelope.result;
 
     const tuiCaller = await buildCaller(container);
     const tuiTask = (await tuiCaller.tasks?.list() as TaskDto[])

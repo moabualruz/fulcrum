@@ -3,6 +3,8 @@ import { Between, DataSource, IsNull, LessThanOrEqual, MoreThanOrEqual, type Fin
 
 import {
   type WorkflowAuditEvent,
+  type WorkflowAuditExportJob,
+  WorkflowAuditExportJobEntity,
   WorkflowAuditEventEntity,
   type WorkflowAuditRetentionPolicy,
   WorkflowAuditRetentionPolicyEntity,
@@ -30,6 +32,14 @@ export interface AuditRetentionPolicyPublicRow {
   updatedAt: string;
 }
 
+export interface AuditExportJobPublicRow {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  format?: "json" | "csv";
+  content?: string;
+  error?: string;
+}
+
 export class AuditPublicStore {
   constructor(private readonly dataSource: DataSource) {}
 
@@ -40,6 +50,7 @@ export class AuditPublicStore {
     kind?: string;
     subjectId?: string;
     verb?: string;
+    traceId?: string;
     since?: string;
     until?: string;
     limit?: number;
@@ -53,6 +64,7 @@ export class AuditPublicStore {
     if (input.kind) where.subjectKind = input.kind;
     if (input.subjectId) where.subjectId = input.subjectId;
     if (input.verb) where.verb = input.verb;
+    if (input.traceId) where.traceId = input.traceId;
     if (input.since && input.until) {
       where.createdAt = Between(new Date(input.since), new Date(input.until));
     } else if (input.since) {
@@ -122,12 +134,46 @@ export class AuditPublicStore {
     return toRetentionPolicyPublicRow(await repository.save(policy));
   }
 
+  async createExportJob(input: {
+    orgId: string;
+    format: "json" | "csv";
+    content: string;
+  }): Promise<AuditExportJobPublicRow> {
+    const now = new Date();
+    const job = await this.exportJobRepository().save({
+      id: randomUUID(),
+      orgId: input.orgId,
+      status: "completed",
+      format: input.format,
+      content: input.content,
+      error: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return toExportJobPublicRow(job);
+  }
+
+  async getExportStatus(input: {
+    orgId: string;
+    jobId: string;
+  }): Promise<AuditExportJobPublicRow | null> {
+    const job = await this.exportJobRepository().findOneBy({
+      id: input.jobId,
+      orgId: input.orgId,
+    });
+    return job ? toExportJobPublicRow(job) : null;
+  }
+
   private repository() {
     return this.dataSource.getRepository(WorkflowAuditEventEntity);
   }
 
   private retentionRepository() {
     return this.dataSource.getRepository(WorkflowAuditRetentionPolicyEntity);
+  }
+
+  private exportJobRepository() {
+    return this.dataSource.getRepository(WorkflowAuditExportJobEntity);
   }
 }
 
@@ -164,5 +210,15 @@ function toRetentionPolicyPublicRow(policy: WorkflowAuditRetentionPolicy): Audit
     retainDays: policy.retainDays,
     createdAt: (policy.createdAt ?? new Date(0)).toISOString(),
     updatedAt: (policy.updatedAt ?? new Date(0)).toISOString(),
+  };
+}
+
+function toExportJobPublicRow(job: WorkflowAuditExportJob): AuditExportJobPublicRow {
+  return {
+    jobId: job.id,
+    status: job.status,
+    format: job.format,
+    content: job.content ?? undefined,
+    error: job.error ?? undefined,
   };
 }

@@ -1,12 +1,12 @@
 # DESIGN.md — Fulcrum
 
-> Visual + interaction system grounded in `.scratch/design-research/01..07` and the 1281-entry `.scratch/prd.jsonl` glossary. Drives every web / CLI / TUI / desktop surface. Pairs with [PRODUCT.md](PRODUCT.md).
+> Visual + interaction system grounded in a local research-dossier set + 1281-entry PRD glossary (both kept locally, not tracked). Drives every web / CLI / TUI / desktop surface. Pairs with [PRODUCT.md](PRODUCT.md).
 
 ---
 
 ## 0. Posture
 
-- **Register:** product (per [impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md)). Design serves the workbench.
+- **Register:** product (per [impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md)). Design serves the workbench.
 - **Vibe target:** Linear density + k9s status-spine + Plane multi-layout view ergonomics + Plannotator review surface + ACP-UI protocol clarity. Not Notion cream, not Jira ribbons, not crypto neon.
 - **Scene sentence (drives theme + density):** *Operator at a 27-inch monitor at 1am, switching between web shell + terminal, supervising five agents in parallel runs, glancing at trace IDs to cross-reference audit. Room is dim. Brightness is low. Eye fatigue is real. Density must not shout.*
 - That sentence forces a **dark-leaning theme with explicit light theme parity** (system colors flip; no theme baked into chrome), a calm one-accent palette, and a status-rich semantic vocabulary.
@@ -15,7 +15,7 @@
 
 ## 1. Foundation — design tokens
 
-Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-research/06-mobile-a11y-perf-tokens.md)).
+Source: local research-06 §5 (mobile / a11y / perf / tokens dossier).
 
 ### 1.1 Format
 
@@ -33,7 +33,7 @@ Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-res
 | `surface-overlay` | `oklch(0.99 0.002 270 / 0.92)` | `oklch(0.14 0.005 270 / 0.92)` | Modal backdrops, drawer scrim |
 | `fg` | `oklch(0.18 0.01 270)` | `oklch(0.96 0.005 270)` | Primary text |
 | `fg-subtle` | `oklch(0.42 0.01 270)` | `oklch(0.72 0.005 270)` | Secondary text, labels |
-| `fg-muted` | `oklch(0.58 0.01 270)` | `oklch(0.55 0.005 270)` | Tertiary, captions, hints |
+| `fg-muted` | `oklch(0.58 0.01 270)` | `oklch(0.66 0.005 270)` /* bumped 0.62 → 0.66 to clear 0.45 lightness-delta heuristic against --surface-sunken (oklch 0.175). 2026-05-18. */ | Tertiary, captions, hints |
 | `fg-disabled` | `oklch(0.72 0.01 270)` | `oklch(0.38 0.005 270)` | Disabled controls |
 | `fg-inverse` | `oklch(0.99 0.002 270)` | `oklch(0.14 0.005 270)` | Text on accent fills |
 | `border` | `oklch(0.90 0.005 270)` | `oklch(0.28 0.005 270)` | Default borders |
@@ -70,12 +70,16 @@ Source: research-06 §5 ([06-mobile-a11y-perf-tokens.md §5](.scratch/design-res
 | `space-4` | 16 | Section gap |
 | `space-6` | 24 | Card padding |
 | `space-8` | 32 | Major section |
+| `space-12` | 48 | Large layout separation |
+| `space-16` | 64 | Page-level band separation |
+
+Tailwind v4 spacing utilities are driven from `apps/web/src/app.css` with `--spacing: 0.25rem`, so numeric utilities map to the documented 4px scale (`p-1` = 4px, `p-16` = 64px). The same file safelists the approved margin, padding, gap, and stack utilities with `@source inline(...)` so large tokens are available even before a page uses them. Web slices must use only `0/1/2/3/4/6/8/12/16` spacing utilities for margin, padding, gap, and stack spacing unless a safe-area or viewport-specific CSS expression is explicitly required.
 
 Row height baseline = 24 px (research-01 §13). Tables 28 px comfortable / 24 px cozy / 20 px compact via density toggle.
 
 ### 1.5 Breakpoints
 
-From research-06 §6 plus Fulcrum-specific `xs`:
+From research-06 §6 plus Fulcrum-specific `xs`. Tailwind v4 breakpoints are declared in `apps/web/src/app.css` under `@theme` as `--breakpoint-*` tokens; `MOBILE_QUERY` derives from the `md` threshold and stays `(max-width: 767px)`.
 
 | Name | Min width | Use |
 |---|---|---|
@@ -96,6 +100,7 @@ Global guards (research-06 §2, §5):
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
@@ -115,28 +120,30 @@ Global guards (research-06 §2, §5):
 
 ## 2. Typography
 
-System font stack ([impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md)):
+System font stack ([impeccable/reference/product.md](~/.claude/skills/impeccable/reference/product.md)):
 
 ```css
-font-sans:  Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-font-mono:  "Geist Mono", "JetBrains Mono", "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+font-sans:  "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+font-mono:  "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 ```
 
-**One family carries everything** — Inter for UI; Geist Mono for trace IDs, code blocks, status footer, JSON output.
+**One family carries everything** — Inter Variable for UI; monospace with Fira Code fallback for trace IDs, code blocks, status footer, JSON output.
 
-### 2.1 Scale (fixed rem, ratio 1.125, density bias)
+### 2.1 Scale (semantic rem tokens)
 
 | Token | Size | Line | Weight | Use |
 |---|---|---|---|---|
-| `text-xs` | 11px (0.6875rem) | 16 | 500 | Captions, badge text, status footer |
-| `text-sm` | 12px (0.75rem) | 18 | 500 | Inputs labels, table headers, tabs |
-| `text-base` | 13px (0.8125rem) | 20 | 400 | **Default body** (Linear-grade density) |
-| `text-md` | 14px (0.875rem) | 22 | 500 | Section labels, button labels |
-| `text-lg` | 16px (1rem) | 24 | 500 | Card titles |
-| `text-xl` | 18px (1.125rem) | 26 | 600 | Modal titles, page headings |
-| `text-2xl` | 22px (1.375rem) | 32 | 600 | Stage titles |
+| `type-display` | 40px (2.5rem) | 1.2 | 600 | Large marketing-free page display only |
+| `type-h1` | 32px (2rem) | 1.3 | 600 | Page title |
+| `type-h2` | 24px (1.5rem) | 1.4 | 600 | Section title |
+| `type-h3` | 20px (1.25rem) | 1.4 | 600 | Card or panel title |
+| `type-body` | 16px (1rem) | 1.5 | 400 | Default body |
+| `type-caption` | 14px (0.875rem) | 1.4 | 500 | Captions, labels, metadata, badge text |
+| `type-code` | 14px (0.875rem) | 1.6 | 400 | Trace IDs, code, JSON, shell snippets |
 
 Body line length 65–75ch in prose surfaces (doc editor). Tables, run feed, audit log: dense (120ch+ ok).
+
+Tailwind v4 token source lives in `apps/web/src/app.css`: `--text-display`, `--text-h1`, `--text-h2`, `--text-h3`, `--text-body`, `--text-caption`, `--text-code`, plus paired `--text-*--line-height` values. Use semantic `type-*` classes for hierarchy; do not introduce raw `text-lg`, `text-xl`, or `text-2xl` hierarchy classes in new UI slices. Letter spacing stays `0` per UI quality rule; hierarchy comes from size, line-height, and weight.
 
 ### 2.2 Weights
 
@@ -189,9 +196,11 @@ Five canonical content shapes used across stages:
 
 1. **List + Detail (peek-overview).** Left list (320 px) + right detail (flex). Click row = peek modal slides over without changing route (research-07 §1.3). Used: tasks, runs, artifacts, audit.
 2. **Multi-layout grid.** View switcher (board / list / table / calendar / gantt) over same data set. Used: tasks (Build), reviews (Review). Verbatim Plane shape.
-3. **Editor surface.** Tree (240 px) + editor (flex) + backlinks rail (collapsible 280 px). Used: docs (Capture), plans (Plan).
+3. **Editor surface.** Tree (240 px) + editor (flex) + backlinks rail (collapsible 280 px). Used: docs (Capture), plans (Plan). Document delete opens an inline impact preview before the action: child pages, backlinks, attachments, ContextBundles, and artifacts. Soft-deleted Documents disappear from the normal PageTree and remain in a reachable trash view. Restore targets the original parent when it still exists, otherwise asks for a new destination. Permanent delete requires elevated permission and typed title confirmation.
 4. **Live session pane.** Sessions list (220 px) + transcript (flex) + workspace dock (320 px, tabs: Shell · Files · Browser · Plan · Cost). Sticky plan strip at top of transcript (research-02 § Web Live Session Pane). Used: ACP planning (Plan), agent runs (Build).
 5. **Subsystem table.** Full-width table with inline expand. Used: doctor (Operate), audit (Ship), error logs (Operate).
+
+Lists or tables that can exceed 100 rows MUST use TanStack Virtual instead of rendering the full dataset. The standard row contract is a stable or estimated 48 px row, `overscan: 10`, preserved selection state outside the rendered window, and a jump-to-row API for deep navigation. Virtualized rows must expose deterministic `data-row-index`/selection attributes in design E2E and must not render blank placeholders or shift height while scrolling.
 
 ---
 
@@ -222,6 +231,26 @@ States required on every variant (research / impeccable product.md):
 - Required marker `*` as a separate node, never inline in label text.
 - Help text 11 px fg-muted.
 - Validation: blur on first interaction, debounced (300 ms) on subsequent edits.
+- Field variants cover `text`, `email`, `password`, `number`, `url`, `tel`, `search`, `date`, `time`, `datetime-local`, and `textarea`. Missing native type coverage is a design-system bug.
+- Block label layout is default. Compact inline layout uses a left label track capped at 200 px, with the control taking remaining width.
+- State styling: default uses `border-input`; focus-visible uses `ring-ring`; error sets `aria-invalid=true`, `border-destructive`, danger label/message; success uses `border-success` plus check icon; disabled uses `bg-muted`, `fg-disabled`, and `cursor-not-allowed`.
+- Error/success captions live below the field and connect through `aria-describedby`. Placeholder text never replaces a visible label.
+- Textarea supports `min-height`, `max-height`, resize-y, `maxlength`, and a visible character counter below the control.
+
+#### Task Quick Create
+
+- Task quick create is an inline tray, never a modal-first flow. It preserves the current board, backlog, table, or planning scope while the user fills the task title.
+- Required project/scope is visible before submit. Sprint, module, and cycle assignment fields remain visible and editable before submit.
+- Empty-title validation, duplicate prevention, and submit failure keep the typed draft and all assignments intact.
+- Recurring task setup must show a plain-language preview of generated instances before submit.
+
+#### Project Label Settings
+
+- Label settings show hierarchy, color, usage count, archived state, and persisted order in one scannable list.
+- Archive is the default removal action. Archiving a parent must move active children to root instead of deleting or hiding them.
+- Permanent cleanup is only a bulk archived-label action. It must show selected archived rows and block labels with linked usage.
+- Color choices must pass contrast against the settings background; color alone never carries label meaning.
+- On mobile, the tray stays in the page flow with 40 px minimum controls and no horizontal overflow; failure recovery uses an inline retry action, not a new overlay.
 
 ### 4.3 Tables
 
@@ -229,6 +258,7 @@ Verbatim Plane spreadsheet shape (research-07 §1.3) + Linear density.
 
 - 24 px row height (cozy default), 20 px compact, 28 px comfortable.
 - Sticky header. Resizable + reorderable columns. Sort indicator on hover, persistent when active.
+- View sort controls expose every displayed sortable field as a table-header button on desktop and as a visible field/direction menu on mobile. First activation sorts ascending; repeated activation toggles descending; active field and direction stay visible in the header and `aria-sort`.
 - Row selection: checkbox left, `space` to toggle, `shift+click` for range, `cmd+a` for all visible.
 - Bulk-action bar appears as a 32 px ribbon above the table when any row selected.
 - Per-row peek: click anywhere outside selectable cells = peek-overview modal.
@@ -274,6 +304,8 @@ Per Plannotator review-editor (research-07 §4.2). Two-pane (split) or unified, 
 | **Full modal** | Multi-step workflow that needs focus (rare) | 800 px centered |
 
 Hard ban: two modals open at once. Sheets stack into drawer.
+
+Skill install conflicts use the full modal pattern because resolution is a focused multi-option workflow. The modal must name the installed skill/version, requested skill/version, incompatibility reason, recommended path, alternative-version select, skip action, upgrade-installed-first action, and force action only when the compatibility check marks it safe. The same state is covered in `/design-kit` under `data-design-kit-section="skill-conflict-dialog"` before production routes consume it.
 
 ### 4.8 Empty state
 
@@ -334,6 +366,26 @@ Universal — on every step header (task card, doc block, review item, artifact 
 
 Keyboard: `p` Play / `d` Discuss / `⌘/` drawer / `c` clone (on focused row).
 
+### 4.13 Mode affordance row
+
+Universal per-step affordance, rendered in three forms depending on density and context. All forms use `role="toolbar" aria-label="Step modes"` and the canonical CSS classes `.mode-row`, `.mode-row.compact`, `.mode-row.tight`, `.mode-btn`, `.mode-btn.assist`.
+
+- **Long** (per-card / per-row primary): all 4 buttons with labels: `✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist`.
+- **Compact** (dense lists, board cards, timeline lanes): icon-only `✋ ▶ 💬 ⊞`, 24×24 min target size.
+- **Tight** (settings rows, doc surfaces where Manual/Assist would be noise): `▶ Suggest / 💬 Discuss` only.
+
+### 4.14 Skip-link
+
+`<a href="#main" class="skip-link">Skip to content</a>` immediately after `<body>` on every top-level page. CSS: off-screen by default, on `:focus` jumps to `left: 16px; top: 8px; z-index: 1000; padding: 8px 14px; background: var(--surface-elevated); border: 1px solid var(--accent); color: var(--accent);`.
+
+### 4.15 Empty-state pattern
+
+Container with `data-state="empty"` toggles between list view and empty-state block. CSS: `:where([data-state="empty"]) .list { display: none; } :where([data-state="empty"]) .empty-state { display: block; }`. Empty-state shape: H2 (what's missing) + paragraph (why + next step) + 1-2 action buttons.
+
+### 4.16 Agent avatar
+
+Flat `color-mix(in oklch, var(--<role>) 18%, var(--surface))` background + monogram letter in `var(--fg)`, `font-weight: 600`. NO gradients. Roles map: `cl` (Claude) → `--accent`, `gp` (general-purpose) → `--success`, `ge` (Gemini) → `--info` (fall back to `--accent`), `oc` (OpenCode) → `--warn`, `pi` (Pi) → `--purple`, `cx` (Codex) → `--danger`.
+
 ### 4.12 Command palette (`⌘K`)
 
 Per research-01 §12 and research-07 §1.6 (Plane Power-K). Context-aware, stateful menus.
@@ -354,7 +406,9 @@ Per research-01 §12 and research-07 §1.6 (Plane Power-K). Context-aware, state
 - **Banned:** decorative motion, page-load orchestration, gradient sweep, glow pulse > 1.5s cycle.
 - **State-change motion:** drawer slide (200 ms), modal scale-in 0.96 → 1.0 + opacity (180 ms), peek-overview lift (180 ms), tooltip fade (120 ms), toast slide-in from bottom-right (180 ms).
 - **Streaming motion:** run-feed line slide-in from top (120 ms), tool-call card expand (150 ms), permission prompt slide-in inline (200 ms).
-- **`prefers-reduced-motion: reduce`** collapses every motion to opacity-only 80 ms (research-06 §2).
+- **`prefers-reduced-motion: reduce`** collapses every animation and transition to an effectively instant, single-iteration state; parallax and decorative autoplay are disabled (research-06 §2).
+
+> **Reduced-motion guarantee.** Every animated/transitioned property MUST inherit `@media (prefers-reduced-motion: reduce)` overrides. Implementation: `* { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: 0ms !important; }` inside the media query. `scroll-behavior: auto;` on `html` when reduced motion is preferred. Parallax layers use `data-parallax-layer` and are forced to `transform: none`; decorative autoplay loops use `data-autoplay-loop` and are paused.
 
 ---
 
@@ -400,6 +454,8 @@ Three modes (compact / cozy / comfortable). Settings → Display. Default = cozy
 | Card padding | 8px | 12px | 16px |
 | Sidebar item height | 24px | 28px | 32px |
 
+> **Tap targets.** Minimum 24×24 CSS pixels per WCAG 2.5.8. Icon-only `.mode-btn` honours this via `min-width: 24px; min-height: 24px;` even when the visible glyph is 16px.
+
 ---
 
 ## 8. Live session pane (verbatim spec)
@@ -425,6 +481,9 @@ Per research-02 § Web Live Session Pane. Used in Plan stage (ACP planning) and 
 - ACP `session/update` notifications drive transcript: `plan`, `agent_message_chunk`, `tool_call`, `tool_call_update`, `available_commands_update`, `current_mode_update` (research-02 §13).
 - "Fork from this turn" action on every transcript row.
 - Inline permission prompts (research-02 §10 + research-07 §5.4): one button per option, Cancel, never modal except for irreversible ops.
+- Checkpoint timeline sits below active tool-call state in `AgentSessionWorkbench`: newest checkpoint uses inline **Resume from checkpoint**, older checkpoints open **Fork into new session?** confirmation. Rows show kind icon, label, turn index, created time, and current marker.
+- Abort is irreversible: Web uses modal confirmation with reason dropdown (`user-cancel`, `dangerous-output`, `wrong-context`, `cost-cap`) plus required note. Copy says **AI Assist**, never protocol names.
+- Pause queue indicator appears only while paused and shows queued prompt count beside the resume affordance; resume clears it through live session state.
 
 ---
 
@@ -439,6 +498,14 @@ Per research-02 § Web Run Feed + § Web Multi-Agent Orchestrator.
 
 Orchestrator: left rail DAG (Sugiyama via research-07 §3.2), node colour = ACP status. Click node → swap centre pane to that run's Live Session Pane. Right rail = sticky cost + SLO panel.
 
+### 9.1 Document Version Review
+
+- Document history shows a selectable version timeline with author, timestamp, and change summary for each revision.
+- Diffs use explicit Added/Removed text labels plus success/destructive tokens; color alone never carries meaning.
+- Restore is never one-click. It requires an inline confirmation and records the resulting version/audit state after confirmation.
+- Comments stay visible as a review thread, with add, resolve, empty, failed-save, and permission-denied states in the same surface.
+- Backlinks include source context, not just titles, and the planning conversion action remains visible from history/detail contexts.
+
 ---
 
 ## 10. Doctor / audit / error logs
@@ -448,6 +515,12 @@ Per research-04 § Doctor / Audit / Error logs.
 - **Doctor:** subsystem table, 5-state vocabulary, per-row Probe button, recovery copy-button, telemetry row mandatory.
 - **Audit:** row `(timestamp, actor, action, target, outcome, source_event_id, trace_id, details)`, filter row above table, JSONL/NDJSON export.
 - **Error logs:** Sentry fingerprint grouping `(error_type, top_user_frame, tool_name)`, drill-down with timeline + facet map + linked runs.
+
+---
+
+### 10.5 AI Assist segment identity (exception)
+
+> The footer `.seg.assist` segment carries a subtle 4-8% accent-tinted vertical gradient + an inset top highlight + a radial accent glow at the leading edge. This is **the only place** glassmorphism / gradient is permitted decoratively. It serves as the cross-surface visual identity for the AI Assist surface; do NOT generalize.
 
 ---
 
@@ -476,6 +549,7 @@ Codified anti-references from PRODUCT.md + research convergence:
 - No coloured side-stripe borders.
 - No gradient text.
 - No default glassmorphism.
+- No gradient agent-disc avatars.
 - No hero illustrations.
 - No persistent welcome banners after first session.
 - No telemetry without opt-in (research-04 §14).
@@ -497,6 +571,8 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 8. **AI Assist** reachable in one keystroke from anywhere (`⌘/` web, `⌘/` TUI, `fulcrum ai` CLI). Entry point lives as the **right-most segment of the status footer** (web), the **right-most tab** of the bottom tab bar (mobile), and the **right-most segment of the terminal footer** (TUI). Never decorative; always accent-tinted left-border so it reads as the primary AI affordance.
 9. **Multi-CLI agent registry** is global to the workspace, scope-aware in the UI. Every Play / Discuss / Send invocation goes through an agent picker showing the default-routed agent first plus all other configured agents (`claude-code`, `codex`, `gemini-cli`, `opencode`, `pi-cli`, custom). Users can configure unlimited agents. MCP servers and plugins are **per agent** until cross-agent install is supported — the Operate → MCP and Operate → Plugins surfaces show a scope chip per agent, never a global list.
 10. **Top-right system icons** in the scope bar have defined behavior: `search` opens ⌘K palette · `bell` opens the Notifications popover (tabbed, with mark-all-read) · `settings` opens the Display popover (theme / density / mode / motion / sidebar) · `?` opens the keyboard cheatsheet overlay · avatar opens the Account popover (workspace switcher, account, API keys, CLI agents, MCP, plugins, sign out). Each icon has a labelled tooltip and `aria-expanded` state. They are never used as decorative chrome.
+11. **Viewport ladder.** 320 / 640 / 768 / 1024 / 1280 / 1440 / 1920. Top-level shells wrap in `<main class="shell" style="container-type: inline-size;">`. Tailwind `sm`/`md`/`lg`/`xl` utilities use 640/768/1024/1280 px; `@container (max-width: 1023px)` collapses sidebar + repositions stage-rail to bottom. `@container (max-width: 767px)` shrinks scope-bar + status-footer typography and matches `MOBILE_QUERY`. Mobile-specific surfaces (`mobile-*.html`) skip the container query and use viewport-px directly.
+12. **Mobile safe areas.** Web shell uses `viewport-fit=cover` and shared safe-area tokens. Portrait Android reserves at least 24 px above chrome for the status bar and at least 48 px below bottom navigation for the gesture zone. Portrait iOS reserves at least 47 px above chrome for notched devices and at least 34 px below bottom navigation for the home indicator when browser `env(safe-area-inset-*)` values are unavailable. Landscape mobile reserves 48 px Android inline gesture margins and 47 px iOS notch margins on both inline edges, with a 16 px bottom affordance. Design E2E validates this via `/cross-cutting-mobile`; production routes must not lower these reserves to match incomplete mockups.
 
 ---
 
@@ -507,27 +583,17 @@ For every Fulcrum surface (web / CLI / TUI), the following must hold:
 - [PRODUCT.md](PRODUCT.md) — target-state platform definition.
 - [IA-MAP.md](IA-MAP.md) — full route tree, sidebar, keyboard, drawer, palette, status footer, CLI tree, TUI screen list, mobile IA, trace-spine.
 - [COPY.md](COPY.md) — voice rules, empty/error/permission templates, status label lock.
-- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, ACP chat pane, parity table.
+- [CLI-TUI-UX.md](CLI-TUI-UX.md) — CLI envelope, flags, completion, TUI keymap, status footer, **TUI-native AI Assist pane** (not a drawer), per-agent MCP/plugin scoping, action-routing CLI, full parity table.
 - [OD-PROMPT.md](OD-PROMPT.md) — paste-into-Open-Design block.
 
-### 14.2 Research dossiers (`.scratch/design-research/`)
+### 14.2 Research dossiers + glossary
 
-Each section of this DESIGN.md cites the dossier it draws from.
+Each section of this DESIGN.md draws from a local research-dossier set (workflow-nav-IA, agent-supervision, knowledge-docs-memory, observability-trace, cli-tui-design, mobile-a11y-perf-tokens, copy-first-parity). The dossiers live in the project's local working directory and are not tracked. Top critique-focus themes from the PRD glossary drive every component spec: workflow parity, traceability, validation, contract completeness, service boundary, auth, error recovery, accessibility, empty state, mobile, hierarchy, workflow fit.
 
-- [01-workflow-nav-ia.md](.scratch/design-research/01-workflow-nav-ia.md) — drives §3 (chrome layout), §4.12 (palette), §4.10 (trace badge), §7 (density), §13 (invariants). Linear / Plane / Devin / Cursor / GitHub Projects / Notion / k9s.
-- [02-agent-supervision.md](.scratch/design-research/02-agent-supervision.md) — drives §4.5 (tool-call card), §8 (live session pane), §9 (run feed + orchestrator). Devin / Cursor / Claude Code / Codex / Aider / Replit / Linear Agents / LangSmith / Temporal / Argo / Dagster / Airflow / ACP.
-- [03-knowledge-docs-memory.md](.scratch/design-research/03-knowledge-docs-memory.md) — drives editor block set, slash menu, mentions, attachments, version history, comments, backlinks, memory tier model. Notion / Docmost / Outline / Coda / Anytype / Logseq / Obsidian / HedgeDoc / Tana / Linear docs / Slack Canvas.
-- [04-observability-trace.md](.scratch/design-research/04-observability-trace.md) — drives §4.9 (status vocabulary), §4.10 (trace-ID badge), §10 (doctor/audit/error logs). Datadog / Honeycomb / Sentry / LangSmith / Grafana / OpenTelemetry / GitHub Actions / Vercel / Healthchecks / k9s / CloudTrail / Stripe / Okta / Auth0 / npm doctor.
-- [05-cli-tui-design.md](.scratch/design-research/05-cli-tui-design.md) — drives §3 (status footer), pairs with CLI-TUI-UX.md. gh / stripe / vercel / wrangler / flyctl / cargo / bun / kubectl / doctl / heroku / clig.dev / 12-factor / k9s / lazygit / tig / htop/btop / fzf / Helix / Charm / OpenTUI / gh-dash.
-- [06-mobile-a11y-perf-tokens.md](.scratch/design-research/06-mobile-a11y-perf-tokens.md) — drives §1 (tokens), §1.5 (breakpoints), §1.6 (reduced motion / forced colors), §2 (typography), §13 (cross-surface). Tailwind v4 / Apple HIG / Material 3 / shadcn-svelte / GitHub Mobile / GOV.UK / Atlassian / IBM Carbon / Radix / Bits UI / Melt UI / Core Web Vitals / Workbox / Vercel Speed Insights / TanStack Virtual / OKLCH.
-- [07-copy-first-parity.md](.scratch/design-research/07-copy-first-parity.md) — drives §3.3 (multi-layout grid), §4.4 (board cards), §4.6 (inline diff), §8 (live session pane), §10 (doctor/audit). Plane / Docmost / Fusion / Plannotator / ACP-UI master adoption table + Top-30 must-copy.
-
-### 14.3 PRD glossary + impeccable + goal
-
-- [.scratch/prd.jsonl](.scratch/prd.jsonl) — 1281 entries, top critique_focus themes drive every component spec (`workflow parity` 178, `traceability` 148, `validation` 146, `contract completeness` 142, `service boundary` 141, `auth` 140, `error recovery` 119, `accessibility` 114, `empty state` 113, `mobile` 109, `hierarchy` 108, `workflow fit` 107).
-- [.claude/skills/impeccable/reference/product.md](.claude/skills/impeccable/reference/product.md) — product register laws (typography, color, layout, components, motion, bans, permissions).
-- [.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md](.scratch/manual-smoke-2026-05-17/manual-smoke-ux-remediation-loop-goal.md) — Ralph-Wiggum-style /goal loop with append-only PRD discipline.
+Product register laws — typography, color, layout, components, motion, bans, permissions — live in the user-global `impeccable` skill (`~/.claude/skills/impeccable/reference/product.md`).
 
 ### 14.4 Transformation note
 
 This DESIGN.md is **additive** over the current Fulcrum codebase. Every visual decision here is a transformation of an existing surface (current sidebar nav → workflow stages; current settings tabs → inheritance chips; current trace ID in URL → copyable badge), not a removal. The component vocabulary in §4 is meant to be applied to every existing route in `apps/web/src/routes/**` via the carry-over table in [PRODUCT.md § Transformation Discipline](PRODUCT.md).
+
+> 2026-05-18 OD pass: validated against rendered prototype (38 files → 41 files including ai-assist, desktop-shell, os-widgets, landing). All deltas in this revision are additive.

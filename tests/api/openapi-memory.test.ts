@@ -132,6 +132,7 @@ describe("memory REST API Nest controller contract", () => {
       kind: "decision",
       tags: ["api", "memory"],
       importance: "high",
+      sourceRef: { kind: "manual" },
     }, AUTHORIZATION) as { id: string; body: string };
     expect(created.body).toBe("REST memory should call the same memory surface.");
 
@@ -148,7 +149,7 @@ describe("memory REST API Nest controller contract", () => {
 
   it("preserves delete confirmation and patch validation errors", async () => {
     const { memory } = memoryControllers();
-    const created = await memory.createMemory({ body: "Patch me" }, AUTHORIZATION) as { id: string };
+    const created = await memory.createMemory({ body: "Patch me", sourceRef: { kind: "manual" } }, AUTHORIZATION) as { id: string };
 
     await expect(memory.deleteMemory({ id: created.id }, {}, AUTHORIZATION)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -160,7 +161,7 @@ describe("memory REST API Nest controller contract", () => {
 
   it("supports memory actions and context preview", async () => {
     const { memory, context } = memoryControllers();
-    const created = await memory.createMemory({ body: "Action me" }, AUTHORIZATION) as { id: string };
+    const created = await memory.createMemory({ body: "Action me", sourceRef: { kind: "manual" } }, AUTHORIZATION) as { id: string };
 
     await expect(memory.promoteMemory({ id: created.id }, AUTHORIZATION)).resolves.toMatchObject({ id: created.id });
     await expect(memory.archiveMemory({ id: created.id }, AUTHORIZATION)).resolves.toMatchObject({ archived: true });

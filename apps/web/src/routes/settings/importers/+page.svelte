@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ActionData, PageData } from "./$types";
   import type { ImporterName } from "./+page.server.js";
+  import { CredentialInput } from "@fulcrum/ui-kit";
 
   interface Props {
     data: PageData;
@@ -85,7 +86,7 @@
 
         {#if importOkForTab}
           <p data-import-success class="rounded-md border border-green-700/30 bg-green-950/20 px-3 py-2 text-sm text-green-700">
-            Import complete — {(form as { rowCount?: number }).rowCount ?? 0} tasks imported.
+            Import complete: {(form as { rowCount?: number }).rowCount ?? 0} tasks imported.
           </p>
         {/if}
 
@@ -109,13 +110,11 @@
             {:else}
               <div class="flex flex-col gap-1.5">
                 <label for="api-key-{selectedTab}" class="text-sm font-medium">{tabLabel(selectedTab)} API Key</label>
-                <input
+                <CredentialInput
                   id="api-key-{selectedTab}"
                   name="apiKey"
-                  type="password"
                   placeholder="Enter API key"
                   data-api-key-input
-                  class="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
                 />
               </div>
             {/if}

@@ -1,5 +1,5 @@
 /**
- * TUI Feature Flags screen — Settings → Feature Flags
+ * TUI Feature Flags screen: Settings → Feature Flags
  *
  * Renders all registered flags as a toggleable list with descriptions.
  * Toggle calls flags.set in-process; re-queries flags.list after each toggle.
@@ -27,7 +27,7 @@ export interface FlagItem {
 }
 
 export interface FlagsScreenOptions {
-  /** In-process tRPC caller or equivalent — must expose flags.list and flags.set. */
+  /** In-process tRPC caller or equivalent: must expose flags.list and flags.set. */
   caller: {
     flags: {
       list: () => Promise<FlagItem[]>;
@@ -86,7 +86,7 @@ export class FlagsScreen {
    * Handle a keypress event.
    * Returns true if the key was consumed; false if caller should handle it.
    *
-   * Note: toggle is async — the caller must await handleKeyAsync() to let
+   * Note: toggle is async: the caller must await handleKeyAsync() to let
    * flags.set + flags.list complete before re-rendering.
    */
   async handleKey(key: string): Promise<boolean> {

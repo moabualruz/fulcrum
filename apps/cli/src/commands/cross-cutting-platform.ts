@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { TelemetryConsentStore } from "@platform-core/application/telemetry/consent-store.ts";
 import {
   createDataPortabilityApiCallerFromEnv,
   type DataPortabilityApiEnvironment,
@@ -18,7 +19,7 @@ import {
 import {
   createFeatureExperimentApiCallerFromEnv,
   type FeatureExperimentApiEnvironment,
-} from "@platform-core/interface/http/feature-experiment-api-client.ts";
+} from "@feature-flags/interface/http/feature-experiment-api-client.ts";
 import {
   createThemeSettingsApiCallerFromEnv,
   type ThemeSettingsApiEnvironment,
@@ -46,7 +47,7 @@ type CliOptions = {
   exit?: (code: number) => void;
   stdin?: () => Promise<string>;
   readInput?: (path: string) => Promise<string>;
-  /** Injectable factory for init-keyring — for tests. */
+  /** Injectable factory for init-keyring: for tests. */
   loaderFactory?: NativeAdapterLoader;
 };
 
@@ -319,20 +320,36 @@ export async function runTelemetry(argv: readonly string[], opts: CliOptions = {
   const { print } = io(opts);
   const [sub = "help"] = argv;
   if (sub === "status") {
-    const result = await resolveTelemetryCaller(opts).telemetry.status({});
-    jsonOrText(print, has(argv, "--json"), result, `opted_in=${result.opted_in} row_count=${result.row_count}`);
+    const consentStore = createConsentStore(opts);
+    const consent = consentStore.read();
+    const remote = await tryRemoteStatus(opts);
+    const summary = {
+      consent: consent ?? null,
+      consent_path: consentStore.filePath,
+      remote,
+    };
+    jsonOrText(
+      print,
+      has(argv, "--json"),
+      summary,
+      consent
+        ? `consent=${consent.optedIn ? "yes" : "no"} decided_at=${consent.decidedAt}`
+        : `consent=undecided: run 'fulcrum telemetry opt-in' or 'fulcrum telemetry opt-out'`,
+    );
     return;
   }
 
   if (sub === "opt-in") {
-    const result = await resolveTelemetryCaller(opts).telemetry.optIn({});
-    jsonOrText(print, has(argv, "--json"), result, "opted in");
+    const consent = createConsentStore(opts).write(true);
+    const remote = await tryRemoteOptIn(opts);
+    jsonOrText(print, has(argv, "--json"), { consent, remote }, "opted in");
     return;
   }
 
   if (sub === "opt-out") {
-    const result = await resolveTelemetryCaller(opts).telemetry.optOut({});
-    jsonOrText(print, has(argv, "--json"), result, "opted out");
+    const consent = createConsentStore(opts).write(false);
+    const remote = await tryRemoteOptOut(opts);
+    jsonOrText(print, has(argv, "--json"), { consent, remote }, "opted out");
     return;
   }
 
@@ -343,6 +360,35 @@ export async function runTelemetry(argv: readonly string[], opts: CliOptions = {
   }
 
   fail(opts, `fulcrum telemetry: unknown command '${sub}'`, 2);
+}
+
+function createConsentStore(opts: CliOptions): TelemetryConsentStore {
+  const overridePath = (opts.env as Record<string, string | undefined> | undefined)?.FULCRUM_TELEMETRY_CONSENT_PATH;
+  return new TelemetryConsentStore(overridePath ? { filePath: overridePath } : {});
+}
+
+async function tryRemoteStatus(opts: CliOptions): Promise<Record<string, unknown> | null> {
+  try {
+    return await resolveTelemetryCaller(opts).telemetry.status({});
+  } catch {
+    return null;
+  }
+}
+
+async function tryRemoteOptIn(opts: CliOptions): Promise<Record<string, unknown> | null> {
+  try {
+    return await resolveTelemetryCaller(opts).telemetry.optIn({});
+  } catch {
+    return null;
+  }
+}
+
+async function tryRemoteOptOut(opts: CliOptions): Promise<Record<string, unknown> | null> {
+  try {
+    return await resolveTelemetryCaller(opts).telemetry.optOut({});
+  } catch {
+    return null;
+  }
 }
 
 function resolveTelemetryCaller(opts: CliOptions): Record<string, any> {
@@ -424,7 +470,7 @@ function resolveFeatureFlagCaller(opts: CliOptions): Record<string, any> {
 }
 
 /**
- * runSecretsInitKeyring — `fulcrum secrets init-keyring`
+ * runSecretsInitKeyring: `fulcrum secrets init-keyring`
  *
  * Attempts to (re-)load the native OS keyring module. Prints diagnostic on
  * failure and exits with code 1. Never crashes the process on load error.

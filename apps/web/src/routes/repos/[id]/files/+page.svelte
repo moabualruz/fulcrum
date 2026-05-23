@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 	import type { FileTreeNode } from "./+page.server.js";
 
 	interface Props {
@@ -91,7 +91,7 @@
 				<div
 					data-binary-placeholder
 					class={cn("rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground")}
-				>Binary file — preview not available.</div>
+				>Binary file: preview not available.</div>
 			{:else if payload.fileContent === null}
 				<div class={cn("text-sm text-muted-foreground p-4")}>File not found or empty.</div>
 			{:else}

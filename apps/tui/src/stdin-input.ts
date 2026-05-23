@@ -1,5 +1,5 @@
 /**
- * StdinInput — real stdin keypress adapter for production TUI use.
+ * StdinInput: real stdin keypress adapter for production TUI use.
  *
  * Puts stdin into raw mode so individual keypresses are received immediately
  * (without waiting for Enter). Emits "keypress" events consumed by TuiApp.

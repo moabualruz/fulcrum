@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { invalidateAll, goto } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { browser } from "$app/environment";
   import { enhance } from "$app/forms";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
+  import { invalidateAll } from "$app/navigation";
   import type { PageData } from "./$types";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn, Select } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import { SYMPHONY_COLORS, type SymphonyState } from "$lib/orchestration";
 
   interface Props {
@@ -30,7 +31,7 @@
   }
 
   function claimLabel(row: { orchestration_state: string | null; claimed_by: string | null }): string {
-    if (!row.orchestration_state) return row.claimed_by ? `claimed:${row.claimed_by.slice(0, 8)}` : "—";
+    if (!row.orchestration_state) return row.claimed_by ? `claimed:${row.claimed_by.slice(0, 8)}` : "-";
     return row.claimed_by
       ? `${row.orchestration_state} (${row.claimed_by.slice(0, 8)})`
       : row.orchestration_state;
@@ -38,7 +39,7 @@
 
   function onProjectChange(e: Event) {
     const select = e.target as HTMLSelectElement;
-    const url = new URL($page.url);
+    const url = new URL(page.url);
     if (select.value) {
       url.searchParams.set("project", select.value);
     } else {
@@ -135,7 +136,7 @@
                         <button
                           type="submit"
                           data-cancel-button={d.id}
-                          class={cn(buttonVariants({ variant: "destructive", size: "sm" }))}
+                          class={cn(buttonVariants({ variant: "danger", size: "sm" }))}
                         >Cancel</button>
                       </form>
                     {/if}
@@ -145,7 +146,7 @@
                         <button
                           type="submit"
                           data-retry-button={d.id}
-                          class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                          class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                         >Retry</button>
                       </form>
                     {/if}

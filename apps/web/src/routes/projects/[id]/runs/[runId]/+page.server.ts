@@ -1,9 +1,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { cancelRun, retryRun } from "@execution-orchestration/interface/run-actions.ts";
-import { getProjectRunPageData } from "@execution-orchestration/interface/run-pages.ts";
-import { requestServiceScope } from "$lib/server/request-service-scope";
 import { actionOk } from "$lib/feedback/action-result";
+import { createAgentRunApiForEvent } from "$lib/server/agent-run-api";
 
 interface AgentRunDetail {
   id: string;
@@ -35,15 +33,18 @@ interface EventRow {
   created_at: string | Date;
 }
 
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { params, locals } = event;
   return {
     projectId: params.id,
     activeProjectId: locals?.activeProjectId ?? null,
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals, params.id);
         try {
-          return await getProjectRunPageData(em, ctx, params.runId);
+          return await createAgentRunApiForEvent(event).runs.pageDetail({
+            id: params.runId,
+            projectId: params.id,
+          });
         } catch {
           throw error(404, "Run not found");
         }
@@ -53,15 +54,31 @@ export const load: PageServerLoad = ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-  cancel: async ({ params, locals }) => {
-    const { em, ctx } = await requestServiceScope(locals, params.id);
-    await cancelRun(em, ctx, params.runId!);
+  cancel: async (event) => {
+    await createAgentRunApiForEvent(event).runs.cancel({ id: event.params.runId! });
     return actionOk("Run cancelled");
   },
-  retry: async ({ params, locals }) => {
-    const { em, ctx } = await requestServiceScope(locals, params.id);
-    const result = await retryRun(em, ctx, params.runId!);
+  retry: async (event) => {
+    const { params } = event;
+    const result = await createAgentRunApiForEvent(event).runs.retry({ id: params.runId! }) as { id: string };
     const newId = result.id;
     throw redirect(303, `/projects/${params.id}/runs/${newId}`);
+  },
+  approvalDecision: async (event) => {
+    const { request, params } = event;
+    const form = await request.formData();
+    const approvalId = String(form.get("approvalId") ?? "");
+    const decision = String(form.get("decision") ?? "");
+    if (decision !== "approve" && decision !== "deny" && decision !== "request_info") {
+      throw error(400, "Invalid approval decision");
+    }
+    await createAgentRunApiForEvent(event).runs.recordApprovalDecision({
+      id: params.runId!,
+      projectId: params.id,
+      approvalId,
+      decision: decision as "approve" | "deny" | "request_info",
+      note: String(form.get("note") ?? "") || null,
+    });
+    return actionOk("Approval decision recorded");
   },
 };

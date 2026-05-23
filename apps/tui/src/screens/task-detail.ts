@@ -1,5 +1,6 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { QuitConfirmation } from "../quit-confirmation.ts";
 
 interface TaskLink {
   id: string;
@@ -77,6 +78,7 @@ export class TaskDetailScreen {
   private task: DetailTask | null = null;
   private customFieldDefs: CustomFieldDef[] = [];
   private overlay: Overlay = "none";
+  private readonly quitConfirmation = new QuitConfirmation();
   validationError: string | null = null;
   cancelled = false;
 
@@ -139,6 +141,7 @@ export class TaskDetailScreen {
     this.writeTrace(renderer);
     renderer.writeln();
     renderer.writeln(c.dim("  e title  a assign  s status  p priority  d due  l labels  c child  q back"));
+    this.renderQuitConfirmation(renderer);
 
     if (this.overlay !== "none") {
       renderer.writeln();
@@ -155,9 +158,22 @@ export class TaskDetailScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    const quitAnswer = this.quitConfirmation.answer(key);
+    if (quitAnswer === "stay" || quitAnswer === "confirm") return true;
+    if (quitAnswer === "quit") {
+      this.overlay = "none";
+      if (this.opts.mode === "create") this.cancelled = true;
+      return true;
+    }
+
+    if (key === "q") {
+      return this.requestQuit();
+    }
+
     if (key === "\x1b") {
       if (this.opts.mode === "create") this.cancelled = true;
       this.overlay = "none";
+      this.quitConfirmation.clear();
       return true;
     }
     if (key === "e") return this.open("title");
@@ -206,6 +222,23 @@ export class TaskDetailScreen {
     this.overlay = "dependency";
   }
 
+  requestQuit(): boolean {
+    const decision = this.quitConfirmation.request(
+      this.hasUnsavedDraft,
+      "Discard task detail draft changes.",
+    );
+    if (decision === "quit") return false;
+    return true;
+  }
+
+  get hasUnsavedDraft(): boolean {
+    return this.overlay !== "none" || this.opts.mode === "create";
+  }
+
+  get quitConfirmationMessage(): string | null {
+    return this.quitConfirmation.message;
+  }
+
   async submitBlockedBy(id: string): Promise<void> {
     const trimmed = id.trim();
     if (!trimmed || !this.task || !this.opts.caller.tasks.update) return;
@@ -240,7 +273,15 @@ export class TaskDetailScreen {
 
   private open(overlay: Overlay): true {
     this.overlay = overlay;
+    this.quitConfirmation.clear();
     return true;
+  }
+
+  private renderQuitConfirmation(renderer: Renderer): void {
+    if (!this.quitConfirmation.message) return;
+    renderer.writeln();
+    renderer.writeln(c.yellow(`  ${this.quitConfirmation.message}`));
+    renderer.writeln(c.dim(`  ${this.quitConfirmation.hint ?? ""}`));
   }
 
   private writeLine(renderer: Renderer, label: string, value: string): void {

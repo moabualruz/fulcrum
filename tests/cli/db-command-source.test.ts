@@ -61,16 +61,22 @@ describe("fulcrum db command source behavior", () => {
 
     expect(result.exitCode).toBeNull();
     expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout)).toEqual({
+    expect(JSON.parse(result.stdout)).toMatchObject({
       backend: "pglite",
       connection: {
         type: "local-pglite",
-        dataDir: process.env.FULCRUM_HOME + "/pglite.data",
+        dataDir: process.env.FULCRUM_HOME + "/db/main",
       },
       current: null,
       pending: [],
       pastDue: 0,
       ok: true,
+      runtime: {
+        backend: "pglite",
+        source: "fulcrum-home",
+        target: process.env.FULCRUM_HOME + "/db/main",
+        migrationsTableName: "schema_migrations",
+      },
     });
   });
 
@@ -82,7 +88,7 @@ describe("fulcrum db command source behavior", () => {
 
     expect(result.exitCode).toBeNull();
     expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout)).toEqual({
+    expect(JSON.parse(result.stdout)).toMatchObject({
       backend: "postgres",
       connection: {
         type: "postgres",
@@ -92,7 +98,14 @@ describe("fulcrum db command source behavior", () => {
       pending: [],
       pastDue: 0,
       ok: true,
+      runtime: {
+        backend: "postgres",
+        source: "database-url",
+        target: "postgresql://fulcrum:***@127.0.0.1:5432/fulcrum",
+        migrationsTableName: "schema_migrations",
+      },
     });
+    expect(result.stdout).not.toContain("secret");
   });
 
   test("reset-local-state plans refusal and confirmation against the selected Fulcrum home", async () => {

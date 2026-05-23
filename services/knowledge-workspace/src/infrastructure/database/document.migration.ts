@@ -153,9 +153,30 @@ export class KnowledgeDocuments1778623200004 implements MigrationInterface {
     await queryRunner.query(
       "CREATE INDEX fulcrum_saved_searches_workspace_scope_idx ON fulcrum_saved_searches (workspace_id, scope)",
     );
+
+    await queryRunner.query(`
+      CREATE TABLE fulcrum_search_clicks (
+        id varchar(128) PRIMARY KEY,
+        workspace_id varchar(128) NOT NULL REFERENCES fulcrum_workspaces(id) ON DELETE CASCADE,
+        user_id varchar(128) NOT NULL,
+        project_id varchar(128) REFERENCES fulcrum_projects(id) ON DELETE CASCADE,
+        query text NOT NULL,
+        result_id varchar(128) NOT NULL,
+        result_kind varchar(80) NOT NULL,
+        position integer,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await queryRunner.query(
+      "CREATE INDEX fulcrum_search_clicks_workspace_user_idx ON fulcrum_search_clicks (workspace_id, user_id)",
+    );
+    await queryRunner.query(
+      "CREATE INDEX fulcrum_search_clicks_workspace_project_idx ON fulcrum_search_clicks (workspace_id, project_id)",
+    );
   }
 
   async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query("DROP TABLE IF EXISTS fulcrum_search_clicks");
     await queryRunner.query("DROP TABLE IF EXISTS fulcrum_saved_searches");
     await queryRunner.query("DROP TABLE IF EXISTS fulcrum_doc_search_entries");
     await queryRunner.query("DROP TABLE IF EXISTS fulcrum_doc_collaboration_states");

@@ -44,6 +44,7 @@ IsOptional()(DocumentWorkspacePageTreeRequestDto.prototype, "breadcrumbPageId");
 IsArray()(DocumentWorkspacePageOperationsRequestDto.prototype, "pages");
 IsString()(DocumentWorkspacePageOperationsRequestDto.prototype, "rootPageId");
 IsArray()(DocumentWorkspacePageOperationsRequestDto.prototype, "accessibleTreePageIds");
+IsOptional()(DocumentWorkspacePageOperationsRequestDto.prototype, "operations");
 
 const previewPageTreeDescriptor = Object.getOwnPropertyDescriptor(
   DocumentWorkspaceController.prototype,

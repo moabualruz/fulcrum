@@ -44,7 +44,7 @@ describe("TUI planning workflow", () => {
         acpSessionId: "acp-guided-tui",
         agentName: "codex",
         cwd: "/repo",
-        userPrompt: "Plan with guided ACP from TUI.",
+        userPrompt: "Plan with guided AI Assist from TUI.",
         promptTemplateId: "prototype-first",
         selectedDocIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
         traceId: "trace_guided_acp_tui",
@@ -174,7 +174,7 @@ describe("TUI planning workflow", () => {
                 selectedDocs: [],
                 contextMarkdown: "## Freeform Document: Brief",
               },
-              prompt: "ACP prompt with submit_plan",
+              prompt: "AI Assist prompt with submit_plan",
             };
           },
           startFreeformWorkFromDocs: async (input: unknown) => {
@@ -191,7 +191,7 @@ describe("TUI planning workflow", () => {
                 sourceRefs: [{ kind: "doc", id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" }],
                 contextMarkdown: "## Freeform Document: TUI freeform brief",
               },
-              prompt: "TUI ACP prompt with submit_plan",
+              prompt: "TUI AI Assist prompt with submit_plan",
             };
           },
           startGuidedAcpPlanningSession: async (input: unknown) => {
@@ -218,7 +218,7 @@ describe("TUI planning workflow", () => {
                 sourceRefs: [{ kind: "doc", id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }],
                 contextMarkdown: "## Freeform Document: Brief",
               },
-              prompt: "TUI guided ACP prompt with submit_plan",
+              prompt: "TUI guided AI Assist prompt with submit_plan",
             };
           },
           recordGuidedAcpSessionAction: async (input: unknown) => {
@@ -379,7 +379,7 @@ describe("TUI planning workflow", () => {
     }]);
     expect(tty.plainText()).toContain("Freeform context");
     expect(tty.plainText()).toContain("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-    expect(tty.plainText()).toContain("ACP prompt with submit_plan");
+    expect(tty.plainText()).toContain("AI Assist prompt with submit_plan");
 
     await screen.handleKey("n");
     tty.clear();
@@ -397,7 +397,7 @@ describe("TUI planning workflow", () => {
     expect(tty.plainText()).toContain("Freeform work started");
     expect(tty.plainText()).toContain("TUI freeform brief");
     expect(tty.plainText()).toContain("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
-    expect(tty.plainText()).toContain("TUI ACP prompt with submit_plan");
+    expect(tty.plainText()).toContain("TUI AI Assist prompt with submit_plan");
 
     await screen.handleKey("a");
     tty.clear();
@@ -407,7 +407,7 @@ describe("TUI planning workflow", () => {
       acpSessionId: "acp-guided-tui",
       agentName: "codex",
       cwd: "/repo",
-      userPrompt: "Plan with guided ACP from TUI.",
+      userPrompt: "Plan with guided AI Assist from TUI.",
       promptTemplateId: "prototype-first",
       selectedDocIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
       traceId: "trace_guided_acp_tui",
@@ -415,11 +415,15 @@ describe("TUI planning workflow", () => {
       modelId: "gpt-5.5",
       permissionMode: "review_each_tool",
     }]);
-    expect(tty.plainText()).toContain("Guided ACP session");
-    expect(tty.plainText()).toContain("acp-guided-tui");
-    expect(tty.plainText()).toContain("codex");
+    expect(tty.plainText()).toContain("AI Assist session");
+    // The raw `acp-…` session id is delegated to the caller (asserted above on
+    // `guidedAcpCalls`) but is no longer rendered verbatim: closure-6
+    // `fix(copy): enforce AI Assist copy gates` purges visible `ACP`/protocol
+    // identifiers from the surface, so the session row shows `<agent> active`.
+    expect(tty.plainText()).toContain("Session:");
+    expect(tty.plainText()).toContain("codex active");
     expect(tty.plainText()).toContain("session/new");
-    expect(tty.plainText()).toContain("TUI guided ACP prompt with submit_plan");
+    expect(tty.plainText()).toContain("TUI guided AI Assist prompt with submit_plan");
 
     await screen.handleKey("p");
     tty.clear();
@@ -432,8 +436,11 @@ describe("TUI planning workflow", () => {
       traceId: "trace_guided_acp_tui",
       optionId: "allow_once",
     }]);
-    expect(tty.plainText()).toContain("Guided ACP action");
-    expect(tty.plainText()).toContain("permission_resolved");
+    expect(tty.plainText()).toContain("Planning session action");
+    // Raw status tokens are humanized for display: closure-6
+    // `fix(copy): enforce AI Assist copy gates` routes session status through
+    // `displayStatus`, so `permission_resolved` renders as `Permission Resolved`.
+    expect(tty.plainText()).toContain("Permission Resolved");
     expect(tty.plainText()).toContain("session/request_permission");
 
     await screen.handleKey("u");

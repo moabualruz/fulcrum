@@ -3,9 +3,11 @@ import { randomUUID } from "node:crypto";
 import { DataSource } from "typeorm";
 
 import {
+  WorkManagementCustomFieldDefEntity,
   type WorkManagementFieldDependencyRule,
   WorkManagementFieldDependencyRuleEntity,
 } from "@work-management/infrastructure/database/work-structure.entities.ts";
+import { validateCustomFieldValue } from "@work-management/infrastructure/database/custom-field-store.ts";
 import { FulcrumProjectEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export type FieldDependencyAction = "show" | "hide" | "require";
@@ -44,6 +46,20 @@ export class FieldDependencyStore {
     action: FieldDependencyAction;
   }): Promise<FieldDependencyPublicRow | null> {
     if (!(await this.projectBelongsToOrg(input.projectId, input.orgId))) return null;
+    const sourceField = await this.fieldRepository().findOneBy({
+      id: input.sourceFieldId.trim(),
+      orgId: input.orgId,
+      projectId: input.projectId,
+      archived: false,
+    });
+    const targetField = await this.fieldRepository().findOneBy({
+      id: input.targetFieldId.trim(),
+      orgId: input.orgId,
+      projectId: input.projectId,
+      archived: false,
+    });
+    if (!sourceField || !targetField) return null;
+    validateCustomFieldValue(sourceField, input.sourceValue);
     const rule = await this.ruleRepository().save({
       id: randomUUID(),
       orgId: input.orgId,
@@ -75,10 +91,19 @@ export class FieldDependencyStore {
     });
 
     const missingFields: string[] = [];
+    const fields = await this.fieldRepository().findBy({
+      orgId: input.orgId,
+      projectId: input.projectId,
+      archived: false,
+    });
+    const fieldsById = new Map(fields.map((field) => [field.id, field]));
     for (const rule of rules) {
-      const actualValue = String(input.fieldValues[rule.sourceFieldId] ?? "");
+      const sourceField = fieldsById.get(rule.sourceFieldId);
+      const targetField = fieldsById.get(rule.targetFieldId);
+      if (!sourceField || !targetField) continue;
+      const actualValue = String(input.fieldValues[sourceField.slug] ?? "");
       if (actualValue !== rule.sourceValue) continue;
-      if (isEmptyValue(input.fieldValues[rule.targetFieldId])) missingFields.push(rule.targetFieldId);
+      if (isEmptyValue(input.fieldValues[targetField.slug])) missingFields.push(targetField.slug);
     }
 
     if (missingFields.length > 0) {
@@ -96,6 +121,10 @@ export class FieldDependencyStore {
 
   private ruleRepository() {
     return this.dataSource.getRepository(WorkManagementFieldDependencyRuleEntity);
+  }
+
+  private fieldRepository() {
+    return this.dataSource.getRepository(WorkManagementCustomFieldDefEntity);
   }
 }
 

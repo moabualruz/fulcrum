@@ -1,4 +1,4 @@
-// vendor-installs.ts — run vendor-canonical AGENT-INTEGRATION installers for
+// vendor-installs.ts: run vendor-canonical AGENT-INTEGRATION installers for
 // each detected agent during `fulcrum init <dir>`.
 //
 // Scope: per-agent skill / plugin / extension / hook installs whose vendor
@@ -8,7 +8,7 @@
 // Rules:
 //   - Never pass --output / path-override flags.
 //   - Never spawn interactive auth flows (context7 is deferred).
-//   - Never write hook registrations or skill files here — vendor CLIs do that.
+//   - Never write hook registrations or skill files here: vendor CLIs do that.
 //   - Live pattern-matchers (rg, fd, ast-grep, bat, jq, …) need NO install
 //     command beyond the BYO toolchain; they are not handled here.
 //   - Fail-soft per tool: log warning and continue on any error.
@@ -155,7 +155,7 @@ export async function runPiMcpAdapterIntegration(
     return installOk && initOk;
   }
   if (detected.has("pi") && !hasPi) {
-    console.log("  · pi detected but pi binary not on PATH — skipping pi-mcp-adapter init");
+    console.log("  · pi detected but pi binary not on PATH: skipping pi-mcp-adapter init");
   }
   return false;
 }
@@ -205,7 +205,7 @@ export async function runVendorIntegrations(
   // spliced into the FULCRUM sentinel block by `fulcrum install`. Strip the
   // duplicates that live outside the sentinel so agents don't load the rule
   // twice. Runs AFTER vendor commands so hooks/settings written by the vendor
-  // (PreToolUse, hooks.json) are preserved — only the rule TEXT block is removed.
+  // (PreToolUse, hooks.json) are preserved: only the rule TEXT block is removed.
   console.log("\nStripping duplicate vendor rule blocks (outside FULCRUM sentinel):");
   for (const agent of AGENTS) {
     const rulesFile = agent.rulesFile(home);

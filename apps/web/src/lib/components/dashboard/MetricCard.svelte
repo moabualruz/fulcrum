@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { Card, Stat } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
 
   interface Props {
     label: string;
@@ -9,20 +10,17 @@
 
   const { label, value, href }: Props = $props();
 
-  const cardClass = cn(
-    "block rounded-lg border border-border bg-card p-4 shadow-xs",
-    "hover:bg-accent/50 transition-colors",
-  );
+  const cardClass = cn("block transition-colors hover:bg-accent/50");
 </script>
 
 {#if href !== undefined}
   <a data-metric-card data-metric-label={label} href={href} aria-label="{label}: {value}" class={cardClass}>
-    <div data-metric-value aria-hidden="true" class={cn("text-2xl font-bold tabular-nums")}>{value}</div>
-    <div data-metric-label-text aria-hidden="true" class={cn("text-sm text-muted-foreground mt-1")}>{label}</div>
+    <Card size="sm">
+      <Stat label={label} value={String(value)} />
+    </Card>
   </a>
 {:else}
-  <div data-metric-card data-metric-label={label} class={cardClass}>
-    <div data-metric-value class={cn("text-2xl font-bold tabular-nums")}>{value}</div>
-    <div data-metric-label-text class={cn("text-sm text-muted-foreground mt-1")}>{label}</div>
-  </div>
+  <Card data-metric-card data-metric-label={label} size="sm" class={cardClass}>
+    <Stat label={label} value={String(value)} />
+  </Card>
 {/if}

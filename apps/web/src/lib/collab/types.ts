@@ -1,4 +1,4 @@
-// Collab types — shared by real and mock providers
+// Collab types: shared by real and mock providers
 
 export interface CollabUser {
 	id: string;
@@ -25,6 +25,7 @@ export interface CollabProvider {
 	onCursorChange(cb: (cursors: CursorState[]) => void): () => void;
 	updateCursor(anchor: number, head: number): void;
 	readonly connected: boolean;
+	readonly document?: unknown;
 }
 
 export interface BellWebSocketOptions {

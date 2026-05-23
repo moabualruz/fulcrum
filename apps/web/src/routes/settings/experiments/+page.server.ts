@@ -1,6 +1,6 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 
-import { createFeatureExperimentApiCaller } from "@platform-core/interface/http/feature-experiment-api-client.ts";
+import { createFeatureExperimentApiCaller } from "../../../../../../services/feature-flags/src/interface/http/feature-experiment-api-client.ts";
 
 interface RouteLocals {
   session: unknown;

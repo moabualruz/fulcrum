@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
   import ReviewWorkbench from "$lib/components/review/ReviewWorkbench.svelte";
 
   interface QaCheck {
@@ -56,6 +56,12 @@
     fail: "FAIL",
     warn: "WARN",
   };
+
+  const decisionTraceId = $derived(data.qaReport?.traceId ?? `trace-review-${data.projectId}`);
+  const generatedE2eFiles = $derived([
+    `apps/web/tests/e2e/projects-${data.projectId}-uat.spec.ts`,
+    `apps/web/tests/e2e/projects-${data.projectId}-review.spec.ts`,
+  ]);
 </script>
 
 <div data-testid="review-workbench-page">
@@ -67,6 +73,46 @@
       <h1 class={cn("text-2xl font-semibold tracking-tight")}>Review Workbench</h1>
     </div>
   </header>
+
+  <section data-final-gate class={cn("mb-6 grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.8fr)]")}>
+    <div class={cn("space-y-3 rounded-md border border-border p-4")}>
+      <div class={cn("flex flex-wrap items-center justify-between gap-3")}>
+        <div>
+          <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Final gate</p>
+          <h2 class={cn("text-lg font-semibold")}>UAT and code review handoff</h2>
+        </div>
+        <span data-decision-event-trace class={cn("rounded bg-muted px-2 py-1 font-mono text-xs text-muted-foreground")}>
+          {decisionTraceId}
+        </span>
+      </div>
+      <div data-code-review-prompt class={cn("rounded-md border border-border bg-muted/20 p-3 text-sm")}>
+        <p class={cn("font-medium")}>Code review prompt</p>
+        <p class={cn("mt-1 text-muted-foreground")}>
+          Review QA evidence, inspect changed files, approve only when acceptance and generated E2E coverage are trace-linked, or request changes with blocking feedback.
+        </p>
+      </div>
+      <div class={cn("grid gap-2 sm:grid-cols-3")}>
+        <a href="/projects/{data.projectId}/uat" data-uat-handoff-link class={cn("rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent")}>
+          Open UAT handoff
+        </a>
+        <a href="/projects/{data.projectId}/e2e" data-generated-e2e-link class={cn("rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent")}>
+          Generated E2E runner
+        </a>
+        <a href="/projects/{data.projectId}/reports?tab=final-qa" data-final-qa-link class={cn("rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent")}>
+          Final QA report
+        </a>
+      </div>
+    </div>
+    <aside data-generated-e2e-artifacts class={cn("space-y-2 rounded-md border border-border p-4")}>
+      <p class={cn("text-sm font-semibold")}>Executable E2E artifacts</p>
+      <p class={cn("text-xs text-muted-foreground")}>Approval points to these generated specs before release.</p>
+      <ul class={cn("space-y-1 text-xs")}>
+        {#each generatedE2eFiles as file}
+          <li class={cn("rounded bg-muted/40 px-2 py-1 font-mono")}>{file}</li>
+        {/each}
+      </ul>
+    </aside>
+  </section>
 
   <!-- QA Report Status -->
   <section data-qa-report class={cn("mb-6 space-y-3")}>
@@ -318,6 +364,7 @@
     <div class={cn("grid gap-3 sm:grid-cols-2")}>
       <form method="POST" action="?/uatDecision" class={cn("grid gap-2 rounded-md border border-border p-4")}>
         <input type="hidden" name="decision" value="approve_without_manual_review" />
+        <input type="hidden" name="traceId" value={decisionTraceId} />
         <label class={cn("grid gap-1 text-sm")}>
           <span class={cn("text-muted-foreground")}>Feedback (optional)</span>
           <textarea
@@ -336,6 +383,7 @@
 
       <form method="POST" action="?/uatDecision" class={cn("grid gap-2 rounded-md border border-border p-4")}>
         <input type="hidden" name="decision" value="request_changes" />
+        <input type="hidden" name="traceId" value={decisionTraceId} />
         <label class={cn("grid gap-1 text-sm")}>
           <span class={cn("text-muted-foreground")}>Feedback</span>
           <textarea

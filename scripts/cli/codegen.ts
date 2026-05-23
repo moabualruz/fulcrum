@@ -199,7 +199,7 @@ export async function extractRouterMetadata(routerPath: string): Promise<DomainM
   const context = createExtractorContext(source, project);
   const appRouter = lookupVariable("appRouter", source, context);
   const initializer = appRouter?.getInitializer();
-  const record = unwrapRouterObject(initializer);
+  const record = unwrapRouterObject(initializer) ?? unwrapRootRouterBuilder(initializer, context);
   if (record === null) throw new Error(`appRouter t.router({...}) not found in ${routerPath}`);
 
   return objectProperties(record)
@@ -220,6 +220,40 @@ async function resolveAppRouterSource(entry: SourceFile, routerPath: string, pro
     return project.addSourceFileAtPath(resolved);
   }
   return entry;
+}
+
+function unwrapRootRouterBuilder(
+  initializer: Node | undefined,
+  context: ExtractorContext,
+): ObjectLiteralExpression | null {
+  if (!initializer || !Node.isCallExpression(initializer)) return null;
+  const expression = initializer.getExpression();
+  if (!Node.isIdentifier(expression) || expression.getText() !== "buildFulcrumAppRouter") return null;
+  const rootRouter = context.project.addSourceFileAtPath(resolve(
+    dirname(initializer.getSourceFile().getFilePath()),
+    "root-router.ts",
+  ));
+  const builderDeclaration = lookupVariable("buildFulcrumAppRouter", rootRouter, context) ??
+    rootRouter.getVariableDeclaration("buildFulcrumAppRouter");
+  const builder = builderDeclaration?.getInitializer();
+  if (!builder || !Node.isArrowFunction(builder)) return null;
+  const body = builder.getBody();
+  if (!Node.isBlock(body)) return unwrapRouterFactoryCall(body);
+  for (const statement of body.getStatements()) {
+    if (!Node.isReturnStatement(statement)) continue;
+    return unwrapRouterFactoryCall(statement.getExpression()) ?? null;
+  }
+  return null;
+}
+
+function unwrapRouterFactoryCall(expression: Node | undefined): ObjectLiteralExpression | null {
+  const object = unwrapRouterObject(expression);
+  if (object !== null) return object;
+  if (!expression || !Node.isCallExpression(expression)) return null;
+  const called = expression.getExpression();
+  if (!Node.isIdentifier(called) || called.getText() !== "router") return null;
+  const record = expression.getArguments()[0];
+  return Node.isObjectLiteralExpression(record) ? record : null;
 }
 
 type ExtractorContext = {

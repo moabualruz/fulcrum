@@ -1,5 +1,5 @@
 /**
- * Global selection store — tracks selected task IDs across the app.
+ * Global selection store: tracks selected task IDs across the app.
  * Used by CommandPalette to conditionally show Bulk Action commands.
  */
 

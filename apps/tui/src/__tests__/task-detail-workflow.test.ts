@@ -65,6 +65,7 @@ describe("TUI task relationship hub", () => {
     expect(text).toContain("artifact_1");
     expect(text).toContain("mem_1");
     expect(text).toContain("proj_1");
+    expect(text).toContain("Entity: work_item:task_1");
     expect(text).toContain("evt_1");
   });
 });

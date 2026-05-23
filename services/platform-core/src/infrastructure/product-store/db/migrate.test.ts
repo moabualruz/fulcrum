@@ -55,9 +55,14 @@ describe("product kernel migrations", () => {
   test("is idempotent on re-run", async () => {
     const db = await openIsolatedStore(join(scratch, "idem"));
     try {
-      await migrateIsolatedStore(db);
+      const first = await migrateIsolatedStore(db) as readonly unknown[];
+      const before = await db.query<{ count: number }>("SELECT COUNT(*)::int AS count FROM schema_migrations");
       const second = await migrateIsolatedStore(db);
+      const after = await db.query<{ count: number }>("SELECT COUNT(*)::int AS count FROM schema_migrations");
+
+      expect(first.length).toBeGreaterThan(0);
       expect(second).toEqual([]);
+      expect(after[0]?.count).toBe(before[0]?.count);
       for (const name of REQUIRED_TABLES) {
         expect(await tableExists(db, name)).toBe(true);
       }

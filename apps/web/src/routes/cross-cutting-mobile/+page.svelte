@@ -1,0 +1,159 @@
+<script lang="ts">
+  import { cn } from "@fulcrum/ui-kit";
+
+  type HeaderState = "expanded" | "collapsed";
+  const COLLAPSE_THRESHOLD_PX = 50;
+  const EXPAND_THRESHOLD_PX = 20;
+
+  let headerState = $state<HeaderState>("expanded");
+  let scrollY = $state(0);
+  let lastDirectionChangeY = $state(0);
+  let scrollDirection = $state<"up" | "down">("up");
+
+  function handleScroll(event: Event): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const next = target.scrollTop;
+    const direction: "up" | "down" = next > scrollY ? "down" : "up";
+    if (direction !== scrollDirection) {
+      lastDirectionChangeY = scrollY;
+      scrollDirection = direction;
+    }
+    const delta = Math.abs(next - lastDirectionChangeY);
+    if (direction === "down" && delta >= COLLAPSE_THRESHOLD_PX) {
+      headerState = "collapsed";
+    } else if (direction === "up" && delta >= EXPAND_THRESHOLD_PX) {
+      headerState = "expanded";
+    }
+    scrollY = next;
+  }
+</script>
+
+<main
+  data-cross-cutting-mobile
+  class={cn("min-h-screen overflow-x-hidden bg-background text-foreground")}
+>
+  <section
+    data-android-safe-area-frame
+    class={cn("relative mx-auto flex min-h-screen max-w-md flex-col border-x border-border bg-card")}
+    style:padding-top="var(--fulcrum-safe-area-top)"
+    style:padding-bottom="calc(var(--fulcrum-gesture-zone-bottom) + 72px)"
+    style:padding-left="var(--fulcrum-gesture-zone-inline)"
+    style:padding-right="var(--fulcrum-gesture-zone-inline)"
+  >
+    <header
+      data-android-status-header
+      data-header-state={headerState}
+      class={cn(
+        "sticky top-0 z-10 border-b border-border bg-background/95 px-4 backdrop-blur transition-[height,padding]",
+        headerState === "expanded" ? "h-[56px] py-3" : "h-[24px] overflow-hidden py-0",
+      )}
+    >
+      <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Android safe area</p>
+      <h1 class={cn("mt-1 text-lg font-semibold")}>Gesture-safe mobile shell</h1>
+    </header>
+    <nav data-collapsing-breadcrumb class={cn("sticky top-[24px] z-10 flex items-center gap-2 border-b border-border bg-background/95 px-4 py-1 text-xs")}>
+      <a href="/" class="text-primary underline">Home</a>
+      <span aria-hidden="true">/</span>
+      <a href="/cross-cutting-mobile" class="text-primary underline">Mobile</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">Header collapse</span>
+    </nav>
+    <div data-scroll-region onscroll={handleScroll} class={cn("max-h-[60vh] overflow-y-auto")}>
+      <div data-fake-content-block style="height: 1200px">
+        <p data-current-scroll>scrollY={scrollY} direction={scrollDirection} state={headerState}</p>
+      </div>
+    </div>
+
+    <div class={cn("grid flex-1 gap-3 p-4")}>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Status bar clearance</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Top chrome starts after the 24 px minimum status-bar safe area.</p>
+      </section>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Gesture zone clearance</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Bottom actions stay above the 48 px gesture navigation zone.</p>
+      </section>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Landscape edges</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Short landscape viewports reserve inline gesture margins instead of squeezing content under edge gestures.</p>
+      </section>
+    </div>
+
+    <nav
+      data-android-bottom-nav
+      aria-label="Mobile navigation"
+      class={cn("fixed inset-x-0 mx-auto grid max-w-md grid-cols-3 gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur")}
+      style:bottom="var(--fulcrum-gesture-zone-bottom)"
+      style:padding-left="calc(1rem + var(--fulcrum-gesture-zone-inline))"
+      style:padding-right="calc(1rem + var(--fulcrum-gesture-zone-inline))"
+    >
+      <button class={cn("h-11 rounded-md bg-muted text-sm")}>Capture</button>
+      <button class={cn("h-11 rounded-md bg-primary text-sm text-primary-foreground")}>Build</button>
+      <button class={cn("h-11 rounded-md bg-muted text-sm")}>AI Assist</button>
+    </nav>
+  </section>
+
+  <section
+    data-ios-safe-area-frame
+    class={cn("relative mx-auto mt-8 flex min-h-[844px] max-w-md flex-col overflow-hidden border-x border-border bg-card")}
+    style:padding-top="var(--fulcrum-ios-safe-area-top, max(env(safe-area-inset-top, 0px), 47px))"
+    style:padding-bottom="calc(var(--fulcrum-ios-safe-area-bottom, max(env(safe-area-inset-bottom, 0px), 34px)) + 72px)"
+    style:padding-left="var(--fulcrum-ios-safe-area-inline, max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 0px))"
+    style:padding-right="var(--fulcrum-ios-safe-area-inline, max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 0px))"
+  >
+    <header data-ios-status-header class={cn("sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur")}>
+      <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>iOS safe area</p>
+      <h1 class={cn("mt-1 text-lg font-semibold")}>Notch-safe mobile shell</h1>
+    </header>
+
+    <div class={cn("grid flex-1 content-start gap-3 p-4")}>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Dynamic island clearance</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Top app chrome starts after the 47 px iPhone 14 notch safe area when browser env values are unavailable.</p>
+      </section>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Home indicator clearance</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Bottom navigation remains above the 34 px iOS home indicator reserve.</p>
+      </section>
+      <section class={cn("rounded-md border border-border bg-background p-3 text-sm")}>
+        <h2 class={cn("font-medium")}>Landscape notch edges</h2>
+        <p class={cn("mt-1 text-muted-foreground")}>Landscape iPhone layouts reserve inline notch and gesture space instead of letting tabs sit under rounded corners.</p>
+      </section>
+    </div>
+
+    <nav
+      data-ios-bottom-nav
+      aria-label="iOS mobile navigation"
+      class={cn("fixed inset-x-0 mx-auto grid max-w-md grid-cols-3 gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur")}
+      style:bottom="var(--fulcrum-ios-safe-area-bottom, max(env(safe-area-inset-bottom, 0px), 34px))"
+      style:padding-left="calc(1rem + var(--fulcrum-ios-safe-area-inline, max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 0px)))"
+      style:padding-right="calc(1rem + var(--fulcrum-ios-safe-area-inline, max(env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px), 0px)))"
+    >
+      <button class={cn("h-11 rounded-md bg-muted text-sm")}>Capture</button>
+      <button class={cn("h-11 rounded-md bg-primary text-sm text-primary-foreground")}>Build</button>
+      <button class={cn("h-11 rounded-md bg-muted text-sm")}>AI Assist</button>
+    </nav>
+  </section>
+
+  <section
+    data-breakpoint-ladder
+    class={cn("mx-auto mt-8 grid w-full max-w-6xl gap-3 px-4 pb-8 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5")}
+  >
+    <header class={cn("xs:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5")}>
+      <p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Breakpoint ladder</p>
+      <h2 class={cn("mt-1 text-lg font-semibold")}>Mobile-first responsive shell</h2>
+      <p class={cn("mt-1 max-w-2xl text-sm text-muted-foreground")}>
+        Unprefixed styles cover phone portrait; xs, sm, md, lg, and xl add columns without changing the mobile query threshold.
+      </p>
+    </header>
+    {#each ["base", "xs", "sm", "md", "lg", "xl"] as step}
+      <article data-breakpoint-card={step} class={cn("min-h-24 rounded-md border border-border bg-background p-3 text-sm")}>
+        <p class={cn("font-medium")}>{step}</p>
+        <p class={cn("mt-1 text-muted-foreground")}>
+          {step === "base" ? "320 px phone portrait baseline" : `${step} breakpoint reflow`}
+        </p>
+      </article>
+    {/each}
+  </section>
+</main>

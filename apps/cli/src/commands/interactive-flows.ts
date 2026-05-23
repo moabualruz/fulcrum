@@ -2,7 +2,7 @@
  * Interactive CLI flows for routing rules editing, skills conflict resolution,
  * and CSV import column-mapping wizard.
  *
- * P14 issue 10 — interactive flows, routing, skills, imports.
+ * P14 issue 10: interactive flows, routing, skills, imports.
  *
  * All flows support `--non-interactive` which exits with code 7
  * (INTERACTIVE_REQUIRED) when TTY is unavailable and interactive input needed.
@@ -242,7 +242,7 @@ export async function runSkillsConflictsResolve(
   const keepValue = keepIdx >= 0 ? argv[keepIdx + 1] : undefined;
 
   if (keepValue && ["local", "upstream"].includes(keepValue)) {
-    // Non-interactive path — works regardless of TTY
+    // Non-interactive path: works regardless of TTY
     if (!opts.skillsConflictCaller) {
       printErr("fulcrum skills conflicts resolve: no caller available");
       exit(1);

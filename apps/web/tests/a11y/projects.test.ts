@@ -10,6 +10,10 @@ interface ProjectListing {
   name: string;
   description: string | null;
   updated_at: string;
+  task_count: number;
+  open_task_count: number;
+  doc_count: number;
+  latest_activity_at: string;
 }
 
 interface PageProps {
@@ -26,6 +30,10 @@ const projects: ProjectListing[] = [
     name: "Alpha",
     description: "first sample project",
     updated_at: "2026-04-30T12:00:00.000Z",
+    task_count: 4,
+    open_task_count: 2,
+    doc_count: 1,
+    latest_activity_at: "2026-05-01T12:00:00.000Z",
   },
 ];
 

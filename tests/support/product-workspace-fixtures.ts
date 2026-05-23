@@ -3,7 +3,7 @@ import { PGliteDriver } from "typeorm-pglite";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { z } from "zod/v4";
-import { fulcrumHome } from "@platform-core/application/db/database-config.ts";
+import { defaultLocalPgliteDataDir } from "@platform-core/application/db/database-config.ts";
 import { createDataSourceOptions } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
 import { SeedService } from "@platform-core/infrastructure/application-database/seed.ts";
@@ -20,7 +20,7 @@ export interface TestStore {
 export type TestOrmFixture = TestOrm;
 
 export function productDbDir(): string {
-  return join(fulcrumHome(), "pglite.data");
+  return defaultLocalPgliteDataDir();
 }
 
 const STORE_MODULE_ROOT = "@platform-core/infrastructure/product-store";
@@ -112,6 +112,47 @@ export async function createProject(...args: unknown[]) { return callStore("stor
 export async function createSprint(...args: unknown[]) { return callStore("store/repositories", "createSprint", args); }
 export async function createTask(...args: unknown[]) { return callStore("store/repositories", "createTask", args); }
 export async function listEventsForProject(...args: unknown[]) { return callStore("store/repositories", "listEventsForProject", args); }
+export async function listEventsFiltered(...args: unknown[]) { return callStore("store/repositories", "listEventsFiltered", args); }
+
+/**
+ * Test fixture: events for a single subject (entity), newest first.
+ *
+ * The product store exposes `listEventsForProject` / `listEventsFiltered` but
+ * no per-entity query, so this fixture issues the entity-scoped read directly
+ * against the `events` table — the same table `appendEvent` writes. Used by the
+ * `/projects/[id]/activity` route test's per-entity activity coverage.
+ */
+export async function listEventsForEntity(
+  db: TestStore,
+  subjectKind: string,
+  subjectId: string,
+  options: { limit?: number } = {},
+): Promise<EventRow[]> {
+  const limit = options.limit ?? 50;
+  // events.id is a random UUID, so it cannot tie-break events written within
+  // the same millisecond (now() granularity) — ordering by it is
+  // non-deterministic. ctid reflects physical insert order and is stable for
+  // this append-only fixture store, so it gives a deterministic newest-first
+  // order when created_at ties.
+  const rows = await db.query<Record<string, unknown>>(
+    `SELECT * FROM events
+      WHERE subject_kind = $1 AND subject_id = $2
+      ORDER BY created_at DESC, ctid DESC
+      LIMIT $3`,
+    [subjectKind, subjectId, limit],
+  );
+  return rows.map((r) => ({
+    id: r["id"] as string,
+    org_id: r["org_id"] as string,
+    project_id: (r["project_id"] as string | null) ?? null,
+    actor: (r["actor"] as string) ?? "system",
+    subject_kind: r["subject_kind"] as string,
+    subject_id: r["subject_id"] as string,
+    verb: r["verb"] as string,
+    payload: (r["payload"] as Record<string, unknown>) ?? {},
+    created_at: String(r["created_at"]),
+  }));
+}
 
 export async function getBlameForFile(...args: unknown[]) { return callStore("store/repo-files", "getBlameForFile", args); }
 export async function getFileContent(...args: unknown[]) { return callStore("store/repo-files", "getFileContent", args); }

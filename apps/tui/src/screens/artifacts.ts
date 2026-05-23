@@ -1,5 +1,23 @@
+/**
+ * Ship stage workbench: the TUI `:ship` workbench (DESIGN.md §3.1,
+ * CLI-TUI-UX.md §6, IA-MAP.md §9; OD `tui-runs.html` `ship` screen).
+ *
+ * The Ship stage's release / artifact surface, re-homed under the shared
+ * `StageWorkbench` shell so it carries the same `fulcrum · :ship · …` header,
+ * StatusFooter strip, and empty/error contract as every other stage workbench.
+ */
+
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
+import { truncateWide } from "../utils/truncate.ts";
+import { ModePicker, type WorkflowMode } from "../widgets/ModePicker.ts";
+import {
+  renderStageWorkbenchFooter,
+  renderStageWorkbenchHeader,
+  renderWorkbenchEmptyState,
+  renderWorkbenchErrorFrame,
+  type StageWorkbenchScope,
+} from "./runs-screen.ts";
 
 export interface TuiArtifact {
   id: string;
@@ -52,6 +70,12 @@ export interface ArtifactsScreenOptions {
   taskId?: string;
   homeDir?: string;
   viewportRows?: number;
+  /** Project / branch label rendered in the workbench scope chrome. */
+  projectLabel?: string;
+  /** Active trace id rendered in the workbench footer. */
+  traceId?: string | null;
+  /** Healthy/total MCP servers rendered in the workbench footer. */
+  mcp?: string | null;
 }
 
 type ArtifactOverlay = "none" | "upload" | "archive" | "delete" | "filter" | "detail";
@@ -64,31 +88,82 @@ export class ArtifactsScreen {
   private overlay: ArtifactOverlay = "none";
   private filters: TuiArtifactFilters = {};
   private selectedIds = new Set<string>();
+  private error: string | null = null;
+  /** The focused artifact-row Step mode picker (✋ Manual / ▶ Play / 💬 Discuss / ⊞ AI Assist). */
+  private readonly modePicker = new ModePicker({
+    stepId: "artifact",
+    onSelect: (mode) => {
+      this.stepMode = mode;
+    },
+  });
+  /** Last Step mode selected via the ModePicker row. */
+  private stepMode: WorkflowMode = "manual";
 
   constructor(private readonly opts: ArtifactsScreenOptions) {}
 
+  /** The Step mode currently selected on the focused artifact row (✋/▶/💬/⊞). */
+  get currentStepMode(): WorkflowMode {
+    return this.stepMode;
+  }
+
+  /** The OD stage-scope chrome for the Ship workbench. */
+  private get scope(): StageWorkbenchScope {
+    return {
+      stage: "Ship",
+      route: ":ship",
+      purpose: "artifacts",
+      project: this.opts.projectLabel ?? this.opts.projectId ?? null,
+      detail: `${this.artifacts.length} artifacts`,
+      agent: null,
+      mcp: this.opts.mcp ?? null,
+      traceId: this.opts.traceId ?? this.selectedArtifact?.runId ?? null,
+    };
+  }
+
   async load(): Promise<void> {
-    this.artifacts = await this.opts.caller.artifacts.list(this.listInput());
-    this.clampCursor();
-    await this.loadPreview();
+    try {
+      this.artifacts = await this.opts.caller.artifacts.list(this.listInput());
+      this.error = null;
+      this.clampCursor();
+      await this.loadPreview();
+    } catch (err) {
+      this.artifacts = [];
+      this.error = err instanceof Error ? err.message : String(err);
+    }
   }
 
   render(renderer: Renderer): void {
-    renderer.writeln();
-    renderer.writeln(c.bold("  Artifacts"));
-    renderer.separator();
-    renderer.writeln();
+    renderStageWorkbenchHeader(renderer, this.scope);
 
-    if (this.visibleArtifacts.length === 0) {
-      renderer.writeln(c.dim("  No artifacts."));
-    } else {
+    if (this.error) {
+      renderWorkbenchErrorFrame(renderer, {
+        what: "Artifacts feed failed to load.",
+        next: this.error,
+        traceId: this.opts.traceId,
+      });
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    if (this.artifacts.length === 0) {
+      renderWorkbenchEmptyState(
+        renderer,
+        "No artifacts in this stage yet.",
+        "Press u to upload a release artifact.",
+      );
+      renderer.writeln();
+      renderer.writeln(c.dim("  u upload  f filter  q back"));
+      renderStageWorkbenchFooter(renderer, this.scope);
+      return;
+    }
+
+    {
       for (const artifact of this.visibleArtifacts) {
         const index = this.artifacts.indexOf(artifact);
         const pointer = index === this.cursor ? c.bold(">") : " ";
         const checked = this.selectedIds.has(artifact.id) ? "[x]" : "[ ]";
-        renderer.writeln(
-          `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${retentionBadge(artifact)}  preview:${previewBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`,
-        );
+        const line = `${pointer} ${checked} ${displayName(artifact)}  [${mimeBadge(artifact)}]  ${attachmentBadge(artifact)}  ${retentionBadge(artifact)}  preview:${previewBadge(artifact)}  ${formatBytes(artifact.sizeBytes)}`;
+        renderer.writeln(truncateWide(line, Math.max(20, renderer.width)));
       }
     }
 
@@ -97,10 +172,19 @@ export class ArtifactsScreen {
     if (this.selectedArtifact) {
       renderer.writeln(`  ${previewSummary(this.selectedArtifact)}`);
     }
-    for (const line of this.previewLines) renderer.writeln(`  ${line}`);
+    for (const line of this.previewLines) renderer.writeln(truncateWide(`  ${line}`, Math.max(20, renderer.width)));
+
+    // ModePicker row for the focused artifact-row Step (acceptance: Step-bearing rows).
+    renderer.writeln();
+    renderer.writeln(
+      truncateWide(
+        `  ${c.dim("step modes")}  ${this.modePicker.render()}`,
+        Math.max(20, renderer.width),
+      ),
+    );
 
     renderer.writeln();
-    renderer.writeln(c.dim("  j/k navigate  u upload  d download  a archive  D delete  f filter  Enter preview  q back"));
+    renderer.writeln(c.dim(truncateWide("  j/k navigate  u upload  d download  a archive  D delete  f filter  m/m p/m d/m a modes  Enter preview  q back", Math.max(20, renderer.width))));
 
     if (this.overlay === "upload") {
       renderer.writeln();
@@ -135,6 +219,8 @@ export class ArtifactsScreen {
       renderer.writeln();
       renderer.writeln(c.bold(`  Detail ${displayName(this.selectedArtifact)}`));
     }
+
+    renderStageWorkbenchFooter(renderer, this.scope);
   }
 
   async handleKey(key: string): Promise<boolean> {
@@ -162,6 +248,18 @@ export class ArtifactsScreen {
 
     if (this.overlay !== "none" && (key === "n" || key === "\x1b")) {
       this.overlay = "none";
+      return true;
+    }
+
+    // The `m` chord owns mode selection: the bare `m` arms the picker and the
+    // follow-up selector (m p / m d / m a / m i) completes it. While the chord
+    // is armed the next key is routed to the picker so it never collides with
+    // the bare screen keys (`d` download, `a` archive).
+    if (
+      this.overlay === "none" &&
+      (key === "m" || this.modePicker.isChordArmed) &&
+      this.modePicker.handleKey(key)
+    ) {
       return true;
     }
 

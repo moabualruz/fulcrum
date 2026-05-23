@@ -1,5 +1,5 @@
 /**
- * CLI flags command tests — TDD RED → GREEN.
+ * CLI flags command tests: TDD RED → GREEN.
  *
  * Tests run the CLI handler in-process (no subprocess, no DB needed).
  *
@@ -56,7 +56,7 @@ function fakeFlagsCaller(flags: FlagItem[] = FAKE_FLAGS): {
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("flags.run — list --json", () => {
+describe("flags.run: list --json", () => {
   it("prints JSON array with name, enabled, description", async () => {
     const { run } = await import("@fulcrum/cli/commands/flags.ts");
 
@@ -100,7 +100,7 @@ describe("flags.run — list --json", () => {
   });
 });
 
-describe("flags.run — set", () => {
+describe("flags.run: set", () => {
   it("set router-llm on exits 0 and prints confirmation", async () => {
     const { run } = await import("@fulcrum/cli/commands/flags.ts");
 

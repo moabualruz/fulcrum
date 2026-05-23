@@ -19,7 +19,7 @@ import {
   listWebhooks,
 } from "@integration-hub/application/webhooks/queries.ts";
 import type { WebhookAppContext } from "@integration-hub/domain/webhook.ts";
-import { FlagRegistry } from "@platform-core/application/feature-flags/registry.ts";
+import { FlagRegistry } from "@feature-flags/application/registry.ts";
 import { optionalTrpcEntityManager, requireTrpcEntityManager, type TrpcContext } from "../context.ts";
 import { permissionedProcedure } from "../middleware.ts";
 import {

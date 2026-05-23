@@ -55,7 +55,7 @@ mock.module("@workflow-coordination/interface/http/workflow-api-client", () => (
               modelId: input["modelId"],
               permissionMode: input["permissionMode"],
             },
-            prompt: "ACP prompt",
+            prompt: "AI Assist prompt",
             permissionOptions: [{ optionId: "allow_once", name: "Allow once" }],
           };
         },
@@ -64,7 +64,7 @@ mock.module("@workflow-coordination/interface/http/workflow-api-client", () => (
           return {
             status: "started",
             document: { id: "doc-1", title: input["title"] },
-            prompt: "Freeform ACP prompt",
+            prompt: "Freeform AI Assist prompt",
           };
         },
       },
@@ -101,7 +101,7 @@ describe("/planning/sessions +page.server.ts", () => {
       acpSessionId: "acp-1",
       acpAgentName: "codex",
       acpCwd: "/repo",
-      acpUserPrompt: "Plan with ACP",
+      acpUserPrompt: "Plan with AI Assist",
       acpPermissionMode: "review_each_tool",
       selectedDocIds: "doc-1, doc-2",
       projectId: "project-1",
@@ -132,7 +132,7 @@ describe("/planning/sessions +page.server.ts", () => {
     const result = await mod.actions.guidedAcpStart(event(form({
       acpAgentName: "codex",
       acpCwd: "/repo",
-      acpUserPrompt: "Plan with ACP",
+      acpUserPrompt: "Plan with AI Assist",
       acpPermissionMode: "root",
     })) as Parameters<typeof mod.actions.guidedAcpStart>[0]);
 
@@ -145,7 +145,7 @@ describe("/planning/sessions +page.server.ts", () => {
     expect(calls).toEqual([]);
   });
 
-  test("freeformStart persists freeform docs before ACP planning context", async () => {
+  test("freeformStart persists freeform docs before AI Assist planning context", async () => {
     const mod = await import(`./+page.server.ts?cachebust=${Date.now() + 3}`);
     const result = await mod.actions.freeformStart(event(form({
       freeformTitle: "Workflow brief",
@@ -162,7 +162,7 @@ describe("/planning/sessions +page.server.ts", () => {
       freeformStart: {
         status: "started",
         document: { id: "doc-1", title: "Workflow brief" },
-        prompt: "Freeform ACP prompt",
+        prompt: "Freeform AI Assist prompt",
       },
     });
     expect(calls).toEqual(["api:http://localhost:sid=abc", "freeform:project-1:Workflow brief:acp-freeform"]);

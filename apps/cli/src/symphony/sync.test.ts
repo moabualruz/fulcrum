@@ -50,7 +50,7 @@ describe("lock file round-trip", () => {
 });
 
 // ---------------------------------------------------------------------------
-// detectDrift — unchanged hash → no drift
+// detectDrift: unchanged hash → no drift
 // ---------------------------------------------------------------------------
 describe("detectDrift", () => {
   test("unchanged SPEC hash → driftDetected false, no report written", () => {
@@ -80,7 +80,7 @@ describe("detectDrift", () => {
     // Seed lock with old hash
     writeLockHash(dir, "old-hash-value");
 
-    const specContent = "# SPEC v2 — changed\n";
+    const specContent = "# SPEC v2: changed\n";
     writeFileSync(join(dir, "vendor", "openai-symphony", "SPEC.md"), specContent);
 
     const result = detectDrift(dir);

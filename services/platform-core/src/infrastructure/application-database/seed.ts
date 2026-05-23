@@ -4,19 +4,30 @@ import { MoreThan } from "typeorm";
 import { hashPassword } from "better-auth/crypto";
 import { Org } from "@identity-access/infrastructure/database/entities/auth/Org.ts";
 import { Account, OrgMember, Session, User } from "@identity-access/infrastructure/database/entities/auth/index.ts";
+import { OrganizationMemberEntity } from "@identity-access/infrastructure/database/organization.entities.ts";
 import { seedDefaultRules } from "@notification-center/application/delivery-runtime/defaults.ts";
+import { TenantSetting } from "./entities/TenantSetting.ts";
+import { FulcrumProjectEntity, FulcrumWorkspaceEntity } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 export const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 export const DEFAULT_ORG_NAME = "Local";
 export const DEFAULT_ORG_SLUG = "local";
 export const DEFAULT_ADMIN_EMAIL = "admin@local";
 export const DEFAULT_ADMIN_PASSWORD = "fulcrum-local-admin";
+export const DEFAULT_PROJECT_ID = "local-project";
+export const DEFAULT_PROJECT_SLUG = "local-project";
+export const DEFAULT_PROJECT_NAME = "Local Project";
+export const LOCAL_BOOTSTRAP_SEED_VERSION = "2026-05-18.local-bootstrap.v1";
+export const LOCAL_BOOTSTRAP_SEED_STATUS_KEY = "local.bootstrap.seed.status";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface SeedResult {
   orgId: string;
+  projectId: string;
   userId: string;
   sessionToken: string;
+  seedVersion: string;
+  seedStatus: "ready";
 }
 
 @Injectable()
@@ -50,22 +61,12 @@ export class SeedService {
       role: "owner",
     }, ["orgId", "userId"]);
 
-    if (await this.hasPublicOrganizationTables()) {
-      await this.em.query(`
-        INSERT INTO fulcrum_workspaces (id, slug, name, updated_at)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (id)
-        DO UPDATE SET slug = EXCLUDED.slug, name = EXCLUDED.name, updated_at = EXCLUDED.updated_at
-      `, [defaultOrg.id, DEFAULT_ORG_SLUG, DEFAULT_ORG_NAME, now]);
-      await this.em.query(`
-        INSERT INTO fulcrum_organization_members (id, org_id, user_id, role)
-        VALUES ($1, $2, $3, 'owner')
-        ON CONFLICT (org_id, user_id)
-        DO UPDATE SET role = EXCLUDED.role
-      `, [`${defaultOrg.id}:${adminUser.id}`, defaultOrg.id, adminUser.id]);
+    if (await this.hasPublicBootstrapTables()) {
+      await this.seedPublicBootstrapRows(defaultOrg.id, adminUser.id, now);
     }
 
     await seedDefaultRules(adminUser.id, defaultOrg.id, this.em);
+    await this.writeSeedStatus(defaultOrg.id, adminUser.id, now);
 
     const credentialAccount = await this.em.findOne(Account, {
       where: { userId: adminUser.id, providerId: "credential" },
@@ -90,8 +91,11 @@ export class SeedService {
     if (activeSession) {
       return {
         orgId: defaultOrg.id,
+        projectId: DEFAULT_PROJECT_ID,
         userId: adminUser.id,
         sessionToken: activeSession.id,
+        seedVersion: LOCAL_BOOTSTRAP_SEED_VERSION,
+        seedStatus: "ready",
       };
     }
 
@@ -108,15 +112,77 @@ export class SeedService {
 
     return {
       orgId: defaultOrg.id,
+      projectId: DEFAULT_PROJECT_ID,
       userId: adminUser.id,
       sessionToken,
+      seedVersion: LOCAL_BOOTSTRAP_SEED_VERSION,
+      seedStatus: "ready",
     };
   }
 
-  private async hasPublicOrganizationTables(): Promise<boolean> {
+  private async seedPublicBootstrapRows(orgId: string, userId: string, now: Date): Promise<void> {
+    await this.em.getRepository(FulcrumWorkspaceEntity).save({
+      id: orgId,
+      slug: DEFAULT_ORG_SLUG,
+      name: DEFAULT_ORG_NAME,
+      updatedAt: now,
+    });
+    await this.em.getRepository(OrganizationMemberEntity).save({
+      id: `${orgId}:${userId}`,
+      orgId,
+      userId,
+      role: "owner",
+    });
+    await this.em.getRepository(FulcrumProjectEntity).save({
+      id: DEFAULT_PROJECT_ID,
+      workspaceId: orgId,
+      slug: DEFAULT_PROJECT_SLUG,
+      name: DEFAULT_PROJECT_NAME,
+      description: "Default local project for first-run workflows.",
+      status: "active",
+      ownerId: userId,
+      traceId: `seed:${LOCAL_BOOTSTRAP_SEED_VERSION}`,
+      methodology: "kanban",
+      workflowConfig: {
+        transitions: {
+          backlog: ["todo"],
+          todo: ["in_progress"],
+          in_progress: ["review", "done"],
+          review: ["in_progress", "done"],
+        },
+      },
+      enabledTaskTypes: ["task", "bug", "feature"],
+      updatedAt: now,
+    });
+  }
+
+  private async writeSeedStatus(orgId: string, userId: string, now: Date): Promise<void> {
+    const value = {
+      version: LOCAL_BOOTSTRAP_SEED_VERSION,
+      status: "ready",
+      orgId,
+      userId,
+      projectId: DEFAULT_PROJECT_ID,
+      seededAt: now.toISOString(),
+    };
+    const existing = await this.em.findOne(TenantSetting, { where: { orgId, key: LOCAL_BOOTSTRAP_SEED_STATUS_KEY } });
+    if (existing) {
+      existing.value = value;
+      existing.updatedAt = now;
+      await this.em.save(existing);
+      return;
+    }
+    await this.em.save(this.em.create(TenantSetting, {
+      orgId,
+      key: LOCAL_BOOTSTRAP_SEED_STATUS_KEY,
+      value,
+    }));
+  }
+
+  private async hasPublicBootstrapTables(): Promise<boolean> {
     const rows = await this.em.query(
-      "SELECT to_regclass('public.fulcrum_workspaces') AS workspaces, to_regclass('public.fulcrum_organization_members') AS members",
+      "SELECT to_regclass('public.fulcrum_workspaces') AS workspaces, to_regclass('public.fulcrum_organization_members') AS members, to_regclass('public.fulcrum_projects') AS projects",
     );
-    return Boolean(rows[0]?.workspaces && rows[0]?.members);
+    return Boolean(rows[0]?.workspaces && rows[0]?.members && rows[0]?.projects);
   }
 }

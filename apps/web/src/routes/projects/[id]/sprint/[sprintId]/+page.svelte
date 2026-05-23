@@ -2,7 +2,7 @@
   import type { BoardTask } from "$lib/product-queries";
   import { TASK_STATUSES, buildBoardSnapshot, describeStatus } from "$lib/components/board/board-helpers";
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
 
   interface Sprint {
@@ -116,13 +116,13 @@
           class={cn("text-sm text-left hover:underline")}
           title="Click to edit goal"
         >
-          {data.sprint.goal || "No goal set — click to add"}
+          {data.sprint.goal || "No goal set: click to add"}
         </button>
       {/if}
     </div>
 
     <!-- Date range -->
-    <span class={cn("text-xs text-muted-foreground")}>{data.sprint.start_date} — {data.sprint.end_date}</span>
+    <span class={cn("text-xs text-muted-foreground")}>{data.sprint.start_date}: {data.sprint.end_date}</span>
 
     <!-- Days remaining chip -->
     <span

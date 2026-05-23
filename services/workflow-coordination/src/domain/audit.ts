@@ -28,6 +28,10 @@ export interface AuditEventDto {
   verb: string;
   subjectKind: string;
   subjectId: string | null;
+  causationId?: string | null;
+  fieldName?: string | null;
+  before?: unknown;
+  after?: unknown;
   payload: Record<string, unknown> | null;
   createdAt: Date;
 }

@@ -1,8 +1,10 @@
 import type { Editor, Extension, JSONContent } from "@tiptap/core";
 import { Node } from "@tiptap/core";
+import { Collaboration } from "@tiptap/extension-collaboration";
 import { TaskItem } from "@tiptap/extension-list/task-item";
 import { TaskList } from "@tiptap/extension-list/task-list";
 import { StarterKit } from "@tiptap/starter-kit";
+import type { Doc } from "yjs";
 import { ExcalidrawNode, FileAttachmentNode, ImageNode, MathBlockNode, MathNode, MermaidNode } from "./embeds";
 import { MentionNode } from "./mention";
 import { WikilinkNode } from "./wikilink";
@@ -37,7 +39,11 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "mermaid", label: "Mermaid diagram", aliases: ["diagram", "flowchart"] },
   { id: "sketch", label: "Sketch", aliases: ["excalidraw", "drawing"] },
   { id: "file", label: "File attachment", aliases: ["attachment", "upload"] },
-  { id: "callout", label: "Callout", aliases: ["info", "warning", "tip", "note", "alert"] },
+  { id: "callout-info", label: "Callout / Info", aliases: ["callout", "info", "note", "alert"] },
+  { id: "callout-warning", label: "Callout / Warning", aliases: ["callout", "warning", "warn", "caution"] },
+  { id: "callout-error", label: "Callout / Error", aliases: ["callout", "error", "danger", "stop"] },
+  { id: "callout-success", label: "Callout / Success", aliases: ["callout", "success", "done", "complete"] },
+  { id: "callout-tip", label: "Callout / Tip", aliases: ["callout", "tip", "hint", "idea"] },
   { id: "details", label: "Toggle / Details", aliases: ["collapse", "accordion", "expand", "spoiler"] },
   { id: "columns", label: "Columns", aliases: ["multi-column", "layout", "side-by-side"] },
   { id: "embed", label: "Embed", aliases: ["youtube", "figma", "loom", "iframe", "video"] },
@@ -89,20 +95,67 @@ export const NarrationBlockNode = Node.create({
   ],
 });
 
+export const CALLOUT_TYPES = ["info", "warning", "error", "success", "tip"] as const;
+export type CalloutType = (typeof CALLOUT_TYPES)[number];
+
+const CALLOUT_ICON_GLYPH: Record<CalloutType, string> = {
+  info: "i",
+  warning: "!",
+  error: "x",
+  success: "+",
+  tip: "?",
+};
+
+const CALLOUT_ARIA_LABEL: Record<CalloutType, string> = {
+  info: "Info callout",
+  warning: "Warning callout",
+  error: "Error callout",
+  success: "Success callout",
+  tip: "Tip callout",
+};
+
+function normalizeCalloutType(value: unknown): CalloutType {
+  return (CALLOUT_TYPES as readonly string[]).includes(value as string)
+    ? (value as CalloutType)
+    : "info";
+}
+
 export const CalloutNode = Node.create({
   name: "callout",
   group: "block",
   content: "block+",
   defining: true,
   addAttributes: () => ({
-    type: { default: "info" },
+    type: {
+      default: "info",
+      parseHTML: (element) => normalizeCalloutType(element.getAttribute("data-callout")),
+      renderHTML: (attrs) => ({ "data-callout": normalizeCalloutType(attrs.type) }),
+    },
   }),
   parseHTML: () => [{ tag: "div[data-callout]" }],
-  renderHTML: ({ node, HTMLAttributes }) => [
-    "div",
-    { ...HTMLAttributes, "data-callout": node.attrs.type, class: `callout callout--${node.attrs.type}` },
-    0,
-  ],
+  renderHTML: ({ node, HTMLAttributes }) => {
+    const type = normalizeCalloutType(node.attrs.type);
+    return [
+      "div",
+      {
+        ...HTMLAttributes,
+        "data-callout": type,
+        class: `callout callout--${type}`,
+        role: "note",
+        "aria-label": CALLOUT_ARIA_LABEL[type],
+      },
+      [
+        "span",
+        {
+          class: `callout__icon callout__icon--${type}`,
+          "data-callout-icon": type,
+          "aria-hidden": "true",
+        },
+        CALLOUT_ICON_GLYPH[type],
+      ],
+      ["div", { class: "callout__body" }, 0],
+    ];
+  },
 });
 
 export const DetailsNode = Node.create({
@@ -209,10 +262,15 @@ export function filterSlashMenuItems(items: SlashMenuItem[], query: string): Sla
   });
 }
 
-export function createDocEditorExtensions(): Extension[] {
-  return [
+export interface DocEditorExtensionOptions {
+  collaborationDocument?: Doc | null;
+}
+
+export function createDocEditorExtensions(options: DocEditorExtensionOptions = {}): Extension[] {
+  const extensions: Extension[] = [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
+      undoRedo: options.collaborationDocument ? false : undefined,
       link: {
         autolink: true,
         linkOnPaste: true,
@@ -240,6 +298,15 @@ export function createDocEditorExtensions(): Extension[] {
     EmbedNode,
     StatusNode,
   ] as Extension[];
+
+  if (options.collaborationDocument) {
+    extensions.push(Collaboration.configure({
+      document: options.collaborationDocument,
+      field: "content",
+    }));
+  }
+
+  return extensions;
 }
 
 export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
@@ -289,12 +356,35 @@ export function insertSlashMenuItem(editor: Editor, itemId: string): boolean {
       return chain.insertContent({ type: "excalidraw" }).run();
     case "file":
       return chain.insertContent({ type: "fileAttachment", attrs: { uploading: true } }).run();
-    case "callout":
+    case "callout-info":
+    case "callout-warning":
+    case "callout-error":
+    case "callout-success":
+    case "callout-tip": {
+      const type = itemId.replace(/^callout-/, "") as CalloutType;
+      const titleByType: Record<CalloutType, string> = {
+        info: "Info",
+        warning: "Warning",
+        error: "Error",
+        success: "Success",
+        tip: "Tip",
+      };
       return chain.insertContent({
         type: "callout",
-        attrs: { type: "info" },
-        content: [{ type: "paragraph", content: [{ type: "text", text: "Callout text" }] }],
+        attrs: { type },
+        content: [
+          {
+            type: "heading",
+            attrs: { level: 4 },
+            content: [{ type: "text", text: titleByType[type] }],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Add details here." }],
+          },
+        ],
       }).run();
+    }
     case "details":
       return chain.insertContent({
         type: "details",

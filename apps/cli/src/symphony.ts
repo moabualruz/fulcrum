@@ -1,5 +1,5 @@
 /**
- * fulcrum symphony — CLI surface for orchestration commands (P3#19).
+ * fulcrum symphony: CLI surface for orchestration commands (P3#19).
  *
  * All business logic delegated via SymphonyCaller interface.
  * --json flag on every command emits machine-readable output.
@@ -68,7 +68,7 @@ export interface SymphonyRunOptions {
 /* Help                                                                */
 /* ------------------------------------------------------------------ */
 
-const HELP = `fulcrum symphony — orchestration CLI
+const HELP = `fulcrum symphony: orchestration CLI
 
 Usage:
   fulcrum symphony status [--json]
@@ -335,7 +335,7 @@ async function cmdConformance(argv: readonly string[], opts: ResolvedOpts): Prom
 
   for (const s of result.sections) {
     const tag = s.pass ? "PASS" : "FAIL";
-    const reason = verbose && s.reason ? ` — ${s.reason}` : "";
+    const reason = verbose && s.reason ? `: ${s.reason}` : "";
     print(`${tag}  ${s.section}${reason}`);
   }
 
@@ -347,7 +347,7 @@ async function cmdConformance(argv: readonly string[], opts: ResolvedOpts): Prom
 
 async function defaultConformanceCheck(): Promise<ConformanceResult> {
   // Default: run `bun test` subprocess and parse output.
-  // Placeholder — real implementation parses SPEC.md sections.
+  // Placeholder: real implementation parses SPEC.md sections.
   return { sections: [], pass: true };
 }
 
@@ -361,7 +361,7 @@ function readFlag(argv: readonly string[], flag: string): string | null {
   return argv[idx + 1] as string;
 }
 
-/** Stub caller for CLI bootstrap — returns empty/placeholder data. */
+/** Stub caller for CLI bootstrap: returns empty/placeholder data. */
 export function stubCaller(): SymphonyCaller {
   return {
     getOrchestratorStatus: async () => ({ running: 0, queued: 0, stalled: 0 }),

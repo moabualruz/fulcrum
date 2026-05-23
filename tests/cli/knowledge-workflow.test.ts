@@ -51,7 +51,11 @@ describe("Workflow CLI knowledge workflow", () => {
       source: { kind: "task", id: "task_1" },
       links: [{ targetKind: "task", targetId: "task_1", linkKind: "source" }],
     });
-    expect(JSON.parse(lines[0] as string)).toMatchObject({
+    // `docs create --json` now emits the canonical fulcrum.cli.v1 envelope
+    // (prd-cli-capture-stage-parity); the doc payload is under `.result`.
+    const envelope = JSON.parse(lines[0] as string) as Record<string, unknown>;
+    expect(envelope["schema"]).toBe("fulcrum.cli.v1");
+    expect(envelope["result"]).toMatchObject({
       id: "doc_1",
       links: [{ targetKind: "task", targetId: "task_1" }],
       trace: { source: { kind: "task", id: "task_1" } },

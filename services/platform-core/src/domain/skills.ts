@@ -1,6 +1,15 @@
 import { z } from "zod";
 
-import { SkillConflictKind, SkillConflictStatus } from "@platform-core/infrastructure/application-database/entities/skills/SkillConflict.ts";
+export enum SkillConflictKind {
+  UpstreamConflict = "upstream_conflict",
+  ShaMismatch = "sha_mismatch",
+}
+
+export enum SkillConflictStatus {
+  Open = "open",
+  Overridden = "overridden",
+  Resolved = "resolved",
+}
 
 export const SkillOutputSchema = z.object({
   id: z.string(),

@@ -56,12 +56,15 @@ describe("report command", () => {
         method: "GET",
       },
     ]);
-    expect(JSON.parse(lines.join("\n"))).toEqual({ data: [{ date: "2026-05-15", remaining: 5 }] });
+    const envelope = JSON.parse(lines.join("\n"));
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.command).toBe("fulcrum report burndown");
+    expect(envelope.result).toEqual({ data: [{ date: "2026-05-15", remaining: 5 }] });
   });
 
   it("requires a configured public API without injected caller", async () => {
     const { run } = await import("./report.ts");
-    const errors: string[] = [];
+    const lines: string[] = [];
     const exits: number[] = [];
 
     await run(["burndown", "--project", "project-1", "--json"], {
@@ -69,12 +72,14 @@ describe("report command", () => {
       fetch: (async () => {
         throw new Error("fetch should not run without API configuration");
       }) as unknown as typeof fetch,
-      print: () => undefined,
-      printErr: (line) => errors.push(line),
+      print: (line) => lines.push(line),
+      printErr: () => undefined,
       exit: (code) => exits.push(code),
     });
 
-    expect(errors.join("\n")).toContain("Report API caller is not configured");
+    const envelope = JSON.parse(lines.join("\n"));
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.errors[0].message).toContain("Report API caller is not configured");
     expect(exits).toEqual([1]);
   });
 

@@ -45,6 +45,16 @@ const DOC_HIT: SearchHit = {
   updated_at: "2026-04-30T10:00:00.000Z",
 };
 
+const ARTIFACT_HIT: SearchHit = {
+  id: "search-artifact",
+  source_kind: "artifact",
+  source_id: "artifact-1",
+  title: "handoff.md",
+  body: "trace-abc source apps/web/src/routes/search/+page.svelte",
+  score: 0.8,
+  updated_at: "2026-04-30T10:02:00.000Z",
+};
+
 const EMPTY_DATA: PageProps["data"] = {
   q: "",
   kinds: [],
@@ -112,6 +122,8 @@ describe("/search +page.svelte", () => {
     expect(body).toContain("data-facet-kinds");
     expect(body).toContain('data-kind-checkbox="doc"');
     expect(body).toContain('data-kind-checkbox="task"');
+    expect(body).toContain('data-kind-checkbox="run"');
+    expect(body).toContain('data-kind-checkbox="artifact"');
   });
 
   test("renders date range inputs", () => {
@@ -134,5 +146,27 @@ describe("/search +page.svelte", () => {
     });
     expect(body).toContain("data-saved-searches");
     expect(body).toContain('data-saved-search="My search"');
+  });
+
+  test("renders fast actions and no-result recovery actions", () => {
+    const { body } = render(Page, {
+      props: { data: { ...EMPTY_DATA, q: "missing-trace" } },
+    });
+    expect(body).toContain("data-search-fast-actions");
+    expect(body).toContain('data-search-command-action="open-palette"');
+    expect(body).toContain("Try a trace ID");
+    expect(body).toContain('data-search-empty-action="palette"');
+  });
+
+  test("links artifact results and labels workflow context", () => {
+    const { body } = render(Page, {
+      props: {
+        data: { ...EMPTY_DATA, q: "trace-abc", hits: [ARTIFACT_HIT], grouped: { artifact: [ARTIFACT_HIT] } },
+      },
+    });
+    expect(body).toContain('data-source-kind="artifact"');
+    expect(body).toContain('href="/artifacts/artifact-1"');
+    expect(body).toContain("data-hit-workflow-context");
+    expect(body).toContain("Trace-linked");
   });
 });

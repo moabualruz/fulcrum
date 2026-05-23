@@ -1,14 +1,13 @@
 import { error, fail, redirect } from "@sveltejs/kit";
 import { createDocumentApiForEvent } from "$lib/server/document-api";
-import { requestAppScope } from "$lib/server/application-scope";
 import { renderDocMarkdownToHtml } from "./doc-render.ts";
 
 interface LoadEvent {
   params: { id: string };
   locals: App.Locals & { activeProjectId?: string | null };
-  fetch?: typeof fetch;
-  request?: Request;
-  url?: URL;
+  fetch: typeof fetch;
+  request: Request;
+  url: URL;
 }
 
 interface ActionEvent {
@@ -71,77 +70,45 @@ export const load = (event: LoadEvent) => ({
   streamed: {
     data: (async () => {
       const { params } = event;
-      const serverUrl = process.env["FULCRUM_SERVER_URL"] ?? process.env["FULCRUM_PUBLIC_API_URL"];
-
-      if (serverUrl && event.url && event.request) {
-        // HTTP path: delegate to document API via HTTP (production mode).
-        const api = createDocumentApiForEvent(event as Parameters<typeof createDocumentApiForEvent>[0]);
-        const doc = await api.docs.get({ id: params.id }).catch(mapDocumentNotFound) as PublicDocument;
-        const body = doc.bodyMd ?? doc.body_md ?? "";
-        const docResult = {
-          doc: {
-            id: doc.id,
-            org_id: doc.orgId ?? doc.org_id ?? "",
-            project_id: doc.projectId ?? doc.project_id ?? null,
-            kind: doc.docType ?? doc.type ?? "note",
-            title: doc.title,
-            body,
-            renderedHtml: renderDocMarkdownToHtml(body),
-            frontmatter: doc.frontmatter ?? {},
-            updated_at: doc.updatedAt ?? doc.updated_at ?? "",
-          },
-        };
-        const backlinks = ((await api.docs.listBacklinks({ id: params.id })) as PublicBacklink[]).map((backlink) => ({
-          id: backlink.fromDocId ?? backlink.from_doc_id ?? backlink.id ?? "",
-          title: backlink.title,
-          href: `/docs/${backlink.fromDocId ?? backlink.from_doc_id ?? backlink.id ?? ""}`,
-        }));
-        const comments = ((await api.docs.listComments({ id: params.id })) as PublicComment[]).map((comment) => ({
-          id: comment.id,
-          bodyMd: comment.bodyMd ?? comment.body_md ?? "",
-          authorId: comment.authorId ?? comment.author_id ?? "",
-          parentCommentId: comment.parentCommentId ?? comment.parent_comment_id ?? null,
-          resolved: comment.resolved === true || comment.status === "resolved",
-        }));
-        const attachments = ((await api.docs.listAttachments({ id: params.id })) as PublicAttachment[]).map((attachment) => {
-          const storagePath = attachment.storagePath ?? attachment.storage_path ?? "";
-          return {
-            id: attachment.id,
-            fileName: attachment.fileName ?? attachment.file_name ?? "",
-            mimeType: attachment.mimeType ?? attachment.mime_type ?? "",
-            sizeBytes: Number(attachment.sizeBytes ?? attachment.size_bytes ?? 0),
-            href: attachmentHref(storagePath),
-          };
-        });
-        return { ...docResult, backlinks, comments, attachments };
-      }
-
-      // Local/in-process path: query DB directly via application scope.
-      const { em, ctx } = await requestAppScope(event.locals as Parameters<typeof requestAppScope>[0]);
-      const { getDoc, listDocBacklinks } = await import("@knowledge-workspace/application/docs/queries.ts");
-      const docRaw = await getDoc(em, ctx, params.id);
-      if (!docRaw) throw mapDocumentNotFound(new Error("Document not found"));
-      const body = docRaw.bodyMd ?? "";
+      const api = createDocumentApiForEvent(event);
+      const doc = await api.docs.get({ id: params.id }).catch(mapDocumentNotFound) as PublicDocument;
+      const body = doc.bodyMd ?? doc.body_md ?? "";
       const docResult = {
         doc: {
-          id: docRaw.id,
-          org_id: docRaw.orgId,
-          project_id: docRaw.projectId ?? null,
-          kind: docRaw.docType,
-          title: docRaw.title,
+          id: doc.id,
+          org_id: doc.orgId ?? doc.org_id ?? "",
+          project_id: doc.projectId ?? doc.project_id ?? null,
+          kind: doc.docType ?? doc.type ?? "note",
+          title: doc.title,
           body,
           renderedHtml: renderDocMarkdownToHtml(body),
-          frontmatter: docRaw.frontmatter ?? {},
-          updated_at: docRaw.updatedAt instanceof Date ? docRaw.updatedAt.toISOString() : String(docRaw.updatedAt ?? ""),
+          frontmatter: doc.frontmatter ?? {},
+          updated_at: doc.updatedAt ?? doc.updated_at ?? "",
         },
       };
-      const backlinkRows = await listDocBacklinks(em, ctx, params.id);
-      const backlinks = backlinkRows.map((backlink) => ({
-        id: backlink.fromDocId,
+      const backlinks = ((await api.docs.listBacklinks({ id: params.id })) as PublicBacklink[]).map((backlink) => ({
+        id: backlink.fromDocId ?? backlink.from_doc_id ?? backlink.id ?? "",
         title: backlink.title,
-        href: `/docs/${backlink.fromDocId}`,
+        href: `/docs/${backlink.fromDocId ?? backlink.from_doc_id ?? backlink.id ?? ""}`,
       }));
-      return { ...docResult, backlinks, comments: [], attachments: [] };
+      const comments = ((await api.docs.listComments({ id: params.id })) as PublicComment[]).map((comment) => ({
+        id: comment.id,
+        bodyMd: comment.bodyMd ?? comment.body_md ?? "",
+        authorId: comment.authorId ?? comment.author_id ?? "",
+        parentCommentId: comment.parentCommentId ?? comment.parent_comment_id ?? null,
+        resolved: comment.resolved === true || comment.status === "resolved",
+      }));
+      const attachments = ((await api.docs.listAttachments({ id: params.id })) as PublicAttachment[]).map((attachment) => {
+        const storagePath = attachment.storagePath ?? attachment.storage_path ?? "";
+        return {
+          id: attachment.id,
+          fileName: attachment.fileName ?? attachment.file_name ?? "",
+          mimeType: attachment.mimeType ?? attachment.mime_type ?? "",
+          sizeBytes: Number(attachment.sizeBytes ?? attachment.size_bytes ?? 0),
+          href: attachmentHref(storagePath),
+        };
+      });
+      return { ...docResult, backlinks, comments, attachments };
     })(),
   },
 });

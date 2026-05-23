@@ -3,7 +3,13 @@ import type { EntityManager } from "typeorm";
 import { AppValidationError } from "@platform-core/domain/errors.ts";
 import { ormSqlConnection } from "@platform-core/application/orm-helpers.ts";
 import { previewContext, type ContextSourceRef } from "@knowledge-workspace/application/context/queries.ts";
-import { resolveEffectiveAgentAuthority } from "@work-management/application/project-policy/trust.ts";
+import {
+  normalizeToolPermissionMode,
+  projectPolicySourceFromModulePolicy,
+  resolveEffectiveAgentAuthority,
+  trustModeFromToolPermissionMode,
+  type ToolPermissionMode,
+} from "@work-management/application/project-policy/trust.ts";
 import type { AppContext } from "@execution-orchestration/application/runs/types.ts";
 
 export type DispatchTrustMode = "manual" | "assisted" | "trusted" | "full-auto";
@@ -22,6 +28,7 @@ export interface DispatchTrace {
   };
   authority: {
     trustMode: DispatchTrustMode;
+    permissionMode: ToolPermissionMode;
     approvalRequired: boolean;
     reason: string;
     sources: Record<string, DispatchTrustMode | null>;
@@ -37,6 +44,7 @@ export async function buildDispatchTrace(
     agentName?: string | null;
     includeGlobal?: boolean;
     trustMode?: DispatchTrustMode;
+    permissionMode?: ToolPermissionMode;
   },
 ): Promise<DispatchTrace> {
   const conn = ormSqlConnection(em);
@@ -52,6 +60,7 @@ export async function buildDispatchTrace(
     throw new AppValidationError("Dispatch project does not match task project.");
   }
   if (!task.repo_id) throw new AppValidationError("Dispatch requires task repo trace.");
+  const projectPolicy = await loadProjectAuthorityPolicy(em, ctx, projectId);
 
   const includeGlobal = input.includeGlobal ?? false;
   const contextPreview = await previewContext(em, ctx, {
@@ -60,11 +69,14 @@ export async function buildDispatchTrace(
     includeGlobal,
   });
   const selectedAgent = input.agentName?.trim() || "codex";
+  const requestedPermissionMode = input.permissionMode ? normalizeToolPermissionMode(input.permissionMode) : null;
   const authority = resolveEffectiveAgentAuthority({
     agentProfile: { trustMode: "assisted" },
     workflowDefault: { trustMode: "assisted" },
-    projectPolicy: { trustMode: "assisted" },
-    runOverride: input.trustMode ? { trustMode: input.trustMode } : null,
+    projectPolicy,
+    runOverride: requestedPermissionMode
+      ? { trustMode: trustModeFromToolPermissionMode(requestedPermissionMode) }
+      : input.trustMode ? { trustMode: input.trustMode } : null,
   });
   return {
     taskId: input.taskId,
@@ -80,9 +92,36 @@ export async function buildDispatchTrace(
     },
     authority: {
       trustMode: authority.trustMode,
+      permissionMode: authority.permissionMode,
       approvalRequired: authority.approvalRequired,
       reason: authority.reason,
       sources: authority.sources,
     },
   };
+}
+
+async function loadProjectAuthorityPolicy(
+  em: EntityManager,
+  ctx: AppContext,
+  projectId: string,
+): Promise<{ trustMode: DispatchTrustMode }> {
+  const rows = await ormSqlConnection(em).execute<Array<{ module_policy: Record<string, unknown> | string | null }>>(
+    `SELECT module_policy FROM projects WHERE id = $1 AND org_id = $2`,
+    [projectId, ctx.orgId],
+  );
+  const modulePolicy = objectValue(rows[0]?.module_policy);
+  return projectPolicySourceFromModulePolicy(modulePolicy) as { trustMode: DispatchTrustMode };
+}
+
+function objectValue(value: Record<string, unknown> | string | null | undefined): Record<string, unknown> {
+  if (!value) return {};
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    } catch {
+      return {};
+    }
+  }
+  return value;
 }

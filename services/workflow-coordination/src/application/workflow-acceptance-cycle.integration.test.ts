@@ -214,6 +214,11 @@ describe("Workflow acceptance cycle service", () => {
         ["task-plan-acceptance-cycle-execution", "in-review"],
         ["task-plan-acceptance-cycle-planning", "in-review"],
         ["task-plan-acceptance-cycle-verify-end-to-end", "in-review"],
+        // generated-e2e mirror tasks the acceptance cycle now emits for each plan task
+        ["task-trace-acceptance-cycle-generated-e2e-task-plan-acceptance-cycle-context", "todo"],
+        ["task-trace-acceptance-cycle-generated-e2e-task-plan-acceptance-cycle-execution", "todo"],
+        ["task-trace-acceptance-cycle-generated-e2e-task-plan-acceptance-cycle-planning", "todo"],
+        ["task-trace-acceptance-cycle-generated-e2e-task-plan-acceptance-cycle-verify-end-to-end", "todo"],
       ]);
 
       const runs = await dataSource.getRepository(FulcrumAgentRunEntity).find({

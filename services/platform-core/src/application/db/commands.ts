@@ -1,4 +1,5 @@
 import { resolveDatabaseConfig, type DbBackend, type ResolvedDatabaseConfig } from "./database-config.ts";
+import { resolveApplicationDatabaseRuntime } from "@platform-core/infrastructure/application-database/typeorm.config.ts";
 
 export type ProductDbConnectionSummary =
   | {
@@ -13,6 +14,7 @@ export type ProductDbConnectionSummary =
 export interface ProductDbStatus {
   backend: DbBackend;
   connection: ProductDbConnectionSummary;
+  runtime: ReturnType<typeof resolveApplicationDatabaseRuntime>;
   current: string | null;
   pending: string[];
   pastDue: number;
@@ -34,9 +36,13 @@ function describeDatabaseConnection(config: ResolvedDatabaseConfig): ProductDbCo
 
 export function defaultProductDbStatus(): ProductDbStatus {
   const config = resolveDatabaseConfig();
+  const runtime = resolveApplicationDatabaseRuntime();
   return {
     backend: config.backend,
     connection: describeDatabaseConnection(config),
+    runtime: runtime.backend === "postgres"
+      ? { ...runtime, target: redactDatabaseUrl(runtime.target) }
+      : runtime,
     current: null,
     pending: [],
     pastDue: 0,

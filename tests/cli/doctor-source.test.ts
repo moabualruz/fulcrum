@@ -38,6 +38,10 @@ async function captureRun(args: string[]): Promise<string> {
   }
 }
 
+function envelopeResult<T>(output: string): T {
+  return (JSON.parse(output) as { schema: "fulcrum.cli.v1"; result: T }).result;
+}
+
 beforeEach(async () => {
   scratch = await mkdtemp(join(tmpdir(), "fulcrum-doctor-source-"));
   previousHome = process.env["HOME"];
@@ -78,7 +82,7 @@ afterEach(async () => {
 describe("doctor CLI source command", () => {
   test("emits API subsystem JSON smoke output", async () => {
     const output = await captureRun(["--subsystem", "api", "--json"]);
-    const report = JSON.parse(output) as { subsystem: string; checks: unknown[]; summary: { pass: number; warn: number; fail: number } };
+    const report = envelopeResult<{ subsystem: string; checks: unknown[]; summary: { pass: number; warn: number; fail: number } }>(output);
 
     expect(report.subsystem).toBe("api");
     expect(report.checks.length).toBeGreaterThan(0);
@@ -100,7 +104,7 @@ describe("doctor CLI source command", () => {
     await mkdir(join(home, ".claude", "plugins", "cache", "caveman", "caveman"), { recursive: true });
 
     const output = await captureRun(["--json"]);
-    const report = JSON.parse(output) as Record<string, any>;
+    const report = envelopeResult<Record<string, any>>(output);
 
     expect(report.bun).toBeString();
     expect(report.agents.some((agent: { label: string; detected: boolean }) => agent.label === "Codex CLI" && agent.detected)).toBe(true);
@@ -145,7 +149,7 @@ describe("doctor CLI source command", () => {
     await writeFile(join(repo, "skills", "_archive", "old-skill", "SKILL.md"), "---\nname: old\n---\n");
 
     const output = await captureRun(["--json"]);
-    const report = JSON.parse(output) as Record<string, any>;
+    const report = envelopeResult<Record<string, any>>(output);
 
     expect(report.caveman.defaultMode).toBe("normal");
     expect(report.caveman.defaultModeSource).toBe("env");
@@ -167,7 +171,7 @@ describe("doctor CLI source command", () => {
     await mkdir(join(process.env["XDG_CONFIG_HOME"]!, "caveman"), { recursive: true });
     await writeFile(join(process.env["XDG_CONFIG_HOME"]!, "caveman", "config.json"), JSON.stringify({ defaultMode: 123 }));
 
-    const report = JSON.parse(await captureRun(["--json"])) as Record<string, any>;
+    const report = envelopeResult<Record<string, any>>(await captureRun(["--json"]));
 
     expect(report.caveman.defaultMode).toBe("");
     expect(report.caveman.defaultModeSource).toBe("malformed");
@@ -207,7 +211,7 @@ describe("doctor CLI source command", () => {
     }) as typeof fetch;
 
     try {
-      const report = JSON.parse(await captureRun(["--json", "--probe"])) as Record<string, any>;
+      const report = envelopeResult<Record<string, any>>(await captureRun(["--json", "--probe"]));
       const server = report.mcp.servers.find((entry: { name: string }) => entry.name === "private-http");
       expect(server).toMatchObject({
         transport: "http",
@@ -231,5 +235,22 @@ describe("doctor CLI source command", () => {
     expect(parsed.subsystem ?? "memory").toBe("memory");
     expect(Array.isArray(parsed.checks)).toBe(true);
     expect(parsed.summary).toBeDefined();
+  });
+
+  test("runs pglite rebuild fix and returns verified JSON", async () => {
+    const output = await captureRun(["--run-fix", "pglite-rebuild", "--json"]);
+    const parsed = envelopeResult<{
+      action: string;
+      dbPath: string;
+      quarantinedPath: string | null;
+      verified: boolean;
+      schemaApplied: number;
+    }>(output);
+
+    expect(parsed.action).toBe("pglite-rebuild");
+    expect(parsed.dbPath).toBe(join(process.env["FULCRUM_HOME"]!, "db", "main"));
+    expect(parsed.quarantinedPath).toBeNull();
+    expect(parsed.verified).toBe(true);
+    expect(parsed.schemaApplied).toBeGreaterThan(0);
   });
 });

@@ -135,6 +135,7 @@ describe("Planning preview Nest controller", () => {
   test("delegates approved-plan preview to the server-owned planning service", async () => {
     const input = validApprovedPlanInput();
     const preview: ApprovedPlanPreview = {
+      traceId: "trace-nest",
       title: "Agent-native docs workflow",
       docs: [],
       artifacts: [],
@@ -193,7 +194,9 @@ describe("Planning preview Nest controller", () => {
       projectName: "Project Nest",
     });
     const materialized: ApprovedPlanMaterializeResult = {
+      traceId: "trace-nest",
       breakdown: {
+        traceId: "trace-nest",
         title: "Agent-native docs workflow",
         docs: [],
         artifacts: [],
@@ -267,6 +270,7 @@ describe("Planning preview Nest controller", () => {
       boilerplatePaths: ["services/planning-review/src/application/technical-planning-cycle.ts"],
     });
     const promptOutput: PlanningFreeformPromptResult = {
+      traceId: "trace-prompt-nest",
       context: {
         sourceRefs: [{ kind: "doc", id: "doc-nest" }],
         selectedDocs: [],
@@ -277,6 +281,7 @@ describe("Planning preview Nest controller", () => {
     };
     const technicalOutput: PlanningTechnicalCycleResult = {
       status: "ready_for_plan_review",
+      traceId: "trace-technical-nest",
       eventId: "event-technical-nest",
       context: { sourceRefs: [], selectedDocs: [], contextMarkdown: "" },
       prompt: "prompt",
@@ -569,6 +574,7 @@ describe("Planning preview Nest controller", () => {
         this.seenFreeform = body;
         return {
           status: "ready_for_planning",
+          traceId: "trace-freeform-nest",
           document: {
             id: "doc-nest",
             projectId: "project-nest",
@@ -588,6 +594,7 @@ describe("Planning preview Nest controller", () => {
         this.seenGuided = body;
         return {
           status: "ready_for_acp_prompt",
+          traceId: "trace-guided-nest",
           session: {
             acpSessionId: "acp-nest",
             agentName: "codex",
@@ -607,6 +614,7 @@ describe("Planning preview Nest controller", () => {
         this.seenSessionAction = body;
         return {
           status: "session_action_recorded" as const,
+          traceId: "trace-guided-nest",
           session: {
             acpSessionId: "acp-nest",
             projectId: "project-nest",

@@ -1,12 +1,10 @@
 import { redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { dispatchRun } from "@execution-orchestration/interface/run-actions.ts";
-import { loadRunsPageData } from "@execution-orchestration/interface/run-pages.ts";
 import {
   type RunRange,
 } from "$lib/components/runs/runs-filters";
 import type { RunStatus } from "$lib/server/runs";
-import { requestServiceScope } from "$lib/server/request-service-scope";
+import { createAgentRunApiForEvent } from "$lib/server/agent-run-api";
 
 const VALID_STATUS = new Set<RunStatus>([
   "queued",
@@ -17,13 +15,19 @@ const VALID_STATUS = new Set<RunStatus>([
 ]);
 
 const VALID_RANGE = new Set<RunRange>(["24h", "7d", "30d", "all"]);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-export const load: PageServerLoad = ({ url, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { url, locals } = event;
   const agent = (url.searchParams.get("agent") ?? "").trim();
   const statusRaw = (url.searchParams.get("status") ?? "").trim();
   const rangeRaw = (url.searchParams.get("range") ?? "all").trim();
   const projectParam = url.searchParams.get("project");
   const projectRaw = projectParam === null ? undefined : projectParam.trim();
+  const dateFromRaw = (url.searchParams.get("dateFrom") ?? "").trim();
+  const dateToRaw = (url.searchParams.get("dateTo") ?? "").trim();
+  const dateFrom = DATE_RE.test(dateFromRaw) ? dateFromRaw : "";
+  const dateTo = DATE_RE.test(dateToRaw) ? dateToRaw : "";
 
   const range: RunRange = VALID_RANGE.has(rangeRaw as RunRange)
     ? (rangeRaw as RunRange)
@@ -38,6 +42,8 @@ export const load: PageServerLoad = ({ url, locals }) => {
     status: statusRaw,
     range,
     project: projectRaw ?? "__any__",
+    dateFrom,
+    dateTo,
   };
 
   return {
@@ -48,13 +54,16 @@ export const load: PageServerLoad = ({ url, locals }) => {
     streamed: {
       data: (async () => {
         const projectId = projectRaw !== undefined ? projectRaw || null : locals?.activeProjectId ?? null;
-        const { em, ctx } = await requestServiceScope(locals, projectId);
-        const data = await loadRunsPageData(em, ctx, {
+        const data = await createAgentRunApiForEvent(event).runs.pageData({
+          contextProjectId: projectId,
+          hasProjectFilter: projectRaw !== undefined ? "true" : undefined,
+          filterProjectId: projectRaw !== undefined ? projectRaw || null : undefined,
           range,
           ...(agent ? { agent } : {}),
           ...(status ? { status } : {}),
-          ...(projectRaw !== undefined ? { projectId: projectRaw || null } : {}),
-        });
+          ...(dateFrom ? { dateFrom } : {}),
+          ...(dateTo ? { dateTo } : {}),
+        }) as { runs: Array<Record<string, unknown>>; projects: unknown[]; tasks: unknown[] };
         return { runs: data.runs.map((run) => ({ ...run, status: run.status as RunStatus })), projects: data.projects, tasks: data.tasks };
       })(),
     },
@@ -62,15 +71,15 @@ export const load: PageServerLoad = ({ url, locals }) => {
 };
 
 export const actions: Actions = {
-  dispatch: async ({ request, locals }) => {
+  dispatch: async (event) => {
+    const { request } = event;
     const form = await request.formData();
     const taskId = String(form.get("taskId") ?? "");
     const projectId = String(form.get("projectId") ?? "") || null;
     const agent = String(form.get("agent") ?? "codex");
     if (!taskId) throw redirect(303, "/runs");
 
-    const { em, ctx } = await requestServiceScope(locals, projectId);
-    const result = await dispatchRun(em, ctx, { agentName: agent, prompt: taskId });
+    const result = await createAgentRunApiForEvent(event).runs.dispatchPrompt({ projectId, agentName: agent, prompt: taskId }) as { id: string };
     const id = result.id;
     throw redirect(303, `/runs/${id}`);
   },

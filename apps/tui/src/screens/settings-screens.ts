@@ -1,5 +1,5 @@
 /**
- * TUI settings screen presenters — pure functions producing text output.
+ * TUI settings screen presenters: pure functions producing text output.
  * No terminal I/O; consumed by OpenTUI component tree and tests.
  */
 
@@ -58,7 +58,7 @@ export function renderConnectorsScreen(connectors: ConnectorCard[]): string {
   for (const c of connectors) {
     const lastRun = c.runs[0];
     const syncAt = lastRun ? startedAt(lastRun) : "never";
-    const syncStatus = lastRun ? lastRun.status : "—";
+    const syncStatus = lastRun ? lastRun.status : "-";
     const syncedCount = lastRun ? String(recordsSynced(lastRun)) : "0";
 
     lines.push(`  ${c.kind}  ${c.enabled ? "ON" : "OFF"}  last-sync: ${syncAt}  status: ${syncStatus}  records: ${syncedCount}`);

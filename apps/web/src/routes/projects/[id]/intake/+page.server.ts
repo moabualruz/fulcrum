@@ -1,59 +1,66 @@
-import { fail } from "@sveltejs/kit";
+import { error, fail } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
 
 import {
-  createIntakeRequest,
-  deleteIntakeRequest,
-  listIntakeRequests,
-  updateIntakeRequest,
-  type IntakeStatus,
-} from "@work-management/interface/pm-structure.ts";
-import { requestProjectScope } from "../../project-request-scope";
+  createPlanningStructureApiForEvent,
+  PlanningStructureApiError,
+} from "$lib/server/planning-structure-api";
 
 const INTAKE_STATUSES = ["open", "accepted", "declined", "converted"] as const;
+type IntakeStatus = (typeof INTAKE_STATUSES)[number];
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-  const { em, ctx } = await requestProjectScope(locals, params.id);
-  return {
-    projectId: params.id,
-    streamed: {
-      data: (async () => ({ intake: await listIntakeRequests(em, ctx) }))(),
-    },
-  };
+export const load: PageServerLoad = async (event) => {
+  const projectId = event.params.id;
+  try {
+    const intake = await createPlanningStructureApiForEvent(event).intake.list({ projectId });
+    return {
+      projectId,
+      streamed: {
+        data: Promise.resolve({ intake }),
+      },
+    };
+  } catch (err) {
+    if (err instanceof PlanningStructureApiError && err.status === 404) {
+      throw error(404, "Project not found");
+    }
+    throw err;
+  }
 };
 
 export const actions: Actions = {
-  create: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  create: async (event) => {
+    const fd = await event.request.formData();
     const title = field(fd, "title");
     if (!title) return fail(400, { error: "Title is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await createIntakeRequest(em, ctx, {
+    await createPlanningStructureApiForEvent(event).intake.create({
+      projectId: event.params.id,
       title,
       description: field(fd, "description") || null,
       source: field(fd, "source") || "manual",
     });
     return { success: true };
   },
-  update: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  update: async (event) => {
+    const fd = await event.request.formData();
     const intakeId = field(fd, "intakeId");
     if (!intakeId) return fail(400, { error: "intakeId is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await updateIntakeRequest(em, ctx, {
-      intakeId,
+    await createPlanningStructureApiForEvent(event).intake.update({
+      id: intakeId,
+      projectId: event.params.id,
       title: field(fd, "title") || undefined,
       description: field(fd, "description") || null,
       status: intakeStatus(field(fd, "status")) ?? undefined,
     });
     return { success: true };
   },
-  delete: async ({ params, request, locals }) => {
-    const fd = await request.formData();
+  delete: async (event) => {
+    const fd = await event.request.formData();
     const intakeId = field(fd, "intakeId");
     if (!intakeId) return fail(400, { error: "intakeId is required" });
-    const { em, ctx } = await requestProjectScope(locals, params.id);
-    await deleteIntakeRequest(em, ctx, intakeId);
+    await createPlanningStructureApiForEvent(event).intake.delete({
+      id: intakeId,
+      projectId: event.params.id,
+    });
     return { success: true };
   },
 };

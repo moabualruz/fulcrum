@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
-  import { cn } from "$lib/utils.js";
+  import { cn } from "@fulcrum/ui-kit";
   import WorkflowEditor from "$lib/components/tasks/WorkflowEditor.svelte";
 
   interface Props {

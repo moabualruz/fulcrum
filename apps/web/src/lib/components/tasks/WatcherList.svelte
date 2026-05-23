@@ -119,7 +119,7 @@
         <div
           class="watcher-list__avatar-wrapper"
           role="img"
-          aria-label={`${watcher.user?.name ?? watcher.userId} — ${EMOJI_SOURCES[watcher.source] ?? watcher.source}`}
+          aria-label={`${watcher.user?.name ?? watcher.userId}: ${EMOJI_SOURCES[watcher.source] ?? watcher.source}`}
           onmouseenter={() => { hoveredWatcherId = watcher.id; }}
           onmouseleave={() => { hoveredWatcherId = null; }}
         >

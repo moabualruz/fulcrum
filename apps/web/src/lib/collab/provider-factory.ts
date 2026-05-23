@@ -1,5 +1,5 @@
 /**
- * createCollabProvider — returns MockCollabProvider when flag OFF or in test env,
+ * createCollabProvider: returns MockCollabProvider when flag OFF or in test env,
  * and a HocuspocusProvider adapter when flag ON.
  *
  * Real Hocuspocus is imported dynamically so it is NEVER bundled when flag is OFF.
@@ -17,20 +17,35 @@ export interface ProviderOptions {
 	hocuspocusUrl?: string;
 }
 
+export class CollabProviderConfigError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "CollabProviderConfigError";
+	}
+}
+
+export class CollabProviderDependencyError extends Error {
+	constructor(message: string, options?: ErrorOptions) {
+		super(message, options);
+		this.name = "CollabProviderDependencyError";
+	}
+}
+
 export async function createCollabProvider(options: ProviderOptions): Promise<CollabProvider> {
 	const { docId, user, featuresEnv, hocuspocusUrl } = options;
 
 	if (!isCollabEnabled(featuresEnv)) {
-		// Flag OFF — return a disconnected mock that is never connected
+		// Flag OFF: return a disconnected mock that is never connected
 		return new MockCollabProvider();
 	}
 
 	if (isWebRTCFallbackEnabled(featuresEnv)) {
-		// WebRTC P2P fallback — no Hocuspocus server required
+		// WebRTC P2P fallback: no Hocuspocus server required
 		return createWebRTCProvider(docId, user);
 	}
 
-	// Flag ON — dynamic import so Hocuspocus is tree-shaken when OFF
+	// Flag ON: dynamic import so Hocuspocus is tree-shaken when OFF
+	const url = resolveHocuspocusUrl(hocuspocusUrl);
 	try {
 		const providerModule = "@hocuspocus/provider";
 		const yjsModule = "yjs";
@@ -40,28 +55,38 @@ export async function createCollabProvider(options: ProviderOptions): Promise<Co
 		const { Doc } = await import(/* @vite-ignore */ yjsModule as any);
 		const doc = new Doc();
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const url = hocuspocusUrl ?? (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FULCRUM_HOCUSPOCUS_URL) ?? "ws://localhost:1234";
-
 		return new HocuspocusAdapterProvider(
 			new HocuspocusProvider({ url, name: docId, document: doc }),
+			doc,
 			user,
 		);
-	} catch {
-		// Hocuspocus not installed — fall back to mock (flag ON but deps absent)
-		console.warn("[collab] @hocuspocus/provider not installed, using mock provider");
-		const mock = new MockCollabProvider();
-		mock.setUser(user);
-		mock.connect();
-		return mock;
+	} catch (error) {
+		throw new CollabProviderDependencyError(
+			"real-time-collab-server requires @hocuspocus/provider and yjs",
+			{ cause: error },
+		);
 	}
+}
+
+export function resolveHocuspocusUrl(explicitUrl?: string): string {
+	if (explicitUrl) return explicitUrl;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const envUrl = typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_FULCRUM_HOCUSPOCUS_URL : undefined;
+	if (envUrl) return envUrl;
+	if (typeof window !== "undefined" && window.location?.host) {
+		const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+		return `${protocol}//${window.location.host}/yjs`;
+	}
+	throw new CollabProviderConfigError(
+		"real-time-collab-server requires VITE_FULCRUM_HOCUSPOCUS_URL outside browser runtime",
+	);
 }
 
 // ---- WebRTC fallback provider ------------------------------------------------
 
 function createWebRTCProvider(docId: string, user: CollabUser): CollabProvider {
 	// Same mock-based structure; real impl would use y-webrtc dynamic import
-	console.warn("[collab] WebRTC P2P fallback — using mock provider (y-webrtc not installed)");
+	console.warn("[collab] WebRTC P2P fallback: using mock provider (y-webrtc not installed)");
 	const mock = new MockCollabProvider();
 	mock.setUser(user);
 	return mock;
@@ -72,7 +97,7 @@ function createWebRTCProvider(docId: string, user: CollabUser): CollabProvider {
 /** Thin adapter so Hocuspocus conforms to CollabProvider interface. */
 class HocuspocusAdapterProvider implements CollabProvider {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	constructor(private hp: any, private user: CollabUser) {}
+	constructor(private hp: any, readonly document: unknown, private user: CollabUser) {}
 
 	get connected(): boolean {
 		return this.hp.isConnected?.() ?? false;

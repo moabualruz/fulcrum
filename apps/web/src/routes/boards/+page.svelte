@@ -1,12 +1,7 @@
 <script lang="ts">
   import type { BoardTask } from "$lib/product-queries";
   import type { TaskStatus } from "$lib/server/tasks";
-  import {
-    TASK_STATUSES,
-    buildBoardSnapshot,
-    describeStatus,
-    keyboardMove,
-  } from "$lib/components/board/board-helpers";
+  import { buildBoardSnapshot, describeStatus, keyboardMove, TASK_STATUSES } from "$lib/components/board/board-helpers";
   import BoardColumn from "$lib/components/board/BoardColumn.svelte";
   import BoardSheet from "$lib/components/board/BoardSheet.svelte";
   import KeyboardMoveAnnouncer from "$lib/components/board/KeyboardMoveAnnouncer.svelte";
@@ -17,7 +12,7 @@
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
   import type { DndMovePayload } from "$lib/components/board/board-column-handlers";
   import { page } from "$app/state";
-  import { cn } from "$lib/utils.js";
+  import { cn, Select } from "@fulcrum/ui-kit";
 
   interface Props {
     data: {
@@ -29,8 +24,8 @@
   const { data }: Props = $props();
 
   type ViewMode = "board" | "list" | "spreadsheet" | "gantt" | "calendar";
-  let viewMode = $state<ViewMode>(
-    (page.url.searchParams.get("view") as ViewMode) || "board"
+  const viewMode = $derived(
+    (page.url.searchParams.getAll("view").at(-1) as ViewMode | undefined) || "board"
   );
 
   let resolvedTasks = $state<BoardTask[]>([]);
@@ -133,29 +128,56 @@
   }
 </script>
 
+<!--
+  `/boards` is the older standalone production board. The canonical Build-stage
+  board is the OD `build-board.html` workbench at `/build-board` (`IA-MAP.md
+  §2.3`, `design-alignment/build.md` route-disposition: "Reconcile: one
+  canonical Build board"). `/boards` still resolves and keeps its tRPC-backed
+  load + actions (no 404, no feature loss); the pointer below reconciles the
+  duplication by naming the one canonical Build board.
+-->
+<aside
+  data-boards-canonical-pointer
+  class="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+>
+  <span class="text-muted-foreground">
+    The canonical Build board is the workbench at
+  </span>
+  <a href="/build-board" data-boards-canonical-link class="font-medium text-primary hover:underline">
+    Build · Board
+  </a>
+  <span class="text-muted-foreground">.</span>
+</aside>
+
 <header data-board-header class="mb-3 flex items-center justify-between">
   <h1 class="text-2xl font-semibold tracking-tight">Board</h1>
-  <nav data-view-switcher class={cn("flex items-center gap-1 rounded-md border border-border p-0.5")} aria-label="View mode">
-    {#each [
-      { id: "board", label: "Board", icon: "▦" },
-      { id: "list", label: "List", icon: "☰" },
-      { id: "spreadsheet", label: "Table", icon: "▤" },
-      { id: "gantt", label: "Gantt", icon: "▬" },
-      { id: "calendar", label: "Calendar", icon: "📅" },
-    ] as view (view.id)}
-      <button
-        type="button"
-        data-view={view.id}
-        class={cn(
-          "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-          viewMode === view.id
-            ? "bg-primary text-primary-foreground"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        )}
-        onclick={() => { viewMode = view.id as ViewMode; }}
-        aria-pressed={viewMode === view.id}
-      >{view.icon} {view.label}</button>
-    {/each}
+  <nav aria-label="View mode">
+    <form method="GET" action="/boards" data-view-switcher class={cn("flex items-center gap-1 rounded-md border border-border p-0.5")}>
+      {#if data.project}
+        <input type="hidden" name="project" value={data.project} />
+      {/if}
+      {#each [
+        { id: "board", label: "Board", icon: "▦" },
+        { id: "list", label: "List", icon: "☰" },
+        { id: "spreadsheet", label: "Table", icon: "▤" },
+        { id: "gantt", label: "Gantt", icon: "▬" },
+        { id: "calendar", label: "Calendar", icon: "📅" },
+      ] as view (view.id)}
+        <button
+          type="submit"
+          name="view"
+          value={view.id}
+          data-view={view.id}
+          class={cn(
+            "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+            viewMode === view.id
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          )}
+          aria-pressed={viewMode === view.id}
+        >{view.icon} {view.label}</button>
+      {/each}
+    </form>
   </nav>
 </header>
 

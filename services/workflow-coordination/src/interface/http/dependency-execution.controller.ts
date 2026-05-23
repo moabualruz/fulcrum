@@ -5,6 +5,10 @@ import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { IsArray, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 
 import type { DependencyRunPreviewInput } from "@execution-orchestration/domain/dependency-run-preview.ts";
+import {
+  createSubscriptionEvent,
+  formatSubscriptionServerSentEvent,
+} from "@platform-core/application/subscriptions/event-bus.ts";
 
 import {
   DependencyRunService,
@@ -73,6 +77,7 @@ export class DependencyExecutionController {
     response.setHeader("Content-Type", "text/event-stream");
     response.setHeader("Cache-Control", "no-cache, no-transform");
     response.setHeader("Connection", "keep-alive");
+    response.setHeader("X-Fulcrum-Reconnect", "send-last-event-id");
     let closed = false;
     response.on?.("close", () => {
       closed = true;
@@ -80,7 +85,12 @@ export class DependencyExecutionController {
 
     do {
       const feedback = await this.execution.loadDependencyRunLiveFeedback(query);
-      response.write(`event: feedback\ndata: ${JSON.stringify(feedback)}\n\n`);
+      response.write(formatSubscriptionServerSentEvent(createSubscriptionEvent({
+        topic: `workflow.dependency-run.${feedback.runGroupId ?? query.traceId ?? query.projectId}.feedback`,
+        type: "dependency-run.feedback",
+        traceId: feedback.traceId ?? query.traceId ?? null,
+        payload: feedback,
+      })));
       if (closed || streamOnce(query.once) || !feedback.executorStatus.active) break;
       await sleep(streamPollMs(query.pollMs));
     } while (!closed);

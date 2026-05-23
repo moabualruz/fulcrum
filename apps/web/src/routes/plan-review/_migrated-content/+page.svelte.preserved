@@ -1,0 +1,1383 @@
+<script lang="ts">
+  import { Badge, Button, Chip } from "@fulcrum/ui-kit";
+  import { cn } from "@fulcrum/ui-kit";
+
+  type Stage = {
+    id: string;
+    label: string;
+    route: string;
+    status: "Ready" | "Active" | "Blocked" | "Queued";
+    purpose: string;
+    nextAction: string;
+    evidence: string;
+  };
+
+  type Rule = {
+    id: string;
+    trigger: string;
+    field: string;
+    value: string;
+    action: string;
+    actionValue: string;
+  };
+
+  type CustomFieldType = "text" | "number" | "date" | "select" | "multi-select" | "user" | "url";
+
+  type CustomField = {
+    id: string;
+    name: string;
+    type: CustomFieldType;
+    required: boolean;
+    defaultValue: string;
+    options: string[];
+  };
+
+  type ImportIssue = {
+    key: string;
+    summary: string;
+    state: string;
+    assignee: string;
+    reporter: string;
+    priority: string;
+    estimate: string;
+    attachments: number;
+  };
+
+  type FieldMapping = {
+    source: string;
+    target: string;
+    sample: string;
+  };
+
+  type UserMapping = {
+    source: string;
+    target: string;
+  };
+
+  type CsvMapping = {
+    column: string;
+    target: string;
+  };
+
+  type CsvImportReport = {
+    created: number;
+    skipped: number;
+    errors: string[];
+  };
+
+  type GitHubRepo = {
+    id: string;
+    name: string;
+    issues: number;
+    activeIssues: number;
+    archivedIssues: number;
+    labels: number;
+    collaborators: number;
+    comments: number;
+    prLinks: number;
+  };
+
+  type GitHubUserMap = {
+    source: string;
+    action: "map" | "invite";
+    target: string;
+  };
+
+  type BillingPlan = {
+    id: string;
+    name: string;
+    seats: number;
+    projects: number;
+    automations: number;
+    price: string;
+  };
+
+  const stages: Stage[] = [
+    {
+      id: "docs",
+      label: "Docs",
+      route: "/docs/BRIEF-42",
+      status: "Ready",
+      purpose: "Capture source material, decisions, constraints, and references before planning starts.",
+      nextAction: "Send to planning",
+      evidence: "brief.md version v7",
+    },
+    {
+      id: "planning",
+      label: "Planning",
+      route: "/planning",
+      status: "Active",
+      purpose: "Generate the plan, prototype artifacts, and task breakdown from the selected context.",
+      nextAction: "Open prototype review",
+      evidence: "plan_42 trace_9f73",
+    },
+    {
+      id: "execution",
+      label: "Execution",
+      route: "/build-board",
+      status: "Queued",
+      purpose: "Materialized tasks enter the execution board with dependency order and run ownership.",
+      nextAction: "Dispatch first task",
+      evidence: "3 task drafts queued",
+    },
+    {
+      id: "review",
+      label: "Review",
+      route: "/review",
+      status: "Queued",
+      purpose: "Review code, artifacts, generated checks, and acceptance evidence before handoff.",
+      nextAction: "Request code review",
+      evidence: "review packet pending",
+    },
+    {
+      id: "uat",
+      label: "UAT",
+      route: "/projects/acme/review/uat",
+      status: "Blocked",
+      purpose: "Approve or reject the user acceptance handoff once review clears blocking feedback.",
+      nextAction: "Resolve review blockers",
+      evidence: "2 blockers remain",
+    },
+    {
+      id: "e2e",
+      label: "E2E",
+      route: "/projects/acme/review/e2e",
+      status: "Queued",
+      purpose: "Run generated E2E coverage and attach result artifacts to the review trail.",
+      nextAction: "Run generated E2E",
+      evidence: "generated suite ready",
+    },
+  ];
+
+  let selectedStage = $state<Stage>(stages[1]);
+  let triggerType = $state("state_changed");
+  let conditionField = $state("state");
+  let conditionValue = $state("Done");
+  let actionType = $state("archive");
+  let actionValue = $state("");
+  let ruleValidation = $state("");
+  let previewText = $state("Sample issue AUTH-42 would be archived when state changes to Done.");
+  let savedRules = $state<Rule[]>([
+    {
+      id: "rule-existing-review",
+      trigger: "issue.created",
+      field: "priority",
+      value: "urgent",
+      action: "assign",
+      actionValue: "triage-owner",
+    },
+  ]);
+  let customFieldName = $state("");
+  let customFieldType = $state<CustomFieldType>("text");
+  let customFieldRequired = $state(false);
+  let customFieldDefault = $state("");
+  let customFieldOptions = $state("Low, Medium, High");
+  let customFieldValidation = $state("");
+  let issueDraftTitle = $state("");
+  let customFieldInput = $state<Record<string, string>>({});
+  let customFields = $state<CustomField[]>([
+    {
+      id: "priority",
+      name: "Priority",
+      type: "select",
+      required: false,
+      defaultValue: "Medium",
+      options: ["Low", "Medium", "High"],
+    },
+  ]);
+  let createdIssue = $state<{ title: string; fields: Record<string, string> } | null>(null);
+  let dryRunStatus = $state("Mapping");
+  let dryRunMessage = $state("Map fields and users before preview.");
+  let importProceedState = $state("idle");
+  let fieldMappings = $state<FieldMapping[]>([
+    { source: "Jira Summary", target: "title", sample: "Renew enterprise contract" },
+    { source: "Jira Status", target: "state", sample: "In Review" },
+    { source: "Jira Priority", target: "priority", sample: "High" },
+    { source: "Story Points", target: "estimate", sample: "5" },
+  ]);
+  let userMappings = $state<UserMapping[]>([
+    { source: "ada@acme.test", target: "Ada Lovelace" },
+    { source: "grace@acme.test", target: "Grace Hopper" },
+    { source: "linus@acme.test", target: "Linus Torvalds" },
+  ]);
+  let csvFileName = $state("");
+  let csvUploadError = $state("");
+  let csvStatus = $state("Waiting for CSV");
+  let csvHeaders = $state<string[]>([]);
+  let csvRows = $state<Record<string, string>[]>([]);
+  let csvMappings = $state<CsvMapping[]>([]);
+  let csvProgress = $state(0);
+  let csvReport = $state<CsvImportReport | null>(null);
+  let githubConnected = $state(false);
+  let githubStatus = $state("OAuth required");
+  let selectedGitHubRepoId = $state("");
+  let githubImportStatus = $state("idle");
+  let githubUserMaps = $state<GitHubUserMap[]>([
+    { source: "ada-dev", action: "map", target: "Ada Lovelace" },
+    { source: "grace-ops", action: "map", target: "Grace Hopper" },
+    { source: "linus-build", action: "invite", target: "linus-build@github.local" },
+  ]);
+  let selectedBillingPlanId = $state("pro");
+  let paymentVaulted = $state(false);
+  let billingStatus = $state("Current plan active");
+  let downgradePreview = $state("");
+
+  const triggerOptions = [
+    { value: "issue.created", label: "issue.created", scope: "issue" },
+    { value: "state_changed", label: "state_changed", scope: "issue" },
+    { value: "cycle_started", label: "cycle_started", scope: "cycle" },
+    { value: "cycle_ended", label: "cycle_ended", scope: "cycle" },
+  ];
+
+  const fieldOptions = [
+    { value: "state", label: "state", scope: "issue" },
+    { value: "priority", label: "priority", scope: "issue" },
+    { value: "assignee", label: "assignee", scope: "issue" },
+    { value: "cycle", label: "cycle", scope: "cycle" },
+  ];
+
+  const actionOptions = [
+    { value: "archive", label: "archive" },
+    { value: "close_state", label: "close_state" },
+    { value: "change_state", label: "change_state" },
+    { value: "assign", label: "assign" },
+    { value: "add_label", label: "add_label" },
+  ];
+
+  const customFieldTypes: { value: CustomFieldType; label: string; example: string }[] = [
+    { value: "text", label: "text", example: "Client Name" },
+    { value: "number", label: "number", example: "0" },
+    { value: "date", label: "date", example: "2026-05-19" },
+    { value: "select", label: "select", example: "Low, Medium, High" },
+    { value: "multi-select", label: "multi-select", example: "frontend, backend" },
+    { value: "user", label: "user", example: "IUserLite: ada" },
+    { value: "url", label: "url", example: "https://example.com" },
+  ];
+
+  const importIssues: ImportIssue[] = [
+    { key: "JIRA-101", summary: "Renew enterprise contract", state: "In Review", assignee: "ada@acme.test", reporter: "grace@acme.test", priority: "High", estimate: "5", attachments: 3 },
+    { key: "JIRA-102", summary: "Add audit export", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "3", attachments: 1 },
+    { key: "JIRA-103", summary: "Stabilize graph tests", state: "Blocked", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "High", estimate: "8", attachments: 4 },
+    { key: "JIRA-104", summary: "Import customer labels", state: "Todo", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "Low", estimate: "2", attachments: 0 },
+    { key: "JIRA-105", summary: "Capture review evidence", state: "In Progress", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "5", attachments: 2 },
+    { key: "JIRA-106", summary: "Wire attachment manifest", state: "Todo", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Medium", estimate: "3", attachments: 2 },
+    { key: "JIRA-107", summary: "Normalize issue owners", state: "In Review", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "High", estimate: "5", attachments: 1 },
+    { key: "JIRA-108", summary: "Backfill sprint links", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Low", estimate: "2", attachments: 0 },
+    { key: "JIRA-109", summary: "Validate CSV headers", state: "Done", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Medium", estimate: "1", attachments: 3 },
+    { key: "JIRA-110", summary: "Preview duplicate detection", state: "In Progress", assignee: "ada@acme.test", reporter: "linus@acme.test", priority: "High", estimate: "8", attachments: 2 },
+    { key: "JIRA-111", summary: "Persist importer checkpoint", state: "Todo", assignee: "grace@acme.test", reporter: "ada@acme.test", priority: "Medium", estimate: "3", attachments: 1 },
+    { key: "JIRA-112", summary: "Link imported comments", state: "Todo", assignee: "linus@acme.test", reporter: "grace@acme.test", priority: "Low", estimate: "2", attachments: 0 },
+  ];
+
+  const csvTargetFields = ["title", "description", "state", "priority", "assignee", "estimate", "labels"];
+
+  const githubRepos: GitHubRepo[] = [
+    { id: "acme-fulcrum", name: "acme/fulcrum", issues: 30, activeIssues: 28, archivedIssues: 2, labels: 12, collaborators: 10, comments: 84, prLinks: 7 },
+    { id: "acme-runtime", name: "acme/runtime", issues: 18, activeIssues: 17, archivedIssues: 1, labels: 8, collaborators: 6, comments: 41, prLinks: 4 },
+    { id: "acme-docs", name: "acme/docs", issues: 9, activeIssues: 9, archivedIssues: 0, labels: 5, collaborators: 4, comments: 15, prLinks: 2 },
+  ];
+
+  const githubPreviewIssues = [
+    { number: 42, title: "Preserve PR link on imported issue", description: "Imported issue keeps original body and linked pull request.", comments: 6, pr: "https://github.com/acme/fulcrum/pull/42" },
+    { number: 43, title: "Map collaborator invites", description: "Unknown collaborators become invites before import.", comments: 3, pr: "https://github.com/acme/fulcrum/pull/43" },
+    { number: 44, title: "Skip archived source issue", description: "Archived source issues stay out of the active import set.", comments: 2, pr: "" },
+  ];
+
+  const billingPlans: BillingPlan[] = [
+    { id: "starter", name: "Starter", seats: 20, projects: 5, automations: 10, price: "$0" },
+    { id: "pro", name: "Pro", seats: 50, projects: 25, automations: 100, price: "$18/seat" },
+    { id: "enterprise", name: "Enterprise", seats: 250, projects: 250, automations: 1000, price: "custom" },
+  ];
+
+  const currentBillingPlan = billingPlans[0];
+  const activeSeats = 18;
+  const invoiceHistory = [
+    { id: "INV-2026-004", date: "2026-05-01", total: "$324", status: "paid" },
+    { id: "INV-2026-003", date: "2026-04-01", total: "$306", status: "paid" },
+    { id: "INV-2026-002", date: "2026-03-01", total: "$288", status: "paid" },
+  ];
+
+  function openStage(stage: Stage) {
+    selectedStage = stage;
+  }
+
+  function currentFieldScope(): string {
+    return fieldOptions.find((field) => field.value === conditionField)?.scope ?? "issue";
+  }
+
+  function currentTriggerScope(): string {
+    return triggerOptions.find((trigger) => trigger.value === triggerType)?.scope ?? "issue";
+  }
+
+  function validateRule(): string {
+    if (!conditionField || !conditionValue.trim()) return "Condition requires field and value.";
+    if (!actionType) return "Action required.";
+    if (currentTriggerScope() === "cycle" && currentFieldScope() === "issue") {
+      return "Cycle triggers cannot validate issue fields.";
+    }
+    return "";
+  }
+
+  function buildRuleSummary(): string {
+    const actionSuffix = actionValue.trim() ? ` ${actionValue.trim()}` : "";
+    return `When ${triggerType} and ${conditionField} = ${conditionValue.trim()}, ${actionType}${actionSuffix}.`;
+  }
+
+  function previewRule(): void {
+    const error = validateRule();
+    ruleValidation = error;
+    if (error) {
+      previewText = "Preview blocked until validation passes.";
+      return;
+    }
+    previewText = `Sample issue AUTH-42: ${buildRuleSummary()}`;
+  }
+
+  function saveRule(): void {
+    const error = validateRule();
+    ruleValidation = error;
+    if (error) return;
+    const rule = {
+      id: `rule-${savedRules.length + 1}`,
+      trigger: triggerType,
+      field: conditionField,
+      value: conditionValue.trim(),
+      action: actionType,
+      actionValue: actionValue.trim(),
+    };
+    savedRules = [...savedRules, rule];
+    previewText = `Saved ${buildRuleSummary()}`;
+  }
+
+  function slugify(value: string): string {
+    return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  }
+
+  function parseOptions(): string[] {
+    return customFieldOptions.split(",").map((option) => option.trim()).filter(Boolean);
+  }
+
+  function validateDefault(type: CustomFieldType, value: string, options: string[]): string {
+    if (!value.trim()) return "";
+    if (type === "number" && Number.isNaN(Number(value))) return "Default value must be a number.";
+    if (type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Default date must use YYYY-MM-DD.";
+    if (type === "url" && !/^https?:\/\//.test(value)) return "Default URL must start with http:// or https://.";
+    if ((type === "select" || type === "multi-select") && options.length === 0) return "Select fields need at least one option.";
+    return "";
+  }
+
+  function createCustomField(): void {
+    const name = customFieldName.trim();
+    const id = slugify(name);
+    const options = customFieldType === "select" || customFieldType === "multi-select" ? parseOptions() : [];
+    const duplicate = customFields.some((field) => field.id === id || field.name.toLowerCase() === name.toLowerCase());
+    if (!name) {
+      customFieldValidation = "Field name required.";
+      return;
+    }
+    if (duplicate) {
+      customFieldValidation = "Custom field already exists.";
+      return;
+    }
+    const defaultError = validateDefault(customFieldType, customFieldDefault, options);
+    if (defaultError) {
+      customFieldValidation = defaultError;
+      return;
+    }
+    const field = { id, name, type: customFieldType, required: customFieldRequired, defaultValue: customFieldDefault.trim(), options };
+    customFields = [...customFields, field];
+    customFieldInput = { ...customFieldInput, [id]: field.defaultValue };
+    customFieldName = "";
+    customFieldDefault = "";
+    customFieldValidation = "";
+  }
+
+  function fieldValue(field: CustomField): string {
+    return customFieldInput[field.id] ?? field.defaultValue;
+  }
+
+  function updateFieldValue(fieldId: string, value: string): void {
+    customFieldInput = { ...customFieldInput, [fieldId]: value };
+  }
+
+  function createIssue(): void {
+    const missing = customFields.find((field) => field.required && !fieldValue(field).trim());
+    if (!issueDraftTitle.trim()) {
+      customFieldValidation = "Issue title required.";
+      return;
+    }
+    if (missing) {
+      customFieldValidation = `${missing.name} is required before issue creation.`;
+      return;
+    }
+    createdIssue = {
+      title: issueDraftTitle.trim(),
+      fields: Object.fromEntries(customFields.map((field) => [field.name, fieldValue(field)])),
+    };
+    customFieldValidation = "";
+  }
+
+  function updateFieldMapping(index: number, target: string): void {
+    fieldMappings = fieldMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    dryRunStatus = "Mapping";
+    dryRunMessage = "Mapping changed. Re-run dry-run before import.";
+    importProceedState = "idle";
+  }
+
+  function updateUserMapping(index: number, target: string): void {
+    userMappings = userMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    dryRunStatus = "Mapping";
+    dryRunMessage = "User mapping changed. Re-run dry-run before import.";
+    importProceedState = "idle";
+  }
+
+  function mappedUser(source: string): string {
+    return userMappings.find((mapping) => mapping.source === source)?.target ?? "Unmapped user";
+  }
+
+  function totalAttachmentCount(): number {
+    return importIssues.reduce((total, issue) => total + issue.attachments, 0);
+  }
+
+  function runDryRun(): void {
+    dryRunStatus = "Preview ready";
+    dryRunMessage = `Preview shows 10 of ${importIssues.length} issues exactly as they will be created.`;
+    importProceedState = "ready";
+  }
+
+  function returnToMapping(): void {
+    dryRunStatus = "Mapping";
+    dryRunMessage = "Edit mappings, then re-run dry-run.";
+    importProceedState = "idle";
+  }
+
+  function cancelImport(): void {
+    dryRunStatus = "Cancelled";
+    dryRunMessage = "Import cancelled before any issues were created.";
+    importProceedState = "idle";
+  }
+
+  function proceedImport(): void {
+    if (importProceedState !== "ready") {
+      dryRunMessage = "Run dry-run before import.";
+      return;
+    }
+    dryRunStatus = "Import queued";
+    dryRunMessage = `${importIssues.length} issues queued with ${totalAttachmentCount()} attachments.`;
+    importProceedState = "queued";
+  }
+
+  function parseCsvLine(line: string): string[] {
+    const values: string[] = [];
+    let current = "";
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      const next = line[index + 1];
+      if (char === '"' && quoted && next === '"') {
+        current += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === "," && !quoted) {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim());
+    return values;
+  }
+
+  function detectCsvTarget(column: string): string {
+    const normalized = column.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    if (/(title|summary|name)/.test(normalized)) return "title";
+    if (/(description|details|body)/.test(normalized)) return "description";
+    if (/(status|state|workflow)/.test(normalized)) return "state";
+    if (/priority/.test(normalized)) return "priority";
+    if (/(assignee|owner|assigned)/.test(normalized)) return "assignee";
+    if (/(estimate|story_points|points)/.test(normalized)) return "estimate";
+    if (/(labels|tags)/.test(normalized)) return "labels";
+    return "";
+  }
+
+  function loadCsvText(text: string): void {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const headers = parseCsvLine(lines[0] ?? "");
+    const rows = lines.slice(1).map((line) => {
+      const values = parseCsvLine(line);
+      return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    });
+    csvHeaders = headers;
+    csvRows = rows;
+    csvMappings = headers.map((column) => ({ column, target: detectCsvTarget(column) }));
+    csvStatus = `Detected ${headers.length} columns`;
+    csvProgress = 25;
+    csvReport = null;
+    csvUploadError = "";
+  }
+
+  async function handleCsvUpload(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    csvFileName = file.name;
+    csvReport = null;
+    csvProgress = 0;
+    if (file.size > 10 * 1024 * 1024) {
+      csvUploadError = "CSV file must be 10MB or less.";
+      csvStatus = "Upload blocked";
+      return;
+    }
+    const text = await file.text();
+    loadCsvText(text);
+  }
+
+  function updateCsvMapping(index: number, target: string): void {
+    csvMappings = csvMappings.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, target } : mapping));
+    csvStatus = "Mapping edited";
+    csvReport = null;
+  }
+
+  function mappedCsvValue(row: Record<string, string>, target: string): string {
+    const column = csvMappings.find((mapping) => mapping.target === target)?.column;
+    return column ? row[column] ?? "" : "";
+  }
+
+  function runCsvPreview(): void {
+    if (csvRows.length === 0) {
+      csvUploadError = "Upload CSV before preview.";
+      return;
+    }
+    csvStatus = `Previewing ${Math.min(5, csvRows.length)} sample rows`;
+    csvProgress = 50;
+    csvUploadError = "";
+  }
+
+  function importCsvRows(): void {
+    if (csvRows.length === 0) {
+      csvUploadError = "Upload CSV before import.";
+      return;
+    }
+    const titleColumn = csvMappings.find((mapping) => mapping.target === "title")?.column;
+    const errors = csvRows
+      .map((row, index) => (!titleColumn || !row[titleColumn]?.trim() ? `Row ${index + 1}: title required` : ""))
+      .filter(Boolean);
+    csvReport = {
+      created: csvRows.length - errors.length,
+      skipped: errors.length,
+      errors,
+    };
+    csvProgress = 100;
+    csvStatus = "Import report ready";
+  }
+
+  function connectGitHub(): void {
+    githubConnected = true;
+    selectedGitHubRepoId = githubRepos[0]?.id ?? "";
+    githubStatus = "OAuth connected";
+    githubImportStatus = "repo selected";
+  }
+
+  function selectedGitHubRepo(): GitHubRepo {
+    return githubRepos.find((repo) => repo.id === selectedGitHubRepoId) ?? githubRepos[0];
+  }
+
+  function selectGitHubRepo(id: string): void {
+    selectedGitHubRepoId = id;
+    githubImportStatus = "preview ready";
+  }
+
+  function updateGitHubUserMap(index: number, action: "map" | "invite"): void {
+    githubUserMaps = githubUserMaps.map((mapping, mappingIndex) => (mappingIndex === index ? { ...mapping, action } : mapping));
+    githubImportStatus = "user mapping edited";
+  }
+
+  function importGitHubIssues(): void {
+    if (!githubConnected) {
+      githubStatus = "OAuth required";
+      return;
+    }
+    githubImportStatus = "import complete";
+  }
+
+  function selectedBillingPlan(): BillingPlan {
+    return billingPlans.find((plan) => plan.id === selectedBillingPlanId) ?? billingPlans[1];
+  }
+
+  function seatUsagePercent(): number {
+    return Math.round((activeSeats / currentBillingPlan.seats) * 100);
+  }
+
+  function selectBillingPlan(planId: string): void {
+    selectedBillingPlanId = planId;
+    const plan = billingPlans.find((item) => item.id === planId);
+    billingStatus = plan ? `Previewing ${plan.name}` : "Plan preview unavailable";
+    downgradePreview = "";
+  }
+
+  function vaultPaymentMethod(): void {
+    paymentVaulted = true;
+    billingStatus = "Payment method vaulted";
+  }
+
+  function previewDowngrade(): void {
+    downgradePreview = "Downgrade blocked: active seats exceed Starter limit and advanced automations would be disabled.";
+    billingStatus = "Downgrade dry-run ready";
+  }
+</script>
+
+<svelte:head>
+  <title>Workflow Review</title>
+</svelte:head>
+
+<main data-plan-review-page class={cn("mx-auto flex w-full max-w-7xl flex-col gap-4 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8")}>
+  <header class={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4")}>
+    <div class={cn("min-w-0")}>
+      <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Workflow navigation</p>
+      <h1 class={cn("text-2xl font-semibold tracking-normal text-foreground")}>Plan review path</h1>
+      <p class={cn("mt-1 max-w-3xl text-sm text-muted-foreground")}>
+        Move from source docs to planning, execution, review, UAT, and generated E2E without switching through unrelated feature buckets.
+      </p>
+    </div>
+    <Badge variant="success" size="sm" data-workflow-context>trace_9f73 preserved</Badge>
+  </header>
+
+  <nav aria-label="Primary workflow path" data-primary-workflow-path class={cn("grid min-w-0 gap-2 md:grid-cols-6")}>
+    {#each stages as stage, index}
+      <button
+        type="button"
+        data-workflow-stage={stage.id}
+        data-selected={selectedStage.id === stage.id}
+        class={cn(
+          "min-w-0 rounded-md border border-border bg-card p-3 text-left transition-colors",
+          selectedStage.id === stage.id && "border-primary bg-primary/5",
+        )}
+        onclick={() => openStage(stage)}
+      >
+        <span class={cn("mb-2 flex flex-wrap items-center gap-2")}>
+          <span class={cn("flex size-6 items-center justify-center rounded-full bg-muted text-xs font-semibold")}>{index + 1}</span>
+          <span class={cn("text-sm font-semibold")}>{stage.label}</span>
+        </span>
+        <Badge variant={stage.status === "Blocked" ? "warning" : stage.status === "Active" ? "success" : "outline"} size="sm">{stage.status}</Badge>
+      </button>
+    {/each}
+  </nav>
+
+  <section class={cn("grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(22rem,1.15fr)]")}>
+    <section data-stage-detail class={cn("min-w-0 overflow-hidden rounded-md border border-border bg-card p-4")}>
+      <div class={cn("flex flex-wrap items-center gap-2")}>
+        <h2 class={cn("text-lg font-semibold")}>{selectedStage.label}</h2>
+        <Chip tone="accent">{selectedStage.route}</Chip>
+      </div>
+      <p class={cn("mt-3 text-sm text-muted-foreground")}>{selectedStage.purpose}</p>
+      <dl class={cn("mt-4 grid gap-3 text-sm")}>
+        <div class={cn("rounded-md border border-border bg-muted/35 p-3")}>
+          <dt class={cn("font-medium")}>Next action</dt>
+          <dd data-next-action class={cn("mt-1 text-muted-foreground")}>{selectedStage.nextAction}</dd>
+        </div>
+        <div class={cn("rounded-md border border-border bg-muted/35 p-3")}>
+          <dt class={cn("font-medium")}>Evidence</dt>
+          <dd data-stage-evidence class={cn("mt-1 text-muted-foreground")}>{selectedStage.evidence}</dd>
+        </div>
+      </dl>
+      <Button class={cn("mt-4")} data-open-stage-action>{selectedStage.nextAction}</Button>
+    </section>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-breadcrumb-trail class={cn("min-w-0 overflow-hidden rounded-md border border-border bg-muted/35 p-3")}>
+        <h2 class={cn("text-base font-semibold")}>Workflow breadcrumb</h2>
+        <ol class={cn("mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground")}>
+          {#each stages as stage}
+            <li>
+              <span class={cn("rounded-md border border-border bg-background px-2 py-1", selectedStage.id === stage.id && "border-primary text-foreground")}>
+                {stage.label}
+              </span>
+            </li>
+          {/each}
+        </ol>
+      </section>
+
+      <section data-context-preservation class={cn("min-w-0 overflow-hidden rounded-md border border-border bg-card p-3")}>
+        <h2 class={cn("text-base font-semibold")}>Context carried forward</h2>
+        <div class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("flex flex-wrap justify-between gap-2 rounded-md border border-border bg-background px-3 py-2")}>
+            <span class={cn("text-muted-foreground")}>Project</span>
+            <span class={cn("font-mono")}>acme-auth</span>
+          </div>
+          <div class={cn("flex flex-wrap justify-between gap-2 rounded-md border border-border bg-background px-3 py-2")}>
+            <span class={cn("text-muted-foreground")}>Plan</span>
+            <span class={cn("font-mono")}>plan_42</span>
+          </div>
+          <div class={cn("flex flex-wrap justify-between gap-2 rounded-md border border-border bg-background px-3 py-2")}>
+            <span class={cn("text-muted-foreground")}>Trace</span>
+            <span class={cn("font-mono")}>trace_9f73</span>
+          </div>
+        </div>
+      </section>
+
+      <section data-workflow-next-actions class={cn("min-w-0 overflow-hidden rounded-md border border-border bg-card p-3")}>
+        <h2 class={cn("text-base font-semibold")}>Stage next actions</h2>
+        <ul class={cn("mt-3 grid gap-2 text-sm")}>
+          {#each stages as stage}
+            <li data-stage-next-action={stage.id} class={cn("rounded-md border border-border bg-background px-3 py-2")}>
+              <span class={cn("font-medium")}>{stage.label}:</span> {stage.nextAction}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    </aside>
+  </section>
+
+  <section data-automation-rule-builder class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_22rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Automation rule builder</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Create trigger, condition, and action rules with validation before save.</p>
+        </div>
+        <Badge data-rule-status variant={ruleValidation ? "destructive" : "success"} size="sm">{ruleValidation ? "invalid" : "valid"}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-3")}>
+        <label class={cn("text-sm font-medium")}>
+          Trigger
+          <select data-rule-trigger bind:value={triggerType} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each triggerOptions as trigger}
+              <option value={trigger.value}>{trigger.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Condition field
+          <select data-rule-condition-field bind:value={conditionField} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each fieldOptions as field}
+              <option value={field.value}>{field.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Condition value
+          <input data-rule-condition-value bind:value={conditionValue} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+
+        <label class={cn("text-sm font-medium")}>
+          Action
+          <select data-rule-action bind:value={actionType} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}>
+            {#each actionOptions as action}
+              <option value={action.value}>{action.label}</option>
+            {/each}
+          </select>
+        </label>
+
+        <label class={cn("text-sm font-medium md:col-span-2")}>
+          Action value
+          <input data-rule-action-value bind:value={actionValue} placeholder="assignee, label, or target state" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+      </div>
+
+      {#if ruleValidation}
+        <p data-rule-validation role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{ruleValidation}</p>
+      {/if}
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-preview-rule type="button" variant="outline" onclick={previewRule}>Preview rule</Button>
+        <Button data-save-rule type="button" onclick={saveRule}>Save rule</Button>
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-rule-preview class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Preview</h3>
+        <p data-rule-preview-text class={cn("mt-2 text-sm text-muted-foreground")}>{previewText}</p>
+      </section>
+
+      <section data-saved-rules class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Saved rules</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each savedRules as rule}
+            <article data-saved-rule={rule.id} class={cn("rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+              <p data-saved-rule-trigger={rule.id} class={cn("font-medium")}>{rule.trigger}</p>
+              <p data-saved-rule-condition={rule.id} class={cn("text-muted-foreground")}>{rule.field} = {rule.value}</p>
+              <p data-saved-rule-action={rule.id} class={cn("text-muted-foreground")}>{rule.action}{rule.actionValue ? ` ${rule.actionValue}` : ""}</p>
+            </article>
+          {/each}
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <section data-custom-fields-builder class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Custom fields</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Add typed fields, set required defaults, and verify they appear on issue create and detail.</p>
+        </div>
+        <Badge data-custom-field-count variant="outline" size="sm">{customFields.length} fields</Badge>
+      </div>
+
+      <div data-field-type-picker class={cn("mt-4 grid gap-3 md:grid-cols-4")}>
+        {#each customFieldTypes as type}
+          <button
+            type="button"
+            data-custom-field-type={type.value}
+            data-selected={customFieldType === type.value}
+            onclick={() => (customFieldType = type.value)}
+            class={cn("min-w-0 rounded-md border border-border bg-background p-3 text-left", customFieldType === type.value && "border-primary bg-primary/5")}
+          >
+            <span class={cn("block text-sm font-medium")}>{type.label}</span>
+            <span class={cn("mt-1 block truncate text-xs text-muted-foreground")}>{type.example}</span>
+          </button>
+        {/each}
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]")}>
+        <label class={cn("text-sm font-medium")}>
+          Field name
+          <input data-custom-field-name bind:value={customFieldName} placeholder="Client Name" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("text-sm font-medium")}>
+          Default value
+          <input data-custom-field-default bind:value={customFieldDefault} placeholder="0" class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <label class={cn("flex items-end gap-2 text-sm font-medium")}>
+          <input data-custom-field-required type="checkbox" bind:checked={customFieldRequired} class={cn("mb-3 size-4")} />
+          <span class={cn("pb-2")}>Required</span>
+        </label>
+        <label class={cn("text-sm font-medium md:col-span-3")}>
+          Select options
+          <input data-custom-field-options bind:value={customFieldOptions} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+      </div>
+
+      {#if customFieldValidation}
+        <p data-custom-field-validation role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{customFieldValidation}</p>
+      {/if}
+
+      <Button data-create-custom-field type="button" class={cn("mt-4")} onclick={createCustomField}>Create field</Button>
+
+      <div data-custom-field-list class={cn("mt-4 grid gap-2")}>
+        {#each customFields as field}
+          <article data-custom-field={field.id} data-custom-field-type-row={field.type} data-custom-field-required-row={field.required} class={cn("grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+            <div class={cn("min-w-0")}>
+              <p class={cn("truncate text-sm font-medium")}>{field.name}</p>
+              <p data-custom-field-default-row={field.id} class={cn("text-xs text-muted-foreground")}>Default: {field.defaultValue || "none"}</p>
+            </div>
+            <Chip tone="neutral">{field.type}</Chip>
+            <Badge variant={field.required ? "warning" : "outline"} size="sm">{field.required ? "required" : "optional"}</Badge>
+          </article>
+        {/each}
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-issue-create-custom-fields class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Issue create</h3>
+        <label class={cn("mt-3 block text-sm font-medium")}>
+          Title
+          <input data-issue-title bind:value={issueDraftTitle} class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")} />
+        </label>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each customFields as field}
+            <label data-issue-create-field={field.id} class={cn("block text-sm font-medium")}>
+              {field.name}{field.required ? " *" : ""}
+              <input
+                data-issue-field-input={field.id}
+                value={fieldValue(field)}
+                onchange={(event) => updateFieldValue(field.id, event.currentTarget.value)}
+                class={cn("mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              />
+            </label>
+          {/each}
+        </div>
+        <Button data-create-issue-with-fields type="button" class={cn("mt-3")} onclick={createIssue}>Create issue</Button>
+      </section>
+
+      <section data-issue-detail-custom-fields class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Issue detail</h3>
+        {#if createdIssue}
+          <p data-created-issue-title class={cn("mt-2 text-sm font-medium")}>{createdIssue.title}</p>
+          <dl class={cn("mt-3 grid gap-2 text-sm")}>
+            {#each Object.entries(createdIssue.fields) as [name, value]}
+              <div data-issue-detail-field={name} class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+                <dt class={cn("font-medium")}>{name}</dt>
+                <dd class={cn("text-muted-foreground")}>{value || "empty"}</dd>
+              </div>
+            {/each}
+          </dl>
+        {:else}
+          <p class={cn("mt-2 text-sm text-muted-foreground")}>Create an issue to see custom fields on detail.</p>
+        {/if}
+      </section>
+    </aside>
+  </section>
+
+  <section data-importer-dry-run class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Importer dry-run</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Preview mapped issues, users, and attachments before anything is created.</p>
+        </div>
+        <Badge data-importer-dry-run-status variant={dryRunStatus === "Preview ready" ? "success" : dryRunStatus === "Cancelled" ? "warning" : "outline"} size="sm">{dryRunStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-3")}>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Issues to create</p>
+          <p data-import-total-count class={cn("mt-1 text-2xl font-semibold")}>{importIssues.length}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Preview sample</p>
+          <p data-import-preview-count class={cn("mt-1 text-2xl font-semibold")}>{Math.min(10, importIssues.length)}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Attachments</p>
+          <p data-import-attachment-count class={cn("mt-1 text-2xl font-semibold")}>{totalAttachmentCount()}</p>
+        </div>
+      </div>
+
+      <div class={cn("mt-4 grid gap-4 lg:grid-cols-2")}>
+        <section data-import-field-mapping class={cn("min-w-0 rounded-md border border-border bg-background p-3")}>
+          <h3 class={cn("text-base font-semibold")}>Field mapping</h3>
+          <div class={cn("mt-3 grid gap-2")}>
+            {#each fieldMappings as mapping, index}
+              <label data-import-field-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+                <span class={cn("min-w-0")}>
+                  <span class={cn("block font-medium")}>{mapping.source}</span>
+                  <span class={cn("block truncate text-xs text-muted-foreground")}>Sample: {mapping.sample}</span>
+                </span>
+                <input
+                  data-import-field-map-target={mapping.source}
+                  value={mapping.target}
+                  oninput={(event) => updateFieldMapping(index, event.currentTarget.value)}
+                  class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+                />
+              </label>
+            {/each}
+          </div>
+        </section>
+
+        <section data-import-user-mapping class={cn("min-w-0 rounded-md border border-border bg-background p-3")}>
+          <h3 class={cn("text-base font-semibold")}>User mapping</h3>
+          <div class={cn("mt-3 grid gap-2")}>
+            {#each userMappings as mapping, index}
+              <label data-import-user-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}>
+                <span class={cn("truncate font-medium")}>{mapping.source}</span>
+                <input
+                  data-import-user-map-target={mapping.source}
+                  value={mapping.target}
+                  oninput={(event) => updateUserMapping(index, event.currentTarget.value)}
+                  class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+                />
+              </label>
+            {/each}
+          </div>
+        </section>
+      </div>
+
+      <p data-import-dry-run-message class={cn("mt-4 rounded-md border border-border bg-muted/35 px-3 py-2 text-sm text-muted-foreground")}>{dryRunMessage}</p>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-run-import-dry-run type="button" onclick={runDryRun}>Run dry-run</Button>
+        <Button data-back-to-import-mapping type="button" variant="outline" onclick={returnToMapping}>Back to mapping</Button>
+        <Button data-cancel-import type="button" variant="outline" onclick={cancelImport}>Cancel</Button>
+        <Button data-proceed-import type="button" disabled={importProceedState !== "ready"} onclick={proceedImport}>Proceed to import</Button>
+      </div>
+
+      <div data-import-preview-list class={cn("mt-4 grid gap-2")}>
+        {#each importIssues.slice(0, 10) as issue}
+          <article data-import-preview-issue={issue.key} class={cn("grid gap-3 rounded-md border border-border bg-background p-3 md:grid-cols-[minmax(0,1fr)_9rem_9rem]")}>
+            <div class={cn("min-w-0")}>
+              <p data-import-preview-title={issue.key} class={cn("truncate text-sm font-medium")}>{issue.summary}</p>
+              <p class={cn("mt-1 text-xs text-muted-foreground")}>{issue.key} -> {issue.state}</p>
+              <p data-import-preview-values={issue.key} class={cn("mt-1 text-xs text-muted-foreground")}>
+                {fieldMappings[0]?.target}: {issue.summary}; {fieldMappings[1]?.target}: {issue.state}; {fieldMappings[2]?.target}: {issue.priority}; {fieldMappings[3]?.target}: {issue.estimate}
+              </p>
+            </div>
+            <div class={cn("text-sm")}>
+              <p class={cn("text-muted-foreground")}>Assignee</p>
+              <p data-import-preview-assignee={issue.key} class={cn("font-medium")}>{mappedUser(issue.assignee)}</p>
+            </div>
+            <div class={cn("text-sm")}>
+              <p class={cn("text-muted-foreground")}>Attachments</p>
+              <p data-import-preview-attachments={issue.key} class={cn("font-medium")}>{issue.attachments}</p>
+            </div>
+          </article>
+        {/each}
+      </div>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-import-dry-run-summary class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Dry-run summary</h3>
+        <dl class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Sample shown</dt>
+            <dd data-import-summary-sample class={cn("text-muted-foreground")}>{Math.min(10, importIssues.length)} of {importIssues.length}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>User mapping</dt>
+            <dd data-import-summary-users class={cn("text-muted-foreground")}>{userMappings.length} mapped users</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Attachment count</dt>
+            <dd data-import-summary-attachments class={cn("text-muted-foreground")}>{totalAttachmentCount()} attachments</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section data-import-commit-state class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Commit state</h3>
+        <p data-import-proceed-state class={cn("mt-2 text-sm text-muted-foreground")}>{importProceedState}</p>
+      </section>
+    </aside>
+  </section>
+
+  <section data-csv-importer class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>CSV importer</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Upload a spreadsheet export, auto-detect columns, preview rows, and import with row-level recovery.</p>
+        </div>
+        <Badge data-csv-status variant={csvUploadError ? "destructive" : csvReport ? "success" : "outline"} size="sm">{csvStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+        <label class={cn("text-sm font-medium md:col-span-3")}>
+          CSV file
+          <input data-csv-upload type="file" accept=".csv,text/csv" onchange={handleCsvUpload} class={cn("mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm")} />
+        </label>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>File</p>
+          <p data-csv-file-name class={cn("mt-1 truncate text-sm font-medium")}>{csvFileName || "none"}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Rows</p>
+          <p data-csv-row-count class={cn("mt-1 text-sm font-medium")}>{csvRows.length}</p>
+        </div>
+        <div class={cn("rounded-md border border-border bg-background p-3")}>
+          <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Max size</p>
+          <p data-csv-max-size class={cn("mt-1 text-sm font-medium")}>10MB</p>
+        </div>
+      </div>
+
+      {#if csvUploadError}
+        <p data-csv-upload-error role="alert" class={cn("mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive")}>{csvUploadError}</p>
+      {/if}
+
+      <section data-csv-column-mapping class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Column mapping</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each csvMappings as mapping, index}
+            <label data-csv-column-map={mapping.column} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_12rem]")}>
+              <span class={cn("min-w-0")}>
+                <span class={cn("block font-medium")}>{mapping.column}</span>
+                <span class={cn("block truncate text-xs text-muted-foreground")}>Detected: {mapping.target || "unmapped"}</span>
+              </span>
+              <select
+                data-csv-column-target={mapping.column}
+                value={mapping.target}
+                onchange={(event) => updateCsvMapping(index, event.currentTarget.value)}
+                class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              >
+                <option value="">Skip</option>
+                {#each csvTargetFields as field}
+                  <option value={field}>{field}</option>
+                {/each}
+              </select>
+            </label>
+          {/each}
+        </div>
+      </section>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-csv-preview type="button" variant="outline" onclick={runCsvPreview}>Preview rows</Button>
+        <Button data-csv-import type="button" onclick={importCsvRows}>Import CSV</Button>
+      </div>
+
+      <section data-csv-preview-panel class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Dry-run preview</h3>
+        <div data-csv-preview-list class={cn("mt-3 grid gap-2")}>
+          {#each csvRows.slice(0, 5) as row, index}
+            <article data-csv-preview-row={index + 1} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_8rem_8rem]")}>
+              <div class={cn("min-w-0")}>
+                <p data-csv-preview-title={index + 1} class={cn("truncate font-medium")}>{mappedCsvValue(row, "title") || "Untitled issue"}</p>
+                <p data-csv-preview-description={index + 1} class={cn("truncate text-xs text-muted-foreground")}>{mappedCsvValue(row, "description") || "No description"}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>State</p>
+                <p data-csv-preview-state={index + 1} class={cn("font-medium")}>{mappedCsvValue(row, "state") || "none"}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>Assignee</p>
+                <p data-csv-preview-assignee={index + 1} class={cn("font-medium")}>{mappedCsvValue(row, "assignee") || "unassigned"}</p>
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-csv-progress-panel class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import progress</h3>
+        <div class={cn("mt-3 h-3 overflow-hidden rounded-full bg-muted")}>
+          <div data-csv-progress-bar class={cn("h-full rounded-full bg-primary transition-all")} style={`width: ${csvProgress}%`}></div>
+        </div>
+        <p data-csv-progress-value class={cn("mt-2 text-sm text-muted-foreground")}>{csvProgress}%</p>
+      </section>
+
+      <section data-csv-import-report class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import report</h3>
+        {#if csvReport}
+          <dl class={cn("mt-3 grid gap-2 text-sm")}>
+            <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+              <dt class={cn("font-medium")}>Created</dt>
+              <dd data-csv-created-count class={cn("text-muted-foreground")}>{csvReport.created}</dd>
+            </div>
+            <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+              <dt class={cn("font-medium")}>Skipped</dt>
+              <dd data-csv-skipped-count class={cn("text-muted-foreground")}>{csvReport.skipped}</dd>
+            </div>
+          </dl>
+          <ul data-csv-row-errors class={cn("mt-3 grid gap-1 text-sm text-muted-foreground")}>
+            {#each csvReport.errors as error}
+              <li>{error}</li>
+            {/each}
+          </ul>
+        {:else}
+          <p class={cn("mt-2 text-sm text-muted-foreground")}>Import report appears after running import.</p>
+        {/if}
+      </section>
+    </aside>
+  </section>
+
+  <section data-github-importer class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>GitHub importer</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Connect with OAuth, choose a repo, preview issue scope, map collaborators, and preserve PR links.</p>
+        </div>
+        <Badge data-github-oauth-status variant={githubConnected ? "success" : "warning"} size="sm">{githubStatus}</Badge>
+      </div>
+
+      <div class={cn("mt-4 flex flex-wrap gap-2")}>
+        <Button data-github-connect type="button" onclick={connectGitHub}>Connect GitHub</Button>
+        <Badge data-github-token-storage variant="outline" size="sm">Token encrypted, never shown</Badge>
+      </div>
+
+      <section data-github-repo-picker class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Repo picker</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each githubRepos as repo}
+            <button
+              type="button"
+              data-github-repo-option={repo.id}
+              data-selected={selectedGitHubRepoId === repo.id}
+              onclick={() => selectGitHubRepo(repo.id)}
+              class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-left text-sm md:grid-cols-[minmax(0,1fr)_7rem]", selectedGitHubRepoId === repo.id && "border-primary bg-primary/5")}
+            >
+              <span class={cn("min-w-0")}>
+                <span class={cn("block truncate font-medium")}>{repo.name}</span>
+                <span class={cn("block text-xs text-muted-foreground")}>{repo.activeIssues} active, {repo.archivedIssues} archived skipped</span>
+              </span>
+              <span class={cn("text-muted-foreground")}>{repo.collaborators} people</span>
+            </button>
+          {/each}
+        </div>
+      </section>
+
+      <section data-github-preview class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import preview</h3>
+        <div class={cn("mt-3 grid gap-3 md:grid-cols-4")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Issues</p>
+            <p data-github-preview-issue-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().issues}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Labels</p>
+            <p data-github-preview-label-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().labels}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Collaborators</p>
+            <p data-github-preview-collaborator-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().collaborators}</p>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 p-3")}>
+            <p class={cn("text-xs font-medium uppercase tracking-wide text-muted-foreground")}>Archived skipped</p>
+            <p data-github-preview-archived-count class={cn("mt-1 text-xl font-semibold")}>{selectedGitHubRepo().archivedIssues}</p>
+          </div>
+        </div>
+
+        <div data-github-preview-issues class={cn("mt-3 grid gap-2")}>
+          {#each githubPreviewIssues as issue}
+            <article data-github-preview-issue={issue.number} class={cn("grid gap-3 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_7rem_8rem]")}>
+              <div class={cn("min-w-0")}>
+                <p data-github-preview-title={issue.number} class={cn("truncate font-medium")}>#{issue.number} {issue.title}</p>
+                <p data-github-preview-description={issue.number} class={cn("truncate text-xs text-muted-foreground")}>{issue.description}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>Comments</p>
+                <p data-github-preview-comments={issue.number} class={cn("font-medium")}>{issue.comments}</p>
+              </div>
+              <div>
+                <p class={cn("text-muted-foreground")}>PR link</p>
+                {#if issue.pr}
+                  <a data-github-preview-pr={issue.number} class={cn("truncate text-primary underline-offset-2 hover:underline")} href={issue.pr}>preserved</a>
+                {:else}
+                  <span data-github-preview-pr={issue.number} class={cn("text-muted-foreground")}>none</span>
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+
+      <section data-github-user-mapping class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Collaborator mapping</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each githubUserMaps as mapping, index}
+            <label data-github-user-map={mapping.source} class={cn("grid gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm md:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)]")}>
+              <span class={cn("truncate font-medium")}>{mapping.source}</span>
+              <select
+                data-github-user-map-action={mapping.source}
+                value={mapping.action}
+                onchange={(event) => updateGitHubUserMap(index, event.currentTarget.value as "map" | "invite")}
+                class={cn("h-10 w-full rounded-md border border-input bg-background px-3 text-sm")}
+              >
+                <option value="map">Map</option>
+                <option value="invite">Invite</option>
+              </select>
+              <span data-github-user-map-target={mapping.source} class={cn("truncate text-muted-foreground")}>{mapping.target}</span>
+            </label>
+          {/each}
+        </div>
+      </section>
+
+      <Button data-github-import type="button" class={cn("mt-4")} onclick={importGitHubIssues}>Import GitHub issues</Button>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-github-import-report class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Import report</h3>
+        <dl class={cn("mt-3 grid gap-2 text-sm")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Status</dt>
+            <dd data-github-import-status class={cn("text-muted-foreground")}>{githubImportStatus}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Created</dt>
+            <dd data-github-created-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().activeIssues : 0}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Comments</dt>
+            <dd data-github-comment-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().comments : 0}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>PR links</dt>
+            <dd data-github-pr-link-count class={cn("text-muted-foreground")}>{githubImportStatus === "import complete" ? selectedGitHubRepo().prLinks : 0}</dd>
+          </div>
+        </dl>
+      </section>
+    </aside>
+  </section>
+
+  <section data-workspace-billing class={cn("grid min-w-0 gap-4 rounded-md border border-border bg-card p-4 lg:grid-cols-[minmax(0,1fr)_24rem]")}>
+    <div class={cn("min-w-0")}>
+      <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+        <div class={cn("min-w-0")}>
+          <h2 class={cn("text-lg font-semibold")}>Workspace billing</h2>
+          <p class={cn("mt-1 text-sm text-muted-foreground")}>Track seats, preview plan changes, vault payment method, and export invoices.</p>
+        </div>
+        <Badge data-billing-status variant={paymentVaulted ? "success" : "outline"} size="sm">{billingStatus}</Badge>
+      </div>
+
+      <section data-current-plan class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <div class={cn("flex flex-wrap items-start justify-between gap-3")}>
+          <div>
+            <h3 class={cn("text-base font-semibold")}>{currentBillingPlan.name}</h3>
+            <p data-current-plan-price class={cn("mt-1 text-sm text-muted-foreground")}>{currentBillingPlan.price}</p>
+          </div>
+          <Badge data-seat-warning variant={seatUsagePercent() >= 80 ? "warning" : "success"} size="sm">{seatUsagePercent()}% seats used</Badge>
+        </div>
+        <div class={cn("mt-3 h-3 overflow-hidden rounded-full bg-muted")}>
+          <div data-seat-usage-bar class={cn("h-full rounded-full bg-primary")} style={`width: ${seatUsagePercent()}%`}></div>
+        </div>
+        <dl class={cn("mt-3 grid gap-2 text-sm md:grid-cols-3")}>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Seats</dt>
+            <dd data-seat-usage class={cn("text-muted-foreground")}>{activeSeats} / {currentBillingPlan.seats}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Projects</dt>
+            <dd data-project-limit class={cn("text-muted-foreground")}>{currentBillingPlan.projects}</dd>
+          </div>
+          <div class={cn("rounded-md border border-border bg-muted/30 px-3 py-2")}>
+            <dt class={cn("font-medium")}>Automations</dt>
+            <dd data-automation-limit class={cn("text-muted-foreground")}>{currentBillingPlan.automations}</dd>
+          </div>
+        </dl>
+        {#if seatUsagePercent() >= 80}
+          <p data-overage-warning class={cn("mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground")}>Seat usage crossed 80%; upgrade before invites are blocked.</p>
+        {/if}
+      </section>
+
+      <section data-plan-upgrade class={cn("mt-4 rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Plan selection</h3>
+        <div class={cn("mt-3 grid gap-2 md:grid-cols-3")}>
+          {#each billingPlans as plan}
+            <button
+              type="button"
+              data-billing-plan={plan.id}
+              data-selected={selectedBillingPlanId === plan.id}
+              onclick={() => selectBillingPlan(plan.id)}
+              class={cn("rounded-md border border-border bg-muted/30 p-3 text-left text-sm", selectedBillingPlanId === plan.id && "border-primary bg-primary/5")}
+            >
+              <span class={cn("block font-medium")}>{plan.name}</span>
+              <span class={cn("mt-1 block text-muted-foreground")}>{plan.seats} seats</span>
+              <span class={cn("mt-1 block text-muted-foreground")}>{plan.price}</span>
+            </button>
+          {/each}
+        </div>
+        <div data-upgrade-preview class={cn("mt-3 rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+          <p class={cn("font-medium")}>{selectedBillingPlan().name} preview</p>
+          <p class={cn("mt-1 text-muted-foreground")}>Seats: {currentBillingPlan.seats} -> {selectedBillingPlan().seats}; projects: {currentBillingPlan.projects} -> {selectedBillingPlan().projects}; automations: {currentBillingPlan.automations} -> {selectedBillingPlan().automations}</p>
+        </div>
+        <Button data-downgrade-dry-run type="button" variant="outline" class={cn("mt-3")} onclick={previewDowngrade}>Preview downgrade impact</Button>
+        {#if downgradePreview}
+          <p data-downgrade-preview class={cn("mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground")}>{downgradePreview}</p>
+        {/if}
+      </section>
+    </div>
+
+    <aside class={cn("min-w-0 space-y-3")}>
+      <section data-payment-method class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Payment method</h3>
+        <p data-payment-storage class={cn("mt-2 text-sm text-muted-foreground")}>{paymentVaulted ? "Vault token pm_****4242; card digits not stored in Fulcrum." : "No payment method vaulted."}</p>
+        <Button data-add-payment-method type="button" class={cn("mt-3")} onclick={vaultPaymentMethod}>Add payment method</Button>
+      </section>
+
+      <section data-invoice-history class={cn("rounded-md border border-border bg-background p-3")}>
+        <h3 class={cn("text-base font-semibold")}>Invoice history</h3>
+        <div class={cn("mt-3 grid gap-2")}>
+          {#each invoiceHistory as invoice}
+            <article data-invoice-row={invoice.id} class={cn("rounded-md border border-border bg-muted/30 p-3 text-sm")}>
+              <div class={cn("flex flex-wrap items-center justify-between gap-2")}>
+                <p class={cn("font-medium")}>{invoice.id}</p>
+                <Badge variant="success" size="sm">{invoice.status}</Badge>
+              </div>
+              <p class={cn("mt-1 text-muted-foreground")}>{invoice.date} - {invoice.total}</p>
+              <Button data-invoice-export={invoice.id} type="button" variant="outline" size="sm" class={cn("mt-2")}>Export</Button>
+            </article>
+          {/each}
+        </div>
+      </section>
+    </aside>
+  </section>
+</main>

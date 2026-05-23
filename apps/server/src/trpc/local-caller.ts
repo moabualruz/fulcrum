@@ -15,6 +15,7 @@ import { t } from "@fulcrum/server/trpc/trpc.ts";
 // Re-export session utilities from the tRPC-free module.
 export {
   buildCliTuiCallerContext,
+  resolveCliTuiAuthContextFromContainer,
   resolveCliTuiSession,
   resolveCliTuiSessionFromContainer,
   requireCliTuiSessionContext,

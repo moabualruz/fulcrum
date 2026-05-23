@@ -99,20 +99,56 @@ beforeEach(() => {
 });
 
 describe("/repos +page.server.ts", () => {
-  test("server route uses the repository interface instead of direct application imports", () => {
+  test("server route is a pure invocation layer over the NestJS public API", () => {
     const source = readFileSync(join(import.meta.dir, "+page.server.ts"), "utf8");
-    expect(source).toContain("@integration-hub/interface/repository-pages");
+    // Apps/web must not import TypeORM or platform-core DB runtimes (AGENTS.md).
     expect(source).not.toContain("@integration-hub/application/repos");
+    expect(source).not.toContain("@integration-hub/interface/repository-pages");
+    expect(source).toMatch(/\/api\/v1\/repos/);
   });
 
-  test("load returns repository rows from the service boundary", async () => {
-    repos.push(row({ id: "repo-1", slug: "alpha" }), row({ id: "repo-2", slug: "beta" }));
+  test("load fetches /api/v1/repos through the page event and maps to page rows", async () => {
+    const apiRows = [
+      {
+        id: "repo-1",
+        slug: "alpha",
+        name: "alpha",
+        kind: "local",
+        localPath: "/workspace/alpha",
+        remoteUrl: null,
+        currentBranch: "main",
+        defaultBranch: "main",
+        lastSyncAt: "2026-01-04T00:00:00.000Z",
+        syncStatus: "idle",
+      },
+      {
+        id: "repo-2",
+        slug: "beta",
+        name: "beta",
+        kind: "remote",
+        localPath: null,
+        remoteUrl: "https://example.com/beta.git",
+        currentBranch: null,
+        defaultBranch: "main",
+        lastSyncAt: null,
+        syncStatus: "idle",
+      },
+    ];
     const mod = await import(`./+page.server.ts?cachebust=${Date.now()}`);
+    const calls: string[] = [];
     const result = await mod.load({
       locals: { activeProjectId: "project-1", orgId: "org-1" },
-    } as Parameters<typeof mod.load>[0]);
+      url: new URL("http://localhost/repos"),
+      request: { headers: new Headers({ cookie: "sid=test" }) },
+      fetch: async (url: string | URL) => {
+        const target = url.toString();
+        calls.push(target);
+        return Response.json(apiRows, { status: 200 });
+      },
+    } as unknown as Parameters<typeof mod.load>[0]);
     const payload = await streamedData<{ repos: RepoListRow[] }>(result);
     expect(payload.repos.map((candidate) => candidate.slug)).toEqual(["alpha", "beta"]);
+    expect(calls[0]).toContain("/api/v1/repos?orgId=org-1");
   });
 
   test("sync action queues through the repository public API", async () => {

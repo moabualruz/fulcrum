@@ -4,7 +4,7 @@
  * Topics: agent_run.<id>, project.<id>.tasks, org.<id>.notifications, orchestration.<orgId>.
  */
 
-import type { EventBus } from "./event-bus.ts";
+import { createSubscriptionEvent, serializeSubscriptionEvent, type EventBus } from "./event-bus.ts";
 
 const CHANNEL_PREFIX_MAP: Record<string, string> = {
   agent_run: "agent_run",
@@ -34,8 +34,18 @@ export async function startNotifyBridge(
       try {
         const parsed = JSON.parse(payload) as {
           topic: string;
+          payload?: unknown;
           data: unknown;
+          timestamp?: string;
         };
+        if ("payload" in parsed) {
+          eventBus.publishEvent({
+            topic: parsed.topic,
+            payload: parsed.payload,
+            timestamp: parsed.timestamp ? new Date(parsed.timestamp) : new Date(),
+          });
+          return;
+        }
         eventBus.publish(parsed.topic, parsed.data);
       } catch {
         eventBus.publish(channel, payload);
@@ -57,7 +67,11 @@ export async function emitNotify(
   topic: string,
   data: unknown,
 ): Promise<void> {
-  await client.notify?.(topicToPGChannel(topic), JSON.stringify({ topic, data }));
+  const event = serializeSubscriptionEvent(createSubscriptionEvent({
+    topic,
+    payload: data,
+  }));
+  await client.notify?.(topicToPGChannel(topic), JSON.stringify(event));
 }
 
 export function topicToPGChannel(topic: string): string {

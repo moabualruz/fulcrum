@@ -40,7 +40,7 @@ export interface UpstreamSkillLockEntry {
   claude_plugin?: ClaudePluginDescriptor;
   /**
    * Agents whose vendor publishes a per-agent canonical installer (e.g.
-   * sync stays out of the way — vendor's own write into the agent's
+   * sync stays out of the way: vendor's own write into the agent's
    * top-level skills directory is the source of truth. Empty/absent means
    * the file-copy mirror runs for every detected agent into the same
    * top-level `<agent>/skills/<name>/` location the vendor would have used.
@@ -340,7 +340,7 @@ export async function computeSubpathSha256(
 
 /**
  * Serialize the skills table back to TOML, preserving header comments.
- * We write the lockfile by direct string construction — smol-toml has no
+ * We write the lockfile by direct string construction: smol-toml has no
  * serializer.  The format mirrors what was already in the file.
  */
 async function writeLockfileWithPins(
@@ -548,10 +548,10 @@ async function ensureRepo(repo: string, ref: string, sha: string, dryRun: boolea
  * don't rename their paths.
  *
  * For Claude / Codex / OpenCode / Pi: `<agent>/skills/<name>/SKILL.md`.
- * For Gemini: `~/.gemini/skills/<name>/SKILL.md` — the same path
+ * For Gemini: `~/.gemini/skills/<name>/SKILL.md`: the same path
  * trees from this dir, no extension wrapper needed).
  *
- * Note: this is NOT the same as `agent.skillsDir(home)` for Gemini —
+ * Note: this is NOT the same as `agent.skillsDir(home)` for Gemini -
  * our authored skills live under the `extensions/fulcrum-skills/` wrapper
  * because we own that namespace. Third-party skills go where the vendor
  * itself drops them.
@@ -593,7 +593,7 @@ export async function syncUpstreamSkills(
     : loadedSkills.filter((skill) => !excludedSources.has(skill.source));
   const home = homeDir();
 
-  console.log(`fulcrum upstream skills sync — ${skills.length} curated skill(s)\n`);
+  console.log(`fulcrum upstream skills sync: ${skills.length} curated skill(s)\n`);
 
   const repos = Array.from(new Map(skills.map((s) => [s.source, s])).values());
   const repoDirs = new Map<string, string>();
@@ -614,7 +614,7 @@ export async function syncUpstreamSkills(
       if (!repoDir) continue;
       const src = skillSourcePath(repoDir, skill.subpath);
       if (!src) {
-        console.log(`  ✗ ${skill.name} subpath escapes repo cache — skip`);
+        console.log(`  ✗ ${skill.name} subpath escapes repo cache: skip`);
         integrityFailed = true;
         continue;
       }
@@ -625,7 +625,7 @@ export async function syncUpstreamSkills(
       try {
         computed = await computeSubpathSha256(src, skill.kind);
       } catch {
-        console.log(`  ✗ ${skill.name} subpath hash computation failed — skip`);
+        console.log(`  ✗ ${skill.name} subpath hash computation failed: skip`);
         integrityFailed = true;
         continue;
       }
@@ -633,17 +633,17 @@ export async function syncUpstreamSkills(
       if (skill.subpath_sha256) {
         if (computed.sha256 !== skill.subpath_sha256) {
           console.log(
-            `  ✗ ${skill.name} subpath integrity FAILED — expected ${skill.subpath_sha256}, got ${computed.sha256}`,
+            `  ✗ ${skill.name} subpath integrity FAILED: expected ${skill.subpath_sha256}, got ${computed.sha256}`,
           );
           integrityFailed = true;
         } else {
           console.log(`  ✓ ${skill.name} subpath integrity ok`);
         }
       } else if (updatePins) {
-        console.log(`  · ${skill.name} subpath_sha256 not pinned — computing`);
+        console.log(`  · ${skill.name} subpath_sha256 not pinned: computing`);
         newPins.set(skill.name, computed);
       } else {
-        console.log(`  · ${skill.name} subpath_sha256 not pinned — run with --update-pins to record`);
+        console.log(`  · ${skill.name} subpath_sha256 not pinned: run with --update-pins to record`);
       }
     }
     console.log();
@@ -681,7 +681,7 @@ export async function syncUpstreamSkills(
 
       // Vendor-canonical gate: when the upstream skill ships a per-agent
       // canonical placement under <agent>/skills/<name>/ is the source of
-      // truth. Stay out for those agents — fulcrum-upstream/<name>/ here
+      // truth. Stay out for those agents: fulcrum-upstream/<name>/ here
       // would create a duplicate that triggers "Skill conflict detected"
       // warnings at agent startup.
       if (skill.vendor_canonical_agents && skill.vendor_canonical_agents.includes(target.id)) {
@@ -689,7 +689,7 @@ export async function syncUpstreamSkills(
         continue;
       }
 
-      // W1.6: Claude Code with claude_plugin field — use plugin install path.
+      // W1.6: Claude Code with claude_plugin field: use plugin install path.
       if (isClaudeAgent && skill.claude_plugin) {
         if (dryRun) {
           console.log(`    [dry-run] would run: claude plugin marketplace add ${skill.claude_plugin.marketplace}`);
@@ -698,7 +698,7 @@ export async function syncUpstreamSkills(
           continue;
         }
         if (!claudeAvailable) {
-          console.log(`    · ${skill.name}: claude not on PATH — skipping plugin install (manual: claude plugin marketplace add ${skill.claude_plugin.marketplace} && claude plugin install ${skill.claude_plugin.name})`);
+          console.log(`    · ${skill.name}: claude not on PATH: skipping plugin install (manual: claude plugin marketplace add ${skill.claude_plugin.marketplace} && claude plugin install ${skill.claude_plugin.name})`);
           continue;
         }
         // Check idempotency: if plugin cache dir exists, skip.
@@ -847,13 +847,13 @@ async function uninstallClaudePlugin(skill: UpstreamSkill, dryRun: boolean): Pro
     return;
   }
   if (!(await which("claude"))) {
-    console.log(`      · claude not on PATH — skip plugin uninstall: ${skill.claude_plugin.name}`);
+    console.log(`      · claude not on PATH: skip plugin uninstall: ${skill.claude_plugin.name}`);
     return;
   }
   const { safeClaudePluginUninstall } = await import("./claude-plugin-markers.ts");
   const r = await safeClaudePluginUninstall(skill.claude_plugin.name, { dryRun });
   if (!r.ran) {
-    console.log(`      · ${skill.claude_plugin.name}: ${r.reason ?? "skipped"} — manual: claude plugin uninstall ${skill.claude_plugin.name}`);
+    console.log(`      · ${skill.claude_plugin.name}: ${r.reason ?? "skipped"}: manual: claude plugin uninstall ${skill.claude_plugin.name}`);
     return;
   }
   if (r.ok) {
@@ -870,7 +870,7 @@ export async function removeUpstreamSkills(
   const skills = await filteredUpstreamSkills({ source: opts.source, names: opts.names, lockPath: opts.lockPath });
   const home = homeDir();
 
-  console.log(`fulcrum upstream skills remove — ${skills.length} curated skill(s)\n`);
+  console.log(`fulcrum upstream skills remove: ${skills.length} curated skill(s)\n`);
 
   const claudeAgent = AGENTS.find((agent) => agent.id === "claude-code")!;
   if ((opts.agents === undefined || opts.agents.includes("claude-code")) && await isDir(claudeAgent.baseDir(home))) {

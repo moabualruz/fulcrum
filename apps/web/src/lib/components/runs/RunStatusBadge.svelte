@@ -1,30 +1,32 @@
 <script lang="ts" module>
   import type { RunStatus } from "$lib/server/runs";
+  import type { WorkflowStatus } from "@fulcrum/ui-kit";
 
-  export function badgeClass(s: RunStatus): string {
+  /**
+   * Maps the run-domain `RunStatus` enum onto the canonical cross-surface
+   * `WorkflowStatus` vocabulary owned by the `@fulcrum/ui-kit` StatusBadge
+   * primitive. The run domain says "succeeded"; the canonical vocabulary
+   * (COPY.md §6) says "completed": keep the translation here so the badge
+   * itself stays a pure ui-kit primitive.
+   */
+  export function toWorkflowStatus(s: RunStatus): WorkflowStatus {
     switch (s) {
       case "succeeded":
-        return "rounded px-2 py-0.5 text-xs bg-emerald-100 text-emerald-900";
+        return "completed";
       case "running":
-        return "rounded px-2 py-0.5 text-xs bg-blue-100 text-blue-900 animate-pulse";
+        return "running";
       case "queued":
-        return "rounded px-2 py-0.5 text-xs bg-zinc-100 text-zinc-900";
+        return "queued";
       case "failed":
+        return "failed";
       case "cancelled":
-        return "rounded px-2 py-0.5 text-xs bg-rose-100 text-rose-900";
+        return "cancelled";
     }
-  }
-
-  export function label(s: RunStatus): string {
-    // `in_progress` is not part of `RunStatus`, but keep tolerant for reuse.
-    return (s as string) === "in_progress"
-      ? "In progress"
-      : s.charAt(0).toUpperCase() + s.slice(1);
   }
 </script>
 
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { StatusBadge } from "@fulcrum/ui-kit";
 
   interface Props {
     status: RunStatus;
@@ -33,6 +35,11 @@
   const { status }: Props = $props();
 </script>
 
-<span data-run-status data-status={status} class={cn(badgeClass(status))}
-  >{label(status)}</span
->
+<!--
+  Run status rendering delegates entirely to the `StatusBadge` ui-kit primitive.
+  `data-run-status` + `data-status` carry the run-domain status for existing
+  route selectors; the visual treatment is the canonical OKLCH-tokened badge.
+-->
+<span data-run-status data-status={status} class="contents">
+  <StatusBadge status={toWorkflowStatus(status)} />
+</span>

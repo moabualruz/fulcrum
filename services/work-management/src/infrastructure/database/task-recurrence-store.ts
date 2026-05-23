@@ -58,6 +58,12 @@ export class TaskRecurrenceStore {
     if (input.triggerType === "schedule" && !input.cronExpression && !input.intervalDays) {
       throw new TaskRecurrenceValidationError("Schedule recurrence requires cronExpression or intervalDays.");
     }
+    if (input.cronExpression && !isValidCronExpression(input.cronExpression)) {
+      throw new TaskRecurrenceValidationError("cronExpression must be a valid 5-field cron schedule.");
+    }
+    if (input.intervalDays !== undefined && input.intervalDays !== null && (!Number.isInteger(input.intervalDays) || input.intervalDays < 1)) {
+      throw new TaskRecurrenceValidationError("intervalDays must be a positive integer.");
+    }
     const task = await this.requireTask(input.orgId, input.taskId);
     const saved = await this.ruleRepository().save({
       id: randomUUID(),
@@ -117,6 +123,43 @@ function calculateNextRunAt(input: {
   }
   if (input.cronExpression) return new Date();
   return null;
+}
+
+function isValidCronExpression(expression: string): boolean {
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== 5) return false;
+  const ranges = [
+    [0, 59],
+    [0, 23],
+    [1, 31],
+    [1, 12],
+    [0, 7],
+  ] as const;
+  return fields.every((field, index) => {
+    const range = ranges[index];
+    if (!range) return false;
+    return isValidCronField(field, range[0], range[1]);
+  });
+}
+
+function isValidCronField(field: string, min: number, max: number): boolean {
+  if (!field) return false;
+  return field.split(",").every((part) => {
+    const [range, step] = part.split("/");
+    if (step !== undefined && (!/^\d+$/.test(step) || Number(step) < 1)) return false;
+    if (!range || range === "*") return true;
+    if (/^\d+$/.test(range)) {
+      const value = Number(range);
+      return value >= min && value <= max;
+    }
+    const bounds = range.split("-");
+    if (bounds.length !== 2 || !bounds.every((value) => /^\d+$/.test(value))) return false;
+    const [startRaw, endRaw] = bounds.map(Number);
+    if (startRaw === undefined || endRaw === undefined) return false;
+    const start = startRaw;
+    const end = endRaw;
+    return start >= min && end <= max && start <= end;
+  });
 }
 
 function serializeRule(rule: WorkManagementTaskRecurrenceRule): TaskRecurrencePublicRow {

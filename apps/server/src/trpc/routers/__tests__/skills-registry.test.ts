@@ -89,7 +89,7 @@ describe("skills registry tRPC procedures", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      /* flushed */
+      await em.save(SkillConflict, conflict);
 
       const skillsCaller = caller.fulcrum_skills as Record<string, unknown>;
       const conflicts = skillsCaller.conflicts as {

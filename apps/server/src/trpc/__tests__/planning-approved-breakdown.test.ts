@@ -134,6 +134,7 @@ describe("planning approved-plan tRPC adapter", () => {
     const result = await trpc.planning.previewApprovedPlanBreakdown(input);
 
     expect(result.taskDrafts.map((task) => task.clientKey)).toEqual(["T1"]);
+    expect(result.traceId).toBe("trace-trpc");
     expect(previewApprovedPlanBreakdown).toHaveBeenCalledWith(input);
   });
 
@@ -141,7 +142,11 @@ describe("planning approved-plan tRPC adapter", () => {
     const trpc = await caller();
     const result = await trpc.planning.materializeApprovedPlanBreakdown(input);
 
-    expect(result).toEqual({ breakdown, materialization });
+    expect(result).toEqual({
+      traceId: "trace-trpc",
+      breakdown: { ...breakdown, traceId: "trace-trpc" },
+      materialization,
+    });
     expect(materializeApprovedPlanBreakdown).toHaveBeenCalledTimes(1);
     const [em, appCtx, receivedInput] = materializeApprovedPlanBreakdown.mock.calls[0] as unknown as [
       { marker: string },

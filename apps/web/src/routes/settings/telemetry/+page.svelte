@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { PageData, ActionData } from "./$types";
   import { enhance } from "$app/forms";
-  import { cn } from "$lib/utils.js";
-  import { buttonVariants } from "$lib/components/ui/button";
+  import { cn } from "@fulcrum/ui-kit";
+  import { buttonVariants } from "@fulcrum/ui-kit";
   import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
 
   interface Props { data: PageData; form: ActionData }
@@ -67,7 +67,7 @@
       </div>
       <form method="POST" action="?/purge" use:enhance>
         <button type="submit" data-purge-btn
-          class={cn(buttonVariants({ variant: "destructive" }))}>Purge</button>
+          class={cn(buttonVariants({ variant: "danger" }))}>Purge</button>
       </form>
     </div>
   </div>

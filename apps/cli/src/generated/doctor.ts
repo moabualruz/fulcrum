@@ -4,6 +4,24 @@ export function createDoctorCommand(): Command {
   const command = new Command("doctor");
   command.description("Generated doctor commands.");
 
+  const probeCommand = command.command("probe");
+  probeCommand.description("doctor probe");
+  probeCommand.option("--json", "Emit JSON output");
+  probeCommand.option("--name <string>", "name");
+  probeCommand.action(async (options) => {
+    try {
+      throw new Error("Generated tRPC invocation for doctor.probe requires an explicit surface adapter.");
+    } catch (error) {
+      if (options.json === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(JSON.stringify({ error: { code: "INTERNAL_ERROR", message } }));
+        process.exitCode = 1;
+        return;
+      }
+      throw error;
+    }
+  });
+
   const runCommand = command.command("run");
   runCommand.description("doctor run");
   runCommand.option("--json", "Emit JSON output");

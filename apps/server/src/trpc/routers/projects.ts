@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { createProject, createProjectFromSetup, deleteProject, updateProject } from "@work-management/application/projects/commands.ts";
+import {
+  createProject,
+  createProjectFromSetup,
+  deleteProject,
+  updateProject,
+  updateProjectToolPermissionMode,
+} from "@work-management/application/projects/commands.ts";
 import { getProjectOrNull, listProjectRows, loadProjectOverview } from "@work-management/application/projects/queries.ts";
 import type { AppContext } from "@work-management/application/tasks/types.ts";
 import { requireTrpcEntityManager, type TRPCContext } from "../context.ts";
@@ -22,6 +28,7 @@ const ProjectUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullish(),
 });
+const ToolPermissionModeSchema = z.enum(["review_each_tool", "auto", "danger"]);
 
 function appContext(ctx: TRPCContext, projectId?: string | null): AppContext {
   return {
@@ -68,6 +75,12 @@ export const projectsRouter = t.router({
   update: permissionedProcedure({ resource: "projects", action: "update" })
     .input(ProjectUpdateSchema)
     .mutation(async ({ ctx, input }) => updateProject(requireTrpcEntityManager(ctx), appContext(ctx, input.id), input)),
+
+  updateToolPermissionMode: permissionedProcedure({ resource: "projects", action: "update" })
+    .input(z.object({ id: z.string().min(1), permissionMode: ToolPermissionModeSchema }))
+    .mutation(async ({ ctx, input }) =>
+      updateProjectToolPermissionMode(requireTrpcEntityManager(ctx), appContext(ctx, input.id), input)
+    ),
 
   delete: permissionedProcedure({ resource: "projects", action: "delete" })
     .input(IdInputSchema)

@@ -139,7 +139,7 @@ describe("install source helpers", () => {
     await stripVendorRuleBlocks(noVendor, false);
     expect(await text(noVendor)).toBe("# user heading\nkeep me\n");
 
-    // Dry-run on a missing file is a no-op — the function returns early and
+    // Dry-run on a missing file is a no-op: the function returns early and
     // logs nothing (no vendor headings registered to detect changes).
     const dryRunTarget = join(scratch, "dry-run-vendor.md");
     const logs = await captureLogs(() => stripVendorRuleBlocks(dryRunTarget, true));
@@ -386,6 +386,30 @@ describe("install source helpers", () => {
     } finally {
       process.exit = originalExit;
     }
+  });
+
+  it("runs install twice idempotently and previews uninstall without removing user content", async () => {
+    const home = process.env["HOME"]!;
+    await mkdir(join(home, ".codex"), { recursive: true });
+    await writeFile(join(home, ".codex", "AGENTS.md"), "codex user line\n");
+
+    const first = await captureLogs(() => runInstall(["--profile", "rules-only", "--no-default-mcps"]));
+    const afterFirst = await text(join(home, ".codex", "AGENTS.md"));
+    const second = await captureLogs(() => runInstall(["--profile", "rules-only", "--no-default-mcps"]));
+    const afterSecond = await text(join(home, ".codex", "AGENTS.md"));
+
+    expect(first.join("\n")).toContain("Installing component profile profile.rules-only");
+    expect(second.join("\n")).toContain("Installing component profile profile.rules-only");
+    expect(afterFirst).toContain("codex user line");
+    expect(afterFirst).toContain(BEGIN);
+    expect(afterSecond).toBe(afterFirst);
+
+    const dryRun = await captureLogs(() => runUninstall(["--dry-run", "--keep-state"]));
+    const output = dryRun.join("\n");
+    expect(output).toContain("(dry-run mode");
+    expect(output).toContain("Removing component profile profile.default");
+    expect(output).toContain("keep MCP registry file (--keep-state)");
+    expect(await text(join(home, ".codex", "AGENTS.md"))).toBe(afterFirst);
   });
 
   it("runs full install dry-run with project init, all MCPs, and skill flag exclusions", async () => {

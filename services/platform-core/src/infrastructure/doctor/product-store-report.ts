@@ -1,10 +1,11 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, rename, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { resolveDatabaseConfig } from "@platform-core/application/db/database-config.ts";
 import { applyProductMigrations } from "@platform-core/infrastructure/application-database/product-migrations.ts";
 import { openLocalSqlStore, openPostgresSqlStore, type SqlExecutor } from "@platform-core/infrastructure/application-database/sql.ts";
+import { isCompiledBunBinary } from "@platform-core/infrastructure/product-store/db/pglite.ts";
 
 export type CheckStatus = "ok" | "warning" | "error" | "disabled";
 
@@ -31,6 +32,16 @@ export interface ProductKernelDoctorReport {
   };
   latestEventAt: string | null;
   error?: string;
+  recoveryAction?: "pglite-rebuild";
+  recoveryCommand?: string;
+}
+
+export interface PgliteRebuildReport {
+  action: "pglite-rebuild";
+  dbPath: string;
+  quarantinedPath: string | null;
+  verified: boolean;
+  schemaApplied: number;
 }
 
 export interface ReposDoctorReport {
@@ -114,7 +125,7 @@ async function inspectProductDatabase(
       latestEventAt: normalizeTimestamp(latest[0]?.created_at),
     };
   } catch (err) {
-    return {
+    const report: ProductKernelDoctorReport = {
       engine,
       dbPath,
       schemaApplied: 0,
@@ -122,6 +133,11 @@ async function inspectProductDatabase(
       latestEventAt: null,
       error: (err as Error).message,
     };
+    if (engine === "pglite") {
+      report.recoveryAction = "pglite-rebuild";
+      report.recoveryCommand = "fulcrum doctor --run-fix=pglite-rebuild";
+    }
+    return report;
   } finally {
     if (db) {
       try { await db.close(); } catch { /* ignore */ }
@@ -133,6 +149,10 @@ async function openSelectedProductDatabase(
   productKernel: ProductKernelDoctorReport,
 ): Promise<SqlExecutor | null> {
   if (productKernel.engine === "absent" || productKernel.error) return null;
+  // PGlite's vector tarball is unreachable from a Bun-compiled $bunfs; skip
+  // the open so memory / repos reports return their no-DB defaults instead
+  // of crashing the whole doctor run.
+  if (isCompiledBunBinary()) return null;
   if (productKernel.engine === "pglite") return openLocalSqlStore(productKernel.dbPath);
 
   const config = resolveDatabaseConfig();
@@ -160,14 +180,68 @@ export async function buildProductKernelDoctorReport(): Promise<ProductKernelDoc
       latestEventAt: null,
     };
   }
+  // PGlite's `vector.tar.gz` cannot be resolved from inside a Bun-compiled
+  // `$bunfs`, so calling `openLocalSqlStore` would crash the whole doctor
+  // run. In compiled binaries return the lightweight `pglite` report based on
+  // the PG_VERSION marker alone — full inspection still works under `bun run`
+  // and the NestJS server.
+  if (isCompiledBunBinary()) {
+    return {
+      engine: "pglite",
+      dbPath,
+      schemaApplied: 0,
+      rows: EMPTY_PRODUCT_ROWS,
+      latestEventAt: null,
+    };
+  }
   return inspectProductDatabase("pglite", dbPath, () => openLocalSqlStore(dbPath));
+}
+
+export async function rebuildLocalPgliteDatabase(): Promise<PgliteRebuildReport> {
+  const config = resolveDatabaseConfig();
+  if (config.backend !== "pglite") {
+    throw new Error("pglite-rebuild requires local PGlite; unset FULCRUM_DATABASE_URL/DATABASE_URL or switch backend");
+  }
+  const dbPath = config.dataDir;
+  let quarantinedPath: string | null = null;
+  try {
+    await stat(dbPath);
+    quarantinedPath = `${dbPath}.corrupt-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+    await mkdir(dirname(quarantinedPath), { recursive: true });
+    await rename(dbPath, quarantinedPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  const db = await openLocalSqlStore(dbPath);
+  try {
+    await applyProductMigrations(db);
+  } finally {
+    await db.close();
+  }
+
+  const verified = await buildProductKernelDoctorReport();
+  if (verified.error || verified.engine !== "pglite") {
+    throw new Error(`pglite rebuild verification failed: ${verified.error ?? verified.engine}`);
+  }
+
+  return {
+    action: "pglite-rebuild",
+    dbPath,
+    quarantinedPath,
+    verified: true,
+    schemaApplied: verified.schemaApplied,
+  };
 }
 
 export async function buildMemoryEngineDoctorReport(
   productKernel: ProductKernelDoctorReport,
 ): Promise<{ memoryEngine: MemoryDoctorReport; warnings: number; errors: number }> {
   let db = await openSelectedProductDatabase(productKernel);
-  if (!db) {
+  // Inside a Bun-compiled $bunfs PGlite cannot open a real path either —
+  // skip the tmpdir fallback so the memory report still completes with the
+  // no-DB defaults.
+  if (!db && !isCompiledBunBinary()) {
     try {
       db = await openLocalSqlStore(join(await mkdtemp(join(tmpdir(), "fulcrum-doctor-memory-")), "db"));
       await applyProductMigrations(db);

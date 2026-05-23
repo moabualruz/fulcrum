@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * QuickFilters — sidebar preset filter buttons.
+   * QuickFilters: sidebar preset filter buttons.
    * Presets: My Work, Due Today, Overdue, Unassigned, Blocked.
    */
   import { createEventDispatcher } from "svelte";
   import type { SavedViewQuery } from "@work-management/interface/saved-view-filters.ts";
   import { SavedViewQuerySchema } from "@work-management/interface/saved-view-filters.ts";
-  import { Button } from "$lib/components/ui/button/index.js";
+  import { Button } from "@fulcrum/ui-kit";
 
   interface Props {
     currentUserId?: string;
@@ -66,7 +66,7 @@
       id: "blocked",
       label: "Blocked",
       query: () => SavedViewQuerySchema.parse({
-        // Blocked tasks have a blocking relationship — filter by dependencies
+        // Blocked tasks have a blocking relationship: filter by dependencies
         filters: [{ field: "custom_fields.blocked", op: "is_not_empty" }],
         facets: {},
       }),
@@ -125,7 +125,7 @@
     </label>
 
     <!-- Export button -->
-    <Button variant="outline" size="sm" class="w-full h-7 text-xs" on:click={handleExport}>
+    <Button variant="secondary" size="sm" class="w-full h-7 text-xs" on:click={handleExport}>
       Export
     </Button>
   </div>

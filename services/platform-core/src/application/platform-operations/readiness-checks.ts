@@ -2,7 +2,6 @@ import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join } from "node:path";
 
-import { FEATURE_FLAGS } from "@platform-core/application/feature-flags/registry.ts";
 import { KeyringStatus, loadOrCreateMasterKey, FALLBACK_FILENAME } from "@platform-core/application/secrets/keyring.ts";
 
 export type PlatformDoctorStatus = "pass" | "warn" | "fail" | "skip";
@@ -69,10 +68,45 @@ interface PlatformDoctorOptions {
     /** Status of last outbound report attempt: "ok" | "4xx" | "error" | undefined. */
     lastReportStatus?: "ok" | "4xx" | "error";
   };
+  daemon?: {
+    pidfile?: string;
+    socket?: string;
+  };
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const PLATFORM_DOCTOR_FEATURE_FLAGS = [
+  "router-llm",
+  "embeddings",
+  "memory-llm-extract",
+  "saas-auth",
+  "real-time-collab-server",
+  "external-llm-provider",
+  "public-api",
+  "outbound-webhooks",
+  "notify-email",
+  "notify-webhook",
+  "notify-slack",
+  "notify-discord",
+  "casbin-policies",
+  "pgvector",
+  "connector-linear",
+  "symphony-ssh-worker",
+  "symphony-http-api",
+  "i18n",
+  "report-llm-narration",
+  "search-click-telemetry",
+  "token-tracking",
+  "session-resume",
+  "telemetry-remote",
+  "error-reporting-remote",
+  "desktop-app",
+  "experiments",
+  "scheduled-backups",
+  "skill-marketplace",
+  "trpc-permission-local-dev-bypass",
+] as const;
 
 function fulcrumHome(): string {
   return process.env["FULCRUM_HOME"] ?? join(process.env["HOME"] ?? "", ".fulcrum");
@@ -128,6 +162,15 @@ async function crashlogDirWritable(dir: string): Promise<boolean> {
   }
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function envBool(name: string): boolean | null {
   const value = process.env[name];
   if (value === undefined || value === "") return null;
@@ -148,6 +191,7 @@ function defaultEnabledFlags(): Set<string> {
 export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {}): Promise<PlatformDoctorCheck[]> {
   const stateDir = options.stateDir ?? defaultStateDir();
   const results: PlatformDoctorCheck[] = [];
+  const home = fulcrumHome();
 
   try {
     const settings = await (options.theme?.readSettings() ?? readThemeSettingsFromEnv());
@@ -204,6 +248,27 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     crashWritable ? "No action needed." : "Create the crashlog directory and make it writable by the current user.",
   ));
 
+  const daemonPidfile = options.daemon?.pidfile ?? join(home, "daemon.pid");
+  const daemonSocket = options.daemon?.socket ?? join(home, "daemon.sock");
+  const [daemonPidExists, daemonSocketExists] = await Promise.all([
+    pathExists(daemonPidfile),
+    pathExists(daemonSocket),
+  ]);
+  results.push(check(
+    "platform.daemon",
+    daemonPidExists && daemonSocketExists ? "pass" : daemonPidExists || daemonSocketExists ? "warn" : "skip",
+    daemonPidExists && daemonSocketExists
+      ? "fulcrumd pidfile and socket are present."
+      : daemonPidExists || daemonSocketExists
+        ? "fulcrumd state is stale: pidfile/socket mismatch."
+        : "fulcrumd is stopped.",
+    daemonPidExists && daemonSocketExists
+      ? "No action needed."
+      : daemonPidExists || daemonSocketExists
+        ? "Remove stale ~/.fulcrum/daemon.pid and ~/.fulcrum/daemon.sock, then restart fulcrumd."
+        : "Start fulcrumd when background AI Assist sessions are required.",
+  ));
+
   const backup = options.backup ?? { policyEnabled: false, lastRunAt: null };
   if (!backup.policyEnabled || !backup.lastRunAt) {
     results.push(check("platform.backup_last_run", "pass", "No backup policy or no prior backup recorded.", "Configure backup policy when scheduled backups are required."));
@@ -227,7 +292,7 @@ export async function runPlatformDoctorChecks(options: PlatformDoctorOptions = {
     telemetryValue === null ? "Set telemetry opt-in to true or false." : "No action needed.",
   ));
 
-  const registeredFlags = options.flags?.registeredFlags ?? FEATURE_FLAGS;
+  const registeredFlags = options.flags?.registeredFlags ?? PLATFORM_DOCTOR_FEATURE_FLAGS;
   const enabled = options.flags?.enabled ?? defaultEnabledFlags();
   results.push(check(
     "platform.flags_registry",

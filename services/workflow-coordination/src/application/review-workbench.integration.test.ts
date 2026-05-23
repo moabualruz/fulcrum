@@ -967,9 +967,13 @@ describe("Review workbench Nest service", () => {
       expect(run).toMatchObject({
         projectId: "project-auto-nest",
         traceId: "trace-auto-nest",
+        runId: "run-trace-auto-nest-generated-e2e-bun",
         runner: "bun",
         status: "planned",
         artifactIds: ["e2e-trace-auto-nest-task-auto-nest"],
+        generatedSpecArtifactIds: [
+          "artifact-trace-auto-nest-run-trace-auto-nest-generated-e2e-bun-generated-e2e-spec-1",
+        ],
         stdout: "",
         stderr: "",
         exitCode: null,
@@ -978,8 +982,22 @@ describe("Review workbench Nest service", () => {
       expect(run.command[0]).toBe("bun");
       expect(run.command[1]).toBe("test");
       expect(run.testFiles).toHaveLength(1);
+      expect(run.testFiles[0]).toContain("run-trace-auto-nest-generated-e2e-bun");
       await expect(readFile(run.testFiles[0]!, "utf8")).resolves.toContain(
         "Configured approval generates and plans a regression test.",);
+
+      const generatedSpecArtifact = await dataSource.getRepository(FulcrumArtifactEntity).findOneByOrFail({
+        id: "artifact-trace-auto-nest-run-trace-auto-nest-generated-e2e-bun-generated-e2e-spec-1",
+      });
+      expect(generatedSpecArtifact).toMatchObject({
+        projectId: "project-auto-nest",
+        traceId: "trace-auto-nest",
+        runId: "run-trace-auto-nest-generated-e2e-bun",
+        kind: "generated-e2e-spec",
+        lifecycleState: "created",
+        mime: "text/typescript",
+      });
+      expect(generatedSpecArtifact.bodyPath).toContain("run-trace-auto-nest-generated-e2e-bun");
 
       const runEvent = await dataSource.getRepository(FulcrumRunEventEntity).findOneByOrFail({
         id: "event-trace-auto-nest-generated-e2e-regression-run-completed-bun",
@@ -997,6 +1015,9 @@ describe("Review workbench Nest service", () => {
         runner: "bun",
         status: "planned",
         artifactIds: ["e2e-trace-auto-nest-task-auto-nest"],
+        generatedSpecArtifactIds: [
+          "artifact-trace-auto-nest-run-trace-auto-nest-generated-e2e-bun-generated-e2e-spec-1",
+        ],
       });
     } finally {
       await dataSource.destroy();

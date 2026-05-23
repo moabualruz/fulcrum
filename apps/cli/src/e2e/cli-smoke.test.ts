@@ -12,7 +12,9 @@ describe("CLI E2E smoke with application callers", () => {
       caller: { tasks: { list: async () => [{ id: "task-1", title: "interface task" }] } },
     } as never);
 
-    expect(JSON.parse(io.out[0]!)).toEqual([{ id: "task-1", title: "interface task" }]);
+    // `fulcrum task list --json` wraps output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the rows are `.result` (prd-cli-build-stage-parity).
+    expect(taskEnvelopeResult(io.out[0]!)).toEqual([{ id: "task-1", title: "interface task" }]);
     expect(io.exits).toEqual([]);
   });
 
@@ -44,7 +46,7 @@ describe("CLI E2E smoke with application callers", () => {
         body: null,
       },
     ]);
-    expect(JSON.parse(io.out[0]!)).toEqual([{ id: "task-public", title: "Public task" }]);
+    expect(taskEnvelopeResult(io.out[0]!)).toEqual([{ id: "task-public", title: "Public task" }]);
     expect(io.exits).toEqual([]);
   });
 
@@ -59,7 +61,11 @@ describe("CLI E2E smoke with application callers", () => {
       }) as unknown as typeof fetch,
     });
 
-    expect(io.err.join("\n")).toContain("Task API caller is not configured");
+    // Under `--json` the failure stays inside the canonical envelope: the coded
+    // error lives in `errors[]`, not stderr (prd-cli-build-stage-parity).
+    const envelope = JSON.parse(io.out[0]!) as { schema: string; errors: Array<{ message: string }> };
+    expect(envelope.schema).toBe("fulcrum.cli.v1");
+    expect(envelope.errors.map((e) => e.message).join("\n")).toContain("Task API caller is not configured");
     expect(io.exits).toEqual([1]);
   });
 
@@ -70,7 +76,11 @@ describe("CLI E2E smoke with application callers", () => {
       caller: { docs: { list: async () => [{ id: "doc-1", title: "interface doc" }] } },
     } as never);
 
-    expect(JSON.parse(io.out[0]!)).toEqual([{ id: "doc-1", title: "interface doc" }]);
+    // `docs list --json` emits the canonical fulcrum.cli.v1 envelope
+    // (prd-cli-capture-stage-parity); the doc rows are under `.result`.
+    const envelope = JSON.parse(io.out[0]!) as Record<string, unknown>;
+    expect(envelope["schema"]).toBe("fulcrum.cli.v1");
+    expect(envelope["result"]).toEqual([{ id: "doc-1", title: "interface doc" }]);
     expect(io.exits).toEqual([]);
   });
 
@@ -100,4 +110,11 @@ function captureIo() {
       exit: (code: number) => exits.push(code),
     },
   };
+}
+
+/** Unwrap the `.result` of a `fulcrum task --json` canonical envelope (CLI-TUI-UX §3). */
+function taskEnvelopeResult(line: string): unknown {
+  const envelope = JSON.parse(line) as { schema: string; result: unknown };
+  expect(envelope.schema).toBe("fulcrum.cli.v1");
+  return envelope.result;
 }

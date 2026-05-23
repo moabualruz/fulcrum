@@ -24,6 +24,8 @@ export class AgentRunDispatchBodyDto {
   projectId?: string;
   taskId?: string;
   agent?: string;
+  cwd?: string;
   traceId?: string;
   dependencyTree?: string[];
+  agentConfigJson?: Record<string, unknown>;
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Tests for gated scheduled remote backup with S3/GCS/Azure adapters.
  *
@@ -17,6 +16,7 @@ import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { rmSync } from "node:fs";
+import type { Readable } from "node:stream";
 
 import { parseDSN, uploadBackup, pruneLocalBackups, makeBackupEvent, MAX_LOCAL_COPIES, type UploadResult } from "./remote-adapters.ts";
 import { createLocalBackup, verifyBackupArchive } from "./runner.ts";
@@ -114,6 +114,9 @@ describe("createLocalBackup", () => {
       tag: "architecture",
       dump,
       entityCounts: { tasks: 2 },
+      artifacts: { "artifact/run.log": "trace-output" },
+      config: { theme: "system" },
+      localState: { activeWorkspace: "workspace-1" },
     });
 
     expect(await readFile(result.archivePath)).toBeDefined();
@@ -121,7 +124,14 @@ describe("createLocalBackup", () => {
     expect(verified).toMatchObject({
       ok: true,
       format: "fulcrum.backup.v1",
+      schemaVersion: 1,
       entityCounts: { tasks: 2 },
+      components: {
+        database: expect.objectContaining({ included: true }),
+        artifacts: expect.objectContaining({ included: true, itemCount: 1 }),
+        config: expect.objectContaining({ included: true, itemCount: 1 }),
+        localState: expect.objectContaining({ included: true, itemCount: 1 }),
+      },
     });
     expect(verified.checksumSha256).toMatch(/^[0-9a-f]{64}$/);
   });
@@ -145,7 +155,7 @@ describe("uploadBackup — S3", () => {
   test("calls s3Put with correct bucket/key/body", async () => {
     const archive = await makeFakeArchive(dir, "backup-test.tar.gz");
     const calls: Array<{ Bucket: string; Key: string }> = [];
-    const s3Put = async (p: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }) => {
+    const s3Put = async (p: { Bucket: string; Key: string; Body: Readable }) => {
       calls.push({ Bucket: p.Bucket, Key: p.Key });
     };
 
@@ -154,27 +164,41 @@ describe("uploadBackup — S3", () => {
     expect(result.success).toBe(true);
     expect(result.provider).toBe("s3");
     expect(calls).toHaveLength(1);
-    expect(calls[0].Bucket).toBe("my-bucket");
-    expect(calls[0].Key).toBe("backups/backup-test.tar.gz");
+    expect(calls[0]!.Bucket).toBe("my-bucket");
+    expect(calls[0]!.Key).toBe("backups/backup-test.tar.gz");
     expect(result.attempts).toBe(1);
+  });
+
+  test("keeps remote credentials as a credentialRef instead of inline DSN secrets", async () => {
+    const archive = await makeFakeArchive(dir, "backup-credential-ref.tar.gz");
+    const result = await uploadBackup(archive, "s3://my-bucket/backups", {
+      credentialRef: "credential:remote-backup",
+      s3Put: async () => {},
+      retryBaseMs: 1,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.credentialRef).toBe("credential:remote-backup");
+    expect(makeBackupEvent(result).payload.credentialRef).toBe("credential:remote-backup");
+    expect(() => parseDSN("s3://access:secret@my-bucket/backups")).toThrow("credentialRef");
   });
 
   test("R2 DSN uses same s3Put adapter", async () => {
     const archive = await makeFakeArchive(dir, "backup-r2.tar.gz");
     const calls: Array<{ Bucket: string }> = [];
-    const s3Put = async (p: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }) => {
+    const s3Put = async (p: { Bucket: string; Key: string; Body: Readable }) => {
       calls.push({ Bucket: p.Bucket });
     };
     const result = await uploadBackup(archive, "r2://r2-bucket/prefix", { s3Put, retryBaseMs: 1 });
     expect(result.success).toBe(true);
     expect(result.provider).toBe("r2");
-    expect(calls[0].Bucket).toBe("r2-bucket");
+    expect(calls[0]!.Bucket).toBe("r2-bucket");
   });
 
   test("B2 DSN uses same s3Put adapter", async () => {
     const archive = await makeFakeArchive(dir, "backup-b2.tar.gz");
     const calls: string[] = [];
-    const s3Put = async (p: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }) => {
+    const s3Put = async (p: { Bucket: string; Key: string; Body: Readable }) => {
       calls.push(p.Bucket);
     };
     const result = await uploadBackup(archive, "b2://b2-bucket/prefix", { s3Put, retryBaseMs: 1 });
@@ -202,7 +226,7 @@ describe("uploadBackup — retry behavior", () => {
   test("retries 3× on s3Put error, final failure → error result", async () => {
     const archive = await makeFakeArchive(dir, "backup-retry.tar.gz");
     let callCount = 0;
-    const s3Put = async (_p: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }) => {
+    const s3Put = async (_p: { Bucket: string; Key: string; Body: Readable }) => {
       callCount++;
       throw new Error("ServiceUnavailable (503)");
     };
@@ -218,7 +242,7 @@ describe("uploadBackup — retry behavior", () => {
   test("succeeds on second attempt after one failure", async () => {
     const archive = await makeFakeArchive(dir, "backup-flaky.tar.gz");
     let callCount = 0;
-    const s3Put = async (_p: { Bucket: string; Key: string; Body: NodeJS.ReadableStream }) => {
+    const s3Put = async (_p: { Bucket: string; Key: string; Body: Readable }) => {
       callCount++;
       if (callCount === 1) throw new Error("transient 503");
     };
@@ -284,9 +308,9 @@ describe("uploadBackup — Azure", () => {
 
     expect(result.success).toBe(true);
     expect(result.provider).toBe("azure");
-    expect(calls[0].container).toBe("my-container");
-    expect(calls[0].blob).toBe("bkp/backup-azure.tar.gz");
-    expect(calls[0].path).toBe(archive);
+    expect(calls[0]!.container).toBe("my-container");
+    expect(calls[0]!.blob).toBe("bkp/backup-azure.tar.gz");
+    expect(calls[0]!.path).toBe(archive);
   });
 });
 

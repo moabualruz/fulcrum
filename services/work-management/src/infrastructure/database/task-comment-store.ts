@@ -5,6 +5,7 @@ import { DataSource, In } from "typeorm";
 import {
   type WorkManagementCommentReaction,
   WorkManagementCommentReactionEntity,
+  WorkManagementNotificationEntity,
   type WorkManagementTaskComment,
   WorkManagementTaskCommentEntity,
   type WorkManagementTaskWatcher,
@@ -16,6 +17,7 @@ import {
   FulcrumProjectEntity,
   FulcrumTaskEntity,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
+import { getEventBus } from "@platform-core/application/subscriptions/event-bus.ts";
 
 export interface TaskCommentPublicRow {
   id: string;
@@ -91,11 +93,37 @@ export class TaskCommentStore {
     });
 
     await this.subscribe({ ...input, source: "create" });
+    await this.publishCommentEvent("task.comment.created", input.orgId, task, comment, input.userId);
+
     for (const userId of extractMentionUserIds(comment.body)) {
       await this.subscribe({ orgId: input.orgId, taskId: task.id, userId, source: "mention" });
+      await this.createMentionNotification(input.orgId, task, comment, input.userId, userId);
     }
 
     return serializeComment(comment, []);
+  }
+
+  async updateComment(input: CommentScope & {
+    commentId: string;
+    userId: string;
+    body: Record<string, unknown>;
+  }): Promise<TaskCommentPublicRow | null> {
+    const comment = await this.findCommentInOrg(input);
+    if (!comment || comment.authorId !== input.userId) return null;
+
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: comment.taskId });
+    if (!task) return null;
+
+    comment.body = objectValue(input.body);
+    const updated = await this.commentRepository().save(comment);
+    await this.publishCommentEvent("task.comment.updated", input.orgId, task, updated, input.userId);
+    for (const userId of extractMentionUserIds(updated.body)) {
+      if (userId === input.userId) continue;
+      await this.subscribe({ orgId: input.orgId, taskId: task.id, userId, source: "mention" });
+      await this.createMentionNotification(input.orgId, task, updated, input.userId, userId);
+    }
+
+    return serializeComment(updated, await this.reactionsFor([updated]));
   }
 
   async listComments(input: TaskScope): Promise<TaskCommentPublicRow[]> {
@@ -138,13 +166,16 @@ export class TaskCommentStore {
     return roots;
   }
 
-  async deleteComment(input: CommentScope & { commentId: string }): Promise<boolean> {
+  async deleteComment(input: CommentScope & { commentId: string; userId: string }): Promise<boolean> {
     const comment = await this.findCommentInOrg(input);
-    if (!comment) return false;
+    if (!comment || comment.authorId !== input.userId) return false;
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: comment.taskId });
+    if (!task) return false;
 
     const ids = await this.descendantCommentIds(input.orgId, comment.id);
     await this.reactionRepository().delete({ commentId: In(ids) });
     await this.commentRepository().delete({ id: In(ids), orgId: input.orgId });
+    await this.publishCommentEvent("task.comment.deleted", input.orgId, task, comment, comment.authorId);
     return true;
   }
 
@@ -156,10 +187,12 @@ export class TaskCommentStore {
     comment.resolvedBy = input.userId;
     comment.resolvedAt = new Date();
     const updated = await this.commentRepository().save(comment);
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: updated.taskId });
+    if (task) await this.publishCommentEvent("task.comment.resolved", input.orgId, task, updated, input.userId);
     return serializeComment(updated, await this.reactionsFor([updated]));
   }
 
-  async unresolveComment(input: CommentScope & { commentId: string }): Promise<TaskCommentPublicRow | null> {
+  async unresolveComment(input: CommentScope & { commentId: string; userId: string }): Promise<TaskCommentPublicRow | null> {
     const comment = await this.findCommentInOrg(input);
     if (!comment) return null;
 
@@ -167,6 +200,8 @@ export class TaskCommentStore {
     comment.resolvedBy = null;
     comment.resolvedAt = null;
     const updated = await this.commentRepository().save(comment);
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: updated.taskId });
+    if (task) await this.publishCommentEvent("task.comment.unresolved", input.orgId, task, updated, input.userId);
     return serializeComment(updated, await this.reactionsFor([updated]));
   }
 
@@ -185,12 +220,15 @@ export class TaskCommentStore {
     });
     if (existing) return serializeReaction(existing);
 
-    return serializeReaction(await this.reactionRepository().save({
+    const reaction = await this.reactionRepository().save({
       id: randomUUID(),
       commentId: comment.id,
       userId: input.userId,
       emoji: input.emoji,
-    }));
+    });
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: comment.taskId });
+    if (task) await this.publishCommentEvent("task.comment.reaction_added", input.orgId, task, comment, input.userId, { emoji: input.emoji });
+    return serializeReaction(reaction);
   }
 
   async removeReaction(input: CommentScope & {
@@ -206,6 +244,8 @@ export class TaskCommentStore {
       userId: input.userId,
       emoji: input.emoji,
     });
+    const task = await this.findTaskInOrg({ orgId: input.orgId, taskId: comment.taskId });
+    if (task) await this.publishCommentEvent("task.comment.reaction_removed", input.orgId, task, comment, input.userId, { emoji: input.emoji });
     return true;
   }
 
@@ -303,12 +343,75 @@ export class TaskCommentStore {
     return this.dataSource.getRepository(WorkManagementTaskWatcherEntity);
   }
 
+  private notificationRepository() {
+    return this.dataSource.getRepository(WorkManagementNotificationEntity);
+  }
+
   private taskRepository() {
     return this.dataSource.getRepository(FulcrumTaskEntity);
   }
 
   private projectRepository() {
     return this.dataSource.getRepository(FulcrumProjectEntity);
+  }
+
+  private async createMentionNotification(
+    orgId: string,
+    task: FulcrumTask,
+    comment: WorkManagementTaskComment,
+    actorId: string,
+    recipientId: string,
+  ): Promise<void> {
+    if (recipientId === actorId) return;
+    const notification = await this.notificationRepository().save({
+      id: randomUUID(),
+      workspaceId: orgId,
+      projectId: task.projectId,
+      taskId: task.id,
+      type: "task.comment.mention",
+      actorId,
+      recipientId,
+      readAt: null,
+      payload: {
+        commentId: comment.id,
+        taskId: task.id,
+        bodyPreview: commentPreview(comment.body),
+      },
+      traceId: task.traceId,
+    });
+
+    getEventBus().publish(`org.${orgId}.notifications`, {
+      type: "notification.created",
+      notificationId: notification.id,
+      notificationType: notification.type,
+      taskId: task.id,
+      commentId: comment.id,
+      actorId,
+      recipientId,
+      traceId: task.traceId,
+    });
+  }
+
+  private async publishCommentEvent(
+    type: string,
+    orgId: string,
+    task: FulcrumTask,
+    comment: WorkManagementTaskComment,
+    actorId: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<void> {
+    const payload = {
+      type,
+      orgId,
+      projectId: task.projectId,
+      taskId: task.id,
+      commentId: comment.id,
+      actorId,
+      traceId: task.traceId,
+      ...extra,
+    };
+    getEventBus().publish(`project.${task.projectId}.tasks`, payload);
+    getEventBus().publish(`org.${orgId}.notifications`, payload);
   }
 }
 
@@ -391,4 +494,22 @@ function extractMentionUserIds(value: unknown): string[] {
   };
   visit(value);
   return [...ids];
+}
+
+function commentPreview(value: unknown): string {
+  const text: string[] = [];
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== "object") return;
+    const record = node as Record<string, unknown>;
+    if (typeof record["text"] === "string") text.push(record["text"]);
+    for (const child of Object.values(record)) {
+      if (Array.isArray(child)) {
+        for (const item of child) visit(item);
+      } else if (child && typeof child === "object") {
+        visit(child);
+      }
+    }
+  };
+  visit(value);
+  return text.join(" ").replace(/\s+/g, " ").trim().slice(0, 160);
 }

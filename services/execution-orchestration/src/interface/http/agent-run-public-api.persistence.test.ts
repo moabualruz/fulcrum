@@ -13,6 +13,7 @@ import {
 import { JobQueue1778751000000 } from "@platform-core/infrastructure/database/job-queue.migration.ts";
 import {
   FULCRUM_CONTEXT_MEMORY_RUN_EVENT_ENTITIES,
+  FulcrumRunEventEntity,
 } from "@execution-orchestration/infrastructure/database/run-context.entities.ts";
 import { RunContext1778623200005 } from "@execution-orchestration/infrastructure/database/run-context.migration.ts";
 import { AgentRunPublicStore } from "@execution-orchestration/infrastructure/database/agent-run-public-store.ts";
@@ -252,6 +253,8 @@ async function assertAgentRunPublicApiRoundTrip(
     const dispatchedRun = await runsController.dispatchRun({ orgId: ORG_ID }, {
       taskId: TASK_ID,
       agent: "codex",
+      cwd: "/workspace/project",
+      agentConfigJson: { model: "gpt-5.4", sandbox: "workspace-write" },
       traceId: `trace-dispatched-${source}`,
       dependencyTree: ["task-prerequisite"],
     });
@@ -261,6 +264,8 @@ async function assertAgentRunPublicApiRoundTrip(
       traceId: `trace-dispatched-${source}`,
       status: "queued",
       agent: "codex",
+      cwd: "/workspace/project",
+      agentConfig: { model: "gpt-5.4", sandbox: "workspace-write" },
       dependencyTree: ["task-prerequisite"],
     }));
     const dispatchedRunId = String((dispatchedRun as { id: string }).id);
@@ -278,10 +283,13 @@ async function assertAgentRunPublicApiRoundTrip(
         taskId: TASK_ID,
         traceId: `trace-dispatched-${source}`,
         agent: "codex",
+        cwd: "/workspace/project",
+        agentConfig: { model: "gpt-5.4", sandbox: "workspace-write" },
       },
       attempts: 0,
       maxAttempts: 3,
     });
+    await expect(runsController.cancelRun({ identifier: dispatchedRunId }, { orgId: ORG_ID })).resolves.toEqual({ ok: true });
     await expect(runsController.cancelRun({ identifier: dispatchedRunId }, { orgId: ORG_ID })).resolves.toEqual({ ok: true });
     await expect(dataSource.getRepository(FulcrumJobEntity).findOneByOrFail({
       orgId: ORG_ID,
@@ -302,6 +310,9 @@ async function assertAgentRunPublicApiRoundTrip(
       traceId: `trace-run-${source}`,
       status: "queued",
     }));
+    await expect(runsController.retryRun({ identifier: RUN_ID }, { orgId: ORG_ID })).resolves.toEqual(
+      expect.objectContaining({ id: (retriedRun as { id: string }).id }),
+    );
     const jobs = await dataSource.getRepository(FulcrumJobEntity).find({
       where: { orgId: ORG_ID, queue: "agent-runs", kind: "agent_run" },
       order: { createdAt: "ASC", id: "ASC" },
@@ -309,6 +320,27 @@ async function assertAgentRunPublicApiRoundTrip(
     expect(jobs.map((job) => job.payload)).toEqual([
       expect.objectContaining({ run_id: dispatchedRunId, agent: "codex" }),
       expect.objectContaining({ run_id: (retriedRun as { id: string }).id, agent: null }),
+    ]);
+    const events = await dataSource.getRepository(FulcrumRunEventEntity).find({
+      order: { runId: "ASC", sequence: "ASC" },
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      runId: dispatchedRunId,
+      traceId: `trace-dispatched-${source}`,
+      mutationType: "agent_run.dispatched",
+      agentId: "codex",
+      payload: expect.objectContaining({
+        cwd: "/workspace/project",
+        agentConfig: { model: "gpt-5.4", sandbox: "workspace-write" },
+      }),
+    }));
+    expect(events.filter((event) => event.runId === dispatchedRunId).map((event) => event.mutationType)).toEqual([
+      "agent_run.dispatched",
+      "agent_run.cancelled",
+    ]);
+    expect(events.filter((event) => event.runId === RUN_ID).map((event) => event.mutationType)).toEqual([
+      "agent_run.cancelled",
+      "agent_run.retried",
     ]);
     await expect(statusController.loadRun({ identifier: "missing" }, { orgId: ORG_ID })).rejects.toBeInstanceOf(NotFoundException);
   } finally {

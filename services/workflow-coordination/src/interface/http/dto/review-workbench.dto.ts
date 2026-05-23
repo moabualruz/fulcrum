@@ -4,6 +4,7 @@ import type {
   FinalQaFeedbackGateInput,
   FinalQaReportInput,
   GeneratedE2eRegressionRunInput,
+  GeneratedE2eRunHistoryInput,
   ReviewWorkbenchSessionAnnotationInput,
   ReviewWorkbenchSessionLoadInput,
   ReviewWorkbenchSessionSaveInput,
@@ -184,4 +185,16 @@ export class GeneratedE2eRegressionRunRequestDto
   taskIds?: string[];
   runner?: GeneratedE2eRegressionRunInput["runner"];
   planOnly?: boolean;
+}
+
+export class GeneratedE2eRunHistoryRequestDto implements GeneratedE2eRunHistoryInput {
+  workspaceId!: string;
+  workspaceSlug!: string;
+  workspaceName!: string;
+  projectId!: string;
+  projectSlug!: string;
+  projectName!: string;
+  traceId?: string;
+  taskIds?: string[];
+  limit?: number;
 }

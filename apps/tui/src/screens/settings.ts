@@ -1,9 +1,9 @@
 import type { Renderer } from "../renderer.ts";
 import { c } from "../renderer.ts";
 
-type SettingsTab = "theme" | "secrets" | "errors" | "backup" | "telemetry" | "flags" | "data";
+type SettingsTab = "theme" | "secrets" | "errors" | "backup" | "telemetry" | "flags" | "data" | "aiAssist";
 
-const TABS: SettingsTab[] = ["theme", "secrets", "errors", "backup", "telemetry", "flags", "data"];
+const TABS: SettingsTab[] = ["theme", "secrets", "errors", "backup", "telemetry", "flags", "data", "aiAssist"];
 
 export class SettingsTabs {
   private index = 0;
@@ -85,6 +85,7 @@ export class SecretsSettingsScreen {
   private rows: CredentialRow[] = [];
   private cursor = 0;
   private revealed = new Map<string, string>();
+  private awaitingDelete = false;
 
   constructor(private readonly opts: {
     caller: {
@@ -113,6 +114,10 @@ export class SecretsSettingsScreen {
       const value = this.revealed.get(row.id) ?? row.maskedValue;
       renderer.writeln(`${index === this.cursor ? ">" : " "} ${row.name}: ${value}`);
     }
+    if (this.awaitingDelete) {
+      const row = this.rows[this.cursor];
+      renderer.writeln(`  Delete credential ${row?.name ?? "(none)"} (${row?.id ?? "unknown"})? Confirm? [y/N]`);
+    }
     renderer.writeln(c.dim("  A add  Enter reveal  R rotate  D delete  Esc back"));
   }
 
@@ -126,6 +131,23 @@ export class SecretsSettingsScreen {
   }
 
   async handleKey(key: string): Promise<boolean> {
+    if (this.awaitingDelete) {
+      if (key === "y" || key === "Y") {
+        const row = this.rows[this.cursor];
+        if (row) {
+          await this.opts.caller.secrets.delete({ id: row.id });
+          this.revealed.delete(row.id);
+          await this.load();
+        }
+        this.awaitingDelete = false;
+        return true;
+      }
+      if (key === "n" || key === "N" || key === "\x1b" || key === "q") {
+        this.awaitingDelete = false;
+        return true;
+      }
+      return true;
+    }
     if (key === "j" || key === "\x1b[B") {
       this.cursor = Math.min(this.cursor + 1, Math.max(0, this.rows.length - 1));
       return true;
@@ -146,8 +168,7 @@ export class SecretsSettingsScreen {
       return true;
     }
     if (key === "D") {
-      await this.opts.caller.secrets.delete({ id: row.id });
-      await this.load();
+      this.awaitingDelete = true;
       return true;
     }
     return false;
@@ -445,6 +466,51 @@ export class DataSettingsScreen {
     if (!this.importPath) return;
     const result = await this.opts.caller.data.import({ path: this.importPath });
     this.imported = result.imported;
+  }
+}
+
+export interface AiAssistSettingsState {
+  checkpointMode: string;
+  retentionCount: number;
+  retentionDays: number;
+  eventsTransport: string;
+  sourceSummary?: string;
+}
+
+export class AiAssistSettingsScreen {
+  private state: AiAssistSettingsState | null = null;
+
+  constructor(private readonly opts: {
+    caller: {
+      aiAssist: {
+        get: () => Promise<AiAssistSettingsState>;
+        set: (input: Partial<AiAssistSettingsState>) => Promise<AiAssistSettingsState>;
+      };
+    };
+  }) {}
+
+  async load(): Promise<void> {
+    this.state = await this.opts.caller.aiAssist.get();
+  }
+
+  render(renderer: Renderer): void {
+    renderer.writeln(c.bold("Settings > AI Assist"));
+    renderer.separator();
+    const state = this.state;
+    if (!state) {
+      renderer.writeln("  AI Assist settings not loaded");
+      return;
+    }
+    renderer.infoRow("Checkpoint mode", state.checkpointMode);
+    renderer.infoRow("Retention count", String(state.retentionCount));
+    renderer.infoRow("Retention days", String(state.retentionDays));
+    renderer.infoRow("Events transport", state.eventsTransport);
+    renderer.infoRow("Resolution", state.sourceSummary ?? "session > user > org > built-in");
+    renderer.writeln(c.dim("  :settings ai-assist  Enter edit  Tab tabs  Esc back"));
+  }
+
+  async set(input: Partial<AiAssistSettingsState>): Promise<void> {
+    this.state = await this.opts.caller.aiAssist.set(input);
   }
 }
 

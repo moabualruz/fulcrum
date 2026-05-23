@@ -1,17 +1,15 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { Actions, PageServerLoad } from "./$types";
-import { requestServiceScope } from "$lib/server/request-service-scope";
-import { deleteArtifactForWeb } from "@workflow-coordination/interface/artifact-records.ts";
-import { getArtifactDetail } from "@workflow-coordination/interface/artifact-records.ts";
-import { AppValidationError } from "@platform-core/domain/errors.ts";
+import { createArtifactApiForEvent, toArtifactDetail, type PublicArtifact } from "$lib/server/artifact-api";
 
-export const load: PageServerLoad = ({ params, locals }) => {
+export const load: PageServerLoad = (event) => {
+  const { params } = event;
   return {
     streamed: {
       data: (async () => {
-        const { em, ctx } = await requestServiceScope(locals);
         try {
-          const artifact = await getArtifactDetail(em, ctx, params.id);
+          const publicArtifact = await createArtifactApiForEvent(event).artifacts.get({ id: params.id }) as PublicArtifact;
+          const artifact = toArtifactDetail(publicArtifact);
           return { artifact };
         } catch {
           throw error(404, "Artifact not found");
@@ -22,19 +20,19 @@ export const load: PageServerLoad = ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-  delete: async ({ params, request, locals }) => {
-    const { em, ctx } = await requestServiceScope(locals);
+  delete: async (event) => {
+    const { params, request } = event;
     try {
       const form = await request.formData().catch(() => new FormData());
-      await deleteArtifactForWeb(em, ctx, {
-        id: params.id!,
-        hard: form.get("hard") === "true",
-        confirm: form.get("confirm") === "true",
-      });
+      const hard = formBoolean(form, "hard");
+      await createArtifactApiForEvent(event).artifacts.delete({ id: params.id!, hard });
     } catch (err) {
-      if (err instanceof AppValidationError) throw error(400, err.message);
       throw error(404, "Artifact not found");
     }
     throw redirect(303, "/artifacts");
   },
 };
+
+function formBoolean(form: FormData, key: string): boolean {
+  return form.get(key) === "true";
+}

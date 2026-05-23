@@ -1,11 +1,6 @@
 <script lang="ts">
-  import {
-    createFieldDependencyRule,
-    deleteFieldDependencyRule,
-    listFieldDependencyRules,
-    type FieldDependencyRule,
-  } from "./field-dependency-api.js";
-  import { cn } from "$lib/utils.js";
+  import { } from "./field-dependency-api.js";
+  import { cn, createFieldDependencyRule, deleteFieldDependencyRule, listFieldDependencyRules, Select, type FieldDependencyRule } from "@fulcrum/ui-kit";
 
   interface Props {
     projectId: string;

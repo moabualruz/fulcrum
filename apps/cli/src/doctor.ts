@@ -1,4 +1,4 @@
-// fulcrum doctor — environment health check.
+// fulcrum doctor: environment health check.
 // Reports: bun version, agent dirs detected, tool presence (which hooks fail-open),
 // policy file location + size, skill count, managed MCPs.
 
@@ -15,10 +15,12 @@ import { planPackageMirrorTargets } from "./package-mirror.ts";
 import { getPackageSurfaceManifest, MANAGED_PACKAGE_IDS, packageCacheSourceRoot } from "./package-surfaces.ts";
 import { runPlatformDoctorChecks, type PlatformDoctorCheck } from "@platform-core/application/platform-operations/readiness-checks.ts";
 import { listProfiles } from "@execution-orchestration/interface/agent-catalog.ts";
+import { emitErrorResult, emitResult } from "./lib/cli-output.ts";
 import {
   buildMemoryEngineDoctorReport,
   buildProductKernelDoctorReport,
   buildReposDoctorReport,
+  rebuildLocalPgliteDatabase,
   type MemoryDoctorReport,
   type ProductKernelDoctorReport,
   type ReposDoctorReport,
@@ -81,7 +83,7 @@ interface DoctorReport {
       // native config to confirm the Authorization header (or codex's
       // bearer_token_env_var) is actually present. "n/a" when no auth needed.
       wiring: Record<string, "ok" | "missing" | "n/a">;
-      // MCP initialize handshake — only populated when `--probe` ran.
+      // MCP initialize handshake: only populated when `--probe` ran.
       // "ok" = server replied with a valid initialize result; "fail" = error
       // or timeout; "skipped" = probe disabled or transport not supported.
       handshake: "ok" | "fail" | "skipped";
@@ -356,7 +358,7 @@ async function probeMcpInitialize(
       const res = await fetch(server.url, { method: "POST", headers, body, signal: ctrl.signal });
       clearTimeout(timer);
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-      // We don't strictly need to parse the response — a 2xx + non-empty body
+      // We don't strictly need to parse the response: a 2xx + non-empty body
       // is enough to confirm the MCP endpoint is alive and authed. Streaming
       // SSE responses count too.
       return { ok: true };
@@ -366,7 +368,7 @@ async function probeMcpInitialize(
   }
 
   // stdio: spawn, send `initialize`, read first JSON-RPC line, kill.
-  // Stdin stays open (some MCP servers — dart, semgrep — exit immediately
+  // Stdin stays open (some MCP servers: dart, semgrep: exit immediately
   // on EOF before responding). The reader pulls *one* response chunk and
   // moves on; we don't drain to EOF.
   if (!server.command) return { ok: false, error: "no command" };
@@ -620,7 +622,7 @@ async function buildMcpReport(home: string, opts: { probe?: boolean }): Promise<
         ...(handshake_error ? { handshake_error } : {}),
       });
     }
-  } catch { /* Registry not yet initialised — no entries to report */ }
+  } catch { /* Registry not yet initialised: no entries to report */ }
   return { mcp, warnings };
 }
 
@@ -649,7 +651,22 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
   const componentDatabase = componentLedgerPath();
   const installedComponents = await countInstalledComponents();
   const packageParity = await buildPackageParityReport(home);
-  const productKernel = await buildProductKernelDoctorReport();
+  // PGlite has bundled assets (vector.tar.gz) that cannot be resolved from a
+  // Bun-compiled `$bunfs`. Each DB-touching report catches its own throw +
+  // falls back to its empty default so doctor always prints an envelope.
+  let productKernel: ProductKernelDoctorReport;
+  try {
+    productKernel = await buildProductKernelDoctorReport();
+  } catch (cause) {
+    productKernel = {
+      engine: "absent",
+      dbPath: "",
+      schemaApplied: 0,
+      rows: { orgs: 0, projects: 0, documents: 0, tasks: 0, agentRuns: 0 } as never,
+      latestEventAt: null,
+      error: (cause as Error).message,
+    } as ProductKernelDoctorReport;
+  }
   if (productKernel.error) {
     warnings += 1;
     warningsList.push({
@@ -657,11 +674,21 @@ async function buildReport(opts: { probe?: boolean } = {}): Promise<{ report: Do
       message: productKernel.error,
     });
   }
-  const repos = await buildReposDoctorReport(productKernel);
+  let repos: ReposDoctorReport;
+  try {
+    repos = await buildReposDoctorReport(productKernel);
+  } catch {
+    repos = { totalRepos: 0, syncErrors: 0, activeWatchers: 0, lruQueueDepth: 0, mirrorDiskGb: 0 };
+  }
   if (repos.syncErrors > 0 || repos.mirrorDiskGb > 10) {
     errors += 1;
   }
-  const memoryBuilt = await buildMemoryEngineDoctorReport(productKernel);
+  let memoryBuilt: { memoryEngine: MemoryDoctorReport; warnings: number; errors: number };
+  try {
+    memoryBuilt = await buildMemoryEngineDoctorReport(productKernel);
+  } catch {
+    memoryBuilt = { memoryEngine: { checks: [] }, warnings: 0, errors: 0 };
+  }
   warnings += memoryBuilt.warnings;
   errors += memoryBuilt.errors;
   const platformBuilt = await buildPlatformReport();
@@ -730,7 +757,7 @@ async function buildPackageParityReport(home: string): Promise<PackageParityRepo
 }
 
 function printHumanFormat(report: DoctorReport, home: string): void {
-  console.log("fulcrum doctor — environment health check\n");
+  console.log("fulcrum doctor: environment health check\n");
 
   // Bun
   console.log(`bun       ${report.bun}`);
@@ -746,7 +773,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     }
     const rulesNote = agent.rulesSpliced
       ? "rules spliced"
-      : "rules NOT spliced — run: fulcrum install";
+      : "rules NOT spliced: run: fulcrum install";
     console.log(`  ${pad(agent.label, 14)} ✓  ${rulesNote}`);
   }
   console.log();
@@ -761,11 +788,11 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       const isRequired = toolDef?.required ?? false;
       if (isRequired) {
         console.log(
-          `  ${pad(tool.cmd, 22)} ✗  MISSING — required by ${tool.usedBy}`
+          `  ${pad(tool.cmd, 22)} ✗  MISSING: required by ${tool.usedBy}`
         );
       } else {
         console.log(
-          `  ${pad(tool.cmd, 22)} ·  not installed — ${tool.usedBy} will fail-open`
+          `  ${pad(tool.cmd, 22)} ·  not installed: ${tool.usedBy} will fail-open`
         );
       }
     }
@@ -778,7 +805,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
     console.log(`  size=${report.policy.size}B  mtime=${report.policy.mtime}`);
   } else {
     console.log(
-      "  · not present — run: fulcrum install (seeds default policy)"
+      "  · not present: run: fulcrum install (seeds default policy)"
     );
   }
   console.log();
@@ -830,8 +857,10 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       `  rows: orgs=${pk.rows.orgs} projects=${pk.rows.projects} documents=${pk.rows.documents} tasks=${pk.rows.tasks} agent_runs=${pk.rows.agentRuns}`,
     );
     if (pk.latestEventAt) console.log(`  latest event: ${pk.latestEventAt}`);
-  } else if (pk.error) {
+  }
+  if (pk.error) {
     console.log(`  error: ${pk.error}`);
+    if (pk.recoveryCommand) console.log(`  recovery: ${pk.recoveryCommand}`);
   }
   console.log();
 
@@ -900,7 +929,7 @@ function printHumanFormat(report: DoctorReport, home: string): void {
   if (report.errors > 0) {
     console.log(`✗ ${report.errors} error(s), ${report.warnings} warning(s)`);
   } else if (report.warnings > 0) {
-    console.log(`⚠ ${report.warnings} warning(s) — see above`);
+    console.log(`⚠ ${report.warnings} warning(s): see above`);
   } else {
     console.log("✓ all checks passed");
   }
@@ -909,8 +938,56 @@ function printHumanFormat(report: DoctorReport, home: string): void {
 export async function run(args: string[]): Promise<void> {
   const isJsonOutput = args.includes("--json");
   const probe = args.includes("--probe");
+  const runFixIdx = args.indexOf("--run-fix");
+  const runFix = runFixIdx >= 0 ? args[runFixIdx + 1] : undefined;
   const subsystemIdx = args.indexOf("--subsystem");
   const subsystem = subsystemIdx >= 0 ? args[subsystemIdx + 1] : undefined;
+
+  if (runFix) {
+    if (runFix !== "pglite-rebuild") {
+      if (isJsonOutput) {
+        emitErrorResult(
+          {
+            argv: args,
+            command: "fulcrum doctor",
+            args: { run_fix: runFix },
+            error: {
+              code: "FUL_DOCTOR_UNKNOWN_FIX",
+              message: `fulcrum doctor: unknown fix '${runFix}'`,
+              fix: "Run `fulcrum doctor --json` or `fulcrum doctor --run-fix pglite-rebuild`.",
+            },
+            renderHuman: () => {},
+          },
+          { print: console.log, printErr: console.error },
+        );
+        process.exit(2);
+        return;
+      }
+      console.error(`fulcrum doctor: unknown fix '${runFix}'`);
+      process.exit(2);
+      return;
+    }
+    const result = await rebuildLocalPgliteDatabase();
+    if (isJsonOutput) {
+      emitResult(
+        {
+          argv: args,
+          command: "fulcrum doctor",
+          args: { run_fix: runFix },
+          result,
+          renderHuman: () => {},
+        },
+        { print: console.log, printErr: console.error },
+      );
+    } else {
+      console.log("pglite-rebuild");
+      console.log(`  db: ${result.dbPath}`);
+      console.log(`  quarantined: ${result.quarantinedPath ?? "none"}`);
+      console.log(`  verified: ${result.verified}`);
+      console.log(`  migrations applied: ${result.schemaApplied}`);
+    }
+    return;
+  }
 
   // When --subsystem is given, delegate entirely to the modular orchestrator.
   if (subsystem) {
@@ -918,7 +995,16 @@ export async function run(args: string[]): Promise<void> {
       const { buildDefaultApiDoctorConfig, runApiDoctorChecks } = await import("@platform-core/application/health-checks/checks/api.ts");
       const apiReport = await runApiDoctorChecks(buildDefaultApiDoctorConfig());
       if (isJsonOutput) {
-        console.log(JSON.stringify(apiReport, null, 2));
+        emitResult(
+          {
+            argv: args,
+            command: "fulcrum doctor",
+            args: { subsystem },
+            result: apiReport,
+            renderHuman: () => {},
+          },
+          { print: console.log, printErr: console.error },
+        );
       } else {
         console.log("api subsystem");
         for (const check of apiReport.checks) {
@@ -949,10 +1035,29 @@ export async function run(args: string[]): Promise<void> {
   }
 
   if (isJsonOutput) {
-    console.log(JSON.stringify(report, null, 2));
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum doctor",
+        args: { probe, checks: runOrchestratorChecks },
+        result: report,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
   } else {
     const home = process.env["HOME"] ?? "";
     printHumanFormat(report, home);
+    emitResult(
+      {
+        argv: args,
+        command: "fulcrum doctor",
+        args: { probe, checks: runOrchestratorChecks },
+        result: null,
+        renderHuman: () => {},
+      },
+      { print: console.log, printErr: console.error },
+    );
 
     // Print orchestrator checks in interactive mode.
     if (runOrchestratorChecks && orchestratorReport && orchestratorReport.checks.length > 0) {

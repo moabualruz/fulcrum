@@ -196,7 +196,7 @@ describe("/planning +page.server.ts", () => {
         selectedDocs: [],
         contextMarkdown: "## Freeform Document: Brief",
       },
-      prompt: "ACP prompt with submit_plan",
+      prompt: "AI Assist prompt with submit_plan",
     };
     const fetchFn = mock(async () => jsonResponse(response));
     const fd = new FormData();
@@ -242,7 +242,7 @@ describe("/planning +page.server.ts", () => {
         selectedDocs: [],
         contextMarkdown: "## Freeform Document: New work brief",
       },
-      prompt: "ACP prompt with submit_plan",
+      prompt: "AI Assist prompt with submit_plan",
     };
     const fetchFn = mock(async () => jsonResponse(response));
     const fd = new FormData();
@@ -283,7 +283,7 @@ describe("/planning +page.server.ts", () => {
     });
   });
 
-  test("guidedAcpStart action starts an ACP guided planning session through planning public workflow API", async () => {
+  test("guidedAcpStart action starts an AI Assist guided planning session through planning public workflow API", async () => {
     const route = await import(`./+page.server.ts?cachebust=${Date.now() + 5}`);
     const response = {
       status: "ready_for_acp_prompt",
@@ -306,14 +306,14 @@ describe("/planning +page.server.ts", () => {
         selectedDocs: [],
         contextMarkdown: "## Freeform Document: Brief",
       },
-      prompt: "ACP guided session with submit_plan",
+      prompt: "AI Assist guided session with submit_plan",
     };
     const fetchFn = mock(async () => jsonResponse(response));
     const fd = new FormData();
     fd.set("acpSessionId", "acp-guided-web");
     fd.set("acpAgentName", "codex");
     fd.set("acpCwd", "/repo");
-    fd.set("acpUserPrompt", "Plan with ACP");
+    fd.set("acpUserPrompt", "Plan with AI Assist");
     fd.set("acpPromptTemplateId", "prototype-first");
     fd.set("selectedDocIds", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     fd.set("projectId", "99999999-9999-4999-8999-999999999999");
@@ -339,7 +339,7 @@ describe("/planning +page.server.ts", () => {
       acpSessionId: "acp-guided-web",
       agentName: "codex",
       cwd: "/repo",
-      userPrompt: "Plan with ACP",
+      userPrompt: "Plan with AI Assist",
       promptTemplateId: "prototype-first",
       selectedDocIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
       projectId: "99999999-9999-4999-8999-999999999999",
@@ -360,13 +360,13 @@ describe("/planning +page.server.ts", () => {
         session: { acpSessionId: body["acpSessionId"] },
         traffic: { entries: [] },
         context: { sourceRefs: [], selectedDocs: [], contextMarkdown: "" },
-        prompt: "ACP guided session",
+        prompt: "AI Assist guided session",
       });
     });
     const fd = new FormData();
     fd.set("acpAgentName", "codex");
     fd.set("acpCwd", "/repo");
-    fd.set("acpUserPrompt", "Plan with ACP");
+    fd.set("acpUserPrompt", "Plan with AI Assist");
     fd.set("projectId", "99999999-9999-4999-8999-999999999999");
     fd.set("traceId", "trace_guided_generated");
 
@@ -378,7 +378,7 @@ describe("/planning +page.server.ts", () => {
     expect(body).toMatchObject({
       agentName: "codex",
       cwd: "/repo",
-      userPrompt: "Plan with ACP",
+      userPrompt: "Plan with AI Assist",
       projectId: "99999999-9999-4999-8999-999999999999",
       traceId: "trace_guided_generated",
     });

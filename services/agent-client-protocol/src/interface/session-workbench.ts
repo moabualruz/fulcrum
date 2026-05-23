@@ -4,6 +4,7 @@ export type {
   SessionWorkbenchModel,
   SessionWorkbenchModelOption,
   SessionWorkbenchMode,
+  SessionWorkbenchListItem,
   SessionWorkbenchPermission,
   SessionWorkbenchSession,
   ToolCallSummary,
@@ -16,6 +17,12 @@ export {
 export {
   getActiveSessionManager,
   setActiveSessionManager,
+  abortActiveSession,
+  deleteSavedSession,
+  pauseActiveSession,
+  reconnectActiveSession,
+  resumeActiveSession,
+  resumeSavedSession,
   resolveSessionPermission,
   updateTrafficControl,
 } from "@agent-client-protocol/application/session-manager.ts";

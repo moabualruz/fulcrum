@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { REQUIRED_RESILIENCE_STATES } from "@platform-core/application/interface-parity/resilience-state-matrix.ts";
 import { TuiApp, type TuiCaller } from "../index.ts";
 import { FakeTTY } from "../testing/fake-tty.ts";
 
@@ -10,6 +11,34 @@ describe("TUI E2E data display", () => {
     }));
     expect(text).toContain("Projects");
     expect(text).toContain("interface Project");
+  });
+
+  test("status footer renders supplied trace, run, and branch identity", async () => {
+    const tty = new FakeTTY({ columns: 140, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: makeCaller(),
+      traceContext: {
+        traceId: "trace-visible",
+        runId: "run-visible",
+        spanId: "span-visible",
+        projectId: "project-visible",
+      },
+    });
+
+    await app.mount();
+    const text = tty.plainText();
+
+    // OD StatusFooter: the `trace` segment renders the 8-char trace badge
+    // (the `trace[-_:]?` prefix is stripped: DESIGN.md §4.10 TraceBadge); the
+    // `run` segment carries the run id; `projectId` feeds the `branch` segment.
+    // Span identity is yank-only (`y s` copy keybind, exercised in
+    // apps/tui/src/widgets/widgets.test.ts), not a standalone footer segment.
+    expect(text).toContain("trace:visible");
+    expect(text).toContain("run: run-visible");
+    expect(text).toContain("project-visible");
+    app.stop();
   });
 
   test("runs screen renders run list data", async () => {
@@ -25,29 +54,46 @@ describe("TUI E2E data display", () => {
     expect(text).toContain("codex");
   });
 
+  // The fourth tuple element is the keybind/footer affordance row the screen
+  // renders beneath its rows. Generic domain screens emit the shared
+  // `Status footer` heading; the `tasks` screen is the dedicated TaskListScreen
+  // workbench (closure-6 Build/Operate rework) and renders its own keybind
+  // strip instead — domain screens no longer double-render under the launcher.
   test.each([
-    ["tasks", { tasks: { list: async () => [{ id: "task-1", title: "Ship coverage", status: "open" }] } }, "Ship coverage  [open]  task-1"],
-    ["sprints", { sprints: { list: async () => [{ id: "sprint-1", name: "Sprint 9.6", status: "active" }] } }, "Sprint 9.6  [active]  sprint-1"],
-    ["repos", { repos: { list: async () => [{ id: "repo-1", slug: "fulcrum", status: "idle" }] } }, "fulcrum  [idle]  repo-1"],
-    ["memory", { memories: { list: async () => [{ id: "mem-1", title: "Architecture note" }], promote: async () => ({ ok: true }) } }, "Architecture note  mem-1"],
-    ["search", { search: { query: async () => [{ id: "search-1", title: "Search result" }] } }, "Search result  search-1"],
-  ] as const)("renders %s domain rows from the in-process caller", async (screen, overrides, expected) => {
+    ["tasks", { tasks: { list: async () => [{ id: "task-1", title: "Ship coverage", status: "open" }] } }, "Ship coverage  [open]  task-1", "j/k navigate  Space select  c create"],
+    ["sprints", { sprints: { list: async () => [{ id: "sprint-1", name: "Sprint 9.6", status: "active" }] } }, "Sprint 9.6  [active]  sprint-1", "Status footer"],
+    ["repos", { repos: { list: async () => [{ id: "repo-1", slug: "fulcrum", status: "idle" }] } }, "fulcrum  [idle]  repo-1", "Status footer"],
+    ["memory", { memories: { list: async () => [{ id: "mem-1", title: "Architecture note" }], promote: async () => ({ ok: true }) } }, "Architecture note  mem-1", "Status footer"],
+    ["search", { search: { query: async () => [{ id: "search-1", title: "Search result" }] } }, "Search result  search-1", "Status footer"],
+  ] as const)("renders %s domain rows from the in-process caller", async (screen, overrides, expected, footer) => {
     const text = await renderDomain(screen, makeCaller(overrides as Partial<TuiCaller>));
 
     expect(text).toContain(expected);
-    expect(text).toContain("Status footer");
+    expect(text).toContain(footer);
   });
 
   test.each([
     ["docs"],
     ["skills"],
     ["components"],
-    ["doctor"],
   ] as const)("renders empty %s domain state without a caller shortcut", async (screen) => {
     const text = await renderDomain(screen, makeCaller());
 
     expect(text).toContain("No ");
     expect(text).toContain("records.");
+  });
+
+  // The `doctor` domain screen is no longer a generic empty-list workbench:
+  // closure-6 `fix(tui): route runs and doctor workbenches` promoted it to the
+  // dedicated Operate-stage DoctorScreen, which renders its own subsystem
+  // health spine (the route + status-spine checks) instead of a "No … records."
+  // empty state. Assert the workbench render, not the retired generic contract.
+  test("renders the doctor workbench without a caller shortcut", async () => {
+    const text = await renderDomain("doctor", makeCaller());
+
+    expect(text).toContain("Doctor");
+    expect(text).toContain("stage routes render canonical workbenches");
+    expect(text).toContain("status spine carries trace and mode footer");
   });
 
   test("renders caller errors in the domain detail pane", async () => {
@@ -61,6 +107,57 @@ describe("TUI E2E data display", () => {
 
     expect(text).toContain("Projects");
     expect(text).toContain("projects service unavailable");
+    expect(text).toContain("Fix: check the API/service status");
+    expect(text).toContain("Esc returns to navigation");
+  });
+
+  test("resilience matrix covers empty, unavailable, partial, and subscription TUI states", () => {
+    expect(REQUIRED_RESILIENCE_STATES.filter((state) => state.surface === "tui").map((state) => state.state)).toEqual([
+      "empty-list",
+      "unavailable-sidecar",
+      "failed-subscription",
+      "partial-data",
+    ]);
+  });
+
+  test("run subscription cleanup prevents stale status updates after stop", async () => {
+    const handlers: Array<(payload: { id: string; status?: string }) => void> = [];
+    let unsubscribed = 0;
+    const tty = new FakeTTY({ columns: 100, rows: 30 });
+    const app = new TuiApp({
+      output: tty,
+      input: tty,
+      caller: makeCaller({
+        agent_runs: {
+          list: async () => [{ id: "run-1", agent: "codex", status: "running", taskId: "task-1", projectId: "project-1" }],
+          get: async () => ({ id: "run-1", agent: "codex", status: "running", taskId: "task-1", projectId: "project-1" }),
+          create: async () => ({ id: "run-2", agent: "codex", status: "queued", taskId: "task-2", projectId: "project-1" }),
+          cancel: async () => ({ ok: true }),
+        },
+        runsSubscriptions: {
+          subscribe: (_topic: string, handler: (payload: { id: string; status?: string }) => void) => {
+            handlers.push(handler);
+            return {
+              unsubscribe: () => {
+                unsubscribed += 1;
+                handlers.length = 0;
+              },
+            };
+          },
+        } as never,
+      }),
+    });
+
+    await app.mount();
+    await app.navigateTo("runs");
+    expect(tty.plainText()).toContain("state:running");
+
+    app.stop();
+    for (const handler of handlers) handler({ id: "run-1", status: "failed" });
+    await app.renderForTest();
+
+    expect(unsubscribed).toBe(1);
+    expect(tty.plainText()).not.toContain("state:failed");
   });
 
   test("notification inbox loads unread items and handles read, mute, tab, and return keys", async () => {

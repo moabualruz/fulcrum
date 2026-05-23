@@ -1,8 +1,8 @@
 /**
- * TUI smoke tests — TDD RED → GREEN (P1#15 issue acceptance criteria).
+ * TUI smoke tests: TDD RED → GREEN (P1#15 issue acceptance criteria).
  *
  * Tests run the TUI components in headless mode (no TTY) using FakeTTY.
- * No DB, no real stdin, no subprocess — all in-process.
+ * No DB, no real stdin, no subprocess: all in-process.
  *
  * Acceptance criteria from issue #15:
  *   1. Instantiate TUI in headless mode with a test container.
@@ -79,10 +79,40 @@ function fakeCaller(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. TuiApp — headless mount, status bar
+// 1. TuiApp: headless mount, status bar
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("TuiApp — headless mount", () => {
+describe("TuiApp: headless mount", () => {
+  it("renders the first frame within the startup budget before slow data resolves", async () => {
+    const tty = new FakeTTY();
+    const caller = fakeCaller();
+    const slow = () => new Promise((resolve) => setTimeout(resolve, 250));
+    caller.auth.whoami = async () => {
+      await slow();
+      return { userId: "u1", email: "admin@local", orgId: "local", orgName: "local", role: "owner" };
+    };
+    caller.inference = {
+      health: async () => {
+        await slow();
+        return { status: "ok" };
+      },
+    };
+    caller.notify = {
+      unreadCount: async () => {
+        await slow();
+        return { count: 3 };
+      },
+    };
+
+    const started = performance.now();
+    const app = await launchTui({ output: tty, caller });
+    const firstFrameMs = performance.now() - started;
+
+    expect(firstFrameMs).toBeLessThan(100);
+    expect(tty.plainText()).toContain("Fulcrum TUI");
+    app.stop();
+  });
+
   it("mounts without throwing", async () => {
     const tty = new FakeTTY();
     const caller = fakeCaller();
@@ -97,7 +127,7 @@ describe("TuiApp — headless mount", () => {
     app.stop();
   });
 
-  it("status bar shows admin@local after mount", async () => {
+  it("status footer shows the workspace profile after mount", async () => {
     const tty = new FakeTTY();
     const caller = fakeCaller({ email: "admin@local", orgId: "local" });
 
@@ -109,7 +139,10 @@ describe("TuiApp — headless mount", () => {
     await app.mount();
 
     const text = tty.plainText();
-    expect(text).toContain("admin@local");
+    // OD StatusFooter carries `profile:` (workspace scope), not a user email -
+    // the legacy org/user/screen bar is gone (prd-tui-status-footer-od-parity).
+    expect(text).toContain("profile: local");
+    expect(text).not.toContain("admin@local");
     app.stop();
   });
 
@@ -119,6 +152,7 @@ describe("TuiApp — headless mount", () => {
 
     const app = new TuiApp({ output: tty, caller });
     await app.mount();
+    await app.waitForStartupData();
 
     const text = tty.plainText();
     expect(text).toContain("acme-corp");
@@ -163,7 +197,9 @@ describe("TuiApp — headless mount", () => {
     await app.mount();
 
     expect(app.statusBarInfo).toEqual({ email: "(unauthenticated)", orgId: "local" });
-    expect(tty.plainText()).toContain("(unauthenticated)");
+    // OD StatusFooter renders the `profile:` scope, not a user email; the
+    // unauthenticated fallback surfaces as the `local` workspace profile.
+    expect(tty.plainText()).toContain("profile: local");
     app.stop();
   });
 
@@ -219,6 +255,7 @@ describe("TuiApp — headless mount", () => {
       caller: fakeCaller(),
       telemetry,
       crashLog,
+      traceContext: { traceId: "tui-planning" },
       routes: [{
         path: "/broken",
         screenKey: "broken-route",
@@ -234,13 +271,15 @@ describe("TuiApp — headless mount", () => {
 
     expect(tty.plainText()).toContain("TUI error");
     expect(tty.plainText()).toContain("route render failed");
+    expect(tty.plainText()).toContain("Recovery: press r to retry, b to go back, or q to quit");
+    expect(tty.plainText()).toContain("trace=tui-planning");
     expect(crashRows).toEqual([{ message: "route render failed", screenKey: "broken-route", route: "/broken" }]);
     expect(telemetry.rows.some((row) => row.screenKey === "broken-route" && row.route === "/broken")).toBe(true);
     app.stop();
   });
 });
 
-describe("TuiApp — real keyboard workflows", () => {
+describe("TuiApp: real keyboard workflows", () => {
   it("uses j/k/enter to open a domain screen and escape back to navigation", async () => {
     const tty = new FakeTTY({ columns: 100, rows: 30 });
     const app = new TuiApp({
@@ -254,6 +293,9 @@ describe("TuiApp — real keyboard workflows", () => {
     });
 
     await app.mount();
+    // Domain nav: Projects → Build Board → Tasks. Two 'j' presses to reach Tasks.
+    tty.inject("j");
+    await Bun.sleep(0);
     tty.inject("j");
     await Bun.sleep(0);
     tty.inject("\r");
@@ -316,7 +358,7 @@ describe("TuiApp — real keyboard workflows", () => {
   });
 });
 
-describe("TuiApp — path router", () => {
+describe("TuiApp: path router", () => {
   it("renders configured routes and not-found routes through navigatePath", async () => {
     const tty = new FakeTTY();
     const telemetry = new MemoryTelemetrySink();
@@ -350,7 +392,7 @@ describe("TuiApp — path router", () => {
   });
 });
 
-describe("TuiApp — inference workflow", () => {
+describe("TuiApp: inference workflow", () => {
   it("renders health extras, models, routing, external provider state, and pull progress", async () => {
     const previousFeatures = process.env["FULCRUM_FEATURES"];
     const previousUrl = process.env["FULCRUM_INFERENCE_URL"];
@@ -360,8 +402,8 @@ describe("TuiApp — inference workflow", () => {
     process.env["FULCRUM_INFERENCE_API_KEY"] = "secret";
 
     async function* pullEvents() {
-      yield { pct: 50, downloaded: 5, total: 10 };
-      yield { pct: 100, downloaded: 10, total: 10 };
+      yield { type: "download_progress" as const, pct: 50, downloaded: 5, total: 10 };
+      yield { type: "download_progress" as const, pct: 100, downloaded: 10, total: 10 };
     }
 
     const tty = new FakeTTY({ columns: 120, rows: 40 });
@@ -420,7 +462,7 @@ describe("TuiApp — inference workflow", () => {
   });
 });
 
-describe("TuiApp — artifacts pane", () => {
+describe("TuiApp: artifacts pane", () => {
   it("navigateTo('artifacts') renders artifact list from in-process caller", async () => {
     const tty = new FakeTTY();
     const app = new TuiApp({
@@ -457,10 +499,10 @@ describe("TuiApp — artifacts pane", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. AuthScreen — direct render
+// 2. AuthScreen: direct render
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("AuthScreen — headless render", () => {
+describe("AuthScreen: headless render", () => {
   it("renders user email", () => {
     const tty = new FakeTTY();
     const renderer = new Renderer(tty);
@@ -598,10 +640,10 @@ describe("AuthScreen — headless render", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. FlagsScreen — headless render + toggle
+// 3. FlagsScreen: headless render + toggle
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("FlagsScreen — headless render", () => {
+describe("FlagsScreen: headless render", () => {
   it("renders without throwing with zero flags", async () => {
     const tty = new FakeTTY();
     const renderer = new Renderer(tty);
@@ -717,11 +759,11 @@ describe("FlagsScreen — headless render", () => {
     const screen = new FlagsScreen(renderer, { caller });
     await screen.load();
 
-    // Move up from 0 — should stay at 0
+    // Move up from 0: should stay at 0
     await screen.handleKey("k");
     expect(screen.cursorIndex).toBe(0);
 
-    // Move down from 0 — only 1 item, should stay at 0
+    // Move down from 0: only 1 item, should stay at 0
     await screen.handleKey("j");
     expect(screen.cursorIndex).toBe(0);
   });
@@ -762,10 +804,10 @@ describe("FlagsScreen — headless render", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. TuiApp — navigation to screens
+// 4. TuiApp: navigation to screens
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("TuiApp — screen navigation", () => {
+describe("TuiApp: screen navigation", () => {
   it("navigateTo('auth') renders auth screen", async () => {
     const tty = new FakeTTY();
     const caller = fakeCaller({ email: "admin@local" });

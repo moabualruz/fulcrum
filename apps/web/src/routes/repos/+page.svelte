@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { ActionData, PageData } from "./$types";
 	import { enhance } from "$app/forms";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -31,7 +31,7 @@
 		<button
 			type="button"
 			data-add-repo-trigger
-			class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+			class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 		>Add repo</button>
 	</header>
 
@@ -90,7 +90,7 @@
 										type="submit"
 										data-sync-btn
 										data-repo-id={repo.id}
-										class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+										class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 									>Sync</button>
 								</form>
 							</td>

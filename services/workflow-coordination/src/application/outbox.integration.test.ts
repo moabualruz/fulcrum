@@ -10,6 +10,8 @@ import {
   createOutboxWorker,
   dispatchPendingOutboxEvents,
   getUnreadNotificationCount,
+  OUTBOX_CONSUMER_MAP,
+  OUTBOX_PGLITE_FALLBACK_BEHAVIOR,
   writeOutboxEvent,
   type OutboxDispatcher,
 } from "@workflow-coordination/application/outbox.ts";
@@ -32,14 +34,20 @@ function dispatcher(): OutboxDispatcher & {
   published: Array<{ topic: string; payload: unknown }>;
   indexed: unknown[];
   notified: unknown[];
+  audited: unknown[];
+  workflowEvents: unknown[];
 } {
   const published: Array<{ topic: string; payload: unknown }> = [];
   const indexed: unknown[] = [];
   const notified: unknown[] = [];
+  const audited: unknown[] = [];
+  const workflowEvents: unknown[] = [];
   return {
     published,
     indexed,
     notified,
+    audited,
+    workflowEvents,
     eventBus: {
       publish(topic, payload) {
         published.push({ topic, payload });
@@ -53,6 +61,16 @@ function dispatcher(): OutboxDispatcher & {
     notifications: {
       async handleEvent(event) {
         notified.push(event);
+      },
+    },
+    audit: {
+      async handleEvent(event) {
+        audited.push(event);
+      },
+    },
+    workflow: {
+      async handleEvent(event) {
+        workflowEvents.push(event);
       },
     },
   };
@@ -119,6 +137,58 @@ describe("transactional outbox integration", () => {
     expect(sinks.published).toHaveLength(1);
     expect(sinks.indexed).toHaveLength(1);
     expect(sinks.notified).toHaveLength(1);
+    expect(sinks.audited).toHaveLength(1);
+    expect(sinks.workflowEvents).toHaveLength(1);
+    expect(sinks.published[0]!.payload).toMatchObject({
+      schemaVersion: 1,
+      eventType: "task.updated",
+      eventKey: expect.any(String),
+    });
+  });
+
+  test("consumer failure retries without publishing, then dead-letters with observable metadata", async () => {
+    const testDb = await freshDb();
+    const em = testDb.em;
+    await writeOutboxEvent(em, {
+      orgId: DEFAULT_ORG_ID,
+      projectId: "22222222-2222-4222-8222-222222222222",
+      verb: "task.updated",
+      subjectKind: "task",
+      subjectId: "task-retry",
+      payload: { title: "retry" },
+    });
+
+    const sinks = dispatcher();
+    sinks.search = {
+      async handleEvent() {
+        throw new Error("search unavailable");
+      },
+    };
+
+    const first = await dispatchPendingOutboxEvents(em, sinks, { maxAttempts: 2 });
+    const second = await dispatchPendingOutboxEvents(em, sinks, { maxAttempts: 2 });
+    const outbox = await em.findOneOrFail(DomainEventOutbox, { subjectId: "task-retry" } as never);
+
+    expect(first).toMatchObject({ dispatched: 0, retried: 1, deadLettered: 0 });
+    expect(second).toMatchObject({ dispatched: 0, retried: 0, deadLettered: 1 });
+    expect(sinks.published).toHaveLength(0);
+    expect(outbox.processedAt).toBeInstanceOf(Date);
+    expect(outbox.payload["_outbox"]).toMatchObject({
+      attempts: 2,
+      deadLettered: true,
+      lastError: "search unavailable",
+    });
+  });
+
+  test("documents PGlite fallback latency and consumer ownership map", () => {
+    expect(OUTBOX_PGLITE_FALLBACK_BEHAVIOR).toContain("pollingIntervalMs");
+    expect(OUTBOX_CONSUMER_MAP.map((consumer) => consumer.domain).sort()).toEqual([
+      "audit",
+      "notification",
+      "search",
+      "subscription",
+      "workflow",
+    ]);
   });
 
   test("worker dispatch exposes polling loop with pg-notify fast path", async () => {

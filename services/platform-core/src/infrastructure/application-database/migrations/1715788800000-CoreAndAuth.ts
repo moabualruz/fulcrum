@@ -31,6 +31,8 @@ export class CoreAndAuth1715788800000 implements MigrationInterface {
         "email"      varchar NOT NULL,
         "name"       varchar,
         "avatar_url" varchar,
+        "email_verified" boolean NOT NULL DEFAULT false,
+        "email_verified_at" timestamptz,
         "role"       "users_role_enum" NOT NULL DEFAULT 'member',
         "created_at" timestamptz NOT NULL DEFAULT now(),
         "updated_at" timestamptz NOT NULL DEFAULT now(),

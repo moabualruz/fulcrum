@@ -4,9 +4,7 @@ import {
   FulcrumProjectEntity,
   type FulcrumProject,
 } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
-
-export type WorkflowMethodology = "scrum" | "kanban" | "none";
-export type WorkflowTransitionGraph = Record<string, string[]>;
+import type { WorkflowMethodology, WorkflowTransitionGraph } from "@work-management/domain/workflow-settings.ts";
 
 export interface WorkflowProjectScope {
   orgId: string;
@@ -145,8 +143,15 @@ export class WorkflowSettingsStore {
   }
 
   private async findScopedProject(input: WorkflowProjectScope): Promise<FulcrumProject | null> {
-    return await this.projectRepository().findOneBy({
+    // Accept either canonical UUID or slug — web routes pass slug, CLI passes UUID.
+    const repo = this.projectRepository();
+    const byId = await repo.findOneBy({
       id: input.projectId,
+      workspaceId: input.orgId,
+    });
+    if (byId) return byId;
+    return await repo.findOneBy({
+      slug: input.projectId,
       workspaceId: input.orgId,
     });
   }

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Editor } from "@tiptap/core";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Window } from "happy-dom";
@@ -14,19 +14,58 @@ import {
 } from "./embeds";
 import { createDocEditorExtensions, getSlashMenuItems, insertSlashMenuItem } from "./slash-menu";
 
+const globals = globalThis as unknown as Record<string, unknown>;
+const savedGlobals = {
+  window: globals["window"],
+  document: globals["document"],
+  HTMLElement: globals["HTMLElement"],
+  requestAnimationFrame: globals["requestAnimationFrame"],
+};
+
+// Every Editor created here is tracked so afterAll can destroy each one.
+// A live ProseMirror view schedules deferred (setTimeout) focus/DOM work; if
+// the editor outlives the suite, that timer fires after the happy-dom globals
+// are restored and crashes the whole `bun test` run with `document is not
+// defined`. Destroying every editor before global teardown prevents the leak.
+const liveEditors: Editor[] = [];
+function track(editor: Editor): Editor {
+  liveEditors.push(editor);
+  return editor;
+}
+
 beforeAll(() => {
   const window = new Window();
   window.SyntaxError = SyntaxError;
-  const globals = globalThis as unknown as Record<string, unknown>;
+  // happy-dom's Window does not surface the ES URI helpers; PGlite-backed
+  // tests that run later in the same process read `window.encodeURIComponent`.
+  (window as unknown as Record<string, unknown>)["encodeURIComponent"] = encodeURIComponent;
+  (window as unknown as Record<string, unknown>)["decodeURIComponent"] = decodeURIComponent;
   globals.window = window;
   globals.document = window.document;
   globals.HTMLElement = window.HTMLElement;
   globals.requestAnimationFrame = (callback: FrameRequestCallback) => setTimeout(callback, 0);
 });
 
+afterAll(() => {
+  // Destroy every editor before restoring globals: a leaked ProseMirror view
+  // would otherwise fire a deferred focus timer against a torn-down document.
+  for (const editor of liveEditors.splice(0)) {
+    try {
+      editor.destroy();
+    } catch {
+      // Already destroyed or never mounted: nothing to clean up.
+    }
+  }
+  // Restore the globals so later test files do not inherit a happy-dom window.
+  for (const [key, value] of Object.entries(savedGlobals)) {
+    if (value === undefined) delete globals[key];
+    else globals[key] = value;
+  }
+});
+
 describe("editor embeds", () => {
   test("math node renders valid inline and block expressions with fallback for invalid input", () => {
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: [StarterKit, MathNode, MathBlockNode],
       content: {
         type: "doc",
@@ -39,7 +78,7 @@ describe("editor embeds", () => {
           { type: "mathBlock", attrs: { expression: "\\invalid{" } },
         ],
       },
-    });
+    }));
 
     const html = editor.getHTML();
 
@@ -59,13 +98,13 @@ describe("editor embeds", () => {
     expect(srcdoc).toContain("Diagram syntax error");
     expect(srcdoc).toContain("mermaid.initialize");
 
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: [StarterKit, MermaidNode],
       content: {
         type: "doc",
         content: [{ type: "mermaid", attrs: { diagram } }],
       },
-    });
+    }));
 
     const html = editor.getHTML();
 
@@ -77,13 +116,13 @@ describe("editor embeds", () => {
 
   test("excalidraw node stores base64 JSON data and renders a reopenable thumbnail", () => {
     const drawing = btoa(JSON.stringify({ elements: [{ id: "box-1", type: "rectangle" }] }));
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: [StarterKit, ExcalidrawNode],
       content: {
         type: "doc",
         content: [{ type: "excalidraw", attrs: { drawing, title: "System sketch" } }],
       },
-    });
+    }));
 
     const html = editor.getHTML();
 
@@ -112,7 +151,7 @@ describe("editor embeds", () => {
   });
 
   test("image node renders inline media with upload progress and error states", () => {
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: [StarterKit, ImageNode],
       content: {
         type: "doc",
@@ -122,7 +161,7 @@ describe("editor embeds", () => {
           { type: "image", attrs: { src: "", alt: "failed.png", error: "Upload failed" } },
         ],
       },
-    });
+    }));
 
     const html = editor.getHTML();
 
@@ -135,7 +174,7 @@ describe("editor embeds", () => {
   });
 
   test("file attachment node renders a downloadable chip with filename and size", () => {
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: [StarterKit, FileAttachmentNode],
       content: {
         type: "doc",
@@ -151,7 +190,7 @@ describe("editor embeds", () => {
           },
         ],
       },
-    });
+    }));
 
     const html = editor.getHTML();
 
@@ -165,10 +204,10 @@ describe("editor embeds", () => {
   });
 
   test("file slash command inserts a placeholder attachment chip", () => {
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: createDocEditorExtensions(),
       content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "/file" }] }] },
-    });
+    }));
     editor.commands.setTextSelection(6);
 
     const inserted = insertSlashMenuItem(editor, "file");
@@ -180,10 +219,10 @@ describe("editor embeds", () => {
   });
 
   test("attachment file handler uploads images as image nodes and other files as chips", async () => {
-    const editor = new Editor({
+    const editor = track(new Editor({
       extensions: createDocEditorExtensions(),
       content: { type: "doc", content: [{ type: "paragraph" }] },
-    });
+    }));
     const uploads: File[] = [];
     const image = new File(["png"], "chart.png", { type: "image/png" });
     const pdf = new File(["pdf"], "brief.pdf", { type: "application/pdf" });

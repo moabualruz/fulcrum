@@ -10,7 +10,7 @@
 </script>
 
 <svelte:head>
-  <title>Webhooks — Integrations | Fulcrum</title>
+  <title>Webhooks: Integrations | Fulcrum</title>
 </svelte:head>
 
 <section data-settings-webhooks class="flex flex-col gap-6">
@@ -127,10 +127,10 @@
                 <span data-delivery-status class="rounded border border-border px-2 py-0.5 text-xs">{d.deliveryStatus ?? d.status}</span>
               </td>
               <td class="py-2">{d.attempts ?? d.attempt ?? 0}</td>
-              <td class="py-2">{d.nextAttemptAt ?? d.nextRetryAt ?? "—"}</td>
-              <td class="py-2">{d.lastAttemptAt ?? d.deliveredAt ?? "—"}</td>
+              <td class="py-2">{d.nextAttemptAt ?? d.nextRetryAt ?? "-"}</td>
+              <td class="py-2">{d.lastAttemptAt ?? d.deliveredAt ?? "-"}</td>
               <td class="py-2">
-                <span>{d.responseCode ?? d.responseStatus ?? "—"}</span>
+                <span>{d.responseCode ?? d.responseStatus ?? "-"}</span>
                 {#if d.responseBodyExcerpt}
                   <span class="block max-w-64 truncate text-xs text-muted-foreground">{d.responseBodyExcerpt}</span>
                 {/if}
@@ -140,7 +140,7 @@
                   <span class="block text-xs">{d.errorCode ?? "delivery_error"}</span>
                   <span class="block max-w-64 truncate text-xs text-muted-foreground">{d.errorMessage}</span>
                 {:else}
-                  —
+                  -
                 {/if}
               </td>
               <td class="py-2">

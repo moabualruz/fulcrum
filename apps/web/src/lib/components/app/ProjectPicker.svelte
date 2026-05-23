@@ -3,8 +3,8 @@
 
 	import { goto } from "$app/navigation";
 
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 
 	import { selectProject } from "./project-picker-helpers.ts";
 

@@ -7,17 +7,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
 } from "typeorm";
-
-export enum SkillConflictKind {
-  UpstreamConflict = "upstream_conflict",
-  ShaMismatch = "sha_mismatch",
-}
-
-export enum SkillConflictStatus {
-  Open = "open",
-  Overridden = "overridden",
-  Resolved = "resolved",
-}
+import { SkillConflictKind, SkillConflictStatus } from "@platform-core/domain/skills.ts";
+export { SkillConflictKind, SkillConflictStatus } from "@platform-core/domain/skills.ts";
 
 @Entity("skill_conflicts")
 export class SkillConflict {

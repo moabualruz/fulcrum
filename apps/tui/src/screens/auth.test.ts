@@ -15,6 +15,14 @@ describe("AuthScreen", () => {
       email: "admin@local",
       role: "owner",
       passkeyCount: 2,
+      sessions: [{
+        id: "session_remote",
+        deviceType: "desktop",
+        browser: "Firefox",
+        ipAddress: "203.0.113.0",
+        lastActiveAt: "2026-05-18T12:00:00.000Z",
+        isCurrent: false,
+      }],
     }).render();
 
     const output = tty.plainText();
@@ -29,6 +37,10 @@ describe("AuthScreen", () => {
     expect(output).toContain("owner");
     expect(output).toContain("Passkeys");
     expect(output).toContain("2 passkeys enrolled");
+    expect(output).toContain("Login Sessions");
+    expect(output).toContain("desktop Firefox");
+    expect(output).toContain("203.0.113.0");
+    expect(output).toContain("fulcrum auth revoke-session");
     expect(output).toContain("Press [q] to go back");
   });
 });

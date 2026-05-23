@@ -3,7 +3,6 @@
 
 import type { RequestHandler } from "@sveltejs/kit";
 import { isDataExchangeFeatureEnabled } from "@integration-hub/interface/data-exchange-features.ts";
-import { exportTasksCsvForContext } from "@work-management/interface/task-csv.ts";
 
 function jsonError(msg: string, status = 400): Response {
   return new Response(JSON.stringify({ error: msg }), {
@@ -12,7 +11,7 @@ function jsonError(msg: string, status = 400): Response {
   });
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async ({ url }) => {
   if (!isDataExchangeFeatureEnabled("export-csv")) {
     return jsonError("Feature export-csv not enabled", 403);
   }
@@ -22,19 +21,5 @@ export const GET: RequestHandler = async ({ url, locals }) => {
     return jsonError(`Unknown entity: ${entity}`);
   }
 
-  const { em, ctx } = await requestScopedApp(locals);
-  const result = await exportTasksCsvForContext(em, ctx);
-
-  return new Response(result.bytes, {
-    headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": `attachment; filename="${entity}.csv"`,
-      "x-entity-count": String(result.entityCount),
-    },
-  });
+  return jsonError("CSV export moved to the public data-portability API", 410);
 };
-
-async function requestScopedApp(locals: App.Locals) {
-  const { requestServiceScope } = await import("$lib/server/request-service-scope");
-  return requestServiceScope(locals);
-}

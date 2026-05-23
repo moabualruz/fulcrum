@@ -7,6 +7,7 @@ import {
   upgradeAllWebSkills,
   upgradeWebSkill,
   type InstallSkillInput,
+  type ConflictResolution,
   type ResolveConflictInput,
   type SkillRow,
   type SkillsWebScope,
@@ -15,6 +16,7 @@ import {
 
 export type {
   InstallSkillInput,
+  ConflictResolution,
   ResolveConflictInput,
   SkillRow,
   SkillsWebScope,

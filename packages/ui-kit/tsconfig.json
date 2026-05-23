@@ -1,0 +1,17 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		"skipLibCheck": true,
+		"types": ["bun", "svelte"],
+		"verbatimModuleSyntax": true,
+		// ui-kit consumes @fulcrum/shared-dto, whose source uses explicit `.ts`
+		// import extensions (repo-wide convention). The svelte-kit base config
+		// does not enable this, so the no-emit package build must opt in.
+		"allowImportingTsExtensions": true
+	},
+	"include": ["src/**/*.ts", "src/**/*.svelte"],
+	"exclude": ["node_modules", "dist"]
+}

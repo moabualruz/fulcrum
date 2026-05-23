@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { removeAuthoredSkills, syncSkills } from "./skills.ts";
 import * as proc from "@platform-core/application/runtime-support/process-runner.ts";
 
-describe("skills sync — Claude Code plugin path", () => {
+describe("skills sync: Claude Code plugin path", () => {
   let testHome: string;
   let origHome: string | undefined;
   let origRepoDir: string | undefined;
@@ -109,7 +109,7 @@ describe("skills sync — Claude Code plugin path", () => {
   });
 });
 
-describe("skills sync — Codex scope and runtime HOME", () => {
+describe("skills sync: Codex scope and runtime HOME", () => {
   let testHome: string;
   let origHome: string | undefined;
   let origRepoDir: string | undefined;

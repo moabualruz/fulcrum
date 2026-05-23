@@ -33,6 +33,9 @@ describe("/inbox public notification API transport", () => {
       if (target.includes("/api/trpc")) throw new Error("unexpected local bridge call");
       calls.push({ url: target, init: init ?? {} });
       if (target.includes("/unread-count")) return Response.json({ count: 2 });
+      if (target.includes("/notifications/rules")) {
+        return Response.json([{ id: "rule-1", name: "Workflow blockers", enabled: true, channels: ["in-app"] }]);
+      }
       if (target.includes("/api/v1/audit")) {
         return Response.json({
           data: [
@@ -104,11 +107,17 @@ describe("/inbox public notification API transport", () => {
         read: false,
         readAt: null,
         createdAt: "2026-05-14T10:00:00.000Z",
+        evidenceHref: "/search?q=task%3Atask-1",
+        evidenceLabel: "task:task-1",
       },
+    ]);
+    expect(result.notificationRules).toEqual([
+      { id: "rule-1", name: "Workflow blockers", enabled: true, channels: ["in-app"] },
     ]);
     expect(calls.map((call) => call.url).sort()).toEqual([
       "http://127.0.0.1:3210/api/v1/audit?orgId=org-1&userId=user-1&limit=20&offset=20",
       "http://127.0.0.1:3210/api/v1/notifications/unread-count?orgId=org-1&userId=user-1",
+      "http://127.0.0.1:3210/api/v1/notifications/rules?orgId=org-1&userId=user-1",
       "http://127.0.0.1:3210/api/v1/notifications?orgId=org-1&userId=user-1",
     ].sort());
     for (const call of calls) {
@@ -133,12 +142,14 @@ describe("/inbox public notification API transport", () => {
       if (target.includes("/api/trpc")) throw new Error("unexpected local bridge call");
       calls.push(target);
       if (target.includes("/unread-count")) return Response.json({ count: 0 });
+      if (target.includes("/notifications/rules")) return Response.json([]);
       return Response.json({ data: [], total: 0 });
     }) as never);
 
     expect(calls.sort()).toEqual([
       "http://localhost/api/v1/audit?orgId=org-1&userId=user-1&limit=20&offset=20",
       "http://localhost/api/v1/notifications/unread-count?orgId=org-1&userId=user-1",
+      "http://localhost/api/v1/notifications/rules?orgId=org-1&userId=user-1",
       "http://localhost/api/v1/notifications?orgId=org-1&userId=user-1",
     ].sort());
   });

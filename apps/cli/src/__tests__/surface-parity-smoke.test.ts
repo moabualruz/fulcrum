@@ -34,6 +34,20 @@ function parseLastJson<T>(captured: Captured): T {
   return JSON.parse(captured.lines.at(-1) ?? "null") as T;
 }
 
+/**
+ * Unwrap the `.result` of the last canonical `fulcrum.cli.v1` envelope line.
+ *
+ * `fulcrum artifact` re-homed under the Ship stage (`prd-cli-ship-stage-parity`)
+ * and now routes `--json` through the shared envelope helper, so its output is
+ * the twelve-key envelope, not a bare payload: the smoke check reads `.result`.
+ */
+function parseLastEnvelopeResult<T>(captured: Captured): T {
+  expect(captured.errors).toEqual([]);
+  expect(captured.exitCodes).toEqual([]);
+  const envelope = JSON.parse(captured.lines.at(-1) ?? "null") as { result: T };
+  return envelope.result;
+}
+
 describe("Surface final cross-surface parity smoke", () => {
   test("representative CLI JSON flows cover tasks, docs, repos, artifacts, and notifications", async () => {
     const tasks = capture();
@@ -45,7 +59,9 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<Array<{ id: string }>>(tasks)[0]?.id).toBe("task-1");
+    // `fulcrum task` verbs wrap `--json` output in the canonical fulcrum.cli.v1
+    // envelope (CLI-TUI-UX §3); the payload is `.result` (prd-cli-build-stage-parity).
+    expect(parseLastJson<{ result: Array<{ id: string }> }>(tasks).result[0]?.id).toBe("task-1");
 
     const createdTask = capture();
     await runTasksCli(["create", "--title", "Surface smoke", "--json"], {
@@ -56,14 +72,18 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<{ title: string }>(createdTask).title).toBe("Surface smoke");
+    expect(parseLastJson<{ result: { title: string } }>(createdTask).result.title).toBe("Surface smoke");
 
     const docs = capture();
     await runDocsCli(["list", "--json"], {
       ...docs,
       caller: { docs: { list: async () => [{ id: "doc-1", title: "Surface contract" }] } } as any,
     });
-    expect(parseLastJson<Array<{ id: string }>>(docs)[0]?.id).toBe("doc-1");
+    // `docs list --json` emits the canonical fulcrum.cli.v1 envelope
+    // (prd-cli-capture-stage-parity); the doc rows live under `.result`.
+    const docsEnvelope = parseLastJson<{ schema: string; result: Array<{ id: string }> }>(docs);
+    expect(docsEnvelope.schema).toBe("fulcrum.cli.v1");
+    expect(docsEnvelope.result[0]?.id).toBe("doc-1");
 
     const repos = capture();
     await runReposCli(["list", "--json"], {
@@ -92,7 +112,7 @@ describe("Surface final cross-surface parity smoke", () => {
       ...artifacts,
       caller: { artifacts: { list: async () => [{ id: "artifact-1", filename: "report.txt" }] } } as any,
     });
-    expect(parseLastJson<Array<{ filename: string }>>(artifacts)[0]?.filename).toBe("report.txt");
+    expect(parseLastEnvelopeResult<Array<{ filename: string }>>(artifacts)[0]?.filename).toBe("report.txt");
 
     const artifactDownload = capture();
     await runArtifactsCli(["download", "artifact-1", "--json"], {
@@ -103,10 +123,10 @@ describe("Surface final cross-surface parity smoke", () => {
         },
       } as any,
     });
-    expect(parseLastJson<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
+    expect(parseLastEnvelopeResult<{ path: string }>(artifactDownload).path).toBe("artifacts/report.txt");
 
     const notifications = capture();
-    await runPillar14Command("notify", ["list", "--unread", "--json"], {
+    await runPillar14Command("notify", ["list", "--unread", "--json-raw"], {
       ...notifications,
       caller: { notify: { list: async () => [{ id: "notification-1", read: false }] } },
     });
@@ -149,7 +169,7 @@ describe("Surface final cross-surface parity smoke", () => {
         body: null,
       },
     ]);
-    expect(parseLastJson<Array<{ id: string }>>(captured)[0]?.id).toBe("artifact-public");
+    expect(parseLastEnvelopeResult<Array<{ id: string }>>(captured)[0]?.id).toBe("artifact-public");
   });
 
   test("artifacts list requires a configured public API without injected caller", async () => {
@@ -163,7 +183,14 @@ describe("Surface final cross-surface parity smoke", () => {
       }) as unknown as typeof fetch,
     });
 
-    expect(captured.errors.join("\n")).toContain("Artifact API caller is not configured");
+    // `--json` keeps the failure inside the canonical envelope: the coded
+    // error sits in the always-array `errors` field, `result` is null.
+    const envelope = JSON.parse(captured.lines.at(-1) ?? "null") as {
+      result: unknown;
+      errors: Array<{ message: string }>;
+    };
+    expect(envelope.result).toBeNull();
+    expect(envelope.errors[0]?.message).toContain("Artifact API caller is not configured");
     expect(captured.exitCodes).toEqual([1]);
   });
 
@@ -179,6 +206,23 @@ describe("Surface final cross-surface parity smoke", () => {
       if (["tasks", "repos"].includes(domain.name)) {
         expect(appImports).toContain(apiModules.get(domain.name));
         expect(tuiSource).toContain(domain.name);
+      }
+    }
+  });
+
+  test("surface parity matrix links major CLI workflows to TUI and API equivalents", () => {
+    const majorDomains = ["projects", "tasks", "docs", "repos", "artifacts", "notifications", "runs", "reports", "planning", "review", "settings"];
+
+    for (const name of majorDomains) {
+      const domain = REQUIRED_SURFACE_DOMAINS.find((candidate) => candidate.name === name);
+      expect(domain, `${name} missing from surface matrix`).toBeDefined();
+      expect(domain!.workflows.length, `${name} missing workflow mapping`).toBeGreaterThan(0);
+
+      for (const workflow of domain!.workflows) {
+        expect(workflow.cli.join("\n"), `${name}:${workflow.name} missing fulcrum CLI command`).toContain("fulcrum ");
+        expect(workflow.tui.length, `${name}:${workflow.name} missing TUI action`).toBeGreaterThan(0);
+        expect(workflow.api.join("\n"), `${name}:${workflow.name} missing public API/service route`).toMatch(/appRouter|Api|Module|public API/);
+        expect(workflow.manualScript.length, `${name}:${workflow.name} missing manual parity script`).toBeGreaterThanOrEqual(3);
       }
     }
   });

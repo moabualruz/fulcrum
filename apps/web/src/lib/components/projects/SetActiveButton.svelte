@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants } from "@fulcrum/ui-kit";
+	import { cn } from "@fulcrum/ui-kit";
 	import { runSetActive } from "./set-active-handler.ts";
 
 	interface Props {
@@ -36,6 +36,6 @@
 	disabled={busy}
 	{onclick}
 	class={cn(
-		buttonVariants({ variant: active ? "default" : "outline", size: "sm" }),
+		buttonVariants({ variant: active ? "primary" : "secondary", size: "sm" }),
 	)}
 >{active ? "Active project" : "Set active"}</button>

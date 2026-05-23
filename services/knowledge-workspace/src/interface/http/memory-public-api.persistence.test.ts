@@ -193,6 +193,12 @@ async function assertMemoryPublicApiRoundTrip(
       body: "Digest summary from persisted memories.",
       projectId: PROJECT_ID,
       since: "2026-05-01T00:00:00.000Z",
+      inputs: {
+        projectId: PROJECT_ID,
+        since: "2026-05-01T00:00:00.000Z",
+        memoryIds: expect.arrayContaining([expect.any(String)]),
+      },
+      outputs: { docId: expect.any(String) },
     });
     await expect(
       dataSource.getRepository(FulcrumDocumentEntity).findOneBy({ sourceType: "memory_digest" }),

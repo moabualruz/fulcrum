@@ -141,6 +141,7 @@ export interface UatCodeReviewFeedbackRun {
 
 export interface GeneratedE2eRegressionTest {
   artifactId: string;
+  generationTaskId: string;
   filename: string;
   path: string;
   runner: GeneratedE2eRegressionRunner;
@@ -151,8 +152,27 @@ export interface GeneratedE2eRegressionTest {
   sourceTaskIds: string[];
   sourceCriteria: string[];
   coverageCases: GeneratedE2eCoverageCase[];
+  manualSimulationChecklist: ManualSimulationChecklist;
+  scenarioData: GeneratedE2eScenarioData;
+  mockPolicy: GeneratedE2eMockPolicy;
   ciCommand: string[];
   ciEnv: Record<string, string>;
+}
+
+export interface GeneratedE2eScenarioData {
+  traceId: string | null;
+  projectId: string;
+  taskId: string;
+  taskTitle: string;
+  taskStatus: string | null;
+  latestReviewEventId: string | null;
+  evidenceArtifactIds: string[];
+  evidenceRunIds: string[];
+}
+
+export interface GeneratedE2eMockPolicy {
+  usesMocks: boolean;
+  impossibilityReason: string | null;
 }
 
 export interface GeneratedE2eCoverageCase {
@@ -163,6 +183,49 @@ export interface GeneratedE2eCoverageCase {
   artifactIds: string[];
   runIds: string[];
   latestReviewEventId: string | null;
+}
+
+export type ManualSimulationChecklistStatus = "pending" | "approved";
+export type ManualSimulationStepResultStatus = "passed" | "failed";
+
+export interface ManualSimulationChecklist {
+  id: string;
+  projectId: string;
+  traceId?: string;
+  status: ManualSimulationChecklistStatus;
+  steps: ManualSimulationStep[];
+  e2eSeed: {
+    sourceTaskIds: string[];
+    sourceCriteria: string[];
+    approvedForE2e: boolean;
+  };
+}
+
+export interface ManualSimulationStep {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  criterion: string;
+  setup: string;
+  action: string;
+  expectedObservation: string;
+  evidenceField: string;
+}
+
+export interface ManualSimulationFeedbackAnnotation {
+  id: string;
+  stepId: string;
+  taskId: string;
+  title: string;
+  body: string;
+  severity: "blocking";
+}
+
+export interface ManualSimulationStepResult {
+  stepId: string;
+  status: ManualSimulationStepResultStatus;
+  evidence: string;
+  feedbackAnnotation?: ManualSimulationFeedbackAnnotation;
 }
 
 export interface UatCodeReviewDecisionOutput {
@@ -219,6 +282,7 @@ export interface ConfiguredUatCodeReviewDecisionOutput {
 export interface RunGeneratedE2eRegressionTestsInput {
   projectId: string;
   traceId?: string;
+  taskIds?: string[];
   runner?: GeneratedE2eRegressionRunner;
   planOnly?: boolean;
 }
@@ -229,12 +293,14 @@ export type GeneratedE2eRegressionRunStatus = "passed" | "failed" | "planned";
 export interface GeneratedE2eRegressionRunOutput {
   projectId: string;
   traceId?: string;
+  runId: string;
   runner: GeneratedE2eRegressionRunner;
   status: GeneratedE2eRegressionRunStatus;
   command: string[];
   cwd?: string;
   testFiles: string[];
   artifactIds: string[];
+  generatedSpecArtifactIds: string[];
   stdout: string;
   stderr: string;
   exitCode: number | null;

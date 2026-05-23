@@ -38,6 +38,7 @@ describe("jobs queue", () => {
       const t0 = Date.now();
       const a = await enqueueJob(db, {
         orgId: org.id, queue: "default", kind: "test",
+        traceId: "trace-claim-a",
         availableAt: new Date(t0 - 3000),
       });
       const b = await enqueueJob(db, {
@@ -62,6 +63,7 @@ describe("jobs queue", () => {
       expect(first?.status).toBe("running");
       expect(first?.locked_by).toBe("worker-1");
       expect(first?.attempts).toBe(1);
+      expect(first?.trace_id).toBe("trace-claim-a");
     } finally {
       await db.close();
     }

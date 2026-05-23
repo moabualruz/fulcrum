@@ -19,6 +19,7 @@ describe("agent session workbench model", () => {
       cwd: "/repo",
       supportsLoadSession: true,
     };
+    state.savedSessions = [state.currentSession];
     state.savedSessions = [
       state.currentSession,
       {
@@ -85,6 +86,8 @@ describe("agent session workbench model", () => {
       busy: true,
       error: null,
       startup: { phase: "starting", elapsed: 0, logs: [] },
+      reconnect: { attempts: 0, maxAttempts: 3, exhausted: false, agentName: "codex" },
+      paused: false,
     });
     expect(model.session).toEqual({
       id: "row-1",
@@ -103,6 +106,10 @@ describe("agent session workbench model", () => {
       canChangeMode: true,
       canChangeModel: true,
       canResume: true,
+      canReconnect: false,
+      canAbort: true,
+      canPauseSession: true,
+      canResumeSession: false,
     });
     expect(model.modes.map((mode) => [mode.id, mode.selected])).toEqual([
       ["planning", true],
@@ -129,6 +136,10 @@ describe("agent session workbench model", () => {
       errors: 0,
     });
     expect(model.resumableSessions.map((session) => session.id)).toEqual(["row-1", "row-2"]);
+    expect(model.sessions.map((session) => [session.id, session.status])).toEqual([
+      ["row-1", "running"],
+      ["row-2", "saved"],
+    ]);
   });
 
   test("reports error and disconnected states without enabling session actions", () => {
@@ -147,7 +158,87 @@ describe("agent session workbench model", () => {
       canChangeMode: false,
       canChangeModel: false,
       canResume: false,
+      canReconnect: false,
+      canAbort: false,
+      canPauseSession: false,
+      canResumeSession: false,
     });
+  });
+
+  test("enables reconnect recovery for a dropped resumable session", () => {
+    const state = createAcpSessionState();
+    state.currentSession = {
+      id: "row-1",
+      agentName: "codex",
+      sessionId: "agent-session-1",
+      title: "Plan work",
+      lastUpdated: 20,
+      cwd: "/repo",
+      supportsLoadSession: true,
+    };
+    state.error = "Connection lost: network down";
+    state.reconnectAttempts = 3;
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.connection.status).toBe("error");
+    expect(model.connection.reconnect).toEqual({ attempts: 3, maxAttempts: 3, exhausted: true, agentName: "codex" });
+    expect(model.controls.canReconnect).toBe(true);
+  });
+
+  test("reports paused sessions with resume control", () => {
+    const state = createAcpSessionState();
+    state.currentSession = {
+      id: "row-1",
+      agentName: "codex",
+      sessionId: "agent-session-1",
+      title: "Plan work",
+      lastUpdated: 20,
+      cwd: "/repo",
+      supportsLoadSession: true,
+    };
+    state.savedSessions = [state.currentSession];
+    state.isConnected = true;
+    state.isPaused = true;
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.connection.paused).toBe(true);
+    expect(model.controls.canAbort).toBe(true);
+    expect(model.controls.canPauseSession).toBe(false);
+    expect(model.controls.canResumeSession).toBe(true);
+    expect(model.sessions[0]?.status).toBe("paused");
+  });
+
+  test("sorts saved sessions by last updated for the session list", () => {
+    const state = createAcpSessionState();
+    state.savedSessions = [
+      {
+        id: "older",
+        agentName: "codex",
+        sessionId: "agent-session-1",
+        title: "Older work",
+        lastUpdated: 10,
+        cwd: "/repo",
+        supportsLoadSession: true,
+      },
+      {
+        id: "newer",
+        agentName: "claude",
+        sessionId: "agent-session-2",
+        title: "Newer work",
+        lastUpdated: 20,
+        cwd: "/repo",
+        supportsLoadSession: false,
+      },
+    ];
+
+    const model = buildSessionWorkbenchModel({ state });
+
+    expect(model.sessions.map((session) => [session.id, session.status])).toEqual([
+      ["newer", "completed"],
+      ["older", "saved"],
+    ]);
   });
 
   test("builds an idle model for surfaces before a live runtime connects", () => {

@@ -2,7 +2,7 @@ import "reflect-metadata";
 
 import { Body, Controller, Delete, ForbiddenException, Get, Inject, InternalServerErrorException, Module, NotFoundException, Post, Query } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -144,6 +144,7 @@ const purgeDescriptor = routeDescriptors.purge!;
 
 Controller("api/v1/telemetry")(TelemetryPublicApiController);
 ApiTags("telemetry")(TelemetryPublicApiController);
+ApiForbiddenResponse({ description: "Caller is not allowed to access telemetry" })(TelemetryPublicApiController);
 
 Get("status")(TelemetryPublicApiController.prototype, "status", statusDescriptor);
 Query()(TelemetryPublicApiController.prototype, "status", 0);

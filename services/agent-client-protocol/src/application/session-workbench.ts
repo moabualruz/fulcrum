@@ -28,8 +28,19 @@ export interface SessionWorkbenchModel {
       elapsed: number;
       logs: string[];
     };
+    reconnect: {
+      attempts: number;
+      maxAttempts: number;
+      exhausted: boolean;
+      agentName: string | null;
+    };
+    paused: boolean;
   };
   session: SessionWorkbenchSession | null;
+  checkpoints: SessionWorkbenchCheckpoint[];
+  pauseQueue: {
+    queuedPromptCount: number;
+  };
   controls: {
     canPrompt: boolean;
     canCancel: boolean;
@@ -38,6 +49,10 @@ export interface SessionWorkbenchModel {
     canChangeMode: boolean;
     canChangeModel: boolean;
     canResume: boolean;
+    canReconnect: boolean;
+    canAbort: boolean;
+    canPauseSession: boolean;
+    canResumeSession: boolean;
   };
   modes: SessionWorkbenchMode[];
   models: SessionWorkbenchModelOption[];
@@ -56,6 +71,7 @@ export interface SessionWorkbenchModel {
     summary: TrafficSummary;
   };
   resumableSessions: SessionWorkbenchSession[];
+  sessions: SessionWorkbenchListItem[];
 }
 
 export interface SessionWorkbenchSession {
@@ -66,6 +82,23 @@ export interface SessionWorkbenchSession {
   cwd: string;
   lastUpdated: number;
   supportsResume: boolean;
+}
+
+export interface SessionWorkbenchListItem extends SessionWorkbenchSession {
+  status: "running" | "paused" | "errored" | "saved" | "completed";
+  current: boolean;
+}
+
+export interface SessionWorkbenchCheckpoint {
+  id: string;
+  sessionId: string;
+  kind: "git" | "file" | "message";
+  ref: string;
+  turnIndex: number;
+  messageUuid: string;
+  label: string | null;
+  createdAt: string;
+  current: boolean;
 }
 
 export interface SessionWorkbenchMode extends SessionMode {
@@ -123,8 +156,25 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
         elapsed: state.startupElapsed,
         logs: [...state.startupLogs],
       },
+      reconnect: {
+        attempts: state.reconnectAttempts,
+        maxAttempts: state.reconnectMaxAttempts,
+        exhausted: state.reconnectAttempts >= state.reconnectMaxAttempts,
+        agentName: session?.agentName ?? null,
+      },
+      paused: state.isPaused,
     },
     session,
+    checkpoints: state.checkpoints
+      .map((checkpoint) => ({
+        ...checkpoint,
+        createdAt: new Date(checkpoint.createdAt).toISOString(),
+        current: checkpoint.id === state.currentCheckpointId,
+      }))
+      .sort((a, b) => b.turnIndex - a.turnIndex || b.createdAt.localeCompare(a.createdAt)),
+    pauseQueue: {
+      queuedPromptCount: state.queuedPromptCount,
+    },
     controls: {
       canPrompt: state.isConnected && session !== null,
       canCancel: state.isConnected && session !== null && state.isLoading,
@@ -133,6 +183,10 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
       canChangeMode: state.isConnected && session !== null && state.availableModes.length > 0,
       canChangeModel: state.isConnected && session !== null && state.availableModels.length > 0,
       canResume: state.resumableSessions.length > 0,
+      canReconnect: !state.isConnected && session !== null && session.supportsResume,
+      canAbort: session !== null && (state.isConnected || state.isLoading || state.isPaused),
+      canPauseSession: state.isConnected && session !== null && !state.isPaused,
+      canResumeSession: session !== null && state.isPaused,
     },
     modes: state.availableModes.map((mode) => ({ ...mode, selected: mode.id === state.currentModeId })),
     models: state.availableModels.map((model) => ({ ...model, selected: model.modelId === state.currentModelId })),
@@ -151,6 +205,9 @@ export function buildSessionWorkbenchModel(input: SessionWorkbenchInput): Sessio
       summary: summarizeTraffic(traffic.entries),
     },
     resumableSessions: state.resumableSessions.map(toWorkbenchSession),
+    sessions: state.savedSessions
+      .map((savedSession) => toWorkbenchListItem(state, savedSession))
+      .sort((a, b) => b.lastUpdated - a.lastUpdated),
   };
 }
 
@@ -178,6 +235,20 @@ function toWorkbenchSession(session: SavedSession): SessionWorkbenchSession {
   };
 }
 
+function toWorkbenchListItem(state: AcpSessionState, session: SavedSession): SessionWorkbenchListItem {
+  const current = state.currentSession?.id === session.id;
+  let status: SessionWorkbenchListItem["status"] = "saved";
+  if (current && state.isPaused) status = "paused";
+  else if (current && state.error) status = "errored";
+  else if (current && state.isConnected) status = "running";
+  else if (!session.supportsLoadSession) status = "completed";
+  return {
+    ...toWorkbenchSession(session),
+    status,
+    current,
+  };
+}
+
 function toWorkbenchPermission(permission: PermissionRequest): SessionWorkbenchPermission {
   return {
     sessionId: permission.sessionId,
@@ -196,8 +267,19 @@ function cloneMessage(message: ChatMessage): ChatMessage {
 function cloneToolCall(toolCall: ToolCallInfo): ToolCallInfo {
   return {
     ...toolCall,
+    args: cloneJson(toolCall.args),
+    result: cloneJson(toolCall.result),
     locations: toolCall.locations?.map((location) => ({ ...location })),
+    diffs: toolCall.diffs?.map((diff) => ({
+      ...diff,
+      lines: diff.lines.map((line) => ({ ...line })),
+    })),
   };
+}
+
+function cloneJson(value: unknown): unknown {
+  if (value === undefined || value === null) return value;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function summarizeToolCalls(toolCalls: ToolCallInfo[]): ToolCallSummary {

@@ -13,6 +13,16 @@ export class RepositoryReadModelListQueryDto extends RepositoryRequestContextDto
   limit?: string | number;
 }
 
+export class RepositoryTreeQueryDto extends RepositoryRequestContextDto {
+  branch?: string;
+  dir?: string;
+}
+
+export class RepositoryFileQueryDto extends RepositoryRequestContextDto {
+  branch?: string;
+  path!: string;
+}
+
 export class RepositoryIdParamsDto {
   id!: string;
 }

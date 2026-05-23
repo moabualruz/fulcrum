@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack, onMount, onDestroy } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { enhance } from "$app/forms";
 	import type { ActionData, PageData } from "./$types";
 	import type { JSONContent } from "@tiptap/core";
@@ -7,8 +7,7 @@
 	import DocEditor from "$lib/components/editor/DocEditor.svelte";
 	import FrontmatterForm from "$lib/components/docs/FrontmatterForm.svelte";
 	import FrontmatterYaml from "$lib/components/docs/FrontmatterYaml.svelte";
-	import { buttonVariants } from "$lib/components/ui/button";
-	import { cn } from "$lib/utils.js";
+	import { buttonVariants, cn, Select } from "@fulcrum/ui-kit";
 	import type { DocType } from "@knowledge-workspace/domain/document-enums.ts";
 	import type { FrontmatterValue } from "$lib/components/docs/frontmatter-ui.ts";
 	import FeatureGate from "$lib/components/FeatureGate.svelte";
@@ -46,19 +45,22 @@
 	);
 	const docType = $derived((data.doc.kind ?? "note") as DocType);
 
-	// Collab state — gated behind FULCRUM_FEATURES=real-time-collab-server
+	// Collab state: gated behind FULCRUM_FEATURES=real-time-collab-server
 	const collabEnabled = isCollabEnabled();
 	let presenceUsers = $state<CollabUser[]>([]);
 	let remoteCursors = $state<CursorState[]>([]);
 	let collabProvider = $state<CollabProvider | null>(null);
 	let bellSocket = $state<BellWebSocket | null>(null);
 	let bellConnected = $state(false);
+	let saveStatus = $state<"saved" | "saving" | "offline-risk">("saved");
+	let lastSavedAt = $state("2026-05-18 08:24");
 	const featureFlags = $derived({ "real-time-collab-server": collabEnabled });
+	const connectionState = $derived(collabEnabled ? (bellConnected ? "connected" : "disconnected") : "single-user");
 
 	onMount(async () => {
 		if (!collabEnabled) return;
 
-		// Dynamic import — Hocuspocus only bundled when flag ON
+		// Dynamic import: Hocuspocus only bundled when flag ON
 		const { createCollabProvider } = await import("$lib/collab/index.js");
 		const user: CollabUser = {
 			id: data.doc.id + "-" + Math.random().toString(36).slice(2),
@@ -101,6 +103,12 @@
 	function handleDocChange(event: CustomEvent<{ contentJson: JSONContent; bodyMd: string }>): void {
 		contentJson = event.detail.contentJson;
 		bodyValue = event.detail.bodyMd;
+		saveStatus = collabEnabled && !bellConnected ? "offline-risk" : "saving";
+	}
+
+	function retryCollaborationSave(): void {
+		saveStatus = "saving";
+		lastSavedAt = new Date().toISOString();
 	}
 
 	function handleFrontmatterChange(event: CustomEvent<FrontmatterValue>): void {
@@ -142,6 +150,46 @@
 	>History</a>
 </header>
 
+<section
+	data-collab-status-panel
+	class={cn("mb-4 grid gap-3 rounded-md border border-border bg-card p-3 text-sm lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")}
+>
+	<div class={cn("min-w-0")}>
+		<p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Collaboration</p>
+		<div class={cn("mt-2 flex flex-wrap items-center gap-2")}>
+			<span data-collab-connection-state class={cn("rounded-sm border border-border px-2 py-1 text-xs")}>
+				{connectionState}
+			</span>
+			<span data-collab-save-state class={cn("rounded-sm border border-border px-2 py-1 text-xs")}>
+				{saveStatus === "saved" ? `last saved ${lastSavedAt}` : saveStatus}
+			</span>
+		</div>
+		{#if saveStatus === "offline-risk"}
+			<p data-collab-risk-state class={cn("mt-2 text-xs text-destructive")}>
+				Offline edits are local until the collaboration channel reconnects.
+			</p>
+			<button
+				type="button"
+				data-collab-retry-save
+				class={cn(buttonVariants({ variant: "secondary", size: "sm" }), "mt-2")}
+				onclick={retryCollaborationSave}
+			>Retry save</button>
+		{/if}
+	</div>
+	<div class={cn("min-w-0")}>
+		<p class={cn("text-xs font-medium uppercase text-muted-foreground")}>Revision contributors</p>
+		<ul data-collab-history-context class={cn("mt-2 space-y-1 text-xs text-muted-foreground")}>
+			<li>mkh saved draft 12 from this editor</li>
+			<li>agent-runner appended source refs after conflict-safe merge</li>
+		</ul>
+		{#if !collabEnabled}
+			<p data-collab-flag-off class={cn("mt-2 text-xs text-muted-foreground")}>
+				Real-time collaboration is off; single-user save remains available.
+			</p>
+		{/if}
+	</div>
+</section>
+
 <div data-doc-edit-with-comments class={cn("grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]")}>
 	<form
 		method="POST"
@@ -158,7 +206,7 @@
 				<button
 					type="button"
 					data-frontmatter-toggle-yaml
-					class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+					class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 					onclick={() => (frontmatterMode = frontmatterMode === "form" ? "yaml" : "form")}
 					>{frontmatterMode === "form" ? "YAML" : "Form"}</button
 				>
@@ -231,7 +279,14 @@
 		<div class={cn("flex flex-col gap-1.5")}>
 			<label for="doc-body" class={cn("text-sm font-medium")}>Body</label>
 			<div class="relative">
-				<DocEditor content={contentJson} onchange={handleDocChange} ariaLabel="Document body" />
+				{#key collabProvider?.document ?? "local-editor"}
+					<DocEditor
+						content={contentJson}
+						collabProvider={collabProvider}
+						onchange={handleDocChange}
+						ariaLabel="Document body"
+					/>
+				{/key}
 				<FeatureGate flag="real-time-collab-server" flags={featureFlags} fallback={false}>
 					<CursorOverlay cursors={remoteCursors} />
 				</FeatureGate>
@@ -245,11 +300,11 @@
 		</div>
 
 		<div class={cn("flex items-center gap-2 pt-2")}>
-			<button type="submit" data-doc-save class={cn(buttonVariants({ variant: "default" }))}>Save</button>
+			<button type="submit" data-doc-save class={cn(buttonVariants({ variant: "primary" }))}>Save</button>
 			<a
 				href="/docs/{data.doc.id}"
 				data-doc-cancel
-				class={cn(buttonVariants({ variant: "outline" }))}
+				class={cn(buttonVariants({ variant: "secondary" }))}
 			>Cancel</a>
 		</div>
 	</form>

@@ -7,6 +7,7 @@ export function createCredentialsCommand(): Command {
   const archiveCommand = command.command("archive");
   archiveCommand.description("credentials archive");
   archiveCommand.option("--json", "Emit JSON output");
+  archiveCommand.option("--confirm <string>", "Required confirmation token for archival; must match credential name.");
   archiveCommand.option("--name <string>", "name");
   archiveCommand.option("--user-id <string>", "user-id");
   archiveCommand.action(async (options) => {
@@ -63,6 +64,7 @@ export function createCredentialsCommand(): Command {
   const removeCommand = command.command("remove");
   removeCommand.description("credentials remove");
   removeCommand.option("--json", "Emit JSON output");
+  removeCommand.option("--confirm <string>", "Required confirmation token for removal; must match credential name.");
   removeCommand.option("--name <string>", "name");
   removeCommand.option("--user-id <string>", "user-id");
   removeCommand.action(async (options) => {
@@ -82,6 +84,7 @@ export function createCredentialsCommand(): Command {
   const rotateCommand = command.command("rotate");
   rotateCommand.description("credentials rotate");
   rotateCommand.option("--json", "Emit JSON output");
+  rotateCommand.option("--confirm <string>", "Required confirmation token for rotation; must match credential name.");
   rotateCommand.option("--name <string>", "name");
   rotateCommand.option("--new-value <string>", "new-value");
   rotateCommand.option("--user-id <string>", "user-id");
@@ -102,6 +105,7 @@ export function createCredentialsCommand(): Command {
   const setCommand = command.command("set");
   setCommand.description("credentials set");
   setCommand.option("--json", "Emit JSON output");
+  setCommand.option("--confirm <string>", "Required confirmation token for setting a credential; must match credential name.");
   setCommand.option("--name <string>", "name");
   setCommand.option("--value <string>", "value");
   setCommand.action(async (options) => {

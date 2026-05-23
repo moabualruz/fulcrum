@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseProductArgs, run as runProduct } from "./product.ts";
@@ -18,6 +18,43 @@ function testIo() {
       exit: (code: number) => exits.push(code),
     },
   };
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runMainProductInit(fulcrumHome: string, json = false): Promise<{
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}> {
+  const proc = Bun.spawn([
+    process.execPath,
+    "run",
+    "apps/cli/src/main.ts",
+    "product",
+    "init",
+    ...(json ? ["--json"] : []),
+  ], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      FULCRUM_HOME: fulcrumHome,
+    },
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { exitCode, stdout, stderr };
 }
 
 describe("fulcrum product CLI", () => {
@@ -68,6 +105,67 @@ describe("fulcrum product CLI", () => {
     }));
   });
 
+  test("product init is idempotent and creates the PGlite data directory", async () => {
+    const prevHome = process.env["FULCRUM_HOME"];
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-product-idempotent-"));
+    const fulcrumHome = join(scratch, ".fulcrum");
+    process.env["FULCRUM_HOME"] = fulcrumHome;
+
+    try {
+      const firstIo = testIo();
+      const coldStartBeganAt = performance.now();
+      await runProduct(["init", "--json"], firstIo.opts);
+      const coldStartMs = performance.now() - coldStartBeganAt;
+      const secondIo = testIo();
+      await runProduct(["init", "--json"], secondIo.opts);
+
+      const first = JSON.parse(firstIo.out[0]!);
+      const second = JSON.parse(secondIo.out[0]!);
+      expect(firstIo.err).toEqual([]);
+      expect(secondIo.err).toEqual([]);
+      expect(firstIo.exits).toEqual([]);
+      expect(secondIo.exits).toEqual([]);
+      expect(first.schemaApplied).toEqual(["bootstrapped"]);
+      expect(second.schemaApplied).toEqual(["already-initialized"]);
+      expect(first.org.created).toBe(true);
+      expect(second.org.created).toBe(false);
+      expect(await exists(join(fulcrumHome, "db", "main"))).toBe(true);
+      expect(coldStartMs).toBeLessThan(5_000);
+    } finally {
+      if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
+      else process.env["FULCRUM_HOME"] = prevHome;
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("main product init --json keeps JSON on stdout and errors off stderr", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "fulcrum-product-main-"));
+    const fulcrumHome = join(scratch, ".fulcrum");
+
+    try {
+      const first = await runMainProductInit(fulcrumHome, true);
+      const second = await runMainProductInit(fulcrumHome, true);
+
+      expect(first.exitCode).toBe(0);
+      expect(second.exitCode).toBe(0);
+      expect(first.stderr).toBe("");
+      expect(second.stderr).toBe("");
+      expect(JSON.parse(first.stdout)).toMatchObject({
+        ok: true,
+        engine: "pglite",
+        org: { slug: "local", created: true },
+      });
+      expect(JSON.parse(second.stdout)).toMatchObject({
+        ok: true,
+        engine: "pglite",
+        org: { slug: "local", created: false },
+      });
+      expect(await exists(join(fulcrumHome, "db", "main"))).toBe(true);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  }, 15_000);
+
   test("product commands use configured public APIs after local init", async () => {
     const prevHome = process.env["FULCRUM_HOME"];
     process.env["FULCRUM_HOME"] = join(await mkdtemp(join(tmpdir(), "fulcrum-product-session-test-")), ".fulcrum");
@@ -86,6 +184,12 @@ describe("fulcrum product CLI", () => {
         calls.push({ url: String(url), init: init ?? {} });
         if (String(url).includes("/workflows/review/final-qa/report")) {
           return Response.json({ status: "ready", traceId: "trace-product" });
+        }
+        if (String(url).includes("/api/v1/sprints/sprint-1/start")) {
+          return Response.json({ id: "sprint-1", status: "active" });
+        }
+        if (String(url).includes("/api/v1/sprints/sprint-1/close")) {
+          return Response.json({ closed: true, sprint: { id: "sprint-1", status: "completed" } });
         }
         if (String(url).includes("/api/v1/tasks")) {
           return Response.json({ id: "task-1", title: "Plan task", status: "pending" });
@@ -116,10 +220,34 @@ describe("fulcrum product CLI", () => {
       expect(reportIo.exits).toEqual([]);
       expect(JSON.parse(reportIo.out[0]!)).toEqual({ status: "ready", traceId: "trace-product" });
 
+      const sprintStartIo = testIo();
+      await runProduct(["sprints", "activate", "sprint-1", "--json"], {
+        ...sprintStartIo.opts,
+        env,
+        fetch: fetchFn,
+      });
+      expect(sprintStartIo.exits).toEqual([]);
+      expect(JSON.parse(sprintStartIo.out[0]!)).toMatchObject({ id: "sprint-1", status: "active" });
+
+      const sprintCloseIo = testIo();
+      await runProduct(["sprints", "complete", "sprint-1", "--json"], {
+        ...sprintCloseIo.opts,
+        env,
+        fetch: fetchFn,
+      });
+      expect(sprintCloseIo.exits).toEqual([]);
+      expect(JSON.parse(sprintCloseIo.out[0]!)).toMatchObject({ closed: true, sprint: { id: "sprint-1" } });
+
       expect(calls.map((call) => call.url)).toEqual([
         "http://127.0.0.1:3210/api/v1/projects?orgId=11111111-1111-4111-8111-111111111111",
         "http://127.0.0.1:3210/api/v1/tasks?orgId=11111111-1111-4111-8111-111111111111&userId=22222222-2222-4222-8222-222222222222",
         "http://127.0.0.1:3210/workflows/review/final-qa/report",
+        "http://127.0.0.1:3210/api/v1/sprints/sprint-1/start",
+        "http://127.0.0.1:3210/api/v1/sprints/sprint-1/close",
+      ]);
+      expect(calls.slice(-2).map((call) => JSON.parse(String(call.init.body)))).toEqual([
+        { id: "sprint-1", orgId: "11111111-1111-4111-8111-111111111111" },
+        { id: "sprint-1", unfinishedDisposition: "backlog", orgId: "11111111-1111-4111-8111-111111111111" },
       ]);
     } finally {
       if (prevHome === undefined) delete process.env["FULCRUM_HOME"];
@@ -131,8 +259,24 @@ describe("fulcrum product CLI", () => {
     const io = testIo();
     await runProduct(["projects", "list", "--json"], io.opts);
 
+    expect(io.out).toEqual([]);
     expect(io.exits).toEqual([1]);
     expect(io.err.join("\n")).toContain("Product API caller is not configured");
+    expect(io.err.join("\n")).toContain("missing FULCRUM_SERVER_URL or FULCRUM_PUBLIC_API_URL");
+    expect(io.err.join("\n")).toContain("export FULCRUM_SERVER_URL and FULCRUM_ORG_ID");
+  });
+
+  test("product project commands name the missing org config when only workflow API is configured", async () => {
+    const io = testIo();
+    await runProduct(["projects", "list", "--json"], {
+      ...io.opts,
+      env: { FULCRUM_SERVER_URL: "http://127.0.0.1:3210" },
+      fetch: (async () => Response.json([])) as unknown as typeof fetch,
+    });
+
+    expect(io.out).toEqual([]);
+    expect(io.exits).toEqual([1]);
+    expect(io.err.join("\n")).toContain("missing FULCRUM_ORG_ID for project API commands");
   });
 
   test("product projects list --json uses caller fixture", async () => {
@@ -443,6 +587,7 @@ describe("fulcrum product CLI", () => {
 
   test("product tasks run-feed --watch streams feedback events as JSON lines", async () => {
     const calls: Array<{ method: string; input: unknown }> = [];
+    let unsubscribed = 0;
     const caller = {
       tasks: {
         create: async () => ({}),
@@ -473,8 +618,17 @@ describe("fulcrum product CLI", () => {
                 events: [{ summary: "Agent run completed", output: "worker complete" }],
                 latestEvent: { summary: "Agent run completed", output: "worker complete" },
               });
+              observer.next({
+                projectId: input["projectId"],
+                traceId: input["traceId"],
+                runGroupId: input["traceId"],
+                executorStatus: { queuedTaskCount: 0, runningTaskCount: 0, succeededTaskCount: 1, failedTaskCount: 0, blockedTaskCount: 0, inReviewCount: 0, active: false },
+                runs: [{ id: "run-1", status: "duplicate-after-inactive" }],
+                events: [],
+                latestEvent: null,
+              });
               observer.complete();
-              return { unsubscribe() {} };
+              return { unsubscribe() { unsubscribed += 1; } };
             },
           };
         },
@@ -504,14 +658,135 @@ describe("fulcrum product CLI", () => {
     expect(io.out).toHaveLength(2);
     expect(JSON.parse(io.out[0]!)).toMatchObject({ traceId: "trace_cli_stream", executorStatus: { active: true } });
     expect(JSON.parse(io.out[1]!)).toMatchObject({ traceId: "trace_cli_stream", executorStatus: { active: false } });
+    expect(io.out.join("\n")).not.toContain("duplicate-after-inactive");
+    expect(unsubscribed).toBe(1);
+  });
+
+  test("product tasks run dispatches single and board batches with agent model prompt and trace", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const caller = {
+      tasks: {
+        create: async () => ({}),
+        list: async () => [],
+        update: async () => ({}),
+        dispatchDependencyRun: async (input: Record<string, unknown>) => {
+          calls.push(input);
+          return {
+            runGroupId: input["traceId"] ?? "generated-trace",
+            scheduledRuns: (input["targetTaskIds"] as string[]).map((taskId, index) => ({
+              id: `run-${index + 1}`,
+              taskId,
+              agent: input["agent"],
+              status: "queued",
+            })),
+            skippedTasks: [],
+            warnings: [],
+          };
+        },
+      },
+    };
+
+    const single = testIo();
+    await runProduct([
+      "tasks",
+      "run",
+      "--task",
+      "task-1",
+      "--agent",
+      "codex",
+      "--trace",
+      "trace-single",
+      "--json",
+    ], { ...single.opts, caller });
+
+    const batch = testIo();
+    await runProduct([
+      "tasks",
+      "run",
+      "--mode",
+      "board",
+      "--tasks",
+      "task-1,task-2",
+      "--agent",
+      "codex",
+      "--model",
+      "gpt-5.4",
+      "--prompt",
+      "Use project context",
+      "--trace",
+      "trace-board",
+      "--json",
+    ], { ...batch.opts, caller });
+
+    expect(single.exits).toEqual([]);
+    expect(batch.exits).toEqual([]);
+    expect(JSON.parse(batch.out[0]!).scheduledRuns).toHaveLength(2);
+    expect(calls).toEqual([
+      {
+        mode: "task",
+        targetTaskIds: ["task-1"],
+        traceId: "trace-single",
+        agent: "codex",
+      },
+      {
+        mode: "board",
+        targetTaskIds: ["task-1", "task-2"],
+        traceId: "trace-board",
+        agent: "codex",
+        model: "gpt-5.4",
+        prompt: "Use project context",
+      },
+    ]);
+  });
+
+  test("product tasks run fails closed for missing agent, missing task, and rejected dispatch", async () => {
+    const caller = {
+      tasks: {
+        create: async () => ({}),
+        list: async () => [],
+        update: async () => ({}),
+        dispatchDependencyRun: async (input: Record<string, unknown>) => {
+          if (input["agent"] === "missing-agent") throw new Error("agent not registered");
+          throw new Error("task not found");
+        },
+      },
+    };
+
+    const missingAgent = testIo();
+    await runProduct(["tasks", "run", "--task", "task-1"], { ...missingAgent.opts, caller });
+    expect(missingAgent.exits).toEqual([2]);
+    expect(missingAgent.err.join("\n")).toContain("missing required flag --agent");
+
+    const missingTask = testIo();
+    await runProduct(["tasks", "run", "--agent", "codex"], { ...missingTask.opts, caller });
+    expect(missingTask.exits).toEqual([2]);
+    expect(missingTask.err.join("\n")).toContain("missing required flag --task or --tasks");
+
+    const rejectedDispatch = testIo();
+    await runProduct(["tasks", "run", "--task", "task-1", "--agent", "missing-agent"], {
+      ...rejectedDispatch.opts,
+      caller,
+    });
+    expect(rejectedDispatch.exits).toEqual([1]);
+    expect(rejectedDispatch.err.join("\n")).toContain("agent not registered");
   });
 
   test("product sprints/search/context use caller fixture", async () => {
+    const sprintCalls: Array<{ method: string; input: unknown }> = [];
     const caller = {
       sprints: {
-        list: async () => [{ id: "s1", name: "Sprint 1", status: "planned" }],
-        start: async ({ id }: { id: string }) => ({ id, status: "active" }),
-        close: async ({ id }: { id: string }) => ({ id, status: "completed" }),
+        list: async (input: Record<string, unknown>) => {
+          sprintCalls.push({ method: "list", input });
+          return [{ id: "s1", name: "Sprint 1", status: "planning" }];
+        },
+        start: async (input: { id: string }) => {
+          sprintCalls.push({ method: "start", input });
+          return { id: input.id, status: "active" };
+        },
+        close: async (input: Record<string, unknown>) => {
+          sprintCalls.push({ method: "close", input });
+          return { closed: true, sprint: { id: input["id"], status: "completed" } };
+        },
       },
       search: {
         query: async () => [{ source_kind: "doc", source_id: "d1", title: "kernel" }],
@@ -535,6 +810,27 @@ describe("fulcrum product CLI", () => {
       expect(io.out.length).toBe(1);
       outputs.push(io.out[0] ?? "{}");
     }
+
+    expect(sprintCalls).toEqual([
+      { method: "list", input: { projectId: "p" } },
+      { method: "start", input: { id: "s1" } },
+      { method: "close", input: { id: "s1", unfinishedDisposition: "backlog" } },
+    ]);
+    expect(JSON.parse(outputs[1]!)).toEqual({ id: "s1", status: "active" });
+    expect(JSON.parse(outputs[2]!)).toMatchObject({ closed: true, sprint: { id: "s1", status: "completed" } });
+  });
+
+  test("product sprints lifecycle refuses fake success without a sprints caller", async () => {
+    const io = testIo();
+
+    await runProduct(["sprints", "activate", "s1", "--json"], {
+      ...io.opts,
+      caller: { projects: { list: async () => [] } },
+    });
+
+    expect(io.out).toEqual([]);
+    expect(io.exits).toEqual([1]);
+    expect(io.err.join("\n")).toContain("sprints caller is not configured");
   });
 
   test("product reports final-qa, uat-handoff, decision, and e2e-run route through reports caller with project and trace", async () => {
@@ -1016,6 +1312,8 @@ describe("fulcrum product CLI", () => {
       "ann-cli-inline",
       "--type",
       "suggestion",
+      "--scope",
+      "line",
       "--file",
       "src/app.ts",
       "--line-start",
@@ -1024,10 +1322,17 @@ describe("fulcrum product CLI", () => {
       "1",
       "--side",
       "new",
+      "--severity",
+      "important",
+      "--decorations",
+      "blocking,if-minor",
       "--text",
       "Inline CLI review note.",
       "--suggested-code",
       "trace()",
+      "--viewed-files",
+      "src/app.ts",
+      "--hide-viewed",
       "--search",
       "trace",
       "--json",
@@ -1167,15 +1472,139 @@ describe("fulcrum product CLI", () => {
         reviewId: "review_cli_session",
         annotationId: "ann-cli-inline",
         type: "suggestion",
+        scope: "line",
         filePath: "src/app.ts",
         lineStart: 1,
         lineEnd: 1,
         side: "new",
         text: "Inline CLI review note.",
         suggestedCode: "trace()",
+        severity: "important",
+        decorations: ["blocking", "if-minor"],
+        viewedFilePaths: ["src/app.ts"],
+        hideViewedFiles: true,
         searchQuery: "trace",
       },
     }]);
+  });
+
+  test("product reports validate decision, type, severity, and review identity errors", async () => {
+    const caller = {
+      reports: {
+        recordUatCodeReviewDecision: async () => ({}),
+        runGeneratedE2eRegressionTests: async () => ({}),
+        saveReviewWorkbenchSession: async () => ({}),
+        loadReviewWorkbenchSession: async () => ({}),
+        appendReviewWorkbenchAnnotation: async () => ({}),
+      },
+    };
+
+    const invalidDecision = testIo();
+    await runProduct([
+      "reports",
+      "decision",
+      "--project",
+      "project-1",
+      "--decision",
+      "skip_review",
+      "--type",
+      "uat",
+    ], { ...invalidDecision.opts, caller });
+    expect(invalidDecision.exits).toEqual([2]);
+    expect(invalidDecision.err.join("\n")).toContain(
+      "--decision must be one of: start_uat, start_code_review, request_changes, approve_without_manual_review",
+    );
+
+    const invalidDecisionType = testIo();
+    await runProduct([
+      "reports",
+      "decision",
+      "--project",
+      "project-1",
+      "--decision",
+      "start_uat",
+      "--type",
+      "plan",
+    ], { ...invalidDecisionType.opts, caller });
+    expect(invalidDecisionType.exits).toEqual([2]);
+    expect(invalidDecisionType.err.join("\n")).toContain("--type must be one of: uat, code_review");
+
+    const invalidRunner = testIo();
+    await runProduct([
+      "reports",
+      "e2e-run",
+      "--project",
+      "project-1",
+      "--runner",
+      "shell",
+    ], { ...invalidRunner.opts, caller });
+    expect(invalidRunner.exits).toEqual([2]);
+    expect(invalidRunner.err.join("\n")).toContain("--runner must be one of: bun, playwright");
+
+    const missingReviewIdentity = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "load",
+      "--project",
+      "project-1",
+    ], { ...missingReviewIdentity.opts, caller });
+    expect(missingReviewIdentity.exits).toEqual([2]);
+    expect(missingReviewIdentity.err.join("\n")).toContain("missing required flag --review or --trace");
+
+    const invalidAnnotation = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "annotate",
+      "--project",
+      "project-1",
+      "--review",
+      "review-1",
+      "--file",
+      "src/app.ts",
+      "--line-start",
+      "1",
+      "--line-end",
+      "2",
+      "--type",
+      "finding",
+      "--scope",
+      "range",
+      "--side",
+      "both",
+      "--severity",
+      "warning",
+    ], { ...invalidAnnotation.opts, caller });
+    expect(invalidAnnotation.exits).toEqual([2]);
+    expect(invalidAnnotation.err.join("\n")).toContain("--type must be one of: comment, suggestion, concern");
+
+    const invalidSeverity = testIo();
+    await runProduct([
+      "reports",
+      "review-session",
+      "annotate",
+      "--project",
+      "project-1",
+      "--review",
+      "review-1",
+      "--file",
+      "src/app.ts",
+      "--line-start",
+      "1",
+      "--line-end",
+      "2",
+      "--type",
+      "concern",
+      "--scope",
+      "line",
+      "--side",
+      "new",
+      "--severity",
+      "warning",
+    ], { ...invalidSeverity.opts, caller });
+    expect(invalidSeverity.exits).toEqual([2]);
+    expect(invalidSeverity.err.join("\n")).toContain("--severity must be one of: important, nit, pre_existing");
   });
 
   test("product workflows acceptance-cycle run delegates full-cycle payload to caller", async () => {
@@ -1384,7 +1813,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: Brief",
             },
-            prompt: "ACP prompt with submit_plan",
+            prompt: "AI Assist prompt with submit_plan",
           };
         },
         startFreeformWorkFromDocs: async (input: unknown) => {
@@ -1403,7 +1832,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: CLI freeform brief",
             },
-            prompt: "ACP start prompt with submit_plan",
+            prompt: "AI Assist start prompt with submit_plan",
           };
         },
         startGuidedAcpPlanningSession: async (input: unknown) => {
@@ -1431,7 +1860,7 @@ describe("fulcrum product CLI", () => {
               selectedDocs: [],
               contextMarkdown: "## Freeform Document: Brief",
             },
-            prompt: "ACP guided session with submit_plan",
+            prompt: "AI Assist guided session with submit_plan",
           };
         },
         restartPlanningCycleFromUpdates: async (input: unknown) => {
@@ -1547,7 +1976,7 @@ describe("fulcrum product CLI", () => {
       "--cwd",
       "/repo",
       "--prompt",
-      "Plan with guided ACP",
+      "Plan with guided AI Assist",
       "--template",
       "prototype-first",
       "--source-docs",
@@ -1655,7 +2084,7 @@ describe("fulcrum product CLI", () => {
       acpSessionId: "acp-guided-cli",
       agentName: "codex",
       cwd: "/repo",
-      userPrompt: "Plan with guided ACP",
+      userPrompt: "Plan with guided AI Assist",
       promptTemplateId: "prototype-first",
       selectedDocIds: ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
       projectId: "99999999-9999-4999-8999-999999999999",
@@ -1694,13 +2123,13 @@ describe("fulcrum product CLI", () => {
       successCriteria: ["Prototype and boilerplate artifacts are visible before approval."],
     }]);
     expect(JSON.parse(io.out[0] ?? "{}")).toMatchObject({
-      prompt: "ACP prompt with submit_plan",
+      prompt: "AI Assist prompt with submit_plan",
       context: { sourceRefs: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }] },
     });
     expect(JSON.parse(startIo.out[0] ?? "{}")).toMatchObject({
       status: "ready_for_planning",
       document: { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc" },
-      prompt: "ACP start prompt with submit_plan",
+      prompt: "AI Assist start prompt with submit_plan",
     });
     expect(JSON.parse(guidedIo.out[0] ?? "{}")).toMatchObject({
       status: "ready_for_acp_prompt",
@@ -1852,7 +2281,7 @@ describe("fulcrum product CLI", () => {
       "--severity", "critical",
       "--json",
     ], { ...io.opts, caller });
-    expect(io.exits).toEqual([1]);
+    expect(io.exits).toEqual([2]);
     expect(io.err[0]).toContain("--severity must be info, warning, or error");
   });
 

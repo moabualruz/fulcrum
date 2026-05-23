@@ -48,6 +48,14 @@ export interface TaskCustomFieldsPublicRow {
   customFields: JsonRecord;
 }
 
+export interface TaskCustomFieldBulkResultRow {
+  taskId: string;
+  fieldDefId: string;
+  ok: boolean;
+  customFields?: JsonRecord;
+  error?: string;
+}
+
 export class CustomFieldStore {
   constructor(private readonly dataSource: DataSource) {}
 
@@ -58,9 +66,15 @@ export class CustomFieldStore {
     entityType?: string;
   }): Promise<CustomFieldPublicRow[]> {
     if (input.entityType && input.entityType !== "task") return [];
+    let projectId: string | undefined = input.projectId;
+    if (input.projectId) {
+      const resolved = await this.resolveProjectId(input.projectId, input.orgId);
+      if (!resolved) return [];
+      projectId = resolved;
+    }
     const where = {
       orgId: input.orgId,
-      ...(input.projectId ? { projectId: input.projectId } : {}),
+      ...(projectId ? { projectId } : {}),
       ...(input.includeArchived ? {} : { archived: false }),
     };
     const fields = await this.fieldRepository().find({
@@ -78,17 +92,18 @@ export class CustomFieldStore {
     configJson?: JsonRecord;
     required?: boolean;
   }): Promise<CustomFieldPublicRow | null> {
-    if (!(await this.projectBelongsToOrg(input.projectId, input.orgId))) return null;
-    const position = await this.nextPosition(input.projectId);
+    const projectId = await this.resolveProjectId(input.projectId, input.orgId);
+    if (!projectId) return null;
+    const position = await this.nextPosition(projectId);
     const field = await this.fieldRepository().save({
       id: randomUUID(),
       orgId: input.orgId,
-      projectId: input.projectId,
+      projectId,
       entityType: "task",
       name: input.name,
-      slug: await this.uniqueSlug(input.projectId, input.name),
+      slug: await this.uniqueSlug(projectId, input.name),
       type: normalizeFieldType(input.type),
-      configJson: objectValue(input.configJson),
+      configJson: validateFieldConfig(input.type, input.configJson),
       required: input.required ?? false,
       archived: false,
       position,
@@ -110,7 +125,12 @@ export class CustomFieldStore {
 
     if (input.name !== undefined) field.name = input.name;
     if (input.type !== undefined) field.type = normalizeFieldType(input.type);
-    if (input.configJson !== undefined) field.configJson = objectValue(input.configJson);
+    if (input.type !== undefined || input.configJson !== undefined) {
+      field.configJson = validateFieldConfig(
+        (input.type ?? field.type) as CustomFieldType,
+        input.configJson ?? field.configJson,
+      );
+    }
     if (input.required !== undefined) field.required = input.required;
     if (input.position !== undefined) field.position = input.position;
     return serializeField(await this.fieldRepository().save(field));
@@ -125,8 +145,9 @@ export class CustomFieldStore {
   }
 
   async reorder(input: { orgId: string; projectId: string; orderedIds: string[] }): Promise<boolean> {
-    if (!(await this.projectBelongsToOrg(input.projectId, input.orgId))) return false;
-    const fields = await this.fieldRepository().findBy({ orgId: input.orgId, projectId: input.projectId });
+    const projectId = await this.resolveProjectId(input.projectId, input.orgId);
+    if (!projectId) return false;
+    const fields = await this.fieldRepository().findBy({ orgId: input.orgId, projectId });
     const byId = new Map(fields.map((field) => [field.id, field]));
     input.orderedIds.forEach((id, position) => {
       const field = byId.get(id);
@@ -142,13 +163,11 @@ export class CustomFieldStore {
     fieldDefId: string;
     value: unknown;
   }): Promise<TaskCustomFieldsPublicRow | null> {
-    const [task, field] = await Promise.all([
-      this.findTaskInOrg(input.orgId, input.taskId),
-      this.fieldRepository().findOneBy({ orgId: input.orgId, id: input.fieldDefId, archived: false }),
-    ]);
+    const task = await this.findTaskInOrg(input.orgId, input.taskId);
+    const field = await this.fieldRepository().findOneBy({ orgId: input.orgId, id: input.fieldDefId, archived: false });
     if (!task || !field || field.projectId !== task.projectId) return null;
 
-    const value = validateFieldValue(field, input.value);
+    const value = validateCustomFieldValue(field, input.value);
     task.customFields = { ...objectValue(task.customFields), [field.slug]: value };
     await this.assertRequiredDependencies({
       orgId: input.orgId,
@@ -159,15 +178,38 @@ export class CustomFieldStore {
     return { taskId: updated.id, customFields: objectValue(updated.customFields) };
   }
 
+  async bulkSetTaskFields(input: {
+    orgId: string;
+    changes: Array<{ taskId: string; fieldDefId: string; value: unknown }>;
+  }): Promise<{ results: TaskCustomFieldBulkResultRow[] }> {
+    const results: TaskCustomFieldBulkResultRow[] = [];
+    for (const change of input.changes) {
+      try {
+        const row = await this.setTaskField({ ...change, orgId: input.orgId });
+        if (!row) {
+          results.push({ taskId: change.taskId, fieldDefId: change.fieldDefId, ok: false, error: "Custom field target not found." });
+          continue;
+        }
+        results.push({ taskId: change.taskId, fieldDefId: change.fieldDefId, ok: true, customFields: row.customFields });
+      } catch (cause) {
+        results.push({
+          taskId: change.taskId,
+          fieldDefId: change.fieldDefId,
+          ok: false,
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
+    }
+    return { results };
+  }
+
   async clearTaskField(input: {
     orgId: string;
     taskId: string;
     fieldDefId: string;
   }): Promise<TaskCustomFieldsPublicRow | null> {
-    const [task, field] = await Promise.all([
-      this.findTaskInOrg(input.orgId, input.taskId),
-      this.fieldRepository().findOneBy({ orgId: input.orgId, id: input.fieldDefId, archived: false }),
-    ]);
+    const task = await this.findTaskInOrg(input.orgId, input.taskId);
+    const field = await this.fieldRepository().findOneBy({ orgId: input.orgId, id: input.fieldDefId, archived: false });
     if (!task || !field || field.projectId !== task.projectId) return null;
     if (field.required) throw new Error(`Custom field ${field.slug} is required.`);
 
@@ -192,11 +234,21 @@ export class CustomFieldStore {
       projectId: input.projectId,
       action: "require",
     });
+    if (rules.length === 0) return;
+    const fields = await this.fieldRepository().findBy({
+      orgId: input.orgId,
+      projectId: input.projectId,
+      archived: false,
+    });
+    const fieldsById = new Map(fields.map((field) => [field.id, field]));
     const missingFields: string[] = [];
     for (const rule of rules) {
-      const sourceValue = input.fieldValues[rule.sourceFieldId];
+      const sourceField = fieldsById.get(rule.sourceFieldId);
+      const targetField = fieldsById.get(rule.targetFieldId);
+      if (!sourceField || !targetField) continue;
+      const sourceValue = input.fieldValues[sourceField.slug];
       if (String(sourceValue ?? "") !== rule.sourceValue) continue;
-      if (isEmptyValue(input.fieldValues[rule.targetFieldId])) missingFields.push(rule.targetFieldId);
+      if (isEmptyValue(input.fieldValues[targetField.slug])) missingFields.push(targetField.slug);
     }
     if (missingFields.length > 0) {
       throw new Error(`Required fields missing due to dependency rules: ${missingFields.join(", ")}`);
@@ -216,6 +268,15 @@ export class CustomFieldStore {
       workspaceId: orgId,
     });
     return Boolean(project);
+  }
+
+  /** Resolve a slug-or-UUID project identifier to the canonical UUID. */
+  private async resolveProjectId(projectId: string, orgId: string): Promise<string | null> {
+    const repo = this.dataSource.getRepository(FulcrumProjectEntity);
+    const byId = await repo.findOneBy({ id: projectId, workspaceId: orgId });
+    if (byId) return byId.id;
+    const bySlug = await repo.findOneBy({ slug: projectId, workspaceId: orgId });
+    return bySlug?.id ?? null;
   }
 
   private async nextPosition(projectId: string): Promise<number> {
@@ -265,7 +326,7 @@ function serializeField(field: WorkManagementCustomFieldDef): CustomFieldPublicR
   };
 }
 
-function validateFieldValue(field: WorkManagementCustomFieldDef, value: unknown): unknown {
+export function validateCustomFieldValue(field: WorkManagementCustomFieldDef, value: unknown): unknown {
   if (field.required && isEmptyValue(value)) throw new Error(`Custom field ${field.slug} is required.`);
   if (isEmptyValue(value)) return value;
 
@@ -318,8 +379,32 @@ function optionSet(field: WorkManagementCustomFieldDef): Set<string> {
   }));
 }
 
-function normalizeFieldType(type: CustomFieldType | string): CustomFieldType {
-  return type === "checkbox" ? "boolean" : type as CustomFieldType;
+export function normalizeFieldType(type: CustomFieldType | string): CustomFieldType {
+  if (["text", "number", "date", "select", "multi_select", "boolean", "checkbox", "user", "url", "json"].includes(type)) {
+    return type as CustomFieldType;
+  }
+  throw new Error(`Unsupported custom field type: ${type}`);
+}
+
+function validateFieldConfig(type: CustomFieldType, value: unknown): JsonRecord {
+  const config = objectValue(value);
+  if (type === "select" || type === "multi_select") {
+    const options = config["options"];
+    if (!Array.isArray(options) || options.length === 0) {
+      throw new Error(`Custom field ${type} config requires a non-empty options array.`);
+    }
+    for (const option of options) {
+      if (typeof option === "string") {
+        if (!option.trim()) throw new Error("Custom field option values must be non-empty strings.");
+        continue;
+      }
+      const record = objectValue(option);
+      if (typeof record["value"] !== "string" || !record["value"].trim()) {
+        throw new Error("Custom field option objects require a non-empty value string.");
+      }
+    }
+  }
+  return config;
 }
 
 function isEmptyValue(value: unknown): boolean {

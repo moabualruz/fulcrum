@@ -16,9 +16,10 @@ import {
   Post,
   Query,
   UnauthorizedException,
+  BadRequestException,
 } from "@nestjs/common";
 import type { DynamicModule as NestDynamicModule } from "@nestjs/common";
-import { ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { IsIn, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 import { DataSource } from "typeorm";
@@ -32,8 +33,9 @@ import {
   type SearchHit,
   type SearchSnapshot,
   SearchPublicStore,
+  SearchPublicValidationError,
 } from "@knowledge-workspace/infrastructure/database/search-public-store.ts";
-import { isFeatureEnabled } from "@platform-core/infrastructure/product-store/features.ts";
+import { isFeatureEnabled } from "@feature-flags/application/env-features.ts";
 import { FULCRUM_WORKFLOW_SPINE_ENTITIES } from "@workflow-coordination/infrastructure/database/workflow-spine.entities.ts";
 
 import { SearchQueryDto, SearchSuggestQueryDto, SearchListSavedQueryDto, SearchCreateSavedRequestDto, SearchSavedIdParamsDto, SearchUpdateSavedRequestDto, SearchDeleteSavedQueryDto, SearchClickBodyDto, SearchSnapshotQueryDto, SearchSuggestionsResponseDto } from "./dto/search.dto.ts";
@@ -127,26 +129,28 @@ export class SearchPublicApiService {
     query: SearchListSavedQueryDto,
     authorization: string | undefined,
   ): Promise<SavedSearchRow[]> {
-    const { application } = await this.requireAuthorizedApplication(authorization);
-    return await application.listSavedSearches({
+    const { application, userId } = await this.requireAuthorizedApplication(authorization);
+    this.assertRequestedUser(query.user_id, userId);
+    return await this.mapApplicationErrors(() => application.listSavedSearches({
       orgId: query.org_id,
       userId: query.user_id,
-    });
+    }));
   }
 
   async createSavedSearch(
     body: SearchCreateSavedRequestDto,
     authorization: string | undefined,
   ): Promise<SavedSearchRow> {
-    const { application } = await this.requireAuthorizedApplication(authorization);
-    return await application.createSavedSearch({
+    const { application, userId } = await this.requireAuthorizedApplication(authorization);
+    this.assertRequestedUser(body.user_id, userId);
+    return await this.mapApplicationErrors(() => application.createSavedSearch({
       orgId: body.org_id,
       userId: body.user_id,
       name: body.name,
       queryJson: body.query_json,
       scope: body.scope,
       projectId: body.project_id,
-    });
+    }));
   }
 
   async updateSavedSearch(
@@ -154,8 +158,9 @@ export class SearchPublicApiService {
     body: SearchUpdateSavedRequestDto,
     authorization: string | undefined,
   ): Promise<SavedSearchRow> {
-    const { application } = await this.requireAuthorizedApplication(authorization);
-    const saved = await application.updateSavedSearch({
+    const { application, userId } = await this.requireAuthorizedApplication(authorization);
+    this.assertRequestedUser(body.user_id, userId);
+    const saved = await this.mapApplicationErrors(() => application.updateSavedSearch({
       orgId: body.org_id,
       userId: body.user_id,
       id: params.id,
@@ -163,7 +168,7 @@ export class SearchPublicApiService {
       queryJson: body.query_json,
       scope: body.scope,
       projectId: body.project_id,
-    });
+    }));
     if (!saved) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
     return saved;
   }
@@ -173,12 +178,13 @@ export class SearchPublicApiService {
     query: SearchDeleteSavedQueryDto,
     authorization: string | undefined,
   ): Promise<void> {
-    const { application } = await this.requireAuthorizedApplication(authorization);
-    const result = await application.deleteSavedSearch({
+    const { application, userId } = await this.requireAuthorizedApplication(authorization);
+    this.assertRequestedUser(query.user_id, userId);
+    const result = await this.mapApplicationErrors(() => application.deleteSavedSearch({
       orgId: query.org_id,
       userId: query.user_id,
       id: params.id,
-    });
+    }));
     if (!result) throw new NotFoundException({ error: "Not found", code: "NOT_FOUND" });
   }
 
@@ -186,8 +192,9 @@ export class SearchPublicApiService {
     body: SearchClickBodyDto,
     authorization: string | undefined,
   ): Promise<SearchClickAck> {
-    const { application } = await this.requireAuthorizedApplication(authorization);
-    return await application.recordClick({
+    const { application, userId } = await this.requireAuthorizedApplication(authorization);
+    this.assertRequestedUser(body.user_id, userId);
+    return await this.mapApplicationErrors(() => application.recordClick({
       orgId: body.org_id,
       userId: body.user_id,
       query: body.query,
@@ -195,7 +202,7 @@ export class SearchPublicApiService {
       resultKind: body.result_kind,
       position: parseOptionalLimit(body.position),
       projectId: body.project_id,
-    });
+    }));
   }
 
   async snapshot(
@@ -227,6 +234,23 @@ export class SearchPublicApiService {
       throw new InternalServerErrorException("Search public API store is not configured.");
     }
     return { application, userId };
+  }
+
+  private assertRequestedUser(requestedUserId: string, authenticatedUserId: string): void {
+    if (requestedUserId !== authenticatedUserId) {
+      throw new UnauthorizedException({ error: "unauthorized" });
+    }
+  }
+
+  private async mapApplicationErrors<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof SearchPublicValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   private storeBackedApplication(): SearchPublicApplication | null {
@@ -435,6 +459,8 @@ if (
 
 Controller("api/v1/search")(SearchPublicApiController);
 ApiTags("search")(SearchPublicApiController);
+ApiBearerAuth()(SearchPublicApiController);
+ApiUnauthorizedResponse({ description: "Bearer token is missing or invalid" })(SearchPublicApiController);
 
 Get()(SearchPublicApiController.prototype, "search", searchDescriptor);
 Query()(SearchPublicApiController.prototype, "search", 0);

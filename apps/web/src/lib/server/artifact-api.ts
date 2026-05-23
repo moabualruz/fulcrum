@@ -10,6 +10,10 @@ export interface PublicArtifact {
   run_id?: string | null;
   taskId?: string | null;
   task_id?: string | null;
+  traceId?: string | null;
+  trace_id?: string | null;
+  docId?: string | null;
+  doc_id?: string | null;
   kind: string;
   title?: string;
   filename?: string | null;
@@ -44,6 +48,8 @@ export function toArtifactRow(artifact: PublicArtifact) {
     project_id: artifact.projectId ?? artifact.project_id ?? null,
     run_id: artifact.runId ?? artifact.run_id ?? null,
     task_id: artifact.taskId ?? artifact.task_id ?? null,
+    trace_id: artifact.traceId ?? artifact.trace_id ?? null,
+    doc_id: artifact.docId ?? artifact.doc_id ?? null,
     kind: artifact.kind,
     title: artifact.title ?? artifact.filename ?? artifact.id,
     body_path: artifact.bodyPath ?? artifact.body_path ?? null,
@@ -52,6 +58,19 @@ export function toArtifactRow(artifact: PublicArtifact) {
     mime: artifact.mime ?? null,
     archived: artifact.archived ?? false,
     created_at: artifact.createdAt ?? artifact.created_at ?? "",
+  };
+}
+
+export function toArtifactDetail(artifact: PublicArtifact) {
+  const row = toArtifactRow(artifact);
+  const createdAt = row.created_at ? new Date(row.created_at).getTime() : Number.NaN;
+  const ageDays = Number.isFinite(createdAt) ? Math.floor((Date.now() - createdAt) / 86_400_000) : 0;
+  return {
+    ...row,
+    filename: artifact.filename ?? row.title,
+    downloadHref: `/artifacts/${artifact.id}/download`,
+    retentionDaysRemaining: Math.max(0, 90 - ageDays),
+    content: typeof artifact.metadataJson?.["content"] === "string" ? artifact.metadataJson["content"] : null,
   };
 }
 

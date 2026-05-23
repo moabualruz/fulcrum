@@ -32,6 +32,12 @@ export interface CredentialPublicRow {
   createdAt: string | null;
 }
 
+export interface CredentialAuditReference {
+  credentialId: string;
+  name: string;
+  provider: string;
+}
+
 export class CredentialPermissionError extends Error {}
 
 export class CredentialStore {
@@ -68,6 +74,18 @@ export class CredentialStore {
     const { key } = await requireMasterKey(input.keyring);
     const value = new TextDecoder().decode(decrypt(key, Buffer.from(credential.encryptedValue, "base64")));
     return { name: credential.name, value };
+  }
+
+  async getPublic(input: {
+    orgId: string;
+    userId: string;
+    name: string;
+    targetUserId?: string;
+  }): Promise<CredentialPublicRow | null> {
+    const targetUserId = input.targetUserId ?? input.userId;
+    await this.assertCanAct(input, targetUserId);
+    const credential = await this.findCredential(input.orgId, targetUserId, input.name);
+    return credential ? serializeCredential(credential) : null;
   }
 
   async set(input: {
@@ -175,6 +193,14 @@ export class CredentialStore {
   private credentialRepository() {
     return this.dataSource.getRepository(FulcrumCredentialEntity);
   }
+}
+
+export function credentialAuditReference(credential: CredentialPublicRow): CredentialAuditReference {
+  return {
+    credentialId: credential.id,
+    name: credential.name,
+    provider: credential.provider,
+  };
 }
 
 function serializeCredential(credential: FulcrumCredential): CredentialPublicRow {

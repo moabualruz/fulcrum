@@ -582,7 +582,7 @@ function packageMcpSpec(
     return {
       transport: "http",
       url,
-      description: `${packageName} package MCP server — ${name}`,
+      description: `${packageName} package MCP server: ${name}`,
       vendor: packageName,
       default_enabled: false,
       auth_env_vars: packageMcpAuthEnvVars(entry),
@@ -596,7 +596,7 @@ function packageMcpSpec(
     return {
       transport: "stdio",
       command: [command, ...args].join(" "),
-      description: `${packageName} package MCP server — ${name}`,
+      description: `${packageName} package MCP server: ${name}`,
       vendor: packageName,
       default_enabled: false,
       auth_env_vars: packageMcpAuthEnvVars(entry),
@@ -729,7 +729,7 @@ async function installClaudePlugin(
   }
   if (!(await which("claude"))) {
     const marketplaceHint = marketplace ? `claude plugin marketplace add ${marketplace} && ` : "";
-    console.log(`     · skip ${label} Claude plugin (claude not on PATH) — manual: ${marketplaceHint}claude plugin install ${pluginName}`);
+    console.log(`     · skip ${label} Claude plugin (claude not on PATH): manual: ${marketplaceHint}claude plugin install ${pluginName}`);
     return;
   }
   let ok = true;
@@ -758,7 +758,7 @@ async function uninstallClaudePlugin(home: string, label: string, pluginName: st
     return;
   }
   if (!(await which("claude"))) {
-    console.log(`     · ${label}: claude not on PATH — manual: claude plugin uninstall ${pluginName}`);
+    console.log(`     · ${label}: claude not on PATH: manual: claude plugin uninstall ${pluginName}`);
     return;
   }
   if (await runBestEffort(["claude", "plugin", "uninstall", pluginName], `${label} Claude plugin uninstall`, false)) {
@@ -850,7 +850,7 @@ async function installGeminiSuperpowers(home: string, dryRun: boolean): Promise<
     return;
   }
   if (!(await which("gemini"))) {
-    console.log(`     · skip Superpowers Gemini extension (gemini not on PATH) — manual: gemini extensions install ${SUPERPOWERS_GEMINI_EXTENSION} --consent --skip-settings`);
+    console.log(`     · skip Superpowers Gemini extension (gemini not on PATH): manual: gemini extensions install ${SUPERPOWERS_GEMINI_EXTENSION} --consent --skip-settings`);
     return;
   }
   await runBestEffort(
@@ -966,7 +966,7 @@ async function installPiSuperpowersPackage(home: string, dryRun: boolean): Promi
     return;
   }
   if (!(await which("pi"))) {
-    console.log("     · pi not on PATH — using Superpowers Pi skill mirror fallback");
+    console.log("     · pi not on PATH: using Superpowers Pi skill mirror fallback");
     await installSuperpowersSkillMirror(home, "pi", dryRun);
     return;
   }

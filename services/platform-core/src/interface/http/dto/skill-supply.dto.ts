@@ -4,6 +4,8 @@ export class SkillSupplyListQueryDto {
 
 export class SkillSupplyInstallDto {
   path!: string;
+  forceConflict?: boolean;
+  conflictResolution?: "alt-version" | "skip" | "upgrade-installed";
 }
 
 export class SkillSupplyUpgradeDto {
@@ -11,12 +13,13 @@ export class SkillSupplyUpgradeDto {
 }
 
 export class SkillSupplySyncDto {
-  fetchUpstream!: boolean;
+  fetchUpstream?: boolean;
 }
 
 export class SkillSupplyResolveConflictDto {
   slug!: string;
-  resolution!: "local" | "upstream" | "editor";
+  resolution!: "local" | "upstream" | "editor" | "force" | "alt-version" | "skip" | "upgrade-installed";
+  altVersion?: string;
 }
 
 export class SkillSupplyOverrideConflictDto {

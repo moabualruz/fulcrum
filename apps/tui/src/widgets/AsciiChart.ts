@@ -42,9 +42,12 @@ export function renderVelocityBar(data: number[], opts: ChartOpts = {}): string 
   const lines: string[] = [];
   for (let i = 0; i < data.length; i++) {
     const val = data[i]!;
-    const barLen = Math.round((val / max) * (width - 10));
+    const prefix = `S${(i + 1).toString().padStart(2)} │`;
+    const suffix = ` ${val}`;
+    const maxBarLen = Math.max(0, width - prefix.length - suffix.length);
+    const barLen = Math.round((val / max) * maxBarLen);
     const bar = "█".repeat(barLen);
-    lines.push(`S${(i + 1).toString().padStart(2)} │${bar} ${val}`);
+    lines.push(`${prefix}${bar}${suffix}`);
   }
   return lines.join("\n");
 }
@@ -73,9 +76,11 @@ export function renderHistogram(data: number[], opts: ChartOpts = {}): string {
   const lines: string[] = [];
   for (let i = 0; i < data.length; i++) {
     const val = data[i]!;
-    const barLen = Math.round((val / max) * (width - 8));
+    const prefix = `${i.toString().padStart(3)} │`;
+    const maxBarLen = Math.max(0, width - prefix.length);
+    const barLen = Math.round((val / max) * maxBarLen);
     const bar = "█".repeat(barLen);
-    lines.push(`${i.toString().padStart(3)} │${bar}`);
+    lines.push(`${prefix}${bar}`);
   }
   return lines.join("\n");
 }

@@ -1,5 +1,5 @@
 /**
- * fulcrum export — export tasks to various formats.
+ * fulcrum export: export tasks to various formats.
  *
  * Usage:
  *   fulcrum export tasks --project <id> --format csv|json [--output <file>]

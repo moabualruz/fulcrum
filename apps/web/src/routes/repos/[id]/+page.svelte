@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { PageData } from "./$types";
 	import { enhance } from "$app/forms";
-	import { buttonVariants } from "$lib/components/ui/button";
+	import { buttonVariants } from "@fulcrum/ui-kit";
 	import RouteSkeleton from "$lib/components/feedback/RouteSkeleton.svelte";
-	import { cn } from "$lib/utils.js";
+	import { cn } from "@fulcrum/ui-kit";
 
 	interface Props {
 		data: PageData;
@@ -42,7 +42,7 @@
 			<button
 				type="submit"
 				data-sync-now
-				class={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+				class={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
 			>Sync now</button>
 		</form>
 	</header>

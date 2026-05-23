@@ -26,7 +26,7 @@ describe("guided ACP planning application action", () => {
     const ctx = { orgId: DEFAULT_ORG_ID, userId: USER_ID, projectId: null };
     const sourceDoc = await createDoc(em, ctx, {
       title: "Replacement workflow brief",
-      bodyMd: "Use ACP selectors, prompt templates, permission review, and traffic visibility.",
+      bodyMd: "Use AI Assist selectors, prompt templates, permission review, and traffic visibility.",
       scope: "global",
       docType: "scratch",
       source: { kind: "trace", id: "trace-guided-acp" },
@@ -69,12 +69,15 @@ describe("guided ACP planning application action", () => {
       "allow_session",
       "deny",
     ]);
-    expect(result.context.sourceRefs).toEqual([{ kind: "doc", id: sourceDoc.id }]);
+    expect(result.context.sourceRefs).toEqual([
+      expect.objectContaining({ kind: "doc", id: sourceDoc.id, sourceId: expect.stringContaining(`doc:${sourceDoc.id}@v`) }),
+    ]);
     expect(result.prompt).toContain("Plan the guided ACP workflow.");
     expect(result.prompt).toContain("Trace ID: trace-guided-acp");
     expect(result.prompt).toContain("## Freeform Document: Replacement workflow brief");
     expect(result.prompt).toContain("submit_plan");
-    expect(result.prompt).toContain("ACP guided session");
+    expect(result.prompt).toContain("AI Assist guided session");
+    expect(result.prompt).toContain("source_id: doc:");
     expect(result.traffic.entries).toEqual([
       expect.objectContaining({
         direction: "out",
@@ -116,7 +119,9 @@ describe("guided ACP planning application action", () => {
         modeId: "planning",
         modelId: "gpt-5.5",
         permissionMode: "review_each_tool",
-        sourceRefs: [{ kind: "doc", id: sourceDoc.id }],
+        sourceRefs: [
+          expect.objectContaining({ kind: "doc", id: sourceDoc.id, sourceId: expect.stringContaining(`doc:${sourceDoc.id}@v`) }),
+        ],
       }),
     }]);
   });

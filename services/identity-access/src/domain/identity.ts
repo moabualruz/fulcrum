@@ -9,7 +9,9 @@ export interface AuthApplicationContext {
 export interface SessionContextDto {
   userId: string;
   orgId: string;
+  activeOrgId: string;
   sessionId: string;
+  sessionExpiresAt: string | null;
   email: string | null;
   role: string | null;
   orgName?: string;
@@ -35,4 +37,3 @@ export interface AcceptInviteOutput {
   userId: string;
   orgId: string;
 }
-

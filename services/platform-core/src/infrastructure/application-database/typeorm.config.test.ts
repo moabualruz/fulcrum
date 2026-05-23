@@ -17,10 +17,13 @@ describe("application database TypeORM config", () => {
     const options = createDataSourceOptions([], {
       FULCRUM_HOME: "/tmp/fulcrum-typeorm-config",
     });
+    const migrations = Array.isArray(options.migrations)
+      ? options.migrations
+      : Object.values(options.migrations ?? {});
 
-    expect(options.migrations).toBeArray();
-    expect(options.migrations).toHaveLength(29);
-    expect(String(options.migrations?.[0])).not.toContain("*");
+    expect(migrations).toBeArray();
+    expect(migrations).toHaveLength(30);
+    expect(String(migrations[0])).not.toContain("*");
   });
 
   test("defaults to local PGlite through the shared database resolver", () => {

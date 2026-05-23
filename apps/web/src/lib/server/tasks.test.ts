@@ -166,7 +166,17 @@ describe("server actions: tasks", () => {
       const events = await readEventsForSubject(db, id);
       const moved = events.find((e) => e.verb === "status_changed");
       expect(moved?.subject_kind).toBe("task");
-      expect(moved?.payload).toEqual({ from: "pending", to: "in_progress", task: id });
+      // `feat(audit): link task state transitions` enriched the status-change
+      // event payload with a causation id and before/after status snapshots
+      // alongside the original from/to/task keys.
+      expect(moved?.payload).toEqual({
+        causation_id: `task:${id}:status:pending->in_progress`,
+        before: { status: "pending" },
+        after: { status: "in_progress" },
+        from: "pending",
+        to: "in_progress",
+        task: id,
+      });
     } finally {
       await db.close();
     }

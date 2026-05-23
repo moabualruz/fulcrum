@@ -13,7 +13,14 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBody,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
 import { IsBoolean, IsIn, IsOptional, IsString, MinLength } from "class-validator";
 
 import {
@@ -26,6 +33,11 @@ import {
 
 import { SkillSupplyListQueryDto, SkillSupplyInstallDto, SkillSupplyUpgradeDto, SkillSupplySyncDto, SkillSupplyResolveConflictDto, SkillSupplyOverrideConflictDto, SkillSupplyOverrideLockDto } from "./dto/skill-supply.dto.ts";
 export { SkillSupplyListQueryDto, SkillSupplyInstallDto, SkillSupplyUpgradeDto, SkillSupplySyncDto, SkillSupplyResolveConflictDto, SkillSupplyOverrideConflictDto, SkillSupplyOverrideLockDto };
+
+export interface SkillSupplySyncResponse extends SkillSupplySyncResult {
+  ok: true;
+  trace_id: string;
+}
 
 export class SkillSupplyPublicApiService {
   constructor(private readonly store: SkillLockStore) {}
@@ -50,8 +62,13 @@ export class SkillSupplyPublicApiService {
     return await this.mapMissing(() => this.store.uninstall({ slug }));
   }
 
-  async sync(input: SkillSupplySyncDto): Promise<SkillSupplySyncResult> {
-    return await this.store.sync(input);
+  async sync(input: SkillSupplySyncDto = {}): Promise<SkillSupplySyncResponse> {
+    const result = await this.store.sync({ fetchUpstream: input.fetchUpstream ?? false });
+    return {
+      ok: true,
+      trace_id: createSkillSupplyTraceId("sync"),
+      ...result,
+    };
   }
 
   async resolveConflict(input: SkillSupplyResolveConflictDto): Promise<SkillSupplyRow> {
@@ -105,7 +122,7 @@ export class SkillSupplyPublicApiController {
     return await this.service.uninstall(slug);
   }
 
-  async sync(body: SkillSupplySyncDto): Promise<SkillSupplySyncResult> {
+  async sync(body: SkillSupplySyncDto = {}): Promise<SkillSupplySyncResponse> {
     return await this.service.sync(body);
   }
 
@@ -136,15 +153,22 @@ IsString()(SkillSupplyListQueryDto.prototype, "orgId");
 
 IsString()(SkillSupplyInstallDto.prototype, "path");
 MinLength(1)(SkillSupplyInstallDto.prototype, "path");
+IsOptional()(SkillSupplyInstallDto.prototype, "forceConflict");
+IsBoolean()(SkillSupplyInstallDto.prototype, "forceConflict");
+IsOptional()(SkillSupplyInstallDto.prototype, "conflictResolution");
+IsIn(["alt-version", "skip", "upgrade-installed"])(SkillSupplyInstallDto.prototype, "conflictResolution");
 
 IsString()(SkillSupplyUpgradeDto.prototype, "slug");
 MinLength(1)(SkillSupplyUpgradeDto.prototype, "slug");
 
+IsOptional()(SkillSupplySyncDto.prototype, "fetchUpstream");
 IsBoolean()(SkillSupplySyncDto.prototype, "fetchUpstream");
 
 IsString()(SkillSupplyResolveConflictDto.prototype, "slug");
 MinLength(1)(SkillSupplyResolveConflictDto.prototype, "slug");
-IsIn(["local", "upstream", "editor"])(SkillSupplyResolveConflictDto.prototype, "resolution");
+IsIn(["local", "upstream", "editor", "force", "alt-version", "skip", "upgrade-installed"])(SkillSupplyResolveConflictDto.prototype, "resolution");
+IsOptional()(SkillSupplyResolveConflictDto.prototype, "altVersion");
+IsString()(SkillSupplyResolveConflictDto.prototype, "altVersion");
 
 IsString()(SkillSupplyOverrideConflictDto.prototype, "conflictId");
 MinLength(1)(SkillSupplyOverrideConflictDto.prototype, "conflictId");
@@ -187,6 +211,7 @@ applyGetRoute("listConflicts", "conflicts", null, "List skill lock conflicts");
 applyPostRoute("install", "", SkillSupplyInstallDto, "Install skill");
 applyPostRoute("upgrade", "upgrade", SkillSupplyUpgradeDto, "Upgrade skills");
 applyPostRoute("sync", "sync", SkillSupplySyncDto, "Sync skills");
+applySyncRecoveryMetadata();
 applyPostRoute("resolveConflict", "conflicts/resolve", SkillSupplyResolveConflictDto, "Resolve skill conflict");
 applyPostRoute("overrideConflict", "conflicts/override", SkillSupplyOverrideConflictDto, "Override skill conflict");
 applyPatchRoute("overrideLock", "lock", SkillSupplyOverrideLockDto, "Override skill lock");
@@ -246,4 +271,36 @@ function applyPatchRoute(
   ApiBody({ type: bodyType })(SkillSupplyPublicApiController.prototype, method, descriptor);
   ApiOperation({ summary })(SkillSupplyPublicApiController.prototype, method, descriptor);
   ApiOkResponse({ description: summary })(SkillSupplyPublicApiController.prototype, method, descriptor);
+}
+
+function applySyncRecoveryMetadata(): void {
+  const descriptor = routeDescriptors.sync!;
+  ApiOkResponse({
+    description: "Skill sync result with trace_id",
+    schema: {
+      type: "object",
+      required: ["ok", "trace_id"],
+      properties: {
+        ok: { type: "boolean" },
+        trace_id: { type: "string" },
+        merged: { type: "array", items: { type: "string" } },
+        conflicts: { type: "array", items: { type: "string" } },
+        errors: { type: "array", items: { type: "string" } },
+      },
+    },
+  })(SkillSupplyPublicApiController.prototype, "sync", descriptor);
+  applySwaggerResponseMetadata(descriptor.value, "400", "Invalid request - Check request schema");
+  applySwaggerResponseMetadata(descriptor.value, "401", "Unauthorized - Reauthenticate");
+  applySwaggerResponseMetadata(descriptor.value, "403", "Forbidden - Check permissions");
+  applySwaggerResponseMetadata(descriptor.value, "404", "Not found - Verify resource exists");
+}
+
+function applySwaggerResponseMetadata(method: (...args: unknown[]) => unknown, status: string, description: string): void {
+  const metadataKey = "swagger/apiResponse";
+  const responses = Reflect.getMetadata(metadataKey, method) ?? {};
+  Reflect.defineMetadata(metadataKey, { ...responses, [status]: { description } }, method);
+}
+
+function createSkillSupplyTraceId(action: string): string {
+  return `trace-skills-${action}-${crypto.randomUUID()}`;
 }

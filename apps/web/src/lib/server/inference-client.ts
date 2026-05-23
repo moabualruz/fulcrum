@@ -104,7 +104,7 @@ export async function listRouting(): Promise<FeatureRouting[]> {
 
 export async function pullModel(modelId: string): Promise<ReadableStream<Uint8Array>> {
   const controller = new AbortController();
-  // No timeout for pull — it's long-running
+  // No timeout for pull: it's long-running
   const res = await fetch(String(new URL(`/models/${encodeURIComponent(modelId)}/pull`, sidecarBaseUrl())), {
     method: "POST",
     signal: controller.signal,
