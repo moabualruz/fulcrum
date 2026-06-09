@@ -17,16 +17,11 @@ export interface Agent {
   baseDir: (home: string) => string;
   /**
    * Root directory whose *existence* signals that this agent is installed on
-   * the current machine.  Used by detection-aware commands (hooks enable/disable)
+   * the current machine. Used by detection-aware commands (hooks enable/disable)
    * to skip writing config files for agents that are absent.
-   *
-   * For most agents rootDir === baseDir.  Gemini is the exception: baseDir is
-   * ~/.gemini but rulesFile targets ~/AGENTS.md (the @-import shared path).
-   * Using ~ as rootDir would mean Gemini is *always* detected, so we use
-   * ~/.gemini as the canonical presence signal instead.
    */
   rootDir: (home: string) => string;
-  /** File that receives the <!-- BEGIN/END FULCRUM RULES --> sentinel splice. */
+  /** File that receives the <!-- BEGIN/END FULCRUM RULES --> loader block. */
   rulesFile: (home: string) => string;
   /**
    * Parent directory for synced skills. Install places skills under
@@ -71,14 +66,10 @@ export const AGENTS: readonly Agent[] = [
     id: "gemini",
     label: "Gemini CLI",
     baseDir:          (home) => `${home}/.gemini`,
-    // rootDir is ~/.gemini — the agent's config root and canonical presence
-    // signal. rulesFile targets ~/AGENTS.md (the @-import destination) which
-    // exists on every machine and would cause false-positive detection.
     rootDir:          (home) => `${home}/.gemini`,
-    // The GEMINI.md in ~/.gemini/ contains `@AGENTS.md` — the actual rules
-    // content lives in ~/AGENTS.md (the @-import target). Doctor checks that
-    // ~/AGENTS.md contains the sentinel to confirm rules are spliced.
-    rulesFile:        (home) => `${home}/AGENTS.md`,
+    // Gemini reads GEMINI.md and supports @ imports. Fulcrum installs the
+    // loader block there with a direct import to ~/.fulcrum/rules/AGENTS.md.
+    rulesFile:        (home) => `${home}/.gemini/GEMINI.md`,
     // Gemini uses an extension namespace: ~/.gemini/extensions/fulcrum-skills/skills/
     skillsDir:        (home) => `${home}/.gemini/extensions/fulcrum-skills/skills`,
     cavemanInstallDir:(home) => `${home}/.gemini/extensions/caveman`,

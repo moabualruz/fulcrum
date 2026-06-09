@@ -1,4 +1,4 @@
-// Tests for the agent registry — ensures structural invariants and that every
+// Tests for the agent registry - ensures structural invariants and that every
 // getter returns a non-empty string for a fake $HOME.
 
 import { describe, expect, test } from "bun:test";
@@ -22,7 +22,7 @@ const EXPECTED_IDS = ["claude-code", "codex", "gemini", "opencode", "pi"] as con
 // 1. All 5 agents present, IDs unique
 // ---------------------------------------------------------------------------
 
-describe("AGENTS registry — presence and uniqueness", () => {
+describe("AGENTS registry - presence and uniqueness", () => {
   test("exactly 5 agents", () => {
     expect(AGENTS.length).toBe(5);
   });
@@ -45,7 +45,7 @@ describe("AGENTS registry — presence and uniqueness", () => {
 // 2. Every getter returns a non-empty string under a fake $HOME
 // ---------------------------------------------------------------------------
 
-describe("AGENTS registry — getters return non-empty strings", () => {
+describe("AGENTS registry - getters return non-empty strings", () => {
   for (const agent of AGENTS) {
     describe(`agent: ${agent.id}`, () => {
       test("baseDir is non-empty", () => {
@@ -93,7 +93,7 @@ describe("AGENTS registry — getters return non-empty strings", () => {
 // 3. Specific path expectations for known agents
 // ---------------------------------------------------------------------------
 
-describe("AGENTS registry — specific path expectations", () => {
+describe("AGENTS registry - specific path expectations", () => {
   const home = FAKE_HOME;
 
   test("Claude Code: rulesFile = ~/.claude/CLAUDE.md", () => {
@@ -121,9 +121,9 @@ describe("AGENTS registry — specific path expectations", () => {
     expect(claude.rootDir(home)).toBe(`${home}/.claude`);
   });
 
-  test("Gemini: rulesFile = ~/AGENTS.md (the @-import target)", () => {
+  test("Gemini: rulesFile = ~/.gemini/GEMINI.md", () => {
     const gemini = AGENTS.find((a) => a.id === "gemini")!;
-    expect(gemini.rulesFile(home)).toBe(`${home}/AGENTS.md`);
+    expect(gemini.rulesFile(home)).toBe(`${home}/.gemini/GEMINI.md`);
   });
 
   test("Gemini: skillsDir = ~/.gemini/extensions/fulcrum-skills/skills", () => {
@@ -137,7 +137,7 @@ describe("AGENTS registry — specific path expectations", () => {
   });
 
   // Gemini's rootDir must be ~/.gemini (not ~) so detection is not a false
-  // positive on every machine (~/AGENTS.md as rootDir would always exist).
+  // positive on every machine.
   test("Gemini: rootDir = ~/.gemini (not ~)", () => {
     const gemini = AGENTS.find((a) => a.id === "gemini")!;
     expect(gemini.rootDir(home)).toBe(`${home}/.gemini`);

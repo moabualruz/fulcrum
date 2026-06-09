@@ -1,6 +1,7 @@
-// fulcrum install: splice rules/AGENTS.md into each agent's primary rules
-// file via <!-- BEGIN/END FULCRUM RULES --> sentinel markers, vendor recipe
-// pool, seed tool-output-policy.toml, and install caveman per detected agent.
+// fulcrum install: publish canonical rules under ~/.fulcrum/rules,
+// install small per-agent loader blocks via <!-- BEGIN/END FULCRUM RULES -->
+// sentinel markers, vendor recipe pool, seed tool-output-policy.toml, and
+// install caveman per detected agent.
 //
 // Idempotent. Non-destructive: user content outside the markers is preserved.
 //
@@ -23,7 +24,7 @@
 //                      default enable step and leave existing MCP state intact.
 //   --enable-all-mcps Enable every builtin MCP after registration.
 
-import { mkdir, readFile, writeFile, copyFile, readdir, stat, appendFile, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, readFile, writeFile, copyFile, readdir, stat, mkdtemp, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { which, run as runProc } from "@platform-core/application/runtime-support/process-runner.ts";
@@ -296,12 +297,6 @@ async function installCavemanFromRepo(
   return true;
 }
 
-/** appendFile wrapper: skips in dry-run. */
-async function ap(path: string, data: string): Promise<void> {
-  if (DRY_RUN) { console.log(`     [dry-run] would append: ${path}`); return; }
-  await appendFile(path, data);
-}
-
 /** runProc wrapper: skips in dry-run. */
 async function runProcDry(cmd: string[]): Promise<{ exit: number; stdout: string; stderr: string }> {
   if (DRY_RUN) {
@@ -362,19 +357,60 @@ export async function spliceSentinel(target: string, body: string, label: string
   }
 }
 
-function rulesTargets(home: string): Array<{ path: string; label: string; alwaysCreate?: boolean }> {
-  // Gemini's rulesFile (~/AGENTS.md) must always be created even if ~/.gemini
-  // doesn't exist yet: that's the @AGENTS.md import source for GEMINI.md.
+type RulesTarget = {
+  agentId: (typeof AGENTS)[number]["id"];
+  path: string;
+  label: string;
+};
+
+function rulesTargets(home: string): RulesTarget[] {
+  return AGENTS.map((a) => ({
+    agentId: a.id,
+    path: a.rulesFile(home),
+    label: a.label,
+  }));
+}
+
+function agentSupportsRulesImport(agentId: RulesTarget["agentId"]): boolean {
+  return agentId === "claude-code" || agentId === "gemini";
+}
+
+function rulesLoaderBody(target: RulesTarget, installedRulesIndex: string): string {
+  if (agentSupportsRulesImport(target.agentId)) {
+    return [
+      "# Fulcrum rule import",
+      "",
+      `@${installedRulesIndex}`,
+    ].join("\n");
+  }
+
   return [
-    ...AGENTS
-      .filter((a) => a.id !== "gemini")
-      .map((a) => ({ path: a.rulesFile(home), label: a.label })),
-    {
-      path: AGENTS.find((a) => a.id === "gemini")!.rulesFile(home),
-      label: "Gemini source (referenced via @AGENTS.md)",
-      alwaysCreate: true,
-    },
-  ];
+    "# Fulcrum rule loader",
+    "",
+    `Before planning, editing, running commands, or answering project-specific questions, read ${installedRulesIndex} with the available file-reading tool.`,
+    "",
+    "That file contains always-on rules plus conditional links to situational markdown files. Read linked files only when their trigger applies.",
+    "",
+    "If the file cannot be read, state the blocker and continue with the user's request using project-local instructions.",
+  ].join("\n");
+}
+
+async function installRulesSourceFiles(root: string): Promise<string> {
+  const src = `${root}/rules`;
+  const index = `${src}/AGENTS.md`;
+  if (!(await exists(index))) {
+    throw new Error(`fulcrum install: cannot find ${index}`);
+  }
+  const dst = `${fulcrumHome()}/rules`;
+  if (DRY_RUN) {
+    console.log(`     [dry-run] would refresh rules source: ${dst}`);
+  } else {
+    await rm(dst, { recursive: true, force: true });
+  }
+  await mk(dst);
+  await copyTree(src, dst);
+  console.log(`     ✓ rules source installed: ${dst}`);
+  return `${dst}/AGENTS.md`;
 }
 
 async function vendorHookSnippets(): Promise<void> {
@@ -437,8 +473,8 @@ const VENDOR_RULE_HEADINGS: ReadonlyArray<string> = [
 /**
  * Strip vendor-installed rule blocks that live OUTSIDE the FULCRUM sentinel.
  *
- * the agent's primary rules file. The same rule text lives in rules/AGENTS.md
- * and is spliced into the FULCRUM sentinel block by `fulcrum install`. The
+ * the agent's primary rules file. The same rule trigger lives in rules/AGENTS.md
+ * and is referenced from the FULCRUM sentinel block by `fulcrum install`. The
  * duplicate outside the sentinel wastes context and can conflict.
  *
  * Rules:
@@ -539,16 +575,15 @@ export function assertNotAgentsPath(p: string, home: string): void {
   }
 }
 
-async function geminiShim(home = process.env["HOME"] ?? ""): Promise<void> {
-  const gemDir = `${home}/.gemini`;
-  if (!(await isDir(gemDir))) return;
-  const file = `${gemDir}/GEMINI.md`;
-  let body = "";
-  if (await exists(file)) body = await readFile(file, "utf8");
-  if (!/@AGENTS\.md/.test(body)) {
-    await ap(file, (body && !body.endsWith("\n") ? "\n" : "") + "@AGENTS.md\n");
-    console.log("     ✓ Gemini GEMINI.md updated with @AGENTS.md import");
-  }
+async function removeExactLineIfPresent(target: string, line: string, label: string): Promise<void> {
+  if (!(await exists(target))) return;
+  const existing = await readFile(target, "utf8");
+  const lines = existing.split(/\r?\n/);
+  const next = lines.filter((l) => l.trim() !== line).join("\n").replace(/\n+$/, "");
+  const out = next ? next + "\n" : "";
+  if (out === existing) return;
+  await wf(target, out);
+  console.log(`     ✓ removed legacy ${label}: ${target}`);
 }
 
 export async function installRulesBlocks(home: string, dryRun = false): Promise<void> {
@@ -556,20 +591,18 @@ export async function installRulesBlocks(home: string, dryRun = false): Promise<
   DRY_RUN = dryRun;
   try {
     const root = repoRoot();
-    const rulesPath = `${root}/rules/AGENTS.md`;
-    if (!(await exists(rulesPath))) {
-      throw new Error(`fulcrum install: cannot find ${rulesPath}`);
-    }
-    const body = (await readFile(rulesPath, "utf8")).trimEnd();
+    const installedRulesIndex = await installRulesSourceFiles(root);
     for (const t of rulesTargets(home)) {
       const parent = dirname(t.path);
-      if (!t.alwaysCreate && !(await isDir(parent)) && !(await exists(t.path))) {
+      if (!(await isDir(parent)) && !(await exists(t.path))) {
         console.log(`     · skip ${t.label} (parent dir not present)`);
         continue;
       }
-      await spliceSentinel(t.path, body, t.label);
+      if (t.agentId === "gemini") {
+        await removeExactLineIfPresent(t.path, "@AGENTS.md", "Gemini @AGENTS.md import");
+      }
+      await spliceSentinel(t.path, rulesLoaderBody(t, installedRulesIndex), t.label);
     }
-    await geminiShim(home);
   } finally {
     DRY_RUN = previousDryRun;
   }

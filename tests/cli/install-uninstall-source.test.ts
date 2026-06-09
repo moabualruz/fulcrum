@@ -165,7 +165,7 @@ describe("install source helpers", () => {
     expect(await text(join(process.env["FULCRUM_HOME"]!, "tool-output-policy.toml"))).toBe("custom = true\n");
   });
 
-  it("previews rule splicing without creating agent files", async () => {
+  it("previews rule loader install without creating agent files", async () => {
     const home = process.env["HOME"]!;
     await mkdir(join(home, ".codex"), { recursive: true });
     await mkdir(join(home, ".gemini"), { recursive: true });
@@ -174,24 +174,32 @@ describe("install source helpers", () => {
     const output = logs.join("\n");
 
     expect(output).toContain("would write");
-    expect(output).toContain("Gemini GEMINI.md updated with @AGENTS.md import");
+    expect(output).toContain("would copy");
     await expect(readFile(join(home, ".codex", "AGENTS.md"), "utf8")).rejects.toThrow();
-    await expect(readFile(join(home, "AGENTS.md"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(home, ".fulcrum", "rules", "AGENTS.md"), "utf8")).rejects.toThrow();
     await expect(readFile(join(home, ".gemini", "GEMINI.md"), "utf8")).rejects.toThrow();
   });
 
-  it("installs only Gemini source when other agent dirs are absent and keeps existing Gemini import single", async () => {
+  it("installs only Gemini loader when other agent dirs are absent and removes legacy Gemini import", async () => {
     const home = process.env["HOME"]!;
     await mkdir(join(home, ".gemini"), { recursive: true });
+    await mkdir(join(process.env["FULCRUM_HOME"]!, "rules"), { recursive: true });
     await writeFile(join(home, ".gemini", "GEMINI.md"), "user settings\n@AGENTS.md\n");
+    await writeFile(join(process.env["FULCRUM_HOME"]!, "rules", "stale.md"), "stale\n");
 
     const logs = await captureLogs(() => installRulesBlocks(home, false));
     const output = logs.join("\n");
 
     expect(output).toContain("skip Claude Code");
     expect(output).toContain("skip Codex CLI");
-    expect(await text(join(home, "AGENTS.md"))).toContain(BEGIN);
-    expect(await text(join(home, ".gemini", "GEMINI.md"))).toBe("user settings\n@AGENTS.md\n");
+    const rulesIndex = join(process.env["FULCRUM_HOME"]!, "rules", "AGENTS.md");
+    expect(await text(rulesIndex)).toContain("Fulcrum rule index");
+    await expect(readFile(join(process.env["FULCRUM_HOME"]!, "rules", "stale.md"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(process.env["FULCRUM_HOME"]!, "rules", "AGENTS.original.md"), "utf8")).rejects.toThrow();
+    const geminiRules = await text(join(home, ".gemini", "GEMINI.md"));
+    expect(geminiRules).toContain(BEGIN);
+    expect(geminiRules).toContain(`@${rulesIndex}`);
+    expect(geminiRules).not.toContain("@AGENTS.md");
     await expect(readFile(join(home, ".codex", "AGENTS.md"), "utf8")).rejects.toThrow();
   });
 
@@ -204,7 +212,7 @@ describe("install source helpers", () => {
     );
   });
 
-  it("installs rules into detected agent homes and Gemini import shim", async () => {
+  it("installs rule loaders into detected agent homes", async () => {
     const home = process.env["HOME"]!;
     await mkdir(join(home, ".codex"), { recursive: true });
     await mkdir(join(home, ".gemini"), { recursive: true });
@@ -212,9 +220,15 @@ describe("install source helpers", () => {
 
     await installRulesBlocks(home, false);
 
-    expect(await text(join(home, ".codex", "AGENTS.md"))).toContain(BEGIN);
-    expect(await text(join(home, "AGENTS.md"))).toContain(BEGIN);
-    expect(await text(join(home, ".gemini", "GEMINI.md"))).toContain("@AGENTS.md");
+    const codexRules = await text(join(home, ".codex", "AGENTS.md"));
+    const rulesIndex = join(process.env["FULCRUM_HOME"]!, "rules", "AGENTS.md");
+    expect(codexRules).toContain(BEGIN);
+    expect(codexRules).toContain("read ");
+    expect(codexRules).toContain(rulesIndex);
+    await expect(readFile(join(home, "AGENTS.md"), "utf8")).rejects.toThrow();
+    const geminiRules = await text(join(home, ".gemini", "GEMINI.md"));
+    expect(geminiRules).toContain(BEGIN);
+    expect(geminiRules).toContain(`@${rulesIndex}`);
   });
 
   it("locks caveman config to ultra and preserves owned-key TOML style JSON ownership", async () => {
@@ -517,6 +531,7 @@ describe("uninstall source helpers", () => {
     await mkdir(join(home, ".gemini", "extensions", "superpowers"), { recursive: true });
     await mkdir(join(home, ".config", "opencode", "packages", "cloudflare"), { recursive: true });
     await mkdir(join(home, ".pi", "agent", "packages", "superpowers"), { recursive: true });
+    await mkdir(join(fulcrumHome, "rules"), { recursive: true });
     await mkdir(join(fulcrumHome, "hooks", "snippets"), { recursive: true });
     await mkdir(join(fulcrumHome, "hooks", "enabled"), { recursive: true });
     await mkdir(join(fulcrumHome, "cache", "pkg"), { recursive: true });
@@ -564,6 +579,7 @@ describe("uninstall source helpers", () => {
     await writeFile(join(home, ".pi", "agent", "packages", "superpowers", "owned.txt"), "owned\n");
     await writeFile(join(fulcrumHome, "state", "global", "mcp-registry.toml"), "");
     await writeFile(join(fulcrumHome, "state", "global", "smoke-test"), "smoke");
+    await writeFile(join(fulcrumHome, "rules", "AGENTS.md"), "managed\n");
 
     const logs = await captureLogs(() => runUninstall(["--purge"]));
     const output = logs.join("\n");
@@ -590,6 +606,7 @@ describe("uninstall source helpers", () => {
     await expect(readFile(join(home, ".gemini", "extensions", "superpowers", "owned.txt"), "utf8")).rejects.toThrow();
     await expect(readFile(join(home, ".config", "opencode", "packages", "cloudflare", "owned.txt"), "utf8")).rejects.toThrow();
     await expect(readFile(join(home, ".pi", "agent", "packages", "superpowers", "owned.txt"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(fulcrumHome, "rules", "AGENTS.md"), "utf8")).rejects.toThrow();
     await expect(readFile(join(fulcrumHome, "hooks", "snippets"), "utf8")).rejects.toThrow();
     await expect(readFile(join(fulcrumHome, "cache", "pkg"), "utf8")).rejects.toThrow();
     await expect(readFile(join(fulcrumHome, "state", "product"), "utf8")).rejects.toThrow();

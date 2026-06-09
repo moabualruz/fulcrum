@@ -192,7 +192,7 @@ interface AgentDir {
   id: string;
   label: string;
   path: string;
-  rulesFile?: string;      // primary file that gets sentinel-spliced
+  rulesFile?: string;      // primary file that gets the Fulcrum loader block
   cavemanPath?: string;    // path whose existence signals caveman is installed
   settingsPath?: string;   // optional settings file (currently Claude Code only)
 }
@@ -326,7 +326,7 @@ async function checkMcpAuthWiring(
  *
  * Errors caught and surfaced as { ok: false, error }. Probe is opt-in
  * because spawning every MCP per agent inflates `fulcrum doctor` runtime
- * by 5–30s.
+ * by 5-30s.
  */
 async function probeMcpInitialize(
   server: { transport: "http" | "stdio"; url?: string; command?: string; auth_env_vars: string[] },
@@ -772,8 +772,8 @@ function printHumanFormat(report: DoctorReport, home: string): void {
       continue;
     }
     const rulesNote = agent.rulesSpliced
-      ? "rules spliced"
-      : "rules NOT spliced: run: fulcrum install";
+      ? "rules loader installed"
+      : "rules loader missing: run: fulcrum install";
     console.log(`  ${pad(agent.label, 14)} ✓  ${rulesNote}`);
   }
   console.log();

@@ -806,6 +806,7 @@ export async function run(args: string[]): Promise<void> {
 
   console.log("2/4  Removing compatibility leftovers");
   await removeExactLine(`${home}/.gemini/GEMINI.md`, "@AGENTS.md", "Gemini @AGENTS.md import");
+  await removePath(`${fulcrumHome()}/rules`, "rules source files");
   const { removeAllHookRegistrations } = await import("./hooks.ts");
   await removeAllHookRegistrations({ dryRun: DRY_RUN });
   await removePath(`${fulcrumHome()}/hooks/snippets`, "hook snippets");
