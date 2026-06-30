@@ -111,6 +111,7 @@ describe("doctor CLI source command", () => {
     expect(report.caveman.defaultMode).toBe("ultra");
     expect(report.piMcpAdapter).toEqual({ adapterPresent: true, deepwikiPresent: true });
     expect(report.tools.length).toBeGreaterThan(20);
+    expect(report.tools.some((tool: { cmd: string }) => tool.cmd === "headroom")).toBe(true);
     expect(report.components.total).toBeGreaterThan(0);
     expect(Array.isArray(report.components.packageParity)).toBe(true);
     expect(Array.isArray(report.mcp.servers)).toBe(true);

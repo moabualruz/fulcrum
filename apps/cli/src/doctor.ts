@@ -180,6 +180,7 @@ const TOOLS: ToolCheck[] = [
   { cmd: "pip-audit",              usedBy: "capabilities.md §5 Python supply-chain audit", required: false },
   { cmd: "cargo-deny",             usedBy: "capabilities.md §5 Rust supply-chain audit", required: false },
   { cmd: "phpstan",                usedBy: "capabilities.md §5 PHP static analysis (tool-output-policy)", required: false },
+  { cmd: "headroom",               usedBy: "Headroom context compression, proxy, and MCP retrieval", required: false },
 
   // Release toolchain.
   { cmd: "git-cliff",              usedBy: "`bun run changelog` and `bun run release`", required: false },

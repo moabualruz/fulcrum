@@ -191,6 +191,17 @@ export const DEFAULT_DART_SERVER: McpServerSpec = {
   agent_visibility: { ...ALL_VISIBLE },
 };
 
+/** Headroom: local context compression and CCR retrieval MCP via `headroom mcp serve`. */
+export const DEFAULT_HEADROOM_SERVER: McpServerSpec = {
+  transport: "stdio",
+  command: "headroom mcp serve",
+  description: "Headroom MCP server: compress, retrieve, and inspect context compression stats",
+  vendor: "headroom",
+  default_enabled: false,
+  auth_env_vars: [],
+  agent_visibility: { ...ALL_VISIBLE },
+};
+
 // ── Canonical ordered list for install/uninstall iteration ──────────────────
 
 /** All builtin MCP servers, keyed by registry name. */
@@ -215,6 +226,8 @@ export const BUILTIN_MCPS: Array<{ name: string; spec: McpServerSpec }> = [
   { name: "cloudflare-ai-gateway",        spec: DEFAULT_CLOUDFLARE_AI_GATEWAY_SERVER },
   // Dart
   { name: "dart",                         spec: DEFAULT_DART_SERVER },
+  // Headroom
+  { name: "headroom",                     spec: DEFAULT_HEADROOM_SERVER },
 ];
 
 export const MINIMAL_DEFAULT_MCPS = ["deepwiki"] as const;

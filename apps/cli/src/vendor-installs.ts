@@ -129,6 +129,113 @@ export async function runTavilyIntegration(dir: string, dryRun: boolean): Promis
   return ok;
 }
 
+async function headroomInstallCommand(): Promise<string[] | null> {
+  if (await which("pipx")) return ["pipx", "install", "headroom-ai[all]"];
+  if (await which("uv")) return ["uv", "tool", "install", "headroom-ai[all]"];
+  if (await which("python3")) return ["python3", "-m", "pip", "install", "--user", "headroom-ai[all]"];
+  return null;
+}
+
+async function cursorDetected(dir: string, home: string): Promise<boolean> {
+  return !!(await which("cursor")) || await isDir(`${dir}/.cursor`) || await isDir(`${home}/.cursor`);
+}
+
+async function antigravityDetected(home: string): Promise<boolean> {
+  return !!(await which("antigravity")) ||
+    await isDir(`${home}/.antigravity`) ||
+    await isDir(`${home}/Library/Application Support/Google/Antigravity`);
+}
+
+async function hermesDetected(home: string): Promise<boolean> {
+  return !!(await which("hermes")) || await isDir(`${home}/.hermes`);
+}
+
+export async function runHeadroomIntegration(
+  dir: string,
+  home: string,
+  dryRun: boolean,
+): Promise<boolean> {
+  const detected = await detectedAgentIds(home);
+  const hasHeadroom = !!(await which("headroom"));
+  let ok = true;
+
+  if (hasHeadroom && !dryRun) {
+    console.log("  · headroom CLI already on PATH");
+  } else {
+    const installCommand = await headroomInstallCommand();
+    if (!installCommand) {
+      if (hasHeadroom) {
+        console.log("  · headroom CLI already on PATH");
+      } else {
+        console.log("  · skip Headroom install: no pipx, uv, or python3 on PATH");
+        ok = false;
+      }
+    } else {
+      ok = await vendorRun(
+        "headroom: install headroom-ai[all]",
+        installCommand,
+        dir,
+        dryRun,
+      ) && ok;
+    }
+  }
+
+  if (!ok && !dryRun && !hasHeadroom) return false;
+
+  ok = await vendorRun(
+    "headroom: mcp install --force",
+    ["headroom", "mcp", "install", "--force"],
+    dir,
+    dryRun,
+  ) && ok;
+
+  if (detected.has("claude-code")) {
+    ok = await vendorRun(
+      "headroom: wrap claude prepare",
+      ["headroom", "wrap", "claude", "--prepare-only", "--no-mcp", "--no-serena"],
+      dir,
+      dryRun,
+    ) && ok;
+  }
+  if (detected.has("codex")) {
+    ok = await vendorRun(
+      "headroom: wrap codex prepare",
+      ["headroom", "wrap", "codex", "--prepare-only", "--no-mcp", "--no-serena"],
+      dir,
+      dryRun,
+    ) && ok;
+  }
+  if (await cursorDetected(dir, home)) {
+    ok = await vendorRun(
+      "headroom: wrap cursor prepare",
+      ["headroom", "wrap", "cursor", "--prepare-only"],
+      dir,
+      dryRun,
+    ) && ok;
+  }
+
+  if (detected.has("gemini")) {
+    console.log("  · Gemini detected; Headroom is exposed through Fulcrum mcp.headroom, no upstream wrap gemini command is published");
+  }
+  if (detected.has("opencode")) {
+    console.log("  · OpenCode detected but Headroom does not ship `headroom wrap opencode`; use Fulcrum mcp.headroom or proxy base URL setup");
+  }
+  if (detected.has("pi")) {
+    console.log("  · Pi detected but Headroom does not ship a Pi wrapper or registrar; use Fulcrum mcp.headroom through pi-mcp-adapter");
+  }
+  if (await antigravityDetected(home)) {
+    console.log("  · Antigravity detected but Headroom only classifies its traffic today; no upstream wrapper or registrar is published");
+  }
+  if (await hermesDetected(home)) {
+    console.log("  · Hermes support is not published by Headroom; no wrapper or registrar is available");
+  }
+
+  if (ok && !dryRun) {
+    recordVendorComponent("package.headroom");
+  }
+  return ok;
+}
+
 export async function runPiMcpAdapterIntegration(
   dir: string,
   home: string,
@@ -190,6 +297,11 @@ export async function runVendorIntegrations(
   // ── tavily skills ─────────────────────────────────────────────────────────
   // Single canonical command covers all 7 tavily skills.
   await runTavilyIntegration(dir, dryRun);
+
+  // ── headroom ─────────────────────────────────────────────────────────────
+  // Install upstream CLI extras, register its MCP, and prepare non-launching
+  // wrap surfaces for detected supported harnesses.
+  await runHeadroomIntegration(dir, home, dryRun);
 
   // ── context7 ─────────────────────────────────────────────────────────────
   // OAuth setup is interactive; never spawn it here. Print deferred note.

@@ -72,6 +72,8 @@ describe("component CLI source command", () => {
     const listJson = await captureRun(["list", "--json"]);
     const list = JSON.parse(listJson.stdout) as Array<{ id: string; defaultProfile: boolean }>;
     expect(list.some((row) => row.id === "rules.global" && row.defaultProfile)).toBe(true);
+    expect(list.some((row) => row.id === "package.headroom" && row.defaultProfile)).toBe(true);
+    expect(list.some((row) => row.id === "mcp.headroom" && row.defaultProfile)).toBe(true);
 
     const infoText = await captureRun(["info", "policy.tool-output"]);
     expect(infoText.stdout).toContain("id: policy.tool-output");
@@ -79,6 +81,12 @@ describe("component CLI source command", () => {
 
     const infoJson = await captureRun(["info", "rules.global", "--json"]);
     expect(JSON.parse(infoJson.stdout).surfaces[0].kind).toBe("sentinel-block");
+
+    const headroomMcp = await captureRun(["info", "mcp.headroom", "--json"]);
+    expect(JSON.parse(headroomMcp.stdout).surfaces[0]).toMatchObject({
+      kind: "mcp-registry-entry",
+      target: "mcp:headroom",
+    });
   });
 
   it("plans scoped and all-agent component operations with validation errors", async () => {

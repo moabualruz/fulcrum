@@ -8,6 +8,8 @@
 - **Surface** — concrete artifact a component installs (`SurfaceSpec`): a sentinel block, a hook registration, an MCP entry, a skill sync, a vendor command, a directory copy, a JSON patch, …
 - **SurfaceKind** — discriminator for adapter dispatch: `sentinel-block | policy-seed | hook-registration | skill-sync | upstream-skill-sync | mcp-registry-entry | mcp-agent-config | vendor-command | directory-copy | file-copy | json-patch | toml-block`.
 - **Profile** — a component whose `profileMembers` reference other components. `profile.default`, `profile.minimal`, `profile.verify-all` are the ship profiles.
+- **Managed package** - package component whose install surface delegates to a vendor-native command and records Fulcrum ownership in the ledger.
+- **Headroom package** - managed package for the `headroom` CLI plus `mcp.headroom`, used for context compression, CCR retrieval, and proxy setup without replacing CodeGraph.
 - **Plan** — ordered list of `ComponentAction`s for a given operation/target/agent set. Produced by the planner; consumed by the executor.
 - **Ledger** — SQLite store at `~/.fulcrum/state/global/components.db` recording component status, surfaces, artifacts, operations, and operation steps.
 - **RemovePolicy** — `managed-only | sentinel-only | keep-modified | purgeable`. Drives whether `remove`/`--purge` deletes a surface.

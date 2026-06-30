@@ -51,6 +51,7 @@ export const MANAGED_PACKAGE_IDS = [
   "package.caveman",
   "package.cloudflare",
   "package.superpowers",
+  "package.headroom",
 ] as const;
 
 export type ManagedPackageId = (typeof MANAGED_PACKAGE_IDS)[number];
@@ -108,6 +109,19 @@ const PACKAGE_DEFINITIONS: Record<ManagedPackageId, Omit<PackageSurfaceManifest,
       },
     },
   },
+  "package.headroom": {
+    packageId: "package.headroom",
+    source: {
+      repo: "https://github.com/chopratejas/headroom",
+      officialInstallers: {
+        "claude-code": ["headroom", "mcp", "install", "--force"],
+        codex: ["headroom", "mcp", "install", "--force"],
+        gemini: ["headroom", "mcp", "install", "--force"],
+        opencode: ["headroom", "mcp", "install", "--force"],
+        pi: ["headroom", "mcp", "install", "--force"],
+      },
+    },
+  },
 };
 
 const FALLBACK_SURFACES: Record<ManagedPackageId, Array<{ kind: PackageSurfaceKind; name: string; relativePath: string }>> = {
@@ -149,6 +163,12 @@ const FALLBACK_SURFACES: Record<ManagedPackageId, Array<{ kind: PackageSurfaceKi
     { kind: "metadata", name: "plugin", relativePath: ".claude-plugin/plugin.json" },
     { kind: "asset", name: "README", relativePath: "README.md" },
   ],
+  "package.headroom": [
+    { kind: "tool", name: "headroom", relativePath: "bin/headroom" },
+    { kind: "mcp", name: "headroom", relativePath: ".mcp.json" },
+    { kind: "metadata", name: "pyproject", relativePath: "pyproject.toml" },
+    { kind: "asset", name: "README", relativePath: "README.md" },
+  ],
 };
 
 export function isKnownPackageId(packageId: string): packageId is ManagedPackageId {
@@ -164,6 +184,8 @@ export function packageCacheSourceRoot(packageId: ManagedPackageId, home: string
       return `${fulcrumHome}/cache/cloudflare-skills`;
     case "package.superpowers":
       return `${fulcrumHome}/cache/superpowers`;
+    case "package.headroom":
+      return `${fulcrumHome}/cache/headroom`;
   }
 }
 

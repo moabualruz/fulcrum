@@ -4,6 +4,7 @@ import { removeUpstreamSkills, syncUpstreamSkills } from "@fulcrum/cli/upstream-
 import { removeCavemanCopies } from "@fulcrum/cli/uninstall.ts";
 import {
   runAstGrepIntegration,
+  runHeadroomIntegration,
   runPiMcpAdapterIntegration,
   runTavilyIntegration,
 } from "@fulcrum/cli/vendor-installs.ts";
@@ -25,6 +26,7 @@ export type VendorComponent =
   | "caveman"
   | "cloudflare"
   | "superpowers"
+  | "headroom"
   | "ast-grep"
   | "tavily"
   | "pi-mcp-adapter";
@@ -41,6 +43,8 @@ export function classifyVendorComponent(componentId: string): VendorComponent {
       return "cloudflare";
     case "package.superpowers":
       return "superpowers";
+    case "package.headroom":
+      return "headroom";
     case "package.ast-grep":
       return "ast-grep";
     case "package.tavily":
@@ -92,6 +96,9 @@ async function installVendor(
       await installSuperpowersPackage({ dryRun, agents });
       return;
       return;
+    case "headroom":
+      await runHeadroomIntegration(process.cwd(), process.env["HOME"] ?? "", dryRun);
+      return;
     case "ast-grep":
       await runAstGrepIntegration(process.cwd(), dryRun);
       return;
@@ -126,6 +133,9 @@ async function removeVendor(
     case "superpowers":
       await uninstallSuperpowersPackage({ dryRun, agents });
       return;
+      return;
+    case "headroom":
+      console.log("     · headroom removal is manual: run `headroom mcp uninstall`, remove wrapper edits if present, then uninstall headroom-ai");
       return;
     case "ast-grep":
       console.log("     · ast-grep removal is manual: npx skills add does not publish a safe uninstall command");

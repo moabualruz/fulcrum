@@ -1,4 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
+import { which } from "@platform-core/application/runtime-support/process-runner.ts";
 import { isEnabled, loadRegistry, type AgentId } from "./mcp-registry.ts";
 import type { AgentSurfaceTarget, PackageSurfaceKind, PackageSurfaceManifest } from "./package-surfaces.ts";
 
@@ -151,6 +152,10 @@ async function exists(path: string): Promise<boolean> {
 }
 
 async function nativePackageInstalled(packageId: string, agentId: AgentId, home: string): Promise<boolean> {
+  if (packageId === "package.headroom") {
+    return (await which("headroom")) !== null;
+  }
+
   if (agentId === "claude-code") {
     const pluginRoots: Record<string, string[]> = {
       "package.caveman": [

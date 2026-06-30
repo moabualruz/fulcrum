@@ -8,6 +8,8 @@
 - **Profile** — named install plan: `minimal`, `rules-only`, `full`. Drives default-profile component plans.
 - **Surface** — agent-visible artifact a package ships: skill, rule, MCP, command, agent, hook, tool, metadata, asset (`S/R/M/C/A/H/T/P`).
 - **Mirror** — full-package copy into a non-native agent's directory tree when no first-party installer exists.
+- **Managed package** - lifecycle component that installs a vendor tool or package through Fulcrum while preserving the vendor's native setup contract.
+- **Headroom package** - managed Headroom CLI/MCP/proxy integration for context compression and CCR retrieval. It complements RTK and CodeGraph; it does not replace CodeGraph's indexed code intelligence.
 - **Parity report** — per-package, per-agent count of source vs installed surfaces, missing targets, unsupported primitives, and source-only leaks.
 - **Disabled config** — native agent config that registers an MCP server in a not-enabled state. Codex/Gemini/OpenCode support; Claude/Pi report `disabledConfigUnsupported`.
 - **Session command** — `fulcrum session ...` controls persisted AI Assist sessions: list, pause, resume, abort, checkpoint, restore, checkpoints, watch. User-facing copy says session, not ACP.
