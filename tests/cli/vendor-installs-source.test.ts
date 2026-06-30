@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
   runAstGrepIntegration,
+  runHeadroomIntegration,
   runPiMcpAdapterIntegration,
   runTavilyIntegration,
   runVendorIntegrations,
@@ -64,6 +65,7 @@ describe("vendor integration installers", () => {
     const output = result.logs.join("\n");
     expect(output).toContain("npx skills add ast-grep/agent-skill");
     expect(output).toContain("npx skills add https://github.com/tavily-ai/skills");
+    expect(output).toContain("headroom mcp install --force");
     expect(output).toContain("pi install npm:pi-mcp-adapter");
     expect(output).toContain("Stripping duplicate vendor rule blocks");
     expect(result.warnings).toEqual([]);
@@ -117,6 +119,33 @@ describe("vendor integration installers", () => {
     expect(dryRun.logs.join("\n")).toContain("pi-mcp-adapter init");
   });
 
+  test("headroom installs the full Python package and prepares supported detected harnesses", async () => {
+    const bin = await withFakePath(["pipx", "hermes"]);
+    process.env.PATH = bin;
+    const home = await mkdtemp(join(tmpdir(), "fulcrum-vendor-headroom-home-"));
+    const dir = await mkdtemp(join(tmpdir(), "fulcrum-vendor-headroom-project-"));
+    await mkdir(join(home, ".claude"), { recursive: true });
+    await mkdir(join(home, ".codex"), { recursive: true });
+    await mkdir(join(home, ".config/opencode"), { recursive: true });
+    await mkdir(join(home, ".pi/agent"), { recursive: true });
+    await mkdir(join(dir, ".cursor"), { recursive: true });
+
+    const result = await captureLogs(async () => {
+      expect(await runHeadroomIntegration(dir, home, true)).toBe(true);
+    });
+
+    const output = result.logs.join("\n");
+    expect(output).toContain("headroom-ai[all]");
+    expect(output).toContain("headroom mcp install --force");
+    expect(output).toContain("headroom wrap claude --prepare-only --no-mcp --no-serena");
+    expect(output).toContain("headroom wrap codex --prepare-only --no-mcp --no-serena");
+    expect(output).toContain("headroom wrap cursor --prepare-only");
+    expect(output).toContain("OpenCode detected but Headroom does not ship `headroom wrap opencode`");
+    expect(output).toContain("Pi detected but Headroom does not ship a Pi wrapper or registrar");
+    expect(output).toContain("Hermes support is not published by Headroom");
+    expect(result.warnings).toEqual([]);
+  });
+
   test("full vendor integration dry-run keeps deferred context7 and strip-rule steps visible", async () => {
     const home = await mkdtemp(join(tmpdir(), "fulcrum-vendor-full-home-"));
     await mkdir(join(home, ".codex"), { recursive: true });
@@ -130,6 +159,7 @@ describe("vendor integration installers", () => {
     expect(output).toContain("Vendor integrations:");
     expect(output).toContain("caveman handled by fulcrum install per-agent mirrors");
     expect(output).toContain("context7: OAuth setup is interactive");
+    expect(output).toContain("headroom mcp install --force");
     expect(output).toContain("Stripping duplicate vendor rule blocks");
   });
 });

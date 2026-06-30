@@ -20,6 +20,8 @@ const DEFAULT_PROFILE_MEMBERS = [
   "skills.upstream",
   "package.cloudflare",
   "package.superpowers",
+  "package.headroom",
+  "mcp.headroom",
   "mcp.deepwiki",
   "mcp.registry",
 ] as const;
@@ -181,6 +183,7 @@ export const ALL_COMPONENTS: readonly ComponentSpec[] = [
   vendorPackageComponent("caveman"),
   vendorPackageComponent("cloudflare"),
   vendorPackageComponent("superpowers"),
+  vendorPackageComponent("headroom"),
   vendorPackageComponent("ast-grep"),
   vendorPackageComponent("tavily"),
   vendorPackageComponent("pi-mcp-adapter"),
@@ -257,6 +260,7 @@ function vendorPackageComponent(
     | "caveman"
     | "cloudflare"
     | "superpowers"
+    | "headroom"
     | "ast-grep"
     | "tavily"
     | "pi-mcp-adapter",
