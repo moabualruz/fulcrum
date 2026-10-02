@@ -75,14 +75,6 @@ Companion artifacts travel with rules:
 - Hook recipes: `hooks/recipes/*.snippet.md`, vendored to `~/.fulcrum/hooks/snippets/` by install. Per-agent registration in `docs/hooks.md`.
 - Skill registry: `skills/SOURCES.md`. `fulcrum skills sync` mirrors `skills/<name>/` to each agent's native namespace, excluding `.original.md` and source-only folders from generated CLI agent mirrors while keeping them in project source.
 
-## Context-mode routing for Codex
-
-Fulcrum project instructions must preserve context-mode routing wherever Codex reads project rules. The root index is `rules/AGENTS.md`; detailed triggers live under `rules/situational/`.
-
-- When context-mode MCP tools are available, use `ctx_batch_execute` for multi-command exploration, `ctx_search` for follow-up lookup, `ctx_execute` / `ctx_execute_file` for analysis or output over 20 lines, and `ctx_fetch_and_index` for web/document fetches.
-- Do not dump raw large shell, grep, file, or HTTP output into the conversation. If context-mode transport is closed, use the smallest bounded shell fallback needed to repair context-mode itself, then retry MCP tools.
-- Keep context-mode routing inside project instruction files when updating Fulcrum rules. Do not remove it from root `AGENTS.md` or `rules/AGENTS.md` during install/uninstall cleanup unless the user explicitly asks to remove context-mode.
-
 ## Conventions that apply to current work
 
 - **Competitive parity audit loop.** Product features iterate: audit competing app → identify gaps → implement additions with stated exit criteria → review → re-audit until parity + surplus. Every iteration updates all source-of-truth docs. Docs, code, and progress never drift out of sync. See tracker `## Competitive Parity Audit Framework` for process and exit criteria.

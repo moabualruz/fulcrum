@@ -43,7 +43,7 @@ When a trigger applies, read the linked file before acting. If this file is inst
 - Search, data tools, HTTP, browser, database, performance, and process handling: `situational/tooling.md`
 - Git workflow, diffs, commits, verification, and security scans: `situational/git-quality-security.md`
 - Architecture, naming, test scope, and persistence or server stack choices: `situational/architecture-and-code.md`
-- Context-mode routing, subagents, output style, and long-session context control: `situational/orchestration-and-context.md`
+- Subagents, output style, and long-session context control: `situational/orchestration-and-context.md`
 
 ## Vendor rule note
 

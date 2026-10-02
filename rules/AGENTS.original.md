@@ -15,12 +15,6 @@
 - Opt-out: user says `normal mode` or `stop caveman` — drop caveman for that session only. Resume next session.
 - Auto-clarity: drop caveman for security warnings, irreversible-action confirmations (`rm -rf`, `--force` push, data deletion), multi-step sequences where order matters. Resume after.
 
-## 0c. Context-mode routing
-
-- **Use context-mode MCP tools when available.** `ctx_batch_execute` for multi-command exploration, `ctx_search` for follow-up lookup, `ctx_execute` / `ctx_execute_file` for analysis or output over 20 lines, `ctx_fetch_and_index` for web/document fetches. Why: raw tool output floods context and closes long-running sessions. Instead-of: unbounded shell, grep, file reads, or HTTP output in chat.
-- **If context-mode transport is closed, repair narrowly then retry.** Use only bounded shell commands needed to inspect config/logs or restore context-mode routing; do not treat failure as permission to dump large raw output. Why: context-mode failures compound when diagnostics bypass the same safeguards. Instead-of: continuing broad exploration with raw shell.
-- **Preserve this rule in Fulcrum installs.** Root `AGENTS.md` and `rules/AGENTS.md` must keep context-mode routing unless user explicitly requests removal. Why: `fulcrum install` distributes `rules/AGENTS.md`; removing this block breaks Codex again after reinstall.
-
 ## 1. Search & discovery
 
 - `rg <pattern>` — when grepping a tree. Instead of `grep -r`, `find ... | xargs grep`. Why: respects `.gitignore`, ~10× faster, no surprise binary matches. Trigger: "find all callers of foo".
